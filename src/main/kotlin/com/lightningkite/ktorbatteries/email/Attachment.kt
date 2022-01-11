@@ -1,4 +1,4 @@
-package com.lightningkite.ktorkmongo.email
+package com.lightningkite.ktorbatteries.email
 
 import java.io.File
 import java.net.URL

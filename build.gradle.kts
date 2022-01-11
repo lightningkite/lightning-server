@@ -22,23 +22,34 @@ repositories {
 val ktorVersion = "1.6.7"
 val kotlinVersion:String by project
 dependencies {
-    api("com.lightningkite.ktorkmongo:server:0.0.3")
+    api("com.lightningkite.ktorkmongo:server:0.0.4-SNAPSHOT")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.5.2")
     implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.2.6")
     implementation("io.ktor:ktor-html-builder:$ktorVersion")
+
     api("io.ktor:ktor-auth:$ktorVersion")
     api("io.ktor:ktor-websockets:$ktorVersion")
     api("io.ktor:ktor-serialization:$ktorVersion")
     api("io.ktor:ktor-server-core:$ktorVersion")
+    api("io.ktor:ktor-auth-jwt:$ktorVersion")
+    api("io.ktor:ktor-server-cio:$ktorVersion")
+
     api("org.litote.kmongo:kmongo-coroutine-serialization:4.4.0")
     implementation("io.ktor:ktor-gson:1.6.7")
 
     implementation("org.apache.commons:commons-email:1.5")
     implementation("org.apache.commons:commons-vfs2:2.9.0")
+    implementation("com.github.abashev:vfs-s3:4.3.5")
 
-    kspTest("com.lightningkite.ktorkmongo:processor:0.0.3")
+    implementation("com.charleskorn.kaml:kaml:0.38.0")
+    implementation("com.lightningkite:kotliner-cli:1.0.1")
+
+    implementation("com.google.firebase:firebase-admin:8.1.0")
+
+    kspTest("com.lightningkite.ktorkmongo:processor:0.0.4-SNAPSHOT")
+
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
     testImplementation("io.ktor:ktor-auth:$ktorVersion")
     testImplementation("io.ktor:ktor-auth-jwt:$ktorVersion")

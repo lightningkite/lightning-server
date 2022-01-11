@@ -1,7 +1,7 @@
-package com.lightningkite.ktorkmongo.email
+package com.lightningkite.ktorbatteries.email
 
 interface EmailClient {
-    fun sendEmail(
+    fun send(
         subject: String,
         to: List<String>,
         message: String,

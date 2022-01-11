@@ -1,4 +1,4 @@
-package com.lightningkite.ktorkmongo.email
+package com.lightningkite.ktorbatteries.email
 
 import kotlinx.html.InputType
 import org.apache.commons.mail.EmailAttachment
@@ -7,7 +7,7 @@ import org.apache.commons.mail.MultiPartEmail
 import org.apache.commons.mail.SimpleEmail
 
 class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
-    override fun sendEmail(
+    override fun send(
         subject: String,
         to: List<String>,
         message: String,

@@ -1,6 +1,10 @@
-package mongo
+package com.lightningkite.ktorbatteries.mongo
 
+import com.lightningkite.ktorbatteries.SetOnce
+import com.lightningkite.ktorbatteries.SettingSingleton
+import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.lightningkite.ktorkmongo.embeddedMongo
+import com.lightningkite.ktorkmongo.fixUuidSerialization
 import com.lightningkite.ktorkmongo.testMongo
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
@@ -13,7 +17,8 @@ import java.net.URI
 
 @kotlinx.serialization.Serializable
 data class MongoSettings(
-    val url: String = "file://${File("./local/mongo").absolutePath}"
+    val url: String = "file://${File("./local/mongo").absolutePath}",
+    val databaseName: String = "default"
 ) {
     val client by lazy {
         when {
@@ -29,10 +34,12 @@ data class MongoSettings(
         }
     }
 
-    companion object {
-        var instance: MongoSettings = MongoSettings()
+    companion object: SettingSingleton<MongoSettings>() {
+        init { fixUuidSerialization() }
     }
-    init { instance = this }
+    init {
+        instance = this
+    }
 }
 
-val mongo get() = MongoSettings.instance.client
+val mongo get() = MongoSettings.instance.client.getDatabase(MongoSettings.instance.databaseName)

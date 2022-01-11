@@ -1,8 +1,8 @@
-package com.lightningkite.ktorkmongo.exceptions
+package com.lightningkite.ktorbatteries.exceptions
 
-import com.lightningkite.ktorkmongo.BadFormatException
-import com.lightningkite.ktorkmongo.UUIDException
-import com.lightningkite.ktorkmongo.settings.GeneralServerSettings
+import com.lightningkite.ktorbatteries.BadFormatException
+import com.lightningkite.ktorbatteries.UUIDException
+import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.mongodb.MongoWriteException
 import io.ktor.application.*
 import io.ktor.features.*

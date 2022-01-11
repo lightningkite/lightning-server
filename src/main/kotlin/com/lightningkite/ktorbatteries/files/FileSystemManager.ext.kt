@@ -1,6 +1,6 @@
-package com.lightningkite.ktorkmongo.files
+package com.lightningkite.ktorbatteries.files
 
-import com.lightningkite.ktorkmongo.settings.GeneralServerSettings
+import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.apache.commons.vfs2.FileObject
@@ -12,7 +12,7 @@ import java.net.URL
 
 
 val FileObject.publicUrl: String
-    get() = if (this is LocalFile) "${GeneralServerSettings.instance.publicUrl}${
+    get() = if (this is LocalFile) "${GeneralServerSettings.instance.publicUrl}user-content/${
         path.toString().replace("\\", "/")
             .removePrefix(FilesSettings.instance.storageUrl.replace("\\", "/").removePrefix("file:///"))
     }"

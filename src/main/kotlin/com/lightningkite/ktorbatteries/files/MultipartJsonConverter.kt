@@ -1,35 +1,22 @@
-package com.lightningkite.ktorkmongo.files
+package com.lightningkite.ktorbatteries.files
 
 import com.lightningkite.ktorkmongo.IsFile
 import io.ktor.application.*
 import io.ktor.features.*
-import io.ktor.gson.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.request.*
-import io.ktor.routing.*
-import io.ktor.serialization.*
 import io.ktor.util.pipeline.*
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.html.InputType
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.descriptors.capturedKClass
-import kotlinx.serialization.encoding.CompositeDecoder.Companion.UNKNOWN_NAME
+import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.json.*
 import kotlinx.serialization.serializer
 import org.apache.commons.vfs2.VFS
-import org.litote.kmongo.json
 import kotlin.io.use
-
-private fun Application.test() {
-    install(ContentNegotiation) {
-        json(Json)
-        register(ContentType.MultiPart.FormData, MultipartJsonConverter(Json))
-    }
-}
 
 class MultipartJsonConverter(val json: Json): ContentConverter {
     val jsonKey = "__json"
@@ -82,11 +69,11 @@ private fun KSerializer<*>.isFile(parts: List<String>): IsFile? {
     var current = this.descriptor
     for(part in parts.dropLast(1)) {
         val index = current.getElementIndex(part)
-        if(index == UNKNOWN_NAME) return null
+        if(index == CompositeDecoder.UNKNOWN_NAME) return null
         current = current.getElementDescriptor(index)
     }
     val index = current.getElementIndex(parts.last())
-    if(index == UNKNOWN_NAME) return null
+    if(index == CompositeDecoder.UNKNOWN_NAME) return null
     val final = current.getElementAnnotations(index)
     return final.asSequence().filterIsInstance<IsFile>().firstOrNull()
 }

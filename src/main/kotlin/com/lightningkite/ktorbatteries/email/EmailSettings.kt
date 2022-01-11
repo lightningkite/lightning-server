@@ -1,5 +1,8 @@
-package com.lightningkite.ktorkmongo.email
+package com.lightningkite.ktorbatteries.email
 
+import com.lightningkite.ktorbatteries.SetOnce
+import com.lightningkite.ktorbatteries.SettingSingleton
+import com.lightningkite.ktorbatteries.files.FilesSettings
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -12,11 +15,11 @@ data class EmailSettings(
         EmailClientOption.SMTP -> SmtpEmailClient(smtp ?: throw IllegalArgumentException("Option SMTP was requested, but no additional information was present under the 'smtp' key."))
     }
 
-    companion object {
-        var instance: EmailSettings = EmailSettings()
-    }
+    companion object: SettingSingleton<EmailSettings>()
     init { instance = this }
 }
+
+val email: EmailClient get() = EmailSettings.instance.emailClient
 
 @Serializable
 enum class EmailClientOption {
