@@ -1,7 +1,5 @@
 package com.lightningkite.ktorbatteries.exceptions
 
-import com.lightningkite.ktorbatteries.BadFormatException
-import com.lightningkite.ktorbatteries.UUIDException
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.mongodb.MongoWriteException
 import io.ktor.application.*

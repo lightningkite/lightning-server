@@ -9,6 +9,7 @@ plugins {
     `maven-publish`
 }
 
+
 val publishVersion:String by project
 version = publishVersion + if(System.getenv("stage") == "true") "" else "-SNAPSHOT"
 
@@ -28,6 +29,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.5.2")
     implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.2.6")
     implementation("io.ktor:ktor-html-builder:$ktorVersion")
+    implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.7.3")
+
+    api("org.jetbrains.kotlinx:kotlinx-serialization-properties:1.3.2")
 
     api("io.ktor:ktor-auth:$ktorVersion")
     api("io.ktor:ktor-websockets:$ktorVersion")
@@ -67,7 +71,10 @@ kotlin {
         kotlin.srcDir("build/generated/ksp/test/kotlin")
     }
 }
-
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    kotlinOptions.freeCompilerArgs += "-opt-in=kotlinx.serialization.ExperimentalSerializationApi"
+    kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
+}
 
 // Signing and publishing
 val props = project.rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { stream ->
