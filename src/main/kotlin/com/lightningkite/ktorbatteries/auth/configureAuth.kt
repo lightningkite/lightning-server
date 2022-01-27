@@ -8,6 +8,7 @@ import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.auth.jwt.*
+import io.ktor.features.*
 import io.ktor.http.*
 import io.ktor.http.auth.*
 import io.ktor.request.*
@@ -28,12 +29,14 @@ fun Authentication.Configuration.quickJwt(
                 ?: run {
                     val value = it.request.queryParameters["jwt"]
                     if (value != null) {
-                        it.response.cookies.append(
-                            name = HttpHeaders.Authorization,
-                            value = value,
-                            domain = AuthSettings.instance.authDomain,
-                            secure = GeneralServerSettings.instance.publicUrl.startsWith("https:"),
-                            extensions = mapOf("SameSite" to "Lax")
+                        it.response.header(
+                            "Set-Cookie", renderSetCookieHeader(
+                                name = HttpHeaders.Authorization,
+                                value = value,
+                                domain = AuthSettings.instance.authDomain,
+                                secure = it.request.headers["X-Scheme"]?.contains("https") == true,
+                                extensions = mapOf("SameSite" to "Lax")
+                            )
                         )
                     }
                     value
