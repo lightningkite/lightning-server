@@ -18,9 +18,12 @@ buildscript {
         mavenLocal()
         mavenCentral()
         google()
+        maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
     }
     dependencies {
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
         classpath("org.jetbrains.dokka:dokka-gradle-plugin:$dokkaVersion")
+        classpath("com.lightningkite:deploy-helpers:master-SNAPSHOT")
     }
 }
+

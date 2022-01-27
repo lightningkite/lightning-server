@@ -4,10 +4,10 @@ import com.lightningkite.ktorbatteries.auto.defaults
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.lightningkite.ktorbatteries.settings.runServer
 import com.lightningkite.ktorbatteries.typed.*
-import com.lightningkite.ktorkmongo.and
-import com.lightningkite.ktorkmongo.eq
+import com.lightningkite.ktorkmongo.*
 import io.ktor.application.*
 import io.ktor.auth.*
+import io.ktor.features.*
 import io.ktor.routing.*
 import kotlinx.html.body
 import kotlinx.html.form
@@ -27,18 +27,28 @@ import kotlin.reflect.typeOf
 class SchemaTest {
     @Test fun quick() {
         println(Json.encodeToSchema(Post.serializer()))
-        println(Json.encodeToSchema(PostModification.serializer()))
     }
     @Test fun params() {
-        println(Properties.encodeToStringMap(PostFields.author eq "Bill" and (PostFields.title eq "Bills Greatest")).entries.joinToString("&") { it.key + "=" + URLEncoder.encode(it.value, Charsets.UTF_8) })
+        println(
+            Properties.encodeToStringMap(Post.chain.condition { (it.author eq "Bill") and (it.title eq "Bills Greatest") }).entries.joinToString(
+                "&"
+            ) { it.key + "=" + URLEncoder.encode(it.value, Charsets.UTF_8) })
     }
     @Test fun makeFormFile() {
         File("./build/out/form.html").apply { parentFile.mkdirs() }.bufferedWriter().use {
             it.appendHTML().html {
                 head { this.includeFormScript() }
                 body {
-                    form("testThing", "testThing", Post(author = "Jack Knife", title = "101 Ways to Cut", content = "Leftways\nRightways\nDownwards\nAnd more!"))
-                    form<PostModification>("testThingChange", "testThingChange", collapsed = true )
+                    form(
+                        "testThing",
+                        "testThing",
+                        Post(
+                            author = "Jack Knife",
+                            title = "101 Ways to Cut",
+                            content = "Leftways\nRightways\nDownwards\nAnd more!"
+                        )
+                    )
+                    form<Modification<Post>>("testThingChange", "testThingChange", collapsed = true)
                 }
             }
         }
@@ -56,18 +66,30 @@ class SchemaTest {
                     this.post { user, subj: String -> notes.add(subj) }
 
                     route.subject("{id}") { user: TestPrincipal? ->
-                        notes[parameters["id"]!!.toInt()]
+                        parameters["id"]!!.toInt()
                     }.apply {
-                        get { _ -> this }
-                        deleteParams { user, subj: String -> notes.add(subj) }
+                        get { _ -> notes[this] }
+                        delete { user -> notes.removeAt(this) }
                     }
                 }
                 route("api-docs") {
                     apiHelp()
+                }
+
+                subject("mongoModel") { user: TestPrincipal? -> Post.mongo }.apply {
+                    get { _, params: Query<Post> -> this.query(params) }
+                    post("query") { _, params: Query<Post> -> this.query(params) }
+                    post { _, params: Post -> this.insertOne(params) }
+                    patch { _, params: MassModification<Post> -> this.updateMany(params) }
+                    subject("{id}") { user: TestPrincipal? -> parameters["id"]!!.toUUID() }.apply {
+                        get { _ -> Post.mongo.get(this) ?: throw NotFoundException() }
+                        patch { _, params: Modification<Post> -> Post.mongo.updateOneById(this, params) }
+                    }
                 }
             }
         }
     }
 }
 
-private class TestPrincipal: Principal
+
+private class TestPrincipal : Principal

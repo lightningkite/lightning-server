@@ -4,15 +4,20 @@ import com.lightningkite.ktorbatteries.SetOnce
 import com.lightningkite.ktorbatteries.SettingSingleton
 import com.lightningkite.ktorbatteries.files.FilesSettings
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 @Serializable
 data class EmailSettings(
-    val option: EmailClientOption = EmailClientOption.CONSOLE,
+    val option: EmailClientOption = EmailClientOption.Console,
     val smtp: SmtpConfig? = null
 ) {
-    val emailClient: EmailClient = when(option) {
-        EmailClientOption.CONSOLE -> ConsoleEmailClient
-        EmailClientOption.SMTP -> SmtpEmailClient(smtp ?: throw IllegalArgumentException("Option SMTP was requested, but no additional information was present under the 'smtp' key."))
+    @Transient
+    val emailClient: EmailClient = when (option) {
+        EmailClientOption.Console -> ConsoleEmailClient
+        EmailClientOption.Smtp -> SmtpEmailClient(
+            smtp
+                ?: throw IllegalArgumentException("Option SMTP was requested, but no additional information was present under the 'smtp' key.")
+        )
     }
 
     companion object: SettingSingleton<EmailSettings>()
@@ -23,8 +28,8 @@ val email: EmailClient get() = EmailSettings.instance.emailClient
 
 @Serializable
 enum class EmailClientOption {
-    CONSOLE,
-    SMTP,
+    Console,
+    Smtp,
 }
 
 @Serializable

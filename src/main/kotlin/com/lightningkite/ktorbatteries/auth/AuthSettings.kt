@@ -14,7 +14,6 @@ import java.util.*
 
 @Serializable
 data class AuthSettings(
-    val userIdKey: String = "userId",
     val authDomain: String? = null,
     val jwtAudience: String = "user",
     val jwtIssuer: String = GeneralServerSettings.instance.publicUrl,
@@ -22,15 +21,21 @@ data class AuthSettings(
     val jwtExpirationMilliseconds: Long? = Duration.ofDays(365).toMillis(),
     val jwtSecret: String = buildString {
         val rand = SecureRandom.getInstanceStrong()
-        repeat(32) {
+        repeat(64) {
             append(
                 availableCharacters[rand.nextInt(availableCharacters.length)]
             )
         }
     }
 ) {
-    companion object: SettingSingleton<AuthSettings>()
-    init { instance = this }
+    companion object : SettingSingleton<AuthSettings>() {
+        const val userIdKey: String = "userId"
+    }
+
+    init {
+        instance = this
+    }
 }
 
-private val availableCharacters = "1234567890qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"
+private val availableCharacters =
+    "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM~!@#%^&*()_+`-=[]{};':,./<>?"

@@ -15,7 +15,7 @@ fun Application.configureFiles() {
     routing {
         val root = VFS.getManager().resolveFile(FilesSettings.instance.storageUrl)
         if (root.fileSystem is LocalFileSystem) {
-            static("user-content") {
+            static(FilesSettings.instance.userContentPath) {
                 files(root.path.toString())
             }
         }

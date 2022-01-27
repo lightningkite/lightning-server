@@ -23,11 +23,11 @@ fun Authentication.Configuration.quickJwt(
     jwt {
         realm = AuthSettings.instance.jwtRealm
         authHeader {
-            val token = it.request.header(HttpHeaders.Authorization)
+            val token = it.request.header(HttpHeaders.Authorization)?.removePrefix("Bearer ")
                 ?: it.request.cookies[HttpHeaders.Authorization]
                 ?: run {
                     val value = it.request.queryParameters["jwt"]
-                    if(value != null) {
+                    if (value != null) {
                         it.response.cookies.append(
                             name = HttpHeaders.Authorization,
                             value = value,
@@ -55,7 +55,7 @@ fun Authentication.Configuration.quickJwt(
                 jwtChecks(credential)
             ) {
                 credential.payload
-                    .getClaim(AuthSettings.instance.userIdKey)
+                    .getClaim(AuthSettings.userIdKey)
                     .asString()
                     .let { idToPrincipal(it) }
             } else null
@@ -67,7 +67,7 @@ fun makeToken(id: String): String {
     return JWT.create()
         .withAudience(AuthSettings.instance.jwtAudience)
         .withIssuer(AuthSettings.instance.jwtIssuer)
-        .withClaim(AuthSettings.instance.userIdKey, id)
+        .withClaim(AuthSettings.userIdKey, id)
         .withIssuedAt(Date())
         .let {
             AuthSettings.instance.jwtExpirationMilliseconds?.let { exp ->
@@ -120,19 +120,14 @@ fun Route.emailMagicLink(
 fun Route.refreshToken(path: String = "refresh-token", idFromPrincipal: (Principal) -> String) {
     post(path) {
         val userId = call.principal<Principal>()!!.let(idFromPrincipal)
-        val token = JWT.create()
-            .withAudience(AuthSettings.instance.jwtAudience)
-            .withIssuer(AuthSettings.instance.jwtIssuer)
-            .withClaim(AuthSettings.instance.userIdKey, userId)
-            .withIssuedAt(Date())
-            .withExpiresAt(Date(System.currentTimeMillis() + 31_557_600_000L))
-            .sign(Algorithm.HMAC256(AuthSettings.instance.jwtSecret))
+        val token = makeToken(userId)
         call.respond(token)
     }
 }
 
-fun Route.logOut(path: String = "refresh-token") {
+fun Route.logOut(path: String = "logout") {
     get(path) {
         call.response.cookies.appendExpired(HttpHeaders.Authorization)
+        call.respond(HttpStatusCode.NoContent)
     }
 }

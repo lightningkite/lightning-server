@@ -6,6 +6,7 @@ import io.ktor.http.*
 import io.ktor.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
+import io.ktor.util.pipeline.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
@@ -32,7 +33,14 @@ import kotlinx.serialization.serializer
 //
 //}
 
-class APIEndpoint<USER: Principal, SUBJECT, IN, OUT>(
+/**
+ * DslMarker for subject endpoints
+ */
+@DslMarker
+@Target(AnnotationTarget.CLASS, AnnotationTarget.TYPEALIAS, AnnotationTarget.TYPE, AnnotationTarget.FUNCTION)
+public annotation class ApiEndpointDsl
+
+class APIEndpoint<USER : Principal, SUBJECT, IN, OUT>(
     val subject: SubjectRoute<*, *>,
     val route: Route,
     val inputType: KType?,
@@ -60,10 +68,12 @@ object API {
     val subjects: MutableList<SubjectRoute<*, *>> = ArrayList()
 }
 
+@ApiEndpointDsl
 inline fun <reified USER: Principal, reified SUBJECT> Route.subject(path: String, noinline getSubject: suspend ApplicationCall.(USER?) -> SUBJECT): SubjectRoute<USER, SUBJECT> {
     return SubjectRoute(route(path){}, typeOf<USER>(), typeOf<SUBJECT>(), getSubject).also { API.subjects.add(it) }
 }
 
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified OUT : Any> SubjectRoute<USER, SUBJECT>.bodyEndpoint(
     method: HttpMethod = HttpMethod.Post,
     successStatus: HttpStatusCode = HttpStatusCode.OK,
@@ -84,6 +94,7 @@ inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified
     )
 }
 
+@ApiEndpointDsl
 @OptIn(ExperimentalSerializationApi::class)
 inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified OUT : Any> SubjectRoute<USER, SUBJECT>.paramsEndpoint(
     method: HttpMethod = HttpMethod.Get,
@@ -114,6 +125,7 @@ inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified
     )
 }
 
+@ApiEndpointDsl
 @OptIn(ExperimentalSerializationApi::class)
 inline fun <reified USER : Principal, reified SUBJECT, reified OUT : Any> SubjectRoute<USER, SUBJECT>.noInputEndpoint(
     method: HttpMethod = HttpMethod.Get,
@@ -141,77 +153,128 @@ inline fun <reified USER : Principal, reified SUBJECT, reified OUT : Any> Subjec
     )
 }
 
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified OUT : Any> SubjectRoute<USER, SUBJECT>.get(
     successStatus: HttpStatusCode = HttpStatusCode.OK,
     noinline forFunction: suspend SUBJECT.(USER?) -> OUT
 ) = noInputEndpoint(method = HttpMethod.Get, successStatus = successStatus, forFunction = forFunction)
 
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified OUT : Any> SubjectRoute<USER, SUBJECT>.get(
     successStatus: HttpStatusCode = HttpStatusCode.OK,
     noinline forFunction: suspend SUBJECT.(USER?, IN) -> OUT
 ) = paramsEndpoint(method = HttpMethod.Get, successStatus = successStatus, forFunction = forFunction)
 
+@ApiEndpointDsl
+inline fun <reified USER : Principal, reified SUBJECT, reified OUT : Any> SubjectRoute<USER, SUBJECT>.delete(
+    successStatus: HttpStatusCode = HttpStatusCode.OK,
+    noinline forFunction: suspend SUBJECT.(USER?) -> OUT
+) = noInputEndpoint(method = HttpMethod.Delete, successStatus = successStatus, forFunction = forFunction)
+
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified OUT : Any> SubjectRoute<USER, SUBJECT>.deleteParams(
     successStatus: HttpStatusCode = HttpStatusCode.OK,
     noinline forFunction: suspend SUBJECT.(USER?, IN) -> OUT
 ) = paramsEndpoint(method = HttpMethod.Delete, successStatus = successStatus, forFunction = forFunction)
 
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified OUT : Any> SubjectRoute<USER, SUBJECT>.post(
     successStatus: HttpStatusCode = HttpStatusCode.OK,
     noinline forFunction: suspend SUBJECT.(USER?, IN) -> OUT
 ) = bodyEndpoint(method = HttpMethod.Post, successStatus = successStatus, forFunction = forFunction)
 
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified OUT : Any> SubjectRoute<USER, SUBJECT>.put(
     successStatus: HttpStatusCode = HttpStatusCode.OK,
     noinline forFunction: suspend SUBJECT.(USER?, IN) -> OUT
 ) = bodyEndpoint(method = HttpMethod.Put, successStatus = successStatus, forFunction = forFunction)
 
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified OUT : Any> SubjectRoute<USER, SUBJECT>.patch(
     successStatus: HttpStatusCode = HttpStatusCode.OK,
     noinline forFunction: suspend SUBJECT.(USER?, IN) -> OUT
 ) = bodyEndpoint(method = HttpMethod.Patch, successStatus = successStatus, forFunction = forFunction)
 
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified OUT : Any> SubjectRoute<USER, SUBJECT>.deleteBody(
     successStatus: HttpStatusCode = HttpStatusCode.OK,
     noinline forFunction: suspend SUBJECT.(USER?, IN) -> OUT
 ) = bodyEndpoint(method = HttpMethod.Delete, successStatus = successStatus, forFunction = forFunction)
 
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified OUT : Any> SubjectRoute<USER, SUBJECT>.get(
     path: String,
     successStatus: HttpStatusCode = HttpStatusCode.OK,
     noinline forFunction: suspend SUBJECT.(USER?) -> OUT
-) = route.route(path) { noInputEndpoint(method = HttpMethod.Get, successStatus = successStatus, forFunction = forFunction) }
+) = route.route(path) {
+    noInputEndpoint(
+        method = HttpMethod.Get,
+        successStatus = successStatus,
+        forFunction = forFunction
+    )
+}
 
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified OUT : Any> SubjectRoute<USER, SUBJECT>.get(
     path: String,
     successStatus: HttpStatusCode = HttpStatusCode.OK,
     noinline forFunction: suspend SUBJECT.(USER?, IN) -> OUT
-) = route.route(path) { paramsEndpoint(method = HttpMethod.Get, successStatus = successStatus, forFunction = forFunction) }
+) = route.route(path) {
+    paramsEndpoint(
+        method = HttpMethod.Get,
+        successStatus = successStatus,
+        forFunction = forFunction
+    )
+}
 
+@ApiEndpointDsl
+inline fun <reified USER : Principal, reified SUBJECT, reified OUT : Any> SubjectRoute<USER, SUBJECT>.delete(
+    path: String,
+    successStatus: HttpStatusCode = HttpStatusCode.OK,
+    noinline forFunction: suspend SUBJECT.(USER?) -> OUT
+) = route.route(path) {
+    noInputEndpoint(
+        method = HttpMethod.Delete,
+        successStatus = successStatus,
+        forFunction = forFunction
+    )
+}
+
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified OUT : Any> SubjectRoute<USER, SUBJECT>.deleteParams(
     path: String,
     successStatus: HttpStatusCode = HttpStatusCode.OK,
     noinline forFunction: suspend SUBJECT.(USER?, IN) -> OUT
-) = route.route(path) { paramsEndpoint(method = HttpMethod.Delete, successStatus = successStatus, forFunction = forFunction) }
+) = route.route(path) {
+    paramsEndpoint(
+        method = HttpMethod.Delete,
+        successStatus = successStatus,
+        forFunction = forFunction
+    )
+}
 
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified OUT : Any> SubjectRoute<USER, SUBJECT>.post(
     path: String,
     successStatus: HttpStatusCode = HttpStatusCode.OK,
     noinline forFunction: suspend SUBJECT.(USER?, IN) -> OUT
 ) = route.route(path) { bodyEndpoint(method = HttpMethod.Post, successStatus = successStatus, forFunction = forFunction) }
 
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified OUT : Any> SubjectRoute<USER, SUBJECT>.put(
     path: String,
     successStatus: HttpStatusCode = HttpStatusCode.OK,
     noinline forFunction: suspend SUBJECT.(USER?, IN) -> OUT
 ) = route.route(path) { bodyEndpoint(method = HttpMethod.Put, successStatus = successStatus, forFunction = forFunction) }
 
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified OUT : Any> SubjectRoute<USER, SUBJECT>.patch(
     path: String,
     successStatus: HttpStatusCode = HttpStatusCode.OK,
     noinline forFunction: suspend SUBJECT.(USER?, IN) -> OUT
 ) = route.route(path) { bodyEndpoint(method = HttpMethod.Patch, successStatus = successStatus, forFunction = forFunction) }
 
+@ApiEndpointDsl
 inline fun <reified USER : Principal, reified SUBJECT, reified IN : Any, reified OUT : Any> SubjectRoute<USER, SUBJECT>.deleteBody(
     path: String,
     successStatus: HttpStatusCode = HttpStatusCode.OK,

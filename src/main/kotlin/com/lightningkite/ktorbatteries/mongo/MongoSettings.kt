@@ -1,19 +1,15 @@
 package com.lightningkite.ktorbatteries.mongo
 
-import com.lightningkite.ktorbatteries.SetOnce
 import com.lightningkite.ktorbatteries.SettingSingleton
-import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.lightningkite.ktorkmongo.embeddedMongo
 import com.lightningkite.ktorkmongo.fixUuidSerialization
 import com.lightningkite.ktorkmongo.testMongo
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
-import com.squareup.okhttp.internal.framed.Settings
 import org.bson.UuidRepresentation
 import org.litote.kmongo.coroutine.coroutine
 import org.litote.kmongo.reactivestreams.KMongo
 import java.io.File
-import java.net.URI
 
 @kotlinx.serialization.Serializable
 data class MongoSettings(
@@ -42,4 +38,4 @@ data class MongoSettings(
     }
 }
 
-val mongo get() = MongoSettings.instance.client.getDatabase(MongoSettings.instance.databaseName)
+val mongoDb get() = MongoSettings.instance.client.getDatabase(MongoSettings.instance.databaseName)

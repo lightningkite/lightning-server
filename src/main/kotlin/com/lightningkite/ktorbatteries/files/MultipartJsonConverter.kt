@@ -37,8 +37,12 @@ class MultipartJsonConverter(val json: Json) : ContentConverter {
                     val path = part.name?.split('.') ?: return@forEachPart
                     val isFile = serializer.isFile(path) ?: return@forEachPart
                     if (part.contentType == null) throw BadRequestException("Content type not provided for uploaded file")
-                    if (isFile.allowedTypes.asSequence().map { ContentType.parse(it) }
-                            .none { part.contentType!!.match(it) }) {
+                    if (
+                        isFile.allowedTypes
+                            .asSequence()
+                            .map { ContentType.parse(it) }
+                            .none { part.contentType!!.match(it) }
+                    ) {
                         throw BadRequestException("Content type ${part.contentType} doesn't match any of the accepted types: ${isFile.allowedTypes.joinToString()}")
                     }
                     part
@@ -48,7 +52,10 @@ class MultipartJsonConverter(val json: Json) : ContentConverter {
                                 @Suppress("BlockingMethodInNonBlockingContext")
                                 VFS.getManager()!!
                             }
-                            manager.uploadUnique(input, "${isFile.pathPrefix}/${part.originalFileName!!}")
+                            manager.uploadUnique(
+                                input,
+                                "${FilesSettings.instance.storageUrl}${FilesSettings.instance.userContentPath}${isFile.pathPrefix}/${part.originalFileName!!}"
+                            )
                         }
                         .let {
                             var current: MutableMap<String, Any?> = mainData

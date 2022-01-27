@@ -10,21 +10,28 @@ import org.apache.commons.vfs2.provider.local.LocalFile
 import java.io.InputStream
 import java.net.URL
 
+private val allowedChars = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"
 
 val FileObject.publicUrl: String
-    get() = if (this is LocalFile) "${GeneralServerSettings.instance.publicUrl}user-content/${
-        path.toString().replace("\\", "/")
-            .removePrefix(FilesSettings.instance.storageUrl.replace("\\", "/").removePrefix("file:///"))
-    }"
-    else URL("https", url.host, url.port, url.file).toString()
+    get() = if (this is LocalFile)
+        "${GeneralServerSettings.instance.publicUrl}${
+            path.toString()
+                .replace("\\", "/")
+                .removePrefix(
+                    FilesSettings.instance.storageUrl
+                        .replace("\\", "/")
+                        .removePrefix("file:///")
+                )
+        }"
+    else
+        URL("https", url.host, url.port, url.file).toString()
 
-fun getRandomString(length: Int, allowedChars: List<Char>): String = (1..length)
+fun getRandomString(length: Int, allowedChars: String): String = (1..length)
     .map { allowedChars.random() }
     .joinToString("")
 
 
 suspend fun FileSystemManager.resolveFileWithUniqueName(path: String): FileObject {
-    val allowedChars: List<Char> = ('A'..'Z') + ('a'..'z') + ('0'..'9')
     val name = path.substringBeforeLast(".")
     val extension = path.substringAfterLast('.', "")
     var random = ""

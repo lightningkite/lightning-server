@@ -1,17 +1,17 @@
 package com.lightningkite.ktorbatteries
 
-import com.lightningkite.ktorbatteries.files.FilesSettings
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
 public class SetOnce<T>(
-    private val makeDefault: ()->T = { throw IllegalAccessError("This property has not been set yet.") }
-): ReadWriteProperty<Any?, T> {
+    private val makeDefault: () -> T = { throw IllegalAccessError("This property has not been set yet.") }
+) : ReadWriteProperty<Any?, T> {
     private var value: T? = null
     public var set = false
         private set
+
     override fun getValue(thisRef: Any?, property: KProperty<*>): T {
-        if(!set) {
+        if (!set) {
             value = makeDefault()
             set = true
         }
@@ -20,7 +20,7 @@ public class SetOnce<T>(
     }
 
     override fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
-        if(set) throw IllegalAccessError("This property (${property.name}) can only be set once.")
+        if (set) throw IllegalAccessError("This property (${property.name}) can only be set once.")
         set = true
         this.value = value
     }
