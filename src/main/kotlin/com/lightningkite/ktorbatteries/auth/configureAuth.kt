@@ -84,9 +84,6 @@ fun makeToken(id: String): String {
 @Serializable
 data class EmailRequest(val email: String)
 
-@Serializable
-data class TokenResponse(val token: String)
-
 fun Route.emailMagicLink(
     path: String = "login-email",
     emailSubject: String = "${GeneralServerSettings.instance.projectName} Log In",
@@ -94,9 +91,11 @@ fun Route.emailMagicLink(
         """
         We received a request for a login email for ${email}. To log in, please click the link the link below.
         
-        ${GeneralServerSettings.instance.publicUrl}landing?jwt=$token
+        ${GeneralServerSettings.instance.publicUrl}/landing?jwt=$token
         
         If you did not request to be logged in, you can simply ignore this email.
+        
+        ${GeneralServerSettings.instance.projectName}
         """.trimIndent()
     },
     emailHtmlTemplate: ((email: String, token: String) -> String)? = null,
