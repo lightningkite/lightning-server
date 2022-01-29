@@ -15,7 +15,7 @@ plugins {
 group = "com.lightningkite.ktor-batteries"
 
 repositories {
-    mavenLocal()
+//    mavenLocal()
     mavenCentral()
     maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
     maven { url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap") }
@@ -23,7 +23,7 @@ repositories {
 
 val ktorVersion = "1.6.7"
 val kotlinVersion: String by project
-val ktorKmongoVersion = "newser-again-SNAPSHOT"
+val ktorKmongoVersion = "0.0.5"
 dependencies {
     api("com.lightningkite.ktorkmongo:server:$ktorKmongoVersion")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
@@ -48,7 +48,7 @@ dependencies {
     api("org.apache.commons:commons-vfs2:2.9.0")
     api("com.github.abashev:vfs-s3:4.3.5")
     api("com.charleskorn.kaml:kaml:0.40.0")
-    api("com.lightningkite:kotliner-cli:master-SNAPSHOT")
+    api("com.lightningkite:kotliner-cli:1.0.3")
     api("com.google.firebase:firebase-admin:8.1.0")
 
     kspTest("com.lightningkite.ktorkmongo:processor:$ktorKmongoVersion")

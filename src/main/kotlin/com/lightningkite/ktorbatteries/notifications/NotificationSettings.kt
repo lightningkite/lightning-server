@@ -5,6 +5,7 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.lightningkite.ktorbatteries.SettingSingleton
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import java.io.File
 
 @Serializable
@@ -12,12 +13,17 @@ data class NotificationSettings(
     val implementation: NotificationImplementation = NotificationImplementation.Console,
     val credentials: String? = null
 ) {
-    companion object: SettingSingleton<NotificationSettings>()
+    companion object : SettingSingleton<NotificationSettings>()
+
     init {
         instance = this
     }
+
+    @Transient
+    var sendNotificationsDuringTests: Boolean = false
+
     val notifications by lazy {
-        when(implementation) {
+        when (implementation) {
             NotificationImplementation.Console -> ConsoleNotificationInterface
             NotificationImplementation.FCM -> {
                 assert(credentials != null) { "FCM was selected for notification implementation, but no credential file was provided." }

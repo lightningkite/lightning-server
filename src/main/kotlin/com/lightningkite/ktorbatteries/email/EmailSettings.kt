@@ -20,8 +20,14 @@ data class EmailSettings(
         )
     }
 
-    companion object: SettingSingleton<EmailSettings>()
-    init { instance = this }
+    @Transient
+    var sendEmailDuringTests: Boolean = false
+
+    companion object : SettingSingleton<EmailSettings>()
+
+    init {
+        instance = this
+    }
 }
 
 val email: EmailClient get() = EmailSettings.instance.emailClient

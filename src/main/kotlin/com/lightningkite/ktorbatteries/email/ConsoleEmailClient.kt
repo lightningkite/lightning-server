@@ -8,6 +8,7 @@ object ConsoleEmailClient : EmailClient {
         htmlMessage: String?,
         attachments: List<Attachment>
     ) {
+        if (to.isEmpty() || (System.getenv("test") == "true" && !EmailSettings.instance.sendEmailDuringTests)) return
         println(buildString {
             appendLine("-----EMAIL-----")
             appendLine(subject)
@@ -22,7 +23,7 @@ object ConsoleEmailClient : EmailClient {
             appendLine()
             attachments.forEach {
                 appendLine(it.name)
-                when(it){
+                when (it) {
                     is Attachment.Local -> appendLine(it.file)
                     is Attachment.Remote -> appendLine(it.url)
                 }
