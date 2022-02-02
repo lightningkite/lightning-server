@@ -10,7 +10,7 @@ import org.apache.commons.vfs2.provider.local.LocalFile
 import java.io.InputStream
 import java.net.URL
 
-private val allowedChars = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"
+private const val allowedChars = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"
 
 val FileObject.publicUrl: String
     get() = if (this is LocalFile)

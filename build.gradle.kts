@@ -15,21 +15,22 @@ plugins {
 group = "com.lightningkite.ktor-batteries"
 
 repositories {
-//    mavenLocal()
-    mavenCentral()
+    mavenLocal()
+    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
     maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
     maven { url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap") }
+    mavenCentral()
 }
 
 val ktorVersion = "1.6.7"
 val kotlinVersion: String by project
-val ktorKmongoVersion = "0.0.5"
+val ktorKmongoVersion = "master-SNAPSHOT"
 dependencies {
     api("com.lightningkite.ktorkmongo:server:$ktorKmongoVersion")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.5.2")
-    implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.2.8")
+    implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.3.0")
     implementation("io.ktor:ktor-html-builder:$ktorVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.7.3")
 
