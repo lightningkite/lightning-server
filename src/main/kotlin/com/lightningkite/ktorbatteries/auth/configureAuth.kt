@@ -66,14 +66,14 @@ fun Authentication.Configuration.quickJwt(
     }
 }
 
-fun makeToken(id: String): String {
+fun makeToken(id: String, expiration: Long? = null): String {
     return JWT.create()
         .withAudience(AuthSettings.instance.jwtAudience)
         .withIssuer(AuthSettings.instance.jwtIssuer)
         .withClaim(AuthSettings.userIdKey, id)
         .withIssuedAt(Date())
         .let {
-            AuthSettings.instance.jwtExpirationMilliseconds?.let { exp ->
+            (expiration ?: AuthSettings.instance.jwtExpirationMilliseconds)?.let { exp ->
                 it.withExpiresAt(Date(System.currentTimeMillis() + exp))
             } ?: it
         }
@@ -87,7 +87,7 @@ data class EmailRequest(val email: String)
 fun Route.emailMagicLink(
     path: String = "login-email",
     emailSubject: String = "${GeneralServerSettings.instance.projectName} Log In",
-    emailTemplate: (email: String, token: String) -> String = { email, token ->
+    emailTemplate: suspend (email: String, token: String) -> String = { email, token ->
         """
         We received a request for a login email for ${email}. To log in, please click the link the link below.
         
@@ -98,7 +98,19 @@ fun Route.emailMagicLink(
         ${GeneralServerSettings.instance.projectName}
         """.trimIndent()
     },
-    emailHtmlTemplate: ((email: String, token: String) -> String)? = null,
+    emailHtmlTemplate: (suspend (email: String, token: String) -> String)? = { email, token ->
+        """
+        <!DOCTYPE html>
+        <html>
+        <body>
+        <p>We received a request for a login email for ${email}. To log in, please click the link below.</p>
+        <a href="${GeneralServerSettings.instance.publicUrl}/landing?jwt=$token">Click here to login</a>
+        <p>If you did not request to be logged in, you can simply ignore this email.</p>
+        <h3>${GeneralServerSettings.instance.projectName}</h3>
+        </body>
+        </html>
+        """.trimIndent()
+    },
     emailAttachments: List<Attachment> = listOf(),
     returnIfUserExists: Boolean = false,
     getUserIdByEmail: suspend (email: String) -> String?
