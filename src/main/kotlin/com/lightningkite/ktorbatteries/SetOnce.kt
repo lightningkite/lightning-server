@@ -3,11 +3,11 @@ package com.lightningkite.ktorbatteries
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
-public class SetOnce<T>(
+class SetOnce<T>(
     private val makeDefault: () -> T = { throw IllegalAccessError("This property has not been set yet.") }
 ) : ReadWriteProperty<Any?, T> {
     private var value: T? = null
-    public var set = false
+    var set = false
         private set
 
     override fun getValue(thisRef: Any?, property: KProperty<*>): T {

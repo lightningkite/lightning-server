@@ -9,7 +9,6 @@ data class GeneralServerSettings(
     val host: String = "0.0.0.0",
     val port: Int = 80,
     val publicUrl: String = "http://$host:$port/",
-    val logging: String = "",
     val debug: Boolean = false
 ) {
     init {

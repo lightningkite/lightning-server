@@ -25,7 +25,6 @@ fun Authentication.Configuration.quickJwt(
         realm = AuthSettings.instance.jwtRealm
         authHeader {
             val token = it.request.header(HttpHeaders.Authorization)?.removePrefix("Bearer ")
-                ?: it.request.cookies[HttpHeaders.Authorization]
                 ?: run {
                     val value = it.request.queryParameters["jwt"]
                     if (value != null) {
@@ -41,6 +40,7 @@ fun Authentication.Configuration.quickJwt(
                     }
                     value
                 }
+                ?: it.request.cookies[HttpHeaders.Authorization]
                 ?: return@authHeader null
             HttpAuthHeader.Single(AuthScheme.Bearer, token)
         }

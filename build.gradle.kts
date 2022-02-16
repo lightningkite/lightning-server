@@ -60,6 +60,8 @@ dependencies {
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
     testImplementation("io.ktor:ktor-serialization:$ktorVersion")
     testImplementation("io.ktor:ktor-server-cio:$ktorVersion")
+
+    implementation("ch.qos.logback:logback-classic:1.2.10")
 }
 
 ksp {
