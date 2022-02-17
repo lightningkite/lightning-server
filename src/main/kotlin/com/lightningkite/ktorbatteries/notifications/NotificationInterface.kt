@@ -5,6 +5,7 @@ interface NotificationInterface {
         targets: List<String>,
         title: String? = null,
         body: String? = null,
-        imageUrl: String? = null
+        imageUrl: String? = null,
+        data: Map<String, String> = mapOf(),
     )
 }

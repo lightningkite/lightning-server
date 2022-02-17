@@ -7,12 +7,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 object FcmNotificationInterface: NotificationInterface {
-    override suspend fun send(targets: List<String>, title: String?, body: String?, imageUrl: String?) {
+    override suspend fun send(
+        targets: List<String>,
+        title: String?,
+        body: String?,
+        imageUrl: String?,
+        data: Map<String, String>
+    ) {
         withContext(Dispatchers.IO) {
             targets.chunked(500)
                 .map {
                     MulticastMessage.builder()
                         .addAllTokens(it)
+                        .putAllData(data)
                         .setNotification(
                             Notification.builder()
                                 .setTitle(title)
