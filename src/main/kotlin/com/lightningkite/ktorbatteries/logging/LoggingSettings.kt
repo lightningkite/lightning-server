@@ -22,12 +22,13 @@ data class LoggingSettings(
 ) {
     @Serializable
     data class ContextSettings(
-        val filePattern: String? = "build/logs/logfile-%d{yyyy-MM-dd_HH}.log",
+        val filePattern: String? = "build/logs/logfile-%d{yyyy-MM-dd}.log",
         val toConsole: Boolean = false,
-        val level: String = "INFO"
+        val level: String = "INFO",
+        val additive: Boolean = false,
     ) {
         fun apply(partName: String, to: LogbackLogger) {
-            to.isAdditive = false
+            to.isAdditive = additive
             to.level = Level.toLevel(level)
             if (filePattern?.isNotBlank() == true) {
                 to.addAppender(RollingFileAppender<ILoggingEvent>().apply rolling@{
