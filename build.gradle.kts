@@ -27,9 +27,11 @@ val kotlinVersion: String by project
 val ktorKmongoVersion = "master-SNAPSHOT"
 dependencies {
     api("com.lightningkite.ktorkmongo:server:$ktorKmongoVersion")
+    implementation("com.lightningkite.khrysalis:jvm-runtime:master-SNAPSHOT")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.5.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.5.2")
     implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.3.0")
     implementation("io.ktor:ktor-html-builder:$ktorVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.7.3")
@@ -51,6 +53,8 @@ dependencies {
     api("com.charleskorn.kaml:kaml:0.40.0")
     api("com.lightningkite:kotliner-cli:1.0.3")
     api("com.google.firebase:firebase-admin:8.1.0")
+
+    api("io.lettuce:lettuce-core:6.1.6.RELEASE")
 
     kspTest("com.lightningkite.ktorkmongo:processor:$ktorKmongoVersion")
 

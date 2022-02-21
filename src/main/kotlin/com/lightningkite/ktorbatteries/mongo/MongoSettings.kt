@@ -1,7 +1,6 @@
 package com.lightningkite.ktorbatteries.mongo
 
 import com.lightningkite.ktorbatteries.SettingSingleton
-import com.lightningkite.ktorkmongo.embeddedMongo
 import com.lightningkite.ktorkmongo.fixUuidSerialization
 import com.lightningkite.ktorkmongo.testMongo
 import com.mongodb.ConnectionString
