@@ -17,7 +17,7 @@ import java.io.File
 
 @Serializable
 data class LoggingSettings(
-    val default: ContextSettings? = ContextSettings(),
+    val default: ContextSettings? = ContextSettings(null, true, "INFO", false),
     val logger: Map<String, ContextSettings>? = null
 ) {
     @Serializable

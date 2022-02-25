@@ -6,7 +6,7 @@ import com.google.firebase.messaging.Notification
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-object FcmNotificationInterface: NotificationInterface {
+object FcmNotificationInterface : NotificationInterface {
     override suspend fun send(
         targets: List<String>,
         title: String?,
@@ -18,15 +18,20 @@ object FcmNotificationInterface: NotificationInterface {
             targets.chunked(500)
                 .map {
                     MulticastMessage.builder()
-                        .addAllTokens(it)
-                        .putAllData(data)
-                        .setNotification(
-                            Notification.builder()
-                                .setTitle(title)
-                                .setBody(body)
-                                .setImage(imageUrl)
-                                .build()
-                        )
+                        .apply {
+                            addAllTokens(it)
+                            putAllData(data)
+                            if (title != null || body != null || imageUrl != null) {
+                                setNotification(
+                                    Notification.builder()
+                                        .setTitle(title)
+                                        .setBody(body)
+                                        .setImage(imageUrl)
+                                        .build()
+                                )
+
+                            }
+                        }
                         .build()
                 }
                 .forEach { FirebaseMessaging.getInstance().sendMulticast(it) }
