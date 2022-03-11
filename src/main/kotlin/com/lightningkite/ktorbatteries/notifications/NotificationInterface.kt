@@ -10,6 +10,7 @@ interface NotificationInterface {
         body: String? = null,
         imageUrl: String? = null,
         data: Map<String, String>? = null,
+        critical: Boolean = false,
     )
 
     suspend fun send(

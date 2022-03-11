@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 object FcmNotificationInterface : NotificationInterface {
     /**
      * Sends a simple notification and data. No custom options are set beyond what is provided.
+     * If you need a more complicated set of messages you should use the other functions.
      */
     override suspend fun send(
         targets: List<String>,
@@ -14,44 +15,70 @@ object FcmNotificationInterface : NotificationInterface {
         body: String?,
         imageUrl: String?,
         data: Map<String, String>?,
+        critical: Boolean,
     ) {
-        targets.chunked(500)
-            .map {
-                MulticastMessage.builder()
-                    .apply {
-                        addAllTokens(it)
-                        putAllData(data)
-                        if (title != null || body != null || imageUrl != null) {
-                            setApnsConfig(
-                                ApnsConfig
-                                    .builder()
-                                    .setFcmOptions(
-                                        ApnsFcmOptions
-                                            .builder()
-                                            .setImage(imageUrl)
-                                            .build()
-                                    )
-                                    .build()
-                            )
-                            setWebpushConfig(
-                                WebpushConfig
-                                    .builder()
-                                    .setNotification(
-                                        WebpushNotification.builder()
-                                            .setImage(imageUrl)
-                                            .build()
-                                    )
-                                    .build()
-                            )
-                            setNotification(
-                                Notification.builder()
+        val includeNotification = title != null || body != null || imageUrl != null
+
+        val builder = MulticastMessage.builder()
+            .apply {
+                putAllData(data)
+                setApnsConfig(
+                    ApnsConfig
+                        .builder()
+                        .apply {
+                            if (includeNotification)
+                                setFcmOptions(
+                                    ApnsFcmOptions
+                                        .builder()
+                                        .setImage(imageUrl)
+                                        .build()
+                                )
+                            if (critical)
+                                setAps(
+                                    Aps.builder()
+                                        .setSound(
+                                            CriticalSound.builder()
+                                                .setCritical(true)
+                                                .build()
+                                        )
+                                        .build()
+                                )
+                        }
+                        .build()
+                )
+                if (includeNotification)
+                    setWebpushConfig(
+                        WebpushConfig
+                            .builder()
+                            .setNotification(
+                                WebpushNotification.builder()
                                     .setTitle(title)
                                     .setBody(body)
                                     .setImage(imageUrl)
                                     .build()
                             )
-                        }
-                    }
+                            .build()
+                    )
+                if (critical)
+                    setAndroidConfig(
+                        AndroidConfig.builder()
+                            .setPriority(AndroidConfig.Priority.HIGH)
+                            .build()
+                    )
+                if (includeNotification)
+                    setNotification(
+                        Notification.builder()
+                            .setTitle(title)
+                            .setBody(body)
+                            .setImage(imageUrl)
+                            .build()
+                    )
+            }
+
+        targets.chunked(500)
+            .map {
+                builder
+                    .addAllTokens(it)
                     .build()
             }
             .forEach { FirebaseMessaging.getInstance().sendMulticast(it) }

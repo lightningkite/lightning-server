@@ -9,7 +9,8 @@ object ConsoleNotificationInterface : NotificationInterface {
         title: String?,
         body: String?,
         imageUrl: String?,
-        data: Map<String, String>?
+        data: Map<String, String>?,
+        critical: Boolean,
     ) {
         if (targets.isEmpty() || (System.getenv("test") == "true" && !NotificationSettings.instance.sendNotificationsDuringTests)) return
         println(buildString {
@@ -21,6 +22,7 @@ object ConsoleNotificationInterface : NotificationInterface {
             appendLine("Title: $title")
             appendLine("Body: $body")
             appendLine("Image URL: $imageUrl")
+            appendLine("Critical: $critical")
             if (data?.isNotEmpty() == true) appendLine("Data: {${data.entries.joinToString { "${it.key}: ${it.value} " }}}")
         })
     }
