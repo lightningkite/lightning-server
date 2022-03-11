@@ -21,7 +21,8 @@ object FcmNotificationInterface : NotificationInterface {
 
         val builder = MulticastMessage.builder()
             .apply {
-                putAllData(data)
+                if (data != null)
+                    putAllData(data)
                 setApnsConfig(
                     ApnsConfig
                         .builder()
@@ -33,16 +34,21 @@ object FcmNotificationInterface : NotificationInterface {
                                         .setImage(imageUrl)
                                         .build()
                                 )
-                            if (critical)
-                                setAps(
-                                    Aps.builder()
-                                        .setSound(
-                                            CriticalSound.builder()
-                                                .setCritical(true)
-                                                .build()
-                                        )
-                                        .build()
-                                )
+
+                            setAps(
+                                Aps.builder()
+                                    .apply {
+                                        if (critical)
+                                            setSound(
+                                                CriticalSound.builder()
+                                                    .setCritical(true)
+                                                    .setName("default")
+                                                    .setVolume(1.0)
+                                                    .build()
+                                            )
+                                    }
+                                    .build()
+                            )
                         }
                         .build()
                 )
