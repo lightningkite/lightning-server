@@ -43,12 +43,12 @@ dependencies {
     api("io.ktor:ktor-auth-jwt:$ktorVersion")
     api("io.ktor:ktor-server-cio:$ktorVersion")
 
-    api("org.litote.kmongo:kmongo-coroutine-serialization:4.4.0")
+    api("org.litote.kmongo:kmongo-coroutine-serialization:4.5.0")
 
     api("org.apache.commons:commons-email:1.5")
     api("org.apache.commons:commons-vfs2:2.9.0")
     api("com.github.abashev:vfs-s3:4.3.5")
-    api("com.charleskorn.kaml:kaml:0.40.0")
+    api("com.charleskorn.kaml:kaml:0.42.0")
     api("com.lightningkite:kotliner-cli:1.0.3")
     api("com.google.firebase:firebase-admin:8.1.0")
 
@@ -61,7 +61,7 @@ dependencies {
     testImplementation("io.ktor:ktor-serialization:$ktorVersion")
     testImplementation("io.ktor:ktor-server-cio:$ktorVersion")
 
-    implementation("ch.qos.logback:logback-classic:1.2.10")
+    implementation("ch.qos.logback:logback-classic:1.2.11")
 }
 
 ksp {
