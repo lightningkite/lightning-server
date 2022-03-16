@@ -11,13 +11,7 @@ interface NotificationInterface {
         imageUrl: String? = null,
         data: Map<String, String>? = null,
         critical: Boolean = false,
+        androidChannel: String? = null
     )
 
-    suspend fun send(
-        message: Message
-    )
-
-    suspend fun send(
-        message: MulticastMessage
-    )
 }

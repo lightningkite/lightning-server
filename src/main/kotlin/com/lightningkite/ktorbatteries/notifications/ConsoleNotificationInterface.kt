@@ -1,7 +1,5 @@
 package com.lightningkite.ktorbatteries.notifications
 
-import com.google.firebase.messaging.Message
-import com.google.firebase.messaging.MulticastMessage
 
 object ConsoleNotificationInterface : NotificationInterface {
     override suspend fun send(
@@ -11,6 +9,7 @@ object ConsoleNotificationInterface : NotificationInterface {
         imageUrl: String?,
         data: Map<String, String>?,
         critical: Boolean,
+        androidChannel: String?,
     ) {
         if (targets.isEmpty() || (System.getenv("test") == "true" && !NotificationSettings.instance.sendNotificationsDuringTests)) return
         println(buildString {
@@ -27,19 +26,4 @@ object ConsoleNotificationInterface : NotificationInterface {
         })
     }
 
-    override suspend fun send(message: Message) {
-        if (System.getenv("test") == "true" && !NotificationSettings.instance.sendNotificationsDuringTests) return
-        println(buildString {
-            appendLine("-----NOTIFICATION-----")
-            appendLine("Sending individual message.")
-        })
-    }
-
-    override suspend fun send(message: MulticastMessage) {
-        if (System.getenv("test") == "true" && !NotificationSettings.instance.sendNotificationsDuringTests) return
-        println(buildString {
-            appendLine("-----NOTIFICATION-----")
-            appendLine("Sending Multicast message.")
-        })
-    }
 }

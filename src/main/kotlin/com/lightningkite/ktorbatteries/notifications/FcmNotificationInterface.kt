@@ -16,6 +16,7 @@ object FcmNotificationInterface : NotificationInterface {
         imageUrl: String?,
         data: Map<String, String>?,
         critical: Boolean,
+        androidChannel: String?,
     ) {
         val includeNotification = title != null || body != null || imageUrl != null
 
@@ -65,10 +66,19 @@ object FcmNotificationInterface : NotificationInterface {
                             )
                             .build()
                     )
-                if (critical)
+                if (critical || androidChannel != null)
                     setAndroidConfig(
                         AndroidConfig.builder()
-                            .setPriority(AndroidConfig.Priority.HIGH)
+                            .apply {
+                                if (critical)
+                                    setPriority(AndroidConfig.Priority.HIGH)
+                                if (androidChannel != null)
+                                    setNotification(
+                                        AndroidNotification.builder()
+                                            .setChannelId(androidChannel)
+                                            .build()
+                                    )
+                            }
                             .build()
                     )
                 if (includeNotification)
@@ -90,12 +100,5 @@ object FcmNotificationInterface : NotificationInterface {
             .forEach { FirebaseMessaging.getInstance().sendMulticast(it) }
     }
 
-    override suspend fun send(message: Message) {
-        FirebaseMessaging.getInstance().send(message)
-    }
-
-    override suspend fun send(message: MulticastMessage) {
-        FirebaseMessaging.getInstance().sendMulticast(message)
-    }
 }
 
