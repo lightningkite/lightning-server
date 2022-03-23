@@ -1,5 +1,6 @@
 package com.lightningkite.ktorbatteries.notifications
 
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -91,14 +92,23 @@ object FcmNotificationInterface : NotificationInterface {
                     )
             }
 
-        targets.chunked(500)
+        targets
+            .chunked(500)
             .map {
                 builder
                     .addAllTokens(it)
                     .build()
             }
-            .forEach { FirebaseMessaging.getInstance().sendMulticast(it) }
+            .forEach {
+                withContext(Dispatchers.IO) {
+                    try {
+                        FirebaseMessaging.getInstance().sendMulticast(it, true)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        throw e
+                    }
+                }
+            }
     }
-
 }
 

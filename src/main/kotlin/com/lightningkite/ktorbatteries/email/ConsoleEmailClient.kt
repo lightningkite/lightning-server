@@ -1,7 +1,7 @@
 package com.lightningkite.ktorbatteries.email
 
 object ConsoleEmailClient : EmailClient {
-    override fun send(
+    override suspend fun send(
         subject: String,
         to: List<String>,
         message: String,

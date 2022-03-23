@@ -1,13 +1,17 @@
 package com.lightningkite.ktorbatteries.email
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.html.InputType
+import org.apache.commons.mail.DefaultAuthenticator
 import org.apache.commons.mail.EmailAttachment
 import org.apache.commons.mail.HtmlEmail
 import org.apache.commons.mail.MultiPartEmail
 import org.apache.commons.mail.SimpleEmail
+import javax.mail.Authenticator
 
 class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
-    override fun send(
+    override suspend fun send(
         subject: String,
         to: List<String>,
         message: String,
@@ -15,7 +19,7 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
         attachments: List<Attachment>
     ) {
         val email = if (htmlMessage == null) {
-            if(attachments.isEmpty()){
+            if (attachments.isEmpty()) {
                 SimpleEmail().setMsg(message)
             } else {
                 val multiPart = MultiPartEmail()
@@ -58,7 +62,7 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
             email
         }
         email.hostName = smtpConfig.hostName
-        if(smtpConfig.username != null){
+        if (smtpConfig.username != null) {
             email.setAuthentication(smtpConfig.username, smtpConfig.password!!)
         }
         email.setSmtpPort(smtpConfig.port)
@@ -66,7 +70,8 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
         email.setFrom(smtpConfig.fromEmail)
         email.subject = subject
         email.addTo(*to.toTypedArray())
-
-        email.send()
+        withContext(Dispatchers.IO) {
+            email.send()
+        }
     }
 }

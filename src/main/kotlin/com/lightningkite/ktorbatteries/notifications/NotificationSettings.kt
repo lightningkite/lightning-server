@@ -3,7 +3,11 @@ package com.lightningkite.ktorbatteries.notifications
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.messaging.FirebaseMessaging
 import com.lightningkite.ktorbatteries.SettingSingleton
+import com.lightningkite.ktorbatteries.serverhealth.HealthCheckable
+import com.lightningkite.ktorbatteries.serverhealth.HealthStatus
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import java.io.File
@@ -12,6 +16,7 @@ import java.io.File
 data class NotificationSettings(
     val implementation: NotificationImplementation = NotificationImplementation.Console,
     val credentials: String? = null
+//) : HealthCheckable {
 ) {
     companion object : SettingSingleton<NotificationSettings>()
 
@@ -38,6 +43,24 @@ data class NotificationSettings(
             }
         }
     }
+
+//    override suspend fun healthCheck(): HealthStatus =
+//        when (implementation) {
+//            NotificationImplementation.Console -> HealthStatus("Notifications", true)
+//            NotificationImplementation.FCM -> {
+//                try {
+//                    notifications.let {
+//
+////                    FirebaseAuth.getInstance().createCustomToken("hehe")
+//                        HealthStatus("Notifications", true)
+//                    }
+//                } catch (e: Exception) {
+//                    e.printStackTrace()
+//                    HealthStatus("Notifications", false, e.message)
+//                }
+//            }
+//        }
+
 }
 
 val notifications: NotificationInterface get() = NotificationSettings.instance.notifications
