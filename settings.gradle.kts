@@ -14,9 +14,10 @@ pluginManagement {
 buildscript {
     val kotlinVersion:String by extra
     repositories {
-        mavenLocal()
-        maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
+//        mavenLocal()
         mavenCentral()
+        maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
+        maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
         google()
     }
     dependencies {
