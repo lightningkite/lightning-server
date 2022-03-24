@@ -62,8 +62,9 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
             email
         }
         email.hostName = smtpConfig.hostName
-        if (smtpConfig.username != null) {
-            email.setAuthentication(smtpConfig.username, smtpConfig.password!!)
+        if (smtpConfig.username != null || smtpConfig.password != null) {
+            if (smtpConfig.username == null || smtpConfig.password == null) throw Exception("Missing Authentication")
+            email.setAuthentication(smtpConfig.username, smtpConfig.password)
         }
         email.setSmtpPort(smtpConfig.port)
         email.isSSLOnConnect = smtpConfig.useSSL

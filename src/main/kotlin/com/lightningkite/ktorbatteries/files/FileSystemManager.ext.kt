@@ -1,11 +1,7 @@
 package com.lightningkite.ktorbatteries.files
 
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.apache.commons.vfs2.FileObject
-import org.apache.commons.vfs2.FileSystemManager
-import org.apache.commons.vfs2.VFS
 import org.apache.commons.vfs2.provider.local.LocalFile
 import java.io.InputStream
 import java.net.URL
@@ -31,31 +27,22 @@ fun getRandomString(length: Int, allowedChars: String): String = (1..length)
     .joinToString("")
 
 
-suspend fun FileSystemManager.resolveFileWithUniqueName(path: String): FileObject {
+suspend fun CoroutineFileSystemManager.resolveFileWithUniqueName(path: String): FileObject {
     val name = path.substringBeforeLast(".")
     val extension = path.substringAfterLast('.', "")
     var random = ""
     var exists = true
     while (exists) {
-        withContext(Dispatchers.IO) {
-            @Suppress("BlockingMethodInNonBlockingContext")
-            exists = resolveFile("$name$random.$extension").exists()
-        }
+        exists = resolveFile("$name$random.$extension").exists()
         if (exists) {
             random = "-${getRandomString(10, allowedChars)}"
         }
     }
-    return withContext(Dispatchers.IO) {
-        @Suppress("BlockingMethodInNonBlockingContext")
-        resolveFile("$name$random.$extension")
-    }
+    return resolveFile("$name$random.$extension")
 }
 
-suspend fun FileSystemManager.uploadUnique(stream: InputStream, path: String): FileObject =
-    withContext(Dispatchers.IO) {
-        @Suppress("BlockingMethodInNonBlockingContext")
-        VFS.getManager()
-    }
+suspend fun CoroutineFileSystemManager.uploadUnique(stream: InputStream, path: String): FileObject =
+    files()
         .resolveFileWithUniqueName(path)
         .use { file ->
             file.content.outputStream
@@ -64,11 +51,10 @@ suspend fun FileSystemManager.uploadUnique(stream: InputStream, path: String): F
             file
         }
 
-suspend fun FileSystemManager.upload(stream: InputStream, path: String): FileObject =
-    withContext(Dispatchers.IO) {
-        @Suppress("BlockingMethodInNonBlockingContext")
-        VFS.getManager().resolveFile(path)
-    }
+suspend fun CoroutineFileSystemManager.upload(stream: InputStream, path: String): FileObject =
+    @Suppress("BlockingMethodInNonBlockingContext")
+    files()
+        .resolveFile(path)
         .use { file ->
             file.content.outputStream
                 .buffered()

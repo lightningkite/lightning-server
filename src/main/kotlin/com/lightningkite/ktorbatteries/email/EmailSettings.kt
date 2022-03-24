@@ -39,6 +39,8 @@ data class EmailSettings(
         emailClient.send("Test Message", listOf("test@example.com"), "Test Message", null)
         HealthStatus("Email", true)
     } catch (e: Exception) {
+        e.printStackTrace()
+        println(e.message)
         HealthStatus("Email", false, e.message)
     }
 
