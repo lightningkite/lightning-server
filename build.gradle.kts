@@ -25,7 +25,7 @@ repositories {
 
 val ktorVersion = "1.6.7"
 val kotlinVersion: String by project
-val ktorKmongoVersion = "0.9.8"
+val ktorKmongoVersion = "0.9.9"
 dependencies {
     api("com.lightningkite.ktorkmongo:server:$ktorKmongoVersion")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
