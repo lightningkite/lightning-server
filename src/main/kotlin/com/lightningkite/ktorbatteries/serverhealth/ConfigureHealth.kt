@@ -32,6 +32,8 @@ fun Route.configureHealth(path: String, features: List<HealthCheckable>) {
                 """.trimIndent()
             }
 
+
+        System.gc()
         val maxMem = Runtime.getRuntime().maxMemory()
         val totalMemory = Runtime.getRuntime().totalMemory()
         val freeMemory = Runtime.getRuntime().freeMemory()
