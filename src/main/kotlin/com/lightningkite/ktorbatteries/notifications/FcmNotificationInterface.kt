@@ -101,12 +101,7 @@ object FcmNotificationInterface : NotificationInterface {
             }
             .forEach {
                 withContext(Dispatchers.IO) {
-                    try {
-                        FirebaseMessaging.getInstance().sendMulticast(it, true)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        throw e
-                    }
+                    FirebaseMessaging.getInstance().sendMulticast(it)
                 }
             }
     }

@@ -1,7 +1,5 @@
 package com.lightningkite.ktorbatteries.notifications
 
-import com.google.firebase.messaging.Message
-import com.google.firebase.messaging.MulticastMessage
 
 interface NotificationInterface {
     suspend fun send(
@@ -13,5 +11,4 @@ interface NotificationInterface {
         critical: Boolean = false,
         androidChannel: String? = null
     )
-
 }
