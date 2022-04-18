@@ -23,17 +23,17 @@ repositories {
     mavenCentral()
 }
 
-val ktorVersion = "1.6.7"
+val ktorVersion = "1.6.8"
 val kotlinVersion: String by project
-val ktorKmongoVersion = "0.9.9"
+val ktorKmongoVersion = "0.9.10"
 dependencies {
     api("com.lightningkite.ktorkmongo:server:$ktorKmongoVersion")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.0")
-    implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.4.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.1")
+    implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.4.5")
     implementation("io.ktor:ktor-html-builder:$ktorVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.7.5")
 
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:1.3.2")
 
@@ -47,7 +47,7 @@ dependencies {
     api("org.apache.commons:commons-email:1.5")
     api("org.apache.commons:commons-vfs2:2.9.0")
     api("com.github.abashev:vfs-s3:4.3.5")
-    api("com.charleskorn.kaml:kaml:0.42.0")
+    api("com.charleskorn.kaml:kaml:0.43.0")
     api("com.lightningkite:kotliner-cli:1.0.3")
     api("com.google.firebase:firebase-admin:8.1.0")
 
