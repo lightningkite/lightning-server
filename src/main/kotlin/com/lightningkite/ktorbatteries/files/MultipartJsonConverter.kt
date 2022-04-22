@@ -8,8 +8,6 @@ import io.ktor.http.content.*
 import io.ktor.request.*
 import io.ktor.util.pipeline.*
 import io.ktor.utils.io.core.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encoding.CompositeDecoder
@@ -48,10 +46,7 @@ class MultipartJsonConverter(val json: Json) : ContentConverter {
                     part
                         .streamProvider()
                         .use { input ->
-                            val manager = withContext(Dispatchers.IO) {
-                                @Suppress("BlockingMethodInNonBlockingContext")
-                                VFS.getManager()!!
-                            }
+                            val manager = files()
                             manager.uploadUnique(
                                 input,
                                 "${FilesSettings.instance.storageUrl}${FilesSettings.instance.userContentPath}${isFile.pathPrefix}/${part.originalFileName!!}"

@@ -1,7 +1,7 @@
 package com.lightningkite.ktorbatteries.email
 
 interface EmailClient {
-    fun send(
+    suspend fun send(
         subject: String,
         to: List<String>,
         message: String,
