@@ -121,19 +121,18 @@ inline fun <reified USER: Principal, reified T : HasId> Route.adminList(
                         for(key in keys) {
                             th { +key }
                         }
-                        th { +"Link" }
                     }
                     for(item in propItems) {
                         tr {
-                            onClick = "location.href = \"\""
                             for(key in keys) {
                                 td {
-                                    +(item[key] ?: "-")
-                                }
-                            }
-                            td {
-                                a(href=item["_id"]!!) {
-                                    +"Detail"
+                                    if(key == "_id") {
+                                        a(href=item["_id"]!!) {
+                                            +(item[key] ?: "-")
+                                        }
+                                    } else {
+                                        +(item[key] ?: "-")
+                                    }
                                 }
                             }
                         }

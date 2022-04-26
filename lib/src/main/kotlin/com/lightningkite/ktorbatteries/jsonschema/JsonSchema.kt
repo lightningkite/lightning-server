@@ -70,6 +70,22 @@ enum class JsonType(jsonType: String) {
 @Target()
 annotation class JsonSchema {
   /**
+   * Format, passed onto schema
+   */
+  @SerialInfo
+  @Retention(AnnotationRetention.BINARY)
+  @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+  annotation class Options(val json: String)
+
+  /**
+   * Format, passed onto schema
+   */
+  @SerialInfo
+  @Retention(AnnotationRetention.BINARY)
+  @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+  annotation class Format(val format: String)
+
+  /**
    * Description of this property
    */
   @SerialInfo

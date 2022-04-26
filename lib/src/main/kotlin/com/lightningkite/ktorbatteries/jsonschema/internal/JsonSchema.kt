@@ -5,8 +5,16 @@ import com.lightningkite.ktorbatteries.jsonschema.JsonSchema.*
 import com.lightningkite.ktorbatteries.jsonschema.JsonSchema.IntRange
 import com.lightningkite.ktorbatteries.jsonschema.JsonType
 import com.lightningkite.ktorbatteries.serialization.Serialization
+import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.json.*
+import kotlinx.serialization.modules.SerializersModuleCollector
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZonedDateTime
+import kotlin.reflect.KClass
 
 @PublishedApi
 internal inline val SerialDescriptor.jsonLiteral
@@ -158,6 +166,7 @@ internal fun SerialDescriptor.jsonSchemaString(
     return jsonSchemaElement(annotations) {
         val pattern = annotations.lastOfInstance<Pattern>()?.pattern ?: ""
         val enum = annotations.lastOfInstance<StringEnum>()?.values ?: arrayOf()
+        val format = annotations.lastOfInstance<Format>()?.format
 
         if (pattern.isNotEmpty()) {
             it["pattern"] = pattern
@@ -165,6 +174,10 @@ internal fun SerialDescriptor.jsonSchemaString(
 
         if (enum.isNotEmpty()) {
             it["enum"] = enum.toList()
+        }
+
+        format?.let { f ->
+            it["format"] = f
         }
     }
 }
@@ -203,8 +216,40 @@ internal fun SerialDescriptor.createJsonSchema(
     annotations: List<Annotation>,
     definitions: JsonSchemaDefinitions
 ): JsonObject {
+    if(this.kind == SerialKind.CONTEXTUAL)
+        return Serialization.module.getContextualDescriptor(this)!!.createJsonSchema(annotations, definitions)
+
     val combinedAnnotations = annotations + this.annotations
     val key = JsonSchemaDefinitions.Key(this, combinedAnnotations)
+
+    when(this) {
+        Serialization.module.getContextual(Instant::class)?.descriptor -> {
+            return jsonSchemaElement(annotations) {
+                it["format"] = "datetime-local"
+                it["options"] = buildJsonObject {
+                    putJsonObject("flatpickr") {
+                        put("dateFormat", "Z")
+                        put("time_24hr", true)
+                    }
+                }
+            }
+        }
+//        Serialization.module.getContextual(ZonedDateTime::class)?.descriptor -> {
+//            return jsonSchemaElement(annotations) {
+//                it["format"] = "datetime-local"
+//            }
+//        }
+        Serialization.module.getContextual(LocalDate::class)?.descriptor -> {
+            return jsonSchemaElement(annotations) {
+                it["format"] = "date"
+            }
+        }
+        Serialization.module.getContextual(LocalTime::class)?.descriptor -> {
+            return jsonSchemaElement(annotations) {
+                it["format"] = "time"
+            }
+        }
+    }
 
     return when (jsonType) {
         JsonType.NUMBER -> definitions.get(key) { jsonSchemaNumber(combinedAnnotations) }
@@ -245,6 +290,10 @@ internal fun JsonObjectBuilder.applyJsonSchemaDefaults(
 
         if (description.isNotEmpty()) {
             this["description"] = description
+        }
+
+        annotations.lastOfInstance<Options>()?.let {
+            this["options"] = Serialization.json.parseToJsonElement(it.json) as JsonObject
         }
     }
 }

@@ -7,6 +7,7 @@ import com.lightningkite.ktorbatteries.db.adminPages
 import com.lightningkite.ktorbatteries.db.database
 import com.lightningkite.ktorbatteries.files.FilesSettings
 import com.lightningkite.ktorbatteries.files.configureFiles
+import com.lightningkite.ktorbatteries.jsonschema.JsonSchema
 import com.lightningkite.ktorbatteries.logging.LoggingSettings
 import com.lightningkite.ktorbatteries.mongo.MongoSettings
 import com.lightningkite.ktorbatteries.mongo.mongoDb
@@ -28,7 +29,8 @@ data class TestModel(
     override val _id: UUID = UUID.randomUUID(),
     val timestamp: Instant = Instant.now(),
     val name: String = "No Name",
-    val number: Int = 3123
+    val number: Int = 3123,
+    @JsonSchema.Format("jodit") val content: String = ""
 ): HasId
 
 @Serializable
@@ -38,8 +40,8 @@ data class User(
     val email: String
 ): HasId
 
-val TestModel.Companion.mongo get() = database.collection<TestModel>("TestModel")
-val User.Companion.mongo get() = database.collection<User>("User")
+val TestModel.Companion.table get() = database.collection<TestModel>("TestModel")
+val User.Companion.table get() = database.collection<User>("User")
 
 data class UserPrincipal(val user: User): Principal
 
@@ -61,13 +63,13 @@ fun main(vararg args: String) {
         configureSerialization()
         authentication {
             quickJwt { id ->
-                User.mongo
+                User.table
                     .get(UUID.fromString(id))
                     ?.let { UserPrincipal(it) }
             }
         }
         routing {
-            adminPages(TestModel.mongo, defaultItem = {TestModel()}) { user: UserPrincipal? -> SecurityRules.AllowAll() }
+            adminPages(TestModel.table, defaultItem = {TestModel()}) { user: UserPrincipal? -> SecurityRules.AllowAll() }
         }
     }
 }

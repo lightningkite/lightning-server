@@ -10,14 +10,30 @@ import kotlin.reflect.typeOf
 
 
 fun HEAD.includeFormScript() {
+    script { src = "https://cdn.jsdelivr.net/npm/@json-editor/json-editor@latest/dist/jsoneditor.min.js" }
+
     link(
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css",
+        href = "https://cdn.jsdelivr.net/npm/flatpickr@4.6.3/dist/flatpickr.min.css",
         rel = "stylesheet"
     ) {
-        integrity = "sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3"
         attributes["crossorigin"] = "anonymous"
     }
-    script { src = "https://cdn.jsdelivr.net/npm/@json-editor/json-editor@latest/dist/jsoneditor.min.js" }
+    script {
+        src = "https://cdn.jsdelivr.net/npm/flatpickr@4.6.3/dist/flatpickr.min.js"
+        integrity = "sha256-/irFIZmSo2CKXJ4rxHWfrI+yGJuI16Z005X/bENdpTY="
+        attributes["crossorigin"] = "anonymous"
+    }
+    unsafe {
+        +"""
+    
+    <script src="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/jodit/3.17.1/jodit.min.css"/>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jodit/3.17.1/jodit.min.js"></script>    
+        """.trimIndent()
+    }
 }
 
 inline fun <reified T> FORM.insideHtmlForm(
@@ -26,7 +42,7 @@ inline fun <reified T> FORM.insideHtmlForm(
     defaultValue: T? = null,
     collapsed: Boolean = false,
 ) {
-    input(InputType.hidden, name="__json") {
+    input(InputType.hidden, name = "__json") {
         id = "$jsEditorName-input"
     }
     jsForm(
@@ -37,11 +53,13 @@ inline fun <reified T> FORM.insideHtmlForm(
     )
     script {
         unsafe {
-            raw("""
+            raw(
+                """
                 $jsEditorName.on('change', function () {
                     document.querySelector('#$jsEditorName-input').value = JSON.stringify(editor.getValue())
                 })
-                """.trimIndent())
+                """.trimIndent()
+            )
         }
     }
 }
@@ -69,10 +87,15 @@ fun FlowContent.jsFormUntyped(
                     disable_properties: true,
                     form_name_root: "$title",
                     collapsed: $collapsed,
-                    theme: 'bootstrap4',
                     schema: ${Serialization.json.encodeToSchema(Serialization.module.serializer(type))}
                 });
-                ${if(defaultValue != null) "${jsEditorName}.on('ready', () => ${jsEditorName}.setValue(${Json(Serialization.json) { encodeDefaults = true }.encodeToString(Serialization.module.serializer(type), defaultValue)}))" else "" }
+                ${
+                if (defaultValue != null) "${jsEditorName}.on('ready', () => ${jsEditorName}.setValue(${
+                    Json(
+                        Serialization.json
+                    ) { encodeDefaults = true }.encodeToString(Serialization.module.serializer(type), defaultValue)
+                }))" else ""
+            }
             """.trimIndent()
         }
     }
@@ -101,11 +124,18 @@ fun FlowContent.displayUntyped(
                     disable_properties: true,
                     form_name_root: "$title",
                     collapsed: $collapsed,
-                    theme: 'bootstrap4',
                     schema: ${Serialization.json.encodeToSchema(Serialization.module.serializer(type))}
                 });
                 ${jsEditorName}.disable()
-                ${if(defaultValue != null) "${jsEditorName}.setValue(${Serialization.json.encodeToString(Serialization.module.serializer(type), defaultValue)})" else "" }
+                ${
+                if (defaultValue != null) "${jsEditorName}.setValue(${
+                    Serialization.json.encodeToString(
+                        Serialization.module.serializer(
+                            type
+                        ), defaultValue
+                    )
+                })" else ""
+            }
             """.trimIndent()
         }
     }
