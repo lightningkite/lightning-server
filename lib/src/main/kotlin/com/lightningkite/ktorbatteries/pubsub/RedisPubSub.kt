@@ -18,7 +18,6 @@ class RedisPubSub(val client: StatefulRedisPubSubConnection<String, String>): Pu
             .filter { it.channel == key }
             .map { Serialization.json.decodeFromString(serializer, it.message) }
         return object: PubSubChannel<T> {
-            @InternalCoroutinesApi
             override suspend fun collect(collector: FlowCollector<T>) {
                 listen.collect { collector.emit(it) }
             }

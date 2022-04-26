@@ -1,16 +1,13 @@
 package com.lightningkite.ktorbatteries.typed
 
 import com.lightningkite.ktorbatteries.jsonschema.encodeToSchema
-import com.lightningkite.ktorbatteries.routes.*
 import com.lightningkite.ktorbatteries.serialization.Serialization
-import io.ktor.html.*
-import io.ktor.http.*
-import io.ktor.response.*
-import io.ktor.routing.*
 import kotlinx.html.*
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
+
 
 fun HEAD.includeFormScript() {
     link(
@@ -23,14 +20,40 @@ fun HEAD.includeFormScript() {
     script { src = "https://cdn.jsdelivr.net/npm/@json-editor/json-editor@latest/dist/jsoneditor.min.js" }
 }
 
-inline fun <reified T> FlowContent.form(
+inline fun <reified T> FORM.insideHtmlForm(
     title: String,
     jsEditorName: String,
     defaultValue: T? = null,
     collapsed: Boolean = false,
-) = formUntyped(title, jsEditorName, typeOf<T>(), defaultValue, collapsed)
+) {
+    input(InputType.hidden, name="__json") {
+        id = "$jsEditorName-input"
+    }
+    jsForm(
+        title = title,
+        jsEditorName = jsEditorName,
+        defaultValue = defaultValue,
+        collapsed = collapsed
+    )
+    script {
+        unsafe {
+            raw("""
+                $jsEditorName.on('change', function () {
+                    document.querySelector('#$jsEditorName-input').value = JSON.stringify(editor.getValue())
+                })
+                """.trimIndent())
+        }
+    }
+}
 
-fun FlowContent.formUntyped(
+inline fun <reified T> FlowContent.jsForm(
+    title: String,
+    jsEditorName: String,
+    defaultValue: T? = null,
+    collapsed: Boolean = false,
+) = jsFormUntyped(title, jsEditorName, typeOf<T>(), defaultValue, collapsed)
+
+fun FlowContent.jsFormUntyped(
     title: String,
     jsEditorName: String,
     type: KType,
@@ -49,7 +72,7 @@ fun FlowContent.formUntyped(
                     theme: 'bootstrap4',
                     schema: ${Serialization.json.encodeToSchema(Serialization.module.serializer(type))}
                 });
-                ${if(defaultValue != null) "${jsEditorName}.setValue(${Serialization.json.encodeToString(Serialization.module.serializer(type), defaultValue)})" else "" }
+                ${if(defaultValue != null) "${jsEditorName}.on('ready', () => ${jsEditorName}.setValue(${Json(Serialization.json) { encodeDefaults = true }.encodeToString(Serialization.module.serializer(type), defaultValue)}))" else "" }
             """.trimIndent()
         }
     }
@@ -84,48 +107,6 @@ fun FlowContent.displayUntyped(
                 ${jsEditorName}.disable()
                 ${if(defaultValue != null) "${jsEditorName}.setValue(${Serialization.json.encodeToString(Serialization.module.serializer(type), defaultValue)})" else "" }
             """.trimIndent()
-        }
-    }
-}
-
-fun Route.helpFor(api: APIEndpoint<*, *, *, *>) = get {
-    if(api.inputType == null) {
-        context.respond(HttpStatusCode.NoContent)
-        return@get
-    }
-    this.context.respondHtml {
-        head {
-            includeFormScript()
-        }
-        body {
-            script {
-                unsafe {
-                    raw("""
-                        async function submit() {
-                            const r = await fetch("${api.route.fullPath}", { method: '${api.route.selector.maybeMethod?.value}', body: editor.getValue() })
-                            const asJson = await r.json()
-                            result.setValue(asJson)
-                        }
-                    """.trimIndent())
-                }
-            }
-            h1 {
-                +api.route.fullPath
-            }
-            formUntyped("Input", "editor", api.inputType)
-            button(type = ButtonType.button, classes = "btn btn-primary") {
-                onClick = "submit()"
-                +"Submit"
-            }
-            displayUntyped("Output", "result", api.outputType, collapsed = true)
-        }
-    }
-}
-
-fun Route.apiHelp() {
-    for(subj in API.subjects) {
-        for(child in subj.children) {
-            route(child.route.fullPath + "/" + child.route.selector.maybeMethod?.value) { helpFor(child) }.also { println(it.fullPath) }
         }
     }
 }

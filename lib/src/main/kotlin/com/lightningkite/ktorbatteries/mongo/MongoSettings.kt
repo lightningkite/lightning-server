@@ -4,6 +4,7 @@ import com.lightningkite.kotlinercli.cli
 import com.lightningkite.ktorbatteries.SettingSingleton
 import com.lightningkite.ktorbatteries.serverhealth.HealthCheckable
 import com.lightningkite.ktorbatteries.serverhealth.HealthStatus
+import com.lightningkite.ktorkmongo.database
 import com.lightningkite.ktorkmongo.embeddedMongo
 import com.lightningkite.ktorkmongo.fixUuidSerialization
 import com.lightningkite.ktorkmongo.testMongo
@@ -32,7 +33,7 @@ data class MongoSettings(
                     .applyConnectionString(ConnectionString(url))
                     .uuidRepresentation(UuidRepresentation.STANDARD)
                     .build()
-            ).coroutine
+            )
             else -> throw IllegalArgumentException("MongoDB connection style not recognized: got $url but only understand file:, mongodb:, and test")
         }
     }
@@ -50,7 +51,7 @@ data class MongoSettings(
     override suspend fun healthCheck(): HealthStatus =
         try {
             withTimeout(5000L) {
-                mongoDb.listCollectionNames()
+                mongoDb.database.listCollectionNames()
                 HealthStatus("Database", true)
             }
         } catch (e: Exception) {
@@ -58,4 +59,4 @@ data class MongoSettings(
         }
 }
 
-val mongoDb get() = MongoSettings.instance.client.getDatabase(MongoSettings.instance.databaseName)
+val mongoDb get() = MongoSettings.instance.client.database(MongoSettings.instance.databaseName)

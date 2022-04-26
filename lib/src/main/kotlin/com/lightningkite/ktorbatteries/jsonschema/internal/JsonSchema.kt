@@ -4,16 +4,17 @@ import com.lightningkite.ktorbatteries.jsonschema.JsonSchema
 import com.lightningkite.ktorbatteries.jsonschema.JsonSchema.*
 import com.lightningkite.ktorbatteries.jsonschema.JsonSchema.IntRange
 import com.lightningkite.ktorbatteries.jsonschema.JsonType
+import com.lightningkite.ktorbatteries.serialization.Serialization
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.json.*
 
 @PublishedApi
 internal inline val SerialDescriptor.jsonLiteral
-    inline get() = kind.jsonType.json
+    inline get() = jsonType.json
 
 @PublishedApi
-internal val SerialKind.jsonType: JsonType
-    get() = when (this) {
+internal val SerialDescriptor.jsonType: JsonType
+    get() = when (this.kind) {
         StructureKind.LIST -> JsonType.ARRAY
         StructureKind.MAP -> JsonType.OBJECT_MAP
         PolymorphicKind.SEALED -> JsonType.OBJECT_SEALED
@@ -21,6 +22,7 @@ internal val SerialKind.jsonType: JsonType
         PrimitiveKind.FLOAT, PrimitiveKind.DOUBLE -> JsonType.NUMBER
         PrimitiveKind.STRING, PrimitiveKind.CHAR, SerialKind.ENUM -> JsonType.STRING
         PrimitiveKind.BOOLEAN -> JsonType.BOOLEAN
+        SerialKind.CONTEXTUAL -> Serialization.module.getContextualDescriptor(this)!!.jsonType
         else -> JsonType.OBJECT
     }
 
@@ -204,7 +206,7 @@ internal fun SerialDescriptor.createJsonSchema(
     val combinedAnnotations = annotations + this.annotations
     val key = JsonSchemaDefinitions.Key(this, combinedAnnotations)
 
-    return when (kind.jsonType) {
+    return when (jsonType) {
         JsonType.NUMBER -> definitions.get(key) { jsonSchemaNumber(combinedAnnotations) }
         JsonType.STRING -> definitions.get(key) { jsonSchemaString(combinedAnnotations) }
         JsonType.BOOLEAN -> definitions.get(key) { jsonSchemaBoolean(combinedAnnotations) }
