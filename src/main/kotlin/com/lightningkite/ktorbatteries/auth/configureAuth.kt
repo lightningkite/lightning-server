@@ -18,66 +18,47 @@ import io.ktor.routing.*
 import kotlinx.serialization.Serializable
 import java.util.*
 
-private fun JWTAuthenticationProvider.Configuration.sharedSetup() {
-    realm = AuthSettings.instance.jwtRealm
-    authHeader {
-        val token = it.request.header(HttpHeaders.Authorization)?.removePrefix("Bearer ")
-            ?: run {
-                val value = it.request.queryParameters["jwt"]
-                if (value != null) {
-                    it.response.header(
-                        "Set-Cookie", renderSetCookieHeader(
-                            name = HttpHeaders.Authorization,
-                            value = value,
-                            domain = AuthSettings.instance.authDomain,
-                            secure = it.request.headers["X-Scheme"]?.contains("https") == true,
-                            extensions = mapOf("SameSite" to "Lax")
-                        )
-                    )
-                }
-                value
-            }
-            ?: it.request.cookies[HttpHeaders.Authorization]
-            ?: return@authHeader null
-        HttpAuthHeader.Single(AuthScheme.Bearer, token)
-    }
-    verifier(
-        JWT
-            .require(Algorithm.HMAC256(AuthSettings.instance.jwtSecret))
-            .withAudience(AuthSettings.instance.jwtAudience)
-            .withIssuer(AuthSettings.instance.jwtIssuer)
-            .build()
-    )
-}
-
-fun Authentication.Configuration.jwtCustomChecks(
+/**
+Handles the setup and main verification for jwt token authentication.
+The only thing required from the user is to provide a Principal object.
+The user can also do any other verification they may need at the same time.
+A return of null from jwtChecksAndPrincipal will result in authentication failure.
+ */
+fun Authentication.Configuration.quickJwt(
     jwtChecksAndPrincipal: suspend (JWTCredential) -> Principal?,
 ) {
     jwt {
-        sharedSetup()
+        realm = AuthSettings.instance.jwtRealm
+        authHeader {
+            val token = it.request.header(HttpHeaders.Authorization)?.removePrefix("Bearer ")
+                ?: run {
+                    val value = it.request.queryParameters["jwt"]
+                    if (value != null) {
+                        it.response.header(
+                            "Set-Cookie", renderSetCookieHeader(
+                                name = HttpHeaders.Authorization,
+                                value = value,
+                                domain = AuthSettings.instance.authDomain,
+                                secure = it.request.headers["X-Scheme"]?.contains("https") == true,
+                                extensions = mapOf("SameSite" to "Lax")
+                            )
+                        )
+                    }
+                    value
+                }
+                ?: it.request.cookies[HttpHeaders.Authorization]
+                ?: return@authHeader null
+            HttpAuthHeader.Single(AuthScheme.Bearer, token)
+        }
+        verifier(
+            JWT
+                .require(Algorithm.HMAC256(AuthSettings.instance.jwtSecret))
+                .withAudience(AuthSettings.instance.jwtAudience)
+                .withIssuer(AuthSettings.instance.jwtIssuer)
+                .build()
+        )
         validate { credential: JWTCredential ->
             jwtChecksAndPrincipal(credential)
-        }
-    }
-}
-
-fun Authentication.Configuration.quickJwt(
-    jwtChecks: suspend (JWTCredential) -> Boolean = { true },
-    idToPrincipal: suspend (String) -> Principal?
-) {
-    jwt {
-        sharedSetup()
-        validate { credential: JWTCredential ->
-            if (
-                credential.payload.audience.contains(AuthSettings.instance.jwtAudience) &&
-                credential.payload.issuer == AuthSettings.instance.jwtIssuer &&
-                jwtChecks(credential)
-            ) {
-                credential.payload
-                    .getClaim(AuthSettings.userIdKey)
-                    .asString()
-                    .let { idToPrincipal(it) }
-            } else null
         }
     }
 }
