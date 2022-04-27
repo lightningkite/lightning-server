@@ -2,6 +2,7 @@ package com.lightningkite.ktorbatteries.auth
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import com.google.rpc.context.AttributeContext.Auth
 import com.lightningkite.ktorbatteries.email.Attachment
 import com.lightningkite.ktorbatteries.email.EmailSettings
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
@@ -17,40 +18,55 @@ import io.ktor.routing.*
 import kotlinx.serialization.Serializable
 import java.util.*
 
+private fun JWTAuthenticationProvider.Configuration.sharedSetup() {
+    realm = AuthSettings.instance.jwtRealm
+    authHeader {
+        val token = it.request.header(HttpHeaders.Authorization)?.removePrefix("Bearer ")
+            ?: run {
+                val value = it.request.queryParameters["jwt"]
+                if (value != null) {
+                    it.response.header(
+                        "Set-Cookie", renderSetCookieHeader(
+                            name = HttpHeaders.Authorization,
+                            value = value,
+                            domain = AuthSettings.instance.authDomain,
+                            secure = it.request.headers["X-Scheme"]?.contains("https") == true,
+                            extensions = mapOf("SameSite" to "Lax")
+                        )
+                    )
+                }
+                value
+            }
+            ?: it.request.cookies[HttpHeaders.Authorization]
+            ?: return@authHeader null
+        HttpAuthHeader.Single(AuthScheme.Bearer, token)
+    }
+    verifier(
+        JWT
+            .require(Algorithm.HMAC256(AuthSettings.instance.jwtSecret))
+            .withAudience(AuthSettings.instance.jwtAudience)
+            .withIssuer(AuthSettings.instance.jwtIssuer)
+            .build()
+    )
+}
+
+fun Authentication.Configuration.jwtCustomChecks(
+    jwtChecksAndPrincipal: suspend (JWTCredential) -> Principal?,
+) {
+    jwt {
+        sharedSetup()
+        validate { credential: JWTCredential ->
+            jwtChecksAndPrincipal(credential)
+        }
+    }
+}
+
 fun Authentication.Configuration.quickJwt(
-    jwtChecks: (JWTCredential) -> Boolean = { true },
+    jwtChecks: suspend (JWTCredential) -> Boolean = { true },
     idToPrincipal: suspend (String) -> Principal?
 ) {
     jwt {
-        realm = AuthSettings.instance.jwtRealm
-        authHeader {
-            val token = it.request.header(HttpHeaders.Authorization)?.removePrefix("Bearer ")
-                ?: run {
-                    val value = it.request.queryParameters["jwt"]
-                    if (value != null) {
-                        it.response.header(
-                            "Set-Cookie", renderSetCookieHeader(
-                                name = HttpHeaders.Authorization,
-                                value = value,
-                                domain = AuthSettings.instance.authDomain,
-                                secure = it.request.headers["X-Scheme"]?.contains("https") == true,
-                                extensions = mapOf("SameSite" to "Lax")
-                            )
-                        )
-                    }
-                    value
-                }
-                ?: it.request.cookies[HttpHeaders.Authorization]
-                ?: return@authHeader null
-            HttpAuthHeader.Single(AuthScheme.Bearer, token)
-        }
-        verifier(
-            JWT
-                .require(Algorithm.HMAC256(AuthSettings.instance.jwtSecret))
-                .withAudience(AuthSettings.instance.jwtAudience)
-                .withIssuer(AuthSettings.instance.jwtIssuer)
-                .build()
-        )
+        sharedSetup()
         validate { credential: JWTCredential ->
             if (
                 credential.payload.audience.contains(AuthSettings.instance.jwtAudience) &&
