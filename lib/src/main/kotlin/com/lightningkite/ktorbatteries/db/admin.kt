@@ -41,8 +41,6 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminDetail(
     get("{id}") {
         val secured = collection.secure(secure(this.context.principal()))
         val item = secured.get(this.context.parameters["id"]!!.toUuidOrBadRequest().also { println(it) })
-        println(secured.query(Query()).toList())
-        println(item)
         context.respondHtml {
             head { includeFormScript() }
             body {
@@ -57,21 +55,31 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminDetail(
                     button {
                         +"Save"
                     }
-                    deleteButton {
+                    a(href = "${context.parameters["id"]!!}/delete") {
                         +"Delete"
                     }
                 }
             }
         }
     }
-    delete("{id}") {
+    get("{id}/delete") {
+        call.respondHtml {
+            body {
+                p { +"Are you sure?" }
+                form {
+                    button(formMethod = ButtonFormMethod.post) { +"Yes" }
+                }
+            }
+        }
+    }
+    post("{id}/delete") {
         collection.deleteOneById(this.context.parameters["id"]!!.toUuidOrBadRequest())
         call.respondRedirect("..")
     }
     post("{id}") {
         val item: T = call.receive()
         collection.replaceOneById(this.context.parameters["id"]!!.toUuidOrBadRequest(), item)
-        call.respondRedirect("..")
+        call.respondRedirect(".")
     }
     get("create") {
         val user = this.context.principal<USER>()
@@ -97,7 +105,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminDetail(
     post("create") {
         val item: T = call.receive()
         collection.insertOne(item)
-        call.respondRedirect("..")
+        call.respondRedirect(".")
     }
 }
 
@@ -121,7 +129,8 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminList(
         val keys = propItems.flatMap { it.keys }.distinct()
         context.respondHtml {
             body {
-                a(href = "create") {
+                println("/" + (this@adminList.selector as PathSegmentConstantRouteSelector).value + "/create")
+                a(href = "/" + (this@adminList.selector as PathSegmentConstantRouteSelector).value + "/create") {
                     +"Create"
                 }
                 table {

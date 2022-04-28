@@ -20,6 +20,7 @@ data class FilesSettings(
         instance = this
     }
 
+    override val healthCheckName: String get() = "Storage"
     override suspend fun healthCheck(): HealthStatus = try {
         files()
             .resolveFile("$storageUrl/healthCheck.txt")
@@ -28,9 +29,9 @@ data class FilesSettings(
                     .buffered()
                     .use { out -> "Health Check".toByteArray().inputStream().copyTo(out) }
             }
-        HealthStatus("Storage", true, null)
+        HealthStatus(HealthStatus.Level.OK)
     } catch (e: Exception) {
-        HealthStatus("Storage", false, e.message)
+        HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
     }
 }
 

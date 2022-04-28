@@ -48,14 +48,15 @@ data class MongoSettings(
         instance = this
     }
 
+    override val healthCheckName: String get() = "Database"
     override suspend fun healthCheck(): HealthStatus =
         try {
             withTimeout(5000L) {
                 mongoDb.database.listCollectionNames()
-                HealthStatus("Database", true)
+                HealthStatus(HealthStatus.Level.OK)
             }
         } catch (e: Exception) {
-            HealthStatus("Database", false, e.message)
+            HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
         }
 }
 

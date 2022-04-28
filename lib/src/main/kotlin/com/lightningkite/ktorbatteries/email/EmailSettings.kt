@@ -35,87 +35,15 @@ data class EmailSettings(
         instance = this
     }
 
-    override suspend fun healthCheck(): HealthStatus = try {
-        emailClient.send("Test Message", listOf("test@example.com"), "Test Message", null)
-        HealthStatus("Email", true)
-    } catch (e: Exception) {
-        e.printStackTrace()
-        println(e.message)
-        HealthStatus("Email", false, e.message)
-    }
-
-
-    fun healthCheck2(): HealthStatus {
-        when (option) {
-            EmailClientOption.Console -> return HealthStatus("Email", true)
-            EmailClientOption.Smtp -> {
-                if (smtp == null) return HealthStatus("Email", false)
-                else {
-                    return try {
-                        SSLSocketFactory.getDefault().createSocket(smtp.hostName, smtp.port)
-                    } catch (e: Exception) {
-                        return HealthStatus("Email", false, "Host or port failed")
-                    }.use socket@{ socket ->
-                        BufferedReader(InputStreamReader(socket.getInputStream())).use reader@{ reader ->
-                            DataOutputStream(socket.getOutputStream()).use { output ->
-
-                                var message = "EHLO ${smtp.hostName}\r\n"
-                                output.writeBytes(message)
-                                var response: String = reader.readLine()
-                                if (response.substringBefore(" ") != "250") return@use HealthStatus(
-                                    "Email",
-                                    false,
-                                    "Host or port failed"
-                                )
-                                while (response != "") {
-                                    response = reader.readLine()
-                                }
-
-                                message = "AUTH LOGIN\r\n"
-                                output.writeBytes(message)
-                                response = reader.readLine()
-                                if (response.substringBefore(" ") != "334") return@use HealthStatus(
-                                    "Email",
-                                    false,
-                                    "Server hated our auth request"
-                                )
-                                while (response != "") {
-                                    response = reader.readLine()
-                                }
-
-                                message = "${Base64.getEncoder().encodeToString(smtp.username?.toByteArray())}\r\n"
-                                output.writeBytes(message)
-                                response = reader.readLine()
-                                if (response.substringBefore(" ") != "334") return@use HealthStatus(
-                                    "Email",
-                                    false,
-                                    "Bad Username"
-                                )
-                                while (response != "") {
-                                    response = reader.readLine()
-                                }
-
-                                message = "${Base64.getEncoder().encodeToString(smtp.password?.toByteArray())}\r\n"
-                                output.writeBytes(message)
-                                response = reader.readLine()
-                                if (response.substringBefore(" ") != "334") return@use HealthStatus(
-                                    "Email",
-                                    false,
-                                    "Bad Password"
-                                )
-                                while (response != "") {
-                                    response = reader.readLine()
-                                }
-
-                                message = "QUIT\r\n"
-                                output.writeBytes(message)
-
-                                return@use HealthStatus("Email", true)
-                            }
-                        }
-                    }
-                }
-            }
+    override val healthCheckName: String get() = "Email"
+    override suspend fun healthCheck(): HealthStatus {
+        return try {
+            emailClient.send("Test Message", listOf("test@example.com"), "Test Message", null)
+            HealthStatus(HealthStatus.Level.OK)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            println(e.message)
+            HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
         }
     }
 }

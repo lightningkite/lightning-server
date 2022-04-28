@@ -1,14 +1,16 @@
 # TODO
 
 - [ ] Auth: safer tokens?  refresh?
-- [ ] Error reporting to Sentry
+- [X] Error reporting to Sentry
+- [ ] Type safe routing?
+- [ ] OAuth2 Google/Apple Login
 - [ ] SMS through Twilio
 - [ ] Cache through Redis
 - [ ] Performance Monitoring
 - [ ] JVM server detail configuration?
 - [ ] Auto Admin
   - [ ] Foreign Keys in Editor
-  - [ ] Delete
+  - [X] Delete
   - [ ] Filter List
   - [ ] Sort List
   - [ ] Multiple Pages

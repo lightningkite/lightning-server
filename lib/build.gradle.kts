@@ -61,6 +61,8 @@ dependencies {
     testImplementation("io.ktor:ktor-server-content-negotiation-jvm:$ktorVersion")
     testImplementation("io.ktor:ktor-server-cio-jvm:$ktorVersion")
 
+    implementation("io.sentry:sentry:5.5.2")
+
     kspTest("com.lightningkite.ktorkmongo:processor:$ktorKmongoVersion")
 
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")

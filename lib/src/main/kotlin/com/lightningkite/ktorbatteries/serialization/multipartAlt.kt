@@ -1,54 +1,58 @@
-/*
- * Copyright 2014-2021 JetBrains s.r.o and contributors. Use of this source code is governed by the Apache 2.0 license.
- */
-
 package com.lightningkite.ktorbatteries.serialization
 
 import io.ktor.http.*
 import io.ktor.http.cio.*
 import io.ktor.http.cio.internals.*
+import io.ktor.http.content.*
 import io.ktor.network.util.*
+import io.ktor.util.*
 import io.ktor.utils.io.*
 import io.ktor.utils.io.core.*
 import io.ktor.utils.io.pool.*
+import io.ktor.utils.io.streams.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
+import org.litote.kmongo.out
 import java.io.*
 import java.io.EOFException
 import java.nio.*
+import kotlin.coroutines.CoroutineContext
 import kotlin.math.min
-
 
 /**
  * Parse a multipart preamble
  * @return number of bytes copied
  */
+private val dashDash = ByteBuffer.wrap("--".toByteArray())
 private suspend fun parsePreambleImpl(
-    boundaryPrefixed: ByteBuffer,
     input: ByteReadChannel,
     output: BytePacketBuilder,
     limit: Long = Long.MAX_VALUE
-): Long {
-    return copyUntilBoundary(
-        "preamble/prologue",
-        boundaryPrefixed,
-        input,
-        { output.writeFully(it) },
-        limit
-    )
-}
-/**
- * Parse multipart part headers
- */
-private suspend fun parsePartHeadersImpl(input: ByteReadChannel): HttpHeadersMap {
-    val builder = CharArrayBuilder()
+): ByteBuffer {
+    val buffer = DefaultByteBufferPool.borrow()
+    var copied = 0L
 
     try {
-        return parseHeaders(input, builder)
-            ?: throw EOFException("Failed to parse multipart headers: unexpected end of stream")
-    } catch (t: Throwable) {
-        builder.release()
-        throw t
+        while (true) {
+            buffer.clear()
+            val rc = input.readUntilDelimiter(CrLf, buffer)
+            buffer.flip()
+            if(input.isClosedForRead) throw IOException("eh?")
+            if(buffer.startsWith(dashDash)) {
+                // we found the delimiter!
+                return ByteBuffer.wrap("\r\n".toByteArray() + buffer.moveToByteArray())
+            } else {
+                output.writeFully(buffer)
+                output.writeText("\r\n")
+                input.skipDelimiter(CrLf)
+                copied += rc
+                if (copied > limit) {
+                    throw IOException("Multipart preamble limit of $limit bytes exceeded")
+                }
+            }
+        }
+    } finally {
+        DefaultByteBufferPool.recycle(buffer)
     }
 }
 
@@ -117,26 +121,17 @@ private val BoundaryTrailingBuffer = ByteBuffer.allocate(8192)!!
 /**
  * Starts a multipart parser coroutine producing multipart events
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 public fun CoroutineScope.parseMultipart(
-    boundaryPrefixed: ByteBuffer,
-    input: ByteReadChannel,
-    totalLength: Long?
+    input: ByteReadChannel
 ): ReceiveChannel<MultipartEvent> = produce {
     @Suppress("DEPRECATION")
-    val readBeforeParse = input.totalBytesRead
-    val firstBoundary = boundaryPrefixed.duplicate()!!.apply {
-        position(2)
-    }
 
     val preamble = BytePacketBuilder()
-    parsePreambleImpl(firstBoundary, input, preamble, 8192)
+    val boundary = parsePreambleImpl(input, preamble, 8192)
 
     if (preamble.size > 0) {
         send(MultipartEvent.Preamble(preamble.build()))
-    }
-
-    if (skipBoundary(firstBoundary, input)) {
-        return@produce
     }
 
     val trailingBuffer = BoundaryTrailingBuffer.duplicate()
@@ -155,12 +150,12 @@ public fun CoroutineScope.parseMultipart(
 
         var hh: HttpHeadersMap? = null
         try {
-            hh = parsePartHeadersImpl(input)
+            hh = parseHeaders(input)
             if (!headers.complete(hh)) {
                 hh.release()
                 throw kotlin.coroutines.cancellation.CancellationException("Multipart processing has been cancelled")
             }
-            parsePartBodyImpl(boundaryPrefixed, input, body, hh)
+            parsePartBodyImpl(boundary, input, body, hh)
         } catch (t: Throwable) {
             if (headers.completeExceptionally(t)) {
                 hh?.release()
@@ -170,25 +165,15 @@ public fun CoroutineScope.parseMultipart(
         }
 
         body.close()
-    } while (!skipBoundary(boundaryPrefixed, input))
+    } while (!skipBoundary(boundary, input))
 
     if (input.availableForRead != 0) {
         input.skipDelimiter(CrLf)
     }
 
-    if (totalLength != null) {
-        @Suppress("DEPRECATION")
-        val consumedExceptEpilogue = input.totalBytesRead - readBeforeParse
-        val size = totalLength - consumedExceptEpilogue
-        if (size > Int.MAX_VALUE) throw IOException("Failed to parse multipart: prologue is too long")
-        if (size > 0) {
-            send(MultipartEvent.Epilogue(input.readPacket(size.toInt())))
-        }
-    } else {
-        val epilogueContent = input.readRemaining()
-        if (epilogueContent.isNotEmpty) {
-            send(MultipartEvent.Epilogue(epilogueContent))
-        }
+    val epilogueContent = input.readRemaining()
+    if (epilogueContent.isNotEmpty) {
+        send(MultipartEvent.Epilogue(epilogueContent))
     }
 }
 
@@ -225,63 +210,6 @@ private suspend fun copyUntilBoundary(
 }
 
 private const val PrefixChar = '-'.code.toByte()
-
-private fun findBoundary(contentType: CharSequence): Int {
-    var state = 0 // 0 header value, 1 param name, 2 param value unquoted, 3 param value quoted, 4 escaped
-    var paramNameCount = 0
-
-    for (i in contentType.indices) {
-        val ch = contentType[i]
-
-        when (state) {
-            0 -> {
-                if (ch == ';') {
-                    state = 1
-                    paramNameCount = 0
-                }
-            }
-            1 -> {
-                if (ch == '=') {
-                    state = 2
-                } else if (ch == ';') {
-                    // do nothing
-                    paramNameCount = 0
-                } else if (ch == ',') {
-                    state = 0
-                } else if (ch == ' ') {
-                    // do nothing
-                } else if (paramNameCount == 0 && contentType.startsWith("boundary=", i, ignoreCase = true)) {
-                    return i
-                } else {
-                    paramNameCount++
-                }
-            }
-            2 -> {
-                when (ch) {
-                    '"' -> state = 3
-                    ',' -> state = 0
-                    ';' -> {
-                        state = 1
-                        paramNameCount = 0
-                    }
-                }
-            }
-            3 -> {
-                if (ch == '"') {
-                    state = 1
-                    paramNameCount = 0
-                } else if (ch == '\\') {
-                    state = 4
-                }
-            }
-            4 -> {
-                state = 3
-            }
-        }
-    }
-
-    return -1
-}
 
 /**
  * Tries to skip the specified [delimiter] or fails if encounters bytes differs from the required.
@@ -387,270 +315,114 @@ private fun ByteBuffer.indexOfPartial(sub: ByteBuffer): Int {
     return -1
 }
 
+public class CIOMultipartDataBase2(
+    override val coroutineContext: CoroutineContext,
+    channel: ByteReadChannel,
+    private val formFieldLimit: Int = 65536,
+    private val inMemoryFileUploadLimit: Int = formFieldLimit
+) : MultiPartData, CoroutineScope {
+    private val events: ReceiveChannel<MultipartEvent> = parseMultipart(channel)
 
-internal class CharArrayBuilder(
-    val pool: ObjectPool<CharArray> = CharArrayPool
-) : CharSequence, Appendable {
-
-    private var buffers: MutableList<CharArray>? = null
-    private var current: CharArray? = null
-    private var stringified: String? = null
-    private var released: Boolean = false
-    private var remaining: Int = 0
-
-    override var length: Int = 0
-        private set
-
-    override fun get(index: Int): Char {
-        require(index >= 0) { "index is negative: $index" }
-        require(index < length) { "index $index is not in range [0, $length)" }
-
-        return getImpl(index)
-    }
-
-    private fun getImpl(index: Int) = bufferForIndex(index).get(index % current!!.size)
-
-    override fun subSequence(startIndex: Int, endIndex: Int): CharSequence {
-        require(startIndex <= endIndex) { "startIndex ($startIndex) should be less or equal to endIndex ($endIndex)" }
-        require(startIndex >= 0) { "startIndex is negative: $startIndex" }
-        require(endIndex <= length) { "endIndex ($endIndex) is greater than length ($length)" }
-
-        return SubSequenceImpl(startIndex, endIndex)
-    }
-
-    override fun toString(): String = stringified ?: copy(0, length).toString().also { stringified = it }
-
-    override fun equals(other: Any?): Boolean {
-        if (other !is CharSequence) return false
-        if (length != other.length) return false
-
-        return rangeEqualsImpl(0, other, 0, length)
-    }
-
-    override fun hashCode(): Int = stringified?.hashCode() ?: hashCodeImpl(0, length)
-
-    override fun append(value: Char): Appendable {
-        nonFullBuffer()[current!!.size - remaining] = value
-        stringified = null
-        remaining -= 1
-        length++
-        return this
-    }
-
-    override fun append(value: CharSequence?, startIndex: Int, endIndex: Int): Appendable {
-        value ?: return this
-
-        var current = startIndex
-        while (current < endIndex) {
-            val buffer = nonFullBuffer()
-            val offset = buffer.size - remaining
-            val bytesToCopy = min(endIndex - current, remaining)
-
-            for (i in 0 until bytesToCopy) {
-                buffer[offset + i] = value[current + i]
-            }
-
-            current += bytesToCopy
-            remaining -= bytesToCopy
-        }
-
-        stringified = null
-        length += endIndex - startIndex
-        return this
-    }
-
-    override fun append(value: CharSequence?): Appendable {
-        value ?: return this
-        return append(value, 0, value.length)
-    }
-
-    fun release() {
-        val list = buffers
-
-        if (list != null) {
-            current = null
-            for (i in 0 until list.size) {
-                pool.recycle(list[i])
-            }
-        } else {
-            current?.let { pool.recycle(it) }
-            current = null
-        }
-
-        released = true
-        buffers = null
-        stringified = null
-        length = 0
-        remaining = 0
-    }
-
-    private fun copy(startIndex: Int, endIndex: Int): CharSequence {
-        if (startIndex == endIndex) return ""
-
-        val builder = StringBuilder(endIndex - startIndex)
-
-        var buffer: CharArray
-
-        var base = startIndex - (startIndex % CHAR_BUFFER_ARRAY_LENGTH)
-
-        while (base < endIndex) {
-            buffer = bufferForIndex(base)
-            val innerStartIndex = maxOf(0, startIndex - base)
-            val innerEndIndex = minOf(endIndex - base, CHAR_BUFFER_ARRAY_LENGTH)
-
-            for (innerIndex in innerStartIndex until innerEndIndex) {
-                builder.append(buffer.get(innerIndex))
-            }
-
-            base += CHAR_BUFFER_ARRAY_LENGTH
-        }
-
-        return builder
-    }
-
-    @Suppress("ConvertTwoComparisonsToRangeCheck")
-    private inner class SubSequenceImpl(val start: Int, val end: Int) : CharSequence {
-        private var stringified: String? = null
-
-        override val length: Int
-            get() = end - start
-
-        override fun get(index: Int): Char {
-            val withOffset = index + start
-            require(index >= 0) { "index is negative: $index" }
-            require(withOffset < end) { "index ($index) should be less than length ($length)" }
-
-            return this@CharArrayBuilder.getImpl(withOffset)
-        }
-
-        override fun subSequence(startIndex: Int, endIndex: Int): CharSequence {
-            require(startIndex >= 0) { "start is negative: $startIndex" }
-            require(startIndex <= endIndex) { "start ($startIndex) should be less or equal to end ($endIndex)" }
-            require(endIndex <= end - start) { "end should be less than length ($length)" }
-            if (startIndex == endIndex) return ""
-
-            return SubSequenceImpl(start + startIndex, start + endIndex)
-        }
-
-        override fun toString() = stringified ?: copy(start, end).toString().also { stringified = it }
-
-        override fun equals(other: Any?): Boolean {
-            if (other !is CharSequence) return false
-            if (other.length != length) return false
-
-            return rangeEqualsImpl(start, other, 0, length)
-        }
-
-        override fun hashCode() = stringified?.hashCode() ?: hashCodeImpl(start, end)
-    }
-
-    private fun bufferForIndex(index: Int): CharArray {
-        val list = buffers
-
-        if (list == null) {
-            if (index >= CHAR_BUFFER_ARRAY_LENGTH) throwSingleBuffer(index)
-            return current ?: throwSingleBuffer(index)
-        }
-
-        return list[index / current!!.size]
-    }
-
-    private fun throwSingleBuffer(index: Int): Nothing {
-        if (released) throw IllegalStateException("Buffer is already released")
-        throw IndexOutOfBoundsException("$index is not in range [0; ${currentPosition()})")
-    }
-
-    private fun nonFullBuffer(): CharArray {
-        return if (remaining == 0) appendNewArray() else current!!
-    }
-
-    private fun appendNewArray(): CharArray {
-        val newBuffer = pool.borrow()
-        val existing = current
-        current = newBuffer
-        remaining = newBuffer.size
-
-        released = false
-
-        if (existing != null) {
-            val list = buffers ?: ArrayList<CharArray>().also {
-                buffers = it
-                it.add(existing)
-            }
-
-            list.add(newBuffer)
-        }
-
-        return newBuffer
-    }
-
-    private fun rangeEqualsImpl(start: Int, other: CharSequence, otherStart: Int, length: Int): Boolean {
-        for (i in 0 until length) {
-            if (getImpl(start + i) != other[otherStart + i]) return false
-        }
-
-        return true
-    }
-
-    private fun hashCodeImpl(start: Int, end: Int): Int {
-        var hc = 0
-        for (i in start until end) {
-            hc = 31 * hc + getImpl(i).code
-        }
-
-        return hc
-    }
-
-    private fun currentPosition() = current!!.size - remaining
-}
-
-/**
- * Parse HTTP headers. Not applicable to request and response status lines.
- */
-internal suspend fun parseHeaders(
-    input: ByteReadChannel,
-    builder: io.ktor.http.cio.internals.CharArrayBuilder,
-    range: MutableRange = MutableRange(0, 0)
-): HttpHeadersMap? {
-    val headers = HttpHeadersMap(builder)
-
-    try {
+    override suspend fun readPart(): PartData? {
         while (true) {
-            if (!input.readUTF8LineTo(builder, HTTP_LINE_LIMIT)) {
-                headers.release()
-                return null
+            val event = events.tryReceive().getOrNull() ?: break
+            eventToData(event)?.let { return it }
+        }
+
+        return readPartSuspend()
+    }
+
+    private suspend fun readPartSuspend(): PartData? {
+        try {
+            while (true) {
+                val event = events.receive()
+                eventToData(event)?.let { return it }
             }
+        } catch (t: ClosedReceiveChannelException) {
+            return null
+        }
+    }
 
-            range.end = builder.length
-            val rangeLength = range.end - range.start
+    private suspend fun eventToData(evt: MultipartEvent): PartData? {
+        return try {
+            when (evt) {
+                is MultipartEvent.MultipartPart -> partToData(evt)
+                else -> {
+                    evt.release()
+                    null
+                }
+            }
+        } catch (t: Throwable) {
+            evt.release()
+            throw t
+        }
+    }
 
-            if (rangeLength == 0) break
-            if (rangeLength >= HTTP_LINE_LIMIT) error("Header line length limit exceeded")
+    private suspend fun partToData(part: MultipartEvent.MultipartPart): PartData {
+        val headers = part.headers.await()
 
-            val nameStart = range.start
-            val nameEnd = parseHeaderName(builder, range)
+        val contentDisposition = headers["Content-Disposition"]?.let { ContentDisposition.parse(it.toString()) }
+        val filename = contentDisposition?.parameter("filename")
 
-            val nameHash = builder.hashCodeLowerCase(nameStart, nameEnd)
+        if (filename == null) {
+            val packet = part.body.readRemaining(formFieldLimit.toLong()) // TODO fail if limit exceeded
 
-            val headerEnd = range.end
-            parseHeaderValue(builder, range)
-
-            val valueStart = range.start
-            val valueEnd = range.end
-            val valueHash = builder.hashCodeLowerCase(valueStart, valueEnd)
-            range.start = headerEnd
-
-            headers.put(nameHash, valueHash, nameStart, nameEnd, valueStart, valueEnd)
+            try {
+                return PartData.FormItem(packet.readText(), { part.release() }, CIOHeaders(headers))
+            } finally {
+                packet.release()
+            }
         }
 
-        val host = headers[HttpHeaders.Host]
-        if (host != null && host.any { hostForbiddenSymbols.contains(it) }) {
-            error("Host cannot contain any of the following symbols: $hostForbiddenSymbols")
+        // file upload
+        val buffer = ByteBuffer.allocate(inMemoryFileUploadLimit)
+        part.body.readAvailable(buffer)
+
+        val completeRead = if (buffer.remaining() > 0) {
+            part.body.readAvailable(buffer) == -1
+        } else false
+
+        buffer.flip()
+
+        if (completeRead) {
+            val input = ByteArrayInputStream(buffer.array(), buffer.arrayOffset(), buffer.remaining()).asInput()
+            return PartData.FileItem({ input }, { part.release() }, CIOHeaders(headers))
         }
 
-        return headers
-    } catch (t: Throwable) {
-        headers.release()
-        throw t
+        @Suppress("BlockingMethodInNonBlockingContext")
+        val tmp = File.createTempFile("file-upload", ".tmp")
+
+        FileOutputStream(tmp).use { stream ->
+            stream.channel.use { out ->
+                out.truncate(0L)
+
+                while (true) {
+                    while (buffer.hasRemaining()) {
+                        out.write(buffer)
+                    }
+                    buffer.clear()
+
+                    if (part.body.readAvailable(buffer) == -1) break
+                    buffer.flip()
+                }
+            }
+        }
+
+        var closed = false
+        val lazyInput = lazy {
+            if (closed) throw IllegalStateException("Already disposed")
+            FileInputStream(tmp).asInput()
+        }
+
+        return PartData.FileItem(
+            { lazyInput.value },
+            {
+                closed = true
+                if (lazyInput.isInitialized()) lazyInput.value.close()
+                part.release()
+                tmp.delete()
+            },
+            CIOHeaders(headers)
+        )
     }
 }

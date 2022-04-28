@@ -145,3 +145,15 @@ fun Route.logOut(path: String = "logout") {
         call.respond(HttpStatusCode.NoContent)
     }
 }
+
+/*
+
+By linking up database with users, we could get this setup going:
+
+routing {
+    authUrls(User.table, database)
+}
+
+data class User(...): Principal, HasEmail, HasPhoneNumber
+
+ */

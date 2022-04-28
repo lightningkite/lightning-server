@@ -5,30 +5,49 @@ import io.ktor.server.application.*
 import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import org.slf4j.event.Level
 import java.lang.management.ManagementFactory
 import java.lang.management.OperatingSystemMXBean
+import java.time.Instant
 
 interface HealthCheckable {
+    val healthCheckName: String get() = this::class.simpleName ?: "???"
     suspend fun healthCheck(): HealthStatus
 }
 
-data class HealthStatus(val name: String, val ok: Boolean, val additionalMessage: String? = null)
+data class HealthStatus(val level: Level, val checkedAt: Instant = Instant.now(), val additionalMessage: String? = null) {
+    enum class Level(val color: String) {
+        OK("green"),
+        WARNING("yellow"),
+        URGENT("orange"),
+        ERROR("red")
+    }
+}
 
+private val healthCache = HashMap<HealthCheckable, HealthStatus>()
 fun Route.configureHealth(path: String, features: List<HealthCheckable>) {
     get(path) {
 
+        val now = Instant.now()
         val results = features
-            .map { it.healthCheck() }
+            .map {
+                healthCache[it]?.takeIf {
+                    now.toEpochMilli() - it.checkedAt.toEpochMilli() < 60_000 && it.level <= HealthStatus.Level.WARNING
+                }?.let { s -> return@map it.healthCheckName to s }
+                val result = it.healthCheck()
+                healthCache[it] = result
+                return@map it.healthCheckName to result
+            }
 
         val resultHtml = results
             .joinToString("") { status ->
                 //language=HTML
                 """
-                <p>
-                    <div style='font-size: 18px; font-weight: bold;'>${status.name}</div>
-                     <div style='color: ${if (status.ok) "green" else "red"};'>${if (status.ok) "Good" else "Bad"}</div>
-                     ${status.additionalMessage?.let { "<div>$it</div>" } ?: ""}
-                </p>
+                <div>
+                    <div style='font-size: 18px; font-weight: bold;'>${status.first}</div>
+                     <div style='color: ${status.second.level.color};'>${status.second.level.name}</div>
+                     ${status.second.additionalMessage?.let { "<div>$it</div>" } ?: ""}
+                </div>
                 """.trimIndent()
             }
 
@@ -43,7 +62,7 @@ fun Route.configureHealth(path: String, features: List<HealthCheckable>) {
         val osBean: OperatingSystemMXBean = ManagementFactory.getOperatingSystemMXBean()
         val loadAverage = osBean.systemLoadAverage
 
-        val sendBadCode = loadAverage > 70 || memUsagePercent > 70 || results.any { !it.ok }
+        val sendBadCode = loadAverage > 70 || memUsagePercent > 70 || results.any { it.second.level > HealthStatus.Level.WARNING }
 
         call.respondText(
             //language=HTML

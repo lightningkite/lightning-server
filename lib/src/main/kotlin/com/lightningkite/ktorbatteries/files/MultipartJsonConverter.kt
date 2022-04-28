@@ -1,5 +1,6 @@
 package com.lightningkite.ktorbatteries.files
 
+import com.lightningkite.ktorbatteries.serialization.CIOMultipartDataBase2
 import com.lightningkite.ktorkmongo.IsFile
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
@@ -16,6 +17,7 @@ import io.ktor.utils.io.*
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.GlobalScope.coroutineContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -23,25 +25,29 @@ import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.json.*
 import kotlinx.serialization.serializer
 import org.apache.commons.vfs2.VFS
+import java.nio.ByteBuffer
 import kotlin.io.use
 
 class MultipartJsonConverter(val json: Json) : ContentConverter {
     val jsonKey = "__json"
     override suspend fun deserialize(charset: Charset, typeInfo: TypeInfo, content: ByteReadChannel): Any? {
         val mainData = HashMap<String, Any?>()
+        var baselineJson: JsonElement = JsonNull
         val serializer = json.serializersModule.serializer(typeInfo.reifiedType)
-        multiPartData(ContentType.MultiPart.FormData, null, content).forEachPart { part ->
+        CIOMultipartDataBase2(coroutineContext, content).forEachPart { part ->
             when (part) {
                 is PartData.BinaryChannelItem -> {
                     part.provider().discard()
                 }
                 is PartData.FormItem -> {
-                    if (part.name == jsonKey) json.parseToJsonElement(part.value).jsonObject.writeInto(mainData)
+                    if (part.name == jsonKey) {
+                        baselineJson = json.parseToJsonElement(part.value)
+                    }
                 }
                 is PartData.BinaryItem -> {
-                    if (part.name == jsonKey) json.parseToJsonElement(part.provider().readText()).jsonObject.writeInto(
-                        mainData
-                    )
+                    if (part.name == jsonKey) {
+                        baselineJson = json.parseToJsonElement(part.provider().readText())
+                    }
                 }
                 is PartData.FileItem -> {
                     val path = part.name?.split('.') ?: return@forEachPart
@@ -75,7 +81,12 @@ class MultipartJsonConverter(val json: Json) : ContentConverter {
                 }
             }
         }
-        return json.decodeFromJsonElement(serializer, mainData.toJsonObject())
+        return if(baselineJson is JsonObject) {
+            baselineJson.jsonObject.writeInto(mainData)
+            json.decodeFromJsonElement(serializer, mainData.toJsonObject())
+        } else {
+            baselineJson
+        }
     }
 
     override suspend fun serialize(
@@ -122,14 +133,4 @@ private fun Map<String, Any?>.toJsonObject(): JsonObject = buildJsonObject {
             }
         )
     }
-}
-
-@OptIn(InternalAPI::class)
-private fun multiPartData(contentType: ContentType, length: Long? = null, rc: ByteReadChannel): MultiPartData {
-    return CIOMultipartDataBase(
-        Dispatchers.Unconfined,
-        rc,
-        contentType.toString(),
-        length
-    )
 }

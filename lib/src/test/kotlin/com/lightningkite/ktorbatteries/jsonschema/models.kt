@@ -8,10 +8,10 @@ import com.lightningkite.ktorbatteries.mongo.MongoSettings
 import com.lightningkite.ktorbatteries.mongo.mongoDb
 import com.lightningkite.ktorbatteries.notifications.NotificationSettings
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
+import com.lightningkite.ktorkmongo.DatabaseModel
 import com.lightningkite.ktorkmongo.HasId
-import com.lightningkite.ktorkmongo.MongoCollection
 import com.lightningkite.ktorkmongo.UUIDSerializer
-import com.lightningkite.ktorkmongo.withFields
+import com.lightningkite.ktorkmongo.collection
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
@@ -19,7 +19,7 @@ import kotlinx.serialization.UseSerializers
 import java.util.*
 
 @Serializable
-@MongoCollection
+@DatabaseModel
 data class Post(
     override val _id: UUID = UUID.randomUUID(),
     val author: String,
@@ -27,7 +27,7 @@ data class Post(
     val content: String
 ) : HasId
 
-val Post.Companion.mongo get() = mongoDb.getCollection<Post>().withFields()
+val Post.Companion.mongo get() = mongoDb.collection<Post>()
 
 @Serializable
 data class Settings(

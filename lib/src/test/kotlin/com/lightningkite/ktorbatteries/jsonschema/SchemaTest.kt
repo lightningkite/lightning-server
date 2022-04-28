@@ -5,10 +5,7 @@ import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.lightningkite.ktorbatteries.settings.runServer
 import com.lightningkite.ktorbatteries.typed.*
 import com.lightningkite.ktorkmongo.*
-import io.ktor.application.*
 import io.ktor.auth.*
-import io.ktor.features.*
-import io.ktor.routing.*
 import kotlinx.html.body
 import kotlinx.html.form
 import kotlinx.html.head
