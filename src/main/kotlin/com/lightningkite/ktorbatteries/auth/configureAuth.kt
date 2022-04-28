@@ -2,7 +2,6 @@ package com.lightningkite.ktorbatteries.auth
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
-import com.google.rpc.context.AttributeContext.Auth
 import com.lightningkite.ktorbatteries.email.Attachment
 import com.lightningkite.ktorbatteries.email.EmailSettings
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
@@ -22,10 +21,10 @@ import java.util.*
 Handles the setup and main verification for jwt token authentication.
 The only thing required from the user is to provide a Principal object.
 The user can also do any other verification they may need at the same time.
-A return of null from jwtChecksAndPrincipal will result in authentication failure.
+A return of null from validate will result in authentication failure.
  */
 fun Authentication.Configuration.quickJwt(
-    jwtChecksAndPrincipal: suspend (JWTCredential) -> Principal?,
+    validate: suspend (JWTCredential) -> Principal?,
 ) {
     jwt {
         realm = AuthSettings.instance.jwtRealm
@@ -58,7 +57,7 @@ fun Authentication.Configuration.quickJwt(
                 .build()
         )
         validate { credential: JWTCredential ->
-            jwtChecksAndPrincipal(credential)
+            validate(credential)
         }
     }
 }
