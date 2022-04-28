@@ -2,17 +2,17 @@ package com.lightningkite.ktorbatteries.exceptions
 
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.mongodb.MongoWriteException
-import io.ktor.application.*
-import io.ktor.features.*
+import io.ktor.server.application.*
+import io.ktor.server.plugins.*
 import io.ktor.http.*
-import io.ktor.response.*
+import io.ktor.server.response.*
 import io.ktor.util.pipeline.*
 import java.io.PrintWriter
 import java.io.StringWriter
 
 
-class ForbiddenException:Exception()
-class AuthenticationException:Exception()
+class ForbiddenException : Exception()
+class AuthenticationException : Exception()
 
 //fun Application.configureExceptions() {
 //    install(StatusPages){

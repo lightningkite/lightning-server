@@ -1,9 +1,10 @@
 package com.lightningkite.ktorbatteries.db
 
 import com.lightningkite.ktorbatteries.routes.fullPath
-import io.ktor.application.*
-import io.ktor.http.cio.websocket.*
-import io.ktor.routing.*
+import com.lightningkite.ktorbatteries.serialization.Serialization
+import io.ktor.server.application.*
+import io.ktor.server.routing.*
+import io.ktor.server.websocket.*
 import io.ktor.util.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.flow.Flow
@@ -14,68 +15,73 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 
-class JsonWebSockets {
+class JsonWebSocketSession<SEND, RECEIVE>(
+    val call: ApplicationCall,
+    val send: suspend (SEND) -> Unit,
+    val incoming: Flow<RECEIVE>
+)
 
-    class Session<SEND, RECEIVE>(
-        val call: ApplicationCall,
-        val send: suspend (SEND)->Unit,
-        val incoming: Flow<RECEIVE>
-    )
-    class UntypedSession(
-        val call: ApplicationCall,
-        val send: suspend (String)->Unit,
-        val incoming: Flow<String>
-    )
+class JsonWebSocketUntypedSession(
+    val call: ApplicationCall,
+    val send: suspend (String) -> Unit,
+    val incoming: Flow<String>
+)
 
-    val entries = HashMap<String, suspend UntypedSession.() -> Unit>()
-    var json: Json = Json
-
-    companion object Feature: ApplicationFeature<ApplicationCallPipeline, JsonWebSockets, JsonWebSockets> {
-        override val key: AttributeKey<JsonWebSockets> = AttributeKey("JsonWebSockets")
-
-        override fun install(
-            pipeline: ApplicationCallPipeline,
-            configure: JsonWebSockets.() -> Unit
-        ): JsonWebSockets = JsonWebSockets().apply(configure)
+private val jsonWebSocketEntriesAttr = AttributeKey<MutableMap<String, suspend JsonWebSocketUntypedSession.() -> Unit>>("jsonWebSocketEntries")
+val Application.jsonWebSocketEntries: MutableMap<String, suspend JsonWebSocketUntypedSession.() -> Unit>
+    get() = this.attributes.getOrNull(jsonWebSocketEntriesAttr) ?: run {
+        val map = HashMap<String, suspend JsonWebSocketUntypedSession.() -> Unit>()
+        this.attributes.put(jsonWebSocketEntriesAttr, map)
+        return@run map
     }
-}
 
-fun <SEND, RECEIVE> Route.jsonWebSocket(sendSerializer: KSerializer<SEND>, receiveSerializer: KSerializer<RECEIVE>, handler: suspend JsonWebSockets.Session<SEND, RECEIVE>.()->Unit) {
-    val feature = application.feature(JsonWebSockets)
+
+fun <SEND, RECEIVE> Route.jsonWebSocket(
+    sendSerializer: KSerializer<SEND>,
+    receiveSerializer: KSerializer<RECEIVE>,
+    handler: suspend JsonWebSocketSession<SEND, RECEIVE>.() -> Unit
+) {
     webSocket {
         handler(
-            JsonWebSockets.Session(
-            call = this.call,
-            send = { send(feature.json.encodeToString(sendSerializer, it)) },
-            incoming = incoming.consumeAsFlow()
-                .mapNotNull { it as? Frame.Text }
-                .mapNotNull {
-                    val text = it.readText()
-                    if(text == "") {
-                        send("")
-                        null
-                    } else {
-                        feature.json.decodeFromString(receiveSerializer, text)
+            JsonWebSocketSession(
+                call = this.call,
+                send = { send(Serialization.json.encodeToString(sendSerializer, it)) },
+                incoming = incoming.consumeAsFlow()
+                    .mapNotNull { it as? Frame.Text }
+                    .mapNotNull {
+                        val text = it.readText()
+                        if (text == "") {
+                            send("")
+                            null
+                        } else {
+                            Serialization.json.decodeFromString(receiveSerializer, text)
+                        }
                     }
-                }
-        ))
+            ))
     }
     @Suppress("UNCHECKED_CAST")
-    feature.entries[this.fullPath] = {
+    application.jsonWebSocketEntries[this.fullPath] = {
         handler(
-            JsonWebSockets.Session(
-            call = this.call,
-            send = { send(feature.json.encodeToString(sendSerializer, it)) },
-            incoming = incoming.map { feature.json.decodeFromString(receiveSerializer, it) }
-        ))
+            JsonWebSocketSession(
+                call = this.call,
+                send = { send(Serialization.json.encodeToString(sendSerializer, it)) },
+                incoming = incoming.map { Serialization.json.decodeFromString(receiveSerializer, it) }
+            ))
     }
 }
-inline fun <reified SEND, reified RECEIVE> Route.jsonWebSocket(noinline handler: suspend JsonWebSockets.Session<SEND, RECEIVE>.()->Unit) {
-    val feature = application.feature(JsonWebSockets)
-    jsonWebSocket<SEND, RECEIVE>(feature.json.serializersModule.serializer(), feature.json.serializersModule.serializer(), handler)
+
+inline fun <reified SEND, reified RECEIVE> Route.jsonWebSocket(noinline handler: suspend JsonWebSocketSession<SEND, RECEIVE>.() -> Unit) {
+    jsonWebSocket<SEND, RECEIVE>(
+        Serialization.json.serializersModule.serializer(),
+        Serialization.json.serializersModule.serializer(),
+        handler
+    )
 }
 
-inline fun <reified SEND, reified RECEIVE> Route.jsonWebSocket(path: String, noinline handler: suspend JsonWebSockets.Session<SEND, RECEIVE>.()->Unit) {
+inline fun <reified SEND, reified RECEIVE> Route.jsonWebSocket(
+    path: String,
+    noinline handler: suspend JsonWebSocketSession<SEND, RECEIVE>.() -> Unit
+) {
     route(path) {
         jsonWebSocket(handler)
     }

@@ -1,9 +1,10 @@
 package com.lightningkite.ktorbatteries.db
 
+import com.lightningkite.ktorbatteries.serialization.Serialization
 import com.lightningkite.ktorkmongo.MultiplexMessage
-import io.ktor.application.*
-import io.ktor.http.cio.websocket.*
-import io.ktor.routing.*
+import io.ktor.server.application.*
+import io.ktor.server.routing.*
+import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -16,23 +17,23 @@ import kotlin.collections.set
 
 
 private data class OpenChannel(val channel: Channel<String>, val job: Job)
+
 fun Route.multiplexWebSocket() {
-    val feature = application.feature(JsonWebSockets)
     webSocket {
-        val entries = feature.entries
+        val entries = application.jsonWebSocketEntries
         val myOpenSockets = ConcurrentHashMap<String, OpenChannel>()
-        incomingLoop@for(message in incoming) {
-            if(message !is Frame.Text) continue
+        incomingLoop@ for (message in incoming) {
+            if (message !is Frame.Text) continue
             val text = message.readText()
-            if(text == "") {
+            if (text == "") {
                 send("")
                 continue
             }
-            val decoded: MultiplexMessage = feature.json.decodeFromString(text)
+            val decoded: MultiplexMessage = Serialization.json.decodeFromString(text)
             when {
                 decoded.start -> {
                     val handler = entries[decoded.path]
-                    if(handler == null) {
+                    if (handler == null) {
 //                        println("Path '${decoded.path}' not found.  Available paths: ${feature.entries.keys.joinToString()}")
 //                        send(feature.json.encodeToString(MultiplexMessage(channel = decoded.channel, error = "Path '${decoded.path}' not found.  Available paths: ${feature.entries.keys.joinToString()}")))
                         continue@incomingLoop
@@ -41,14 +42,33 @@ fun Route.multiplexWebSocket() {
                     myOpenSockets[decoded.channel] = OpenChannel(
                         channel = incomingChannel,
                         job = launch {
-                            handler(JsonWebSockets.UntypedSession(
-                                call = this@webSocket.call,
-                                send = { send(feature.json.encodeToString(MultiplexMessage(channel = decoded.channel, data = it))) },
-                                incoming = incomingChannel.consumeAsFlow()
-                            ))
+                            handler(
+                                JsonWebSocketUntypedSession(
+                                    call = this@webSocket.call,
+                                    send = {
+                                        send(
+                                            Serialization.json.encodeToString(
+                                                MultiplexMessage(
+                                                    channel = decoded.channel,
+                                                    data = it
+                                                )
+                                            )
+                                        )
+                                    },
+                                    incoming = incomingChannel.consumeAsFlow()
+                                )
+                            )
                         }
                     )
-                    send(feature.json.encodeToString(MultiplexMessage(channel = decoded.channel, path = decoded.path, start = true)))
+                    send(
+                        Serialization.json.encodeToString(
+                            MultiplexMessage(
+                                channel = decoded.channel,
+                                path = decoded.path,
+                                start = true
+                            )
+                        )
+                    )
                 }
                 decoded.end -> {
                     val open = myOpenSockets.remove(decoded.channel) ?: continue

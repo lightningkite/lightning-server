@@ -5,19 +5,19 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.lightningkite.ktorbatteries.email.Attachment
 import com.lightningkite.ktorbatteries.email.EmailSettings
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
-import io.ktor.application.*
-import io.ktor.auth.*
-import io.ktor.auth.jwt.*
-import io.ktor.features.*
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.auth.jwt.*
+import io.ktor.server.plugins.*
 import io.ktor.http.*
 import io.ktor.http.auth.*
-import io.ktor.request.*
-import io.ktor.response.*
-import io.ktor.routing.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import java.util.*
 
-fun Authentication.Configuration.quickJwt(
+fun AuthenticationConfig.quickJwt(
     jwtChecks: (JWTCredential) -> Boolean = { true },
     idToPrincipal: suspend (String) -> Principal?
 ) {
@@ -127,7 +127,7 @@ fun Route.emailMagicLink(
                 attachments = emailAttachments
             )
             call.respond(HttpStatusCode.NoContent)
-        } ?: call.respond(if(returnIfUserExists) HttpStatusCode.NotFound else HttpStatusCode.NoContent)
+        } ?: call.respond(if (returnIfUserExists) HttpStatusCode.NotFound else HttpStatusCode.NoContent)
     }
 }
 

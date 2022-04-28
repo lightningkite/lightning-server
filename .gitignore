@@ -2,3 +2,5 @@
 build
 .idea
 local.properties
+local
+settings.yaml

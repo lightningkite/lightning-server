@@ -42,6 +42,7 @@ inline fun <reified T> FORM.insideHtmlForm(
     defaultValue: T? = null,
     collapsed: Boolean = false,
 ) {
+    this.encType = FormEncType.multipartFormData
     input(InputType.hidden, name = "__json") {
         id = "$jsEditorName-input"
     }

@@ -1,25 +1,30 @@
 package com.lightningkite.ktorbatteries.db
 
 import com.lightningkite.ktorbatteries.typed.*
-import io.ktor.application.*
+import io.ktor.server.application.*
 import io.ktor.http.*
-import io.ktor.response.*
-import io.ktor.routing.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
 import kotlinx.coroutines.flow.*
 import com.lightningkite.ktorkmongo.*
-import io.ktor.auth.*
-import io.ktor.features.*
-import io.ktor.request.*
-import io.ktor.routing.put
+import io.ktor.server.auth.*
+import io.ktor.server.plugins.*
+import io.ktor.server.request.*
+import io.ktor.server.routing.put
+import io.ktor.util.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import java.util.*
 
-fun String.toUuidOrBadRequest() = try { UUID.fromString(this) } catch(e: Exception) { throw BadRequestException("ID ${this} could not be parsed as a UUID.") }
+fun String.toUuidOrBadRequest() = try {
+    UUID.fromString(this)
+} catch (e: Exception) {
+    throw BadRequestException("ID ${this} could not be parsed as a UUID.")
+}
 
 // Creates writing end points for the model. POST, PUT, PATCH, DELETE,
-@ContextDsl
-inline fun <reified USER: Principal, reified T : HasId> Route.exposeWrite(
+@KtorDsl
+inline fun <reified USER : Principal, reified T : HasId> Route.exposeWrite(
     collection: FieldCollection<T>,
     crossinline secure: suspend (USER?) -> SecurityRules<T>
 ) {
@@ -113,7 +118,7 @@ inline fun <reified USER: Principal, reified T : HasId> Route.exposeWrite(
             collection
                 .secure(secure(user))
                 .findOneAndUpdateById(id.toUuidOrBadRequest(), input)
-                .also { if(it.old == null && it.new == null) throw NotFoundException() }
+                .also { if (it.old == null && it.new == null) throw NotFoundException() }
         }
     )
 
@@ -144,9 +149,10 @@ inline fun <reified USER: Principal, reified T : HasId> Route.exposeWrite(
             )
         ),
         implementation = { user: USER?, id: String, _: Unit ->
-            if(!collection
-                .secure(secure(user))
-                .deleteOneById(id.toUuidOrBadRequest())) {
+            if (!collection
+                    .secure(secure(user))
+                    .deleteOneById(id.toUuidOrBadRequest())
+            ) {
                 throw NotFoundException()
             }
             Unit
@@ -155,8 +161,8 @@ inline fun <reified USER: Principal, reified T : HasId> Route.exposeWrite(
 }
 
 // Creates Reading endpoints for the model. GET, and listing
-@ContextDsl
-inline fun <reified USER: Principal, reified T : HasId> Route.exposeRead(
+@KtorDsl
+inline fun <reified USER : Principal, reified T : HasId> Route.exposeRead(
     collection: FieldCollection<T>,
     crossinline secure: suspend (USER?) -> SecurityRules<T>
 ) {
@@ -213,8 +219,8 @@ inline fun <reified USER: Principal, reified T : HasId> Route.exposeRead(
 
 // Creates websocket listening end points for a model
 @OptIn(ExperimentalCoroutinesApi::class)
-@ContextDsl
-inline fun <reified USER: Principal, reified T : HasId> Route.exposeWebSocket(
+@KtorDsl
+inline fun <reified USER : Principal, reified T : HasId> Route.exposeWebSocket(
     collection: WatchableFieldCollection<T>,
     crossinline secure: suspend (USER?) -> SecurityRules<T>
 ) {
@@ -232,8 +238,8 @@ inline fun <reified USER: Principal, reified T : HasId> Route.exposeWebSocket(
 }
 
 // Calls all three of the endpoint type functions
-@ContextDsl
-inline fun <reified USER: Principal, reified T : HasId> Route.exposeReadWrite(
+@KtorDsl
+inline fun <reified USER : Principal, reified T : HasId> Route.exposeReadWrite(
     collection: FieldCollection<T>,
     crossinline secure: suspend (USER?) -> SecurityRules<T>
 
@@ -243,8 +249,8 @@ inline fun <reified USER: Principal, reified T : HasId> Route.exposeReadWrite(
 }
 
 // Calls all three of the endpoint type functions
-@ContextDsl
-inline fun <reified USER: Principal, reified T : HasId> Route.exposeAll(
+@KtorDsl
+inline fun <reified USER : Principal, reified T : HasId> Route.exposeAll(
     collection: WatchableFieldCollection<T>,
     crossinline secure: suspend (USER?) -> SecurityRules<T>
 
@@ -256,8 +262,8 @@ inline fun <reified USER: Principal, reified T : HasId> Route.exposeAll(
 
 
 // Calls Both read/listening end points. restRead and websockets.
-@ContextDsl
-inline fun <reified USER: Principal, reified T : HasId> Route.exposeReadAndWebSocket(
+@KtorDsl
+inline fun <reified USER : Principal, reified T : HasId> Route.exposeReadAndWebSocket(
     collection: WatchableFieldCollection<T>,
     crossinline secure: suspend (USER?) -> SecurityRules<T>
 ) {

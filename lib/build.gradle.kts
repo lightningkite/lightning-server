@@ -23,28 +23,27 @@ repositories {
     mavenCentral()
 }
 
-val ktorVersion = "1.6.8"
+val ktorVersion = "2.0.0"
 val kotlinVersion: String by project
 val ktorKmongoVersion = "db-separation-SNAPSHOT"
 dependencies {
     api("com.lightningkite.ktorkmongo:server:$ktorKmongoVersion")
     api("com.lightningkite.ktorkmongo:mongo:$ktorKmongoVersion")
+    api("io.ktor:ktor-server-auth-jvm:$ktorVersion")
+    api("io.ktor:ktor-server-websockets-jvm:$ktorVersion")
+    api("io.ktor:ktor-server-content-negotiation-jvm:$ktorVersion")
+    api("io.ktor:ktor-server-core-jvm:$ktorVersion")
+    api("io.ktor:ktor-server-auth-jwt-jvm:$ktorVersion")
+    api("io.ktor:ktor-server-cio-jvm:$ktorVersion")
     implementation("com.lightningkite.khrysalis:jvm-runtime:master-SNAPSHOT")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.1")
     implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.4.5")
-    implementation("io.ktor:ktor-html-builder:$ktorVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.7.5")
 
+    api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:1.3.2")
-
-    api("io.ktor:ktor-auth:$ktorVersion")
-    api("io.ktor:ktor-websockets:$ktorVersion")
-    api("io.ktor:ktor-serialization:$ktorVersion")
-    api("io.ktor:ktor-server-core:$ktorVersion")
-    api("io.ktor:ktor-auth-jwt:$ktorVersion")
-    api("io.ktor:ktor-server-cio:$ktorVersion")
 
     api("org.apache.commons:commons-email:1.5")
     api("org.apache.commons:commons-vfs2:2.9.0")
@@ -54,15 +53,17 @@ dependencies {
     api("com.google.firebase:firebase-admin:8.1.0")
 
     api("io.lettuce:lettuce-core:6.1.6.RELEASE")
+    implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-server-html-builder-jvm:$ktorVersion")
+    testImplementation("io.ktor:ktor-server-auth-jvm:$ktorVersion")
+    testImplementation("io.ktor:ktor-server-auth-jwt-jvm:$ktorVersion")
+    testImplementation("io.ktor:ktor-server-test-host-jvm:$ktorVersion")
+    testImplementation("io.ktor:ktor-server-content-negotiation-jvm:$ktorVersion")
+    testImplementation("io.ktor:ktor-server-cio-jvm:$ktorVersion")
 
     kspTest("com.lightningkite.ktorkmongo:processor:$ktorKmongoVersion")
 
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
-    testImplementation("io.ktor:ktor-auth:$ktorVersion")
-    testImplementation("io.ktor:ktor-auth-jwt:$ktorVersion")
-    testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
-    testImplementation("io.ktor:ktor-serialization:$ktorVersion")
-    testImplementation("io.ktor:ktor-server-cio:$ktorVersion")
 
     implementation("ch.qos.logback:logback-classic:1.2.11")
 }

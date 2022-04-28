@@ -1,10 +1,12 @@
 @file:UseContextualSerialization(Instant::class, UUID::class)
+
 package com.lightningkite.ktorbatteries.demo
 
 import com.lightningkite.ktorbatteries.auth.AuthSettings
 import com.lightningkite.ktorbatteries.auth.quickJwt
 import com.lightningkite.ktorbatteries.db.adminPages
 import com.lightningkite.ktorbatteries.db.database
+import com.lightningkite.ktorbatteries.db.exposeReadWrite
 import com.lightningkite.ktorbatteries.files.FilesSettings
 import com.lightningkite.ktorbatteries.files.configureFiles
 import com.lightningkite.ktorbatteries.jsonschema.JsonSchema
@@ -16,8 +18,10 @@ import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.lightningkite.ktorbatteries.settings.loadSettings
 import com.lightningkite.ktorbatteries.settings.runServer
 import com.lightningkite.ktorkmongo.*
-import io.ktor.auth.*
-import io.ktor.routing.*
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.auth.Principal
+import io.ktor.server.routing.*
 import kotlinx.serialization.*
 import java.io.File
 import java.time.Instant
@@ -31,19 +35,19 @@ data class TestModel(
     val name: String = "No Name",
     val number: Int = 3123,
     @JsonSchema.Format("jodit") val content: String = ""
-): HasId
+) : HasId
 
 @Serializable
 @DatabaseModel
 data class User(
     override val _id: UUID = UUID.randomUUID(),
     val email: String
-): HasId
+) : HasId
 
 val TestModel.Companion.table get() = database.collection<TestModel>("TestModel")
 val User.Companion.table get() = database.collection<User>("User")
 
-data class UserPrincipal(val user: User): Principal
+data class UserPrincipal(val user: User) : Principal
 
 @Serializable
 data class Settings(
@@ -59,6 +63,7 @@ fun main(vararg args: String) {
     loadSettings(File("settings.yaml")) { Settings() }
     database = mongoDb
     runServer {
+        install(IgnoreTrailingSlash)
         configureFiles()
         configureSerialization()
         authentication {
@@ -69,7 +74,14 @@ fun main(vararg args: String) {
             }
         }
         routing {
-            adminPages(TestModel.table, defaultItem = {TestModel()}) { user: UserPrincipal? -> SecurityRules.AllowAll() }
+            route("admin") {
+                adminPages(
+                    TestModel.table,
+                    defaultItem = { TestModel() }) { user: UserPrincipal? -> SecurityRules.AllowAll() }
+            }
+            route("rest") {
+                exposeReadWrite(TestModel.table) { user: UserPrincipal? -> SecurityRules.AllowAll() }
+            }
         }
     }
 }

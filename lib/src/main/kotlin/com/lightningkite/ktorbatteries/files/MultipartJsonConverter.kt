@@ -1,13 +1,22 @@
 package com.lightningkite.ktorbatteries.files
 
 import com.lightningkite.ktorkmongo.IsFile
-import io.ktor.application.*
-import io.ktor.features.*
+import io.ktor.server.application.*
+import io.ktor.server.plugins.*
 import io.ktor.http.*
+import io.ktor.http.cio.*
 import io.ktor.http.content.*
-import io.ktor.request.*
+import io.ktor.serialization.*
+import io.ktor.server.http.content.*
+import io.ktor.server.request.*
+import io.ktor.util.*
 import io.ktor.util.pipeline.*
+import io.ktor.util.reflect.*
+import io.ktor.utils.io.*
+import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope.coroutineContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encoding.CompositeDecoder
@@ -18,11 +27,14 @@ import kotlin.io.use
 
 class MultipartJsonConverter(val json: Json) : ContentConverter {
     val jsonKey = "__json"
-    override suspend fun convertForReceive(context: PipelineContext<ApplicationReceiveRequest, ApplicationCall>): Any? {
+    override suspend fun deserialize(charset: Charset, typeInfo: TypeInfo, content: ByteReadChannel): Any? {
         val mainData = HashMap<String, Any?>()
-        val serializer = json.serializersModule.serializer(context.subject.typeInfo)
-        context.context.receiveMultipart().forEachPart { part ->
+        val serializer = json.serializersModule.serializer(typeInfo.reifiedType)
+        multiPartData(ContentType.MultiPart.FormData, null, content).forEachPart { part ->
             when (part) {
+                is PartData.BinaryChannelItem -> {
+                    part.provider().discard()
+                }
                 is PartData.FormItem -> {
                     if (part.name == jsonKey) json.parseToJsonElement(part.value).jsonObject.writeInto(mainData)
                 }
@@ -66,11 +78,12 @@ class MultipartJsonConverter(val json: Json) : ContentConverter {
         return json.decodeFromJsonElement(serializer, mainData.toJsonObject())
     }
 
-    override suspend fun convertForSend(
-        context: PipelineContext<Any, ApplicationCall>,
+    override suspend fun serialize(
         contentType: ContentType,
+        charset: Charset,
+        typeInfo: TypeInfo,
         value: Any
-    ): Any? = throw NotImplementedError()
+    ): OutgoingContent = throw NotImplementedError()
 }
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -109,4 +122,14 @@ private fun Map<String, Any?>.toJsonObject(): JsonObject = buildJsonObject {
             }
         )
     }
+}
+
+@OptIn(InternalAPI::class)
+private fun multiPartData(contentType: ContentType, length: Long? = null, rc: ByteReadChannel): MultiPartData {
+    return CIOMultipartDataBase(
+        Dispatchers.Unconfined,
+        rc,
+        contentType.toString(),
+        length
+    )
 }

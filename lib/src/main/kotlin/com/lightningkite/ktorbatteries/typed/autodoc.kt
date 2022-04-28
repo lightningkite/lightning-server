@@ -1,15 +1,15 @@
 package com.lightningkite.ktorbatteries.typed
 
 import com.lightningkite.ktorbatteries.routes.*
-import io.ktor.html.*
+import io.ktor.server.html.*
 import io.ktor.http.*
-import io.ktor.response.*
-import io.ktor.routing.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kotlinx.html.*
 import kotlin.reflect.typeOf
 
 fun Route.helpFor(api: ApiEndpoint<*, *, *>) = get {
-    if(api.inputType == null) {
+    if (api.inputType == null) {
         context.respond(HttpStatusCode.NoContent)
         return@get
     }
@@ -21,24 +21,26 @@ fun Route.helpFor(api: ApiEndpoint<*, *, *>) = get {
             div {
                 script {
                     unsafe {
-                        raw("""
+                        raw(
+                            """
                         async function submit() {
                             const r = await fetch("${api.route.fullPath}", { method: '${api.route.selector.maybeMethod?.value}', body: editor.getValue() })
                             const asJson = await r.json()
                             result.setValue(asJson)
                         }
-                    """.trimIndent())
+                    """.trimIndent()
+                        )
                     }
                 }
                 h1 {
                     +api.route.fullPath
                 }
-                div{
-                    p { + api.summary }
-                    p { + api.description }
-                    p { + "Input type: ${api.inputType}" }
-                    p { + "Output type: ${api.outputType}" }
-                    p { + "User type: ${api.userType}" }
+                div {
+                    p { +api.summary }
+                    p { +api.description }
+                    p { +"Input type: ${api.inputType}" }
+                    p { +"Output type: ${api.outputType}" }
+                    p { +"User type: ${api.userType}" }
                 }
                 div {
                     jsFormUntyped("Input", "editor", api.inputType)
@@ -58,7 +60,7 @@ fun Route.helpFor(api: ApiEndpoint<*, *, *>) = get {
 
 fun Route.apiHelp() {
     val routes = ApiEndpoint.known.associateBy { it.route.fullPath + "/" + it.route.selector.maybeMethod?.value }
-    for(r in routes) {
+    for (r in routes) {
         route(r.key) { helpFor(r.value) }.also { println(it.fullPath) }
     }
     get {
@@ -74,12 +76,12 @@ fun Route.apiHelp() {
 
 fun FlowContent.apiHelpIndex() {
     val routes = ApiEndpoint.known.associateBy { it.route.fullPath + "/" + it.route.selector.maybeMethod?.value }
-    for(r in routes) {
+    for (r in routes) {
         div {
             a(href = r.key) {
-                + r.value.route.fullPath
-                + " - "
-                + r.value.summary
+                +r.value.route.fullPath
+                +" - "
+                +r.value.summary
             }
         }
     }

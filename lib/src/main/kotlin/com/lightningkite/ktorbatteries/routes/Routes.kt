@@ -1,7 +1,7 @@
 package com.lightningkite.ktorbatteries.routes
 
 import io.ktor.http.*
-import io.ktor.routing.*
+import io.ktor.server.routing.*
 
 
 private val Route.recursiveChildren: Sequence<Route>
