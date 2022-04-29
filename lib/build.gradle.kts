@@ -42,6 +42,9 @@ dependencies {
     implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.4.5")
     implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.7.5")
 
+    api("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    api("io.ktor:ktor-client-cio:$ktorVersion")
+
     api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:1.3.2")
 

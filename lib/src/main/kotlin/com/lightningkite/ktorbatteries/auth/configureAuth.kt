@@ -1,10 +1,17 @@
 package com.lightningkite.ktorbatteries.auth
 
 import com.auth0.jwt.JWT
+import com.auth0.jwt.JWTCreator
 import com.auth0.jwt.algorithms.Algorithm
+import com.auth0.jwt.exceptions.JWTVerificationException
+import com.auth0.jwt.interfaces.DecodedJWT
+import com.lightningkite.ktorbatteries.client
 import com.lightningkite.ktorbatteries.email.Attachment
 import com.lightningkite.ktorbatteries.email.EmailSettings
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
@@ -79,6 +86,24 @@ fun makeToken(id: String, expiration: Long? = null): String {
         }
         .sign(Algorithm.HMAC256(AuthSettings.instance.jwtSecret))
 }
+
+fun makeToken(additionalSetup: JWTCreator.Builder.()->JWTCreator.Builder = { this }): String {
+    return JWT.create()
+        .withAudience(AuthSettings.instance.jwtAudience)
+        .withIssuer(AuthSettings.instance.jwtIssuer)
+        .withIssuedAt(Date())
+        .let(additionalSetup)
+        .sign(Algorithm.HMAC256(AuthSettings.instance.jwtSecret))
+}
+
+fun checkToken(token: String): DecodedJWT? = try {
+    JWT
+        .require(Algorithm.HMAC256(AuthSettings.instance.jwtSecret))
+        .withAudience(AuthSettings.instance.jwtAudience)
+        .withIssuer(AuthSettings.instance.jwtIssuer)
+        .build()
+        .verify(token)
+} catch(e: JWTVerificationException) { null }
 
 //TODO: Move?
 @Serializable

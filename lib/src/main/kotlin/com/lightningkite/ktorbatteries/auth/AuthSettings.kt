@@ -26,8 +26,15 @@ data class AuthSettings(
                 availableCharacters[rand.nextInt(availableCharacters.length)]
             )
         }
-    }
+    },
+    val oauth: Map<String, OauthProviderCredentials> = mapOf()
 ) {
+    @Serializable
+    data class OauthProviderCredentials(
+        val id: String,
+        val secret: String
+    )
+
     companion object : SettingSingleton<AuthSettings>() {
         const val userIdKey: String = "userId"
     }

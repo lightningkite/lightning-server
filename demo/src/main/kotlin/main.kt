@@ -3,7 +3,9 @@
 package com.lightningkite.ktorbatteries.demo
 
 import com.lightningkite.ktorbatteries.auth.AuthSettings
+import com.lightningkite.ktorbatteries.auth.oauthGoogle
 import com.lightningkite.ktorbatteries.auth.quickJwt
+import com.lightningkite.ktorbatteries.client
 import com.lightningkite.ktorbatteries.db.adminPages
 import com.lightningkite.ktorbatteries.db.database
 import com.lightningkite.ktorbatteries.db.exposeReadWrite
@@ -18,9 +20,14 @@ import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.lightningkite.ktorbatteries.settings.loadSettings
 import com.lightningkite.ktorbatteries.settings.runServer
 import com.lightningkite.ktorkmongo.*
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.Principal
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.*
 import java.io.File
@@ -81,6 +88,12 @@ fun main(vararg args: String) {
             }
             route("rest") {
                 exposeReadWrite(TestModel.table) { user: UserPrincipal? -> SecurityRules.AllowAll() }
+            }
+            get {
+                call.respondText("Welcome!")
+            }
+            route("google") {
+                oauthGoogle("") { it }
             }
         }
     }

@@ -2,7 +2,7 @@
 
 - [ ] Auth: safer tokens?  refresh?
 - [X] Error reporting to Sentry
-- [ ] Type safe routing?
+- [ ] Autogenerate API for client in Khrysalis
 - [ ] OAuth2 Google/Apple Login
 - [ ] SMS through Twilio
 - [ ] Cache through Redis
