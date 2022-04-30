@@ -2,9 +2,7 @@
 
 package com.lightningkite.ktorbatteries.demo
 
-import com.lightningkite.ktorbatteries.auth.AuthSettings
-import com.lightningkite.ktorbatteries.auth.oauthGoogle
-import com.lightningkite.ktorbatteries.auth.quickJwt
+import com.lightningkite.ktorbatteries.auth.*
 import com.lightningkite.ktorbatteries.client
 import com.lightningkite.ktorbatteries.db.adminPages
 import com.lightningkite.ktorbatteries.db.database
@@ -27,10 +25,13 @@ import io.ktor.client.request.forms.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.Principal
+import io.ktor.server.plugins.*
+import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.*
 import java.io.File
+import java.lang.Exception
 import java.time.Instant
 import java.util.*
 
@@ -44,17 +45,9 @@ data class TestModel(
     @JsonSchema.Format("jodit") val content: String = ""
 ) : HasId
 
-@Serializable
-@DatabaseModel
-data class User(
-    override val _id: UUID = UUID.randomUUID(),
-    val email: String
-) : HasId
-
 val TestModel.Companion.table get() = database.collection<TestModel>("TestModel")
-val User.Companion.table get() = database.collection<User>("User")
 
-data class UserPrincipal(val user: User) : Principal
+data class DirectPrincipal(val id: String) : Principal
 
 @Serializable
 data class Settings(
@@ -74,26 +67,27 @@ fun main(vararg args: String) {
         configureFiles()
         configureSerialization()
         authentication {
-            quickJwt { id ->
-                User.table
-                    .get(UUID.fromString(id))
-                    ?.let { UserPrincipal(it) }
-            }
+            quickJwt { id -> DirectPrincipal(id) }
+        }
+        install(StatusPages) {
+            exception<Exception> { call, cause -> call.respondText(cause.message ?: "Unknown Error") }
         }
         routing {
-            route("admin") {
-                adminPages(
-                    TestModel.table,
-                    defaultItem = { TestModel() }) { user: UserPrincipal? -> SecurityRules.AllowAll() }
-            }
-            route("rest") {
-                exposeReadWrite(TestModel.table) { user: UserPrincipal? -> SecurityRules.AllowAll() }
-            }
-            get {
-                call.respondText("Welcome!")
-            }
-            route("google") {
-                oauthGoogle("") { it }
+            authenticate(optional = true) {
+                route("admin") {
+                    adminPages(
+                        TestModel.table,
+                        defaultItem = { TestModel() }) { user: DirectPrincipal? -> SecurityRules.AllowAll() }
+                }
+                route("rest") {
+                    exposeReadWrite(TestModel.table) { user: DirectPrincipal? -> SecurityRules.AllowAll() }
+                }
+                get {
+                    call.respondText("Welcome, ${call.principal<DirectPrincipal>()?.id}!")
+                }
+                oauthGoogle(GeneralServerSettings.instance.publicUrl) { it }
+                oauthGithub(GeneralServerSettings.instance.publicUrl) { it }
+                oauthApple(GeneralServerSettings.instance.publicUrl) { it }
             }
         }
     }

@@ -41,6 +41,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.1")
     implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.4.5")
     implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.7.5")
+    api("io.ktor:ktor-server-status-pages:$ktorVersion")
 
     api("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     api("io.ktor:ktor-client-cio:$ktorVersion")
@@ -54,6 +55,9 @@ dependencies {
     api("com.charleskorn.kaml:kaml:0.43.0")
     api("com.lightningkite:kotliner-cli:1.0.3")
     api("com.google.firebase:firebase-admin:8.1.0")
+
+    implementation("org.bouncycastle:bcprov-jdk15on:1.59")
+    implementation("org.bouncycastle:bcpkix-jdk15on:1.59")
 
     api("io.lettuce:lettuce-core:6.1.6.RELEASE")
     implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
