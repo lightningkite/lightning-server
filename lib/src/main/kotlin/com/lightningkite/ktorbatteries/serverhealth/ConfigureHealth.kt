@@ -8,7 +8,9 @@ import io.ktor.server.routing.*
 import org.slf4j.event.Level
 import java.lang.management.ManagementFactory
 import java.lang.management.OperatingSystemMXBean
+import java.net.NetworkInterface
 import java.time.Instant
+import kotlin.streams.toList
 
 interface HealthCheckable {
     val healthCheckName: String get() = this::class.simpleName ?: "???"
@@ -51,7 +53,6 @@ fun Route.configureHealth(path: String, features: List<HealthCheckable>) {
                 """.trimIndent()
             }
 
-
         System.gc()
         val maxMem = Runtime.getRuntime().maxMemory()
         val totalMemory = Runtime.getRuntime().totalMemory()
@@ -80,6 +81,7 @@ fun Route.configureHealth(path: String, features: List<HealthCheckable>) {
             }
             </head>
             <body>
+            <p>Server ID: ${NetworkInterface.getNetworkInterfaces().toList().sortedBy { it.name }.firstOrNull()?.hardwareAddress?.sumOf { it.hashCode() }?.toString(16)}</p>
             <h2>Server Features</h2>
             $resultHtml
             

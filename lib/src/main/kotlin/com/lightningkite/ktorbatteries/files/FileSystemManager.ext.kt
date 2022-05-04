@@ -3,21 +3,18 @@ package com.lightningkite.ktorbatteries.files
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import org.apache.commons.vfs2.FileObject
 import org.apache.commons.vfs2.provider.local.LocalFile
+import java.io.File
 import java.io.InputStream
 import java.net.URL
+import java.nio.file.Path
+import kotlin.io.path.relativeTo
 
 private const val allowedChars = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"
 
 val FileObject.publicUrl: String
     get() = if (this is LocalFile)
-        "${GeneralServerSettings.instance.publicUrl}${
-            path.toString()
-                .replace("\\", "/")
-                .removePrefix(
-                    FilesSettings.instance.storageUrl
-                        .replace("\\", "/")
-                        .removePrefix("file:///")
-                )
+        "${GeneralServerSettings.instance.publicUrl}/${
+            path.relativeTo(Path.of(FilesSettings.instance.storageUrl.removePrefix("file://")))
         }"
     else
         URL("https", url.host, url.port, url.file).toString()

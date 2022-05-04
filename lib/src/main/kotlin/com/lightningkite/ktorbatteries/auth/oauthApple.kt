@@ -31,7 +31,7 @@ fun Route.oauthApple(
     emailToId: suspend (String) -> String
 ): Route {
     Security.addProvider(BouncyCastleProvider())
-    val settings = AuthSettings.instance.oauth["apple"]!!
+    val settings = AuthSettings.instance.oauth["apple"] ?: return this
     val teamId = settings.secret.substringBefore("|")
     val keyString = settings.secret.substringAfter("|")
     val algorithm = run {

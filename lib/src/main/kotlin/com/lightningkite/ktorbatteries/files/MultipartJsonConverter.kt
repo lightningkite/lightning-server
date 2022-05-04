@@ -32,6 +32,7 @@ class MultipartJsonConverter(val json: Json) : ContentConverter {
     val jsonKey = "__json"
     override suspend fun deserialize(charset: Charset, typeInfo: TypeInfo, content: ByteReadChannel): Any? {
         val mainData = HashMap<String, Any?>()
+        val overrideData = HashMap<String, Any?>()
         var baselineJson: JsonElement = JsonNull
         val serializer = json.serializersModule.serializer(typeInfo.reifiedType)
         CIOMultipartDataBase2(coroutineContext, content).forEachPart { part ->
@@ -53,25 +54,25 @@ class MultipartJsonConverter(val json: Json) : ContentConverter {
                     val path = part.name?.split('.') ?: return@forEachPart
                     val isFile = serializer.isFile(path) ?: return@forEachPart
                     if (part.contentType == null) throw BadRequestException("Content type not provided for uploaded file")
-                    if (
-                        isFile.allowedTypes
-                            .asSequence()
-                            .map { ContentType.parse(it) }
-                            .none { part.contentType!!.match(it) }
-                    ) {
-                        throw BadRequestException("Content type ${part.contentType} doesn't match any of the accepted types: ${isFile.allowedTypes.joinToString()}")
-                    }
+//                    if (
+//                        isFile.allowedTypes
+//                            .asSequence()
+//                            .map { ContentType.parse(it) }
+//                            .none { part.contentType!!.match(it) }
+//                    ) {
+//                        throw BadRequestException("Content type ${part.contentType} doesn't match any of the accepted types: ${isFile.allowedTypes.joinToString()}")
+//                    }
                     part
                         .streamProvider()
                         .use { input ->
                             val manager = files()
                             manager.uploadUnique(
                                 input,
-                                "${FilesSettings.instance.storageUrl}${FilesSettings.instance.userContentPath}${isFile.pathPrefix}/${part.originalFileName!!}"
+                                "${FilesSettings.instance.storageUrl}${FilesSettings.instance.userContentPath}/files/${part.originalFileName!!}"
                             )
                         }
                         .let {
-                            var current: MutableMap<String, Any?> = mainData
+                            var current: MutableMap<String, Any?> = overrideData
                             for (pathPart in path.dropLast(1)) {
                                 @Suppress("UNCHECKED_CAST")
                                 current = current[pathPart] as? MutableMap<String, Any?> ?: HashMap()
@@ -83,6 +84,7 @@ class MultipartJsonConverter(val json: Json) : ContentConverter {
         }
         return if(baselineJson is JsonObject) {
             baselineJson.jsonObject.writeInto(mainData)
+            mainData.putAll(overrideData)
             json.decodeFromJsonElement(serializer, mainData.toJsonObject())
         } else {
             baselineJson

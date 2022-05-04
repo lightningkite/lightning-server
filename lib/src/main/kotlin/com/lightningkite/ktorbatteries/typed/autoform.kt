@@ -2,7 +2,10 @@ package com.lightningkite.ktorbatteries.typed
 
 import com.lightningkite.ktorbatteries.jsonschema.encodeToSchema
 import com.lightningkite.ktorbatteries.serialization.Serialization
+import com.lightningkite.ktorkmongo.IsFile
+import io.ktor.util.*
 import kotlinx.html.*
+import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import kotlin.reflect.KType
@@ -36,6 +39,7 @@ fun HEAD.includeFormScript() {
     }
 }
 
+@OptIn(InternalAPI::class)
 inline fun <reified T> FORM.insideHtmlForm(
     title: String,
     jsEditorName: String,
@@ -63,7 +67,41 @@ inline fun <reified T> FORM.insideHtmlForm(
             )
         }
     }
+    div {
+        classes = setOf("je-object__container")
+        div {
+            attributes.set("data-theme", "html")
+            classes = setOf("je-indented-panel")
+            Serialization.json.serializersModule.serializer<T>().descriptor.fileFieldNames.forEach {
+                div {
+                    classes = setOf("row")
+                    label {
+                        classes = setOf("je-form-input-label")
+                        +"Upload "
+                        +it.replace(".", " ")
+                        input(InputType.file) {
+                            classes = setOf("row")
+                            this.name = it
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
+
+@InternalAPI
+public val SerialDescriptor.fileFieldNames: List<String>
+    get() {
+        return (0 until elementsCount)
+            .flatMap {
+                val name = getElementName(it)
+                println("Checking $name for IsFile... ${getElementAnnotations(it)}")
+                getElementDescriptor(it).fileFieldNames.map { "$name.$it" } + if (getElementAnnotations(it).any { it is IsFile }) listOf(
+                    name
+                ) else listOf()
+            }
+    }
 
 inline fun <reified T> FlowContent.jsForm(
     title: String,
@@ -130,7 +168,9 @@ fun FlowContent.displayUntyped(
                 ${jsEditorName}.disable()
                 ${
                 if (defaultValue != null) "${jsEditorName}.setValue(${
-                    Serialization.json.encodeToString(
+                    Json(
+                        Serialization.json
+                    ) { encodeDefaults = true }.encodeToString(
                         Serialization.module.serializer(
                             type
                         ), defaultValue

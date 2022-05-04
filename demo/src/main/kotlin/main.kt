@@ -42,7 +42,8 @@ data class TestModel(
     val timestamp: Instant = Instant.now(),
     val name: String = "No Name",
     val number: Int = 3123,
-    @JsonSchema.Format("jodit") val content: String = ""
+    @JsonSchema.Format("jodit") val content: String = "",
+    @IsFile val file: String? = null
 ) : HasId
 
 val TestModel.Companion.table get() = database.collection<TestModel>("TestModel")
