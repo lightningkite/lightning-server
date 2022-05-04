@@ -16,7 +16,7 @@ group = "com.lightningkite.ktor-batteries"
 
 repositories {
 //    mavenLocal()
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
+//    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
     maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
     maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
     maven { url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap") }
@@ -25,7 +25,7 @@ repositories {
 
 val ktorVersion = "1.6.8"
 val kotlinVersion: String by project
-val ktorKmongoVersion = "0.9.10"
+val ktorKmongoVersion = "0.10.0"
 dependencies {
     api("com.lightningkite.ktorkmongo:server:$ktorKmongoVersion")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
