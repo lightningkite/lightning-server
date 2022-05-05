@@ -22,64 +22,72 @@ fun Route.multiplexWebSocket() {
     webSocket {
         val entries = application.jsonWebSocketEntries
         val myOpenSockets = ConcurrentHashMap<String, OpenChannel>()
-        incomingLoop@ for (message in incoming) {
-            if (message is Frame.Close) break@incomingLoop
-            if (message !is Frame.Text) continue
-            val text = message.readText()
-            if (text == "") {
-                send("")
-                continue
-            }
-            val decoded: MultiplexMessage = Serialization.json.decodeFromString(text)
-            when {
-                decoded.start -> {
-                    val handler = entries[decoded.path]
-                    if (handler == null) {
+        try {
+            incomingLoop@ for (message in incoming) {
+                if (message is Frame.Close) break@incomingLoop
+                if (message !is Frame.Text) continue
+                val text = message.readText()
+                if (text == "") {
+                    send("")
+                    continue
+                }
+                val decoded: MultiplexMessage = Serialization.json.decodeFromString(text)
+                when {
+                    decoded.start -> {
+                        val handler = entries[decoded.path]
+                        if (handler == null) {
 //                        println("Path '${decoded.path}' not found.  Available paths: ${feature.entries.keys.joinToString()}")
 //                        send(feature.json.encodeToString(MultiplexMessage(channel = decoded.channel, error = "Path '${decoded.path}' not found.  Available paths: ${feature.entries.keys.joinToString()}")))
-                        continue@incomingLoop
-                    }
-                    val incomingChannel = Channel<String>()
-                    myOpenSockets[decoded.channel] = OpenChannel(
-                        channel = incomingChannel,
-                        job = launch {
-                            handler(
-                                JsonWebSocketUntypedSession(
-                                    call = this@webSocket.call,
-                                    send = {
-                                        send(
-                                            Serialization.json.encodeToString(
-                                                MultiplexMessage(
-                                                    channel = decoded.channel,
-                                                    data = it
+                            continue@incomingLoop
+                        }
+                        val incomingChannel = Channel<String>()
+                        myOpenSockets[decoded.channel] = OpenChannel(
+                            channel = incomingChannel,
+                            job = launch {
+                                handler(
+                                    JsonWebSocketUntypedSession(
+                                        call = this@webSocket.call,
+                                        send = {
+                                            send(
+                                                Serialization.json.encodeToString(
+                                                    MultiplexMessage(
+                                                        channel = decoded.channel,
+                                                        data = it
+                                                    )
                                                 )
                                             )
-                                        )
-                                    },
-                                    incoming = incomingChannel.consumeAsFlow()
+                                        },
+                                        incoming = incomingChannel.consumeAsFlow()
+                                    )
+                                )
+                            }
+                        )
+                        send(
+                            Serialization.json.encodeToString(
+                                MultiplexMessage(
+                                    channel = decoded.channel,
+                                    path = decoded.path,
+                                    start = true
                                 )
                             )
-                        }
-                    )
-                    send(
-                        Serialization.json.encodeToString(
-                            MultiplexMessage(
-                                channel = decoded.channel,
-                                path = decoded.path,
-                                start = true
-                            )
                         )
-                    )
-                }
-                decoded.end -> {
-                    val open = myOpenSockets.remove(decoded.channel) ?: continue
-                    open.job.cancel()
-                }
-                decoded.data != null -> {
-                    val open = myOpenSockets[decoded.channel] ?: continue
-                    open.channel.send(decoded.data!!)
+                    }
+                    decoded.end -> {
+                        val open = myOpenSockets.remove(decoded.channel) ?: continue
+                        open.job.cancel()
+                    }
+                    decoded.data != null -> {
+                        val open = myOpenSockets[decoded.channel] ?: continue
+                        open.channel.send(decoded.data!!)
+                    }
                 }
             }
+        } finally {
+            for (value in myOpenSockets.values) {
+                value.job.cancel()
+                value.channel.close()
+            }
+            this.close()
         }
     }
 }
