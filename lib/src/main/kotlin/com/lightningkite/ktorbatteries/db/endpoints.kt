@@ -26,7 +26,7 @@ fun String.toUuidOrBadRequest() = try {
 @KtorDsl
 inline fun <reified USER : Principal, reified T : HasId> Route.exposeWrite(
     collection: FieldCollection<T>,
-    crossinline secure: suspend (USER?) -> SecurityRules<T>
+    crossinline rules: suspend (principal: USER?, input: FieldCollection<T>) -> FieldCollection<T>
 ) {
 
     post(
@@ -35,8 +35,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeWrite(
         errorCases = listOf(),
         successCode = HttpStatusCode.Created,
         implementation = { user: USER?, values: List<T> ->
-            collection
-                .secure(secure(user))
+            rules(user, collection)
                 .insertMany(values)
         }
     )
@@ -47,8 +46,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeWrite(
         errorCases = listOf(),
         successCode = HttpStatusCode.Created,
         implementation = { user: USER?, value: T ->
-            collection
-                .secure(secure(user))
+            rules(user, collection)
                 .insertOne(value)
         }
     )
@@ -59,8 +57,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeWrite(
         summary = "Modifies many ${T::class.simpleName}s at the same time by ID.",
         errorCases = listOf(),
         implementation = { user: USER?, values: List<T> ->
-            val db = collection
-                .secure(secure(user))
+            val db = rules(user, collection)
             values.map { db.replaceOneById(it._id, it) }
         }
     )
@@ -81,8 +78,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeWrite(
             )
         ),
         implementation = { user: USER?, id: String, value: T ->
-            collection
-                .secure(secure(user))
+            rules(user, collection)
                 .replaceOneById(id.toUuidOrBadRequest(), value)
                 ?: throw NotFoundException()
         }
@@ -93,8 +89,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeWrite(
         summary = "Modifies many ${T::class.simpleName}s at the same time.  Returns the number of changed items.",
         errorCases = listOf(),
         implementation = { user: USER?, input: MassModification<T> ->
-            collection
-                .secure(secure(user))
+            rules(user, collection)
                 .updateMany(input)
         }
     )
@@ -115,8 +110,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeWrite(
             )
         ),
         implementation = { user: USER?, id: String, input: Modification<T> ->
-            collection
-                .secure(secure(user))
+            rules(user, collection)
                 .findOneAndUpdateById(id.toUuidOrBadRequest(), input)
                 .also { if (it.old == null && it.new == null) throw NotFoundException() }
         }
@@ -127,8 +121,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeWrite(
         summary = "Deletes all matching ${T::class.simpleName}s, returning the number of deleted items.",
         errorCases = listOf(),
         implementation = { user: USER?, filter: Condition<T> ->
-            collection
-                .secure(secure(user))
+            rules(user, collection)
                 .deleteMany(filter)
         }
     )
@@ -149,8 +142,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeWrite(
             )
         ),
         implementation = { user: USER?, id: String, _: Unit ->
-            if (!collection
-                    .secure(secure(user))
+            if (!rules(user, collection)
                     .deleteOneById(id.toUuidOrBadRequest())
             ) {
                 throw NotFoundException()
@@ -164,15 +156,14 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeWrite(
 @KtorDsl
 inline fun <reified USER : Principal, reified T : HasId> Route.exposeRead(
     collection: FieldCollection<T>,
-    crossinline secure: suspend (USER?) -> SecurityRules<T>
+    crossinline rules: suspend (principal: USER?, input: FieldCollection<T>) -> FieldCollection<T>
 ) {
     get(
         path = "",
         summary = "Gets a list of ${T::class.simpleName}s.",
         errorCases = listOf(),
         implementation = { user: USER?, input: Query<T> ->
-            collection
-                .secure(secure(user))
+            rules(user, collection)
                 .query(input)
                 .toList()
         }
@@ -185,8 +176,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeRead(
         summary = "Gets a list of ${T::class.simpleName}s that match the given query.",
         errorCases = listOf(),
         implementation = { user: USER?, input: Query<T> ->
-            collection
-                .secure(secure(user))
+            rules(user, collection)
                 .query(input)
                 .toList()
         }
@@ -209,8 +199,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeRead(
             )
         ),
         implementation = { user: USER?, id: String, input: Unit ->
-            collection
-                .secure(secure(user))
+            rules(user, collection)
                 .get(id.toUuidOrBadRequest())
                 ?: throw NotFoundException()
         }
@@ -222,10 +211,13 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeRead(
 @KtorDsl
 inline fun <reified USER : Principal, reified T : HasId> Route.exposeWebSocket(
     collection: WatchableFieldCollection<T>,
-    crossinline secure: suspend (USER?) -> SecurityRules<T>
+    crossinline rules: suspend (principal: USER?, input: FieldCollection<T>) -> FieldCollection<T>
 ) {
     jsonWebSocket<ListChange<T>, Query<T>> {
-        val secured = collection.secure(secure(call.principal<USER>()))
+        val secured = rules(
+            call.principal(),
+            collection
+        ) as WatchableFieldCollection // collection.secure(secure(call.principal<USER>()))
         incoming.flatMapLatest { query ->
             secured.watch(query.condition)
                 .map { it.listChange() }
@@ -241,23 +233,23 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeWebSocket(
 @KtorDsl
 inline fun <reified USER : Principal, reified T : HasId> Route.exposeReadWrite(
     collection: FieldCollection<T>,
-    crossinline secure: suspend (USER?) -> SecurityRules<T>
+    crossinline rules: suspend (principal: USER?, input: FieldCollection<T>) -> FieldCollection<T>
 
 ) {
-    this.exposeRead(collection, secure)
-    this.exposeWrite(collection, secure)
+    this.exposeRead(collection, rules)
+    this.exposeWrite(collection, rules)
 }
 
 // Calls all three of the endpoint type functions
 @KtorDsl
 inline fun <reified USER : Principal, reified T : HasId> Route.exposeAll(
     collection: WatchableFieldCollection<T>,
-    crossinline secure: suspend (USER?) -> SecurityRules<T>
+    crossinline rules: suspend (principal: USER?, input: FieldCollection<T>) -> FieldCollection<T>
 
 ) {
-    this.exposeRead(collection, secure)
-    this.exposeWrite(collection, secure)
-    this.exposeWebSocket(collection, secure)
+    this.exposeRead(collection, rules)
+    this.exposeWrite(collection, rules)
+    this.exposeWebSocket(collection, rules)
 }
 
 
@@ -265,9 +257,9 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeAll(
 @KtorDsl
 inline fun <reified USER : Principal, reified T : HasId> Route.exposeReadAndWebSocket(
     collection: WatchableFieldCollection<T>,
-    crossinline secure: suspend (USER?) -> SecurityRules<T>
+    crossinline rules: suspend (principal: USER?, input: FieldCollection<T>) -> FieldCollection<T>
 ) {
-    this.exposeRead(collection, secure)
-    this.exposeWebSocket(collection, secure)
+    this.exposeRead(collection, rules)
+    this.exposeWebSocket(collection, rules)
 }
 

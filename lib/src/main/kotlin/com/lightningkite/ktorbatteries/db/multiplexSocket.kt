@@ -23,6 +23,7 @@ fun Route.multiplexWebSocket() {
         val entries = application.jsonWebSocketEntries
         val myOpenSockets = ConcurrentHashMap<String, OpenChannel>()
         incomingLoop@ for (message in incoming) {
+            if (message is Frame.Close) break@incomingLoop
             if (message !is Frame.Text) continue
             val text = message.readText()
             if (text == "") {
