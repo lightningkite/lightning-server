@@ -68,7 +68,13 @@ fun main(vararg args: String) {
         configureFiles()
         configureSerialization()
         authentication {
-            quickJwt { id -> DirectPrincipal(id) }
+            quickJwt { creds ->
+                DirectPrincipal(
+                    creds.payload
+                        .getClaim(AuthSettings.userIdKey)
+                        .asString()
+                )
+            }
         }
         install(StatusPages) {
             exception<Exception> { call, cause -> call.respondText(cause.message ?: "Unknown Error") }
