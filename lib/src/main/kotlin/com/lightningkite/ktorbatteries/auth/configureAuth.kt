@@ -24,9 +24,14 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import java.util.*
 
+/**
+Handles the setup and main verification for jwt token authentication.
+The only thing required from the user is to provide a Principal object.
+The user can also do any other verification they may need at the same time.
+A return of null from validate will result in authentication failure.
+ */
 fun AuthenticationConfig.quickJwt(
-    jwtChecks: (JWTCredential) -> Boolean = { true },
-    idToPrincipal: suspend (String) -> Principal?
+    validate: suspend (JWTCredential) -> Principal?,
 ) {
     jwt {
         realm = AuthSettings.instance.jwtRealm
@@ -59,16 +64,7 @@ fun AuthenticationConfig.quickJwt(
                 .build()
         )
         validate { credential: JWTCredential ->
-            if (
-                credential.payload.audience.contains(AuthSettings.instance.jwtAudience) &&
-                credential.payload.issuer == AuthSettings.instance.jwtIssuer &&
-                jwtChecks(credential)
-            ) {
-                credential.payload
-                    .getClaim(AuthSettings.userIdKey)
-                    .asString()
-                    .let { idToPrincipal(it) }
-            } else null
+            validate(credential)
         }
     }
 }
