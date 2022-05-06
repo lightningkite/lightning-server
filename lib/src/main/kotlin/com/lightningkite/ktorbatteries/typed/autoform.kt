@@ -96,7 +96,6 @@ public val SerialDescriptor.fileFieldNames: List<String>
         return (0 until elementsCount)
             .flatMap {
                 val name = getElementName(it)
-                println("Checking $name for IsFile... ${getElementAnnotations(it)}")
                 getElementDescriptor(it).fileFieldNames.map { "$name.$it" } + if (getElementAnnotations(it).any { it is IsFile }) listOf(
                     name
                 ) else listOf()

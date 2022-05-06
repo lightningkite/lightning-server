@@ -14,7 +14,8 @@ private const val allowedChars = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOP
 val FileObject.publicUrl: String
     get() = if (this is LocalFile)
         "${GeneralServerSettings.instance.publicUrl}/${
-            path.relativeTo(Path.of(FilesSettings.instance.storageUrl.removePrefix("file://")))
+            path.relativeTo(Path.of(FilesSettings.instance.storageUrl.removePrefix("file://"))).toString()
+                .replace("\\", "/")
         }"
     else
         URL("https", url.host, url.port, url.file).toString()

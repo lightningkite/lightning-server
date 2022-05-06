@@ -95,6 +95,28 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeWrite(
     )
 
     patchItem(
+        path = "delta",
+        summary = "Modifies a ${T::class.simpleName} by ID, returning both the previous value and new value.",
+        errorCases = listOf(
+            ApiEndpoint.ErrorCase(
+                status = HttpStatusCode.NotFound,
+                internalCode = 0,
+                description = "There was no known object by that ID."
+            ),
+            ApiEndpoint.ErrorCase(
+                status = HttpStatusCode.BadRequest,
+                internalCode = 0,
+                description = "The ID could not be parsed as a UUID."
+            )
+        ),
+        implementation = { user: USER?, id: String, input: Modification<T> ->
+            rules(user, collection)
+                .findOneAndUpdateById(id.toUuidOrBadRequest(), input)
+                .also { if (it.old == null && it.new == null) throw NotFoundException() }
+        }
+    )
+
+    patchItem(
         path = "",
         summary = "Modifies a ${T::class.simpleName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
@@ -113,6 +135,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.exposeWrite(
             rules(user, collection)
                 .findOneAndUpdateById(id.toUuidOrBadRequest(), input)
                 .also { if (it.old == null && it.new == null) throw NotFoundException() }
+                .new
         }
     )
 

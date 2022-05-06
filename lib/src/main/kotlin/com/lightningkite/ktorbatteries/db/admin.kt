@@ -26,20 +26,20 @@ import kotlin.reflect.typeOf
 inline fun <reified USER : Principal, reified T : HasId> Route.adminPages(
     collection: FieldCollection<T>,
     crossinline defaultItem: (USER?) -> T,
-    crossinline secure: suspend (USER?) -> SecurityRules<T>
+    crossinline rules: suspend (principal: USER?, input: FieldCollection<T>) -> FieldCollection<T>
 ) {
-    adminDetail(collection, defaultItem, secure)
-    adminList(collection, defaultItem, secure)
+    adminDetail(collection, defaultItem, rules)
+    adminList(collection, defaultItem, rules)
 }
 
 @KtorDsl
 inline fun <reified USER : Principal, reified T : HasId> Route.adminDetail(
     collection: FieldCollection<T>,
     crossinline defaultItem: (USER?) -> T,
-    crossinline secure: suspend (USER?) -> SecurityRules<T>
+    crossinline rules: suspend (principal: USER?, input: FieldCollection<T>) -> FieldCollection<T>
 ) {
     get("{id}") {
-        val secured = collection.secure(secure(this.context.principal()))
+        val secured = rules(context.principal(), collection)
         val item = secured.get(this.context.parameters["id"]!!.toUuidOrBadRequest().also { println(it) })
         context.respondHtml {
             head { includeFormScript() }
@@ -83,7 +83,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminDetail(
     }
     get("create") {
         val user = this.context.principal<USER>()
-        val secured = collection.secure(secure(user))
+        val secured = rules(user, collection)
         context.respondHtml {
             head { includeFormScript() }
             body {
@@ -113,10 +113,10 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminDetail(
 inline fun <reified USER : Principal, reified T : HasId> Route.adminList(
     collection: FieldCollection<T>,
     crossinline defaultItem: (USER?) -> T,
-    crossinline secure: suspend (USER?) -> SecurityRules<T>
+    crossinline rules: suspend (principal: USER?, input: FieldCollection<T>) -> FieldCollection<T>
 ) {
     get {
-        val secured = collection.secure(secure(this.context.principal()))
+        val secured = rules(context.principal(), collection)
         val items = secured.query(
             Query(
                 condition = Condition.Always(),
@@ -129,8 +129,8 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminList(
         val keys = propItems.flatMap { it.keys }.distinct()
         context.respondHtml {
             body {
-                println("/" + (this@adminList.selector as PathSegmentConstantRouteSelector).value + "/create")
-                a(href = "/" + (this@adminList.selector as PathSegmentConstantRouteSelector).value + "/create") {
+                println((this@adminList.selector as PathSegmentConstantRouteSelector).value + "/create")
+                a(href = (this@adminList.selector as PathSegmentConstantRouteSelector).value + "/create") {
                     +"Create"
                 }
                 table {
@@ -144,7 +144,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminList(
                             for (key in keys) {
                                 td {
                                     if (key == "_id") {
-                                        a(href = "/" + (this@adminList.selector as PathSegmentConstantRouteSelector).value + "/" + item["_id"]!!) {
+                                        a(href = (this@adminList.selector as PathSegmentConstantRouteSelector).value + "/" + item["_id"]!!) {
                                             +(item[key] ?: "-")
                                         }
                                     } else {

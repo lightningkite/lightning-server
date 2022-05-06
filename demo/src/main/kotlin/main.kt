@@ -87,7 +87,11 @@ fun main(vararg args: String) {
                         defaultItem = { TestModel() }) { user: DirectPrincipal? -> SecurityRules.AllowAll() }
                 }
                 route("rest") {
-                    exposeReadWrite(TestModel.table) { user: DirectPrincipal? -> SecurityRules.AllowAll() }
+                    exposeReadWrite(TestModel.table) { user: DirectPrincipal?, collection ->
+                        collection.secure(
+                            SecurityRules.AllowAll()
+                        )
+                    }
                 }
                 get {
                     call.respondText("Welcome, ${call.principal<DirectPrincipal>()?.id}!")
