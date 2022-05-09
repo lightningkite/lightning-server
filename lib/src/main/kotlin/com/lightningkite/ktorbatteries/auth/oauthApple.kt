@@ -10,6 +10,7 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.*
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.jce.interfaces.ECKey
 import org.bouncycastle.openssl.PEMParser
@@ -26,6 +27,7 @@ import java.security.interfaces.ECPrivateKey
 import java.security.interfaces.ECPublicKey
 
 
+@KtorDsl
 fun Route.oauthApple(
     defaultLanding: String = GeneralServerSettings.instance.publicUrl,
     emailToId: suspend (String) -> String

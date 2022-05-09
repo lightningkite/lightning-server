@@ -1,46 +1,72 @@
 package com.lightningkite.ktorbatteries.db
 
-import com.lightningkite.ktorbatteries.routes.fullPath
+import com.lightningkite.ktorbatteries.routes.pathRelativeTo
 import com.lightningkite.ktorbatteries.serialization.Serialization
-import com.lightningkite.ktorbatteries.typed.jsForm
 import com.lightningkite.ktorbatteries.typed.includeFormScript
 import com.lightningkite.ktorbatteries.typed.insideHtmlForm
 import com.lightningkite.ktorkmongo.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.html.*
-import io.ktor.server.http.content.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
-import io.ktor.util.pipeline.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.html.*
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.properties.encodeToStringMap
+import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
-
-@KtorDsl
-inline fun <reified USER : Principal, reified T : HasId> Route.adminPages(
-    collection: FieldCollection<T>,
-    crossinline defaultItem: (USER?) -> T,
-    crossinline rules: suspend (principal: USER?, input: FieldCollection<T>) -> FieldCollection<T>
+data class AutoAdminSection<USER: Principal, T: HasId>(
+    val route: Route,
+    val type: KType,
+    val userType: KType,
+    val defaultItem: (USER?) -> T,
+    val getCollection: suspend (USER?) -> FieldCollection<T>
 ) {
-    adminDetail(collection, defaultItem, rules)
-    adminList(collection, defaultItem, rules)
+    companion object {
+        val known: MutableCollection<AutoAdminSection<*, *>> = ArrayList()
+    }
 }
 
 @KtorDsl
-inline fun <reified USER : Principal, reified T : HasId> Route.adminDetail(
-    collection: FieldCollection<T>,
-    crossinline defaultItem: (USER?) -> T,
-    crossinline rules: suspend (principal: USER?, input: FieldCollection<T>) -> FieldCollection<T>
-) {
+fun Route.adminIndex(path: String = "admin") = route(path) {
+    get {
+        context.respondHtml {
+            head {}
+            body {
+                div {
+                    for(section in AutoAdminSection.known) {
+                        div {
+                            a(href = section.route.pathRelativeTo(this@route.parent!!)) {
+                                +section.type.toString()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@KtorDsl
+inline fun <reified USER : Principal, reified T : HasId> Route.adminPages(
+    path: String = "",
+    noinline defaultItem: (USER?) -> T,
+    noinline getCollection: suspend (principal: USER?) -> FieldCollection<T>
+) = route(path) {
+    AutoAdminSection.known.add(
+        AutoAdminSection(
+        route = this,
+        type = typeOf<T>(),
+        userType = typeOf<USER>(),
+        defaultItem = defaultItem,
+        getCollection = getCollection,
+    ))
     get("{id}") {
-        val secured = rules(context.principal(), collection)
-        val item = secured.get(this.context.parameters["id"]!!.toUuidOrBadRequest().also { println(it) })
+        val secured = getCollection(call.principal())
+        val item = secured.get(this.context.parameters["id"]!!.toUuidOrBadRequest())
         context.respondHtml {
             head { includeFormScript() }
             body {
@@ -73,17 +99,17 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminDetail(
         }
     }
     post("{id}/delete") {
-        collection.deleteOneById(this.context.parameters["id"]!!.toUuidOrBadRequest())
+        getCollection(call.principal()).deleteOneById(this.context.parameters["id"]!!.toUuidOrBadRequest())
         call.respondRedirect("..")
     }
     post("{id}") {
         val item: T = call.receive()
-        collection.replaceOneById(this.context.parameters["id"]!!.toUuidOrBadRequest(), item)
+        getCollection(call.principal()).replaceOneById(this.context.parameters["id"]!!.toUuidOrBadRequest(), item)
         call.respondRedirect(".")
     }
     get("create") {
         val user = this.context.principal<USER>()
-        val secured = rules(user, collection)
+        val secured = getCollection(call.principal())
         context.respondHtml {
             head { includeFormScript() }
             body {
@@ -104,19 +130,11 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminDetail(
     }
     post("create") {
         val item: T = call.receive()
-        collection.insertOne(item)
+        getCollection(call.principal()).insertOne(item)
         call.respondRedirect(".")
     }
-}
-
-@KtorDsl
-inline fun <reified USER : Principal, reified T : HasId> Route.adminList(
-    collection: FieldCollection<T>,
-    crossinline defaultItem: (USER?) -> T,
-    crossinline rules: suspend (principal: USER?, input: FieldCollection<T>) -> FieldCollection<T>
-) {
     get {
-        val secured = rules(context.principal(), collection)
+        val secured = getCollection(call.principal())
         val items = secured.query(
             Query(
                 condition = Condition.Always(),
@@ -129,8 +147,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminList(
         val keys = propItems.flatMap { it.keys }.distinct()
         context.respondHtml {
             body {
-                println((this@adminList.selector as PathSegmentConstantRouteSelector).value + "/create")
-                a(href = (this@adminList.selector as PathSegmentConstantRouteSelector).value + "/create") {
+                a(href = (this@route.selector as PathSegmentConstantRouteSelector).value + "/create") {
                     +"Create"
                 }
                 table {
@@ -144,7 +161,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminList(
                             for (key in keys) {
                                 td {
                                     if (key == "_id") {
-                                        a(href = (this@adminList.selector as PathSegmentConstantRouteSelector).value + "/" + item["_id"]!!) {
+                                        a(href = (this@route.selector as PathSegmentConstantRouteSelector).value + "/" + item["_id"]!!) {
                                             +(item[key] ?: "-")
                                         }
                                     } else {

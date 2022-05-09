@@ -11,6 +11,7 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.*
 import kotlinx.serialization.Serializable
 import java.util.*
 
@@ -23,6 +24,7 @@ data class OauthResponse(
     val id_token: String? = null
 )
 
+@KtorDsl
 inline fun Route.oauth(
     niceName: String,
     codeName: String,

@@ -2,7 +2,6 @@ package com.lightningkite.ktorbatteries.email
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.html.InputType
 import org.apache.commons.mail.DefaultAuthenticator
 import org.apache.commons.mail.EmailAttachment
 import org.apache.commons.mail.HtmlEmail

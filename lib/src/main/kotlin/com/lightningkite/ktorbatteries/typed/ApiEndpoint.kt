@@ -35,7 +35,7 @@ data class ApiEndpoint<USER : Principal, INPUT : Any, OUTPUT>(
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiBase(
-    path: String,
+    path: String = "",
     method: HttpMethod,
     summary: String,
     description: String = summary,
@@ -75,7 +75,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiBody(
-    path: String,
+    path: String = "",
     method: HttpMethod,
     summary: String,
     description: String = summary,
@@ -89,7 +89,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiQuery(
-    path: String,
+    path: String = "",
     method: HttpMethod,
     summary: String,
     description: String = summary,
@@ -115,7 +115,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiParameterlessBody(
-    path: String,
+    path: String = "",
     method: HttpMethod,
     summary: String,
     description: String = summary,
@@ -131,7 +131,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiSingleParameterBody(
-    path: String,
+    path: String = "",
     method: HttpMethod,
     summary: String,
     description: String = summary,
@@ -154,7 +154,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiParameterlessQuery(
-    path: String,
+    path: String = "",
     method: HttpMethod,
     summary: String,
     description: String = summary,
@@ -177,7 +177,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiSingleParameterQuery(
-    path: String,
+    path: String = "",
     method: HttpMethod,
     summary: String,
     description: String = summary,
@@ -200,7 +200,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.get(
-    path: String,
+    path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
@@ -213,7 +213,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.getItem(
-    path: String,
+    path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
@@ -226,7 +226,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.post(
-    path: String,
+    path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
@@ -239,7 +239,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.postItem(
-    path: String,
+    path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
@@ -252,7 +252,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.put(
-    path: String,
+    path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
@@ -265,7 +265,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.putItem(
-    path: String,
+    path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
@@ -278,7 +278,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.patch(
-    path: String,
+    path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
@@ -291,7 +291,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.patchItem(
-    path: String,
+    path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
@@ -304,7 +304,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.delete(
-    path: String,
+    path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
@@ -317,7 +317,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.deleteItem(
-    path: String,
+    path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,

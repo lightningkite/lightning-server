@@ -4,9 +4,10 @@ package com.lightningkite.ktorbatteries.demo
 
 import com.lightningkite.ktorbatteries.auth.*
 import com.lightningkite.ktorbatteries.client
+import com.lightningkite.ktorbatteries.db.adminIndex
 import com.lightningkite.ktorbatteries.db.adminPages
+import com.lightningkite.ktorbatteries.db.autoCollection
 import com.lightningkite.ktorbatteries.db.database
-import com.lightningkite.ktorbatteries.db.exposeReadWrite
 import com.lightningkite.ktorbatteries.files.FilesSettings
 import com.lightningkite.ktorbatteries.files.configureFiles
 import com.lightningkite.ktorbatteries.jsonschema.JsonSchema
@@ -17,6 +18,7 @@ import com.lightningkite.ktorbatteries.serialization.configureSerialization
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.lightningkite.ktorbatteries.settings.loadSettings
 import com.lightningkite.ktorbatteries.settings.runServer
+import com.lightningkite.ktorbatteries.typed.apiHelp
 import com.lightningkite.ktorkmongo.*
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -81,21 +83,12 @@ fun main(vararg args: String) {
         }
         routing {
             authenticate(optional = true) {
-                route("admin") {
-                    adminPages(
-                        TestModel.table,
-                        defaultItem = { TestModel() }) { user: DirectPrincipal? -> SecurityRules.AllowAll() }
-                }
-                route("rest") {
-                    exposeReadWrite(TestModel.table) { user: DirectPrincipal?, collection ->
-                        collection.secure(
-                            SecurityRules.AllowAll()
-                        )
-                    }
-                }
+                autoCollection("test-model", { TestModel() }, { user: DirectPrincipal? -> TestModel.table })
                 get {
                     call.respondText("Welcome, ${call.principal<DirectPrincipal>()?.id}!")
                 }
+                adminIndex()
+                apiHelp()
                 oauthGoogle(GeneralServerSettings.instance.publicUrl) { it }
                 oauthGithub(GeneralServerSettings.instance.publicUrl) { it }
                 oauthApple(GeneralServerSettings.instance.publicUrl) { it }

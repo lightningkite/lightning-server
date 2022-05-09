@@ -5,10 +5,11 @@ import io.ktor.server.html.*
 import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.*
 import kotlinx.html.*
 import kotlin.reflect.typeOf
 
-fun Route.helpFor(api: ApiEndpoint<*, *, *>) = get {
+private fun Route.helpFor(root: Route, api: ApiEndpoint<*, *, *>) = get {
     if (api.inputType == null) {
         context.respond(HttpStatusCode.NoContent)
         return@get
@@ -52,33 +53,35 @@ fun Route.helpFor(api: ApiEndpoint<*, *, *>) = get {
                 }
             }
             nav {
-                apiHelpIndex()
+//                apiHelpIndex()
             }
         }
     }
 }
 
-fun Route.apiHelp() {
+@KtorDsl
+fun Route.apiHelp(path: String = "docs") = route(path) {
+    val rootRoute = this
     val routes = ApiEndpoint.known.associateBy { it.route.fullPath + "/" + it.route.selector.maybeMethod?.value }
     for (r in routes) {
-        route(r.key) { helpFor(r.value) }.also { println(it.fullPath) }
+        route(r.key) { helpFor(rootRoute, r.value) }.also { println(it.fullPath) }
     }
     get {
         context.respondHtml {
             head { title("Index") }
             body {
                 h1 { +"API Docs Index" }
-                apiHelpIndex()
+                apiHelpIndex(path)
             }
         }
     }
 }
 
-fun FlowContent.apiHelpIndex() {
+private fun FlowContent.apiHelpIndex(prefix: String) {
     val routes = ApiEndpoint.known.associateBy { it.route.fullPath + "/" + it.route.selector.maybeMethod?.value }
     for (r in routes) {
         div {
-            a(href = r.key) {
+            a(href = prefix + r.key) {
                 +r.value.route.fullPath
                 +" - "
                 +r.value.summary

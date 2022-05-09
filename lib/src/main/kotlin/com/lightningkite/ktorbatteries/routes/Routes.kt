@@ -24,13 +24,13 @@ private fun Route.commonAncestor(with: Route): Route? {
     return a
 }
 
-fun Route.pathRelativeTo(other: Route): String? {
+fun Route.pathRelativeTo(base: Route): String? {
     var pathBeforeAncestor = ""
     var pathAfterAncestor = ""
-    val depthA = generateSequence(this) { it.parent }.count()
-    val depthB = generateSequence(other) { it.parent }.count()
-    var a = this
-    var b = other
+    val depthA = generateSequence(base) { it.parent }.count()
+    val depthB = generateSequence(this) { it.parent }.count()
+    var a = base
+    var b = this
     if (depthA > depthB) {
         repeat(depthA - depthB) {
             a = a.parent ?: return null
@@ -52,16 +52,18 @@ fun Route.pathRelativeTo(other: Route): String? {
         a = a.parent ?: return null
         b = b.parent ?: return null
     }
+    println("pathBeforeAncestor: $pathBeforeAncestor")
+    println("pathAfterAncestor: $pathAfterAncestor")
     return "." + pathBeforeAncestor + pathAfterAncestor
 }
 
 private val RouteSelector.segment: String
     get() = when (this) {
         is PathSegmentConstantRouteSelector -> "/$value"
-        is PathSegmentParameterRouteSelector -> "/something"
-        is PathSegmentOptionalParameterRouteSelector -> "/something"
-        is PathSegmentWildcardRouteSelector -> "/something"
-        is PathSegmentTailcardRouteSelector -> "/something"
+        is PathSegmentParameterRouteSelector -> "/-"
+        is PathSegmentOptionalParameterRouteSelector -> "/-"
+        is PathSegmentWildcardRouteSelector -> "/-"
+        is PathSegmentTailcardRouteSelector -> "/-"
         is TrailingSlashRouteSelector -> "/"
         else -> ""
     }
