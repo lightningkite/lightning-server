@@ -131,7 +131,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiSingleParameterBody(
-    path: String = "",
+    postIdPath: String = "",
     method: HttpMethod,
     summary: String,
     description: String = summary,
@@ -139,7 +139,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (user: USER?, id: String, input: INPUT) -> OUTPUT
 ) = apiBody<USER, INPUT, OUTPUT>(
-    path.removeSuffix("/") + "/{id}",
+    "{id}" + if (postIdPath.isBlank()) "" else "/$postIdPath",
     method,
     summary,
     description,
@@ -177,7 +177,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiSingleParameterQuery(
-    path: String = "",
+    postIdPath: String = "",
     method: HttpMethod,
     summary: String,
     description: String = summary,
@@ -185,7 +185,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (user: USER?, id: String, input: INPUT) -> OUTPUT
 ) = apiQuery<USER, INPUT, OUTPUT>(
-    path.removeSuffix("/") + "/{id}",
+    "{id}" + if (postIdPath.isBlank()) "" else "/$postIdPath",
     method,
     summary,
     description,
@@ -213,13 +213,13 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.getItem(
-    path: String = "",
+    postIdPath: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (user: USER?, id: String, input: INPUT) -> OUTPUT
-) = apiSingleParameterQuery(path, HttpMethod.Get, summary, description, errorCases, successCode, implementation)
+) = apiSingleParameterQuery(postIdPath, HttpMethod.Get, summary, description, errorCases, successCode, implementation)
 
 /**
  * Builds a route to match `GET` requests
@@ -239,13 +239,13 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.postItem(
-    path: String = "",
+    postIdPath: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (user: USER?, id: String, input: INPUT) -> OUTPUT
-) = apiSingleParameterBody(path, HttpMethod.Post, summary, description, errorCases, successCode, implementation)
+) = apiSingleParameterBody(postIdPath, HttpMethod.Post, summary, description, errorCases, successCode, implementation)
 
 /**
  * Builds a route to match `GET` requests
@@ -265,13 +265,13 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.putItem(
-    path: String = "",
+    postIdPath: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (user: USER?, id: String, input: INPUT) -> OUTPUT
-) = apiSingleParameterBody(path, HttpMethod.Put, summary, description, errorCases, successCode, implementation)
+) = apiSingleParameterBody(postIdPath, HttpMethod.Put, summary, description, errorCases, successCode, implementation)
 
 /**
  * Builds a route to match `GET` requests
@@ -291,13 +291,13 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  */
 @KtorDsl
 inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.patchItem(
-    path: String = "",
+    postIdPath: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (user: USER?, id: String, input: INPUT) -> OUTPUT
-) = apiSingleParameterBody(path, HttpMethod.Patch, summary, description, errorCases, successCode, implementation)
+) = apiSingleParameterBody(postIdPath, HttpMethod.Patch, summary, description, errorCases, successCode, implementation)
 
 /**
  * Builds a route to match `GET` requests

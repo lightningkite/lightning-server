@@ -13,13 +13,9 @@ inline fun <reified USER : Principal, reified T : HasId> Route.autoCollection(
     path: String,
     noinline defaultItem: (principal: USER?) -> T,
     noinline getCollection: suspend (principal: USER?) -> FieldCollection<T>
-) {
-    route("rest") {
-        restApi(path = path, getCollection = getCollection)
-    }
-    route("admin") {
-        adminPages(path = path, defaultItem = defaultItem, getCollection = getCollection)
-    }
+) = route(path) {
+    restApi(path = "rest", getCollection = getCollection)
+    adminPages(path = "admin", defaultItem = defaultItem, getCollection = getCollection)
 }
 
 @KtorDsl
@@ -27,12 +23,8 @@ inline fun <reified USER : Principal, reified T : HasId> Route.autoCollectionWat
     path: String,
     noinline defaultItem: (principal: USER?) -> T,
     noinline getCollection: suspend (principal: USER?) -> WatchableFieldCollection<T>
-) {
-    route("rest") {
-        restApi(path = path, getCollection = getCollection)
-        restApiWebsocket(path = path, getCollection = getCollection)
-    }
-    route("admin") {
-        adminPages(path = path, defaultItem = defaultItem, getCollection = getCollection)
-    }
+) = route(path) {
+    restApi(path = "rest", getCollection = getCollection)
+    restApiWebsocket(path = "rest", getCollection = getCollection)
+    adminPages(path = "admin", defaultItem = defaultItem, getCollection = getCollection)
 }

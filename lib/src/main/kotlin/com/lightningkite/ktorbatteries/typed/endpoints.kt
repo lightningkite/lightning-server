@@ -73,7 +73,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.restApi(
 
     // This is used get a single object with id of _id
     getItem(
-        path = "",
+        postIdPath = "",
         summary = "Gets a single ${T::class.simpleName} by ID.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
@@ -128,7 +128,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.restApi(
     )
 
     putItem(
-        path = "",
+        postIdPath = "",
         summary = "Replaces a single ${T::class.simpleName} by ID.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
@@ -160,7 +160,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.restApi(
     )
 
     patchItem(
-        path = "delta",
+        postIdPath = "delta",
         summary = "Modifies a ${T::class.simpleName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
@@ -182,7 +182,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.restApi(
     )
 
     patchItem(
-        path = "",
+        postIdPath = "",
         summary = "Modifies a ${T::class.simpleName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
