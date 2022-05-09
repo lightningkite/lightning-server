@@ -40,7 +40,7 @@ data class ApiWebsocket<USER : Principal, INPUT, OUTPUT>(
     data class ErrorCase(val closeReason: CloseReason, val internalCode: Int, val description: String)
 }
 
-inline fun <reified USER : Principal, reified INPUT, reified OUTPUT> Route.jsonWebSocket(
+inline fun <reified USER : Principal, reified INPUT, reified OUTPUT> Route.apiWebsocket(
     path: String = "",
     summary: String,
     description: String = summary,

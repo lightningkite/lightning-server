@@ -10,7 +10,7 @@ import io.ktor.util.*
 
 @KtorDsl
 inline fun <reified USER : Principal, reified T : HasId> Route.autoCollection(
-    path: String = "",
+    path: String,
     noinline defaultItem: (principal: USER?) -> T,
     noinline getCollection: suspend (principal: USER?) -> FieldCollection<T>
 ) {
@@ -24,7 +24,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.autoCollection(
 
 @KtorDsl
 inline fun <reified USER : Principal, reified T : HasId> Route.autoCollectionWatchable(
-    path: String = "",
+    path: String,
     noinline defaultItem: (principal: USER?) -> T,
     noinline getCollection: suspend (principal: USER?) -> WatchableFieldCollection<T>
 ) {

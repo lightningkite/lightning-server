@@ -24,7 +24,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.restApiWebsocket(
     path: String = "",
     crossinline getCollection: suspend (principal: USER?) -> WatchableFieldCollection<T>
 ) {
-    jsonWebSocket<USER, Query<T>, ListChange<T>>(
+    apiWebsocket<USER, Query<T>, ListChange<T>>(
         path = path,
         summary = "Gets a changing list of ${T::class.simpleName}s that match the given query.",
         errorCases = listOf(),
