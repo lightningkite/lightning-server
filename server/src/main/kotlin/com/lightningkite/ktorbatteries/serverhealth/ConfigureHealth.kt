@@ -5,6 +5,7 @@ import io.ktor.server.application.*
 import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.*
 import org.slf4j.event.Level
 import java.lang.management.ManagementFactory
 import java.lang.management.OperatingSystemMXBean
@@ -27,7 +28,10 @@ data class HealthStatus(val level: Level, val checkedAt: Instant = Instant.now()
 }
 
 private val healthCache = HashMap<HealthCheckable, HealthStatus>()
-fun Route.configureHealth(path: String, features: List<HealthCheckable>) {
+@Deprecated("Use new naming instead", ReplaceWith("healthCheckPage"))
+fun Route.configureHealth(path: String, features: List<HealthCheckable>) = healthCheckPage(path, features)
+@KtorDsl
+fun Route.healthCheckPage(path: String, features: List<HealthCheckable>) {
     get(path) {
 
         val now = Instant.now()
