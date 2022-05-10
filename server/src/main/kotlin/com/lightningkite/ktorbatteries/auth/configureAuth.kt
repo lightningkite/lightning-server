@@ -36,7 +36,7 @@ The user can also do any other verification they may need at the same time.
 A return of null from validate will result in authentication failure.
  */
 fun AuthenticationConfig.quickJwt(
-    validate: suspend (JWTCredential) -> Principal?,
+    validate: suspend ApplicationCall.(JWTCredential) -> Principal?,
 ) {
     jwt {
         realm = AuthSettings.instance.jwtRealm
