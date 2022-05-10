@@ -17,11 +17,12 @@ class LiveCompleteModelApi<Model : HasId>(
             root: String,
             multiplexSocketUrl: String,
             path: String,
-            token: String
+            token: String,
+            headers: Map<String, String> = mapOf(),
         ): LiveCompleteModelApi<Model> = LiveCompleteModelApi(
-            read = LiveReadModelApi("$root$path", token, defaultJsonMapper.serializersModule.serializer()),
-            write = LiveWriteModelApi("$root$path", token, defaultJsonMapper.serializersModule.serializer()),
-            observe = LiveObserveModelApi.create(multiplexSocketUrl, token, path)
+            read = LiveReadModelApi("$root$path", token, headers, defaultJsonMapper.serializersModule.serializer()),
+            write = LiveWriteModelApi("$root$path", token, headers, defaultJsonMapper.serializersModule.serializer()),
+            observe = LiveObserveModelApi.create(multiplexSocketUrl, token, headers, path)
         )
     }
 }

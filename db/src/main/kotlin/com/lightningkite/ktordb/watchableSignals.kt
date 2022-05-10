@@ -2,62 +2,57 @@ package com.lightningkite.ktordb
 
 import kotlinx.coroutines.flow.*
 
-suspend fun <Model> Flow<Model>.collectChunked(chunkSize: Int, action: suspend (List<Model>) -> Unit) {
-    val list = ArrayList<Model>()
-    this.collect {
-        list.add(it)
-        if (list.size >= chunkSize) {
-            action(list)
-            list.clear()
-        }
-    }
-    action(list)
-}
 
-class PostCreateSignalFieldCollection<Model : Any>(
-    val wraps: FieldCollection<Model>,
+class PostCreateSignalWatchableFieldCollection<Model : Any>(
+    val wraps: WatchableFieldCollection<Model>,
     val onCreate: suspend (Model) -> Unit,
-) : FieldCollection<Model> by wraps {
+) : WatchableFieldCollection<Model> by wraps {
     override suspend fun insertOne(model: Model): Model {
         val result = wraps.insertOne(model)
         onCreate(result)
         return result
     }
+
     override suspend fun insertMany(models: List<Model>): List<Model> {
         val result = wraps.insertMany(models)
         result.forEach { onCreate(it) }
         return result
     }
 }
-class PreCreateSignalFieldCollection<Model: Any>(
-    val wraps: FieldCollection<Model>,
-    val onCreate: suspend (Model)->Model,
-): FieldCollection<Model> by wraps {
+
+class PreCreateSignalWatchableFieldCollection<Model : Any>(
+    val wraps: WatchableFieldCollection<Model>,
+    val onCreate: suspend (Model) -> Model,
+) : WatchableFieldCollection<Model> by wraps {
     override suspend fun insertOne(model: Model): Model {
         return wraps.insertOne(onCreate(model))
     }
+
     override suspend fun insertMany(models: List<Model>): List<Model> {
         return wraps.insertMany(models.map { onCreate(it) })
     }
 }
-class PreDeleteSignalFieldCollection<Model: Any>(
-    val wraps: FieldCollection<Model>,
-    val onDelete: suspend (Model)->Unit,
-): FieldCollection<Model> by wraps {
+
+class PreDeleteSignalWatchableFieldCollection<Model : Any>(
+    val wraps: WatchableFieldCollection<Model>,
+    val onDelete: suspend (Model) -> Unit,
+) : WatchableFieldCollection<Model> by wraps {
     override suspend fun deleteMany(condition: Condition<Model>): Int {
         wraps.find(condition).collect(FlowCollector(onDelete))
         return wraps.deleteMany(condition)
     }
+
     override suspend fun deleteOne(condition: Condition<Model>): Boolean {
         wraps.find(condition, limit = 1).collect(FlowCollector(onDelete))
         return wraps.deleteOne(condition)
     }
 }
 
-class PostDeleteSignalFieldCollection<Model: HasId>(
-    val wraps: FieldCollection<Model>,
-    val onDelete: suspend (Model)->Unit,
-): FieldCollection<Model> by wraps {
+
+class PostDeleteSignalWatchableFieldCollection<Model : HasId>(
+    val wraps: WatchableFieldCollection<Model>,
+    val onDelete: suspend (Model) -> Unit,
+) : WatchableFieldCollection<Model> by wraps {
     override suspend fun deleteMany(condition: Condition<Model>): Int {
         var count = 0
         wraps.find(condition).collectChunked(1000) { list ->
@@ -66,6 +61,7 @@ class PostDeleteSignalFieldCollection<Model: HasId>(
         }
         return count
     }
+
     override suspend fun deleteOne(condition: Condition<Model>): Boolean {
         val toDelete = wraps.find(condition, limit = 1).toList()
         val result = wraps.deleteOne(startChain<Model>()[HasIdFields._id<Model>()] inside toDelete.map { it._id })
@@ -73,17 +69,18 @@ class PostDeleteSignalFieldCollection<Model: HasId>(
         return result
     }
 }
-class PostChangeSignalFieldCollection<Model: HasId>(
-    val wraps: FieldCollection<Model>,
-    val changed: suspend (before: Model, after: Model)->Unit,
-): FieldCollection<Model> by wraps {
+
+class PostChangeSignalWatchableFieldCollection<Model : HasId>(
+    val wraps: WatchableFieldCollection<Model>,
+    val changed: suspend (before: Model, after: Model) -> Unit,
+) : WatchableFieldCollection<Model> by wraps {
     override suspend fun replaceOne(
         condition: Condition<Model>,
         model: Model
     ): Model? {
         val before = wraps.find(condition, limit = 1).firstOrNull() ?: return null
         val result = wraps.replaceOne(condition, model)
-        if(result != null) changed(before, result)
+        if (result != null) changed(before, result)
         return result
     }
 
@@ -100,7 +97,10 @@ class PostChangeSignalFieldCollection<Model: HasId>(
     ): Int {
         var count = 0
         wraps.find(condition).collectChunked(1000) { list ->
-            count += wraps.updateMany(startChain<Model>()[HasIdFields._id<Model>()] inside list.map { it._id }, modification)
+            count += wraps.updateMany(
+                startChain<Model>()[HasIdFields._id<Model>()] inside list.map { it._id },
+                modification
+            )
             list.forEach { changed(it, modification(it)) }
         }
         return count
@@ -111,25 +111,29 @@ class PostChangeSignalFieldCollection<Model: HasId>(
         modification: Modification<Model>
     ): EntryChange<Model> {
         val change = wraps.findOneAndUpdate(condition, modification)
-        if(change.old != null && change.new != null)
+        if (change.old != null && change.new != null)
             changed(change.old!!, change.new!!)
         return change
     }
 }
 
 
-fun <Model : Any> FieldCollection<Model>.postCreate(
-    action: suspend (Model)->Unit
-): FieldCollection<Model> = PostCreateSignalFieldCollection(this, action)
-fun <Model : Any> FieldCollection<Model>.preCreate(
-    action: suspend (Model)->Model
-): FieldCollection<Model> = PreCreateSignalFieldCollection(this, action)
-fun <Model : Any> FieldCollection<Model>.preDelete(
-    action: suspend (Model)->Unit
-): FieldCollection<Model> = PreDeleteSignalFieldCollection(this, action)
-fun <Model : HasId> FieldCollection<Model>.postDelete(
-    action: suspend (Model)->Unit
-): FieldCollection<Model> = PostDeleteSignalFieldCollection(this, action)
-fun <Model : HasId> FieldCollection<Model>.postChange(
-    action: suspend (Model, Model)->Unit
-): FieldCollection<Model> = PostChangeSignalFieldCollection(this, action)
+fun <Model : Any> WatchableFieldCollection<Model>.postWatchableCreate(
+    action: suspend (Model) -> Unit
+): WatchableFieldCollection<Model> = PostCreateSignalWatchableFieldCollection(this, action)
+
+fun <Model : Any> WatchableFieldCollection<Model>.preWatchableCreate(
+    action: suspend (Model) -> Model
+): WatchableFieldCollection<Model> = PreCreateSignalWatchableFieldCollection(this, action)
+
+fun <Model : Any> WatchableFieldCollection<Model>.preWatchableDelete(
+    action: suspend (Model) -> Unit
+): WatchableFieldCollection<Model> = PreDeleteSignalWatchableFieldCollection(this, action)
+
+fun <Model : HasId> WatchableFieldCollection<Model>.postWatchableDelete(
+    action: suspend (Model) -> Unit
+): WatchableFieldCollection<Model> = PostDeleteSignalWatchableFieldCollection(this, action)
+
+fun <Model : HasId> WatchableFieldCollection<Model>.postWatchableChange(
+    action: suspend (Model, Model) -> Unit
+): WatchableFieldCollection<Model> = PostChangeSignalWatchableFieldCollection(this, action)

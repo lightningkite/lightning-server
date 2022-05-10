@@ -16,10 +16,11 @@ class LiveFullReadModelApi<Model : HasId>(
             root: String,
             multiplexSocketUrl: String,
             path: String,
-            token: String
+            token: String,
+            headers: Map<String, String> = mapOf(),
         ): LiveFullReadModelApi<Model> = LiveFullReadModelApi(
-            read = LiveReadModelApi("$root$path", token, defaultJsonMapper.serializersModule.serializer()),
-            observe = LiveObserveModelApi.create(multiplexSocketUrl, token, path)
+            read = LiveReadModelApi("$root$path", token, headers, defaultJsonMapper.serializersModule.serializer()),
+            observe = LiveObserveModelApi.create(multiplexSocketUrl, token, headers, path)
         )
     }
 }

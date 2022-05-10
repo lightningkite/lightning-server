@@ -10,15 +10,16 @@ plugins {
 }
 
 val kotlinVersion: String by project
-val rxPlusVersion = "master-SNAPSHOT"
+val rxPlusVersion = "1.0.1"
 val khrysalisVersion: String by project
 dependencies {
-    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
-    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
     api(project(":shared"))
     api("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
     api("com.lightningkite.rx:okhttp:$rxPlusVersion")
     api("com.lightningkite.rx:rxplus:$rxPlusVersion")
+
+    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
+    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
 }

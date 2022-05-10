@@ -15,14 +15,17 @@ import okhttp3.Response
 
 class LiveReadModelApi<Model : HasId>(
     val url: String,
-    val token: String,
+    token: String,
+    headers: Map<String, String> = mapOf(),
     val serializer: KSerializer<Model>
 ) : ReadModelApi<Model>() {
+
+    private val authHeaders = headers + mapOf("Authorization" to "Bearer $token")
 
     override fun list(query: Query<Model>): Single<List<Model>> = HttpClient.call(
         url = "$url/query",
         method = HttpClient.POST,
-        headers = mapOf("Authorization" to "Bearer $token"),
+        headers = authHeaders,
         body = query.toJsonRequestBody(),
     ).readJson(ListSerializer(serializer))
 
@@ -30,7 +33,7 @@ class LiveReadModelApi<Model : HasId>(
     override fun get(id: UUIDFor<Model>): Single<Model> = HttpClient.call(
         url = "$url/$id",
         method = HttpClient.GET,
-        headers = mapOf("Authorization" to "Bearer $token"),
+        headers = authHeaders,
     ).readJson(serializer)
 
 }

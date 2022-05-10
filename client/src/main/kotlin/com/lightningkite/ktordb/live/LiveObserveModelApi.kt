@@ -16,6 +16,7 @@ class LiveObserveModelApi<Model : HasId>(
         inline fun <reified Model : HasId> create(
             multiplexUrl: String,
             token: String,
+            headers: Map<String, String>,
             path: String
         ): LiveObserveModelApi<Model> = LiveObserveModelApi(
             openSocket = { query ->

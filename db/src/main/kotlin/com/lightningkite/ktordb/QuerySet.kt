@@ -9,7 +9,6 @@ data class QuerySet<Model: Any>(
     val on: FieldCollection<Model>,
     val condition: Condition<Model>,
 ): Flow<Model> {
-    @InternalCoroutinesApi
     override suspend fun collect(collector: FlowCollector<Model>) {
         on.find(condition).collect(collector)
     }
@@ -20,7 +19,6 @@ data class SortedQuerySet<Model: Any>(
     val condition: Condition<Model>,
     val orderBy: List<SortPart<Model>>
 ): Flow<Model> {
-    @InternalCoroutinesApi
     override suspend fun collect(collector: FlowCollector<Model>) {
         on.find(condition, orderBy).collect(collector)
     }
@@ -33,7 +31,6 @@ data class SlicedSortedQuerySet<Model: Any>(
     val skip: Int,
     val limit: Int
 ): Flow<Model> {
-    @InternalCoroutinesApi
     override suspend fun collect(collector: FlowCollector<Model>) {
         on.find(condition, orderBy, skip, limit).collect(collector)
     }

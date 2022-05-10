@@ -23,7 +23,7 @@ repositories {
 
 val ktorVersion = "2.0.1"
 val kotlinVersion: String by project
-val ktordbVersion = "db-separation-SNAPSHOT"
+val khrysalisVersion: String by project
 dependencies {
     api(project(":db"))
     api(project(":mongo"))
@@ -33,7 +33,7 @@ dependencies {
     api("io.ktor:ktor-server-core-jvm:$ktorVersion")
     api("io.ktor:ktor-server-auth-jwt-jvm:$ktorVersion")
     api("io.ktor:ktor-server-cio-jvm:$ktorVersion")
-    implementation("com.lightningkite.khrysalis:jvm-runtime:master-SNAPSHOT")
+    implementation("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.1")

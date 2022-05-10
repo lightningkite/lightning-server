@@ -8,6 +8,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.SerializersModule
 import java.time.*
+import java.time.format.DateTimeParseException
 import java.util.*
 
 
@@ -18,7 +19,15 @@ object UUIDSerializer: KSerializer<UUID> {
 }
 
 object InstantSerializer: KSerializer<Instant> {
-    override fun deserialize(decoder: Decoder): Instant = Instant.parse(decoder.decodeString())
+    override fun deserialize(decoder: Decoder): Instant {
+        val text = decoder.decodeString()
+        return try {
+            Instant.parse(text)
+        } catch (e: DateTimeParseException) {
+            Instant.parse(text + "z")
+        }
+    }
+
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Instant", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: Instant) = encoder.encodeString(value.toString())
 }
