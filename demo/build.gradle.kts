@@ -5,7 +5,7 @@ plugins {
     application
 }
 
-group = "com.lightningkite.ktor-batteries"
+group = "com.lightningkite.ktorbatteries"
 
 repositories {
     mavenLocal()

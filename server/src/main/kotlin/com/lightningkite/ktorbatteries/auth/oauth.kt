@@ -32,7 +32,7 @@ inline fun Route.oauth(
     getTokenUrl: String,
     scope: String,
     additionalParams: String = "",
-    defaultLanding: String = GeneralServerSettings.instance.publicUrl,
+    defaultLanding: String = "",
     crossinline secretTransform: (String)->String = { it },
     crossinline remoteTokenToUserId: suspend (OauthResponse)->String
 ) = route(codeName) {
@@ -59,7 +59,7 @@ inline fun Route.oauth(
         val tokenResult = checkToken(token) ?: throw BadRequestException("Invalid state token")
         val requester = tokenResult.getClaim("requester")!!.asString()
         if(requester != call.request.origin.remoteHost) throw BadRequestException("Not original requester - original requester was ${requester}, but you are ${call.request.origin.remoteHost}.")
-        val destinationUri = tokenResult.getClaim("landing")!!.asString()
+        val destinationUri = GeneralServerSettings.instance.publicUrl + tokenResult.getClaim("landing")!!.asString()
         call.request.queryParameters["error"]?.let {
             throw BadRequestException("Got error code '${it}' from $niceName.")
         } ?: call.request.queryParameters["code"]?.let { code ->

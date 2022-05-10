@@ -93,9 +93,9 @@ fun main(vararg args: String) {
                 }
                 adminIndex()
                 apiHelp()
-                oauthGoogle(GeneralServerSettings.instance.publicUrl) { it }
-                oauthGithub(GeneralServerSettings.instance.publicUrl) { it }
-                oauthApple(GeneralServerSettings.instance.publicUrl) { it }
+                oauthGoogle() { it }
+                oauthGithub() { it }
+                oauthApple() { it }
             }
         }
         println(TestModel.serializer().descriptor.fileFieldNames)

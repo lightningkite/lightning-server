@@ -22,6 +22,8 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.GlobalScope.coroutineContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.getContextualDescriptor
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.json.*
 import kotlinx.serialization.serializer
@@ -52,8 +54,8 @@ class MultipartJsonConverter(val json: Json) : ContentConverter {
                     }
                 }
                 is PartData.FileItem -> {
-                    val path = part.name?.split('.') ?: return@forEachPart
-                    val isFile = serializer.isFile(path) ?: return@forEachPart
+                    val path = part.name?.split('.') ?: throw BadRequestException("Part name not provided")
+                    if(!serializer.isFile(path)) throw BadRequestException("${part.name} is not a ServerFile.")
                     if (part.contentType == null) throw BadRequestException("Content type not provided for uploaded file")
 //                    if (
 //                        isFile.allowedTypes
@@ -67,7 +69,7 @@ class MultipartJsonConverter(val json: Json) : ContentConverter {
                         .streamProvider()
                         .use { input ->
                             FilesSettings.instance.root.resolveFileWithUniqueName(
-                                "${FilesSettings.instance.userContentPath}/files/${part.originalFileName!!}"
+                                "files/${part.originalFileName!!}"
                             ).upload(input)
                         }
                         .let {
@@ -106,7 +108,11 @@ private fun KSerializer<*>.isFile(parts: List<String>): Boolean {
         if (index == CompositeDecoder.UNKNOWN_NAME) return false
         current = current.getElementDescriptor(index)
     }
-    return current.getElementDescriptor(current.getElementIndex(parts.last())) == Serialization.module.getContextual(ServerFile::class)
+    var descriptor = current.getElementDescriptor(current.getElementIndex(parts.last()))
+    if(descriptor.kind == SerialKind.CONTEXTUAL) {
+        descriptor = Serialization.module.getContextualDescriptor(descriptor)!!
+    }
+    return descriptor == Serialization.module.getContextual(ServerFile::class)?.descriptor
 }
 
 @Suppress("UNCHECKED_CAST")

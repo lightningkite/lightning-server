@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 data class GeneralServerSettings(
     val projectName: String = "My Project",
     val host: String = "0.0.0.0",
-    val port: Int = 80,
+    val port: Int = 8080,
     val publicUrl: String = "http://$host:$port",
     val debug: Boolean = false,
     val cors: List<String>? = null

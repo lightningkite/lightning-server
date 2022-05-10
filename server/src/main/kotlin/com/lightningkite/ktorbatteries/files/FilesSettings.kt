@@ -14,7 +14,7 @@ import java.io.File
 @Serializable
 data class FilesSettings(
     val storageUrl: String = "file://${File("./local/files").absolutePath}",
-    val userContentPath: String = "/user-content",
+    val userContentPath: String = "user-content",
     val signedUrlExpirationSeconds: Int? = null
 ) : HealthCheckable {
     companion object : SettingSingleton<FilesSettings>()

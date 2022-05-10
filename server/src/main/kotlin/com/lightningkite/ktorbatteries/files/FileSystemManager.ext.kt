@@ -15,7 +15,7 @@ private const val allowedChars = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOP
 
 val FileObject.publicUrlUnsigned: String
     get() = when(this) {
-        is LocalFile -> "${GeneralServerSettings.instance.publicUrl}/${
+        is LocalFile -> "${GeneralServerSettings.instance.publicUrl}/${FilesSettings.instance.userContentPath}/${
             path.relativeTo(Path.of(FilesSettings.instance.storageUrl.removePrefix("file://"))).toString()
                 .replace("\\", "/")
         }"
@@ -24,7 +24,7 @@ val FileObject.publicUrlUnsigned: String
 
 val FileObject.publicUrl: String
     get() = when(this) {
-        is LocalFile -> "${GeneralServerSettings.instance.publicUrl}/${
+        is LocalFile -> "${GeneralServerSettings.instance.publicUrl}/${FilesSettings.instance.userContentPath}/${
             path.relativeTo(Path.of(FilesSettings.instance.storageUrl.removePrefix("file://"))).toString()
                 .replace("\\", "/")
         }"

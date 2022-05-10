@@ -105,7 +105,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminPages(
     post("{id}") {
         val item: T = call.receive()
         getCollection(call.principal()).replaceOneById(this.context.parameters["id"]!!.toUuidOrBadRequest(), item)
-        call.respondRedirect(".")
+        call.respondRedirect("..")
     }
     get("create") {
         val user = this.context.principal<USER>()
@@ -131,7 +131,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminPages(
     post("create") {
         val item: T = call.receive()
         getCollection(call.principal()).insertOne(item)
-        call.respondRedirect(".")
+        call.respondRedirect("..")
     }
     get {
         val secured = getCollection(call.principal())
@@ -143,7 +143,6 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminPages(
                 limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 25,
             )
         ).toList()
-        println("ServerFile serializer: ${Serialization.module.getContextual(ServerFile::class)}")
         val propItems = items.map { Serialization.properties.encodeToStringMap(it) }
         val keys = propItems.flatMap { it.keys }.distinct()
         context.respondHtml {

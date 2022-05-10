@@ -21,7 +21,7 @@ repositories {
 val ktorVersion = "1.6.7"
 val kotlinVersion:String by project
 dependencies {
-    api(project(":server"))
+    api(project(":db"))
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.5.2")
