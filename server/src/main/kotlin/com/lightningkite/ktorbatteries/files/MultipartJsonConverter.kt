@@ -54,6 +54,7 @@ class MultipartJsonConverter(val json: Json) : ContentConverter {
                     }
                 }
                 is PartData.FileItem -> {
+                    if(part.originalFileName?.isBlank() != false) return@forEachPart
                     val path = part.name?.split('.') ?: throw BadRequestException("Part name not provided")
                     if(!serializer.isFile(path)) throw BadRequestException("${part.name} is not a ServerFile.")
                     if (part.contentType == null) throw BadRequestException("Content type not provided for uploaded file")

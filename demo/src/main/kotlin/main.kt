@@ -66,11 +66,8 @@ data class Settings(
 
 @OptIn(InternalAPI::class)
 fun main(vararg args: String) {
-    fixUuidSerialization()
     loadSettings(File("settings.yaml")) { Settings() }
-    database = mongoDb
     runServer {
-        install(IgnoreTrailingSlash)
         configureFiles()
         configureSerialization()
         authentication {

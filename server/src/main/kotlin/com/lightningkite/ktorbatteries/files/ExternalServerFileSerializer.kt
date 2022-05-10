@@ -92,6 +92,7 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
                 }
             }
         }
+        println("Raw is $raw, and we're good to go!")
         return ServerFile(raw)
     }
 }

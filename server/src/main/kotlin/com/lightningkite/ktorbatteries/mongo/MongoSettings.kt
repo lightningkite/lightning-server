@@ -2,6 +2,7 @@ package com.lightningkite.ktorbatteries.mongo
 
 import com.lightningkite.kotlinercli.cli
 import com.lightningkite.ktorbatteries.SettingSingleton
+import com.lightningkite.ktorbatteries.db.database
 import com.lightningkite.ktorbatteries.serverhealth.HealthCheckable
 import com.lightningkite.ktorbatteries.serverhealth.HealthStatus
 import com.lightningkite.ktordb.database
@@ -46,6 +47,7 @@ data class MongoSettings(
 
     init {
         instance = this
+        database = MongoSettings.instance.client.database(MongoSettings.instance.databaseName)
     }
 
     override val healthCheckName: String get() = "Database"
@@ -60,4 +62,5 @@ data class MongoSettings(
         }
 }
 
+@Deprecated("Use database instead", ReplaceWith("database", "com.lightningkite.ktorbatteries.db"))
 val mongoDb get() = MongoSettings.instance.client.database(MongoSettings.instance.databaseName)

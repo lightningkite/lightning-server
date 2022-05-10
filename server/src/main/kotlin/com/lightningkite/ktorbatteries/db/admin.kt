@@ -100,12 +100,12 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminPages(
     }
     post("{id}/delete") {
         getCollection(call.principal()).deleteOneById(this.context.parameters["id"]!!.toUuidOrBadRequest())
-        call.respondRedirect("..")
+        call.respondRedirect("../admin")
     }
     post("{id}") {
         val item: T = call.receive()
         getCollection(call.principal()).replaceOneById(this.context.parameters["id"]!!.toUuidOrBadRequest(), item)
-        call.respondRedirect("..")
+        call.respondRedirect("../admin")
     }
     get("create") {
         val user = this.context.principal<USER>()
@@ -131,7 +131,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminPages(
     post("create") {
         val item: T = call.receive()
         getCollection(call.principal()).insertOne(item)
-        call.respondRedirect("..")
+        call.respondRedirect("../admin")
     }
     get {
         val secured = getCollection(call.principal())

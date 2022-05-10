@@ -8,7 +8,10 @@ import com.auth0.jwt.interfaces.DecodedJWT
 import com.lightningkite.ktorbatteries.client
 import com.lightningkite.ktorbatteries.email.Attachment
 import com.lightningkite.ktorbatteries.email.EmailSettings
+import com.lightningkite.ktorbatteries.email.email
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
+import com.lightningkite.ktorbatteries.typed.get
+import com.lightningkite.ktorbatteries.typed.post
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -21,6 +24,8 @@ import io.ktor.http.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.*
+import kotlinx.html.INPUT
 import kotlinx.serialization.Serializable
 import java.util.*
 
@@ -105,6 +110,74 @@ fun checkToken(token: String): DecodedJWT? = try {
 @Serializable
 data class EmailRequest(val email: String)
 
+@KtorDsl
+fun Route.emailMagicLinkEndpoint(
+    path: String = "login-email",
+    makeLink: suspend (email: String) -> String,
+    emailSubject: String = "${GeneralServerSettings.instance.projectName} Log In",
+    template: (suspend (email: String, link: String) -> String) = { email, link ->
+        """
+        <!DOCTYPE html>
+        <html>
+        <body>
+        <p>We received a request for a login email for ${email}. To log in, please click the link below.</p>
+        <a href="$link">Click here to login</a>
+        <p>If you did not request to be logged in, you can simply ignore this email.</p>
+        <h3>${GeneralServerSettings.instance.projectName}</h3>
+        </body>
+        </html>
+        """.trimIndent()
+    },
+) {
+    post(
+        path = path,
+        summary = "Sends a login email to the given address",
+        errorCases = listOf(),
+        successCode = HttpStatusCode.NoContent,
+        implementation = { _: Unit?, address: String ->
+            val link = makeLink(address)
+            email.send(
+                subject = emailSubject,
+                to = listOf(address),
+                message = "Log in to ${GeneralServerSettings.instance.projectName} as ${address}:\n$link",
+                htmlMessage = template(address, link)
+            )
+            Unit
+        }
+    )
+}
+
+@KtorDsl
+inline fun <reified USER: Principal> Route.refreshTokenEndpoint(path: String = "refresh-token", crossinline principalToToken: suspend (USER) -> String) {
+    get(
+        path = path,
+        summary = "Retrieves a new token for the user.",
+        errorCases = listOf(),
+        implementation = { user: USER?, input: Unit ->
+            if(user == null) throw BadRequestException("You are not authenticated.")
+            principalToToken(user)
+        }
+    )
+}
+
+@Deprecated("Use the new format instead")
+fun Route.refreshToken(path: String = "refresh-token", idFromPrincipal: (Principal) -> String) {
+    post(path) {
+        val userId = call.principal<Principal>()!!.let(idFromPrincipal)
+        val token = makeToken(userId)
+        call.respond(token)
+    }
+}
+
+@Deprecated("Use the new format instead")
+fun Route.logOut(path: String = "logout") {
+    get(path) {
+        call.response.cookies.appendExpired(HttpHeaders.Authorization)
+        call.respond(HttpStatusCode.NoContent)
+    }
+}
+
+@Deprecated("Use the new format instead")
 fun Route.emailMagicLink(
     path: String = "login-email",
     emailSubject: String = "${GeneralServerSettings.instance.projectName} Log In",
@@ -151,30 +224,3 @@ fun Route.emailMagicLink(
         } ?: call.respond(if (returnIfUserExists) HttpStatusCode.NotFound else HttpStatusCode.NoContent)
     }
 }
-
-fun Route.refreshToken(path: String = "refresh-token", idFromPrincipal: (Principal) -> String) {
-    post(path) {
-        val userId = call.principal<Principal>()!!.let(idFromPrincipal)
-        val token = makeToken(userId)
-        call.respond(token)
-    }
-}
-
-fun Route.logOut(path: String = "logout") {
-    get(path) {
-        call.response.cookies.appendExpired(HttpHeaders.Authorization)
-        call.respond(HttpStatusCode.NoContent)
-    }
-}
-
-/*
-
-By linking up database with users, we could get this setup going:
-
-routing {
-    authUrls(User.table, database)
-}
-
-data class User(...): Principal, HasEmail, HasPhoneNumber
-
- */
