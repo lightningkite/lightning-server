@@ -16,10 +16,10 @@ repositories {
     mavenCentral()
 }
 
-val ktorKmongoVersion = "db-separation-SNAPSHOT"
 dependencies {
-    api(project(":lib"))
-    kspTest("com.lightningkite.ktorkmongo:processor:$ktorKmongoVersion")
+    api(project(":server"))
+    ksp(project(":processor"))
+    testImplementation("org.jetbrains.kotlin:kotlin-test")
 }
 
 kotlin {

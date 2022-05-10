@@ -1,6 +1,8 @@
-.gradle
-build
 .idea
+build
+.gradle
 local.properties
+node_modules
+java_pid*.hprof
 local
 settings.yaml

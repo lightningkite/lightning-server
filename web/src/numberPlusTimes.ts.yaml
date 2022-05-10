@@ -1,0 +1,8 @@
+- id: com.lightningkite.ktordb.plus
+  type: call
+  receiver: T
+  template: (~this~ + ~0~) as ~T0~
+- id: com.lightningkite.ktordb.times
+  type: call
+  receiver: T
+  template: (~this~ * ~0~) as ~T0~

@@ -1,0 +1,17 @@
+@file:SharedCode
+package com.lightningkite.ktordb
+
+import com.lightningkite.khrysalis.IsCodableAndHashable
+import com.lightningkite.khrysalis.SharedCode
+import io.reactivex.rxjava3.core.Single
+
+abstract class WriteModelApi<Model : IsCodableAndHashable> {
+    abstract fun post(value: Model): Single<Model>
+    abstract fun postBulk(values:List<Model>): Single<List<Model>>
+    abstract fun put(value: Model): Single<Model>
+    abstract fun putBulk(values:List<Model>): Single<List<Model>>
+    abstract fun patch(id: UUIDFor<Model>, modification: Modification<Model>): Single<Model>
+    abstract fun patchBulk(modification: MassModification<Model>): Single<List<Model>>
+    abstract fun delete(id: UUIDFor<Model>): Single<Unit>
+    abstract fun deleteBulk(condition: Condition<Model>): Single<Unit>
+}

@@ -1,4 +1,4 @@
-@file:UseContextualSerialization(Instant::class, UUID::class)
+@file:UseContextualSerialization(Instant::class, UUID::class, ServerFile::class)
 
 package com.lightningkite.ktorbatteries.demo
 
@@ -14,12 +14,14 @@ import com.lightningkite.ktorbatteries.jsonschema.JsonSchema
 import com.lightningkite.ktorbatteries.logging.LoggingSettings
 import com.lightningkite.ktorbatteries.mongo.MongoSettings
 import com.lightningkite.ktorbatteries.mongo.mongoDb
+import com.lightningkite.ktorbatteries.serialization.Serialization
 import com.lightningkite.ktorbatteries.serialization.configureSerialization
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.lightningkite.ktorbatteries.settings.loadSettings
 import com.lightningkite.ktorbatteries.settings.runServer
 import com.lightningkite.ktorbatteries.typed.apiHelp
-import com.lightningkite.ktorkmongo.*
+import com.lightningkite.ktorbatteries.typed.fileFieldNames
+import com.lightningkite.ktordb.*
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -31,6 +33,7 @@ import io.ktor.server.plugins.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.*
 import kotlinx.serialization.*
 import java.io.File
 import java.lang.Exception
@@ -45,7 +48,7 @@ data class TestModel(
     val name: String = "No Name",
     val number: Int = 3123,
     @JsonSchema.Format("jodit") val content: String = "",
-    @IsFile val file: String? = null
+    val file: ServerFile? = null
 ) : HasId
 
 val TestModel.Companion.table get() = database.collection<TestModel>("TestModel")
@@ -61,6 +64,7 @@ data class Settings(
     val mongo: MongoSettings = MongoSettings()
 )
 
+@OptIn(InternalAPI::class)
 fun main(vararg args: String) {
     fixUuidSerialization()
     loadSettings(File("settings.yaml")) { Settings() }
@@ -94,5 +98,6 @@ fun main(vararg args: String) {
                 oauthApple(GeneralServerSettings.instance.publicUrl) { it }
             }
         }
+        println(TestModel.serializer().descriptor.fileFieldNames)
     }
 }

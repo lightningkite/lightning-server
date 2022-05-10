@@ -1,0 +1,146 @@
+PODS:
+  - Cosmos (23.0.0)
+  - DKCamera (1.6.7)
+  - DKImagePickerController/Camera (4.3.2):
+    - DKCamera
+    - DKImagePickerController/Core
+  - DKImagePickerController/Core (4.3.2):
+    - DKImagePickerController/ImageDataManager
+    - DKImagePickerController/Resource
+  - DKImagePickerController/ImageDataManager (4.3.2)
+  - DKImagePickerController/Resource (4.3.2)
+  - IBPCollectionViewCompositionalLayout (0.6.9)
+  - KhrysalisRuntime (0.7.1)
+  - KMongoClient (0.7.1):
+    - KhrysalisRuntime
+    - RxSwiftPlus/Http
+  - LifecycleHooks (0.6.2)
+  - M13Checkbox (3.4.0)
+  - RxCocoa (6.2.0):
+    - RxRelay (= 6.2.0)
+    - RxSwift (= 6.2.0)
+  - RxCoreLocation (1.5.1):
+    - RxCoreLocation/Core (= 1.5.1)
+  - RxCoreLocation/Core (1.5.1):
+    - RxCocoa (~> 6.0)
+    - RxSwift (~> 6.0)
+  - RxRelay (6.2.0):
+    - RxSwift (= 6.2.0)
+  - RxSwift (6.2.0)
+  - RxSwiftPlus (0.1.0):
+    - RxSwiftPlus/Bindings (= 0.1.0)
+    - RxSwiftPlus/BindingsCosmo (= 0.1.0)
+    - RxSwiftPlus/BindingsSearchTextField (= 0.1.0)
+    - RxSwiftPlus/BindingsXibToXmlRuntime (= 0.1.0)
+    - RxSwiftPlus/BindingsXibToXmlRuntimeKhrysalis (= 0.1.0)
+    - RxSwiftPlus/Core (= 0.1.0)
+    - RxSwiftPlus/Http (= 0.1.0)
+    - RxSwiftPlus/Resources (= 0.1.0)
+    - RxSwiftPlus/ViewGenerator (= 0.1.0)
+    - RxSwiftPlus/ViewGeneratorCalendar (= 0.1.0)
+    - RxSwiftPlus/ViewGeneratorImage (= 0.1.0)
+    - RxSwiftPlus/ViewGeneratorLocation (= 0.1.0)
+  - RxSwiftPlus/Bindings (0.1.0):
+    - IBPCollectionViewCompositionalLayout
+    - LifecycleHooks
+    - RxSwiftPlus/Core
+  - RxSwiftPlus/BindingsCosmo (0.1.0):
+    - Cosmos
+    - RxSwiftPlus/Bindings
+  - RxSwiftPlus/BindingsSearchTextField (0.1.0):
+    - RxSwiftPlus/Bindings
+    - SearchTextField
+  - RxSwiftPlus/BindingsXibToXmlRuntime (0.1.0):
+    - RxSwiftPlus/Bindings
+    - XmlToXibRuntime
+  - RxSwiftPlus/BindingsXibToXmlRuntimeKhrysalis (0.1.0):
+    - KhrysalisRuntime
+    - RxSwiftPlus/BindingsXibToXmlRuntime
+  - RxSwiftPlus/Core (0.1.0):
+    - RxCocoa (~> 6.2.0)
+    - RxSwift (~> 6.2.0)
+  - RxSwiftPlus/Http (0.1.0):
+    - Starscream
+  - RxSwiftPlus/Resources (0.1.0):
+    - RxSwiftPlus/Core
+  - RxSwiftPlus/ViewGenerator (0.1.0):
+    - RxSwiftPlus/Resources
+  - RxSwiftPlus/ViewGeneratorCalendar (0.1.0):
+    - RxSwiftPlus/ViewGenerator
+  - RxSwiftPlus/ViewGeneratorImage (0.1.0):
+    - DKImagePickerController/Camera
+    - DKImagePickerController/Core
+    - DKImagePickerController/ImageDataManager
+    - DKImagePickerController/Resource
+    - RxSwiftPlus/Resources
+    - RxSwiftPlus/ViewGenerator
+  - RxSwiftPlus/ViewGeneratorLocation (0.1.0):
+    - RxCoreLocation
+    - RxSwiftPlus/ViewGenerator
+  - SearchTextField (1.2.4)
+  - Starscream (4.0.4)
+  - XmlToXibRuntime (0.1.0):
+    - M13Checkbox
+
+DEPENDENCIES:
+  - KhrysalisRuntime (from `../../../khrysalis/KhrysalisRuntime.podspec`)
+  - KMongoClient (from `../../`)
+  - RxCoreLocation (from `https://github.com/RxSwiftCommunity/RxCoreLocation.git`, branch `master`)
+  - RxSwift (from `../../../RxSwift/RxSwift.podspec`)
+  - RxSwiftPlus (from `../../../RxSwiftPlus/RxSwiftPlus.podspec`)
+  - XmlToXibRuntime (from `../../../android-xml-to-ios-xib/XmlToXibRuntime.podspec`)
+
+SPEC REPOS:
+  trunk:
+    - Cosmos
+    - DKCamera
+    - DKImagePickerController
+    - IBPCollectionViewCompositionalLayout
+    - LifecycleHooks
+    - M13Checkbox
+    - RxCocoa
+    - RxRelay
+    - SearchTextField
+    - Starscream
+
+EXTERNAL SOURCES:
+  KhrysalisRuntime:
+    :path: "../../../khrysalis/KhrysalisRuntime.podspec"
+  KMongoClient:
+    :path: "../../"
+  RxCoreLocation:
+    :branch: master
+    :git: https://github.com/RxSwiftCommunity/RxCoreLocation.git
+  RxSwift:
+    :path: "../../../RxSwift/RxSwift.podspec"
+  RxSwiftPlus:
+    :path: "../../../RxSwiftPlus/RxSwiftPlus.podspec"
+  XmlToXibRuntime:
+    :path: "../../../android-xml-to-ios-xib/XmlToXibRuntime.podspec"
+
+CHECKOUT OPTIONS:
+  RxCoreLocation:
+    :commit: 8c4b301640e84c258018a82a105678ae287576a7
+    :git: https://github.com/RxSwiftCommunity/RxCoreLocation.git
+
+SPEC CHECKSUMS:
+  Cosmos: b5c6a9a637e28a061b54c8f8b1d8529d7d4db73f
+  DKCamera: a902b66921fca14b7a75266feb8c7568aa7caa71
+  DKImagePickerController: b5eb7f7a388e4643264105d648d01f727110fc3d
+  IBPCollectionViewCompositionalLayout: bbb29e39ac564666a8c3cdb6633ed944b6feb55b
+  KhrysalisRuntime: 3a72ac3c2ceaef60b9f9733ed02f1e247081f8b2
+  KMongoClient: 5a4534a0a2bb89cf0911f62afd0d176b31263548
+  LifecycleHooks: 246984e8ef036a8c717298166845bb999b245f5b
+  M13Checkbox: 6f59404540ac98ba83a3d1afac335895a40c6a5d
+  RxCocoa: 4baf94bb35f2c0ab31bc0cb9f1900155f646ba42
+  RxCoreLocation: 5db05ff830a313466a29e82798d983826b93a2f8
+  RxRelay: e72dbfd157807478401ef1982e1c61c945c94b2f
+  RxSwift: d356ab7bee873611322f134c5f9ef379fa183d8f
+  RxSwiftPlus: 0adf05aaa8534dbd268500335323eb5778239ef3
+  SearchTextField: 40dc3cc57def5a211f263cac263622c163bbc25a
+  Starscream: 5178aed56b316f13fa3bc55694e583d35dd414d9
+  XmlToXibRuntime: fb0067babac6185448e49ad067fbc3b0fa0c86fc
+
+PODFILE CHECKSUM: 81d3f9611f515dc1722359ec33cbb12974d637ab
+
+COCOAPODS: 1.11.2

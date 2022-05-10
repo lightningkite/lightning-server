@@ -11,5 +11,10 @@ pluginManagement {
     }
 }
 
-include(":lib")
+include(":server")
 include(":demo")
+include(":mongo")
+include(":processor")
+include(":db")
+include(":shared")
+include(":client")

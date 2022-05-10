@@ -1,0 +1,36 @@
+package com.lightningkite.ktordb
+
+import com.lightningkite.ktordb.application.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collect
+import org.junit.Test
+
+
+class SecurityTests : MongoTest() {
+    val user1 = User(email = "user1@lightningkite.com",)
+    val otherUser = User(email = "otherUser@lightningkite.com",)
+
+    lateinit var user1Jwt: String
+    lateinit var otherUserJwt: String
+
+
+    @Test
+    fun test(): Unit = runBlocking {
+        val myPosts = Post.mongo.secure(Post.secure(user1))
+        val dansPosts = Post.mongo.secure(Post.secure(otherUser))
+        GlobalScope.launch {
+            myPosts.watch(Post.chain.let { Post.chain.author eq user1._id }).collect {
+            }
+        }
+        delay(1000L)
+        myPosts.insertOne(Post(author = user1._id, content = "User1 post"))
+        dansPosts.insertOne(Post(author = otherUser._id, content = "OtherUser post"))
+        myPosts.insertOne(Post(author = user1._id, content = "Another User1 Post"))
+        myPosts.updateMany(
+            Post.chain.content eq "User1 post",
+            Post.chain.content assign "User1 post updated"
+        )
+        delay(1000L)
+    }
+
+}

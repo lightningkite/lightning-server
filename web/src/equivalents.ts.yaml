@@ -1,0 +1,72 @@
+- id: com.lightningkite.ktordb.fields
+  type: get
+  template: '((~this~ as any)._fields as Map<string, PartialDataClassProperty<~T0~>>)'
+- id: com.lightningkite.ktordb.fields
+  type: set
+  template: '(~this~ as any)._fields = ~value~'
+
+- id: com.lightningkite.ktordb.DataClassProperty
+  type: call
+  template: '~0~'
+
+- id: com.lightningkite.ktordb.DataClassProperty
+  type: typeRef
+  template: 'String'
+
+- id: com.lightningkite.ktordb.PartialDataClassProperty
+  type: typeRef
+  template: 'String'
+
+- id: com.lightningkite.ktordb.PartialDataClassProperty.name
+  type: call
+  template: ~this~
+
+- id: com.lightningkite.ktordb.PartialDataClassProperty.anyGet
+  type: call
+  template:
+    pattern: keyGet(~0~, ~this~)
+    imports:
+      keyGet: '@lightningkite/ktor-kmongo|DataClassProperty'
+
+- id: com.lightningkite.ktordb.PartialDataClassProperty.anySet
+  type: call
+  template:
+    pattern: keySet(~0~, ~this~, ~1~)
+    imports:
+      keySet: '@lightningkite/ktor-kmongo|DataClassProperty'
+
+- id: com.lightningkite.ktordb.PartialDataClassProperty.compare
+  type: get
+  template:
+    pattern: compareByField(~this~)
+    imports:
+      compareByField: '@lightningkite/khrysalis-runtime'
+
+- id: com.lightningkite.ktordb.PartialDataClassProperty.hashCode
+  type: call
+  template:
+    pattern: hashString(~this~)
+    imports:
+      hashString: '@lightningkite/khrysalis-runtime'
+
+- id: com.lightningkite.ktordb.PartialDataClassProperty.equals
+  type: call
+  template: (~this~ === ~0~)
+
+- id: com.lightningkite.ktordb.PartialDataClassProperty.toString
+  type: call
+  template: ~this~
+
+- id: com.lightningkite.ktordb.DataClassProperty.get
+  type: call
+  template:
+    pattern: keyGet(~0~, ~this~)
+    imports:
+      keyGet: '@lightningkite/ktor-kmongo|DataClassProperty'
+
+- id: com.lightningkite.ktordb.DataClassProperty.set
+  type: call
+  template:
+    pattern: keySet(~0~, ~this~, ~1~)
+    imports:
+      keySet: '@lightningkite/ktor-kmongo|DataClassProperty'
