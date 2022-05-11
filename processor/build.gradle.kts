@@ -20,9 +20,9 @@ dependencies {
 }
 
 standardPublishing {
-    name.set("Ktor-Kmongo-Processor")
-    description.set("A tool for communication between a server and a client built around MongoDB Collections.")
-    github("lightningkite", "ktor-kmongo")
+    name.set("Ktor-Batteries-Processor")
+    description.set("A tool for communication between a server and a client built around Ktor Servers")
+    github("lightningkite", "ktor-batteries")
 
     licenses {
         mit()

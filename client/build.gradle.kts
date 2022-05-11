@@ -25,16 +25,19 @@ dependencies {
 }
 
 khrysalis {
-    projectName = "KMongoClient"
+    iosProjectName = "BatteriesClient"
     iosProjectFolder = rootDir.resolve("ios")
-    iosSourceFolder = rootDir.resolve("ios/KMongoClient/Classes/client")
+    iosSourceFolder = rootDir.resolve("ios/BatteriesClient/Classes/client")
+    webProjectName = "@lightningkite/ktor-batteries"
+    webProjectFolder = rootDir.resolve("web")
+    webSourceFolder = rootDir.resolve("web/src/client")
     libraryMode = true
 }
 
 standardPublishing {
     name.set("Ktor-Kmongo-Client")
-    description.set("A tool for communication between a server and a client built around MongoDB Collections.")
-    github("lightningkite", "ktor-kmongo")
+    description.set("The client side of communication between server and client.")
+    github("lightningkite", "ktor-batteries")
 
     licenses {
         mit()
@@ -53,4 +56,5 @@ standardPublishing {
         )
     }
 }
+tasks.getByName("equivalentsJarMain").published = true
 

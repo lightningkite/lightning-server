@@ -37,17 +37,19 @@ kotlin {
 }
 
 khrysalis {
-    iosProjectName = "KMongoClient"
+    iosProjectName = "BatteriesClient"
     iosProjectFolder = rootDir.resolve("ios")
-    iosSourceFolder = rootDir.resolve("ios/KMongoClient/Classes/shared")
+    iosSourceFolder = rootDir.resolve("ios/BatteriesClient/Classes/shared")
+    webProjectName = "@lightningkite/ktor-batteries"
+    webProjectFolder = rootDir.resolve("web")
+    webSourceFolder = rootDir.resolve("web/src/shared")
     libraryMode = true
-    webProjectName = "@lightningkite/ktor-kmongo"
 }
 
 standardPublishing {
-    name.set("Ktor-Kmongo-Shared")
-    description.set("A tool for communication between a server and a client built around MongoDB Collections.")
-    github("lightningkite", "ktor-kmongo")
+    name.set("Ktor-Batteries-Shared")
+    description.set("A tool for communication between a server and a client built around Ktor servers.")
+    github("lightningkite", "ktor-batteries")
 
     licenses {
         mit()
@@ -66,3 +68,4 @@ standardPublishing {
         )
     }
 }
+tasks.getByName("equivalentsJarMain").published = true
