@@ -8,7 +8,8 @@ import { Modification } from '../db/Modification'
 import { UUIDFor } from '../db/UUIDFor'
 import { ReifiedType } from '@lightningkite/khrysalis-runtime'
 import { HttpBody, HttpClient, fromJSON, unsuccessfulAsError } from '@lightningkite/rxjs-plus'
-import { Observable, switchMap } from 'rxjs'
+import { Observable, from, map as rMap, switchMap } from 'rxjs'
+import { map, mergeMap } from 'rxjs/operators'
 
 //! Declares com.lightningkite.ktordb.live.LiveWriteModelApi
 export class LiveWriteModelApi<Model extends HasId> extends WriteModelApi<Model> {
@@ -42,8 +43,8 @@ export class LiveWriteModelApi<Model extends HasId> extends WriteModelApi<Model>
         return HttpClient.INSTANCE.call(`${this.url}/${id}`, HttpClient.INSTANCE.PATCH, this.authHeaders, HttpBody.json(modification), undefined).pipe(unsuccessfulAsError, fromJSON<Model>(this.serializer));
     }
     
-    public patchBulk(modification: MassModification<Model>): Observable<Array<Model>> {
-        return HttpClient.INSTANCE.call(`${this.url}/bulk`, HttpClient.INSTANCE.PATCH, this.authHeaders, HttpBody.json(modification), undefined).pipe(unsuccessfulAsError, fromJSON<Array<Model>>([Array, this.serializer]));
+    public patchBulk(modification: MassModification<Model>): Observable<number> {
+        return HttpClient.INSTANCE.call(`${this.url}/bulk`, HttpClient.INSTANCE.PATCH, this.authHeaders, HttpBody.json(modification), undefined).pipe(mergeMap((it: Response): Observable<string> => (from(it.text())))).pipe(map((it: string): number => (parseInt(it))));
     }
     
     public _delete(id: UUIDFor<Model>): Observable<void> {

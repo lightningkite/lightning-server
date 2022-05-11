@@ -66,13 +66,15 @@ class LiveWriteModelApi<Model : HasId>(
         body = modification.toJsonRequestBody(Modification.serializer(serializer)),
     ).readJson(serializer)
 
-    override fun patchBulk(modification: MassModification<Model>): Single<List<Model>> =
+    override fun patchBulk(modification: MassModification<Model>): Single<Long> =
         HttpClient.call(
             url = "$url/bulk",
             method = HttpClient.PATCH,
             headers = authHeaders,
             body = modification.toJsonRequestBody(MassModification.serializer(serializer)),
-        ).readJson(ListSerializer(serializer))
+        )
+            .flatMap { it.readText() }
+            .map { it.toLong() }
 
     override fun delete(id: UUIDFor<Model>): Single<Unit> = HttpClient.call(
         url = "$url/$id",

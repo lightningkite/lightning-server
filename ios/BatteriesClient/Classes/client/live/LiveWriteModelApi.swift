@@ -41,8 +41,10 @@ public class LiveWriteModelApi<Model : HasId> : WriteModelApi<Model> {
         return HttpClient.INSTANCE.call(url: "\(String(kotlin: self.url))/\(id)", method: HttpClient.INSTANCE.PATCH, headers: self.authHeaders, body: modification.toJsonRequestBody()).readJson(serializer: Model.self);
     }
     
-    override public func patchBulk(modification: MassModification<Model>) -> Single<Array<Model>> {
-        return HttpClient.INSTANCE.call(url: "\(String(kotlin: self.url))/bulk", method: HttpClient.INSTANCE.PATCH, headers: self.authHeaders, body: modification.toJsonRequestBody()).readJson(serializer: Array<Model>.self);
+    override public func patchBulk(modification: MassModification<Model>) -> Single<Int> {
+        return HttpClient.INSTANCE.call(url: "\(String(kotlin: self.url))/bulk", method: HttpClient.INSTANCE.PATCH, headers: self.authHeaders, body: modification.toJsonRequestBody())
+            .flatMap { (it) -> Single<String> in it.readText() }
+            .map { (it) -> Int in Int(it)! };
     }
     
     override public func delete(id: UUIDFor<Model>) -> Single<Void> {

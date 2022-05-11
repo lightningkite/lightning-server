@@ -14,7 +14,7 @@ open class WriteModelApi<Model : Codable & Hashable> {
     open func put(_ value: Model) -> Single<Model> { TODO() }
     open func putBulk(values: Array<Model>) -> Single<Array<Model>> { TODO() }
     open func patch(id: UUIDFor<Model>, modification: Modification<Model>) -> Single<Model> { TODO() }
-    open func patchBulk(modification: MassModification<Model>) -> Single<Array<Model>> { TODO() }
+    open func patchBulk(modification: MassModification<Model>) -> Single<Int> { TODO() }
     open func delete(id: UUIDFor<Model>) -> Single<Void> { TODO() }
     open func deleteBulk(_ condition: Condition<Model>) -> Single<Void> { TODO() }
 }

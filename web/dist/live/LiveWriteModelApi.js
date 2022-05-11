@@ -6,6 +6,7 @@ exports.LiveWriteModelApi = void 0;
 const WriteModelApi_1 = require("../WriteModelApi");
 const rxjs_plus_1 = require("@lightningkite/rxjs-plus");
 const rxjs_1 = require("rxjs");
+const operators_1 = require("rxjs/operators");
 //! Declares com.lightningkite.ktordb.live.LiveWriteModelApi
 class LiveWriteModelApi extends WriteModelApi_1.WriteModelApi {
     constructor(url, token, headers, serializer) {
@@ -30,7 +31,7 @@ class LiveWriteModelApi extends WriteModelApi_1.WriteModelApi {
         return rxjs_plus_1.HttpClient.INSTANCE.call(`${this.url}/${id}`, rxjs_plus_1.HttpClient.INSTANCE.PATCH, this.authHeaders, rxjs_plus_1.HttpBody.json(modification), undefined).pipe(rxjs_plus_1.unsuccessfulAsError, (0, rxjs_plus_1.fromJSON)(this.serializer));
     }
     patchBulk(modification) {
-        return rxjs_plus_1.HttpClient.INSTANCE.call(`${this.url}/bulk`, rxjs_plus_1.HttpClient.INSTANCE.PATCH, this.authHeaders, rxjs_plus_1.HttpBody.json(modification), undefined).pipe(rxjs_plus_1.unsuccessfulAsError, (0, rxjs_plus_1.fromJSON)([Array, this.serializer]));
+        return rxjs_plus_1.HttpClient.INSTANCE.call(`${this.url}/bulk`, rxjs_plus_1.HttpClient.INSTANCE.PATCH, this.authHeaders, rxjs_plus_1.HttpBody.json(modification), undefined).pipe((0, operators_1.mergeMap)((it) => ((0, rxjs_1.from)(it.text())))).pipe((0, operators_1.map)((it) => (parseInt(it))));
     }
     _delete(id) {
         return rxjs_plus_1.HttpClient.INSTANCE.call(`${this.url}/${id}`, rxjs_plus_1.HttpClient.INSTANCE.DELETE, this.authHeaders, undefined, undefined).pipe(rxjs_plus_1.unsuccessfulAsError, (0, rxjs_1.switchMap)(x => x.text().then(x => undefined)));

@@ -6,6 +6,7 @@ exports.MockWriteModelApi = void 0;
 const WriteModelApi_1 = require("../WriteModelApi");
 const ItemNotFound_1 = require("./ItemNotFound");
 const rxjs_1 = require("rxjs");
+const operators_1 = require("rxjs/operators");
 //! Declares com.lightningkite.ktordb.mock.MockWriteModelApi
 class MockWriteModelApi extends WriteModelApi_1.WriteModelApi {
     constructor(table) {
@@ -41,7 +42,7 @@ class MockWriteModelApi extends WriteModelApi_1.WriteModelApi {
     }
     patchBulk(modification) {
         return (0, rxjs_1.of)(this.table
-            .asList().filter((it) => (modification.condition.invoke(it))).map((it) => (this.table.replaceItem(modification.modification.invoke(it)))));
+            .asList().filter((it) => (modification.condition.invoke(it))).map((it) => (this.table.replaceItem(modification.modification.invoke(it))))).pipe((0, operators_1.map)((it) => (it.length)));
     }
     _delete(id) {
         return (0, rxjs_1.of)(this.table.deleteItemById(id));

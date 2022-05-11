@@ -10,6 +10,7 @@ import { ItemNotFound } from './ItemNotFound'
 import { MockTable } from './MockTable'
 import { forEach } from 'iter-tools-es'
 import { Observable, of, throwError } from 'rxjs'
+import { map } from 'rxjs/operators'
 
 //! Declares com.lightningkite.ktordb.mock.MockWriteModelApi
 export class MockWriteModelApi<Model extends HasId> extends WriteModelApi<Model> {
@@ -46,9 +47,9 @@ export class MockWriteModelApi<Model extends HasId> extends WriteModelApi<Model>
         })() ?? throwError(new ItemNotFound(`404 item with key ${id} not found`));
     }
     
-    public patchBulk(modification: MassModification<Model>): Observable<Array<Model>> {
+    public patchBulk(modification: MassModification<Model>): Observable<number> {
         return of(this.table
-            .asList().filter((it: Model): boolean => (modification.condition.invoke(it))).map((it: Model): Model => (this.table.replaceItem(modification.modification.invoke(it)))));
+            .asList().filter((it: Model): boolean => (modification.condition.invoke(it))).map((it: Model): Model => (this.table.replaceItem(modification.modification.invoke(it))))).pipe(map((it: Array<Model>): number => (it.length)));
     }
     
     public _delete(id: UUIDFor<Model>): Observable<void> {

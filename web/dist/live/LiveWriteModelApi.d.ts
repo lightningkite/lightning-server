@@ -16,7 +16,7 @@ export declare class LiveWriteModelApi<Model extends HasId> extends WriteModelAp
     put(value: Model): Observable<Model>;
     putBulk(values: Array<Model>): Observable<Array<Model>>;
     patch(id: UUIDFor<Model>, modification: Modification<Model>): Observable<Model>;
-    patchBulk(modification: MassModification<Model>): Observable<Array<Model>>;
+    patchBulk(modification: MassModification<Model>): Observable<number>;
     _delete(id: UUIDFor<Model>): Observable<void>;
     deleteBulk(condition: Condition<Model>): Observable<void>;
 }

@@ -1,7 +1,8 @@
 import {Condition} from './Condition'
 import {Modification} from './Modification'
 import {compareBy, DataClass, parseObject, ReifiedType} from "@lightningkite/khrysalis-runtime";
-import {DataClassProperty} from "./DataClassProperty";
+import {DataClassProperty, PartialDataClassProperty} from "./DataClassProperty";
+import {SortPart} from "./SortPart";
 
 (Condition as any).fromJSON = <T>(data: Record<string, any>, types: Array<ReifiedType>): Condition<T> => {
     const type = types[0]
@@ -44,17 +45,17 @@ import {DataClassProperty} from "./DataClassProperty";
         case "IntBitsAnySet":
             return new Condition.IntBitsAnySet(data.IntBitsAnySet as number) as unknown as Condition<T>
         case "AllElements":
-            return new Condition.AllElements(parseObject(data.AllElements, [Condition, type[0]])) as unknown as Condition<T>
+            return new Condition.AllElements(parseObject(data.AllElements, [Condition, type[1]])) as unknown as Condition<T>
         case "AnyElements":
-            return new Condition.AnyElements(parseObject(data.AnyElements, [Condition, type[0]])) as unknown as Condition<T>
+            return new Condition.AnyElements(parseObject(data.AnyElements, [Condition, type[1]])) as unknown as Condition<T>
         case "SizesEquals":
             return new Condition.SizesEquals(data.SizesEquals as number) as unknown as Condition<T>
         case "Exists":
             return new Condition.Exists(data.Exists as string) as unknown as Condition<T>
         case "OnKey":
-            return parseObject(data.OnKey, [Condition.OnKey, type[1]])
+            return parseObject(data.OnKey, [Condition.OnKey, type[2]])
         case "IfNotNull":
-            return parseObject(data.IfNotNull, [Condition, type])
+            return new Condition.IfNotNull(parseObject(data.IfNotNull, [Condition, type]))
         default:
             const baseType = type[0]
             const propTypes = baseType.propertyTypes(type.slice(1))
@@ -140,3 +141,117 @@ import {DataClassProperty} from "./DataClassProperty";
     result[this.key] = this.condition
     return result
 };
+
+(Modification as any).fromJSON = <T>(data: Record<string, any>, types: Array<ReifiedType>): Modification<T> => {
+    const type = types[0]
+    let key = Object.keys(data)[0]
+    switch (key) {
+        case "Chain":
+            return new Modification.Chain(parseObject(data.Chain, [Array, [Modification, type]]))
+        case "IfNotNull":
+            return new Modification.IfNotNull(parseObject(data.IfNotNull, [Modification, type])) as unknown as Modification<T>
+        case "Assign":
+            return new Modification.Assign(parseObject<T>(data.Assign, type))
+        case "CoerceAtMost":
+            return new Modification.CoerceAtMost(parseObject<T>(data.CoerceAtMost, type))
+        case "CoerceAtLeast":
+            return new Modification.CoerceAtLeast(parseObject<T>(data.CoerceAtLeast, type))
+        case "Increment":
+            return new Modification.Increment(data.Increment as number) as unknown as Modification<T>
+        case "Multiply":
+            return new Modification.Multiply(data.Multiply as number) as unknown as Modification<T>
+        case "AppendString":
+            return new Modification.AppendString(data.AppendString as string) as unknown as Modification<T>
+        case "AppendList":
+            return new Modification.AppendList(parseObject<Array<any>>(data.AppendList, [Array, type[1]])) as unknown as Modification<T>
+        case "AppendSet":
+            return new Modification.AppendSet(parseObject<Array<any>>(data.AppendSet, [Array, type[1]])) as unknown as Modification<T>
+        case "Remove":
+            return new Modification.Remove(parseObject(data.Remove, [Condition, type[1]])) as unknown as Modification<T>
+        case "RemoveInstances":
+            return new Modification.RemoveInstances(parseObject<Array<any>>(data.RemoveInstances, [Array, type[1]])) as unknown as Modification<T>
+        case "DropFirst":
+            return new Modification.DropFirst() as unknown as Modification<T>
+        case "DropLast":
+            return new Modification.DropLast() as unknown as Modification<T>
+        case "PerElement":
+            return parseObject(data.PerElement, [Modification.PerElement, type[1]])
+        case "Combine":
+            return new Modification.Combine(parseObject<Map<string, any>>(data.Combine, [Map, [String], type[2]])) as unknown as Modification<T>
+        case "ModifyByKey":
+            return new Modification.ModifyByKey(parseObject<Map<string, Modification<any>>>(data.ModifyByKey, [Map, [String], [Modification, type[2]]])) as unknown as Modification<T>
+        case "RemoveKeys":
+            return new Modification.RemoveKeys(parseObject<Set<string>>(data.RemoveKeys, [Set, [String]])) as unknown as Modification<T>
+        default:
+            const baseType = type[0]
+            const propTypes = baseType.propertyTypes(type.slice(1))
+            const innerType = propTypes[key]
+            return new Modification.OnField(key as DataClassProperty<T, unknown>, parseObject(data[key], [Modification, innerType]))
+    }
+}
+
+(Modification.Chain as any).prototype.toJSON = function (this: Modification.Chain<any>): Record<string, any> {
+    return {Chain: this.modifications}
+};
+(Modification.IfNotNull as any).prototype.toJSON = function (this: Modification.IfNotNull<any>): Record<string, any> {
+    return {IfNotNull: this.modification}
+};
+(Modification.Assign as any).prototype.toJSON = function (this: Modification.Assign<any>): Record<string, any> {
+    return {Assign: this.value}
+};
+(Modification.CoerceAtMost as any).prototype.toJSON = function (this: Modification.CoerceAtMost<any>): Record<string, any> {
+    return {CoerceAtMost: this.value}
+};
+(Modification.CoerceAtLeast as any).prototype.toJSON = function (this: Modification.CoerceAtLeast<any>): Record<string, any> {
+    return {CoerceAtLeast: this.value}
+};
+(Modification.Increment as any).prototype.toJSON = function (this: Modification.Increment<any>): Record<string, any> {
+    return {Increment: this.by}
+};
+(Modification.Multiply as any).prototype.toJSON = function (this: Modification.Multiply<any>): Record<string, any> {
+    return {Multiply: this.by}
+};
+(Modification.AppendString as any).prototype.toJSON = function (this: Modification.AppendString): Record<string, any> {
+    return {AppendString: this.value}
+};
+(Modification.AppendList as any).prototype.toJSON = function (this: Modification.AppendList<any>): Record<string, any> {
+    return {AppendList: this.items}
+};
+(Modification.AppendSet as any).prototype.toJSON = function (this: Modification.AppendSet<any>): Record<string, any> {
+    return {AppendSet: this.items}
+};
+(Modification.Remove as any).prototype.toJSON = function (this: Modification.Remove<any>): Record<string, any> {
+    return {Remove: this.condition}
+};
+(Modification.RemoveInstances as any).prototype.toJSON = function (this: Modification.RemoveInstances<any>): Record<string, any> {
+    return {RemoveInstances: this.items}
+};
+(Modification.DropFirst as any).prototype.toJSON = function (this: Modification.DropFirst<any>): Record<string, any> {
+    return {DropFirst: true}
+};
+(Modification.DropLast as any).prototype.toJSON = function (this: Modification.DropLast<any>): Record<string, any> {
+    return {DropLast: true}
+};
+(Modification.Combine as any).prototype.toJSON = function (this: Modification.Combine<any>): Record<string, any> {
+    return {Combine: this.map}
+};
+(Modification.ModifyByKey as any).prototype.toJSON = function (this: Modification.ModifyByKey<any>): Record<string, any> {
+    return {ModifyByKey: this.map}
+};
+(Modification.RemoveKeys as any).prototype.toJSON = function (this: Modification.RemoveKeys<any>): Record<string, any> {
+    return {RemoveKeys: this.fields}
+};
+(Modification.OnField as any).prototype.toJSON = function (this: Modification.OnField<any, any>): Record<string, any> {
+    const result: Record<string, any> = {}
+    result[this.key] = this.modification
+    return result
+};
+
+(SortPart as any).prototype.toJSON = function (this: SortPart<any>): string {
+    return this.ascending ? this.field : `-${this.field}`
+};
+(SortPart as any).fromJSON = <T>(value: string, types: Array<ReifiedType>): SortPart<T> => {
+    const descending = value.startsWith('-')
+    const realName = descending ? value.substring(1) : value
+    return new SortPart<T>(realName as PartialDataClassProperty<T>, !descending)
+}

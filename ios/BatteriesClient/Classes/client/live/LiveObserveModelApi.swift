@@ -54,7 +54,7 @@ public class LiveObserveModelApiCompanion {
         return LiveObserveModelApi<Model>(openSocket: { (query) -> Observable<Array<Model>> in xObservableToListObservable((multiplexedSocket(url: "\(String(kotlin: multiplexUrl))?jwt=\(String(kotlin: token))", path: path) as Observable<WebSocketIsh<ListChange<Model>, Query<Model>>>)
                 .switchMap { (it) -> Observable<ListChange<Model>> in
                 it.send(query)
-                return it.messages
+                return it.messages.catchError({ (it) -> Observable<ListChange<Model>> in Observable.never() })
         }, ordering: getListComparator(query.orderBy) ?? compareBy(selector: { (it) in it._id })) });
     }
 }

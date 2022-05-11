@@ -16,7 +16,7 @@ export abstract class WriteModelApi<Model extends any> {
     public abstract put(value: Model): Observable<Model>
     public abstract putBulk(values: Array<Model>): Observable<Array<Model>>
     public abstract patch(id: UUIDFor<Model>, modification: Modification<Model>): Observable<Model>
-    public abstract patchBulk(modification: MassModification<Model>): Observable<Array<Model>>
+    public abstract patchBulk(modification: MassModification<Model>): Observable<number>
     public abstract _delete(id: UUIDFor<Model>): Observable<void>
     public abstract deleteBulk(condition: Condition<Model>): Observable<void>
 }

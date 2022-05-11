@@ -37,11 +37,12 @@ public class MockWriteModelApi<Model : HasId> : WriteModelApi<Model> {
         } ?? Single.error(ItemNotFound(message: "404 item with key \(id) not found"));
     }
     
-    override public func patchBulk(modification: MassModification<Model>) -> Single<Array<Model>> {
+    override public func patchBulk(modification: MassModification<Model>) -> Single<Int> {
         return Single.just(self.table
                 .asList()
                 .filter({ (it) -> Bool in modification.condition.invoke(on: it) })
-            .map({ (it) -> Model in self.table.replaceItem(item: modification.modification.invoke(on: it)) }));
+            .map({ (it) -> Model in self.table.replaceItem(item: modification.modification.invoke(on: it)) }))
+            .map { (it) -> Int in Int(it.count) };
     }
     
     override public func delete(id: UUIDFor<Model>) -> Single<Void> {

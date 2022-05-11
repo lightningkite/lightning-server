@@ -9,6 +9,7 @@ const Query_1 = require("../db/Query");
 const SortPart_1 = require("../db/SortPart");
 const sockets_1 = require("./sockets");
 const khrysalis_runtime_1 = require("@lightningkite/khrysalis-runtime");
+const rxjs_1 = require("rxjs");
 const operators_1 = require("rxjs/operators");
 //! Declares com.lightningkite.ktordb.live.LiveObserveModelApi
 class LiveObserveModelApi extends ObserveModelApi_1.ObserveModelApi {
@@ -35,7 +36,7 @@ exports.LiveObserveModelApi = LiveObserveModelApi;
                 var _a;
                 return (xObservableToListObservable((0, sockets_1.multiplexedSocketReified)([ListChange_1.ListChange, Model], [Query_1.Query, Model], `${multiplexUrl}?jwt=${token}`, path, undefined).pipe((0, operators_1.switchMap)((it) => {
                     it.send(query);
-                    return it.messages;
+                    return it.messages.pipe((0, operators_1.catchError)((it) => (rxjs_1.NEVER)));
                 })), (_a = (0, SortPart_1.xListComparatorGet)(query.orderBy)) !== null && _a !== void 0 ? _a : (0, khrysalis_runtime_1.compareBy)((it) => (it._id))));
             });
         }
@@ -47,24 +48,24 @@ exports.LiveObserveModelApi = LiveObserveModelApi;
 function xObservableToListObservable(this_, ordering) {
     const localList = [];
     return this_.pipe((0, operators_1.map)((it) => {
-        const it_9 = it.wholeList;
-        if (it_9 !== null) {
-            localList.length = 0;
-            localList.push(...it_9.slice().sort(ordering));
-        }
-        const it_11 = it._new;
+        const it_11 = it.wholeList;
         if (it_11 !== null) {
-            (0, khrysalis_runtime_1.listRemoveAll)(localList, (o) => ((0, khrysalis_runtime_1.safeEq)(it_11._id, o._id)));
-            let index = localList.findIndex((inList) => (ordering(it_11, inList) < 0));
+            localList.length = 0;
+            localList.push(...it_11.slice().sort(ordering));
+        }
+        const it_13 = it._new;
+        if (it_13 !== null) {
+            (0, khrysalis_runtime_1.listRemoveAll)(localList, (o) => ((0, khrysalis_runtime_1.safeEq)(it_13._id, o._id)));
+            let index = localList.findIndex((inList) => (ordering(it_13, inList) < 0));
             if (index === (-1)) {
                 index = localList.length;
             }
-            localList.splice(index, 0, it_11);
+            localList.splice(index, 0, it_13);
         }
         else {
-            const it_18 = it.old;
-            if (it_18 !== null) {
-                (0, khrysalis_runtime_1.listRemoveAll)(localList, (o) => ((0, khrysalis_runtime_1.safeEq)(it_18._id, o._id)));
+            const it_20 = it.old;
+            if (it_20 !== null) {
+                (0, khrysalis_runtime_1.listRemoveAll)(localList, (o) => ((0, khrysalis_runtime_1.safeEq)(it_20._id, o._id)));
             }
         }
         return localList;

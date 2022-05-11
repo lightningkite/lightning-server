@@ -26,7 +26,7 @@ class LiveObserveModelApi<Model : HasId>(
                 )
                     .switchMap {
                         it.send(query)
-                        it.messages
+                        it.messages.onErrorResumeNext { Observable.never() }
                     }
                     .toListObservable(query.orderBy.comparator ?: compareBy { it._id })
             }

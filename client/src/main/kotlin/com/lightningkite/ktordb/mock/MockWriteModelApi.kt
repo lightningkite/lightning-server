@@ -28,11 +28,12 @@ class MockWriteModelApi<Model : HasId>(
             Single.just(modified)
         } ?: Single.error(ItemNotFound("404 item with key $id not found"))
 
-    override fun patchBulk(modification: MassModification<Model>): Single<List<Model>> =
+    override fun patchBulk(modification: MassModification<Model>): Single<Long> =
         Single.just(table
             .asList()
             .filter { modification.condition.invoke(it) }
             .map { table.replaceItem(modification.modification.invoke(it)) })
+            .map { it.size.toLong() }
 
     override fun delete(id: UUIDFor<Model>): Single<Unit> = Single.just(table.deleteItemById(id))
 
