@@ -1,9 +1,9 @@
-import { Condition } from '../Condition';
-import { HasId } from '../HasId';
-import { MassModification } from '../MassModification';
-import { Modification } from '../Modification';
-import { UUIDFor } from '../UUIDFor';
 import { WriteModelApi } from '../WriteModelApi';
+import { Condition } from '../db/Condition';
+import { HasId } from '../db/HasId';
+import { MassModification } from '../db/MassModification';
+import { Modification } from '../db/Modification';
+import { UUIDFor } from '../db/UUIDFor';
 import { MockTable } from './MockTable';
 import { Observable } from 'rxjs';
 export declare class MockWriteModelApi<Model extends HasId> extends WriteModelApi<Model> {

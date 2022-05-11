@@ -1,5 +1,5 @@
 {
-  "name": "ktor-kmongo",
+  "name": "@lightningkite/ktor-batteries",
   "version": "0.1.0",
   "description": "",
   "main": "dist/index.js",
@@ -13,7 +13,9 @@
     "sprintf-js": "1.1.x",
     "@types/sprintf-js": "1.1.x",
     "mersenne-twister": "1.x",
-    "@types/mersenne-twister": "1.x"
+    "@types/mersenne-twister": "1.x",
+    "@lightningkite/khrysalis-runtime": "1.0.0-RC2",
+    "@lightningkite/rxjs-plus": "0.10.3"
   },
   "devDependencies": {
     "typescript": "^4.5.2",
@@ -26,5 +28,19 @@
     "prepack": "tsc",
     "test": "jest --env=node --colors --coverage test"
   },
-  "author": "Lightning Kite"
+  "author": "Lightning Kite",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lightningkite/ktor-batteries.git"
+  },
+  "keywords": [
+    "batteries",
+    "ktor",
+    "client"
+  ],
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lightningkite/ktor-batteries/issues"
+  },
+  "homepage": "https://github.com/lightningkite/ktor-batteries#readme"
 }

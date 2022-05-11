@@ -16,6 +16,9 @@ val khrysalisVersion: String by project
 dependencies {
     kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
     kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
+
+    equivalents("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion:equivalents")
+
     api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:1.3.2")
     api("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
@@ -42,7 +45,7 @@ khrysalis {
     iosSourceFolder = rootDir.resolve("ios/BatteriesClient/Classes/shared")
     webProjectName = "@lightningkite/ktor-batteries"
     webProjectFolder = rootDir.resolve("web")
-    webSourceFolder = rootDir.resolve("web/src/shared")
+    webSourceFolder = rootDir.resolve("web/src")
     libraryMode = true
 }
 

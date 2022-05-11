@@ -26,14 +26,14 @@
   template:
     pattern: keyGet(~0~, ~this~)
     imports:
-      keyGet: '@lightningkite/ktor-batteries|DataClassProperty'
+      keyGet: '@lightningkite/ktor-batteries|db/DataClassProperty'
 
 - id: com.lightningkite.ktordb.PartialDataClassProperty.anySet
   type: call
   template:
     pattern: keySet(~0~, ~this~, ~1~)
     imports:
-      keySet: '@lightningkite/ktor-batteries|DataClassProperty'
+      keySet: '@lightningkite/ktor-batteries|db/DataClassProperty'
 
 - id: com.lightningkite.ktordb.PartialDataClassProperty.compare
   type: get
@@ -62,11 +62,11 @@
   template:
     pattern: keyGet(~0~, ~this~)
     imports:
-      keyGet: '@lightningkite/ktor-batteries|DataClassProperty'
+      keyGet: '@lightningkite/ktor-batteries|db/DataClassProperty'
 
 - id: com.lightningkite.ktordb.DataClassProperty.set
   type: call
   template:
     pattern: keySet(~0~, ~this~, ~1~)
     imports:
-      keySet: '@lightningkite/ktor-batteries|DataClassProperty'
+      keySet: '@lightningkite/ktor-batteries|db/DataClassProperty'

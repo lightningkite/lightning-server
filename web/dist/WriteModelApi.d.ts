@@ -1,7 +1,7 @@
-import { Condition } from './Condition';
-import { MassModification } from './MassModification';
-import { Modification } from './Modification';
-import { UUIDFor } from './UUIDFor';
+import { Condition } from './db/Condition';
+import { MassModification } from './db/MassModification';
+import { Modification } from './db/Modification';
+import { UUIDFor } from './db/UUIDFor';
 import { Observable } from 'rxjs';
 export declare abstract class WriteModelApi<Model extends any> {
     protected constructor();

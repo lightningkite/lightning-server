@@ -1,6 +1,7 @@
 BatteriesClient
-com.lightningkite.ktordb.MongoCollection
-com.lightningkite.ktordb.IsFile
+com.lightningkite.ktordb.DatabaseModel
+com.lightningkite.ktordb.AllowedTypes
+com.lightningkite.ktordb.StoragePrefix
 com.lightningkite.ktordb
 com.lightningkite.ktordb.Condition
 com.lightningkite.ktordb.serializers
@@ -35,6 +36,7 @@ com.lightningkite.ktordb.DataClassProperty
 com.lightningkite.ktordb.KSerializer_fields
 com.lightningkite.ktordb.fields
 com.lightningkite.ktordb.EntryChange
+com.lightningkite.ktordb.map
 com.lightningkite.ktordb.MySealedClassSerializer
 com.lightningkite.ktordb.AltSealedClassSerializer
 com.lightningkite.ktordb.AbstractPolymorphicSerializer
@@ -43,6 +45,8 @@ com.lightningkite.ktordb.throwSubtypeNotRegistered
 com.lightningkite.ktordb.cast
 com.lightningkite.ktordb.HasId
 com.lightningkite.ktordb.HasIdFields
+com.lightningkite.ktorbatteries.jsonschema.JsonSchema
+com.lightningkite.ktorbatteries.jsonschema
 com.lightningkite.ktordb.ListChange
 com.lightningkite.ktordb.listChange
 com.lightningkite.ktordb.MassModification
@@ -79,12 +83,18 @@ com.lightningkite.ktordb.ClientModule
 com.lightningkite.ktordb.listElement
 com.lightningkite.ktordb.mapValueElement
 com.lightningkite.ktordb.nullElement
+com.lightningkite.ktordb.ServerFile
+com.lightningkite.ktordb.ServerFileSerialization
 com.lightningkite.ktordb.SortPart
 com.lightningkite.ktordb.comparator
 com.lightningkite.ktordb.SortPartSerializer
 com.lightningkite.ktordb.UUIDFor
 com.lightningkite.ktordb.startChain
 com.lightningkite.ktordb.PropChain
+com.lightningkite.ktordb.condition
+com.lightningkite.ktordb.modification
+com.lightningkite.ktordb.always
+com.lightningkite.ktordb.never
 com.lightningkite.ktordb.eq
 com.lightningkite.ktordb.neq
 com.lightningkite.ktordb.ne
@@ -106,8 +116,6 @@ com.lightningkite.ktordb.sizesEquals
 com.lightningkite.ktordb.containsKey
 com.lightningkite.ktordb.notNull
 com.lightningkite.ktordb.get
-com.lightningkite.ktordb.condition
-com.lightningkite.ktordb.modification
 com.lightningkite.ktordb.assign
 com.lightningkite.ktordb.coerceAtMost
 com.lightningkite.ktordb.coerceAtLeast
@@ -118,7 +126,6 @@ com.lightningkite.ktordb.addUnique
 com.lightningkite.ktordb.removeAll
 com.lightningkite.ktordb.dropLast
 com.lightningkite.ktordb.dropFirst
-com.lightningkite.ktordb.map
 com.lightningkite.ktordb.mapIf
 com.lightningkite.ktordb.modifyByKey
 com.lightningkite.ktordb.removeKeys

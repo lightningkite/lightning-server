@@ -1,7 +1,7 @@
-import { HasId } from '../HasId';
-import { ListChange } from '../ListChange';
 import { ObserveModelApi } from '../ObserveModelApi';
-import { Query } from '../Query';
+import { HasId } from '../db/HasId';
+import { ListChange } from '../db/ListChange';
+import { Query } from '../db/Query';
 import { Comparator } from '@lightningkite/khrysalis-runtime';
 import { Observable } from 'rxjs';
 export declare class LiveObserveModelApi<Model extends HasId> extends ObserveModelApi<Model> {
@@ -14,7 +14,7 @@ export declare namespace LiveObserveModelApi {
     class Companion {
         private constructor();
         static INSTANCE: Companion;
-        create<Model extends HasId>(Model: Array<any>, multiplexUrl: string, token: string, path: string): LiveObserveModelApi<Model>;
+        create<Model extends HasId>(Model: Array<any>, multiplexUrl: string, token: string, headers: Map<string, string>, path: string): LiveObserveModelApi<Model>;
     }
 }
 export declare function xObservableToListObservable<T extends HasId>(this_: Observable<ListChange<T>>, ordering: Comparator<T>): Observable<Array<T>>;

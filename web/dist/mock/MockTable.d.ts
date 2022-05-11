@@ -1,7 +1,7 @@
-import { Condition } from '../Condition';
-import { HasId } from '../HasId';
 import { SignalData } from '../SignalData';
-import { UUIDFor } from '../UUIDFor';
+import { Condition } from '../db/Condition';
+import { HasId } from '../db/HasId';
+import { UUIDFor } from '../db/UUIDFor';
 import { Observable, Subject } from 'rxjs';
 export declare class MockTable<Model extends HasId> {
     constructor();

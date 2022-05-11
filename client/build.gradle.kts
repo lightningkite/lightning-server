@@ -18,6 +18,9 @@ dependencies {
     api("com.lightningkite.rx:okhttp:$rxPlusVersion")
     api("com.lightningkite.rx:rxplus:$rxPlusVersion")
 
+    equivalents("com.lightningkite.rx:rxplus:$rxPlusVersion:equivalents")
+    equivalents("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion:equivalents")
+
     kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
     kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
@@ -30,12 +33,12 @@ khrysalis {
     iosSourceFolder = rootDir.resolve("ios/BatteriesClient/Classes/client")
     webProjectName = "@lightningkite/ktor-batteries"
     webProjectFolder = rootDir.resolve("web")
-    webSourceFolder = rootDir.resolve("web/src/client")
+    webSourceFolder = rootDir.resolve("web/src")
     libraryMode = true
 }
 
 standardPublishing {
-    name.set("Ktor-Kmongo-Client")
+    name.set("Ktor-Batteries-Client")
     description.set("The client side of communication between server and client.")
     github("lightningkite", "ktor-batteries")
 

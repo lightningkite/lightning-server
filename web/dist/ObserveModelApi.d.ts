@@ -1,4 +1,4 @@
-import { Query } from './Query';
+import { Query } from './db/Query';
 import { Observable } from 'rxjs';
 export declare abstract class ObserveModelApi<Model extends any> {
     protected constructor();
