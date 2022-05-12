@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'BatteriesClient'
-  s.version          = '0.9.4'
+  s.version          = '0.1.0'
   s.summary          = 'BatteriesClient'
 
   s.description      = <<-DESC

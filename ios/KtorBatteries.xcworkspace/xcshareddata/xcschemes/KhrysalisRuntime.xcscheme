@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "5EAABE96233EC33F007E7CED"
-               BuildableName = "BatteriesClient.framework"
-               BlueprintName = "BatteriesClient"
-               ReferencedContainer = "container:BatteriesClient.xcodeproj">
+               BuildableName = "KtorBatteries.framework"
+               BlueprintName = "KtorBatteries"
+               ReferencedContainer = "container:KtorBatteries.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "5EAABE9F233EC33F007E7CED"
-               BuildableName = "BatteriesClientTests.xctest"
-               BlueprintName = "BatteriesClientTests"
-               ReferencedContainer = "container:BatteriesClient.xcodeproj">
+               BuildableName = "KtorBatteriesTests.xctest"
+               BlueprintName = "KtorBatteriesTests"
+               ReferencedContainer = "container:KtorBatteries.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -61,9 +61,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "5EAABE96233EC33F007E7CED"
-            BuildableName = "BatteriesClient.framework"
-            BlueprintName = "BatteriesClient"
-            ReferencedContainer = "container:BatteriesClient.xcodeproj">
+            BuildableName = "KtorBatteries.framework"
+            BlueprintName = "KtorBatteries"
+            ReferencedContainer = "container:KtorBatteries.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </ProfileAction>

@@ -1,5 +1,5 @@
 import XCTest
-import BatteriesClient
+import KtorBatteries
 import KhrysalisRuntime
 
 class Tests: XCTestCase {

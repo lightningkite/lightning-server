@@ -1,4 +1,4 @@
-BatteriesClient
+KtorBatteries
 com.lightningkite.ktordb.DatabaseModel
 com.lightningkite.ktordb.AllowedTypes
 com.lightningkite.ktordb.StoragePrefix

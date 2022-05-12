@@ -28,9 +28,9 @@ dependencies {
 }
 
 khrysalis {
-    iosProjectName = "BatteriesClient"
+    iosProjectName = "KtorBatteries"
     iosProjectFolder = rootDir.resolve("ios")
-    iosSourceFolder = rootDir.resolve("ios/BatteriesClient/Classes/client")
+    iosSourceFolder = rootDir.resolve("ios/KtorBatteries/Classes/client")
     webProjectName = "@lightningkite/ktor-batteries"
     webProjectFolder = rootDir.resolve("web")
     webSourceFolder = rootDir.resolve("web/src")
