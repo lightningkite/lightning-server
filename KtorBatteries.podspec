@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
-  s.name             = 'BatteriesClient'
+  s.name             = 'KtorBatteries'
   s.version          = '0.1.0'
-  s.summary          = 'BatteriesClient'
+  s.summary          = 'KtorBatteries'
 
   s.description      = <<-DESC
   Helpers for connecting to a Ktor server
@@ -16,7 +16,7 @@ Pod::Spec.new do |s|
 
   s.ios.deployment_target = '11.0'
 
-  s.source_files = 'ios/BatteriesClient/Classes/**/*'
+  s.source_files = 'ios/KtorBatteries/Classes/**/*'
   s.dependency 'RxSwiftPlus/Http'
   s.dependency 'KhrysalisRuntime'
 end
