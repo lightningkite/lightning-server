@@ -12,6 +12,7 @@ open class Condition<T: IsCodableAndHashable> protected constructor()  {
     open override fun equals(other: Any?): Boolean { fatalError() }
 
     open operator fun invoke(on: T): Boolean { fatalError() }
+    open fun simplify(): Condition<T> = this
 
     infix fun and(other: Condition<T>): Condition.And<T> = Condition.And(listOf(this, other))
     infix fun or(other: Condition<T>): Condition.Or<T> = Condition.Or(listOf(this, other))
@@ -37,15 +38,24 @@ open class Condition<T: IsCodableAndHashable> protected constructor()  {
 
     @Serializable(ConditionAndSerializer::class)
     @SerialName("And")
-    data class And<T: IsCodableAndHashable>(val conditions: List<Condition<T>>): Condition<T>() { override fun invoke(on: T): Boolean = conditions.all { it(on) } }
+    data class And<T: IsCodableAndHashable>(val conditions: List<Condition<T>>): Condition<T>() {
+        override fun invoke(on: T): Boolean = conditions.all { it(on) }
+        override fun simplify(): Condition<T> = if(conditions.isEmpty()) Condition.Always() else Condition.And(conditions.distinct())
+    }
 
     @Serializable(ConditionOrSerializer::class)
     @SerialName("Or")
-    data class Or<T: IsCodableAndHashable>(val conditions: List<Condition<T>>): Condition<T>() { override fun invoke(on: T): Boolean = conditions.any { it(on) } }
+    data class Or<T: IsCodableAndHashable>(val conditions: List<Condition<T>>): Condition<T>() {
+        override fun invoke(on: T): Boolean = conditions.any { it(on) }
+        override fun simplify(): Condition<T> = if(conditions.isEmpty()) Condition.Never() else Condition.Or(conditions.distinct())
+    }
 
     @Serializable(ConditionNotSerializer::class)
     @SerialName("Not")
-    data class Not<T: IsCodableAndHashable>(val condition: Condition<T>): Condition<T>() { override fun invoke(on: T): Boolean = !condition(on) }
+    data class Not<T: IsCodableAndHashable>(val condition: Condition<T>): Condition<T>() {
+        override fun invoke(on: T): Boolean = !condition(on)
+        override fun simplify(): Condition<T> = (condition as? Condition.Not<T>)?.condition ?: this
+    }
 
     @Serializable(ConditionEqualSerializer::class)
     @SerialName("Equal")

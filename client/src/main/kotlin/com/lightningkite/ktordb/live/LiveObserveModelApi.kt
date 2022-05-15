@@ -7,13 +7,14 @@ import com.lightningkite.ktordb.HasId
 import com.lightningkite.ktordb.ListChange
 import com.lightningkite.ktordb.Query
 import io.reactivex.rxjava3.core.Observable
+import java.util.*
 
-class LiveObserveModelApi<Model : HasId>(
+class LiveObserveModelApi<Model : HasId<UUID>>(
     val openSocket: (query: Query<Model>) -> Observable<List<Model>>
 ) : ObserveModelApi<Model>() {
 
     companion object {
-        inline fun <reified Model : HasId> create(
+        inline fun <reified Model : HasId<UUID>> create(
             multiplexUrl: String,
             token: String,
             headers: Map<String, String>,
@@ -46,7 +47,7 @@ class LiveObserveModelApi<Model : HasId>(
     }
 }
 
-fun <T : HasId> Observable<ListChange<T>>.toListObservable(ordering: Comparator<T>): Observable<List<T>> {
+fun <T : HasId<UUID>> Observable<ListChange<T>>.toListObservable(ordering: Comparator<T>): Observable<List<T>> {
     val localList = ArrayList<T>()
     return map {
         it.wholeList?.let { localList.clear(); localList.addAll(it.sortedWith(ordering)) }

@@ -4,6 +4,7 @@ package com.lightningkite.ktordb
 import com.lightningkite.khrysalis.IsCodableAndHashable
 import com.lightningkite.khrysalis.SharedCode
 import io.reactivex.rxjava3.core.Single
+import java.util.*
 
 abstract class WriteModelApi<Model : IsCodableAndHashable> {
     abstract fun post(value: Model): Single<Model>

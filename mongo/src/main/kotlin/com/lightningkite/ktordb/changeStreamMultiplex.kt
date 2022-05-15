@@ -123,10 +123,10 @@ fun cleanMultiplexCache() {
     }
 }
 
-fun <T: HasId> MongoCollection<T>.insertIntoCache(item: T) {
+fun <T: HasId<ID>, ID: Comparable<ID>> MongoCollection<T>.insertIntoCache(item: T) {
     cache()[item._id] = item
 }
-fun <T: HasId> MongoCollection<T>.insertIntoCache(items: List<T>) = items.forEach { insertIntoCache(it) }
+fun <T: HasId<ID>, ID: Comparable<ID>> MongoCollection<T>.insertIntoCache(items: List<T>) = items.forEach { insertIntoCache(it) }
 
 private fun <T> EntryChange<T>.given(condition: Condition<T>): EntryChange<T>? {
     val old2 = old?.takeIf { condition(it) }

@@ -20,14 +20,6 @@ class QuickTest {
         SetOnce.allowOverwrite {
             val x = loadSettings(File("settings.yaml")) { Settings() }
         }
-        runBlocking {
-            val uploaded = FilesSettings.instance.root.resolveFile("test.txt").upload(ByteArrayInputStream("Test".toByteArray()))
-            println(uploaded.publicUrl)
 
-            val asString = Serialization.json.encodeToString(ServerFile(uploaded.publicUrl))
-            println(asString)
-            val returned: ServerFile = Serialization.json.decodeFromString(asString)
-            println(returned)
-        }
     }
 }

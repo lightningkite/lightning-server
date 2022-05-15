@@ -2,13 +2,12 @@ package com.lightningkite.ktordb
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 
 open class SecuredFieldCollection<Model: Any>(
     open val wraps: FieldCollection<Model>,
     val rules: SecurityRules<Model>,
 ): FieldCollection<Model> {
-
-
     override suspend fun find(
         condition: Condition<Model>,
         orderBy: List<SortPart<Model>>,
@@ -89,5 +88,15 @@ open class SecuredFieldCollection<Model: Any>(
     ): Int {
         return wraps.deleteMany(rules.delete(condition))
     }
+
+    override suspend fun watch(
+        condition: Condition<Model>
+    ): Flow<EntryChange<Model>> = wraps.watch(condition and rules.read(condition))
+        .mapNotNull {
+            val old = it.old?.let { rules.mask(it) }
+            val new = it.new?.let { rules.mask(it) }
+            if(old == new) null
+            else EntryChange(old, new)
+        }
 }
 

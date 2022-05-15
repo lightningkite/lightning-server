@@ -9,13 +9,12 @@ import kotlinx.serialization.Serializable
 import java.util.*
 
 @SwiftProtocolExtends("Codable", "Hashable")
-interface HasId {
-    val _id: UUID
-
+interface HasId<ID: Comparable<ID>> {
+    val _id: ID
 }
 
 object HasIdFields {
-    fun <T: HasId> _id() = DataClassProperty<T, UUID>(
+    fun <T: HasId<ID>, ID: Comparable<ID>> _id() = DataClassProperty<T, ID>(
         name = "_id",
         get = { it._id },
         set = { _, _ -> fatalError() },

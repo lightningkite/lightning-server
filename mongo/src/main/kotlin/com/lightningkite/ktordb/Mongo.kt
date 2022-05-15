@@ -6,7 +6,7 @@ import org.litote.kmongo.coroutine.CoroutineDatabase
 import org.litote.kmongo.coroutine.coroutine
 import kotlin.reflect.KClass
 
-class MongoDatabase(val database: CoroutineDatabase) : WatchableDatabase {
+class MongoDatabase(val database: CoroutineDatabase) : Database {
     constructor(client: MongoClient, databaseName: String):this(client.getDatabase(databaseName).coroutine){}
     override fun <T : Any> collection(clazz: KClass<T>, name: String): MongoFieldCollection<T> {
         return MongoFieldCollection(

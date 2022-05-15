@@ -18,7 +18,7 @@ import kotlinx.serialization.properties.encodeToStringMap
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
-data class AutoAdminSection<USER: Principal, T: HasId>(
+data class AutoAdminSection<USER: Principal, T: HasId<*>>(
     val route: Route,
     val type: KType,
     val userType: KType,
@@ -51,7 +51,7 @@ fun Route.adminIndex(path: String = "admin") = route(path) {
 }
 
 @KtorDsl
-inline fun <reified USER : Principal, reified T : HasId> Route.adminPages(
+inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.adminPages(
     path: String = "",
     noinline defaultItem: (USER?) -> T,
     noinline getCollection: suspend (principal: USER?) -> FieldCollection<T>
@@ -66,7 +66,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminPages(
     ))
     get("{id}") {
         val secured = getCollection(call.principal())
-        val item = secured.get(this.context.parameters["id"]!!.toUuidOrBadRequest())
+        val item = secured.get(this.context.parameters["id"]!!.parseUrlPartOrBadRequest())
         context.respondHtml {
             head { includeFormScript() }
             body {
@@ -99,12 +99,12 @@ inline fun <reified USER : Principal, reified T : HasId> Route.adminPages(
         }
     }
     post("{id}/delete") {
-        getCollection(call.principal()).deleteOneById(this.context.parameters["id"]!!.toUuidOrBadRequest())
+        getCollection(call.principal()).deleteOneById(this.context.parameters["id"]!!.parseUrlPartOrBadRequest())
         call.respondRedirect("../admin")
     }
     post("{id}") {
         val item: T = call.receive()
-        getCollection(call.principal()).replaceOneById(this.context.parameters["id"]!!.toUuidOrBadRequest(), item)
+        getCollection(call.principal()).replaceOneById(this.context.parameters["id"]!!.parseUrlPartOrBadRequest(), item)
         call.respondRedirect("../admin")
     }
     get("create") {

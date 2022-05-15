@@ -14,6 +14,7 @@ import java.lang.IllegalStateException
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.collections.HashMap
+import java.util.*
 
 var _overrideWebSocketProvider: ((url: String) -> Observable<WebSocketInterface>)? = null
 private val sharedSocketCache = HashMap<String, Observable<WebSocketInterface>>()

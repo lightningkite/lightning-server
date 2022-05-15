@@ -1,5 +1,6 @@
 package com.lightningkite.ktorbatteries.db
 
+import com.lightningkite.ktorbatteries.serialization.Serialization
 import com.lightningkite.ktorbatteries.typed.*
 import io.ktor.http.*
 import io.ktor.server.routing.*
@@ -9,20 +10,22 @@ import io.ktor.server.auth.*
 import io.ktor.server.plugins.*
 import io.ktor.util.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.serialization.properties.decodeFromStringMap
+import kotlinx.serialization.properties.encodeToStringMap
 import java.util.*
 
-fun String.toUuidOrBadRequest() = try {
-    UUID.fromString(this)
-} catch (e: Exception) {
-    throw BadRequestException("ID ${this} could not be parsed as a UUID.")
+inline fun <reified T: Comparable<T>> String.parseUrlPartOrBadRequest(): T = try {
+    Serialization.properties.decodeFromStringMap<ForeignKey<HasId<T>, T>>(mapOf("id" to this)).id
+} catch(e: Exception) {
+    throw BadRequestException("ID ${this} could not be parsed as a ${T::class.simpleName}.")
 }
 
 // Creates websocket listening end points for a model
 @OptIn(ExperimentalCoroutinesApi::class)
 @KtorDsl
-inline fun <reified USER : Principal, reified T : HasId> Route.restApiWebsocket(
+inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.restApiWebsocket(
     path: String = "",
-    crossinline getCollection: suspend (principal: USER?) -> WatchableFieldCollection<T>
+    crossinline getCollection: suspend (principal: USER?) -> FieldCollection<T>
 ) {
     apiWebsocket<USER, Query<T>, ListChange<T>>(
         path = path,
@@ -43,7 +46,7 @@ inline fun <reified USER : Principal, reified T : HasId> Route.restApiWebsocket(
 
 // Calls all three of the endpoint type functions
 @KtorDsl
-inline fun <reified USER : Principal, reified T : HasId> Route.restApi(
+inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.restApi(
     path: String = "",
     crossinline getCollection: suspend (principal: USER?) -> FieldCollection<T>
 ) = route(path) {
@@ -84,12 +87,12 @@ inline fun <reified USER : Principal, reified T : HasId> Route.restApi(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.BadRequest,
                 internalCode = 0,
-                description = "The ID could not be parsed as a UUID."
+                description = "The ID could not be parsed."
             )
         ),
         implementation = { user: USER?, id: String, input: Unit ->
             getCollection(user)
-                .get(id.toUuidOrBadRequest())
+                .get(id.parseUrlPartOrBadRequest())
                 ?: throw NotFoundException()
         }
     )
@@ -116,6 +119,18 @@ inline fun <reified USER : Principal, reified T : HasId> Route.restApi(
         }
     )
 
+    postItem(
+        postIdPath = "",
+        summary = "Creates or updates a ${T::class.simpleName}",
+        errorCases = listOf(),
+        successCode = HttpStatusCode.Created,
+        implementation = { user: USER?, id: String, value: T ->
+            getCollection(user)
+                .upsertOneById(id.parseUrlPartOrBadRequest(), value)
+                ?: throw NotFoundException()
+        }
+    )
+
     // This is used replace many objects at once. This does make individual calls to the database. Kmongo does not have a many replace option.
     put(
         path = "",
@@ -139,12 +154,12 @@ inline fun <reified USER : Principal, reified T : HasId> Route.restApi(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.BadRequest,
                 internalCode = 0,
-                description = "The ID could not be parsed as a UUID."
+                description = "The ID could not be parsed."
             )
         ),
         implementation = { user: USER?, id: String, value: T ->
             getCollection(user)
-                .replaceOneById(id.toUuidOrBadRequest(), value)
+                .replaceOneById(id.parseUrlPartOrBadRequest(), value)
                 ?: throw NotFoundException()
         }
     )
@@ -171,12 +186,12 @@ inline fun <reified USER : Principal, reified T : HasId> Route.restApi(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.BadRequest,
                 internalCode = 0,
-                description = "The ID could not be parsed as a UUID."
+                description = "The ID could not be parsed."
             )
         ),
         implementation = { user: USER?, id: String, input: Modification<T> ->
             getCollection(user)
-                .findOneAndUpdateById(id.toUuidOrBadRequest(), input)
+                .findOneAndUpdateById(id.parseUrlPartOrBadRequest(), input)
                 .also { if (it.old == null && it.new == null) throw NotFoundException() }
         }
     )
@@ -193,12 +208,12 @@ inline fun <reified USER : Principal, reified T : HasId> Route.restApi(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.BadRequest,
                 internalCode = 0,
-                description = "The ID could not be parsed as a UUID."
+                description = "The ID could not be parsed."
             )
         ),
         implementation = { user: USER?, id: String, input: Modification<T> ->
             getCollection(user)
-                .findOneAndUpdateById(id.toUuidOrBadRequest(), input)
+                .findOneAndUpdateById(id.parseUrlPartOrBadRequest(), input)
                 .also { if (it.old == null && it.new == null) throw NotFoundException() }
                 .new
         }
@@ -226,12 +241,12 @@ inline fun <reified USER : Principal, reified T : HasId> Route.restApi(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.BadRequest,
                 internalCode = 0,
-                description = "The ID could not be parsed as a UUID."
+                description = "The ID could not be parsed."
             )
         ),
         implementation = { user: USER?, id: String, _: Unit ->
             if (!getCollection(user)
-                    .deleteOneById(id.toUuidOrBadRequest())
+                    .deleteOneById(id.parseUrlPartOrBadRequest())
             ) {
                 throw NotFoundException()
             }

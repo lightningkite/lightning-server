@@ -23,8 +23,8 @@ fun Condition<*>.dump(into: Document = Document(), key: String?): Document {
     when (this) {
         is Condition.Always -> {}
         is Condition.Never -> into["thisFieldWillNeverExist"] = "no never"
-        is Condition.And -> into["\$and"] = conditions.map { it.dump(key = key)  }
-        is Condition.Or -> into["\$or"] = conditions.map { it.dump(key = key)  }
+        is Condition.And -> if(conditions.isNotEmpty()) into["\$and"] = conditions.map { it.dump(key = key)  }
+        is Condition.Or -> if(conditions.isEmpty()) into["thisFieldWillNeverExist"] = "no never" else into["\$or"] = conditions.map { it.dump(key = key)  }
         is Condition.Equal -> into.sub(key)["\$eq"] = value
         is Condition.NotEqual -> into.sub(key)["\$ne"] = value
         is Condition.AllElements<*> -> condition.dump(into.sub(key).sub("\$not").sub("\$elemMatch"), key = "\$not")
@@ -108,5 +108,5 @@ data class UpdateWithOptions(
     var options: UpdateOptions = UpdateOptions()
 )
 
-fun Condition<*>.bson() = Document().also { dump(it, null) }
+fun Condition<*>.bson() = Document().also { simplify().dump(it, null) }
 fun Modification<*>.bson(): UpdateWithOptions = UpdateWithOptions().also { dump(it, null) }

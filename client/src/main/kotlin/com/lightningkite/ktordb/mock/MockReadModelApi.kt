@@ -7,9 +7,10 @@ import com.lightningkite.ktordb.HasId
 import com.lightningkite.ktordb.UUIDFor
 import io.reactivex.rxjava3.core.Single
 import kotlin.math.min
+import java.util.*
 
 
-class MockReadModelApi<Model : HasId>(
+class MockReadModelApi<Model : HasId<UUID>>(
     val table: MockTable<Model>
 ) : ReadModelApi<Model>() {
 

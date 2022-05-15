@@ -16,8 +16,8 @@ class TestTest: MongoTest() {
         val dan = User(email = "dan@lightningkite.com",)
         User.mongo.insertOne(dan)
 
-        val myPosts = Post.mongo.secure(Post.secure(me))
-        val dansPosts = Post.mongo.secure(Post.secure(dan))
+        val myPosts = Post.mongo.forUser(me)
+        val dansPosts = Post.mongo.forUser(dan)
 
         val listenerCount = 100
         val expectedEvents = 3

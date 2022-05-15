@@ -54,26 +54,26 @@ class PreDeleteSignalFieldCollection<Model: Any>(
     }
 }
 
-class PostDeleteSignalFieldCollection<Model: HasId>(
+class PostDeleteSignalFieldCollection<Model: HasId<ID>, ID: Comparable<ID>>(
     val wraps: FieldCollection<Model>,
     val onDelete: suspend (Model)->Unit,
 ): FieldCollection<Model> by wraps {
     override suspend fun deleteMany(condition: Condition<Model>): Int {
         var count = 0
         wraps.find(condition).collectChunked(1000) { list ->
-            count += wraps.deleteMany(startChain<Model>()[HasIdFields._id<Model>()] inside list.map { it._id })
+            count += wraps.deleteMany(startChain<Model>()[HasIdFields._id()] inside list.map { it._id })
             list.forEach { onDelete(it) }
         }
         return count
     }
     override suspend fun deleteOne(condition: Condition<Model>): Boolean {
         val toDelete = wraps.find(condition, limit = 1).toList()
-        val result = wraps.deleteOne(startChain<Model>()[HasIdFields._id<Model>()] inside toDelete.map { it._id })
+        val result = wraps.deleteOne(startChain<Model>()[HasIdFields._id()] inside toDelete.map { it._id })
         toDelete.forEach { onDelete(it) }
         return result
     }
 }
-class PostChangeSignalFieldCollection<Model: HasId>(
+class PostChangeSignalFieldCollection<Model: HasId<ID>, ID: Comparable<ID>>(
     val wraps: FieldCollection<Model>,
     val changed: suspend (before: Model, after: Model)->Unit,
 ): FieldCollection<Model> by wraps {
@@ -100,7 +100,7 @@ class PostChangeSignalFieldCollection<Model: HasId>(
     ): Int {
         var count = 0
         wraps.find(condition).collectChunked(1000) { list ->
-            count += wraps.updateMany(startChain<Model>()[HasIdFields._id<Model>()] inside list.map { it._id }, modification)
+            count += wraps.updateMany(startChain<Model>()[HasIdFields._id()] inside list.map { it._id }, modification)
             list.forEach { changed(it, modification(it)) }
         }
         return count
@@ -127,9 +127,9 @@ fun <Model : Any> FieldCollection<Model>.preCreate(
 fun <Model : Any> FieldCollection<Model>.preDelete(
     action: suspend (Model)->Unit
 ): FieldCollection<Model> = PreDeleteSignalFieldCollection(this, action)
-fun <Model : HasId> FieldCollection<Model>.postDelete(
+fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.postDelete(
     action: suspend (Model)->Unit
 ): FieldCollection<Model> = PostDeleteSignalFieldCollection(this, action)
-fun <Model : HasId> FieldCollection<Model>.postChange(
+fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.postChange(
     action: suspend (Model, Model)->Unit
 ): FieldCollection<Model> = PostChangeSignalFieldCollection(this, action)

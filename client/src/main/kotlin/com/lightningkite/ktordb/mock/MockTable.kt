@@ -9,9 +9,10 @@ import com.lightningkite.ktordb.UUIDFor
 import io.reactivex.rxjava3.core.Observer
 import io.reactivex.rxjava3.subjects.PublishSubject
 import java.util.*
+import java.util.*
 
 
-class MockTable<Model : HasId> {
+class MockTable<Model : HasId<UUID>> {
 
     val data: MutableMap<UUIDFor<Model>, Model> = mutableMapOf()
     val signals: PublishSubject<SignalData<Model>> = PublishSubject.create()

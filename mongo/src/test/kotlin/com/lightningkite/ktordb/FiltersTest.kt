@@ -1,7 +1,6 @@
 package com.lightningkite.ktordb
 
 import com.lightningkite.ktordb.application.*
-import com.lightningkite.ktordb.Query
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -15,8 +14,8 @@ class FiltersTest: MongoTest() {
         val dan = User(email = "dan@lightningkite.com",)
         User.mongo.insertOne(dan)
 
-        val myPosts = Post.mongo.secure(Post.secure(me))
-        val dansPosts = Post.mongo.secure(Post.secure(dan))
+        val myPosts = Post.mongo.forUser(me)
+        val dansPosts = Post.mongo.forUser(dan)
 
         myPosts.insertOne(Post(author = me._id, content = "Joe post"))
         myPosts.insertOne(Post(author = me._id, content = "Alphabetical post"))

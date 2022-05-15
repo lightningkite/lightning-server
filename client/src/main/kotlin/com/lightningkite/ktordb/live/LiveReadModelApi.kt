@@ -12,8 +12,9 @@ import io.reactivex.rxjava3.core.Single
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import okhttp3.Response
+import java.util.*
 
-class LiveReadModelApi<Model : HasId>(
+class LiveReadModelApi<Model : HasId<UUID>>(
     val url: String,
     token: String,
     headers: Map<String, String> = mapOf(),

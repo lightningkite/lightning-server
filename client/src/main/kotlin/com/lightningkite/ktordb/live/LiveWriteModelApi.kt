@@ -12,8 +12,9 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import okhttp3.RequestBody
 import okhttp3.Response
+import java.util.*
 
-class LiveWriteModelApi<Model : HasId>(
+class LiveWriteModelApi<Model : HasId<UUID>>(
     val url: String,
     token: String,
     headers: Map<String, String>,

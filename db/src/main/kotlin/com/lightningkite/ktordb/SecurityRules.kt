@@ -11,6 +11,7 @@ queryableRequires: TCondition
 
  */
 
+@Deprecated("Prefer using the new ModelPermissions instead.")
 interface SecurityRules<Model> {
     suspend fun sortAllowed(filter: SortPart<Model>): Condition<Model>
 
@@ -41,9 +42,7 @@ interface SecurityRules<Model> {
 //    abstract suspend fun read
 //}
 
-
-/*
-
-
-
- */
+@Deprecated("Prefer using new ModelPermissions instead")
+fun <Model: Any> FieldCollection<Model>.secure(
+    rules: SecurityRules<Model>
+) = SecuredFieldCollection<Model>(this, rules)

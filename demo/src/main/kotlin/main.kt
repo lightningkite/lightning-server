@@ -49,7 +49,7 @@ data class TestModel(
     val number: Int = 3123,
     @JsonSchema.Format("jodit") val content: String = "",
     val file: ServerFile? = null
-) : HasId
+) : HasId<UUID>
 
 val TestModel.Companion.table get() = database.collection<TestModel>("TestModel")
 
@@ -63,6 +63,43 @@ data class Settings(
     val logging: LoggingSettings = LoggingSettings(),
     val mongo: MongoSettings = MongoSettings()
 )
+
+fun securityRulesForTestModel(email: String) = object: SecurityRules<TestModel> {
+    override suspend fun sortAllowed(filter: SortPart<TestModel>): Condition<TestModel> {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun read(filter: Condition<TestModel>): Condition<TestModel> {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun edit(
+        filter: Condition<TestModel>,
+        modification: Modification<TestModel>
+    ): Pair<Condition<TestModel>, Modification<TestModel>> {
+        return super.edit(filter, modification)
+    }
+
+    override suspend fun delete(filter: Condition<TestModel>): Condition<TestModel> {
+        return super.delete(filter)
+    }
+
+    override suspend fun mask(model: TestModel): TestModel {
+        return super.mask(model)
+    }
+
+    override suspend fun create(model: TestModel): TestModel {
+        return super.create(model)
+    }
+
+    override suspend fun replace(model: TestModel): Pair<Condition<TestModel>, TestModel> {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun maxQueryTimeMs(): Long {
+        return super.maxQueryTimeMs()
+    }
+}
 
 @OptIn(InternalAPI::class)
 fun main(vararg args: String) {

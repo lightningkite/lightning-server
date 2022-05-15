@@ -16,7 +16,7 @@ data class User(
     var email: String,
     var age:Long = 0,
     var friends: List<UUIDFor<User>> = listOf()
-): HasId { companion object }
+): HasId<UUID> { companion object }
 
 @DatabaseModel()
 @Serializable
@@ -25,14 +25,14 @@ data class Post(
     var author: UUIDFor<User>,
     var content: String,
     var at: Long? = null
-): HasId { companion object }
+): HasId<UUID> { companion object }
 
 @DatabaseModel()
 @Serializable
 data class Employee(
     override val _id: @Contextual UUID = UUID.randomUUID(),
     var dictionary: Map<String, Int> = mapOf(),
-): HasId { companion object }
+): HasId<UUID> { companion object }
 
 
 @DatabaseModel
@@ -42,7 +42,7 @@ data class EmbeddedObjectTest(
     var name:String = "",
     var embed1:ClassUsedForEmbedding = ClassUsedForEmbedding("value1", 1),
     var embed2:ClassUsedForEmbedding = ClassUsedForEmbedding("value2", 2),
-): HasId { companion object }
+): HasId<UUID> { companion object }
 
 
 @Serializable
@@ -63,7 +63,7 @@ data class EmbeddedNullable(
     override val _id: UUID = UUID.randomUUID(),
     var name:String = "",
     var embed1:ClassUsedForEmbedding? = null,
-): HasId { companion object }
+): HasId<UUID> { companion object }
 
 @DatabaseModel
 @Serializable
@@ -96,11 +96,11 @@ data class LargeTestModel(
     var listNullable: List<Int>? = null,
     var mapNullable: Map<String, Int>? = null,
     var embeddedNullable: ClassUsedForEmbedding? = null,
-): HasId { companion object }
+): HasId<UUID> { companion object }
 
 @DatabaseModel
 @Serializable
 data class EmbeddedMap(
     override val _id: UUID = UUID.randomUUID(),
     var map: Map<String, RecursiveEmbed>,
-) : HasId
+) : HasId<UUID>

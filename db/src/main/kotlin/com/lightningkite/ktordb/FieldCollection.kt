@@ -55,5 +55,10 @@ interface FieldCollection<Model: Any> {
     suspend fun deleteMany(
         condition: Condition<Model>
     ): Int
+
+    suspend fun watch(
+        condition: Condition<Model>
+    ): Flow<EntryChange<Model>>
+
 }
 

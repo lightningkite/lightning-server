@@ -16,8 +16,8 @@ class SecurityTests : MongoTest() {
 
     @Test
     fun test(): Unit = runBlocking {
-        val myPosts = Post.mongo.secure(Post.secure(user1))
-        val dansPosts = Post.mongo.secure(Post.secure(otherUser))
+        val myPosts = Post.mongo.forUser(user1)
+        val dansPosts = Post.mongo.forUser(otherUser)
         GlobalScope.launch {
             myPosts.watch(Post.chain.let { Post.chain.author eq user1._id }).collect {
             }

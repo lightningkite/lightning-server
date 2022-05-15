@@ -4,8 +4,9 @@ package com.lightningkite.ktordb.mock
 import com.lightningkite.khrysalis.SharedCode
 import com.lightningkite.ktordb.*
 import io.reactivex.rxjava3.core.Single
+import java.util.*
 
-class MockWriteModelApi<Model : HasId>(
+class MockWriteModelApi<Model : HasId<UUID>>(
     val table: MockTable<Model>,
 ) : WriteModelApi<Model>() {
 

@@ -25,7 +25,7 @@ data class Post(
     val author: String,
     val title: String,
     val content: String
-) : HasId
+) : HasId<UUID>
 
 val Post.Companion.mongo get() = mongoDb.collection<Post>()
 

@@ -5,62 +5,60 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
 import java.util.*
 
-fun <Model: Any> FieldCollection<Model>.secure(
-    rules: SecurityRules<Model>
-) = SecuredFieldCollection<Model>(this, rules)
-
-fun <Model: Any> WatchableFieldCollection<Model>.secure(
-    rules: SecurityRules<Model>
-) = WatchableSecuredFieldCollection<Model>(this, rules)
-
 suspend fun <Model : Any>
         FieldCollection<Model>.updateMany(
     mass: MassModification<Model>
 ) = updateMany(mass.condition, mass.modification)
 
 
-suspend fun <Model : HasId>
+suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
         FieldCollection<Model>.updateOneById(
-    id: UUID,
+    id: ID,
     modification: Modification<Model>
 ): Boolean {
-    return updateOne(Condition.OnField(HasIdFields._id<Model>(), Condition.Equal(id)), modification)
+    return updateOne(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), modification)
 }
 
-suspend fun <Model : HasId>
+suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
         FieldCollection<Model>.findOneAndUpdateById(
-    id: UUID,
+    id: ID,
     modification: Modification<Model>
 ): EntryChange<Model> {
-    return findOneAndUpdate(Condition.OnField(HasIdFields._id<Model>(), Condition.Equal(id)), modification)
+    return findOneAndUpdate(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), modification)
 }
 
-suspend fun <Model : HasId>
+suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
         FieldCollection<Model>.deleteOneById(
-    id: UUID
+    id: ID
 ): Boolean {
-    return deleteOne(Condition.OnField(HasIdFields._id<Model>(), Condition.Equal(id)))
+    return deleteOne(Condition.OnField(HasIdFields._id(), Condition.Equal(id)))
 }
 
-suspend fun <Model : HasId>
+suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
         FieldCollection<Model>.replaceOneById(
-    id: UUID,
+    id: ID,
     model: Model
-) = replaceOne(Condition.OnField(HasIdFields._id<Model>(), Condition.Equal(id)), model)
+) = replaceOne(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), model)
+
+suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
+        FieldCollection<Model>.upsertOneById(
+    id: ID,
+    model: Model
+) = upsertOne(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), model)
 
 
-suspend fun <Model : HasId>
+suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
         FieldCollection<Model>.get(
-    id: UUID
+    id: ID
 ): Model? {
-    return find(Condition.OnField(HasIdFields._id<Model>(), Condition.Equal(id)), limit = 1).firstOrNull()
+    return find(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), limit = 1).firstOrNull()
 }
 
-suspend fun <Model : HasId>
+suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
         FieldCollection<Model>.getMany(
-    ids: List<UUID>
+    ids: List<ID>
 ): List<Model> {
-    return find(Condition.OnField(HasIdFields._id<Model>(), Condition.Inside(ids)), limit = 1).toList()
+    return find(Condition.OnField(HasIdFields._id(), Condition.Inside(ids)), limit = 1).toList()
 }
 
 suspend fun <Model : Any>

@@ -12,6 +12,13 @@ class PropChain<From: IsCodableAndHashable, To: IsCodableAndHashable>(
         mapCondition = { mapCondition(Condition.OnField(prop, it)) },
         mapModification = { mapModification(Modification.OnField(prop, it)) }
     )
+
+    override fun hashCode(): Int = mapCondition(Condition.Always()).hashCode()
+
+    override fun toString(): String = "PropChain(${mapCondition(Condition.Always())})"
+
+    @Suppress("UNCHECKED_CAST")
+    override fun equals(other: Any?): Boolean = other is PropChain<*, *> && mapCondition(Condition.Always()) == (other as PropChain<Any?, Any?>).mapCondition(Condition.Always())
 }
 
 inline fun <T: IsCodableAndHashable> condition(setup: (PropChain<T, T>) -> Condition<T>): Condition<T> = startChain<T>().let(setup)

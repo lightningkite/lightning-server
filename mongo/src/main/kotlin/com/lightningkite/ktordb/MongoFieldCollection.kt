@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 
 class MongoFieldCollection<Model: Any>(
     val wraps: CoroutineCollection<Model>
-): WatchableFieldCollection<Model> {
+): FieldCollection<Model> {
 
     override suspend fun find(
         condition: Condition<Model>,

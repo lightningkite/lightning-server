@@ -7,8 +7,9 @@ import com.lightningkite.ktordb.ObserveModelApi
 import com.lightningkite.ktordb.Query
 import com.lightningkite.rx.ValueSubject
 import io.reactivex.rxjava3.core.Observable
+import java.util.*
 
-class MockObserveModelApi<Model : HasId>(
+class MockObserveModelApi<Model : HasId<UUID>>(
     val table: MockTable<Model>,
 ) : ObserveModelApi<Model>() {
     override fun observe(query: Query<Model>): Observable<List<Model>> {
