@@ -1,8 +1,8 @@
 import { CompleteModelApi } from '../CompleteModelApi';
-import { HasId } from '../HasId';
 import { ObserveModelApi } from '../ObserveModelApi';
 import { ReadModelApi } from '../ReadModelApi';
 import { WriteModelApi } from '../WriteModelApi';
+import { HasId } from '../db/HasId';
 import { MockTable } from './MockTable';
 export declare class MockCompleteModelApi<Model extends HasId> extends CompleteModelApi<Model> {
     readonly table: MockTable<Model>;

@@ -10,13 +10,16 @@ plugins {
 }
 
 val kotlinVersion: String by project
-val rxPlusVersion = "1.0.1"
+val rxPlusVersion = "1.0.2"
 val khrysalisVersion: String by project
 dependencies {
     api(project(":shared"))
     api("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
     api("com.lightningkite.rx:okhttp:$rxPlusVersion")
     api("com.lightningkite.rx:rxplus:$rxPlusVersion")
+
+    equivalents("com.lightningkite.rx:rxplus:$rxPlusVersion:equivalents")
+    equivalents("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion:equivalents")
 
     kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
     kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
@@ -25,16 +28,19 @@ dependencies {
 }
 
 khrysalis {
-    projectName = "KMongoClient"
+    iosProjectName = "KtorBatteries"
     iosProjectFolder = rootDir.resolve("ios")
-    iosSourceFolder = rootDir.resolve("ios/KMongoClient/Classes/client")
+    iosSourceFolder = rootDir.resolve("ios/KtorBatteries/Classes/client")
+    webProjectName = "@lightningkite/ktor-batteries"
+    webProjectFolder = rootDir.resolve("web")
+    webSourceFolder = rootDir.resolve("web/src")
     libraryMode = true
 }
 
 standardPublishing {
-    name.set("Ktor-Kmongo-Client")
-    description.set("A tool for communication between a server and a client built around MongoDB Collections.")
-    github("lightningkite", "ktor-kmongo")
+    name.set("Ktor-Batteries-Client")
+    description.set("The client side of communication between server and client.")
+    github("lightningkite", "ktor-batteries")
 
     licenses {
         mit()
@@ -53,4 +59,5 @@ standardPublishing {
         )
     }
 }
+tasks.getByName("equivalentsJarMain").published = true
 

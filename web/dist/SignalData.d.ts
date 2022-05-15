@@ -1,4 +1,4 @@
-import { HasId } from './HasId';
+import { HasId } from './db/HasId';
 import { ReifiedType } from '@lightningkite/khrysalis-runtime';
 export declare class SignalData<Model extends HasId> {
     readonly item: Model;

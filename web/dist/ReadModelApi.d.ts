@@ -1,5 +1,5 @@
-import { Query } from './Query';
-import { UUIDFor } from './UUIDFor';
+import { Query } from './db/Query';
+import { UUIDFor } from './db/UUIDFor';
 import { Observable } from 'rxjs';
 export declare abstract class ReadModelApi<Model extends any> {
     protected constructor();

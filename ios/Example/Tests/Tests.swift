@@ -1,5 +1,5 @@
 import XCTest
-import KMongoClient
+import KtorBatteries
 import KhrysalisRuntime
 
 class Tests: XCTestCase {

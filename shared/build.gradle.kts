@@ -16,6 +16,9 @@ val khrysalisVersion: String by project
 dependencies {
     kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
     kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
+
+    equivalents("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion:equivalents")
+
     api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:1.3.2")
     api("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
@@ -37,17 +40,19 @@ kotlin {
 }
 
 khrysalis {
-    iosProjectName = "KMongoClient"
+    iosProjectName = "KtorBatteries"
     iosProjectFolder = rootDir.resolve("ios")
-    iosSourceFolder = rootDir.resolve("ios/KMongoClient/Classes/shared")
+    iosSourceFolder = rootDir.resolve("ios/KtorBatteries/Classes/shared")
+    webProjectName = "@lightningkite/ktor-batteries"
+    webProjectFolder = rootDir.resolve("web")
+    webSourceFolder = rootDir.resolve("web/src")
     libraryMode = true
-    webProjectName = "@lightningkite/ktor-kmongo"
 }
 
 standardPublishing {
-    name.set("Ktor-Kmongo-Shared")
-    description.set("A tool for communication between a server and a client built around MongoDB Collections.")
-    github("lightningkite", "ktor-kmongo")
+    name.set("Ktor-Batteries-Shared")
+    description.set("A tool for communication between a server and a client built around Ktor servers.")
+    github("lightningkite", "ktor-batteries")
 
     licenses {
         mit()
@@ -66,3 +71,4 @@ standardPublishing {
         )
     }
 }
+tasks.getByName("equivalentsJarMain").published = true

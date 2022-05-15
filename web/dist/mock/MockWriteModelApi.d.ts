@@ -1,9 +1,9 @@
-import { Condition } from '../Condition';
-import { HasId } from '../HasId';
-import { MassModification } from '../MassModification';
-import { Modification } from '../Modification';
-import { UUIDFor } from '../UUIDFor';
 import { WriteModelApi } from '../WriteModelApi';
+import { Condition } from '../db/Condition';
+import { HasId } from '../db/HasId';
+import { MassModification } from '../db/MassModification';
+import { Modification } from '../db/Modification';
+import { UUIDFor } from '../db/UUIDFor';
 import { MockTable } from './MockTable';
 import { Observable } from 'rxjs';
 export declare class MockWriteModelApi<Model extends HasId> extends WriteModelApi<Model> {
@@ -14,7 +14,7 @@ export declare class MockWriteModelApi<Model extends HasId> extends WriteModelAp
     put(value: Model): Observable<Model>;
     putBulk(values: Array<Model>): Observable<Array<Model>>;
     patch(id: UUIDFor<Model>, modification: Modification<Model>): Observable<Model>;
-    patchBulk(modification: MassModification<Model>): Observable<Array<Model>>;
+    patchBulk(modification: MassModification<Model>): Observable<number>;
     _delete(id: UUIDFor<Model>): Observable<void>;
     deleteBulk(condition: Condition<Model>): Observable<void>;
 }

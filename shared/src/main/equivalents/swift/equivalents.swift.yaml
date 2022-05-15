@@ -1,0 +1,10 @@
+- id: com.lightningkite.ktordb.fields
+  type: get
+  template:
+    pattern: 'try getDataClassProperties(type: ~this~)'
+    imports: [ KtorBatteries ]
+- id: com.lightningkite.ktordb.fields
+  type: set
+  template:
+    pattern: 'registerDataClassProperties(type: ~this~, properties: ~value~)'
+    imports: [ KtorBatteries ]

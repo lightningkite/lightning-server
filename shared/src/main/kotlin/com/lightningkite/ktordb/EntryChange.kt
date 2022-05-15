@@ -11,6 +11,7 @@ data class EntryChange<T: IsCodableAndHashable>(
     val new: T? = null
 )
 
+// This will not convert well. Manually add the type argument to the return EntryChange on the swift side. "EntryChange<B>"
 inline fun <T: IsCodableAndHashable, B: IsCodableAndHashable> EntryChange<T>.map(mapper: (T)->B): EntryChange<B> {
     return EntryChange(old?.let(mapper), new?.let(mapper))
 }

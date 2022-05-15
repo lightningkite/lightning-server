@@ -43,9 +43,9 @@ kotlin {
 }
 
 standardPublishing {
-    name.set("Ktor-Kmongo-Server")
-    description.set("A tool for communication between a server and a client built around MongoDB Collections.")
-    github("lightningkite", "ktor-kmongo")
+    name.set("Ktor-Batteries-Mongo")
+    description.set("A MongoDB implementation of Ktor-Batteries-Databases.")
+    github("lightningkite", "ktor-batteries")
 
     licenses {
         mit()

@@ -1,6 +1,6 @@
-import { HasId } from '../HasId';
 import { ObserveModelApi } from '../ObserveModelApi';
-import { Query } from '../Query';
+import { HasId } from '../db/HasId';
+import { Query } from '../db/Query';
 import { MockTable } from './MockTable';
 import { Observable } from 'rxjs';
 export declare class MockObserveModelApi<Model extends HasId> extends ObserveModelApi<Model> {

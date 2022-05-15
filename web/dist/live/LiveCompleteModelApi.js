@@ -22,8 +22,8 @@ exports.LiveCompleteModelApi = LiveCompleteModelApi;
     class Companion {
         constructor() {
         }
-        create(Model, root, multiplexSocketUrl, path, token) {
-            return new LiveCompleteModelApi(new LiveReadModelApi_1.LiveReadModelApi(`${root}${path}`, token, Model), new LiveWriteModelApi_1.LiveWriteModelApi(`${root}${path}`, token, Model), LiveObserveModelApi_1.LiveObserveModelApi.Companion.INSTANCE.create(Model, multiplexSocketUrl, token, path));
+        create(Model, root, multiplexSocketUrl, path, token, headers = new Map([])) {
+            return new LiveCompleteModelApi(new LiveReadModelApi_1.LiveReadModelApi(`${root}${path}`, token, headers, Model), new LiveWriteModelApi_1.LiveWriteModelApi(`${root}${path}`, token, headers, Model), LiveObserveModelApi_1.LiveObserveModelApi.Companion.INSTANCE.create(Model, multiplexSocketUrl, token, headers, path));
         }
     }
     Companion.INSTANCE = new Companion();
