@@ -8,11 +8,12 @@ import io.ktor.util.*
 
 
 @KtorDsl
-inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.autoCollection(
+inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.autoCollection(
     path: String,
     noinline defaultItem: (principal: USER?) -> T,
     noinline getCollection: suspend (principal: USER?) -> FieldCollection<T>
 ) = route(path) {
     restApi(path = "rest", getCollection = getCollection)
+    restApiWebsocket(path = "rest", getCollection = getCollection)
     adminPages(path = "admin", defaultItem = defaultItem, getCollection = getCollection)
 }

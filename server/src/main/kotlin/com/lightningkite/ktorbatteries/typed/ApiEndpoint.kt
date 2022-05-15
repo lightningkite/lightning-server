@@ -1,9 +1,13 @@
 package com.lightningkite.ktorbatteries.typed
 
+import com.lightningkite.ktorbatteries.routes.fullPath
 import com.lightningkite.ktorbatteries.serialization.Serialization
+import com.lightningkite.ktordb.ForeignKey
+import com.lightningkite.ktordb.HasId
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.http.*
+import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -13,11 +17,12 @@ import kotlinx.serialization.properties.decodeFromStringMap
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
-data class ApiEndpoint<USER : Principal, INPUT : Any, OUTPUT>(
+data class ApiEndpoint<USER, INPUT : Any, OUTPUT>(
     val route: Route,
     val summary: String,
     val description: String = summary,
     val errorCases: List<ErrorCase>,
+    val routeTypes: Map<String, KType> = mapOf(),
     val inputType: KType? = null,
     val outputType: KType? = null,
     val userType: KType? = null,
@@ -27,19 +32,30 @@ data class ApiEndpoint<USER : Principal, INPUT : Any, OUTPUT>(
         val known: MutableCollection<ApiEndpoint<*, *, *>> = ArrayList()
     }
 
+    val functionName: String get() = summary.split(' ').joinToString("") { it.replaceFirstChar { it.uppercase() } }.replaceFirstChar { it.lowercase() }
+
     data class ErrorCase(val status: HttpStatusCode, val internalCode: Int, val description: String)
 }
+
+inline fun <reified T: Comparable<T>> String.parseUrlPartOrBadRequest(): T = try {
+    Serialization.properties.decodeFromStringMap<ForeignKey<HasId<T>, T>>(mapOf("id" to this)).id
+} catch(e: Exception) {
+    throw BadRequestException("ID ${this} could not be parsed as a ${T::class.simpleName}.")
+}
+
+data class BoxPrincipal<USER>(val user: USER): Principal
 
 /**
  * Builds a route to match `GET` requests
  */
 @KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiBase(
+inline fun <reified USER, reified INPUT : Any, reified OUTPUT> Route.apiBase(
     path: String = "",
     method: HttpMethod,
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
+    routeTypes: Map<String, KType> = mapOf(),
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline parseInput: suspend ApplicationCall.() -> INPUT,
     noinline implementation: suspend (user: USER?, input: INPUT, pathSegments: Map<String, List<String>>) -> OUTPUT
@@ -49,7 +65,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
     val userType = typeOf<USER>().takeUnless { it.classifier == Unit::class }
     val route = route(path, method) {
         handle {
-            val user = if (userType != null) context.principal<USER>() else null
+            val user = if (userType != null) context.principal<BoxPrincipal<USER>>()?.user else null
             val input = if (inputType != null) context.parseInput() else Unit as INPUT
             val result = implementation(user, input, context.parameters.toMap())
             if (outputType == null) call.respond(HttpStatusCode.NoContent)
@@ -62,6 +78,7 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
         summary = summary,
         description = description,
         errorCases = errorCases,
+        routeTypes = routeTypes,
         inputType = inputType,
         outputType = outputType,
         userType = userType,
@@ -74,47 +91,60 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  * Builds a route to match `GET` requests
  */
 @KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiBody(
+inline fun <reified USER, reified INPUT : Any, reified OUTPUT> Route.apiBody(
     path: String = "",
     method: HttpMethod,
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
-    successCode: HttpStatusCode = HttpStatusCode.OK,
-    noinline implementation: suspend (user: USER?, input: INPUT, pathSegments: Map<String, List<String>>) -> OUTPUT
-): Unit = apiBase(path, method, summary, description, errorCases, successCode, { receive() }, implementation)
-
-/**
- * Builds a route to match `GET` requests
- */
-@KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiQuery(
-    path: String = "",
-    method: HttpMethod,
-    summary: String,
-    description: String = summary,
-    errorCases: List<ApiEndpoint.ErrorCase>,
+    routeTypes: Map<String, KType> = mapOf(),
     successCode: HttpStatusCode = HttpStatusCode.OK,
     noinline implementation: suspend (user: USER?, input: INPUT, pathSegments: Map<String, List<String>>) -> OUTPUT
 ): Unit = apiBase(
-    path,
-    method,
-    summary,
-    description,
-    errorCases,
-    successCode,
-    {
-        Serialization.properties.decodeFromStringMap<INPUT>(
-            request.queryParameters.toMap().mapValues { it.value.joinToString(",") })
-    },
-    implementation
+    path = path,
+    method = method,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    routeTypes = routeTypes,
+    successCode = successCode,
+    parseInput = { receive() },
+    implementation = implementation
 )
 
 /**
  * Builds a route to match `GET` requests
  */
 @KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiParameterlessBody(
+inline fun <reified USER, reified INPUT : Any, reified OUTPUT> Route.apiQuery(
+    path: String = "",
+    method: HttpMethod,
+    summary: String,
+    description: String = summary,
+    errorCases: List<ApiEndpoint.ErrorCase>,
+    routeTypes: Map<String, KType> = mapOf(),
+    successCode: HttpStatusCode = HttpStatusCode.OK,
+    noinline implementation: suspend (user: USER?, input: INPUT, pathSegments: Map<String, List<String>>) -> OUTPUT
+): Unit = apiBase(
+    path = path,
+    method = method,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    routeTypes = routeTypes,
+    successCode = successCode,
+    parseInput = {
+        Serialization.properties.decodeFromStringMap<INPUT>(
+            request.queryParameters.toMap().mapValues { it.value.joinToString(",") })
+    },
+    implementation = implementation
+)
+
+/**
+ * Builds a route to match `GET` requests
+ */
+@KtorDsl
+inline fun <reified USER, reified INPUT : Any, reified OUTPUT> Route.apiParameterlessBody(
     path: String = "",
     method: HttpMethod,
     summary: String,
@@ -122,52 +152,14 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (user: USER?, input: INPUT) -> OUTPUT
-) = apiBody<USER, INPUT, OUTPUT>(path, method, summary, description, errorCases, successCode) { user, input, segments ->
-    implementation(user, input)
-}
-
-/**
- * Builds a route to match `GET` requests
- */
-@KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiSingleParameterBody(
-    postIdPath: String = "",
-    method: HttpMethod,
-    summary: String,
-    description: String = summary,
-    errorCases: List<ApiEndpoint.ErrorCase>,
-    successCode: HttpStatusCode = HttpStatusCode.OK,
-    crossinline implementation: suspend (user: USER?, id: String, input: INPUT) -> OUTPUT
 ) = apiBody<USER, INPUT, OUTPUT>(
-    "{id}" + if (postIdPath.isBlank()) "" else "/$postIdPath",
-    method,
-    summary,
-    description,
-    errorCases,
-    successCode
-) { user, input, segments ->
-    implementation(user, segments["id"]!!.first(), input)
-}
-
-/**
- * Builds a route to match `GET` requests
- */
-@KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiParameterlessQuery(
-    path: String = "",
-    method: HttpMethod,
-    summary: String,
-    description: String = summary,
-    errorCases: List<ApiEndpoint.ErrorCase>,
-    successCode: HttpStatusCode = HttpStatusCode.OK,
-    crossinline implementation: suspend (user: USER?, input: INPUT) -> OUTPUT
-) = apiQuery<USER, INPUT, OUTPUT>(
-    path,
-    method,
-    summary,
-    description,
-    errorCases,
-    successCode
+    path = path,
+    method = method,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    routeTypes = mapOf(),
+    successCode = successCode
 ) { user, input, segments ->
     implementation(user, input)
 }
@@ -176,151 +168,280 @@ inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route
  * Builds a route to match `GET` requests
  */
 @KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.apiSingleParameterQuery(
+inline fun <reified USER, reified ROUTE: Comparable<ROUTE>, reified INPUT : Any, reified OUTPUT> Route.apiSingleParameterBody(
     postIdPath: String = "",
     method: HttpMethod,
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
-    crossinline implementation: suspend (user: USER?, id: String, input: INPUT) -> OUTPUT
-) = apiQuery<USER, INPUT, OUTPUT>(
-    "{id}" + if (postIdPath.isBlank()) "" else "/$postIdPath",
-    method,
-    summary,
-    description,
-    errorCases,
-    successCode
+    crossinline implementation: suspend (user: USER?, id: ROUTE, input: INPUT) -> OUTPUT
+) = apiBody<USER, INPUT, OUTPUT>(
+    path = "{id}" + if (postIdPath.isBlank()) "" else "/$postIdPath",
+    method = method,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    routeTypes = mapOf("id" to typeOf<ROUTE>()),
+    successCode = successCode
 ) { user, input, segments ->
-    implementation(user, segments["id"]!!.first(), input)
+    implementation(user, segments["id"]!!.first().parseUrlPartOrBadRequest<ROUTE>(), input)
 }
 
 /**
  * Builds a route to match `GET` requests
  */
 @KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.get(
+inline fun <reified USER, reified INPUT : Any, reified OUTPUT> Route.apiParameterlessQuery(
+    path: String = "",
+    method: HttpMethod,
+    summary: String,
+    description: String = summary,
+    errorCases: List<ApiEndpoint.ErrorCase>,
+    successCode: HttpStatusCode = HttpStatusCode.OK,
+    crossinline implementation: suspend (user: USER?, input: INPUT) -> OUTPUT
+) = apiQuery<USER, INPUT, OUTPUT>(
+    path = path,
+    method = method,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    routeTypes = mapOf(),
+    successCode = successCode
+) { user, input, segments ->
+    implementation(user, input)
+}
+
+/**
+ * Builds a route to match `GET` requests
+ */
+@KtorDsl
+inline fun <reified USER, reified ROUTE: Comparable<ROUTE>, reified INPUT : Any, reified OUTPUT> Route.apiSingleParameterQuery(
+    postIdPath: String = "",
+    method: HttpMethod,
+    summary: String,
+    description: String = summary,
+    errorCases: List<ApiEndpoint.ErrorCase>,
+    successCode: HttpStatusCode = HttpStatusCode.OK,
+    crossinline implementation: suspend (user: USER?, id: ROUTE, input: INPUT) -> OUTPUT
+) = apiQuery<USER, INPUT, OUTPUT>(
+    path = "{id}" + if (postIdPath.isBlank()) "" else "/$postIdPath",
+    method = method,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    routeTypes = mapOf("id" to typeOf<ROUTE>()),
+    successCode = successCode
+) { user, input, segments ->
+    implementation(user, segments["id"]!!.first().parseUrlPartOrBadRequest<ROUTE>(), input)
+}
+
+/**
+ * Builds a route to match `GET` requests
+ */
+@KtorDsl
+inline fun <reified USER, reified INPUT : Any, reified OUTPUT> Route.get(
     path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (user: USER?, input: INPUT) -> OUTPUT
-) = apiParameterlessQuery(path, HttpMethod.Get, summary, description, errorCases, successCode, implementation)
+) = apiParameterlessQuery(
+    path = path,
+    method = HttpMethod.Get,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    successCode = successCode,
+    implementation = implementation
+)
 
 /**
  * Builds a route to match `GET` requests
  */
 @KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.getItem(
+inline fun <reified USER, reified ROUTE: Comparable<ROUTE>, reified INPUT : Any, reified OUTPUT> Route.getItem(
     postIdPath: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
-    crossinline implementation: suspend (user: USER?, id: String, input: INPUT) -> OUTPUT
-) = apiSingleParameterQuery(postIdPath, HttpMethod.Get, summary, description, errorCases, successCode, implementation)
+    crossinline implementation: suspend (user: USER?, id: ROUTE, input: INPUT) -> OUTPUT
+) = apiSingleParameterQuery(
+    postIdPath = postIdPath,
+    method = HttpMethod.Get,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    successCode = successCode,
+    implementation = implementation
+)
 
 /**
  * Builds a route to match `GET` requests
  */
 @KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.post(
+inline fun <reified USER, reified INPUT : Any, reified OUTPUT> Route.post(
     path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (user: USER?, input: INPUT) -> OUTPUT
-) = apiParameterlessBody(path, HttpMethod.Post, summary, description, errorCases, successCode, implementation)
+) = apiParameterlessBody(
+    path = path,
+    method = HttpMethod.Post,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    successCode = successCode,
+    implementation = implementation
+)
 
 /**
  * Builds a route to match `GET` requests
  */
 @KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.postItem(
+inline fun <reified USER, reified ROUTE: Comparable<ROUTE>, reified INPUT : Any, reified OUTPUT> Route.postItem(
     postIdPath: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
-    crossinline implementation: suspend (user: USER?, id: String, input: INPUT) -> OUTPUT
-) = apiSingleParameterBody(postIdPath, HttpMethod.Post, summary, description, errorCases, successCode, implementation)
+    crossinline implementation: suspend (user: USER?, id: ROUTE, input: INPUT) -> OUTPUT
+) = apiSingleParameterBody(
+    postIdPath = postIdPath,
+    method = HttpMethod.Post,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    successCode = successCode,
+    implementation = implementation
+)
 
 /**
  * Builds a route to match `GET` requests
  */
 @KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.put(
+inline fun <reified USER, reified INPUT : Any, reified OUTPUT> Route.put(
     path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (user: USER?, input: INPUT) -> OUTPUT
-) = apiParameterlessBody(path, HttpMethod.Put, summary, description, errorCases, successCode, implementation)
+) = apiParameterlessBody(
+    path = path,
+    method = HttpMethod.Put,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    successCode = successCode,
+    implementation = implementation
+)
 
 /**
  * Builds a route to match `GET` requests
  */
 @KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.putItem(
+inline fun <reified USER, reified ROUTE: Comparable<ROUTE>, reified INPUT : Any, reified OUTPUT> Route.putItem(
     postIdPath: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
-    crossinline implementation: suspend (user: USER?, id: String, input: INPUT) -> OUTPUT
-) = apiSingleParameterBody(postIdPath, HttpMethod.Put, summary, description, errorCases, successCode, implementation)
+    crossinline implementation: suspend (user: USER?, id: ROUTE, input: INPUT) -> OUTPUT
+) = apiSingleParameterBody(
+    postIdPath = postIdPath,
+    method = HttpMethod.Put,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    successCode = successCode,
+    implementation = implementation
+)
 
 /**
  * Builds a route to match `GET` requests
  */
 @KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.patch(
+inline fun <reified USER, reified INPUT : Any, reified OUTPUT> Route.patch(
     path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (user: USER?, input: INPUT) -> OUTPUT
-) = apiParameterlessBody(path, HttpMethod.Patch, summary, description, errorCases, successCode, implementation)
+) = apiParameterlessBody(
+    path = path,
+    method = HttpMethod.Patch,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    successCode = successCode,
+    implementation = implementation
+)
 
 /**
  * Builds a route to match `GET` requests
  */
 @KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.patchItem(
+inline fun <reified USER, reified ROUTE: Comparable<ROUTE>, reified INPUT : Any, reified OUTPUT> Route.patchItem(
     postIdPath: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
-    crossinline implementation: suspend (user: USER?, id: String, input: INPUT) -> OUTPUT
-) = apiSingleParameterBody(postIdPath, HttpMethod.Patch, summary, description, errorCases, successCode, implementation)
+    crossinline implementation: suspend (user: USER?, id: ROUTE, input: INPUT) -> OUTPUT
+) = apiSingleParameterBody(
+    postIdPath = postIdPath,
+    method = HttpMethod.Patch,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    successCode = successCode,
+    implementation = implementation
+)
 
 /**
  * Builds a route to match `GET` requests
  */
 @KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.delete(
+inline fun <reified USER, reified INPUT : Any, reified OUTPUT> Route.delete(
     path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (user: USER?, input: INPUT) -> OUTPUT
-) = apiParameterlessQuery(path, HttpMethod.Delete, summary, description, errorCases, successCode, implementation)
+) = apiParameterlessQuery(
+    path = path,
+    method = HttpMethod.Delete,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    successCode = successCode,
+    implementation = implementation
+)
 
 /**
  * Builds a route to match `GET` requests
  */
 @KtorDsl
-inline fun <reified USER : Principal, reified INPUT : Any, reified OUTPUT> Route.deleteItem(
+inline fun <reified USER, reified ROUTE: Comparable<ROUTE>, reified INPUT : Any, reified OUTPUT> Route.deleteItem(
     path: String = "",
     summary: String,
     description: String = summary,
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
-    crossinline implementation: suspend (user: USER?, id: String, input: INPUT) -> OUTPUT
-) = apiSingleParameterQuery(path, HttpMethod.Delete, summary, description, errorCases, successCode, implementation)
+    crossinline implementation: suspend (user: USER?, id: ROUTE, input: INPUT) -> OUTPUT
+) = apiSingleParameterQuery(
+    postIdPath = path,
+    method = HttpMethod.Delete,
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    successCode = successCode,
+    implementation = implementation
+)

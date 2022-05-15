@@ -14,22 +14,17 @@ import kotlinx.serialization.properties.decodeFromStringMap
 import kotlinx.serialization.properties.encodeToStringMap
 import java.util.*
 
-inline fun <reified T: Comparable<T>> String.parseUrlPartOrBadRequest(): T = try {
-    Serialization.properties.decodeFromStringMap<ForeignKey<HasId<T>, T>>(mapOf("id" to this)).id
-} catch(e: Exception) {
-    throw BadRequestException("ID ${this} could not be parsed as a ${T::class.simpleName}.")
-}
-
 // Creates websocket listening end points for a model
 @OptIn(ExperimentalCoroutinesApi::class)
 @KtorDsl
-inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.restApiWebsocket(
+inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.restApiWebsocket(
     path: String = "",
     crossinline getCollection: suspend (principal: USER?) -> FieldCollection<T>
 ) {
     apiWebsocket<USER, Query<T>, ListChange<T>>(
         path = path,
-        summary = "Gets a changing list of ${T::class.simpleName}s that match the given query.",
+        summary = "Watch ${T::class.simpleName}",
+        description = "Gets a changing list of ${T::class.simpleName}s that match the given query.",
         errorCases = listOf(),
     ) { user ->
         val secured = getCollection(user)
@@ -46,13 +41,14 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
 
 // Calls all three of the endpoint type functions
 @KtorDsl
-inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.restApi(
+inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.restApi(
     path: String = "",
     crossinline getCollection: suspend (principal: USER?) -> FieldCollection<T>
 ) = route(path) {
     get(
         path = "",
-        summary = "Gets a list of ${T::class.simpleName}s.",
+        summary = "List ${T::class.simpleName}",
+        description = "Gets a list of ${T::class.simpleName}s.",
         errorCases = listOf(),
         implementation = { user: USER?, input: Query<T> ->
             getCollection(user)
@@ -65,7 +61,8 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
     // it's in the POST body.
     post(
         path = "query",
-        summary = "Gets a list of ${T::class.simpleName}s that match the given query.",
+        summary = "Query ${T::class.simpleName}",
+        description = "Gets a list of ${T::class.simpleName}s that match the given query.",
         errorCases = listOf(),
         implementation = { user: USER?, input: Query<T> ->
             getCollection(user)
@@ -77,7 +74,8 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
     // This is used get a single object with id of _id
     getItem(
         postIdPath = "",
-        summary = "Gets a single ${T::class.simpleName} by ID.",
+        summary = "Detail ${T::class.simpleName}",
+        description = "Gets a single ${T::class.simpleName} by ID.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.NotFound,
@@ -90,16 +88,17 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
                 description = "The ID could not be parsed."
             )
         ),
-        implementation = { user: USER?, id: String, input: Unit ->
+        implementation = { user: USER?, id: ID, input: Unit ->
             getCollection(user)
-                .get(id.parseUrlPartOrBadRequest())
+                .get(id)
                 ?: throw NotFoundException()
         }
     )
 
     post(
         path = "bulk",
-        summary = "Creates multiple ${T::class.simpleName}s at the same time.",
+        summary = "Insert Bulk ${T::class.simpleName}",
+        description = "Creates multiple ${T::class.simpleName}s at the same time.",
         errorCases = listOf(),
         successCode = HttpStatusCode.Created,
         implementation = { user: USER?, values: List<T> ->
@@ -110,7 +109,8 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
 
     post(
         path = "",
-        summary = "Creates a new ${T::class.simpleName}",
+        summary = "Insert ${T::class.simpleName}",
+        description = "Creates a new ${T::class.simpleName}",
         errorCases = listOf(),
         successCode = HttpStatusCode.Created,
         implementation = { user: USER?, value: T ->
@@ -124,9 +124,9 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
         summary = "Creates or updates a ${T::class.simpleName}",
         errorCases = listOf(),
         successCode = HttpStatusCode.Created,
-        implementation = { user: USER?, id: String, value: T ->
+        implementation = { user: USER?, id: ID, value: T ->
             getCollection(user)
-                .upsertOneById(id.parseUrlPartOrBadRequest(), value)
+                .upsertOneById(id, value)
                 ?: throw NotFoundException()
         }
     )
@@ -134,7 +134,8 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
     // This is used replace many objects at once. This does make individual calls to the database. Kmongo does not have a many replace option.
     put(
         path = "",
-        summary = "Modifies many ${T::class.simpleName}s at the same time by ID.",
+        summary = "Bulk Replace ${T::class.simpleName}",
+        description = "Modifies many ${T::class.simpleName}s at the same time by ID.",
         errorCases = listOf(),
         implementation = { user: USER?, values: List<T> ->
             val db = getCollection(user)
@@ -144,7 +145,8 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
 
     putItem(
         postIdPath = "",
-        summary = "Replaces a single ${T::class.simpleName} by ID.",
+        summary = "Replace ${T::class.simpleName}",
+        description = "Replaces a single ${T::class.simpleName} by ID.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.NotFound,
@@ -157,16 +159,17 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
                 description = "The ID could not be parsed."
             )
         ),
-        implementation = { user: USER?, id: String, value: T ->
+        implementation = { user: USER?, id: ID, value: T ->
             getCollection(user)
-                .replaceOneById(id.parseUrlPartOrBadRequest(), value)
+                .replaceOneById(id, value)
                 ?: throw NotFoundException()
         }
     )
 
     patch(
         path = "bulk",
-        summary = "Modifies many ${T::class.simpleName}s at the same time.  Returns the number of changed items.",
+        summary = "Bulk Modify ${T::class.simpleName}",
+        description = "Modifies many ${T::class.simpleName}s at the same time.  Returns the number of changed items.",
         errorCases = listOf(),
         implementation = { user: USER?, input: MassModification<T> ->
             getCollection(user)
@@ -176,7 +179,8 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
 
     patchItem(
         postIdPath = "delta",
-        summary = "Modifies a ${T::class.simpleName} by ID, returning both the previous value and new value.",
+        summary = "Modify ${T::class.simpleName} With Delta",
+        description = "Modifies a ${T::class.simpleName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.NotFound,
@@ -189,16 +193,17 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
                 description = "The ID could not be parsed."
             )
         ),
-        implementation = { user: USER?, id: String, input: Modification<T> ->
+        implementation = { user: USER?, id: ID, input: Modification<T> ->
             getCollection(user)
-                .findOneAndUpdateById(id.parseUrlPartOrBadRequest(), input)
+                .findOneAndUpdateById(id, input)
                 .also { if (it.old == null && it.new == null) throw NotFoundException() }
         }
     )
 
     patchItem(
         postIdPath = "",
-        summary = "Modifies a ${T::class.simpleName} by ID, returning both the previous value and new value.",
+        summary = "Modify ${T::class.simpleName}",
+        description = "Modifies a ${T::class.simpleName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.NotFound,
@@ -211,9 +216,9 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
                 description = "The ID could not be parsed."
             )
         ),
-        implementation = { user: USER?, id: String, input: Modification<T> ->
+        implementation = { user: USER?, id: ID, input: Modification<T> ->
             getCollection(user)
-                .findOneAndUpdateById(id.parseUrlPartOrBadRequest(), input)
+                .findOneAndUpdateById(id, input)
                 .also { if (it.old == null && it.new == null) throw NotFoundException() }
                 .new
         }
@@ -221,7 +226,8 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
 
     post(
         path = "bulk-delete",
-        summary = "Deletes all matching ${T::class.simpleName}s, returning the number of deleted items.",
+        summary = "Bulk Delete ${T::class.simpleName}",
+        description = "Deletes all matching ${T::class.simpleName}s, returning the number of deleted items.",
         errorCases = listOf(),
         implementation = { user: USER?, filter: Condition<T> ->
             getCollection(user)
@@ -231,7 +237,8 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
 
     deleteItem(
         path = "",
-        summary = "Deletes a ${T::class.simpleName} by id.",
+        summary = "Delete ${T::class.simpleName}",
+        description = "Deletes a ${T::class.simpleName} by id.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.NotFound,
@@ -244,9 +251,9 @@ inline fun <reified USER : Principal, reified T : HasId<ID>, reified ID: Compara
                 description = "The ID could not be parsed."
             )
         ),
-        implementation = { user: USER?, id: String, _: Unit ->
+        implementation = { user: USER?, id: ID, _: Unit ->
             if (!getCollection(user)
-                    .deleteOneById(id.parseUrlPartOrBadRequest())
+                    .deleteOneById(id)
             ) {
                 throw NotFoundException()
             }

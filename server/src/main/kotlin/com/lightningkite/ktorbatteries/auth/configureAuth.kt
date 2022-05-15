@@ -131,7 +131,8 @@ fun Route.emailMagicLinkEndpoint(
 ) {
     post(
         path = path,
-        summary = "Sends a login email to the given address",
+        summary = "Email Login Link",
+        description = "Sends a login email to the given address",
         errorCases = listOf(),
         successCode = HttpStatusCode.NoContent,
         implementation = { _: Unit?, address: String ->

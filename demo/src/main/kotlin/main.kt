@@ -19,6 +19,8 @@ import com.lightningkite.ktorbatteries.serialization.configureSerialization
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.lightningkite.ktorbatteries.settings.loadSettings
 import com.lightningkite.ktorbatteries.settings.runServer
+import com.lightningkite.ktorbatteries.typed.BoxPrincipal
+import com.lightningkite.ktorbatteries.typed.SDK
 import com.lightningkite.ktorbatteries.typed.apiHelp
 import com.lightningkite.ktorbatteries.typed.fileFieldNames
 import com.lightningkite.ktordb.*
@@ -33,6 +35,7 @@ import io.ktor.server.plugins.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.server.websocket.*
 import io.ktor.util.*
 import kotlinx.serialization.*
 import java.io.File
@@ -53,8 +56,6 @@ data class TestModel(
 
 val TestModel.Companion.table get() = database.collection<TestModel>("TestModel")
 
-data class DirectPrincipal(val id: String) : Principal
-
 @Serializable
 data class Settings(
     val general: GeneralServerSettings = GeneralServerSettings(),
@@ -64,52 +65,16 @@ data class Settings(
     val mongo: MongoSettings = MongoSettings()
 )
 
-fun securityRulesForTestModel(email: String) = object: SecurityRules<TestModel> {
-    override suspend fun sortAllowed(filter: SortPart<TestModel>): Condition<TestModel> {
-        TODO("Not yet implemented")
-    }
-
-    override suspend fun read(filter: Condition<TestModel>): Condition<TestModel> {
-        TODO("Not yet implemented")
-    }
-
-    override suspend fun edit(
-        filter: Condition<TestModel>,
-        modification: Modification<TestModel>
-    ): Pair<Condition<TestModel>, Modification<TestModel>> {
-        return super.edit(filter, modification)
-    }
-
-    override suspend fun delete(filter: Condition<TestModel>): Condition<TestModel> {
-        return super.delete(filter)
-    }
-
-    override suspend fun mask(model: TestModel): TestModel {
-        return super.mask(model)
-    }
-
-    override suspend fun create(model: TestModel): TestModel {
-        return super.create(model)
-    }
-
-    override suspend fun replace(model: TestModel): Pair<Condition<TestModel>, TestModel> {
-        TODO("Not yet implemented")
-    }
-
-    override suspend fun maxQueryTimeMs(): Long {
-        return super.maxQueryTimeMs()
-    }
-}
-
 @OptIn(InternalAPI::class)
 fun main(vararg args: String) {
     loadSettings(File("settings.yaml")) { Settings() }
     runServer {
         configureFiles()
         configureSerialization()
+        install(WebSockets)
         authentication {
             quickJwt { creds ->
-                DirectPrincipal(
+                BoxPrincipal(
                     creds.payload
                         .getClaim(AuthSettings.userIdKey)
                         .asString()
@@ -121,17 +86,20 @@ fun main(vararg args: String) {
         }
         routing {
             authenticate(optional = true) {
-                autoCollection("test-model", { TestModel() }, { user: DirectPrincipal? -> TestModel.table })
+                autoCollection("test-model", { TestModel() }, { user: String? -> TestModel.table })
                 get {
-                    call.respondText("Welcome, ${call.principal<DirectPrincipal>()?.id}!")
+                    call.respondText("Welcome, ${call.principal<BoxPrincipal<String>>()?.user}!")
                 }
                 adminIndex()
                 apiHelp()
+                route("auth") {
+                    emailMagicLinkEndpoint(makeLink = { GeneralServerSettings.instance.publicUrl + "?jwt=" + makeToken(it) })
+                }
                 oauthGoogle() { it }
                 oauthGithub() { it }
                 oauthApple() { it }
             }
         }
-        println(TestModel.serializer().descriptor.fileFieldNames)
+        println(SDK.test())
     }
 }

@@ -4,6 +4,7 @@ import com.lightningkite.ktorbatteries.serialization.Serialization
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
+import io.ktor.util.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.consumeAsFlow
@@ -13,7 +14,7 @@ import kotlinx.serialization.encodeToString
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
-data class ApiWebsocket<USER : Principal, INPUT, OUTPUT>(
+data class ApiWebsocket<USER, INPUT, OUTPUT>(
     val route: Route,
     val summary: String,
     val description: String = summary,
@@ -33,6 +34,8 @@ data class ApiWebsocket<USER : Principal, INPUT, OUTPUT>(
         val incoming: Flow<String>
     )
 
+    val functionName: String get() = summary.split(' ').joinToString("") { it.replaceFirstChar { it.uppercase() } }.replaceFirstChar { it.lowercase() }
+
     companion object {
         val known: MutableCollection<ApiWebsocket<*, *, *>> = ArrayList()
     }
@@ -40,7 +43,8 @@ data class ApiWebsocket<USER : Principal, INPUT, OUTPUT>(
     data class ErrorCase(val closeReason: CloseReason, val internalCode: Int, val description: String)
 }
 
-inline fun <reified USER : Principal, reified INPUT, reified OUTPUT> Route.apiWebsocket(
+@KtorDsl
+inline fun <reified USER, reified INPUT, reified OUTPUT> Route.apiWebsocket(
     path: String = "",
     summary: String,
     description: String = summary,
