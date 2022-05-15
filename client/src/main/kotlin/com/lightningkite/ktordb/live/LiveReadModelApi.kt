@@ -25,7 +25,7 @@ class LiveReadModelApi<Model : HasId<UUID>>(
 
 
     companion object {
-        inline fun <reified Model : HasId> create(
+        inline fun <reified Model : HasId<UUID>> create(
             root: String,
             path: String,
             token: String,

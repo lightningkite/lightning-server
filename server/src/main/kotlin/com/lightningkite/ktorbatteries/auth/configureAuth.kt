@@ -135,7 +135,7 @@ fun Route.emailMagicLinkEndpoint(
         description = "Sends a login email to the given address",
         errorCases = listOf(),
         successCode = HttpStatusCode.NoContent,
-        implementation = { _: Unit?, address: String ->
+        implementation = { address: String ->
             val link = makeLink(address)
             email.send(
                 subject = emailSubject,
