@@ -25,6 +25,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
 
+    ksp(project(":processor"))
     kspTest(project(":processor"))
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
 }

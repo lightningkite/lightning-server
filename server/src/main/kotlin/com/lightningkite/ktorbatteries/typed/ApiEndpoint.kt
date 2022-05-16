@@ -42,9 +42,12 @@ data class ApiEndpoint<USER, INPUT : Any, OUTPUT>(
     data class ErrorCase(val status: HttpStatusCode, val internalCode: Int, val description: String)
 }
 
+@kotlinx.serialization.Serializable
+data class IdHolder<ID>(val id: ID)
 inline fun <reified T: Comparable<T>> String.parseUrlPartOrBadRequest(): T = try {
-    Serialization.properties.decodeFromStringMap<ForeignKey<HasId<T>, T>>(mapOf("id" to this)).id
+    Serialization.properties.decodeFromStringMap<IdHolder<T>>(mapOf("id" to this)).id
 } catch(e: Exception) {
+    e.printStackTrace()
     throw BadRequestException("ID ${this} could not be parsed as a ${T::class.simpleName}.")
 }
 

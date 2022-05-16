@@ -21,7 +21,7 @@ val KSClassDeclaration.usesSub: Boolean
 //            packageName.startsWith("kotlin.String") ||
 //            packageName.startsWith("kotlin.collections") ||
 //            packageName.startsWith("kotlin.Boolean") -> false
-            else -> this.annotations.any { it.shortName.asString() == "Serializable" }
+            else -> this.annotations.any { it.shortName.asString() == "Serializable" } && this.annotations.none { it.shortName.asString() == "DoNotGenerateFields" }
         }
     }
 

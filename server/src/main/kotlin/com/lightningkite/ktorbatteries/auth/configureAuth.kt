@@ -30,22 +30,30 @@ import kotlinx.coroutines.flow.singleOrNull
 import kotlinx.serialization.Serializable
 import java.util.*
 
-inline fun <reified USER, reified ID: Comparable<ID>> Application.configureAuth(
+inline fun <reified USER, reified ID : Comparable<ID>> Application.configureAuth(
     path: String = "auth",
     crossinline onNewUser: suspend (email: String) -> USER? = { null },
     landing: String = GeneralServerSettings.instance.publicUrl,
     emailSubject: String = "${GeneralServerSettings.instance.projectName} Log In",
     noinline template: (suspend (email: String, link: String) -> String) = defaultLoginEmailTemplate
-) where USER: HasEmail, USER : HasId<ID> = configureAuth(
+) where USER : HasEmail, USER : HasId<ID> = configureAuth(
     path = path,
-    userById = { database.collection<USER>().get(it.parseUrlPartOrBadRequest())!! },
-    userByEmail = { database.collection<USER>().find(Condition.OnField(HasEmailFields.email<USER>(), Condition.Equal(it))).singleOrNull() ?: onNewUser(it)?.let { database.collection<USER>().insertOne(it) } ?: throw NotFoundException() },
+    userById = {
+        println("ID string is $it")
+        println("ID string is ${it.parseUrlPartOrBadRequest<UUID>()}")
+        database.collection<USER>().get(it.parseUrlPartOrBadRequest<ID>().also { println("Id is $it") })!!
+    },
+    userByEmail = {
+        database.collection<USER>().find(Condition.OnField(HasEmailFields.email<USER>(), Condition.Equal(it)))
+            .singleOrNull() ?: onNewUser(it)?.let { database.collection<USER>().insertOne(it) }
+        ?: throw NotFoundException()
+    },
     landing = landing,
     emailSubject = emailSubject,
     template = template
 )
 
-inline fun <reified USER: HasId<ID>, reified ID: Comparable<ID>> Application.configureAuth(
+inline fun <reified USER : HasId<ID>, reified ID : Comparable<ID>> Application.configureAuth(
     path: String = "auth",
     crossinline userById: suspend (id: String) -> USER,
     crossinline userByEmail: suspend (id: String) -> USER,
@@ -54,14 +62,26 @@ inline fun <reified USER: HasId<ID>, reified ID: Comparable<ID>> Application.con
     noinline template: (suspend (email: String, link: String) -> String) = defaultLoginEmailTemplate
 ) {
     authentication {
-        quickJwt { creds -> BoxPrincipal(userById(
-            creds.payload
-                .getClaim(AuthSettings.userIdKey)
-                .asString())) }
+        quickJwt { creds ->
+            BoxPrincipal(
+                userById(
+                    creds.payload
+                        .getClaim(AuthSettings.userIdKey)
+                        .asString()
+                        .also { println("ID is ${it}") }
+                )
+            )
+                .also { println("Principal is ${it}") }
+        }
     }
     routing {
         route(path) {
-            emailMagicLinkEndpoint(emailToId = { userByEmail(it)._id.toString() }, emailSubject = emailSubject, template = template, landing = landing)
+            emailMagicLinkEndpoint(
+                emailToId = { userByEmail(it)._id.toString() },
+                emailSubject = emailSubject,
+                template = template,
+                landing = landing
+            )
             refreshTokenEndpoint<USER, ID>()
             oauthGoogle() { userByEmail(it)._id.toString() }
             oauthGithub() { userByEmail(it)._id.toString() }
@@ -129,7 +149,7 @@ fun makeToken(id: String, expiration: Long? = null): String {
         .sign(Algorithm.HMAC256(AuthSettings.instance.jwtSecret))
 }
 
-fun makeToken(additionalSetup: JWTCreator.Builder.()->JWTCreator.Builder = { this }): String {
+fun makeToken(additionalSetup: JWTCreator.Builder.() -> JWTCreator.Builder = { this }): String {
     return JWT.create()
         .withAudience(AuthSettings.instance.jwtAudience)
         .withIssuer(AuthSettings.instance.jwtIssuer)
@@ -145,7 +165,9 @@ fun checkToken(token: String): DecodedJWT? = try {
         .withIssuer(AuthSettings.instance.jwtIssuer)
         .build()
         .verify(token)
-} catch(e: JWTVerificationException) { null }
+} catch (e: JWTVerificationException) {
+    null
+}
 
 //TODO: Move?
 @Serializable
@@ -173,11 +195,11 @@ fun Route.emailMagicLinkEndpoint(
     emailSubject: String = "${GeneralServerSettings.instance.projectName} Log In",
     template: (suspend (email: String, link: String) -> String) = defaultLoginEmailTemplate
 ) = emailMagicLinkEndpoint(
-        path = path,
-        makeLink = { landing + "?jwt=${makeToken(emailToId(it))}" },
-        emailSubject = emailSubject,
-        template = template
-    )
+    path = path,
+    makeLink = { landing + "?jwt=${makeToken(emailToId(it))}" },
+    emailSubject = emailSubject,
+    template = template
+)
 
 @KtorDsl
 fun Route.emailMagicLinkEndpoint(
@@ -206,15 +228,20 @@ fun Route.emailMagicLinkEndpoint(
 }
 
 @KtorDsl
-inline fun <reified USER: HasId<ID>, reified ID: Comparable<ID>> Route.refreshTokenEndpoint(path: String = "refresh-token") = refreshTokenEndpoint<USER>(path) { makeToken(it._id.toString()) }
+inline fun <reified USER : HasId<ID>, reified ID : Comparable<ID>> Route.refreshTokenEndpoint(path: String = "refresh-token") =
+    refreshTokenEndpoint<USER>(path) { makeToken(it._id.toString()) }
+
 @KtorDsl
-inline fun <reified USER> Route.refreshTokenEndpoint(path: String = "refresh-token", crossinline principalToToken: suspend (USER) -> String) {
+inline fun <reified USER> Route.refreshTokenEndpoint(
+    path: String = "refresh-token",
+    crossinline principalToToken: suspend (USER) -> String
+) {
     get(
         path = path,
         summary = "Retrieves a new token for the user.",
         errorCases = listOf(),
         implementation = { user: USER?, input: Unit ->
-            if(user == null) throw BadRequestException("You are not authenticated.")
+            if (user == null) throw BadRequestException("You are not authenticated.")
             principalToToken(user)
         }
     )

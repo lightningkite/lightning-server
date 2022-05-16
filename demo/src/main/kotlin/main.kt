@@ -71,7 +71,6 @@ data class Settings(
     val email: EmailSettings = EmailSettings()
 )
 
-@OptIn(InternalAPI::class)
 fun main(vararg args: String) {
     loadSettings(File("settings.yaml")) { Settings() }
     runServer {
@@ -90,7 +89,9 @@ fun main(vararg args: String) {
                 autoCollection("test-model", { TestModel() }, { user: String? -> TestModel.table })
                 autoCollection("email", { TestModel() }, { user: String? -> TestModel.table })
                 get {
-                    call.respondText("Welcome, ${call.user<User>()?.email ?: "anon"}!")
+                    val user = call.user<User>()
+                    println("User retrieved is $user")
+                    call.respondText("Welcome, ${user?.email ?: "anon"}!")
                 }
                 adminIndex()
                 apiHelp()
