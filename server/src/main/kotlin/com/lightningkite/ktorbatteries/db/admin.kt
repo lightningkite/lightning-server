@@ -2,10 +2,7 @@ package com.lightningkite.ktorbatteries.db
 
 import com.lightningkite.ktorbatteries.routes.pathRelativeTo
 import com.lightningkite.ktorbatteries.serialization.Serialization
-import com.lightningkite.ktorbatteries.typed.BoxPrincipal
-import com.lightningkite.ktorbatteries.typed.includeFormScript
-import com.lightningkite.ktorbatteries.typed.insideHtmlForm
-import com.lightningkite.ktorbatteries.typed.parseUrlPartOrBadRequest
+import com.lightningkite.ktorbatteries.typed.*
 import com.lightningkite.ktordb.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -67,7 +64,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
         getCollection = getCollection,
     ))
     get("{id}") {
-        val secured = getCollection(call.principal<BoxPrincipal<USER>>()?.user)
+        val secured = getCollection(call.user<USER>())
         val item = secured.get(this.context.parameters["id"]!!.parseUrlPartOrBadRequest())
         context.respondHtml {
             head { includeFormScript() }
@@ -101,12 +98,12 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
         }
     }
     post("{id}/delete") {
-        getCollection(call.principal<BoxPrincipal<USER>>()?.user).deleteOneById(this.context.parameters["id"]!!.parseUrlPartOrBadRequest())
+        getCollection(call.user<USER>()).deleteOneById(this.context.parameters["id"]!!.parseUrlPartOrBadRequest())
         call.respondRedirect("../admin")
     }
     post("{id}") {
         val item: T = call.receive()
-        getCollection(call.principal<BoxPrincipal<USER>>()?.user).replaceOneById(this.context.parameters["id"]!!.parseUrlPartOrBadRequest(), item)
+        getCollection(call.user<USER>()).replaceOneById(this.context.parameters["id"]!!.parseUrlPartOrBadRequest(), item)
         call.respondRedirect("../admin")
     }
     get("create") {
@@ -131,11 +128,11 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
     }
     post("create") {
         val item: T = call.receive()
-        getCollection(call.principal<BoxPrincipal<USER>>()?.user).insertOne(item)
+        getCollection(call.user<USER>()).insertOne(item)
         call.respondRedirect("../admin")
     }
     get {
-        val secured = getCollection(call.principal<BoxPrincipal<USER>>()?.user)
+        val secured = getCollection(call.user<USER>())
         val items = secured.query(
             Query(
                 condition = Condition.Always(),

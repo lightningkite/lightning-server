@@ -21,3 +21,17 @@ object HasIdFields {
         compare = compareBy { it._id }
     )
 }
+
+@SwiftProtocolExtends("Codable", "Hashable")
+interface HasEmail {
+    val email: String
+}
+
+object HasEmailFields {
+    fun <T: HasEmail> email() = DataClassProperty<T, String>(
+        name = "email",
+        get = { it.email },
+        set = { _, _ -> fatalError() },
+        compare = compareBy { it.email }
+    )
+}

@@ -8,6 +8,7 @@ import com.lightningkite.ktorbatteries.db.adminIndex
 import com.lightningkite.ktorbatteries.db.adminPages
 import com.lightningkite.ktorbatteries.db.autoCollection
 import com.lightningkite.ktorbatteries.db.database
+import com.lightningkite.ktorbatteries.email.EmailSettings
 import com.lightningkite.ktorbatteries.files.FilesSettings
 import com.lightningkite.ktorbatteries.files.configureFiles
 import com.lightningkite.ktorbatteries.jsonschema.JsonSchema
@@ -19,10 +20,7 @@ import com.lightningkite.ktorbatteries.serialization.configureSerialization
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.lightningkite.ktorbatteries.settings.loadSettings
 import com.lightningkite.ktorbatteries.settings.runServer
-import com.lightningkite.ktorbatteries.typed.BoxPrincipal
-import com.lightningkite.ktorbatteries.typed.SDK
-import com.lightningkite.ktorbatteries.typed.apiHelp
-import com.lightningkite.ktorbatteries.typed.fileFieldNames
+import com.lightningkite.ktorbatteries.typed.*
 import com.lightningkite.ktordb.*
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -54,6 +52,13 @@ data class TestModel(
     val file: ServerFile? = null
 ) : HasId<UUID>
 
+@Serializable
+@DatabaseModel
+data class User(
+    override val _id: UUID = UUID.randomUUID(),
+    override val email: String
+): HasId<UUID>, HasEmail
+
 val TestModel.Companion.table get() = database.collection<TestModel>("TestModel")
 
 @Serializable
@@ -62,7 +67,8 @@ data class Settings(
     val auth: AuthSettings = AuthSettings(),
     val files: FilesSettings = FilesSettings(),
     val logging: LoggingSettings = LoggingSettings(),
-    val mongo: MongoSettings = MongoSettings()
+    val mongo: MongoSettings = MongoSettings(),
+    val email: EmailSettings = EmailSettings()
 )
 
 @OptIn(InternalAPI::class)
@@ -71,33 +77,30 @@ fun main(vararg args: String) {
     runServer {
         configureFiles()
         configureSerialization()
+        configureAuth(onNewUser = { User(email = it) })
         install(WebSockets)
-        authentication {
-            quickJwt { creds ->
-                BoxPrincipal(
-                    creds.payload
-                        .getClaim(AuthSettings.userIdKey)
-                        .asString()
-                )
-            }
-        }
         install(StatusPages) {
-            exception<Exception> { call, cause -> call.respondText(cause.message ?: "Unknown Error") }
+            exception<Exception> { call, cause ->
+                cause.printStackTrace()
+                call.respondText(cause.message ?: "Unknown Error")
+            }
         }
         routing {
             authenticate(optional = true) {
                 autoCollection("test-model", { TestModel() }, { user: String? -> TestModel.table })
+                autoCollection("email", { TestModel() }, { user: String? -> TestModel.table })
                 get {
-                    call.respondText("Welcome, ${call.principal<BoxPrincipal<String>>()?.user}!")
+                    call.respondText("Welcome, ${call.user<User>()?.email ?: "anon"}!")
                 }
                 adminIndex()
                 apiHelp()
-                route("auth") {
-                    emailMagicLinkEndpoint(makeLink = { GeneralServerSettings.instance.publicUrl + "?jwt=" + makeToken(it) })
-                }
-                oauthGoogle() { it }
-                oauthGithub() { it }
-                oauthApple() { it }
+
+                get(
+                    path = "test-primitive",
+                    summary = "Get Test Primitive",
+                    errorCases = listOf(),
+                    implementation = { input: Unit -> "42 is great" }
+                )
             }
         }
         println(SDK.test())

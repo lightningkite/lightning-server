@@ -3,6 +3,7 @@ package com.lightningkite.ktorbatteries.typed
 import com.lightningkite.ktorbatteries.exceptions.AuthenticationException
 import com.lightningkite.ktorbatteries.exceptions.ForbiddenException
 import com.lightningkite.ktorbatteries.routes.fullPath
+import com.lightningkite.ktorbatteries.serialization.PrimitiveBox
 import com.lightningkite.ktorbatteries.serialization.Serialization
 import com.lightningkite.ktordb.ForeignKey
 import com.lightningkite.ktordb.HasId
@@ -47,6 +48,7 @@ inline fun <reified T: Comparable<T>> String.parseUrlPartOrBadRequest(): T = try
     throw BadRequestException("ID ${this} could not be parsed as a ${T::class.simpleName}.")
 }
 
+inline fun <reified USER> ApplicationCall.user() = principal<BoxPrincipal<USER>>()?.user
 data class BoxPrincipal<USER>(val user: USER): Principal
 
 /**
@@ -69,13 +71,13 @@ inline fun <reified USER, reified INPUT : Any, reified OUTPUT> Route.apiBase(
     val userType = typeOf<USER>().takeUnless { it.classifier == Unit::class }
     val route = route(path, method) {
         handle {
-            val user = if (userType != null) context.principal<BoxPrincipal<USER>>()?.user else null
+            val user = if (userType != null) context.user<USER>() else null
             if(userType != null && !userType.isMarkedNullable && user == null) throw AuthenticationException()
             val input = if (inputType != null) context.parseInput() else Unit as INPUT
             val result = implementation(user as USER, input, context.parameters.toMap())
             if (outputType == null) call.respond(HttpStatusCode.NoContent)
             else if (result == null) call.respond(HttpStatusCode.NotFound)
-            else call.respond(successCode, result)
+            else call.respond(successCode, PrimitiveBox(result))
         }
     }
     val doc = ApiEndpoint(
@@ -113,7 +115,7 @@ inline fun <reified USER, reified INPUT : Any, reified OUTPUT> Route.apiBody(
     errorCases = errorCases,
     routeTypes = routeTypes,
     successCode = successCode,
-    parseInput = { receive() },
+    parseInput = { receive<PrimitiveBox<INPUT>>().value },
     implementation = implementation
 )
 
@@ -253,7 +255,7 @@ inline fun <reified INPUT : Any, reified OUTPUT> Route.apiParameterlessBody(
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (input: INPUT) -> OUTPUT
-) = apiBody<Unit, INPUT, OUTPUT>(
+) = apiBody<Unit?, INPUT, OUTPUT>(
     path = path,
     method = method,
     summary = summary,
@@ -277,7 +279,7 @@ inline fun <reified ROUTE: Comparable<ROUTE>, reified INPUT : Any, reified OUTPU
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (id: ROUTE, input: INPUT) -> OUTPUT
-) = apiBody<Unit, INPUT, OUTPUT>(
+) = apiBody<Unit?, INPUT, OUTPUT>(
     path = "{id}" + if (postIdPath.isBlank()) "" else "/$postIdPath",
     method = method,
     summary = summary,
@@ -301,7 +303,7 @@ inline fun <reified INPUT : Any, reified OUTPUT> Route.apiParameterlessQuery(
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (input: INPUT) -> OUTPUT
-) = apiQuery<Unit, INPUT, OUTPUT>(
+) = apiQuery<Unit?, INPUT, OUTPUT>(
     path = path,
     method = method,
     summary = summary,
@@ -325,7 +327,7 @@ inline fun <reified ROUTE: Comparable<ROUTE>, reified INPUT : Any, reified OUTPU
     errorCases: List<ApiEndpoint.ErrorCase>,
     successCode: HttpStatusCode = HttpStatusCode.OK,
     crossinline implementation: suspend (id: ROUTE, input: INPUT) -> OUTPUT
-) = apiQuery<Unit, INPUT, OUTPUT>(
+) = apiQuery<Unit?, INPUT, OUTPUT>(
     path = "{id}" + if (postIdPath.isBlank()) "" else "/$postIdPath",
     method = method,
     summary = summary,

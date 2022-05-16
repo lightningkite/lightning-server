@@ -5,16 +5,16 @@ import com.auth0.jwt.JWTCreator
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.exceptions.JWTVerificationException
 import com.auth0.jwt.interfaces.DecodedJWT
-import com.lightningkite.ktorbatteries.client
+import com.lightningkite.ktorbatteries.db.database
 import com.lightningkite.ktorbatteries.email.Attachment
 import com.lightningkite.ktorbatteries.email.EmailSettings
 import com.lightningkite.ktorbatteries.email.email
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
+import com.lightningkite.ktorbatteries.typed.BoxPrincipal
 import com.lightningkite.ktorbatteries.typed.get
+import com.lightningkite.ktorbatteries.typed.parseUrlPartOrBadRequest
 import com.lightningkite.ktorbatteries.typed.post
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
+import com.lightningkite.ktordb.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
@@ -25,9 +25,50 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
-import kotlinx.html.INPUT
+import kotlinx.coroutines.flow.single
+import kotlinx.coroutines.flow.singleOrNull
 import kotlinx.serialization.Serializable
 import java.util.*
+
+inline fun <reified USER, reified ID: Comparable<ID>> Application.configureAuth(
+    path: String = "auth",
+    crossinline onNewUser: suspend (email: String) -> USER? = { null },
+    landing: String = GeneralServerSettings.instance.publicUrl,
+    emailSubject: String = "${GeneralServerSettings.instance.projectName} Log In",
+    noinline template: (suspend (email: String, link: String) -> String) = defaultLoginEmailTemplate
+) where USER: HasEmail, USER : HasId<ID> = configureAuth(
+    path = path,
+    userById = { database.collection<USER>().get(it.parseUrlPartOrBadRequest())!! },
+    userByEmail = { database.collection<USER>().find(Condition.OnField(HasEmailFields.email<USER>(), Condition.Equal(it))).singleOrNull() ?: onNewUser(it)?.let { database.collection<USER>().insertOne(it) } ?: throw NotFoundException() },
+    landing = landing,
+    emailSubject = emailSubject,
+    template = template
+)
+
+inline fun <reified USER: HasId<ID>, reified ID: Comparable<ID>> Application.configureAuth(
+    path: String = "auth",
+    crossinline userById: suspend (id: String) -> USER,
+    crossinline userByEmail: suspend (id: String) -> USER,
+    landing: String = GeneralServerSettings.instance.publicUrl,
+    emailSubject: String = "${GeneralServerSettings.instance.projectName} Log In",
+    noinline template: (suspend (email: String, link: String) -> String) = defaultLoginEmailTemplate
+) {
+    authentication {
+        quickJwt { creds -> BoxPrincipal(userById(
+            creds.payload
+                .getClaim(AuthSettings.userIdKey)
+                .asString())) }
+    }
+    routing {
+        route(path) {
+            emailMagicLinkEndpoint(emailToId = { userByEmail(it)._id.toString() }, emailSubject = emailSubject, template = template, landing = landing)
+            refreshTokenEndpoint<USER, ID>()
+            oauthGoogle() { userByEmail(it)._id.toString() }
+            oauthGithub() { userByEmail(it)._id.toString() }
+            oauthApple() { userByEmail(it)._id.toString() }
+        }
+    }
+}
 
 /**
 Handles the setup and main verification for jwt token authentication.
@@ -110,13 +151,8 @@ fun checkToken(token: String): DecodedJWT? = try {
 @Serializable
 data class EmailRequest(val email: String)
 
-@KtorDsl
-fun Route.emailMagicLinkEndpoint(
-    path: String = "login-email",
-    makeLink: suspend (email: String) -> String,
-    emailSubject: String = "${GeneralServerSettings.instance.projectName} Log In",
-    template: (suspend (email: String, link: String) -> String) = { email, link ->
-        """
+val defaultLoginEmailTemplate: (suspend (email: String, link: String) -> String) = { email: String, link: String ->
+    """
         <!DOCTYPE html>
         <html>
         <body>
@@ -127,7 +163,28 @@ fun Route.emailMagicLinkEndpoint(
         </body>
         </html>
         """.trimIndent()
-    },
+}
+
+@KtorDsl
+fun Route.emailMagicLinkEndpoint(
+    path: String = "login-email",
+    emailToId: suspend (email: String) -> String,
+    landing: String = GeneralServerSettings.instance.publicUrl,
+    emailSubject: String = "${GeneralServerSettings.instance.projectName} Log In",
+    template: (suspend (email: String, link: String) -> String) = defaultLoginEmailTemplate
+) = emailMagicLinkEndpoint(
+        path = path,
+        makeLink = { landing + "?jwt=${makeToken(emailToId(it))}" },
+        emailSubject = emailSubject,
+        template = template
+    )
+
+@KtorDsl
+fun Route.emailMagicLinkEndpoint(
+    path: String = "login-email",
+    makeLink: suspend (email: String) -> String,
+    emailSubject: String = "${GeneralServerSettings.instance.projectName} Log In",
+    template: (suspend (email: String, link: String) -> String) = defaultLoginEmailTemplate
 ) {
     post(
         path = path,
@@ -149,7 +206,9 @@ fun Route.emailMagicLinkEndpoint(
 }
 
 @KtorDsl
-inline fun <reified USER: Principal> Route.refreshTokenEndpoint(path: String = "refresh-token", crossinline principalToToken: suspend (USER) -> String) {
+inline fun <reified USER: HasId<ID>, reified ID: Comparable<ID>> Route.refreshTokenEndpoint(path: String = "refresh-token") = refreshTokenEndpoint<USER>(path) { makeToken(it._id.toString()) }
+@KtorDsl
+inline fun <reified USER> Route.refreshTokenEndpoint(path: String = "refresh-token", crossinline principalToToken: suspend (USER) -> String) {
     get(
         path = path,
         summary = "Retrieves a new token for the user.",

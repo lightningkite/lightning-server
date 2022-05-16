@@ -1,0 +1,14 @@
+### GET request with a header
+GET http://localhost:8080/test-model/rest
+Accept: application/json
+
+### GET request with a header
+GET http://localhost:8080/test-model/rest
+Accept: text/csv
+
+### Login
+POST http://localhost:8080/auth/login-email
+Accept: application/json
+Content-Type: application/json
+
+"joseph@lightningkite.com"
