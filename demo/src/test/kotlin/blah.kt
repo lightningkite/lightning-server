@@ -126,7 +126,7 @@ class LiveApi(val httpUrl: String, val socketUrl: String = httpUrl): Api {
     }
 }
 
-abstract class UserSession(val api: Api, val userToken: String) {
+data class UserSession(val api: Api, val userToken: String) {
     val auth: UserSessionAuthApi = UserSessionAuthApi(api.auth, userToken)
     val testModel: UserSessionTestModelApi = UserSessionTestModelApi(api.testModel, userToken)
     fun getTestPrimitive(): Single<String> = api.getTestPrimitive()

@@ -46,7 +46,7 @@ object SDK {
             val byGroup = ((byUserType[userType] ?: listOf()) + (byUserType[null]?: listOf())).groupBy { it.docGroup }
             val groups = byGroup.keys.filterNotNull()
             val sessionClassName = "${userType.simpleName}Session"
-            appendLine("abstract class $sessionClassName(val api: Api, val ${userType.userTypeTokenName()}: String) {")
+            appendLine("abstract class Abstract$sessionClassName(val api: Api, val ${userType.userTypeTokenName()}: String) {")
             for(group in groups) {
                 appendLine("    val ${group.groupToPartName()}: $sessionClassName${group.groupToInterfaceName()} = $sessionClassName${group.groupToInterfaceName()}(${group.groupToPartName()}, ${userType.userTypeTokenName()})")
             }
