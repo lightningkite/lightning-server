@@ -95,8 +95,7 @@ open class SecuredFieldCollection<Model: Any>(
         .mapNotNull {
             val old = it.old?.let { rules.mask(it) }
             val new = it.new?.let { rules.mask(it) }
-            if(old == new) null
-            else EntryChange(old, new)
+            EntryChange(old, new)
         }
 }
 

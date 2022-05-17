@@ -107,7 +107,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
         call.respondRedirect("../admin")
     }
     get("create") {
-        val user = this.context.principal<BoxPrincipal<USER>>()?.user
+        val user = this.context.user<USER>()
         context.respondHtml {
             head { includeFormScript() }
             body {

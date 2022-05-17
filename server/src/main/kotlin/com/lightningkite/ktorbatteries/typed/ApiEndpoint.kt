@@ -49,7 +49,10 @@ inline fun <reified T: Comparable<T>> String.parseUrlPartOrBadRequest(): T = try
     throw BadRequestException("ID ${this} could not be parsed as a ${T::class.simpleName}.")
 }
 
-inline fun <reified USER> ApplicationCall.user() = principal<BoxPrincipal<USER>>()?.user
+inline fun <reified USER> ApplicationCall.user(): USER? {
+    (authentication.principal as? USER)?.let { return it }
+    return principal<BoxPrincipal<USER>>()?.user
+}
 data class BoxPrincipal<USER>(val user: USER): Principal
 
 /**
