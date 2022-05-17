@@ -1,6 +1,8 @@
+@file:UseContextualSerialization(UUID::class)
 package com.lightningkite.ktorbatteries.jsonschema
 
 import com.lightningkite.ktorbatteries.auto.defaults
+import com.lightningkite.ktorbatteries.serialization.Serialization
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.lightningkite.ktorbatteries.settings.runServer
 import com.lightningkite.ktorbatteries.typed.*
@@ -10,18 +12,21 @@ import kotlinx.html.body
 import kotlinx.html.form
 import kotlinx.html.head
 import kotlinx.html.html
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.properties.Properties
 import org.junit.Test
 import java.io.File
 import kotlinx.html.stream.appendHTML
+import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.capturedKClass
+import kotlinx.serialization.descriptors.getContextualDescriptor
 import kotlinx.serialization.properties.encodeToStringMap
 import java.net.URLEncoder
 import java.util.*
 import kotlin.reflect.typeOf
 
 class SchemaTest {
+
     @Test
     fun quick() {
         println(Json.encodeToSchema(Post.serializer()))

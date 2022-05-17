@@ -86,11 +86,9 @@ fun main(vararg args: String) {
         }
         routing {
             authenticate(optional = true) {
-                autoCollection("test-model", { TestModel() }, { user: String? -> TestModel.table })
-                autoCollection("email", { TestModel() }, { user: String? -> TestModel.table })
+                autoCollection("test-model", { TestModel() }, { user: User? -> TestModel.table })
                 get {
                     val user = call.user<User>()
-                    println("User retrieved is $user")
                     call.respondText("Welcome, ${user?.email ?: "anon"}!")
                 }
                 adminIndex()
@@ -104,6 +102,7 @@ fun main(vararg args: String) {
                 )
             }
         }
-        println(SDK.test())
+        println(SDK.apiFile("com.lightningkite.ktorbatteries.demo"))
+        println(SDK.liveFile("com.lightningkite.ktorbatteries.demo"))
     }
 }

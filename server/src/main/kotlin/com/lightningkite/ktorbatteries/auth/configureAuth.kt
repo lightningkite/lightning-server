@@ -9,6 +9,7 @@ import com.lightningkite.ktorbatteries.db.database
 import com.lightningkite.ktorbatteries.email.Attachment
 import com.lightningkite.ktorbatteries.email.EmailSettings
 import com.lightningkite.ktorbatteries.email.email
+import com.lightningkite.ktorbatteries.routes.docName
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.lightningkite.ktorbatteries.typed.BoxPrincipal
 import com.lightningkite.ktorbatteries.typed.get
@@ -39,9 +40,7 @@ inline fun <reified USER, reified ID : Comparable<ID>> Application.configureAuth
 ) where USER : HasEmail, USER : HasId<ID> = configureAuth(
     path = path,
     userById = {
-        println("ID string is $it")
-        println("ID string is ${it.parseUrlPartOrBadRequest<UUID>()}")
-        database.collection<USER>().get(it.parseUrlPartOrBadRequest<ID>().also { println("Id is $it") })!!
+        database.collection<USER>().get(it.parseUrlPartOrBadRequest<ID>())!!
     },
     userByEmail = {
         database.collection<USER>().find(Condition.OnField(HasEmailFields.email<USER>(), Condition.Equal(it)))
@@ -76,6 +75,7 @@ inline fun <reified USER : HasId<ID>, reified ID : Comparable<ID>> Application.c
     }
     routing {
         route(path) {
+            docName = "Auth"
             emailMagicLinkEndpoint(
                 emailToId = { userByEmail(it)._id.toString() },
                 emailSubject = emailSubject,
@@ -238,7 +238,8 @@ inline fun <reified USER> Route.refreshTokenEndpoint(
 ) {
     get(
         path = path,
-        summary = "Retrieves a new token for the user.",
+        summary = "Refresh token",
+        description = "Retrieves a new token for the user.",
         errorCases = listOf(),
         implementation = { user: USER?, input: Unit ->
             if (user == null) throw BadRequestException("You are not authenticated.")

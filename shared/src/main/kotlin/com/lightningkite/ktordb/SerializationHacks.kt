@@ -1,6 +1,14 @@
 package com.lightningkite.ktordb
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.capturedKClass
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.SerializersModuleBuilder
+import kotlinx.serialization.modules.contextual
+import kotlin.reflect.KClass
 import kotlin.reflect.full.memberProperties
 
 fun KSerializer<*>.listElement(): KSerializer<*>? {

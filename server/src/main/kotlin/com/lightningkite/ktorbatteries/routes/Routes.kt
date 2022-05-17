@@ -3,6 +3,10 @@ package com.lightningkite.ktorbatteries.routes
 import io.ktor.http.*
 import io.ktor.server.routing.*
 
+private val docNames = HashMap<Route, String?>()
+public var Route.docName: String?
+    get() = docNames[this]
+    set(value) { docNames[this] = value }
 
 private val Route.recursiveChildren: Sequence<Route>
     get() = sequenceOf(this) + this.children.asSequence().flatMap { it.recursiveChildren }
@@ -58,10 +62,10 @@ fun Route.pathRelativeTo(base: Route): String? {
 private val RouteSelector.segment: String
     get() = when (this) {
         is PathSegmentConstantRouteSelector -> "/$value"
-        is PathSegmentParameterRouteSelector -> "/-"
-        is PathSegmentOptionalParameterRouteSelector -> "/-"
-        is PathSegmentWildcardRouteSelector -> "/-"
-        is PathSegmentTailcardRouteSelector -> "/-"
+        is PathSegmentParameterRouteSelector -> "/\$$name"
+        is PathSegmentOptionalParameterRouteSelector -> "/\$$name"
+        is PathSegmentWildcardRouteSelector -> "/anything"
+        is PathSegmentTailcardRouteSelector -> "/\$${this.name}"
         is TrailingSlashRouteSelector -> "/"
         else -> ""
     }

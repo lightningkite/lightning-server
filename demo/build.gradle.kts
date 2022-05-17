@@ -19,7 +19,7 @@ repositories {
 dependencies {
     api(project(":server"))
     ksp(project(":processor"))
-    testImplementation("org.jetbrains.kotlin:kotlin-test")
+    testImplementation(project(":client"))
 }
 
 kotlin {

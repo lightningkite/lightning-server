@@ -1,5 +1,6 @@
 package com.lightningkite.ktorbatteries.db
 
+import com.lightningkite.ktorbatteries.routes.docName
 import com.lightningkite.ktorbatteries.serialization.Serialization
 import com.lightningkite.ktorbatteries.typed.*
 import io.ktor.http.*
@@ -20,11 +21,13 @@ import java.util.*
 inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.restApiWebsocket(
     path: String = "",
     crossinline getCollection: suspend (principal: USER?) -> FieldCollection<T>
-) {
+) = route(path) {
+    val modelName = T::class.simpleName
+    this.docName = modelName
     apiWebsocket<USER, Query<T>, ListChange<T>>(
-        path = path,
-        summary = "Watch ${T::class.simpleName}",
-        description = "Gets a changing list of ${T::class.simpleName}s that match the given query.",
+        path = "",
+        summary = "Watch ${modelName}",
+        description = "Gets a changing list of ${modelName}s that match the given query.",
         errorCases = listOf(),
     ) { user ->
         val secured = getCollection(user)
@@ -45,10 +48,12 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
     path: String = "",
     crossinline getCollection: suspend (principal: USER?) -> FieldCollection<T>
 ) = route(path) {
+    val modelName = T::class.simpleName
+    this.docName = modelName
     get(
         path = "",
-        summary = "List ${T::class.simpleName}",
-        description = "Gets a list of ${T::class.simpleName}s.",
+        summary = "List",
+        description = "Gets a list of ${modelName}s.",
         errorCases = listOf(),
         implementation = { user: USER?, input: Query<T> ->
             getCollection(user)
@@ -61,8 +66,8 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
     // it's in the POST body.
     post(
         path = "query",
-        summary = "Query ${T::class.simpleName}",
-        description = "Gets a list of ${T::class.simpleName}s that match the given query.",
+        summary = "Query",
+        description = "Gets a list of ${modelName}s that match the given query.",
         errorCases = listOf(),
         implementation = { user: USER?, input: Query<T> ->
             getCollection(user)
@@ -74,8 +79,8 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
     // This is used get a single object with id of _id
     getItem(
         postIdPath = "",
-        summary = "Detail ${T::class.simpleName}",
-        description = "Gets a single ${T::class.simpleName} by ID.",
+        summary = "Detail",
+        description = "Gets a single ${modelName} by ID.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.NotFound,
@@ -97,8 +102,8 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
 
     post(
         path = "bulk",
-        summary = "Insert Bulk ${T::class.simpleName}",
-        description = "Creates multiple ${T::class.simpleName}s at the same time.",
+        summary = "Insert Bulk",
+        description = "Creates multiple ${modelName}s at the same time.",
         errorCases = listOf(),
         successCode = HttpStatusCode.Created,
         implementation = { user: USER?, values: List<T> ->
@@ -109,8 +114,8 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
 
     post(
         path = "",
-        summary = "Insert ${T::class.simpleName}",
-        description = "Creates a new ${T::class.simpleName}",
+        summary = "Insert",
+        description = "Creates a new ${modelName}",
         errorCases = listOf(),
         successCode = HttpStatusCode.Created,
         implementation = { user: USER?, value: T ->
@@ -121,7 +126,8 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
 
     postItem(
         postIdPath = "",
-        summary = "Creates or updates a ${T::class.simpleName}",
+        summary = "Upsert",
+        description = "Creates or updates a ${modelName}",
         errorCases = listOf(),
         successCode = HttpStatusCode.Created,
         implementation = { user: USER?, id: ID, value: T ->
@@ -134,8 +140,8 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
     // This is used replace many objects at once. This does make individual calls to the database. Kmongo does not have a many replace option.
     put(
         path = "",
-        summary = "Bulk Replace ${T::class.simpleName}",
-        description = "Modifies many ${T::class.simpleName}s at the same time by ID.",
+        summary = "Bulk Replace",
+        description = "Modifies many ${modelName}s at the same time by ID.",
         errorCases = listOf(),
         implementation = { user: USER?, values: List<T> ->
             val db = getCollection(user)
@@ -145,8 +151,8 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
 
     putItem(
         postIdPath = "",
-        summary = "Replace ${T::class.simpleName}",
-        description = "Replaces a single ${T::class.simpleName} by ID.",
+        summary = "Replace",
+        description = "Replaces a single ${modelName} by ID.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.NotFound,
@@ -168,8 +174,8 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
 
     patch(
         path = "bulk",
-        summary = "Bulk Modify ${T::class.simpleName}",
-        description = "Modifies many ${T::class.simpleName}s at the same time.  Returns the number of changed items.",
+        summary = "Bulk Modify",
+        description = "Modifies many ${modelName}s at the same time.  Returns the number of changed items.",
         errorCases = listOf(),
         implementation = { user: USER?, input: MassModification<T> ->
             getCollection(user)
@@ -179,8 +185,8 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
 
     patchItem(
         postIdPath = "delta",
-        summary = "Modify ${T::class.simpleName} With Delta",
-        description = "Modifies a ${T::class.simpleName} by ID, returning both the previous value and new value.",
+        summary = "Modify",
+        description = "Modifies a ${modelName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.NotFound,
@@ -202,8 +208,8 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
 
     patchItem(
         postIdPath = "",
-        summary = "Modify ${T::class.simpleName}",
-        description = "Modifies a ${T::class.simpleName} by ID, returning both the previous value and new value.",
+        summary = "Modify With Diff",
+        description = "Modifies a ${modelName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.NotFound,
@@ -226,8 +232,8 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
 
     post(
         path = "bulk-delete",
-        summary = "Bulk Delete ${T::class.simpleName}",
-        description = "Deletes all matching ${T::class.simpleName}s, returning the number of deleted items.",
+        summary = "Bulk Delete",
+        description = "Deletes all matching ${modelName}s, returning the number of deleted items.",
         errorCases = listOf(),
         implementation = { user: USER?, filter: Condition<T> ->
             getCollection(user)
@@ -237,8 +243,8 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
 
     deleteItem(
         path = "",
-        summary = "Delete ${T::class.simpleName}",
-        description = "Deletes a ${T::class.simpleName} by id.",
+        summary = "Delete",
+        description = "Deletes a ${modelName} by id.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
                 status = HttpStatusCode.NotFound,

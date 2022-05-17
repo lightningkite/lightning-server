@@ -28,12 +28,12 @@ open class ModelPermissionsFieldCollection<Model : Any>(
 
     override suspend fun insertOne(model: Model): Model {
         if(!permissions.create(model)) throw SecurityException("You do not have permission to insert this instance.  You can only insert instances that adhere to the following condition: ${permissions.create}")
-        return base.insertOne(model)
+        return base.insertOne(model).let { permissions.mask(it) }
     }
 
     override suspend fun insertMany(models: List<Model>): List<Model> {
         val passingModels = models.filter { permissions.create(it) }
-        return base.insertMany(passingModels)
+        return base.insertMany(passingModels).map { permissions.mask(it) }
     }
 
     override suspend fun replaceOne(condition: Condition<Model>, model: Model): Model? {
@@ -41,12 +41,12 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         return base.findOneAndUpdate(
             condition and permissions.allowed(modification),
             modification
-        ).new
+        ).new?.let { permissions.mask(it) }
     }
 
     override suspend fun upsertOne(condition: Condition<Model>, model: Model): Model? {
         val modification = Modification.Assign(model)
-        return base.upsertOne(condition and permissions.allowed(modification), model)
+        return base.upsertOne(condition and permissions.allowed(modification), model)?.let { permissions.mask(it) }
     }
 
     override suspend fun updateOne(condition: Condition<Model>, modification: Modification<Model>): Boolean {
@@ -57,7 +57,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         condition: Condition<Model>,
         modification: Modification<Model>
     ): EntryChange<Model> {
-        return base.findOneAndUpdate(condition and permissions.allowed(modification), modification)
+        return base.findOneAndUpdate(condition and permissions.allowed(modification), modification).map { permissions.mask(it) }
     }
 
     override suspend fun updateMany(condition: Condition<Model>, modification: Modification<Model>): Int {

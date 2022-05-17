@@ -1,5 +1,6 @@
 package com.lightningkite.ktorbatteries.typed
 
+import com.lightningkite.ktorbatteries.routes.docName
 import com.lightningkite.ktorbatteries.serialization.Serialization
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
@@ -15,15 +16,15 @@ import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
 data class ApiWebsocket<USER, INPUT, OUTPUT>(
-    val route: Route,
-    val summary: String,
-    val description: String = summary,
+    override val route: Route,
+    override val summary: String,
+    override val description: String = summary,
     val errorCases: List<ErrorCase>,
     val inputType: KType,
     val outputType: KType,
     val userType: KType? = null,
     val implementation: suspend Session<INPUT, OUTPUT>.(user: USER?)->Unit
-) {
+): Documentable {
     class Session<INPUT, OUTPUT>(
         val send: suspend (OUTPUT) -> Unit,
         val incoming: Flow<INPUT>
@@ -33,8 +34,6 @@ data class ApiWebsocket<USER, INPUT, OUTPUT>(
         val send: suspend (String) -> Unit,
         val incoming: Flow<String>
     )
-
-    val functionName: String get() = summary.split(' ').joinToString("") { it.replaceFirstChar { it.uppercase() } }.replaceFirstChar { it.lowercase() }
 
     companion object {
         val known: MutableCollection<ApiWebsocket<*, *, *>> = ArrayList()

@@ -76,7 +76,7 @@ inline fun <reified T> FORM.insideHtmlForm(
         div {
             attributes.set("data-theme", "html")
             classes = setOf("je-indented-panel")
-            Serialization.json.serializersModule.serializer<T>().descriptor.fileFieldNames.forEach {
+            Serialization.json.serializersModule.serializer<T>().descriptor.fileFieldNames().forEach {
                 div {
                     classes = setOf("row")
                     label {
@@ -95,20 +95,23 @@ inline fun <reified T> FORM.insideHtmlForm(
 }
 
 @InternalAPI
-public val SerialDescriptor.fileFieldNames: List<String>
-    get() {
-        return (0 until elementsCount)
-            .flatMap {
-                val name = getElementName(it)
-                var descriptor = getElementDescriptor(it)
-                if(descriptor.kind == SerialKind.CONTEXTUAL) {
-                    descriptor = Serialization.module.getContextualDescriptor(descriptor)!!
-                }
-                descriptor.fileFieldNames.map { "$name.$it" } + if (descriptor == Serialization.module.getContextual(ServerFile::class)?.descriptor) listOf(
-                    name
-                ) else listOf()
+fun SerialDescriptor.fileFieldNames(visited: MutableSet<SerialDescriptor> = mutableSetOf()): List<String> {
+    if(!visited.add(this)) return listOf()
+    return (0 until elementsCount)
+        .flatMap {
+            val name = getElementName(it)
+            var descriptor = getElementDescriptor(it)
+            if (descriptor.kind == SerialKind.CONTEXTUAL) {
+                descriptor = Serialization.module.getContextualDescriptor(descriptor)!!
             }
-    }
+            descriptor.fileFieldNames(visited).map { "$name.$it" } + if (descriptor == Serialization.module.getContextual(
+                    ServerFile::class
+                )?.descriptor
+            ) listOf(
+                name
+            ) else listOf()
+        }
+}
 
 inline fun <reified T> FlowContent.jsForm(
     title: String,

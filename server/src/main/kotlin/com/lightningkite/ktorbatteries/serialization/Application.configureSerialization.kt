@@ -20,7 +20,6 @@ fun Application.configureSerialization() {
         serialization(ContentType.Text.Xml, Serialization.xml)
         serialization(ContentType.Text.CSV, Serialization.csv)
         serialization(ContentType.Application.Xml, Serialization.xml)
-        serialization(ContentType.Application.ProtoBuf, Serialization.protobuf)
         serialization(ContentType.Application.Bson, object : BinaryFormat {
             override val serializersModule: SerializersModule get() = Serialization.module
             override fun <T> decodeFromByteArray(deserializer: DeserializationStrategy<T>, bytes: ByteArray): T =

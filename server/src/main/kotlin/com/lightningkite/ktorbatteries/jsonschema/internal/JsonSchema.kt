@@ -218,8 +218,9 @@ internal fun SerialDescriptor.createJsonSchema(
     annotations: List<Annotation>,
     definitions: JsonSchemaDefinitions
 ): JsonObject {
-    if(this.kind == SerialKind.CONTEXTUAL)
-        return Serialization.module.getContextualDescriptor(this)!!.createJsonSchema(annotations, definitions)
+    if(this.kind == SerialKind.CONTEXTUAL) {
+        return (Serialization.module.getContextualDescriptor(this) ?: throw IllegalStateException("Contextual missing for $this")).createJsonSchema(annotations, definitions)
+    }
 
     val combinedAnnotations = annotations + this.annotations
     val key = JsonSchemaDefinitions.Key(this, combinedAnnotations)

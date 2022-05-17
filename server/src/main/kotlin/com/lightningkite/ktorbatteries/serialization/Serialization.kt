@@ -13,7 +13,6 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.overwriteWith
 import kotlinx.serialization.modules.serializersModuleOf
 import kotlinx.serialization.properties.Properties
-import kotlinx.serialization.protobuf.ProtoBuf
 import nl.adaptivity.xmlutil.serialization.XML
 
 object Serialization {
@@ -43,11 +42,6 @@ object Serialization {
     var cbor: Cbor by SetOnce {
         Cbor {
             ignoreUnknownKeys = true
-            serializersModule = module
-        }
-    }
-    var protobuf: ProtoBuf by SetOnce {
-        ProtoBuf {
             serializersModule = module
         }
     }

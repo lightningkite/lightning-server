@@ -2,10 +2,10 @@ package com.lightningkite.ktorbatteries.typed
 
 import com.lightningkite.ktorbatteries.exceptions.AuthenticationException
 import com.lightningkite.ktorbatteries.exceptions.ForbiddenException
+import com.lightningkite.ktorbatteries.routes.docName
 import com.lightningkite.ktorbatteries.routes.fullPath
 import com.lightningkite.ktorbatteries.serialization.PrimitiveBox
 import com.lightningkite.ktorbatteries.serialization.Serialization
-import com.lightningkite.ktordb.ForeignKey
 import com.lightningkite.ktordb.HasId
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -21,23 +21,21 @@ import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
 data class ApiEndpoint<USER, INPUT : Any, OUTPUT>(
-    val route: Route,
-    val summary: String,
-    val description: String = summary,
+    override val route: Route,
+    override val summary: String,
+    override val description: String = summary,
     val errorCases: List<ErrorCase>,
     val routeTypes: Map<String, KType> = mapOf(),
     val inputType: KType? = null,
     val outputType: KType? = null,
     val userType: KType? = null,
     val implementation: suspend (user: USER, input: INPUT, pathSegments: Map<String, List<String>>) -> OUTPUT
-) {
+): Documentable {
     val authenticationRequired: Boolean get() = userType?.isMarkedNullable == false
 
     companion object {
         val known: MutableCollection<ApiEndpoint<*, *, *>> = ArrayList()
     }
-
-    val functionName: String get() = summary.split(' ').joinToString("") { it.replaceFirstChar { it.uppercase() } }.replaceFirstChar { it.lowercase() }
 
     data class ErrorCase(val status: HttpStatusCode, val internalCode: Int, val description: String)
 }
