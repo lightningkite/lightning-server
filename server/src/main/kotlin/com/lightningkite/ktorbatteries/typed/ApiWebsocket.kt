@@ -22,7 +22,7 @@ data class ApiWebsocket<USER, INPUT, OUTPUT>(
     val errorCases: List<ErrorCase>,
     val inputType: KType,
     val outputType: KType,
-    val userType: KType? = null,
+    override val userType: KType? = null,
     val implementation: suspend Session<INPUT, OUTPUT>.(user: USER?)->Unit
 ): Documentable {
     class Session<INPUT, OUTPUT>(

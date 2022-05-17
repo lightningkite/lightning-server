@@ -13,9 +13,9 @@ data class Query<T: IsCodableAndHashable>(
     val limit: Int = 100,
 ) {
     constructor(
-        makeCondition: (PropChain<T, T>)->Condition<T>,
-        orderBy: List<SortPart<T>>,
+        orderBy: List<SortPart<T>> = listOf(),
         skip: Int = 0,
         limit: Int = 100,
+        makeCondition: (PropChain<T, T>)->Condition<T>,
     ):this(makeCondition(startChain()), orderBy, skip, limit)
 }

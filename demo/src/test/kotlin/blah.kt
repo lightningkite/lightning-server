@@ -2,16 +2,11 @@ package com.lightningkite.ktorbatteries.demo
 
 import com.lightningkite.rx.okhttp.*
 import kotlin.String
-import com.lightningkite.ktordb.Query
 import com.lightningkite.ktorbatteries.demo.TestModel
+import com.lightningkite.ktordb.*
 import kotlin.collections.List
 import java.util.UUID
-import com.lightningkite.ktordb.MassModification
 import kotlin.Int
-import com.lightningkite.ktordb.Modification
-import com.lightningkite.ktordb.EntryChange
-import com.lightningkite.ktordb.Condition
-import com.lightningkite.ktordb.ListChange
 import com.lightningkite.rx.kotlin
 import com.lightningkite.rx.okhttp.*
 import com.lightningkite.ktordb.live.*
@@ -128,5 +123,30 @@ class LiveApi(val httpUrl: String, val socketUrl: String = httpUrl): Api {
             method = HttpClient.DELETE,
         ).discard()
         override fun watchTestModel(userToken: String): Observable<WebSocketIsh<Query<TestModel>, ListChange<TestModel>>> = multiplexedSocket(url = "$httpUrl/multiplex", path = "/test-model/rest")
+    }
+}
+
+data class UserSession(val api: Api, val userToken: String) {
+    val auth: UserSessionAuthApi = UserSessionAuthApi(api.auth, userToken)
+    val testModel: UserSessionTestModelApi = UserSessionTestModelApi(api.testModel, userToken)
+    fun getTestPrimitive(): Single<String> = api.getTestPrimitive()
+    data class UserSessionAuthApi(val api: Api.AuthApi, val userToken: String) {
+        fun refreshToken(): Single<String> = api.refreshToken(userToken)
+        fun emailLoginLink(input: String): Single<Unit> = api.emailLoginLink(input)
+    }
+    data class UserSessionTestModelApi(val api: Api.TestModelApi, val userToken: String) {
+        fun query(input: Query<TestModel>): Single<List<TestModel>> = api.query(userToken, input)
+        fun detail(id: UUID): Single<TestModel> = api.detail(userToken, id)
+        fun insertBulk(input: List<TestModel>): Single<List<TestModel>> = api.insertBulk(userToken, input)
+        fun insert(input: TestModel): Single<TestModel> = api.insert(userToken, input)
+        fun upsert(id: UUID, input: TestModel): Single<TestModel> = api.upsert(userToken, id, input)
+        fun bulkReplace(input: List<TestModel>): Single<List<TestModel>> = api.bulkReplace(userToken, input)
+        fun replace(id: UUID, input: TestModel): Single<TestModel> = api.replace(userToken, id, input)
+        fun bulkModify(input: MassModification<TestModel>): Single<Int> = api.bulkModify(userToken, input)
+        fun modify(id: UUID, input: Modification<TestModel>): Single<EntryChange<TestModel>> = api.modify(userToken, id, input)
+        fun modifyWithDiff(id: UUID, input: Modification<TestModel>): Single<TestModel> = api.modifyWithDiff(userToken, id, input)
+        fun bulkDelete(input: Condition<TestModel>): Single<Int> = api.bulkDelete(userToken, input)
+        fun delete(id: UUID): Single<Unit> = api.delete(userToken, id)
+        fun watchTestModel(): Observable<WebSocketIsh<Query<TestModel>, ListChange<TestModel>>> = api.watchTestModel(userToken)
     }
 }
