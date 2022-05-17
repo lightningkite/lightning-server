@@ -104,5 +104,6 @@ fun main(vararg args: String) {
         }
         println(SDK.apiFile("com.lightningkite.ktorbatteries.demo"))
         println(SDK.liveFile("com.lightningkite.ktorbatteries.demo"))
+        println(SDK.sessionFile("com.lightningkite.ktorbatteries.demo"))
     }
 }

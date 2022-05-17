@@ -10,6 +10,7 @@ interface Documentable {
     val route: Route
     val summary: String
     val description: String
+    val userType: KType?
 }
 val Documentable.docGroup: String? get() = generateSequence(route) { it.parent }.mapNotNull { it.docName }.firstOrNull()
 val Documentable.functionName: String get() = summary.split(' ').joinToString("") { it.replaceFirstChar { it.uppercase() } }.replaceFirstChar { it.lowercase() }

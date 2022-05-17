@@ -2,17 +2,18 @@ package com.lightningkite.ktorbatteries.typed
 
 import com.lightningkite.ktorbatteries.routes.fullPath
 import com.lightningkite.ktorbatteries.routes.maybeMethod
-import com.lightningkite.ktordb.comparator
+import io.ktor.http.*
 import io.ktor.server.routing.*
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
 object SDK {
+    private val safeDocumentables = (ApiEndpoint.known.filter { it.route.selector.maybeMethod != HttpMethod.Get || it.inputType == null } + ApiWebsocket.known)
     fun apiFile(packageName: String): CodeEmitter = CodeEmitter(packageName).apply {
         imports.add("io.reactivex.rxjava3.core.Single")
         imports.add("io.reactivex.rxjava3.core.Observable")
         imports.add("com.lightningkite.rx.okhttp.*")
-        val byGroup = (ApiEndpoint.known + ApiWebsocket.known).groupBy { it.docGroup }
+        val byGroup = safeDocumentables.groupBy { it.docGroup }
         val groups = byGroup.keys.filterNotNull()
         appendLine("interface Api {")
         for(group in groups) {
@@ -35,6 +36,42 @@ object SDK {
         appendLine("}")
         appendLine()
     }
+    fun sessionFile(packageName: String): CodeEmitter = CodeEmitter(packageName).apply {
+        imports.add("io.reactivex.rxjava3.core.Single")
+        imports.add("io.reactivex.rxjava3.core.Observable")
+        imports.add("com.lightningkite.rx.okhttp.*")
+        val byUserType = safeDocumentables.groupBy { it.userType?.classifier as? KClass<*> }
+        val userTypes = byUserType.keys.filterNotNull()
+        userTypes.forEach { userType ->
+            val byGroup = ((byUserType[userType] ?: listOf()) + (byUserType[null]?: listOf())).groupBy { it.docGroup }
+            val groups = byGroup.keys.filterNotNull()
+            val sessionClassName = "${userType.simpleName}Session"
+            appendLine("abstract class $sessionClassName(val api: Api, val ${userType.userTypeTokenName()}: String) {")
+            for(group in groups) {
+                appendLine("    val ${group.groupToPartName()}: $sessionClassName${group.groupToInterfaceName()} = $sessionClassName${group.groupToInterfaceName()}(${group.groupToPartName()}, ${userType.userTypeTokenName()})")
+            }
+            for(entry in byGroup[null] ?: listOf()) {
+                append("    ")
+                this.functionHeader(entry, skipAuth = true)
+                append(" = api.")
+                functionCall(entry, skipAuth = false)
+                appendLine()
+            }
+            for(group in groups) {
+                appendLine("    data class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()}, val ${userType.userTypeTokenName()}: String) {")
+                for(entry in byGroup[group]!!) {
+                    append("        ")
+                    this.functionHeader(entry, skipAuth = true)
+                    append(" = api.")
+                    functionCall(entry, skipAuth = false)
+                    appendLine()
+                }
+                appendLine("    }")
+            }
+            appendLine("}")
+            appendLine()
+        }
+    }
     fun liveFile(packageName: String): CodeEmitter = CodeEmitter(packageName).apply {
         imports.add("io.reactivex.rxjava3.core.Single")
         imports.add("io.reactivex.rxjava3.core.Observable")
@@ -42,7 +79,7 @@ object SDK {
         imports.add("com.lightningkite.rx.kotlin")
         imports.add("com.lightningkite.rx.okhttp.*")
         imports.add("com.lightningkite.ktordb.live.*")
-        val byGroup = (ApiEndpoint.known + ApiWebsocket.known).groupBy { it.docGroup }
+        val byGroup = safeDocumentables.groupBy { it.docGroup }
         val groups = byGroup.keys.filterNotNull()
         appendLine("class LiveApi(val httpUrl: String, val socketUrl: String = httpUrl): Api {")
         for(group in groups) {
@@ -132,11 +169,13 @@ public class CodeEmitter(val packageName: String, val body: StringBuilder = Stri
 
 private fun String.groupToInterfaceName(): String = replaceFirstChar { it.uppercase() } + "Api"
 private fun String.groupToPartName(): String = replaceFirstChar { it.lowercase() }
+private fun KType?.userTypeTokenName(): String = (this?.classifier as? KClass<Any>)?.userTypeTokenName() ?: "token"
+private fun KClass<*>.userTypeTokenName(): String = simpleName?.replaceFirstChar { it.lowercase() } ?.plus("Token") ?: "token"
 
-private fun CodeEmitter.functionHeader(documentable: Documentable): java.lang.Appendable? {
+private fun CodeEmitter.functionHeader(documentable: Documentable, skipAuth: Boolean = false) {
     append("fun ${documentable.functionName}(")
     var argComma = false
-    arguments(documentable).forEach {
+    arguments(documentable, skipAuth).forEach {
         if(argComma) append(", ")
         else argComma = true
         append(it.name)
@@ -144,7 +183,7 @@ private fun CodeEmitter.functionHeader(documentable: Documentable): java.lang.Ap
         it.type?.let { append(it) } ?: append(it.stringType ?: "Never")
     }
     append("): ")
-    return when (documentable) {
+    when (documentable) {
         is ApiEndpoint<*, *, *> -> {
             documentable.outputType?.let {
                 append("Single<")
@@ -163,13 +202,23 @@ private fun CodeEmitter.functionHeader(documentable: Documentable): java.lang.Ap
     }
 }
 
+private fun CodeEmitter.functionCall(documentable: Documentable, skipAuth: Boolean = false) {
+    append("${documentable.functionName}(")
+    var argComma = false
+    arguments(documentable, skipAuth).forEach {
+        if(argComma) append(", ")
+        else argComma = true
+        append(it.name)
+    }
+    append(")")
+}
+
 private data class Arg(val name: String, val type: KType? = null, val stringType: String? = null, val default: String? = null)
 
-private fun arguments(documentable: Documentable): List<Arg> = when (documentable) {
+private fun arguments(documentable: Documentable, skipAuth: Boolean = false): List<Arg> = when (documentable) {
     is ApiEndpoint<*, *, *> -> listOfNotNull(
-        documentable.userType?.let {
-            Arg(name = (it.classifier as? KClass<Any>)?.simpleName?.replaceFirstChar { it.lowercase() }
-                ?.plus("Token") ?: "token", stringType = "String")
+        documentable.userType?.takeUnless { skipAuth }?.let {
+            Arg(name = it.userTypeTokenName(), stringType = "String")
         }?.let(::listOf),
         generateSequence(documentable.route) { it.parent }.toList().reversed()
             .mapNotNull { it.selector as? PathSegmentParameterRouteSelector }
@@ -181,9 +230,8 @@ private fun arguments(documentable: Documentable): List<Arg> = when (documentabl
         }?.let(::listOf)
     ).flatten()
     is ApiWebsocket<*, *, *> -> listOfNotNull(
-        documentable.userType?.let {
-            Arg(name = (it.classifier as? KClass<Any>)?.simpleName?.replaceFirstChar { it.lowercase() }
-                ?.plus("Token") ?: "token", stringType = "String")
+        documentable.userType?.takeUnless { skipAuth }?.let {
+            Arg(name = it.userTypeTokenName(), stringType = "String")
         }?.let(::listOf),
         generateSequence(documentable.route) { it.parent }.toList().reversed()
             .mapNotNull { it.selector as? PathSegmentParameterRouteSelector }

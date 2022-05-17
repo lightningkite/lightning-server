@@ -28,7 +28,7 @@ data class ApiEndpoint<USER, INPUT : Any, OUTPUT>(
     val routeTypes: Map<String, KType> = mapOf(),
     val inputType: KType? = null,
     val outputType: KType? = null,
-    val userType: KType? = null,
+    override val userType: KType? = null,
     val implementation: suspend (user: USER, input: INPUT, pathSegments: Map<String, List<String>>) -> OUTPUT
 ): Documentable {
     val authenticationRequired: Boolean get() = userType?.isMarkedNullable == false
