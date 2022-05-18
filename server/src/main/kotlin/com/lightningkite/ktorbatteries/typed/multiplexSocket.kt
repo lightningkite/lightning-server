@@ -25,7 +25,7 @@ private data class OpenChannel(val channel: Channel<String>, val job: Job)
 
 fun Route.multiplexWebSocket(path: String = "") {
     webSocket(path = path) {
-        val user = call.principal<Principal>()
+        val user = call.principal<BoxPrincipal<Any?>>()
         val myOpenSockets = ConcurrentHashMap<String, OpenChannel>()
         try {
             incomingLoop@ for (message in incoming) {
@@ -39,7 +39,7 @@ fun Route.multiplexWebSocket(path: String = "") {
                 val decoded: MultiplexMessage = Serialization.json.decodeFromString(text)
                 when {
                     decoded.start -> {
-                        @Suppress("UNCHECKED_CAST") val apiWebsocket = ApiWebsocket.known.find { it.route.fullPath == decoded.path } as? ApiWebsocket<Principal, Any?, Any?>
+                        @Suppress("UNCHECKED_CAST") val apiWebsocket = ApiWebsocket.known.find { it.route.fullPath == decoded.path } as? ApiWebsocket<Any?, Any?, Any?>
                             ?: continue@incomingLoop
                         if (apiWebsocket.userType != null && !apiWebsocket.userType.jvmErasure.isInstance(user)) continue@incomingLoop
                         val incomingChannel = Channel<String>()

@@ -88,7 +88,7 @@ fun main(vararg args: String) {
             authenticate(optional = true) {
                 autoCollection("test-model", { TestModel() }, { user: User? -> TestModel.table })
                 get {
-                    val user = call.user<User>()
+                    val user = call.user<User?>()
                     call.respondText("Welcome, ${user?.email ?: "anon"}!")
                 }
                 adminIndex()

@@ -21,8 +21,8 @@ data class AutoAdminSection<USER, T: HasId<*>>(
     val route: Route,
     val type: KType,
     val userType: KType,
-    val defaultItem: (USER?) -> T,
-    val getCollection: suspend (USER?) -> FieldCollection<T>
+    val defaultItem: (USER) -> T,
+    val getCollection: suspend (USER) -> FieldCollection<T>
 ) {
     companion object {
         val known: MutableCollection<AutoAdminSection<*, *>> = ArrayList()
@@ -52,8 +52,8 @@ fun Route.adminIndex(path: String = "admin") = route(path) {
 @KtorDsl
 inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.adminPages(
     path: String = "",
-    noinline defaultItem: (USER?) -> T,
-    noinline getCollection: suspend (principal: USER?) -> FieldCollection<T>
+    noinline defaultItem: (USER) -> T,
+    noinline getCollection: suspend (principal: USER) -> FieldCollection<T>
 ) = route(path) {
     AutoAdminSection.known.add(
         AutoAdminSection(

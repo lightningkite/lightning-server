@@ -23,7 +23,7 @@ data class ApiWebsocket<USER, INPUT, OUTPUT>(
     val inputType: KType,
     val outputType: KType,
     override val userType: KType? = null,
-    val implementation: suspend Session<INPUT, OUTPUT>.(user: USER?)->Unit
+    val implementation: suspend Session<INPUT, OUTPUT>.(user: USER)->Unit
 ): Documentable {
     class Session<INPUT, OUTPUT>(
         val send: suspend (OUTPUT) -> Unit,
@@ -48,7 +48,7 @@ inline fun <reified USER, reified INPUT, reified OUTPUT> Route.apiWebsocket(
     summary: String,
     description: String = summary,
     errorCases: List<ApiWebsocket.ErrorCase>,
-    noinline implementation: suspend ApiWebsocket.Session<INPUT, OUTPUT>.(user: USER?) -> Unit
+    noinline implementation: suspend ApiWebsocket.Session<INPUT, OUTPUT>.(user: USER) -> Unit
 ) {
     val inputType = typeOf<INPUT>()
     val outputType = typeOf<OUTPUT>()
@@ -80,6 +80,6 @@ inline fun <reified USER, reified INPUT, reified OUTPUT> Route.apiWebsocket(
                             Serialization.json.decodeFromString(text)
                         }
                     }
-            ), this.call.principal())
+            ), this.call.user<USER>())
     }
 }

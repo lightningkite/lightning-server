@@ -20,7 +20,7 @@ import java.util.*
 @KtorDsl
 inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.restApiWebsocket(
     path: String = "",
-    crossinline getCollection: suspend (principal: USER?) -> FieldCollection<T>
+    crossinline getCollection: suspend (principal: USER) -> FieldCollection<T>
 ) = route(path) {
     val modelName = T::class.simpleName
     this.docName = modelName
@@ -46,7 +46,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
 @KtorDsl
 inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.restApi(
     path: String = "",
-    crossinline getCollection: suspend (principal: USER?) -> FieldCollection<T>
+    crossinline getCollection: suspend (principal: USER) -> FieldCollection<T>
 ) = route(path) {
     val modelName = T::class.simpleName
     this.docName = modelName
@@ -55,7 +55,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
         summary = "List",
         description = "Gets a list of ${modelName}s.",
         errorCases = listOf(),
-        implementation = { user: USER?, input: Query<T> ->
+        implementation = { user: USER, input: Query<T> ->
             getCollection(user)
                 .query(input)
                 .toList()
@@ -69,7 +69,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
         summary = "Query",
         description = "Gets a list of ${modelName}s that match the given query.",
         errorCases = listOf(),
-        implementation = { user: USER?, input: Query<T> ->
+        implementation = { user: USER, input: Query<T> ->
             getCollection(user)
                 .query(input)
                 .toList()
@@ -93,7 +93,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
                 description = "The ID could not be parsed."
             )
         ),
-        implementation = { user: USER?, id: ID, input: Unit ->
+        implementation = { user: USER, id: ID, input: Unit ->
             getCollection(user)
                 .get(id)
                 ?: throw NotFoundException()
@@ -106,7 +106,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
         description = "Creates multiple ${modelName}s at the same time.",
         errorCases = listOf(),
         successCode = HttpStatusCode.Created,
-        implementation = { user: USER?, values: List<T> ->
+        implementation = { user: USER, values: List<T> ->
             getCollection(user)
                 .insertMany(values)
         }
@@ -118,7 +118,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
         description = "Creates a new ${modelName}",
         errorCases = listOf(),
         successCode = HttpStatusCode.Created,
-        implementation = { user: USER?, value: T ->
+        implementation = { user: USER, value: T ->
             getCollection(user)
                 .insertOne(value)
         }
@@ -130,7 +130,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
         description = "Creates or updates a ${modelName}",
         errorCases = listOf(),
         successCode = HttpStatusCode.Created,
-        implementation = { user: USER?, id: ID, value: T ->
+        implementation = { user: USER, id: ID, value: T ->
             getCollection(user)
                 .upsertOneById(id, value)
                 ?: throw NotFoundException()
@@ -143,7 +143,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
         summary = "Bulk Replace",
         description = "Modifies many ${modelName}s at the same time by ID.",
         errorCases = listOf(),
-        implementation = { user: USER?, values: List<T> ->
+        implementation = { user: USER, values: List<T> ->
             val db = getCollection(user)
             values.map { db.replaceOneById(it._id, it) }
         }
@@ -165,7 +165,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
                 description = "The ID could not be parsed."
             )
         ),
-        implementation = { user: USER?, id: ID, value: T ->
+        implementation = { user: USER, id: ID, value: T ->
             getCollection(user)
                 .replaceOneById(id, value)
                 ?: throw NotFoundException()
@@ -177,7 +177,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
         summary = "Bulk Modify",
         description = "Modifies many ${modelName}s at the same time.  Returns the number of changed items.",
         errorCases = listOf(),
-        implementation = { user: USER?, input: MassModification<T> ->
+        implementation = { user: USER, input: MassModification<T> ->
             getCollection(user)
                 .updateMany(input)
         }
@@ -199,7 +199,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
                 description = "The ID could not be parsed."
             )
         ),
-        implementation = { user: USER?, id: ID, input: Modification<T> ->
+        implementation = { user: USER, id: ID, input: Modification<T> ->
             getCollection(user)
                 .findOneAndUpdateById(id, input)
                 .also { if (it.old == null && it.new == null) throw NotFoundException() }
@@ -222,7 +222,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
                 description = "The ID could not be parsed."
             )
         ),
-        implementation = { user: USER?, id: ID, input: Modification<T> ->
+        implementation = { user: USER, id: ID, input: Modification<T> ->
             getCollection(user)
                 .findOneAndUpdateById(id, input)
                 .also { if (it.old == null && it.new == null) throw NotFoundException() }
@@ -235,7 +235,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
         summary = "Bulk Delete",
         description = "Deletes all matching ${modelName}s, returning the number of deleted items.",
         errorCases = listOf(),
-        implementation = { user: USER?, filter: Condition<T> ->
+        implementation = { user: USER, filter: Condition<T> ->
             getCollection(user)
                 .deleteMany(filter)
         }
@@ -257,7 +257,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
                 description = "The ID could not be parsed."
             )
         ),
-        implementation = { user: USER?, id: ID, _: Unit ->
+        implementation = { user: USER, id: ID, _: Unit ->
             if (!getCollection(user)
                     .deleteOneById(id)
             ) {
