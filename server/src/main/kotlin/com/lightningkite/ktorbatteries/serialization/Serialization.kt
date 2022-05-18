@@ -1,6 +1,5 @@
 package com.lightningkite.ktorbatteries.serialization
 
-import com.github.jershell.kbson.BsonFlexibleDecoder
 import com.github.jershell.kbson.Configuration
 import com.github.jershell.kbson.KBson
 import com.lightningkite.ktorbatteries.SetOnce
@@ -44,6 +43,9 @@ object Serialization {
             ignoreUnknownKeys = true
             serializersModule = module
         }
+    }
+    var javaData: JavaData by SetOnce {
+        JavaData(module)
     }
     var properties: Properties by SetOnce {
         Properties(module)

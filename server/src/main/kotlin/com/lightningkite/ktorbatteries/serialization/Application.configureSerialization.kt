@@ -2,7 +2,6 @@ package com.lightningkite.ktorbatteries.serialization
 
 import com.lightningkite.ktorbatteries.files.MultipartJsonConverter
 import io.ktor.server.application.*
-import io.ktor.server.plugins.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.*
 import io.ktor.serialization.kotlinx.cbor.*
@@ -20,6 +19,7 @@ fun Application.configureSerialization() {
         serialization(ContentType.Text.Xml, Serialization.xml)
         serialization(ContentType.Text.CSV, Serialization.csv)
         serialization(ContentType.Application.Xml, Serialization.xml)
+        serialization(ContentType.Application.OctetStream, Serialization.javaData)
         serialization(ContentType.Application.Bson, object : BinaryFormat {
             override val serializersModule: SerializersModule get() = Serialization.module
             override fun <T> decodeFromByteArray(deserializer: DeserializationStrategy<T>, bytes: ByteArray): T =
