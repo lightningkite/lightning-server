@@ -9,6 +9,8 @@ import com.lightningkite.ktorbatteries.db.adminPages
 import com.lightningkite.ktorbatteries.db.autoCollection
 import com.lightningkite.ktorbatteries.db.database
 import com.lightningkite.ktorbatteries.email.EmailSettings
+import com.lightningkite.ktorbatteries.exceptions.ExceptionSettings
+import com.lightningkite.ktorbatteries.exceptions.configureExceptions
 import com.lightningkite.ktorbatteries.files.FilesSettings
 import com.lightningkite.ktorbatteries.files.configureFiles
 import com.lightningkite.ktorbatteries.jsonschema.JsonSchema
@@ -17,6 +19,7 @@ import com.lightningkite.ktorbatteries.mongo.MongoSettings
 import com.lightningkite.ktorbatteries.mongo.mongoDb
 import com.lightningkite.ktorbatteries.serialization.Serialization
 import com.lightningkite.ktorbatteries.serialization.configureSerialization
+import com.lightningkite.ktorbatteries.serverhealth.healthCheckPage
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import com.lightningkite.ktorbatteries.settings.loadSettings
 import com.lightningkite.ktorbatteries.settings.runServer
@@ -30,6 +33,7 @@ import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.Principal
 import io.ktor.server.plugins.*
+import io.ktor.server.plugins.callloging.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -68,21 +72,21 @@ data class Settings(
     val files: FilesSettings = FilesSettings(),
     val logging: LoggingSettings = LoggingSettings(),
     val mongo: MongoSettings = MongoSettings(),
-    val email: EmailSettings = EmailSettings()
+    val email: EmailSettings = EmailSettings(),
+    val exception: ExceptionSettings = ExceptionSettings(),
 )
 
 fun main(vararg args: String) {
     loadSettings(File("settings.yaml")) { Settings() }
+    println("Settings loaded")
     runServer {
         configureFiles()
         configureSerialization()
+        configureExceptions()
         configureAuth(onNewUser = { User(email = it) })
         install(WebSockets)
-        install(StatusPages) {
-            exception<Exception> { call, cause ->
-                cause.printStackTrace()
-                call.respondText(cause.message ?: "Unknown Error")
-            }
+        if(GeneralServerSettings.instance.debug) {
+            install(CallLogging)
         }
         routing {
             authenticate(optional = true) {
@@ -100,10 +104,20 @@ fun main(vararg args: String) {
                     errorCases = listOf(),
                     implementation = { input: Unit -> "42 is great" }
                 )
+                healthCheckPage(path = "health-check", features = listOf(
+                    EmailSettings.instance,
+                    ExceptionSettings.instance,
+                    FilesSettings.instance,
+                    MongoSettings.instance,
+                ))
+                get("die") {
+                    throw Exception("OUCH")
+                }
             }
         }
         println(SDK.apiFile("com.lightningkite.ktorbatteries.demo"))
         println(SDK.liveFile("com.lightningkite.ktorbatteries.demo"))
         println(SDK.sessionFile("com.lightningkite.ktorbatteries.demo"))
+        println("Server config complete")
     }
 }

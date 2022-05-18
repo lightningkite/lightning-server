@@ -29,9 +29,9 @@ data class HealthStatus(val level: Level, val checkedAt: Instant = Instant.now()
 
 private val healthCache = HashMap<HealthCheckable, HealthStatus>()
 @Deprecated("Use new naming instead", ReplaceWith("healthCheckPage"))
-fun Route.configureHealth(path: String, features: List<HealthCheckable>) = healthCheckPage(path, features)
+fun Route.configureHealth(path: String = "health-check", features: List<HealthCheckable>) = healthCheckPage(path, features)
 @KtorDsl
-fun Route.healthCheckPage(path: String, features: List<HealthCheckable>) {
+fun Route.healthCheckPage(path: String = "health-check", features: List<HealthCheckable>) {
     get(path) {
 
         val now = Instant.now()

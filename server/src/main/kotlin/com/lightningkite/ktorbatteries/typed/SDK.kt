@@ -4,10 +4,18 @@ import com.lightningkite.ktorbatteries.routes.fullPath
 import com.lightningkite.ktorbatteries.routes.maybeMethod
 import io.ktor.http.*
 import io.ktor.server.routing.*
+import java.io.File
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
 object SDK {
+    fun make(sourceRoot: File, packageName: String) {
+        val fileFolder = sourceRoot.resolve(packageName.replace('.', '/'))
+        fileFolder.resolve("Api.kt").writeText(apiFile(packageName).toString())
+        fileFolder.resolve("LiveApi.kt").writeText(liveFile(packageName).toString())
+        fileFolder.resolve("Sessions.kt").writeText(sessionFile(packageName).toString())
+    }
+
     private val safeDocumentables = (ApiEndpoint.known.filter { it.route.selector.maybeMethod != HttpMethod.Get || it.inputType == null } + ApiWebsocket.known)
     fun apiFile(packageName: String): CodeEmitter = CodeEmitter(packageName).apply {
         imports.add("io.reactivex.rxjava3.core.Single")

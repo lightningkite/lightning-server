@@ -32,6 +32,12 @@ fun runServer(module: Application.() -> Unit) = embeddedServer(
     factory = CIO,
     port = GeneralServerSettings.instance.port,
     host = GeneralServerSettings.instance.host,
-    module = module,
+    module = {
+        try {
+            module()
+        } catch (t: Throwable) {
+            t.printStackTrace()
+        }
+    },
     watchPaths = listOf("classes")
 ).start(wait = true)

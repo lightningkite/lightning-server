@@ -69,7 +69,8 @@ dependencies {
     testImplementation("io.ktor:ktor-server-content-negotiation-jvm:$ktorVersion")
     testImplementation("io.ktor:ktor-server-cio-jvm:$ktorVersion")
 
-    implementation("io.sentry:sentry:5.7.3")
+    implementation("io.sentry:sentry:1.7.30")
+    implementation("io.sentry:sentry-logback:1.7.30")
 
     kspTest(project(":processor"))
 

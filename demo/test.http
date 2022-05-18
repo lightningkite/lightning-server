@@ -12,3 +12,10 @@ Accept: application/json
 Content-Type: application/json
 
 "joseph@lightningkite.com"
+
+### Login ALt
+POST http://localhost:8080/auth/login-email
+Accept: application/json
+Content-Type: application/json
+
+"josephivie@gmail.com"

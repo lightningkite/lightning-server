@@ -11,10 +11,11 @@ import com.lightningkite.ktorbatteries.notifications.NotificationImplementation
 import com.lightningkite.ktorbatteries.serverhealth.HealthCheckable
 import com.lightningkite.ktorbatteries.serverhealth.HealthStatus
 import com.lightningkite.ktordb.Database
+import io.ktor.util.logging.*
 import io.sentry.Sentry
-import io.sentry.SentryLevel
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import org.slf4j.LoggerFactory
 import java.io.File
 
 @Serializable
@@ -26,9 +27,7 @@ data class ExceptionSettings(
     init {
         ExceptionSettings.instance = this
         sentryDsn?.let {
-            Sentry.init { options ->
-                options.dsn = it
-            }
+            Sentry.init(it)
         }
     }
 
@@ -38,7 +37,8 @@ data class ExceptionSettings(
         return when {
             sentryDsn != null ->
                 try {
-                    Sentry.captureMessage("Sentry Health Check", SentryLevel.DEBUG)
+                    val e = Exception("Health Check: Can Report Exception")
+                    Sentry.capture(e)
                     HealthStatus(HealthStatus.Level.OK)
                 } catch (e: Exception) {
                     HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)

@@ -67,10 +67,8 @@ inline fun <reified USER : HasId<ID>, reified ID : Comparable<ID>> Application.c
                     creds.payload
                         .getClaim(AuthSettings.userIdKey)
                         .asString()
-                        .also { println("ID is ${it}") }
                 )
             )
-                .also { println("Principal is ${it}") }
         }
     }
     routing {
