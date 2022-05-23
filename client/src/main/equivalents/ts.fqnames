@@ -66,6 +66,7 @@ com.lightningkite.ktordb.assign>com.lightningkite.ktordb.PropChaincom.lightningk
 com.lightningkite.ktordb.eq>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.eq.K, com.lightningkite.ktordb.eq.T
 com.lightningkite.ktordb.live.LiveObserveModelApi
 com.lightningkite.ktordb.containsKey>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.containsKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.ktordb.containsKey.T
+com.lightningkite.ktordb.HasEmail
 com.lightningkite.ktordb.live.LiveWriteModelApi
 com.lightningkite.ktordb.always>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.always.K, com.lightningkite.ktordb.always.K
 com.lightningkite.ktordb.anyClear>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.anyClear.K, kotlin.Int
@@ -86,3 +87,4 @@ com.lightningkite.ktordb.dropLast>com.lightningkite.ktordb.PropChaincom.lightnin
 com.lightningkite.ktordb.mapIf>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.mapIf.K, kotlin.collections.Listcom.lightningkite.ktordb.mapIf.T
 com.lightningkite.ktordb.comparator>kotlin.collections.Listcom.lightningkite.ktordb.SortPartcom.lightningkite.ktordb.comparator.T
 com.lightningkite.ktordb.get>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.get.K, kotlin.collections.Mapkotlin.String, com.lightningkite.ktordb.get.T
+com.lightningkite.ktordb.HasEmailFields

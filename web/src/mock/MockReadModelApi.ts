@@ -11,7 +11,7 @@ import { Comparable, compareBy } from '@lightningkite/khrysalis-runtime'
 import { Observable, of, throwError } from 'rxjs'
 
 //! Declares com.lightningkite.ktordb.mock.MockReadModelApi
-export class MockReadModelApi<Model extends HasId> extends ReadModelApi<Model> {
+export class MockReadModelApi<Model extends HasId<string>> extends ReadModelApi<Model> {
     public constructor(public readonly table: MockTable<Model>) {
         super();
     }

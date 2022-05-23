@@ -6,7 +6,7 @@ import { Modification } from '../db/Modification';
 import { UUIDFor } from '../db/UUIDFor';
 import { MockTable } from './MockTable';
 import { Observable } from 'rxjs';
-export declare class MockWriteModelApi<Model extends HasId> extends WriteModelApi<Model> {
+export declare class MockWriteModelApi<Model extends HasId<string>> extends WriteModelApi<Model> {
     readonly table: MockTable<Model>;
     constructor(table: MockTable<Model>);
     post(value: Model): Observable<Model>;

@@ -19,8 +19,8 @@ dependencies {
 
     equivalents("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion:equivalents")
 
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
-    api("org.jetbrains.kotlinx:kotlinx-serialization-properties:1.3.2")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.3")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-properties:1.3.3")
     api("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")

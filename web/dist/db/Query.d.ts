@@ -18,5 +18,5 @@ export declare class Query<T extends any> {
     copy: (values: Partial<Query<T>>) => this;
     equals: (other: any) => boolean;
     hashCode: () => number;
-    static constructorFunction1comPropChaincomQueryTQueryTConditioncomQueryTListcomSortPartcomQueryTIntInt<T extends any>(makeCondition: ((a: PropChain<T, T>) => Condition<T>), orderBy: Array<SortPart<T>>, skip?: number, limit?: number): Query<T>;
+    static constructorListcomSortPartcomQueryTIntIntFunction1comPropChaincomQueryTQueryTConditioncomQueryT<T extends any>(orderBy: SortPart<T>[] | undefined, skip: number | undefined, limit: number | undefined, makeCondition: ((a: PropChain<T, T>) => Condition<T>)): Query<T>;
 }

@@ -12,7 +12,7 @@ import { Observable, from, map as rMap, switchMap } from 'rxjs'
 import { map, mergeMap } from 'rxjs/operators'
 
 //! Declares com.lightningkite.ktordb.live.LiveWriteModelApi
-export class LiveWriteModelApi<Model extends HasId> extends WriteModelApi<Model> {
+export class LiveWriteModelApi<Model extends HasId<string>> extends WriteModelApi<Model> {
     public constructor(public readonly url: string, token: string, headers: Map<string, string>, public readonly serializer: ReifiedType) {
         super();
         this.authHeaders = new Map([...headers, ...new Map([["Authorization", `Bearer ${token}`]])]);
@@ -62,7 +62,7 @@ export namespace LiveWriteModelApi {
         }
         public static INSTANCE = new Companion();
         
-        public create<Model extends HasId>(Model: Array<any>, root: string, path: string, token: string, headers: Map<string, string> = new Map([])): LiveWriteModelApi<Model> {
+        public create<Model extends HasId<string>>(Model: Array<any>, root: string, path: string, token: string, headers: Map<string, string> = new Map([])): LiveWriteModelApi<Model> {
             return new LiveWriteModelApi<Model>(`${root}${path}`, token, headers, Model);
         }
     }

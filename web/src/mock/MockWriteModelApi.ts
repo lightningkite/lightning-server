@@ -13,7 +13,7 @@ import { Observable, of, throwError } from 'rxjs'
 import { map } from 'rxjs/operators'
 
 //! Declares com.lightningkite.ktordb.mock.MockWriteModelApi
-export class MockWriteModelApi<Model extends HasId> extends WriteModelApi<Model> {
+export class MockWriteModelApi<Model extends HasId<string>> extends WriteModelApi<Model> {
     public constructor(public readonly table: MockTable<Model>) {
         super();
     }

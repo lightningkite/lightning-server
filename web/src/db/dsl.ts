@@ -3,7 +3,7 @@
 import { Condition } from './Condition'
 import { DataClassProperty } from './DataClassProperty'
 import { Modification } from './Modification'
-import { Comparable } from '@lightningkite/khrysalis-runtime'
+import { Comparable, safeEq } from '@lightningkite/khrysalis-runtime'
 import { map as iMap } from 'iter-tools-es'
 
 //! Declares com.lightningkite.ktordb.startChain
@@ -17,6 +17,18 @@ export class PropChain<From extends any, To extends any> {
     
     public get<V extends any>(prop: DataClassProperty<To, V>): PropChain<From, V> {
         return new PropChain<From, V>((it: Condition<V>): Condition<From> => (this.mapCondition(new Condition.OnField<To, V>(prop, it))), (it: Modification<V>): Modification<From> => (this.mapModification(new Modification.OnField<To, V>(prop, it))));
+    }
+    
+    public hashCode(): number {
+        return this.mapCondition(new Condition.Always<To>()).hashCode();
+    }
+    
+    public toString(): string {
+        return `PropChain(${this.mapCondition(new Condition.Always<To>())})`;
+    }
+    
+    public equals(other: (any | null)): boolean {
+        return other instanceof PropChain && safeEq(this.mapCondition(new Condition.Always<To>()), (other as PropChain<(any | null), (any | null)>).mapCondition(new Condition.Always<(any | null)>()));
     }
 }
 

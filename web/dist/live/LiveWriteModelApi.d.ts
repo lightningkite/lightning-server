@@ -6,7 +6,7 @@ import { Modification } from '../db/Modification';
 import { UUIDFor } from '../db/UUIDFor';
 import { ReifiedType } from '@lightningkite/khrysalis-runtime';
 import { Observable } from 'rxjs';
-export declare class LiveWriteModelApi<Model extends HasId> extends WriteModelApi<Model> {
+export declare class LiveWriteModelApi<Model extends HasId<string>> extends WriteModelApi<Model> {
     readonly url: string;
     readonly serializer: ReifiedType;
     constructor(url: string, token: string, headers: Map<string, string>, serializer: ReifiedType);
@@ -24,6 +24,6 @@ export declare namespace LiveWriteModelApi {
     class Companion {
         private constructor();
         static INSTANCE: Companion;
-        create<Model extends HasId>(Model: Array<any>, root: string, path: string, token: string, headers?: Map<string, string>): LiveWriteModelApi<Model>;
+        create<Model extends HasId<string>>(Model: Array<any>, root: string, path: string, token: string, headers?: Map<string, string>): LiveWriteModelApi<Model>;
     }
 }

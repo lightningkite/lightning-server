@@ -7,7 +7,7 @@ import { MockTable } from './MockTable'
 import { Observable, concat, of } from 'rxjs'
 
 //! Declares com.lightningkite.ktordb.mock.MockObserveModelApi
-export class MockObserveModelApi<Model extends HasId> extends ObserveModelApi<Model> {
+export class MockObserveModelApi<Model extends HasId<string>> extends ObserveModelApi<Model> {
     public constructor(public readonly table: MockTable<Model>) {
         super();
     }

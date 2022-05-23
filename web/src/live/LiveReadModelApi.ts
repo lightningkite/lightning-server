@@ -9,7 +9,7 @@ import { HttpBody, HttpClient, fromJSON, unsuccessfulAsError } from '@lightningk
 import { Observable } from 'rxjs'
 
 //! Declares com.lightningkite.ktordb.live.LiveReadModelApi
-export class LiveReadModelApi<Model extends HasId> extends ReadModelApi<Model> {
+export class LiveReadModelApi<Model extends HasId<string>> extends ReadModelApi<Model> {
     public constructor(public readonly url: string, token: string, headers: Map<string, string> = new Map([]), public readonly serializer: ReifiedType) {
         super();
         this.authHeaders = new Map([...headers, ...new Map([["Authorization", `Bearer ${token}`]])]);
@@ -38,7 +38,7 @@ export namespace LiveReadModelApi {
         }
         public static INSTANCE = new Companion();
         
-        public create<Model extends HasId>(Model: Array<any>, root: string, path: string, token: string, headers: Map<string, string> = new Map([])): LiveReadModelApi<Model> {
+        public create<Model extends HasId<string>>(Model: Array<any>, root: string, path: string, token: string, headers: Map<string, string> = new Map([])): LiveReadModelApi<Model> {
             return new LiveReadModelApi<Model>(`${root}${path}`, token, headers, Model);
         }
     }

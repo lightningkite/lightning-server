@@ -70,6 +70,7 @@ com.lightningkite.ktordb.nin>com.lightningkite.ktordb.PropChaincom.lightningkite
 com.lightningkite.ktordb.inside
 com.lightningkite.ktordb.startChain
 com.lightningkite.ktordb.dropLast>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.dropLast.K, kotlin.collections.Listcom.lightningkite.ktordb.dropLast.T
+com.lightningkite.ktordb.HasEmailFields
 com.lightningkite.ktordb.times>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.times.K, com.lightningkite.ktordb.times.T
 com.lightningkite.ktordb.eq
 com.lightningkite.ktordb.notNull
@@ -112,6 +113,7 @@ com.lightningkite.ktordb.condition
 com.lightningkite.ktordb.assign>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.assign.K, com.lightningkite.ktordb.assign.T
 com.lightningkite.ktordb.eq>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.eq.K, com.lightningkite.ktordb.eq.T
 com.lightningkite.ktordb.get
+com.lightningkite.ktordb.HasEmail
 com.lightningkite.ktordb.listChange
 com.lightningkite.ktordb.always>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.always.K, com.lightningkite.ktordb.always.K
 com.lightningkite.ktordb.anyClear>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.anyClear.K, kotlin.Int

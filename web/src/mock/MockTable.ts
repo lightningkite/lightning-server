@@ -10,7 +10,7 @@ import { Observable, Subject } from 'rxjs'
 import { map } from 'rxjs/operators'
 
 //! Declares com.lightningkite.ktordb.mock.MockTable
-export class MockTable<Model extends HasId> {
+export class MockTable<Model extends HasId<string>> {
     public constructor() {
         this.data = new EqualOverrideMap([]);
         this.signals = new Subject();

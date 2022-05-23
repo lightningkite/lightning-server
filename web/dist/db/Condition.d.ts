@@ -5,6 +5,7 @@ export declare class Condition<T extends any> {
     hashCode(): number;
     equals(other: (any | null)): boolean;
     invoke(on: T): boolean;
+    simplify(): Condition<T>;
     and(other: Condition<T>): Condition.And<T>;
     or(other: Condition<T>): Condition.Or<T>;
     not(): Condition.Not<T>;
@@ -37,6 +38,7 @@ export declare namespace Condition {
         equals: (other: any) => boolean;
         hashCode: () => number;
         invoke(on: T): boolean;
+        simplify(): Condition<T>;
     }
 }
 export declare namespace Condition {
@@ -51,6 +53,7 @@ export declare namespace Condition {
         equals: (other: any) => boolean;
         hashCode: () => number;
         invoke(on: T): boolean;
+        simplify(): Condition<T>;
     }
 }
 export declare namespace Condition {
@@ -65,6 +68,7 @@ export declare namespace Condition {
         equals: (other: any) => boolean;
         hashCode: () => number;
         invoke(on: T): boolean;
+        simplify(): Condition<T>;
     }
 }
 export declare namespace Condition {

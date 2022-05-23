@@ -15,11 +15,11 @@ export class Query<T extends any> {
     equals: (other: any) => boolean;
     hashCode: () => number;
     
-    public static constructorFunction1comPropChaincomQueryTQueryTConditioncomQueryTListcomSortPartcomQueryTIntInt<T extends any>(
-        makeCondition: ((a: PropChain<T, T>) => Condition<T>),
-        orderBy: Array<SortPart<T>>,
+    public static constructorListcomSortPartcomQueryTIntIntFunction1comPropChaincomQueryTQueryTConditioncomQueryT<T extends any>(
+        orderBy: Array<SortPart<T>> = [],
         skip: number = 0,
         limit: number = 100,
+        makeCondition: ((a: PropChain<T, T>) => Condition<T>),
     ) {
         let result = new Query<T>(makeCondition(startChain<T>()), orderBy, skip, limit);
         

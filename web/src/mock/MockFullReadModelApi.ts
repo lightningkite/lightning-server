@@ -9,7 +9,7 @@ import { MockReadModelApi } from './MockReadModelApi'
 import { MockTable } from './MockTable'
 
 //! Declares com.lightningkite.ktordb.mock.MockFullReadModelApi
-export class MockFullReadModelApi<Model extends HasId> extends FullReadModelApi<Model> {
+export class MockFullReadModelApi<Model extends HasId<string>> extends FullReadModelApi<Model> {
     public constructor(public readonly table: MockTable<Model>) {
         super();
         this.read = new MockReadModelApi<Model>(this.table);
