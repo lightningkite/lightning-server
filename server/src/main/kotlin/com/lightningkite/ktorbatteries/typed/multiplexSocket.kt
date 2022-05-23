@@ -19,13 +19,14 @@ import kotlinx.serialization.serializer
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.collections.set
 import kotlin.reflect.jvm.jvmErasure
+import kotlin.reflect.safeCast
 
 
 private data class OpenChannel(val channel: Channel<String>, val job: Job)
 
 fun Route.multiplexWebSocket(path: String = "") {
     webSocket(path = path) {
-        val user = call.principal<BoxPrincipal<Any?>>()
+        val user = call.principal<Principal>()
         val myOpenSockets = ConcurrentHashMap<String, OpenChannel>()
         try {
             incomingLoop@ for (message in incoming) {
@@ -39,9 +40,14 @@ fun Route.multiplexWebSocket(path: String = "") {
                 val decoded: MultiplexMessage = Serialization.json.decodeFromString(text)
                 when {
                     decoded.start -> {
-                        @Suppress("UNCHECKED_CAST") val apiWebsocket = ApiWebsocket.known.find { it.route.fullPath == decoded.path } as? ApiWebsocket<Any?, Any?, Any?>
-                            ?: continue@incomingLoop
-                        if (apiWebsocket.userType != null && !apiWebsocket.userType.jvmErasure.isInstance(user)) continue@incomingLoop
+                        @Suppress("UNCHECKED_CAST") val apiWebsocket =
+                            ApiWebsocket.known.find { it.route.fullPath == decoded.path } as? ApiWebsocket<Any?, Any?, Any?>
+                                ?: continue@incomingLoop
+
+                        val erasedUserType = apiWebsocket.userType?.jvmErasure
+                        val apiUser = erasedUserType?.safeCast(user)
+                            ?: (user as? BoxPrincipal<*>)?.user?.let { erasedUserType?.safeCast(it) }
+                        if (apiWebsocket.userType != null && apiUser == null && !apiWebsocket.userType.isMarkedNullable) continue@incomingLoop
                         val incomingChannel = Channel<String>()
                         val outSerializer = Serialization.json.serializersModule.serializer(apiWebsocket.outputType)
                         val inSerializer = Serialization.json.serializersModule.serializer(apiWebsocket.inputType)
