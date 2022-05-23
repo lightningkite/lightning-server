@@ -2,6 +2,9 @@ package com.lightningkite.ktorbatteries.exceptions
 
 import com.lightningkite.ktorbatteries.HtmlDefaults
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
+import com.lightningkite.ktorbatteries.typed.BoxPrincipal
+import com.lightningkite.ktordb.HasEmail
+import com.lightningkite.ktordb.HasId
 import com.mongodb.MongoWriteException
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
@@ -10,8 +13,11 @@ import io.ktor.server.auth.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import io.sentry.Sentry
+import io.sentry.event.User
+import io.sentry.event.interfaces.HttpInterface
 import java.io.PrintWriter
 import java.io.StringWriter
 
@@ -67,17 +73,51 @@ private val filterHeaders = setOf(
     HttpHeaders.Authorization.lowercase(),
     HttpHeaders.Cookie.lowercase(),
 )
+private fun Any?.simpleUserTag(): String = when(this) {
+    null -> "anonymous"
+    is BoxPrincipal<*> -> this.user.simpleUserTag()
+    is HasEmail -> this.email
+    is HasId<*> -> this._id.toString()
+    else -> toString()
+}
+private fun Any?.simpleUserId(): String = when(this) {
+    null -> "anonymous"
+    is BoxPrincipal<*> -> this.user.simpleUserId()
+    is HasId<*> -> this._id.toString()
+    else -> toString()
+}
 fun ApplicationCall.reportException(throwable: Throwable) {
     if(ExceptionSettings.instance.sentryDsn != null) {
         val ctx = Sentry.getContext()
+        val p = principal<Principal>()
         ctx.clear()
-        ctx.addExtra("path", request.path())
-        ctx.addExtra("method", request.httpMethod.value)
-        ctx.addExtra("queryParameters", request.queryParameters.entries().filter { it.key != "jwt" }.joinToString("\n") { it.key + ": " + it.value })
-        ctx.addExtra("headers", request.headers.entries().filter {
-            it.key.lowercase() !in filterHeaders
-        }.joinToString("\n") { it.key + ": " + it.value })
-        ctx.addExtra("user", principal<Principal>()?.toString() ?: "anonymous")
+        ctx.http = HttpInterface(
+            request.uri,
+            request.httpMethod.value,
+            request.queryParameters.toMap().filter { it.key != "jwt" },
+            null,
+            request.cookies.rawCookies.filter { it.key.lowercase() !in filterHeaders },
+            request.origin.remoteHost,
+            null,
+            -1,
+            null,
+            "null",
+            -1,
+            null,
+            GeneralServerSettings.instance.publicUrl.startsWith("https"),
+            false,
+            "",
+            "",
+            request.headers.toMap().filter { it.key.lowercase() !in filterHeaders },
+            null
+        )
+        ctx.user = User(
+            p.simpleUserId(),
+            p.simpleUserTag(),
+            (request.headers.get("X-Forwarded-For") ?: request.origin.remoteHost).takeIf { it.all { it.isDigit() || it == '.' } },
+            p.simpleUserTag().takeIf { it.contains('@') },
+            mapOf("stringRepresentation" to p.toString())
+        )
         Sentry.capture(throwable)
         ctx.clear()
     } else {
