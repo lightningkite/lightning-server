@@ -5,7 +5,7 @@ import RxSwift
 import RxSwiftPlus
 import Foundation
 
-public class MockObserveModelApi<Model : HasId> : ObserveModelApi<Model> {
+public class MockObserveModelApi<Model : HasId<UUID>> : ObserveModelApi<Model> {
     public var table: MockTable<Model>
     public init(table: MockTable<Model>) {
         self.table = table

@@ -1,7 +1,9 @@
 KtorBatteries
 com.lightningkite.ktordb.DatabaseModel
+com.lightningkite.ktordb.DoNotGenerateFields
 com.lightningkite.ktordb.AllowedTypes
 com.lightningkite.ktordb.StoragePrefix
+com.lightningkite.ktordb.References
 com.lightningkite.ktordb
 com.lightningkite.ktordb.Condition
 com.lightningkite.ktordb.serializers
@@ -45,6 +47,8 @@ com.lightningkite.ktordb.throwSubtypeNotRegistered
 com.lightningkite.ktordb.cast
 com.lightningkite.ktordb.HasId
 com.lightningkite.ktordb.HasIdFields
+com.lightningkite.ktordb.HasEmail
+com.lightningkite.ktordb.HasEmailFields
 com.lightningkite.ktorbatteries.jsonschema.JsonSchema
 com.lightningkite.ktorbatteries.jsonschema
 com.lightningkite.ktordb.ListChange

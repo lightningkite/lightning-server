@@ -4,7 +4,7 @@ import KhrysalisRuntime
 import RxSwift
 import Foundation
 
-public class MockWriteModelApi<Model : HasId> : WriteModelApi<Model> {
+public class MockWriteModelApi<Model : HasId<UUID>> : WriteModelApi<Model> {
     public var table: MockTable<Model>
     public init(table: MockTable<Model>) {
         self.table = table
