@@ -3,12 +3,10 @@
 import KhrysalisRuntime
 import Foundation
 
-open class HasId<ID : Comparable> {
-    public init() {
-        //Necessary properties should be initialized now
-    }
-    
-    open var _id: ID { get { TODO() } }
+public protocol HasId: AnyObject, Codable, Hashable {
+
+    var _id: UUID { get }
+
 }
 
 public class HasIdFields {

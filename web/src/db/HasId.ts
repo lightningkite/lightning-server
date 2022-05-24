@@ -4,11 +4,10 @@ import { DataClassProperty } from './DataClassProperty'
 import { Comparable } from '@lightningkite/khrysalis-runtime'
 
 //! Declares com.lightningkite.ktordb.HasId
-export abstract class HasId<ID extends Comparable<ID>> {
-    protected constructor() {
-    }
-    
-    public abstract readonly _id: ID;
+export interface HasId<ID extends Comparable<ID>> {
+
+    readonly _id: ID;
+
 }
 
 //! Declares com.lightningkite.ktordb.HasIdFields

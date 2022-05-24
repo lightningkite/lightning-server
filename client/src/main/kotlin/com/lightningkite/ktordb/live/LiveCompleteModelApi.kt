@@ -1,6 +1,7 @@
 @file:SharedCode
 package com.lightningkite.ktordb.live
 
+import com.lightningkite.khrysalis.IsCodableAndHashable
 import com.lightningkite.khrysalis.SharedCode
 import com.lightningkite.ktordb.*
 import com.lightningkite.ktordb.HasId

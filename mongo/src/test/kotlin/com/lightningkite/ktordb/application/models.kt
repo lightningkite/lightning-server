@@ -21,7 +21,7 @@ data class User(
     var email: String,
     var age: Long = 0,
     var friends: List<UUIDFor<User>> = listOf()
-) : HasId<UUID>() {
+) : HasId<UUID> {
     companion object
 }
 
@@ -34,7 +34,7 @@ data class Post(
     var author: UUIDFor<User>,
     var content: String,
     var at: Long? = null
-) : HasId<UUID>() {
+) : HasId<UUID> {
     companion object
 }
 
@@ -46,7 +46,7 @@ val Post.Companion.mongo get() = defaultMongo.collection<Post>()
 data class Employee(
     override val _id: @Contextual UUID = UUID.randomUUID(),
     var dictionary: Map<String, Int> = mapOf(),
-) : HasId<UUID>() {
+) : HasId<UUID> {
     companion object
 }
 
@@ -60,7 +60,7 @@ data class EmbeddedObjectTest(
     var name: String = "",
     var embed1: ClassUsedForEmbedding = ClassUsedForEmbedding("value1", 1),
     var embed2: ClassUsedForEmbedding = ClassUsedForEmbedding("value2", 2),
-) : HasId<UUID>() {
+) : HasId<UUID> {
     companion object
 }
 
@@ -87,7 +87,7 @@ data class EmbeddedNullable(
     override val _id: UUID = UUID.randomUUID(),
     var name: String = "",
     var embed1: ClassUsedForEmbedding? = null,
-) : HasId<UUID>() {
+) : HasId<UUID> {
     companion object
 }
 
@@ -124,7 +124,7 @@ data class LargeTestModel(
     var listNullable: List<Int>? = null,
     var mapNullable: Map<String, Int>? = null,
     var embeddedNullable: ClassUsedForEmbedding? = null,
-) : HasId<UUID>() {
+) : HasId<UUID> {
     companion object
 }
 val LargeTestModel.Companion.mongo get() = defaultMongo.collection<LargeTestModel>()
@@ -134,5 +134,5 @@ val LargeTestModel.Companion.mongo get() = defaultMongo.collection<LargeTestMode
 data class EmbeddedMap(
     override val _id: UUID = UUID.randomUUID(),
     var map: Map<String, RecursiveEmbed>,
-) : HasId<UUID>()
+) : HasId<UUID>
 val EmbeddedMap.Companion.mongo get() = defaultMongo.collection<EmbeddedMap>()

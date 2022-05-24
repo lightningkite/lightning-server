@@ -6,8 +6,8 @@ import kotlinx.serialization.Serializable
 import java.util.*
 
 @SwiftProtocolExtends("Codable", "Hashable")
-abstract class HasId<ID : Comparable<ID>> {
-    abstract val _id: ID
+interface HasId<ID : Comparable<ID>> {
+    val _id: ID
 }
 
 object HasIdFields {
