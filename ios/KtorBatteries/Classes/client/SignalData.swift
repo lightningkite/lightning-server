@@ -3,7 +3,7 @@
 import KhrysalisRuntime
 import Foundation
 
-public class SignalData<Model : HasId<UUID>> : CustomStringConvertible, Hashable {
+public class SignalData<Model : HasId> : CustomStringConvertible, Hashable {
     public var item: Model
     public var created: Bool
     public var deleted: Bool

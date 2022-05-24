@@ -4,22 +4,21 @@ import KhrysalisRuntime
 import RxSwift
 import Foundation
 
-public class MockTable<Model : HasId<UUID>> {
+public class MockTable<Model : HasId> {
     public init() {
         self.data = dictionaryOf()
         self.signals = PublishSubject()
         //Necessary properties should be initialized now
     }
     
-    
-    public var data: Dictionary<UUIDFor<Model>, Model>
+    public var data: Dictionary<Model.ID, Model>
     public let signals: PublishSubject<SignalData<Model>>
     
     public func observe(_ condition: Condition<Model>) -> Observable<Array<Model>> {
         return self.signals.map { (it) -> Array<Model> in self.data.values.filter({ (it) -> Bool in condition.invoke(on: it) }) };
     }
     
-    public func getItem(id: UUIDFor<Model>) -> Model? {
+    public func getItem(id: Model.ID) -> Model? {
         return self.data[id];
     }
     
@@ -47,7 +46,7 @@ public class MockTable<Model : HasId<UUID>> {
         self.deleteItemById(id: item._id)
     }
     
-    public func deleteItemById(id: UUIDFor<Model>) -> Void {
+    public func deleteItemById(id: Model.ID) -> Void {
         if let item = (self.data[id]) {
             self.data.removeValue(forKey: id)
             self.signals.onNext(SignalData(item: item, created: false, deleted: true))

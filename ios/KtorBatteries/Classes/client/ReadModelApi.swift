@@ -4,11 +4,11 @@ import KhrysalisRuntime
 import RxSwift
 import Foundation
 
-open class ReadModelApi<Model : Codable & Hashable> {
+open class ReadModelApi<Model : HasId & Codable & Hashable> {
     public init() {
         //Necessary properties should be initialized now
     }
     
     open func list(_ query: Query<Model>) -> Single<Array<Model>> { TODO() }
-    open func get(id: UUIDFor<Model>) -> Single<Model> { TODO() }
+    open func get(id: Model.ID) -> Single<Model> { TODO() }
 }

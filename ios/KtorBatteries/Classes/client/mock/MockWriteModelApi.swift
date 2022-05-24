@@ -4,7 +4,7 @@ import KhrysalisRuntime
 import RxSwift
 import Foundation
 
-public class MockWriteModelApi<Model : HasId<UUID>> : WriteModelApi<Model> {
+public class MockWriteModelApi<Model : HasId> : WriteModelApi<Model> {
     public var table: MockTable<Model>
     public init(table: MockTable<Model>) {
         self.table = table
@@ -29,7 +29,7 @@ public class MockWriteModelApi<Model : HasId<UUID>> : WriteModelApi<Model> {
         return Single.just(values.map({ (it) -> Model in self.table.replaceItem(item: it) }));
     }
     
-    override public func patch(id: UUIDFor<Model>, modification: Modification<Model>) -> Single<Model> {
+    override public func patch(id: Model.ID, modification: Modification<Model>) -> Single<Model> {
         return (self.table.data[id]).map { (item) in
             let modified = modification.invoke(on: item)
             self.table.replaceItem(item: modified)
@@ -45,7 +45,7 @@ public class MockWriteModelApi<Model : HasId<UUID>> : WriteModelApi<Model> {
             .map { (it) -> Int in Int(it.count) };
     }
     
-    override public func delete(id: UUIDFor<Model>) -> Single<Void> {
+    override public func delete(id: Model.ID) -> Single<Void> {
         return Single.just(self.table.deleteItemById(id: id));
     }
     

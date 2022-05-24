@@ -4,11 +4,11 @@ import KhrysalisRuntime
 import RxSwift
 import Foundation
 
-public class LiveObserveModelApi<Model : HasId<UUID>> : ObserveModelApi<Model> {
+public class LiveObserveModelApi<Model : HasId> : ObserveModelApi<Model> {
     public var openSocket: (Query<Model>) -> Observable<Array<Model>>
     public init(openSocket: @escaping (Query<Model>) -> Observable<Array<Model>>) {
         self.openSocket = openSocket
-        self.alreadyOpen = (HashMap() as Dictionary<Query<Model>, Observable<Array<Model>>>)
+        self.alreadyOpen = Dictionary<Query<Model>, Observable<Array<Model>>>()
         super.init()
         //Necessary properties should be initialized now
     }
@@ -27,7 +27,7 @@ public class LiveObserveModelApi<Model : HasId<UUID>> : ObserveModelApi<Model> {
     }
 }
 
-public func xObservableToListObservable<T : HasId<UUID>>(_ this: Observable<ListChange<T>>, ordering: @escaping TypedComparator<T>) -> Observable<Array<T>> {
+public func xObservableToListObservable<T : HasId>(_ this: Observable<ListChange<T>>, ordering: @escaping TypedComparator<T>) -> Observable<Array<T>> {
     var localList = [] as Array<T>
     return this.map({ (it) -> Array<T> in
         if let it = (it.wholeList) {
@@ -50,7 +50,7 @@ public class LiveObserveModelApiCompanion {
     }
     public static let INSTANCE = LiveObserveModelApiCompanion()
     
-    public func create<Model : HasId<UUID>>(multiplexUrl: String, token: String, headers: Dictionary<String, String>, path: String) -> LiveObserveModelApi<Model> {
+    public func create<Model : HasId>(multiplexUrl: String, token: String, headers: Dictionary<String, String>, path: String) -> LiveObserveModelApi<Model> {
         return LiveObserveModelApi<Model>(openSocket: { (query) -> Observable<Array<Model>> in xObservableToListObservable((multiplexedSocket(url: "\(String(kotlin: multiplexUrl))?jwt=\(String(kotlin: token))", path: path) as Observable<WebSocketIsh<ListChange<Model>, Query<Model>>>)
                 .switchMap { (it) -> Observable<ListChange<Model>> in
                 it.send(query)

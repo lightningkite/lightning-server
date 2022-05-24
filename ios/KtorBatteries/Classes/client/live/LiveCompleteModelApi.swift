@@ -4,7 +4,7 @@ import KhrysalisRuntime
 import RxSwiftPlus
 import Foundation
 
-public class LiveCompleteModelApi<Model : HasId<UUID>> : CompleteModelApi<Model> {
+public class LiveCompleteModelApi<Model : HasId & Hashable & Codable> : CompleteModelApi<Model> {
     private var _read: ReadModelApi<Model>
     override public var read: ReadModelApi<Model> { get { return self._read } set(value) { self._read = value } }
     private var _write: WriteModelApi<Model>
@@ -27,7 +27,7 @@ public class LiveCompleteModelApiCompanion {
     }
     public static let INSTANCE = LiveCompleteModelApiCompanion()
     
-    public func create<Model : HasId<UUID>>(root: String, multiplexSocketUrl: String, path: String, token: String, headers: Dictionary<String, String> = dictionaryOf()) -> LiveCompleteModelApi<Model> {
+    public func create<Model : HasId>(root: String, multiplexSocketUrl: String, path: String, token: String, headers: Dictionary<String, String> = dictionaryOf()) -> LiveCompleteModelApi<Model> {
         return LiveCompleteModelApi<Model>(read: LiveReadModelApi(url: "\(String(kotlin: root))\(String(kotlin: path))", token: token, headers: headers, serializer: Model.self), write: LiveWriteModelApi(url: "\(String(kotlin: root))\(String(kotlin: path))", token: token, headers: headers, serializer: Model.self), observe: LiveObserveModelApiCompanion.INSTANCE.create(multiplexUrl: multiplexSocketUrl, token: token, headers: headers, path: path));
     }
 }

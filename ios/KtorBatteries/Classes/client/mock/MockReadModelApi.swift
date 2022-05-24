@@ -4,7 +4,7 @@ import KhrysalisRuntime
 import RxSwift
 import Foundation
 
-public class MockReadModelApi<Model : HasId<UUID>> : ReadModelApi<Model> {
+public class MockReadModelApi<Model : HasId> : ReadModelApi<Model> {
     public var table: MockTable<Model>
     public init(table: MockTable<Model>) {
         self.table = table
@@ -20,7 +20,7 @@ public class MockReadModelApi<Model : HasId<UUID>> : ReadModelApi<Model> {
             .sorted(by: getListComparator(query.orderBy) ?? compareBy(selector: { (it) in it._id })).dropFirst(query.skip)).prefix(query.limit)));
     }
     
-    override public func get(id: UUIDFor<Model>) -> Single<Model> {
+    override public func get(id: Model.ID) -> Single<Model> {
         return (self.table.getItem(id: id)).map { (it) in
             return Single.just(it)
         } ?? Single.error(ItemNotFound(message: "404 item with key \(id) not found"));

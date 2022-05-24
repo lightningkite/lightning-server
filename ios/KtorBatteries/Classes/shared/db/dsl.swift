@@ -6,7 +6,7 @@ import Foundation
 public func startChain<T : Codable & Hashable>() -> PropChain<T, T> {
     return PropChain(mapCondition: { (it) -> Condition<T> in it }, mapModification: { (it) -> Modification<T> in it });
 }
-public class PropChain<From : Codable & Hashable, To : Codable & Hashable> : KEquatable, KHashable, KStringable {
+public class PropChain<From : Codable & Hashable, To : Codable & Hashable> : KStringable {
     public var mapCondition: (Condition<To>) -> Condition<From>
     public var mapModification: (Modification<To>) -> Modification<From>
     public init(mapCondition: @escaping (Condition<To>) -> Condition<From>, mapModification: @escaping (Modification<To>) -> Modification<From>) {
@@ -19,17 +19,16 @@ public class PropChain<From : Codable & Hashable, To : Codable & Hashable> : KEq
         return PropChain<From, V>(mapCondition: { (it) -> Condition<From> in self.mapCondition(ConditionOnField(key: prop, condition: it)) }, mapModification: { (it) -> Modification<From> in self.mapModification(ModificationOnField(key: prop, modification: it)) });
     }
     
-    public func hashCode() -> Int {
-        return self.mapCondition(ConditionAlways()).hashValue;
-    }
+//    public func hashCod
+    
     
     public func toString() -> String {
         return "PropChain(\(self.mapCondition(ConditionAlways())))";
     }
     
-    public func equals(other: Any) -> Bool {
-        return other is PropChain<Any?, Any?> && self.mapCondition(ConditionAlways()) == (other as! PropChain<Any?, Any?>).mapCondition(ConditionAlways());
-    }
+//    public func equals(other: Any) -> Bool {
+//        return other is PropChain<Any?, Any?> && self.mapCondition(ConditionAlways()) == (other as! PropChain<Any?, Any?>).mapCondition(ConditionAlways());
+//    }
 }
 
 public func condition<T : Codable & Hashable>(setup: @escaping (PropChain<T, T>) -> Condition<T>) -> Condition<T> {
