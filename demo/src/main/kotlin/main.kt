@@ -54,14 +54,14 @@ data class TestModel(
     val number: Int = 3123,
     @JsonSchema.Format("jodit") val content: String = "",
     val file: ServerFile? = null
-) : HasId<UUID>
+) : HasId<UUID>()
 
 @Serializable
 @DatabaseModel
 data class User(
     override val _id: UUID = UUID.randomUUID(),
     override val email: String
-): HasId<UUID>, HasEmail
+) : HasId<UUID>(), HasEmail
 
 val TestModel.Companion.table get() = database.collection<TestModel>("TestModel")
 

@@ -14,9 +14,11 @@ import java.util.*
 data class User(
     override val _id: UUID = UUID.randomUUID(),
     var email: String,
-    var age:Long = 0,
+    var age: Long = 0,
     var friends: List<UUIDFor<User>> = listOf()
-): HasId<UUID> { companion object }
+) : HasId<UUID>() {
+    companion object
+}
 
 @DatabaseModel()
 @Serializable
@@ -25,24 +27,30 @@ data class Post(
     var author: UUIDFor<User>,
     var content: String,
     var at: Long? = null
-): HasId<UUID> { companion object }
+) : HasId<UUID>() {
+    companion object
+}
 
 @DatabaseModel()
 @Serializable
 data class Employee(
     override val _id: @Contextual UUID = UUID.randomUUID(),
     var dictionary: Map<String, Int> = mapOf(),
-): HasId<UUID> { companion object }
+) : HasId<UUID>() {
+    companion object
+}
 
 
 @DatabaseModel
 @Serializable
 data class EmbeddedObjectTest(
     override val _id: UUID = UUID.randomUUID(),
-    var name:String = "",
-    var embed1:ClassUsedForEmbedding = ClassUsedForEmbedding("value1", 1),
-    var embed2:ClassUsedForEmbedding = ClassUsedForEmbedding("value2", 2),
-): HasId<UUID> { companion object }
+    var name: String = "",
+    var embed1: ClassUsedForEmbedding = ClassUsedForEmbedding("value1", 1),
+    var embed2: ClassUsedForEmbedding = ClassUsedForEmbedding("value2", 2),
+) : HasId<UUID>() {
+    companion object
+}
 
 
 @Serializable
@@ -61,9 +69,11 @@ data class RecursiveEmbed(
 @Serializable
 data class EmbeddedNullable(
     override val _id: UUID = UUID.randomUUID(),
-    var name:String = "",
-    var embed1:ClassUsedForEmbedding? = null,
-): HasId<UUID> { companion object }
+    var name: String = "",
+    var embed1: ClassUsedForEmbedding? = null,
+) : HasId<UUID>() {
+    companion object
+}
 
 @DatabaseModel
 @Serializable
@@ -96,11 +106,13 @@ data class LargeTestModel(
     var listNullable: List<Int>? = null,
     var mapNullable: Map<String, Int>? = null,
     var embeddedNullable: ClassUsedForEmbedding? = null,
-): HasId<UUID> { companion object }
+) : HasId<UUID>() {
+    companion object
+}
 
 @DatabaseModel
 @Serializable
 data class EmbeddedMap(
     override val _id: UUID = UUID.randomUUID(),
     var map: Map<String, RecursiveEmbed>,
-) : HasId<UUID>
+) : HasId<UUID>()
