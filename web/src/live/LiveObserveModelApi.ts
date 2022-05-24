@@ -11,7 +11,7 @@ import { NEVER, Observable } from 'rxjs'
 import { catchError, finalize, map, publishReplay, refCount, switchMap } from 'rxjs/operators'
 
 //! Declares com.lightningkite.ktordb.live.LiveObserveModelApi
-export class LiveObserveModelApi<Model extends HasId> extends ObserveModelApi<Model> {
+export class LiveObserveModelApi<Model extends HasId<string>> extends ObserveModelApi<Model> {
     public constructor(public readonly openSocket: ((query: Query<Model>) => Observable<Array<Model>>)) {
         super();
         this.alreadyOpen = new EqualOverrideMap<Query<Model>, Observable<Array<Model>>>();
@@ -36,7 +36,7 @@ export namespace LiveObserveModelApi {
         }
         public static INSTANCE = new Companion();
         
-        public create<Model extends HasId>(Model: Array<any>, multiplexUrl: string, token: string, headers: Map<string, string>, path: string): LiveObserveModelApi<Model> {
+        public create<Model extends HasId<string>>(Model: Array<any>, multiplexUrl: string, token: string, headers: Map<string, string>, path: string): LiveObserveModelApi<Model> {
             return new LiveObserveModelApi<Model>((query: Query<Model>): Observable<Array<Model>> => (xObservableToListObservable<Model>(multiplexedSocketReified<ListChange<Model>, Query<Model>>([ListChange, Model], [Query, Model], `${multiplexUrl}?jwt=${token}`, path, undefined).pipe(switchMap((it: WebSocketIsh<ListChange<Model>, Query<Model>>): Observable<ListChange<Model>> => {
                 it.send(query);
                 return it.messages.pipe(catchError((it: any): Observable<ListChange<Model>> => (NEVER)));
@@ -46,7 +46,7 @@ export namespace LiveObserveModelApi {
 }
 
 //! Declares com.lightningkite.ktordb.live.toListObservable>io.reactivex.rxjava3.core.Observablecom.lightningkite.ktordb.ListChangecom.lightningkite.ktordb.live.toListObservable.T
-export function xObservableToListObservable<T extends HasId>(this_: Observable<ListChange<T>>, ordering: Comparator<T>): Observable<Array<T>> {
+export function xObservableToListObservable<T extends HasId<string>>(this_: Observable<ListChange<T>>, ordering: Comparator<T>): Observable<Array<T>> {
     const localList = ([] as Array<T>);
     return this_.pipe(map((it: ListChange<T>): Array<T> => {
         const it_11 = it.wholeList;

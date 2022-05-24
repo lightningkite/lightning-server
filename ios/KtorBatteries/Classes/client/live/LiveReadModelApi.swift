@@ -5,7 +5,7 @@ import RxSwift
 import RxSwiftPlus
 import Foundation
 
-public class LiveReadModelApi<Model : HasId> : ReadModelApi<Model> {
+public class LiveReadModelApi<Model : HasId<UUID>> : ReadModelApi<Model> {
     public var url: String
     public var serializer: Model.Type
     public init(url: String, token: String, headers: Dictionary<String, String> = dictionaryOf(), serializer: Model.Type) {
@@ -40,7 +40,7 @@ public class LiveReadModelApiCompanion {
     }
     public static let INSTANCE = LiveReadModelApiCompanion()
     
-    public func create<Model : HasId>(root: String, path: String, token: String, headers: Dictionary<String, String> = dictionaryOf()) -> LiveReadModelApi<Model> {
+    public func create<Model : HasId<UUID>>(root: String, path: String, token: String, headers: Dictionary<String, String> = dictionaryOf()) -> LiveReadModelApi<Model> {
         return LiveReadModelApi<Model>(url: "\(String(kotlin: root))\(String(kotlin: path))", token: token, headers: headers, serializer: Model.self);
     }
 }

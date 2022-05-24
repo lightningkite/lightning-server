@@ -28,7 +28,7 @@ data class MongoSettings(
     val client by lazy {
         when {
             url == "test" -> testMongo()
-            url.startsWith("file:") -> embeddedMongo(File(url.removePrefix("file://")), Short.MAX_VALUE + url.hashCode().and(0x7FFF))
+            url.startsWith("file:") -> embeddedMongo(File(url.removePrefix("file://")))
             url.startsWith("mongodb:") -> KMongo.createClient(
                 MongoClientSettings.builder()
                     .applyConnectionString(ConnectionString(url))

@@ -4,7 +4,7 @@ import { Query } from '../db/Query';
 import { UUIDFor } from '../db/UUIDFor';
 import { MockTable } from './MockTable';
 import { Observable } from 'rxjs';
-export declare class MockReadModelApi<Model extends HasId> extends ReadModelApi<Model> {
+export declare class MockReadModelApi<Model extends HasId<string>> extends ReadModelApi<Model> {
     readonly table: MockTable<Model>;
     constructor(table: MockTable<Model>);
     list(query: Query<Model>): Observable<Array<Model>>;

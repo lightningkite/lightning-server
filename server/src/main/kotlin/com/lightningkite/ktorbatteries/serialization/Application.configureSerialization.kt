@@ -16,9 +16,9 @@ fun Application.configureSerialization() {
     install(ContentNegotiation) {
         json(Serialization.json)
         cbor(Serialization.cbor)
-        serialization(ContentType.Text.Xml, Serialization.xml)
+//        serialization(ContentType.Text.Xml, Serialization.xml)
         serialization(ContentType.Text.CSV, Serialization.csv)
-        serialization(ContentType.Application.Xml, Serialization.xml)
+//        serialization(ContentType.Application.Xml, Serialization.xml)
         serialization(ContentType.Application.OctetStream, Serialization.javaData)
         serialization(ContentType.Application.Bson, object : BinaryFormat {
             override val serializersModule: SerializersModule get() = Serialization.module

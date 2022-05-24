@@ -8,6 +8,9 @@ export declare class PropChain<From extends any, To extends any> {
     readonly mapModification: ((a: Modification<To>) => Modification<From>);
     constructor(mapCondition: ((a: Condition<To>) => Condition<From>), mapModification: ((a: Modification<To>) => Modification<From>));
     get<V extends any>(prop: DataClassProperty<To, V>): PropChain<From, V>;
+    hashCode(): number;
+    toString(): string;
+    equals(other: (any | null)): boolean;
 }
 export declare function condition<T extends any>(setup: ((a: PropChain<T, T>) => Condition<T>)): Condition<T>;
 export declare function modification<T extends any>(setup: ((a: PropChain<T, T>) => Modification<T>)): Modification<T>;

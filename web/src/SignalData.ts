@@ -4,7 +4,7 @@ import { HasId } from './db/HasId'
 import { ReifiedType, setUpDataClass } from '@lightningkite/khrysalis-runtime'
 
 //! Declares com.lightningkite.ktordb.SignalData
-export class SignalData<Model extends HasId> {
+export class SignalData<Model extends HasId<string>> {
     public constructor(public readonly item: Model, public readonly created: boolean, public readonly deleted: boolean) {
     }
     public static properties = ["item", "created", "deleted"]

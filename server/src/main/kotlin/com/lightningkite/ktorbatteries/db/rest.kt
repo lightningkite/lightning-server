@@ -26,7 +26,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
     this.docName = modelName
     apiWebsocket<USER, Query<T>, ListChange<T>>(
         path = "",
-        summary = "Watch ${modelName}",
+        summary = "Watch",
         description = "Gets a changing list of ${modelName}s that match the given query.",
         errorCases = listOf(),
     ) { user ->

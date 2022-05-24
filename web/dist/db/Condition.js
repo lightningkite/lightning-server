@@ -12,6 +12,9 @@ class Condition {
     hashCode() { throw undefined; }
     equals(other) { throw undefined; }
     invoke(on) { throw undefined; }
+    simplify() {
+        return this;
+    }
     and(other) {
         return new Condition.And([this, other]);
     }
@@ -70,6 +73,9 @@ exports.Condition = Condition;
         invoke(on) {
             return this.conditions.every((it) => (it.invoke(on)));
         }
+        simplify() {
+            return this.conditions.length === 0 ? new Condition.Always() : new Condition.And([...new khrysalis_runtime_1.EqualOverrideSet(this.conditions)]);
+        }
     }
     And.properties = ["conditions"];
     Condition.And = And;
@@ -86,6 +92,9 @@ exports.Condition = Condition;
         invoke(on) {
             return this.conditions.some((it) => (it.invoke(on)));
         }
+        simplify() {
+            return this.conditions.length === 0 ? new Condition.Never() : new Condition.Or([...new khrysalis_runtime_1.EqualOverrideSet(this.conditions)]);
+        }
     }
     Or.properties = ["conditions"];
     Condition.Or = Or;
@@ -101,6 +110,10 @@ exports.Condition = Condition;
         static propertyTypes(T) { return { condition: [Condition, T] }; }
         invoke(on) {
             return (!this.condition.invoke(on));
+        }
+        simplify() {
+            var _a, _b, _c;
+            return (_c = ((_b = (_a = ((0, khrysalis_runtime_1.tryCastClass)(this.condition, Condition.Not))) === null || _a === void 0 ? void 0 : _a.condition) !== null && _b !== void 0 ? _b : null)) !== null && _c !== void 0 ? _c : this;
         }
     }
     Not.properties = ["condition"];

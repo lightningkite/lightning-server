@@ -7,7 +7,7 @@ import { LiveObserveModelApi } from './LiveObserveModelApi'
 import { LiveReadModelApi } from './LiveReadModelApi'
 
 //! Declares com.lightningkite.ktordb.live.LiveFullReadModelApi
-export class LiveFullReadModelApi<Model extends HasId> extends FullReadModelApi<Model> {
+export class LiveFullReadModelApi<Model extends HasId<string>> extends FullReadModelApi<Model> {
     public constructor(public readonly read: LiveReadModelApi<Model>, public readonly observe: ObserveModelApi<Model>) {
         super();
     }
@@ -21,7 +21,7 @@ export namespace LiveFullReadModelApi {
         }
         public static INSTANCE = new Companion();
         
-        public create<Model extends HasId>(Model: Array<any>, root: string, multiplexSocketUrl: string, path: string, token: string, headers: Map<string, string> = new Map([])): LiveFullReadModelApi<Model> {
+        public create<Model extends HasId<string>>(Model: Array<any>, root: string, multiplexSocketUrl: string, path: string, token: string, headers: Map<string, string> = new Map([])): LiveFullReadModelApi<Model> {
             return new LiveFullReadModelApi<Model>(new LiveReadModelApi<Model>(`${root}${path}`, token, headers, Model), LiveObserveModelApi.Companion.INSTANCE.create<Model>(Model, multiplexSocketUrl, token, headers, path));
         }
     }

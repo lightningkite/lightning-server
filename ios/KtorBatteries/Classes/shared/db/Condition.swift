@@ -12,6 +12,9 @@ open class Condition<T : Codable & Hashable> : KEquatable, KHashable {
     open func equals(other: Any) -> Bool { fatalError() }
     
     open func invoke(on: T) -> Bool { fatalError() }
+    open func simplify() -> Condition<T> {
+        return self;
+    }
     
     public func and(other: Condition<T>) -> ConditionAnd<T> {
         return ConditionAnd(conditions: [self, other]);
@@ -125,9 +128,14 @@ public class ConditionAnd<T : Codable & Hashable> : Condition<T>, CustomStringCo
     }
     public var description: String { return "ConditionAnd(conditions=\(String(kotlin: self.conditions)))" }
     public func copy(conditions: Array<Condition<T>>? = nil) -> ConditionAnd<T> { return ConditionAnd(conditions: conditions ?? self.conditions) }
+    
     override public func invoke(on: T) -> Bool {
         return self.conditions.allSatisfy({ (it) -> Bool in it.invoke(on: on) });
-} }
+    }
+    override public func simplify() -> Condition<T> {
+        return self.conditions.isEmpty ? ConditionAlways() : ConditionAnd<T>(conditions: self.conditions.distinct());
+    }
+}
 public class ConditionOr<T : Codable & Hashable> : Condition<T>, CustomStringConvertible {
     public var conditions: Array<Condition<T>>
     public init(conditions: Array<Condition<T>>) {
@@ -146,9 +154,14 @@ public class ConditionOr<T : Codable & Hashable> : Condition<T>, CustomStringCon
     }
     public var description: String { return "ConditionOr(conditions=\(String(kotlin: self.conditions)))" }
     public func copy(conditions: Array<Condition<T>>? = nil) -> ConditionOr<T> { return ConditionOr(conditions: conditions ?? self.conditions) }
+    
     override public func invoke(on: T) -> Bool {
         return (self.conditions.first(where: { (it) -> Bool in it.invoke(on: on) }) != nil);
-} }
+    }
+    override public func simplify() -> Condition<T> {
+        return self.conditions.isEmpty ? ConditionNever() : ConditionOr<T>(conditions: self.conditions.distinct());
+    }
+}
 public class ConditionNot<T : Codable & Hashable> : Condition<T>, CustomStringConvertible {
     public var condition: Condition<T>
     public init(_ condition: Condition<T>) {
@@ -167,9 +180,14 @@ public class ConditionNot<T : Codable & Hashable> : Condition<T>, CustomStringCo
     }
     public var description: String { return "ConditionNot(condition=\(String(kotlin: self.condition)))" }
     public func copy(_ condition: Condition<T>? = nil) -> ConditionNot<T> { return ConditionNot(condition ?? self.condition) }
+    
     override public func invoke(on: T) -> Bool {
         return (!self.condition.invoke(on: on));
-} }
+    }
+    override public func simplify() -> Condition<T> {
+        return (self.condition as? ConditionNot<T>)?.condition ?? self;
+    }
+}
 public class ConditionEqual<T : Codable & Hashable> : Condition<T>, CustomStringConvertible {
     public var value: T
     public init(_ value: T) {

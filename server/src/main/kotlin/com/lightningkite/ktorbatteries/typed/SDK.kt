@@ -8,15 +8,18 @@ import java.io.File
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
-object SDK {
+typealias SDK = Sdk
+object Sdk {
     fun make(sourceRoot: File, packageName: String) {
         val fileFolder = sourceRoot.resolve(packageName.replace('.', '/'))
+        fileFolder.mkdirs()
         fileFolder.resolve("Api.kt").writeText(apiFile(packageName).toString())
         fileFolder.resolve("LiveApi.kt").writeText(liveFile(packageName).toString())
         fileFolder.resolve("Sessions.kt").writeText(sessionFile(packageName).toString())
     }
 
     private val safeDocumentables = (ApiEndpoint.known.filter { it.route.selector.maybeMethod != HttpMethod.Get || it.inputType == null } + ApiWebsocket.known)
+        .distinctBy { it.docGroup.toString() + "/" + it.summary }
     fun apiFile(packageName: String): CodeEmitter = CodeEmitter(packageName).apply {
         imports.add("io.reactivex.rxjava3.core.Single")
         imports.add("io.reactivex.rxjava3.core.Observable")
@@ -149,7 +152,7 @@ object SDK {
 public class CodeEmitter(val packageName: String, val body: StringBuilder = StringBuilder()): Appendable by body {
     val imports = mutableSetOf<String>()
     fun append(type: KType) {
-        imports.add(type.toString().substringBefore('<'))
+        imports.add(type.toString().substringBefore('<').removeSuffix("?"))
         body.append((type.classifier as? KClass<*>)?.simpleName)
         type.arguments.takeIf { it.isNotEmpty() }?.let {
             body.append('<')
