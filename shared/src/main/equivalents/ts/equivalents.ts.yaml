@@ -70,3 +70,15 @@
     pattern: keySet(~0~, ~this~, ~1~)
     imports:
       keySet: '@lightningkite/ktor-batteries|db/DataClassProperty'
+
+- id: com.lightningkite.ktordb.ServerFile
+  type: type
+  template: 'string'
+
+- id: com.lightningkite.ktordb.ServerFile
+  type: typeRef
+  template: 'String'
+
+- id: com.lightningkite.ktordb.ServerFile.location
+  type: get
+  template: ~this~
