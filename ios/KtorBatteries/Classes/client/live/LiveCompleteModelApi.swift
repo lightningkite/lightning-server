@@ -4,7 +4,7 @@ import KhrysalisRuntime
 import RxSwiftPlus
 import Foundation
 
-public class LiveCompleteModelApi<Model : HasId & Hashable & Codable> : CompleteModelApi<Model> {
+public class LiveCompleteModelApi<Model : HasId> : CompleteModelApi<Model> {
     private var _read: ReadModelApi<Model>
     override public var read: ReadModelApi<Model> { get { return self._read } set(value) { self._read = value } }
     private var _write: WriteModelApi<Model>

@@ -4,7 +4,7 @@ import KhrysalisRuntime
 import RxSwift
 import Foundation
 
-open class WriteModelApi<Model : HasId & Codable & Hashable> {
+open class WriteModelApi<Model : Codable & Hashable> {
     public init() {
         //Necessary properties should be initialized now
     }
@@ -13,8 +13,8 @@ open class WriteModelApi<Model : HasId & Codable & Hashable> {
     open func postBulk(values: Array<Model>) -> Single<Array<Model>> { TODO() }
     open func put(_ value: Model) -> Single<Model> { TODO() }
     open func putBulk(values: Array<Model>) -> Single<Array<Model>> { TODO() }
-    open func patch(id: Model.ID, modification: Modification<Model>) -> Single<Model> { TODO() }
+    open func patch(id: UUIDFor<Model>, modification: Modification<Model>) -> Single<Model> { TODO() }
     open func patchBulk(modification: MassModification<Model>) -> Single<Int> { TODO() }
-    open func delete(id: Model.ID) -> Single<Void> { TODO() }
+    open func delete(id: UUIDFor<Model>) -> Single<Void> { TODO() }
     open func deleteBulk(_ condition: Condition<Model>) -> Single<Void> { TODO() }
 }

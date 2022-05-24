@@ -37,7 +37,7 @@ public class LiveWriteModelApi<Model : HasId> : WriteModelApi<Model> {
         return HttpClient.INSTANCE.call(url: "\(String(kotlin: self.url))/bulk", method: HttpClient.INSTANCE.PUT, headers: self.authHeaders, body: values.toJsonRequestBody()).readJson(serializer: Array<Model>.self);
     }
     
-    override public func patch(id: Model.ID, modification: Modification<Model>) -> Single<Model> {
+    override public func patch(id: UUIDFor<Model>, modification: Modification<Model>) -> Single<Model> {
         return HttpClient.INSTANCE.call(url: "\(String(kotlin: self.url))/\(id)", method: HttpClient.INSTANCE.PATCH, headers: self.authHeaders, body: modification.toJsonRequestBody()).readJson(serializer: Model.self);
     }
     
@@ -47,7 +47,7 @@ public class LiveWriteModelApi<Model : HasId> : WriteModelApi<Model> {
             .map { (it) -> Int in Int(it)! };
     }
     
-    override public func delete(id: Model.ID) -> Single<Void> {
+    override public func delete(id: UUIDFor<Model>) -> Single<Void> {
         return HttpClient.INSTANCE.call(url: "\(String(kotlin: self.url))/\(id)", method: HttpClient.INSTANCE.DELETE, headers: self.authHeaders).discard();
     }
     

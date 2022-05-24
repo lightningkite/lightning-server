@@ -19,16 +19,14 @@ public class PropChain<From : Codable & Hashable, To : Codable & Hashable> : KSt
         return PropChain<From, V>(mapCondition: { (it) -> Condition<From> in self.mapCondition(ConditionOnField(key: prop, condition: it)) }, mapModification: { (it) -> Modification<From> in self.mapModification(ModificationOnField(key: prop, modification: it)) });
     }
     
-//    public func hashCod
-    
+    //    override fun hashCode(): Int = mapCondition(Condition.Always()).hashCode()
     
     public func toString() -> String {
         return "PropChain(\(self.mapCondition(ConditionAlways())))";
     }
     
-//    public func equals(other: Any) -> Bool {
-//        return other is PropChain<Any?, Any?> && self.mapCondition(ConditionAlways()) == (other as! PropChain<Any?, Any?>).mapCondition(ConditionAlways());
-//    }
+    //    @Suppress("UNCHECKED_CAST")
+    //    override fun equals(other: Any?): Boolean = other is PropChain<*, *> && mapCondition(Condition.Always()) == (other as PropChain<Any?, Any?>).mapCondition(Condition.Always())
 }
 
 public func condition<T : Codable & Hashable>(setup: @escaping (PropChain<T, T>) -> Condition<T>) -> Condition<T> {

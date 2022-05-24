@@ -27,7 +27,7 @@ public class LiveReadModelApi<Model : HasId> : ReadModelApi<Model> {
     }
     
     
-    override public func get(id: Model.ID) -> Single<Model> {
+    override public func get(id: UUIDFor<Model>) -> Single<Model> {
         return HttpClient.INSTANCE.call(url: "\(String(kotlin: self.url))/\(id)", method: HttpClient.INSTANCE.GET, headers: self.authHeaders).readJson(serializer: Model.self);
     }
     

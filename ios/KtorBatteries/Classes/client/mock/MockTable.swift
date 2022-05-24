@@ -11,14 +11,15 @@ public class MockTable<Model : HasId> {
         //Necessary properties should be initialized now
     }
     
-    public var data: Dictionary<Model.ID, Model>
+    
+    public var data: Dictionary<UUIDFor<Model>, Model>
     public let signals: PublishSubject<SignalData<Model>>
     
     public func observe(_ condition: Condition<Model>) -> Observable<Array<Model>> {
         return self.signals.map { (it) -> Array<Model> in self.data.values.filter({ (it) -> Bool in condition.invoke(on: it) }) };
     }
     
-    public func getItem(id: Model.ID) -> Model? {
+    public func getItem(id: UUIDFor<Model>) -> Model? {
         return self.data[id];
     }
     
@@ -46,7 +47,7 @@ public class MockTable<Model : HasId> {
         self.deleteItemById(id: item._id)
     }
     
-    public func deleteItemById(id: Model.ID) -> Void {
+    public func deleteItemById(id: UUIDFor<Model>) -> Void {
         if let item = (self.data[id]) {
             self.data.removeValue(forKey: id)
             self.signals.onNext(SignalData(item: item, created: false, deleted: true))

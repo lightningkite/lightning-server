@@ -3,7 +3,7 @@
 import KhrysalisRuntime
 import Foundation
 
-open class FullReadModelApi<Model : HasId & Codable & Hashable> {
+open class FullReadModelApi<Model : Codable & Hashable> {
     public init() {
         //Necessary properties should be initialized now
     }
