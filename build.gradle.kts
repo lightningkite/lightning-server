@@ -4,7 +4,7 @@ buildscript {
     val kotlinVersion:String by extra
     val khrysalisVersion: String by extra
     repositories {
-        mavenLocal()
+//        mavenLocal()
         mavenCentral()
 //        maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
         maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
@@ -20,7 +20,7 @@ buildscript {
 allprojects {
     group = "com.lightningkite.ktorbatteries"
     repositories {
-        mavenLocal()
+//        mavenLocal()
         mavenCentral()
         maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
 //        maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
