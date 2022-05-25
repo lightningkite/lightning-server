@@ -1,8 +1,7 @@
 import { DataClassProperty } from './DataClassProperty';
 import { Comparable } from '@lightningkite/khrysalis-runtime';
-export declare abstract class HasId<ID extends Comparable<ID>> {
-    protected constructor();
-    abstract readonly _id: ID;
+export interface HasId<ID extends Comparable<ID>> {
+    readonly _id: ID;
 }
 export declare class HasIdFields {
     private constructor();
