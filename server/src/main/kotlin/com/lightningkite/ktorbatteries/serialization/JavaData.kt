@@ -33,7 +33,10 @@ class JavaData(override val serializersModule: SerializersModule): BinaryFormat 
         override fun encodeFloat(value: Float) = output.writeFloat(value)
         override fun encodeDouble(value: Double) = output.writeDouble(value)
         override fun encodeChar(value: Char) = output.writeChar(value.code)
-        override fun encodeString(value: String) = output.writeUTF(value)
+        override fun encodeString(value: String) {
+            output.writeShort(value.length)
+            output.write(value.toByteArray(Charsets.UTF_8))
+        }
         override fun encodeEnum(enumDescriptor: SerialDescriptor, index: Int) = output.writeInt(index)
 
         override fun beginCollection(descriptor: SerialDescriptor, collectionSize: Int): CompositeEncoder {
@@ -55,7 +58,13 @@ class JavaData(override val serializersModule: SerializersModule): BinaryFormat 
         override fun decodeFloat(): Float = input.readFloat()
         override fun decodeDouble(): Double = input.readDouble()
         override fun decodeChar(): Char = input.readChar()
-        override fun decodeString(): String = input.readUTF()
+        override fun decodeString(): String {
+            val size = input.readUnsignedShort()
+            val bytes = ByteArray(size)
+            for(i in 0 until size)
+                bytes[i] = input.readByte()
+            return bytes.toString(Charsets.UTF_8)
+        }
         override fun decodeEnum(enumDescriptor: SerialDescriptor): Int = input.readInt()
 
         override fun decodeElementIndex(descriptor: SerialDescriptor): Int {
