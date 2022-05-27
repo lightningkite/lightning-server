@@ -24,6 +24,7 @@ object Sdk {
         imports.add("io.reactivex.rxjava3.core.Single")
         imports.add("io.reactivex.rxjava3.core.Observable")
         imports.add("com.lightningkite.rx.okhttp.*")
+        imports.add("com.lightningkite.ktordb.live.*")
         val byGroup = safeDocumentables.groupBy { it.docGroup }
         val groups = byGroup.keys.filterNotNull()
         appendLine("interface Api {")
@@ -51,6 +52,7 @@ object Sdk {
         imports.add("io.reactivex.rxjava3.core.Single")
         imports.add("io.reactivex.rxjava3.core.Observable")
         imports.add("com.lightningkite.rx.okhttp.*")
+        imports.add("com.lightningkite.ktordb.live.*")
         val byUserType = safeDocumentables.groupBy { it.userType?.classifier as? KClass<*> }
         val userTypes = byUserType.keys.filterNotNull()
         userTypes.forEach { userType ->
@@ -59,7 +61,7 @@ object Sdk {
             val sessionClassName = "${userType.simpleName}Session"
             appendLine("abstract class Abstract$sessionClassName(val api: Api, val ${userType.userTypeTokenName()}: String) {")
             for(group in groups) {
-                appendLine("    val ${group.groupToPartName()}: $sessionClassName${group.groupToInterfaceName()} = $sessionClassName${group.groupToInterfaceName()}(${group.groupToPartName()}, ${userType.userTypeTokenName()})")
+                appendLine("    val ${group.groupToPartName()}: $sessionClassName${group.groupToInterfaceName()} = $sessionClassName${group.groupToInterfaceName()}(api.${group.groupToPartName()}, ${userType.userTypeTokenName()})")
             }
             for(entry in byGroup[null] ?: listOf()) {
                 append("    ")
