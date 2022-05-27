@@ -59,7 +59,9 @@ object Sdk {
             val byGroup = ((byUserType[userType] ?: listOf()) + (byUserType[null]?: listOf())).groupBy { it.docGroup }
             val groups = byGroup.keys.filterNotNull()
             val sessionClassName = "${userType.simpleName}Session"
-            appendLine("abstract class Abstract$sessionClassName(val api: Api, val ${userType.userTypeTokenName()}: String) {")
+            appendLine("abstract class Abstract$sessionClassName(api: Api, ${userType.userTypeTokenName()}: String) {")
+            appendLine("    abstract val api: Api")
+            appendLine("    abstract val ${userType.userTypeTokenName()}: String")
             for(group in groups) {
                 appendLine("    val ${group.groupToPartName()}: $sessionClassName${group.groupToInterfaceName()} = $sessionClassName${group.groupToInterfaceName()}(api.${group.groupToPartName()}, ${userType.userTypeTokenName()})")
             }
@@ -106,6 +108,9 @@ object Sdk {
                     appendLine(" = HttpClient.call(")
                     appendLine("        url = \"\$httpUrl${entry.route.fullPath}\",")
                     appendLine("        method = HttpClient.${entry.route.selector.maybeMethod?.value?.uppercase() ?: "GET"},")
+                    entry.userType?.let {
+                        appendLine("        headers = mapOf(\"Authorization\" to \"Bearer ${it.userTypeTokenName()}\"),")
+                    }
                     entry.inputType?.let {
                         appendLine("        body = input.toJsonRequestBody()")
                     }
@@ -130,6 +135,9 @@ object Sdk {
                         appendLine(" = HttpClient.call(")
                         appendLine("            url = \"\$httpUrl${entry.route.fullPath}\",")
                         appendLine("            method = HttpClient.${entry.route.selector.maybeMethod?.value?.uppercase() ?: "GET"},")
+                        entry.userType?.let {
+                            appendLine("            headers = mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
+                        }
                         entry.inputType?.let {
                             appendLine("            body = input.toJsonRequestBody()")
                         }
