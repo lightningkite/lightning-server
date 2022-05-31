@@ -84,6 +84,13 @@ inline fun <reified USER : HasId<ID>, reified ID : Comparable<ID>> Application.c
             oauthGoogle() { userByEmail(it)._id.toString() }
             oauthGithub() { userByEmail(it)._id.toString() }
             oauthApple() { userByEmail(it)._id.toString() }
+            get(
+                path = "self",
+                summary = "Get Self",
+                description = "Retrieves the user that you currently are",
+                errorCases = listOf(),
+                implementation = { user: USER, _: Unit -> user }
+            )
         }
     }
 }
