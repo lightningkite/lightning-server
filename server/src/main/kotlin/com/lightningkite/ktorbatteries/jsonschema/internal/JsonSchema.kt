@@ -1,12 +1,15 @@
 package com.lightningkite.ktorbatteries.jsonschema.internal
 
+import com.fasterxml.jackson.databind.ser.std.NullSerializer
 import com.lightningkite.ktorbatteries.jsonschema.JsonSchema
 import com.lightningkite.ktorbatteries.jsonschema.JsonSchema.*
 import com.lightningkite.ktorbatteries.jsonschema.JsonSchema.IntRange
 import com.lightningkite.ktorbatteries.jsonschema.JsonType
 import com.lightningkite.ktorbatteries.serialization.Serialization
 import com.lightningkite.ktordb.ServerFile
+import com.lightningkite.ktordb.nullElement
 import kotlinx.serialization.*
+import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModuleCollector
@@ -213,14 +216,46 @@ internal fun SerialDescriptor.jsonSchemaBoolean(
     return jsonSchemaElement(annotations)
 }
 
+
+@OptIn(ExperimentalSerializationApi::class)
+internal class SerialDescriptorForNullable(
+    internal val original: SerialDescriptor
+) : SerialDescriptor by original {
+
+    override val serialName: String = original.serialName + "?"
+    override val isNullable: Boolean
+        get() = true
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is SerialDescriptorForNullable) return false
+        if (original != other.original) return false
+        return true
+    }
+
+    override fun toString(): String {
+        return "$original?"
+    }
+
+    override fun hashCode(): Int {
+        return original.hashCode() * 31
+    }
+}
+
 @PublishedApi
 internal fun SerialDescriptor.createJsonSchema(
     annotations: List<Annotation>,
     definitions: JsonSchemaDefinitions
 ): JsonObject {
     if(this.kind == SerialKind.CONTEXTUAL) {
-        return (Serialization.module.getContextualDescriptor(this) ?: throw IllegalStateException("Contextual missing for $this")).createJsonSchema(annotations, definitions)
+        println("Fetching contextual for ${this.serialName}")
+        val contextual = (Serialization.module.getContextualDescriptor(this) ?: throw IllegalStateException("Contextual missing for $this"))
+        if(this.isNullable)
+            SerialDescriptorForNullable(contextual).createJsonSchema(annotations, definitions)
+        else
+            contextual.createJsonSchema(annotations, definitions)
     }
+    println("Processing $this")
 
     val combinedAnnotations = annotations + this.annotations
     val key = JsonSchemaDefinitions.Key(this, combinedAnnotations)

@@ -28,7 +28,7 @@ var database: Database by SetOnce()
 
 @Serializable
 data class DatabaseSettings(
-    val url: String = "file-mongodb://${File("./local/mongo").absolutePath}",
+    val url: String = "mongodb-file://${File("./local/mongo").absolutePath}",
     val databaseName: String = "default"
 ) : HealthCheckable {
     val db by lazy {
@@ -44,7 +44,14 @@ data class DatabaseSettings(
                     .uuidRepresentation(UuidRepresentation.STANDARD)
                     .build()
             ).database(databaseName)
-            else -> throw IllegalArgumentException("MongoDB connection style not recognized: got $url but only understand file:, mongodb:, and test")
+            else -> throw IllegalArgumentException("MongoDB connection style not recognized: got $url but only understand: " +
+                    "ram\n" +
+                    "ram-preload\n" +
+                    "ram-unsafe-persist\n" +
+                    "mongodb-test\n" +
+                    "mongodb-file:\n" +
+                    "mongodb:"
+            )
         }
     }
 
