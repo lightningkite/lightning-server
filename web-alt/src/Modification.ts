@@ -24,7 +24,3 @@ export type Modification<T> =
     | { ModifyByKey: Record<string, Modification<any>> }
     | { RemoveKeys: Array<string> }
     | SubModification<T, any>
-
-interface Test {
-    readonly something: number
-}
