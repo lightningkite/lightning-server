@@ -6,6 +6,7 @@ import com.lightningkite.ktorbatteries.jsonschema.JsonSchema.*
 import com.lightningkite.ktorbatteries.jsonschema.JsonSchema.IntRange
 import com.lightningkite.ktorbatteries.jsonschema.JsonType
 import com.lightningkite.ktorbatteries.serialization.Serialization
+import com.lightningkite.ktordb.LazyRenamedSerialDescriptor
 import com.lightningkite.ktordb.ServerFile
 import com.lightningkite.ktordb.nullElement
 import kotlinx.serialization.*
@@ -35,7 +36,7 @@ internal val SerialDescriptor.jsonType: JsonType
         PrimitiveKind.FLOAT, PrimitiveKind.DOUBLE -> JsonType.NUMBER
         PrimitiveKind.STRING, PrimitiveKind.CHAR, SerialKind.ENUM -> JsonType.STRING
         PrimitiveKind.BOOLEAN -> JsonType.BOOLEAN
-        SerialKind.CONTEXTUAL -> Serialization.module.getContextualDescriptor(this)!!.jsonType
+        SerialKind.CONTEXTUAL -> Serialization.module.getContextualDescriptor(if(this is LazyRenamedSerialDescriptor) this.getter() else this)!!.jsonType
         else -> JsonType.OBJECT
     }
 
@@ -248,14 +249,12 @@ internal fun SerialDescriptor.createJsonSchema(
     definitions: JsonSchemaDefinitions
 ): JsonObject {
     if(this.kind == SerialKind.CONTEXTUAL) {
-        println("Fetching contextual for ${this.serialName}")
-        val contextual = (Serialization.module.getContextualDescriptor(this) ?: throw IllegalStateException("Contextual missing for $this"))
+        val contextual = (Serialization.module.getContextualDescriptor(if(this is LazyRenamedSerialDescriptor) this.getter() else this) ?: throw IllegalStateException("Contextual missing for $this"))
         if(this.isNullable)
             SerialDescriptorForNullable(contextual).createJsonSchema(annotations, definitions)
         else
             contextual.createJsonSchema(annotations, definitions)
     }
-    println("Processing $this")
 
     val combinedAnnotations = annotations + this.annotations
     val key = JsonSchemaDefinitions.Key(this, combinedAnnotations)

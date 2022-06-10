@@ -22,6 +22,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.GlobalScope.coroutineContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.getContextualDescriptor
 import kotlinx.serialization.encoding.CompositeDecoder
@@ -33,7 +34,7 @@ import kotlin.io.use
 
 class MultipartJsonConverter(val json: Json) : ContentConverter {
     val jsonKey = "__json"
-    override suspend fun deserialize(charset: Charset, typeInfo: TypeInfo, content: ByteReadChannel): Any? {
+    override suspend fun deserialize(charset: Charset, typeInfo: TypeInfo, content: ByteReadChannel): Any? = try{
         val mainData = HashMap<String, Any?>()
         val overrideData = HashMap<String, Any?>()
         var baselineJson: JsonElement = JsonNull
@@ -84,13 +85,15 @@ class MultipartJsonConverter(val json: Json) : ContentConverter {
                 }
             }
         }
-        return if(baselineJson is JsonObject) {
+        if(baselineJson is JsonObject) {
             baselineJson.jsonObject.writeInto(mainData)
             mainData.putAll(overrideData)
             json.decodeFromJsonElement(serializer, mainData.toJsonObject())
         } else {
             baselineJson
         }
+    } catch(e: SerializationException) {
+        throw ContentConvertException(e.message ?: "Failed to read multipart.", e)
     }
 
     override suspend fun serialize(
