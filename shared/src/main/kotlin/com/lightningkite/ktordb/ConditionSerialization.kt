@@ -76,7 +76,7 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
         }
     }
     MySealedClassSerializer(
-        "Condition<${inner.descriptor.serialName}>",
+        "com.lightningkite.ktordb.Condition<${inner.descriptor.serialName}>",
         Condition::class as KClass<Condition<Inner>>,
         map
     ) {

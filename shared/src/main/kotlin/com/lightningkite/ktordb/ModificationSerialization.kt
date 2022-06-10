@@ -70,7 +70,7 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): KSerializer<Modification<
         }
     }
     MySealedClassSerializer(
-        "Modification<${inner.descriptor.serialName}>",
+        "com.lightningkite.ktordb.Modification<${inner.descriptor.serialName}>",
         Modification::class as KClass<Modification<Inner>>,
         map
     ) {

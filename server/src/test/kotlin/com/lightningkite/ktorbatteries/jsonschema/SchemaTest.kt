@@ -1,4 +1,4 @@
-@file:UseContextualSerialization(UUID::class)
+@file:UseContextualSerialization(LocalDate::class, Instant::class, UUID::class, ServerFile::class)
 package com.lightningkite.ktorbatteries.jsonschema
 
 import com.lightningkite.ktorbatteries.auto.defaults
@@ -22,8 +22,11 @@ import kotlinx.serialization.descriptors.capturedKClass
 import kotlinx.serialization.descriptors.getContextualDescriptor
 import kotlinx.serialization.properties.encodeToStringMap
 import java.net.URLEncoder
+import java.time.Instant
+import java.time.LocalDate
 import java.util.*
 import kotlin.reflect.typeOf
+import kotlin.test.assertTrue
 
 class SchemaTest {
 
@@ -38,6 +41,17 @@ class SchemaTest {
             Properties.encodeToStringMap(Post.chain.condition { (it.author eq "Bill") and (it.title eq "Bills Greatest") }).entries.joinToString(
                 "&"
             ) { it.key + "=" + URLEncoder.encode(it.value, Charsets.UTF_8) })
+    }
+
+    @Serializable
+    data class Acknowledgement(
+        val test: UUID? = null
+    )
+
+    @Test
+    fun nullableSchema() {
+        val schema = Serialization.json.encodeToSchema(Acknowledgement.serializer())
+        assertTrue(schema.contains("null"))
     }
 //    @Test fun makeFormFile() {
 //        File("./build/out/form.html").apply { parentFile.mkdirs() }.bufferedWriter().use {

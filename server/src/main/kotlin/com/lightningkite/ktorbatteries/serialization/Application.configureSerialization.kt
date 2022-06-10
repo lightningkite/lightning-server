@@ -14,13 +14,13 @@ import kotlinx.serialization.modules.SerializersModule
 
 fun Application.configureSerialization() {
     install(ContentNegotiation) {
-        json(Serialization.json)
-        cbor(Serialization.cbor)
+        serializationPatch(ContentType.Application.Json, Serialization.json)
+        serializationPatch(ContentType.Application.Cbor, Serialization.cbor)
 //        serialization(ContentType.Text.Xml, Serialization.xml)
-        serialization(ContentType.Text.CSV, Serialization.csv)
+        serializationPatch(ContentType.Text.CSV, Serialization.csv)
 //        serialization(ContentType.Application.Xml, Serialization.xml)
-        serialization(ContentType.Application.OctetStream, Serialization.javaData)
-        serialization(ContentType.Application.Bson, object : BinaryFormat {
+        serializationPatch(ContentType.Application.OctetStream, Serialization.javaData)
+        serializationPatch(ContentType.Application.Bson, object : BinaryFormat {
             override val serializersModule: SerializersModule get() = Serialization.module
             override fun <T> decodeFromByteArray(deserializer: DeserializationStrategy<T>, bytes: ByteArray): T =
                 Serialization.bson.load(deserializer, bytes)

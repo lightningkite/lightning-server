@@ -4,10 +4,7 @@ package com.lightningkite.ktorbatteries.demo
 
 import com.lightningkite.ktorbatteries.auth.*
 import com.lightningkite.ktorbatteries.client
-import com.lightningkite.ktorbatteries.db.adminIndex
-import com.lightningkite.ktorbatteries.db.adminPages
-import com.lightningkite.ktorbatteries.db.autoCollection
-import com.lightningkite.ktorbatteries.db.database
+import com.lightningkite.ktorbatteries.db.*
 import com.lightningkite.ktorbatteries.email.EmailSettings
 import com.lightningkite.ktorbatteries.exceptions.ExceptionSettings
 import com.lightningkite.ktorbatteries.exceptions.configureExceptions
@@ -71,7 +68,7 @@ data class Settings(
     val auth: AuthSettings = AuthSettings(),
     val files: FilesSettings = FilesSettings(),
     val logging: LoggingSettings = LoggingSettings(),
-    val mongo: MongoSettings = MongoSettings(),
+    val database: DatabaseSettings = DatabaseSettings(),
     val email: EmailSettings = EmailSettings(),
     val exception: ExceptionSettings = ExceptionSettings(),
 )
@@ -79,6 +76,7 @@ data class Settings(
 fun main(vararg args: String) {
     loadSettings(File("settings.yaml")) { Settings() }
     println("Settings loaded")
+    prepareModels()
     runServer {
         configureFiles()
         configureSerialization()
@@ -108,16 +106,13 @@ fun main(vararg args: String) {
                     EmailSettings.instance,
                     ExceptionSettings.instance,
                     FilesSettings.instance,
-                    MongoSettings.instance,
+                    DatabaseSettings.instance,
                 ))
                 get("die") {
                     throw Exception("OUCH")
                 }
             }
         }
-        println(SDK.apiFile("com.lightningkite.ktorbatteries.demo"))
-        println(SDK.liveFile("com.lightningkite.ktorbatteries.demo"))
-        println(SDK.sessionFile("com.lightningkite.ktorbatteries.demo"))
-        println("Server config complete")
+        TypescriptSdk.sdkFile(System.out)
     }
 }
