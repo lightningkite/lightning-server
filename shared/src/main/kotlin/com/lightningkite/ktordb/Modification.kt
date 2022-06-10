@@ -117,7 +117,7 @@ open class Modification<T: IsCodableAndHashable> protected constructor()  {
     }
 
     @Serializable()
-    @SerialName("com.lightningkite.ktordb.Modification.PerElement")
+    @SerialName("PerElement")
     data class PerElement<T: IsCodableAndHashable>(val condition: Condition<T>, val modification: Modification<T>): Modification<List<T>>() {
         override fun invoke(on: List<T>): List<T> = on.map { if(condition(it)) modification(it) else it }
         override fun invokeDefault(): List<T> = listOf()
