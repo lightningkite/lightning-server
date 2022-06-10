@@ -79,6 +79,7 @@ data class Settings(
 fun main(vararg args: String) {
     loadSettings(File("settings.yaml")) { Settings() }
     println("Settings loaded")
+    prepareModels()
     runServer {
         configureFiles()
         configureSerialization()
@@ -115,6 +116,7 @@ fun main(vararg args: String) {
                 }
             }
         }
+        TypescriptSdk.typesFile(System.out)
         println(SDK.apiFile("com.lightningkite.ktorbatteries.demo"))
         println(SDK.liveFile("com.lightningkite.ktorbatteries.demo"))
         println(SDK.sessionFile("com.lightningkite.ktorbatteries.demo"))

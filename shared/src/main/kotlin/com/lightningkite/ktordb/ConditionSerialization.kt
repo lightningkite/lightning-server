@@ -76,36 +76,36 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
         }
     }
     MySealedClassSerializer(
-        "Condition<${inner.descriptor.serialName}>",
+        "com.lightningkite.ktordb.Condition<${inner.descriptor.serialName}>",
         Condition::class as KClass<Condition<Inner>>,
         map
     ) {
         when (it) {
-            is Condition.Never -> "Never"
-            is Condition.Always -> "Always"
-            is Condition.And -> "And"
-            is Condition.Or -> "Or"
-            is Condition.Not -> "Not"
-            is Condition.Equal -> "Equal"
-            is Condition.NotEqual -> "NotEqual"
-            is Condition.Inside -> "Inside"
-            is Condition.NotInside -> "NotInside"
-            is Condition.GreaterThan -> "GreaterThan"
-            is Condition.LessThan -> "LessThan"
-            is Condition.GreaterThanOrEqual -> "GreaterThanOrEqual"
-            is Condition.LessThanOrEqual -> "LessThanOrEqual"
-            is Condition.Search -> "Search"
-            is Condition.IntBitsClear -> "IntBitsClear"
-            is Condition.IntBitsSet -> "IntBitsSet"
-            is Condition.IntBitsAnyClear -> "IntBitsAnyClear"
-            is Condition.IntBitsAnySet -> "IntBitsAnySet"
-            is Condition.AllElements<*> -> "AllElements"
-            is Condition.AnyElements<*> -> "AnyElements"
-            is Condition.SizesEquals<*> -> "SizesEquals"
-            is Condition.Exists<*> -> "Exists"
-            is Condition.OnKey<*> -> "OnKey"
-            is Condition.IfNotNull<*> -> "IfNotNull"
-            is Condition.OnField<*, *> -> it.key.name
+            is Condition.Never -> "com.lightningkite.ktordb.Condition.Never<${inner.descriptor.serialName}>"
+            is Condition.Always -> "com.lightningkite.ktordb.Condition.Always<${inner.descriptor.serialName}>"
+            is Condition.And -> "com.lightningkite.ktordb.Condition.And<${inner.descriptor.serialName}>"
+            is Condition.Or -> "com.lightningkite.ktordb.Condition.Or<${inner.descriptor.serialName}>"
+            is Condition.Not -> "com.lightningkite.ktordb.Condition.Not<${inner.descriptor.serialName}>"
+            is Condition.Equal -> "com.lightningkite.ktordb.Condition.Equal<${inner.descriptor.serialName}>"
+            is Condition.NotEqual -> "com.lightningkite.ktordb.Condition.NotEqual<${inner.descriptor.serialName}>"
+            is Condition.Inside -> "com.lightningkite.ktordb.Condition.Inside<${inner.descriptor.serialName}>"
+            is Condition.NotInside -> "com.lightningkite.ktordb.Condition.NotInside<${inner.descriptor.serialName}>"
+            is Condition.GreaterThan -> "com.lightningkite.ktordb.Condition.GreaterThan<${inner.descriptor.serialName}>"
+            is Condition.LessThan -> "com.lightningkite.ktordb.Condition.LessThan<${inner.descriptor.serialName}>"
+            is Condition.GreaterThanOrEqual -> "com.lightningkite.ktordb.Condition.GreaterThanOrEqual<${inner.descriptor.serialName}>"
+            is Condition.LessThanOrEqual -> "com.lightningkite.ktordb.Condition.LessThanOrEqual<${inner.descriptor.serialName}>"
+            is Condition.Search -> "com.lightningkite.ktordb.Condition.Search<${inner.descriptor.serialName}>"
+            is Condition.IntBitsClear -> "com.lightningkite.ktordb.Condition.IntBitsClear<${inner.descriptor.serialName}>"
+            is Condition.IntBitsSet -> "com.lightningkite.ktordb.Condition.IntBitsSet<${inner.descriptor.serialName}>"
+            is Condition.IntBitsAnyClear -> "com.lightningkite.ktordb.Condition.IntBitsAnyClear<${inner.descriptor.serialName}>"
+            is Condition.IntBitsAnySet -> "com.lightningkite.ktordb.Condition.IntBitsAnySet<${inner.descriptor.serialName}>"
+            is Condition.AllElements<*> -> "com.lightningkite.ktordb.Condition.AllElements<${inner.descriptor.serialName}>"
+            is Condition.AnyElements<*> -> "com.lightningkite.ktordb.Condition.AnyElements<${inner.descriptor.serialName}>"
+            is Condition.SizesEquals<*> -> "com.lightningkite.ktordb.Condition.SizesEquals<${inner.descriptor.serialName}>"
+            is Condition.Exists<*> -> "com.lightningkite.ktordb.Condition.Exists<${inner.descriptor.serialName}>"
+            is Condition.OnKey<*> -> "com.lightningkite.ktordb.Condition.OnKey<${inner.descriptor.serialName}>"
+            is Condition.IfNotNull<*> -> "com.lightningkite.ktordb.Condition.IfNotNull<${inner.descriptor.serialName}>"
+            is Condition.OnField<*, *> -> "com.lightningkite.ktordb.Condition.OnField<${inner.descriptor.serialName}>(${it.key.name})"
             else -> fatalError()
         }
     }
@@ -121,7 +121,7 @@ class OnFieldSerializer<K : Any, V>(
         return Condition.OnField(field, condition = decoder.decodeSerializableValue(conditionSerializer))
     }
 
-    override val descriptor: SerialDescriptor = SerialDescriptor(field.name, conditionSerializer.descriptor)
+    override val descriptor: SerialDescriptor = SerialDescriptor("com.lightningkite.ktordb.Condition.OnField(${field.name})", conditionSerializer.descriptor)
 
     override fun serialize(encoder: Encoder, value: Condition.OnField<K, V>) {
         encoder.encodeSerializableValue(conditionSerializer, value.condition)
@@ -141,7 +141,7 @@ class LazyRenamedSerialDescriptor(override val serialName: String, val getter: (
 
 
 class ConditionNeverSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.Never<T>> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Never", PrimitiveKind.BOOLEAN)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.ktordb.Condition.Never<${inner.descriptor.serialName}>", PrimitiveKind.BOOLEAN)
     override fun deserialize(decoder: Decoder): Condition.Never<T> {
         decoder.decodeBoolean()
         return Condition.Never()
@@ -149,7 +149,7 @@ class ConditionNeverSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condi
     override fun serialize(encoder: Encoder, value: Condition.Never<T>) = encoder.encodeBoolean(true)
 }
 class ConditionAlwaysSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.Always<T>> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Always", PrimitiveKind.BOOLEAN)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.ktordb.Condition.Always<${inner.descriptor.serialName}>", PrimitiveKind.BOOLEAN)
     override fun deserialize(decoder: Decoder): Condition.Always<T> {
         decoder.decodeBoolean()
         return Condition.Always()
@@ -158,121 +158,121 @@ class ConditionAlwaysSerializer<T>(val inner: KSerializer<T>) : KSerializer<Cond
 }
 class ConditionAndSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.And<T>> {
     val to by lazy { ListSerializer(Condition.serializer(inner)) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("And") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.And<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.And<T> = Condition.And(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.And<T>) = encoder.encodeSerializableValue(to, value.conditions)
 }
 class ConditionOrSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.Or<T>> {
     val to by lazy { ListSerializer(Condition.serializer(inner)) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Or") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.Or<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.Or<T> = Condition.Or(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.Or<T>) = encoder.encodeSerializableValue(to, value.conditions)
 }
 class ConditionNotSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.Not<T>> {
     val to by lazy { Condition.serializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Not") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.Not<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.Not<T> = Condition.Not(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.Not<T>) = encoder.encodeSerializableValue(to, value.condition)
 }
 class ConditionEqualSerializer<T: IsEquatable>(val inner: KSerializer<T>) : KSerializer<Condition.Equal<T>> {
     val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Equal") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.Equal<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.Equal<T> = Condition.Equal(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.Equal<T>) = encoder.encodeSerializableValue(to, value.value)
 }
 class ConditionNotEqualSerializer<T: IsEquatable>(val inner: KSerializer<T>) : KSerializer<Condition.NotEqual<T>> {
     val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("NotEqual") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.NotEqual<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.NotEqual<T> = Condition.NotEqual(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.NotEqual<T>) = encoder.encodeSerializableValue(to, value.value)
 }
 class ConditionInsideSerializer<T: IsEquatable>(val inner: KSerializer<T>) : KSerializer<Condition.Inside<T>> {
     val to by lazy { ListSerializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Inside") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.Inside<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.Inside<T> = Condition.Inside(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.Inside<T>) = encoder.encodeSerializableValue(to, value.values)
 }
 class ConditionNotInsideSerializer<T: IsEquatable>(val inner: KSerializer<T>) : KSerializer<Condition.NotInside<T>> {
     val to by lazy { ListSerializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("NotInside") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.NotInside<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.NotInside<T> = Condition.NotInside(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.NotInside<T>) = encoder.encodeSerializableValue(to, value.values)
 }
 class ConditionGreaterThanSerializer<T: Comparable<T>>(val inner: KSerializer<T>) : KSerializer<Condition.GreaterThan<T>> {
     val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("GreaterThan") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.GreaterThan<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.GreaterThan<T> = Condition.GreaterThan(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.GreaterThan<T>) = encoder.encodeSerializableValue(to, value.value)
 }
 class ConditionLessThanSerializer<T: Comparable<T>>(val inner: KSerializer<T>) : KSerializer<Condition.LessThan<T>> {
     val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("LessThan") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.LessThan<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.LessThan<T> = Condition.LessThan(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.LessThan<T>) = encoder.encodeSerializableValue(to, value.value)
 }
 class ConditionGreaterThanOrEqualSerializer<T: Comparable<T>>(val inner: KSerializer<T>) : KSerializer<Condition.GreaterThanOrEqual<T>> {
     val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("GreaterThanOrEqual") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.GreaterThanOrEqual<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.GreaterThanOrEqual<T> = Condition.GreaterThanOrEqual(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.GreaterThanOrEqual<T>) = encoder.encodeSerializableValue(to, value.value)
 }
 class ConditionLessThanOrEqualSerializer<T: Comparable<T>>(val inner: KSerializer<T>) : KSerializer<Condition.LessThanOrEqual<T>> {
     val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("LessThanOrEqual") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.LessThanOrEqual<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.LessThanOrEqual<T> = Condition.LessThanOrEqual(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.LessThanOrEqual<T>) = encoder.encodeSerializableValue(to, value.value)
 }
 object ConditionIntBitsClearSerializer : KSerializer<Condition.IntBitsClear> {
     val to by lazy { serializer<Int>() }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("IntBitsClear") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.IntBitsClear") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.IntBitsClear = Condition.IntBitsClear(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.IntBitsClear) = encoder.encodeSerializableValue(to, value.mask)
 }
 object ConditionIntBitsSetSerializer : KSerializer<Condition.IntBitsSet> {
     val to by lazy { serializer<Int>() }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("IntBitsSet") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.IntBitsSet") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.IntBitsSet = Condition.IntBitsSet(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.IntBitsSet) = encoder.encodeSerializableValue(to, value.mask)
 }
 object ConditionIntBitsAnyClearSerializer : KSerializer<Condition.IntBitsAnyClear> {
     val to by lazy { serializer<Int>() }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("IntBitsAnyClear") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.IntBitsAnyClear") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.IntBitsAnyClear = Condition.IntBitsAnyClear(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.IntBitsAnyClear) = encoder.encodeSerializableValue(to, value.mask)
 }
 object ConditionIntBitsAnySetSerializer : KSerializer<Condition.IntBitsAnySet> {
     val to by lazy { serializer<Int>() }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("IntBitsAnySet") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.IntBitsAnySet") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.IntBitsAnySet = Condition.IntBitsAnySet(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.IntBitsAnySet) = encoder.encodeSerializableValue(to, value.mask)
 }
 class ConditionAllElementsSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.AllElements<T>> {
     val to by lazy { Condition.serializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("AllElements") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.AllElements<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.AllElements<T> = Condition.AllElements(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.AllElements<T>) = encoder.encodeSerializableValue(to, value.condition)
 }
 class ConditionAnyElementsSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.AnyElements<T>> {
     val to by lazy { Condition.serializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("AnyElements") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.AnyElements<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.AnyElements<T> = Condition.AnyElements(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.AnyElements<T>) = encoder.encodeSerializableValue(to, value.condition)
 }
 class ConditionExistsSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.Exists<T>> {
     val to by lazy { serializer<String>() }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Exists") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.Exists<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.Exists<T> = Condition.Exists(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.Exists<T>) = encoder.encodeSerializableValue(to, value.key)
 }
 class ConditionSizesEqualsSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.SizesEquals<T>> {
     val to by lazy { serializer<Int>() }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("SizesEquals") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.SizesEquals<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.SizesEquals<T> = Condition.SizesEquals(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.SizesEquals<T>) = encoder.encodeSerializableValue(to, value.count)
 }
 class ConditionIfNotNullSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.IfNotNull<T>> {
     val to by lazy { Condition.serializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("IfNotNull") { to.descriptor }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.ktordb.Condition.IfNotNull<${inner.descriptor.serialName}>") { to.descriptor }
     override fun deserialize(decoder: Decoder): Condition.IfNotNull<T> = Condition.IfNotNull(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.IfNotNull<T>) = encoder.encodeSerializableValue(to, value.condition)
 }

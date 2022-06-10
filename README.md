@@ -1,12 +1,13 @@
-# TODO
+# Ktor Batteries
 
-- [ ] Auth: safer tokens?  refresh?
-- [X] Error reporting to Sentry
-- [ ] Autogenerate API for client in Khrysalis
-- [X] OAuth2 Google/Apple Login
+A project that drastically speeds up server development by automating the creation of RESTful APIs from models.
+
+## TODO
+
+- [ ] Trailing slash regularization
+- [ ] Performance Monitoring
 - [ ] SMS through Twilio
 - [ ] Cache through Redis
-- [ ] Performance Monitoring
 - [ ] JVM server detail configuration?
 - [ ] Auto Admin
   - [ ] Foreign Keys in Editor
