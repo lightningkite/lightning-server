@@ -64,8 +64,9 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
             val prop = inner.fields[name]
             register(
                 OnFieldSerializer<Any, Any?>(
-                    prop as DataClassProperty<Any, Any?>,
-                    Condition.serializer(childSerializers[index]) as KSerializer<Condition<Any?>>
+                    inner as KSerializer<Any>,
+                    childSerializers[index] as KSerializer<Any?>,
+                    prop as DataClassProperty<Any, Any?>
                 )
             )
         }
@@ -94,17 +95,17 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
             is Condition.LessThan -> "com.lightningkite.ktordb.Condition.LessThan<${inner.descriptor.serialName}>"
             is Condition.GreaterThanOrEqual -> "com.lightningkite.ktordb.Condition.GreaterThanOrEqual<${inner.descriptor.serialName}>"
             is Condition.LessThanOrEqual -> "com.lightningkite.ktordb.Condition.LessThanOrEqual<${inner.descriptor.serialName}>"
-            is Condition.Search -> "com.lightningkite.ktordb.Condition.Search<${inner.descriptor.serialName}>"
-            is Condition.IntBitsClear -> "com.lightningkite.ktordb.Condition.IntBitsClear<${inner.descriptor.serialName}>"
-            is Condition.IntBitsSet -> "com.lightningkite.ktordb.Condition.IntBitsSet<${inner.descriptor.serialName}>"
-            is Condition.IntBitsAnyClear -> "com.lightningkite.ktordb.Condition.IntBitsAnyClear<${inner.descriptor.serialName}>"
-            is Condition.IntBitsAnySet -> "com.lightningkite.ktordb.Condition.IntBitsAnySet<${inner.descriptor.serialName}>"
-            is Condition.AllElements<*> -> "com.lightningkite.ktordb.Condition.AllElements<${inner.descriptor.serialName}>"
-            is Condition.AnyElements<*> -> "com.lightningkite.ktordb.Condition.AnyElements<${inner.descriptor.serialName}>"
-            is Condition.SizesEquals<*> -> "com.lightningkite.ktordb.Condition.SizesEquals<${inner.descriptor.serialName}>"
-            is Condition.Exists<*> -> "com.lightningkite.ktordb.Condition.Exists<${inner.descriptor.serialName}>"
-            is Condition.OnKey<*> -> "com.lightningkite.ktordb.Condition.OnKey<${inner.descriptor.serialName}>"
-            is Condition.IfNotNull<*> -> "com.lightningkite.ktordb.Condition.IfNotNull<${inner.descriptor.serialName}>"
+            is Condition.Search -> "com.lightningkite.ktordb.Condition.Search"
+            is Condition.IntBitsClear -> "com.lightningkite.ktordb.Condition.IntBitsClear"
+            is Condition.IntBitsSet -> "com.lightningkite.ktordb.Condition.IntBitsSet"
+            is Condition.IntBitsAnyClear -> "com.lightningkite.ktordb.Condition.IntBitsAnyClear"
+            is Condition.IntBitsAnySet -> "com.lightningkite.ktordb.Condition.IntBitsAnySet"
+            is Condition.AllElements<*> -> "com.lightningkite.ktordb.Condition.AllElements<${inner.listElement()?.descriptor?.serialName}>"
+            is Condition.AnyElements<*> -> "com.lightningkite.ktordb.Condition.AnyElements<${inner.listElement()?.descriptor?.serialName}>"
+            is Condition.SizesEquals<*> -> "com.lightningkite.ktordb.Condition.SizesEquals<${inner.listElement()?.descriptor?.serialName}>"
+            is Condition.Exists<*> -> "com.lightningkite.ktordb.Condition.Exists<${inner.mapValueElement()?.descriptor?.serialName}>"
+            is Condition.OnKey<*> -> "com.lightningkite.ktordb.Condition.OnKey<${inner.mapValueElement()?.descriptor?.serialName}>"
+            is Condition.IfNotNull<*> -> "com.lightningkite.ktordb.Condition.IfNotNull<${inner.descriptor.serialName.removeSuffix("?")}>"
             is Condition.OnField<*, *> -> "com.lightningkite.ktordb.Condition.OnField<${inner.descriptor.serialName}>(${it.key.name})"
             else -> fatalError()
         }
@@ -114,14 +115,16 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
 class ConditionSerializer<Inner>(inner: KSerializer<Inner>) : KSerializer<Condition<Inner>> by getCond(inner)
 
 class OnFieldSerializer<K : Any, V>(
-    val field: DataClassProperty<K, V>,
-    val conditionSerializer: KSerializer<Condition<V>>
+    val outer: KSerializer<K>,
+    val inner: KSerializer<V>,
+    val field: DataClassProperty<K, V>
 ) : KSerializer<Condition.OnField<K, V>> {
+    val conditionSerializer = ConditionSerializer(inner)
     override fun deserialize(decoder: Decoder): Condition.OnField<K, V> {
         return Condition.OnField(field, condition = decoder.decodeSerializableValue(conditionSerializer))
     }
 
-    override val descriptor: SerialDescriptor = SerialDescriptor("com.lightningkite.ktordb.Condition.OnField(${field.name})", conditionSerializer.descriptor)
+    override val descriptor: SerialDescriptor = SerialDescriptor("com.lightningkite.ktordb.Condition.OnField<${outer.descriptor.serialName}>(${field.name})", conditionSerializer.descriptor)
 
     override fun serialize(encoder: Encoder, value: Condition.OnField<K, V>) {
         encoder.encodeSerializableValue(conditionSerializer, value.condition)

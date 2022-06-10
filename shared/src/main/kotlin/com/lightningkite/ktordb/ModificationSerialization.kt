@@ -58,8 +58,9 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): KSerializer<Modification<
             val prop = inner.fields[name]
             register(
                 OnFieldSerializer2<Any, Any?>(
-                    prop as DataClassProperty<Any, Any?>,
-                    Modification.serializer(childSerializers[index]) as KSerializer<Modification<Any?>>
+                    inner as KSerializer<Any>,
+                    childSerializers[index] as KSerializer<Any?>,
+                    prop as DataClassProperty<Any, Any?>
                 )
             )
         }
@@ -76,24 +77,24 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): KSerializer<Modification<
     ) {
         when (it) {
             is Modification.Chain -> "com.lightningkite.ktordb.Modification.Chain<${inner.descriptor.serialName}>"
-            is Modification.IfNotNull<*> -> "com.lightningkite.ktordb.Modification.IfNotNull<${inner.descriptor.serialName}>"
+            is Modification.IfNotNull<*> -> "com.lightningkite.ktordb.Modification.IfNotNull<${inner.descriptor.serialName.removeSuffix("?")}>"
             is Modification.Assign -> "com.lightningkite.ktordb.Modification.Assign<${inner.descriptor.serialName}>"
             is Modification.CoerceAtMost -> "com.lightningkite.ktordb.Modification.CoerceAtMost<${inner.descriptor.serialName}>"
             is Modification.CoerceAtLeast -> "com.lightningkite.ktordb.Modification.CoerceAtLeast<${inner.descriptor.serialName}>"
             is Modification.Increment -> "com.lightningkite.ktordb.Modification.Increment<${inner.descriptor.serialName}>"
             is Modification.Multiply -> "com.lightningkite.ktordb.Modification.Multiply<${inner.descriptor.serialName}>"
-            is Modification.AppendString -> "com.lightningkite.ktordb.Modification.AppendString<${inner.descriptor.serialName}>"
-            is Modification.AppendList<*> -> "com.lightningkite.ktordb.Modification.AppendList<${inner.descriptor.serialName}>"
-            is Modification.AppendSet<*> -> "com.lightningkite.ktordb.Modification.AppendSet<${inner.descriptor.serialName}>"
-            is Modification.Remove<*> -> "com.lightningkite.ktordb.Modification.Remove<${inner.descriptor.serialName}>"
-            is Modification.RemoveInstances<*> -> "com.lightningkite.ktordb.Modification.RemoveInstances<${inner.descriptor.serialName}>"
-            is Modification.DropFirst<*> -> "com.lightningkite.ktordb.Modification.DropFirst<${inner.descriptor.serialName}>"
-            is Modification.DropLast<*> -> "com.lightningkite.ktordb.Modification.DropLast<${inner.descriptor.serialName}>"
-            is Modification.PerElement<*> -> "com.lightningkite.ktordb.Modification.PerElement<${inner.descriptor.serialName}>"
-            is Modification.Combine<*> -> "com.lightningkite.ktordb.Modification.Combine<${inner.descriptor.serialName}>"
-            is Modification.ModifyByKey<*> -> "com.lightningkite.ktordb.Modification.ModifyByKey<${inner.descriptor.serialName}>"
-            is Modification.RemoveKeys<*> -> "com.lightningkite.ktordb.Modification.RemoveKeys<${inner.descriptor.serialName}>"
-            is Modification.OnField<*, *> -> "com.lightningkite.ktordb.Modification.OnField(${it.key.name})<${inner.descriptor.serialName}>"
+            is Modification.AppendString -> "com.lightningkite.ktordb.Modification.AppendString"
+            is Modification.AppendList<*> -> "com.lightningkite.ktordb.Modification.AppendList<${inner.listElement()?.descriptor?.serialName}>"
+            is Modification.AppendSet<*> -> "com.lightningkite.ktordb.Modification.AppendSet<${inner.listElement()?.descriptor?.serialName}>"
+            is Modification.Remove<*> -> "com.lightningkite.ktordb.Modification.Remove<${inner.listElement()?.descriptor?.serialName}>"
+            is Modification.RemoveInstances<*> -> "com.lightningkite.ktordb.Modification.RemoveInstances<${inner.listElement()?.descriptor?.serialName}>"
+            is Modification.DropFirst<*> -> "com.lightningkite.ktordb.Modification.DropFirst<${inner.listElement()?.descriptor?.serialName}>"
+            is Modification.DropLast<*> -> "com.lightningkite.ktordb.Modification.DropLast<${inner.listElement()?.descriptor?.serialName}>"
+            is Modification.PerElement<*> -> "com.lightningkite.ktordb.Modification.PerElement"/*<${inner.listElement()?.descriptor?.serialName}>"*/
+            is Modification.Combine<*> -> "com.lightningkite.ktordb.Modification.Combine<${inner.mapValueElement()?.descriptor?.serialName}>"
+            is Modification.ModifyByKey<*> -> "com.lightningkite.ktordb.Modification.ModifyByKey<${inner.mapValueElement()?.descriptor?.serialName}>"
+            is Modification.RemoveKeys<*> -> "com.lightningkite.ktordb.Modification.RemoveKeys<${inner.mapValueElement()?.descriptor?.serialName}>"
+            is Modification.OnField<*, *> -> "com.lightningkite.ktordb.Modification.OnField<${inner.descriptor.serialName}>(${it.key.name})"
             else -> fatalError()
         }
     }
@@ -102,14 +103,16 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): KSerializer<Modification<
 class ModificationSerializer<Inner>(inner: KSerializer<Inner>) : KSerializer<Modification<Inner>> by getMod(inner)
 
 class OnFieldSerializer2<K : Any, V>(
+    val outer: KSerializer<K>,
+    val inner: KSerializer<V>,
     val field: DataClassProperty<K, V>,
-    val modificationSerializer: KSerializer<Modification<V>>
 ) : KSerializer<Modification.OnField<K, V>> {
+    val modificationSerializer = Modification.serializer(inner)
     override fun deserialize(decoder: Decoder): Modification.OnField<K, V> {
         return Modification.OnField(field, modification = decoder.decodeSerializableValue(modificationSerializer))
     }
 
-    override val descriptor: SerialDescriptor = SerialDescriptor("com.lightningkite.ktordb.Modification.OnField(${field.name})", modificationSerializer.descriptor)
+    override val descriptor: SerialDescriptor = SerialDescriptor("com.lightningkite.ktordb.Modification.OnField<${outer.descriptor.serialName}>(${field.name})", modificationSerializer.descriptor)
 
     override fun serialize(encoder: Encoder, value: Modification.OnField<K, V>) {
         encoder.encodeSerializableValue(modificationSerializer, value.modification)
