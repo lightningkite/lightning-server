@@ -62,10 +62,10 @@ fun Route.pathRelativeTo(base: Route): String? {
 private val RouteSelector.segment: String
     get() = when (this) {
         is PathSegmentConstantRouteSelector -> "/$value"
-        is PathSegmentParameterRouteSelector -> "/\$$name"
-        is PathSegmentOptionalParameterRouteSelector -> "/\$$name"
+        is PathSegmentParameterRouteSelector -> "/\${$name}"
+        is PathSegmentOptionalParameterRouteSelector -> "/\${$name}"
         is PathSegmentWildcardRouteSelector -> "/anything"
-        is PathSegmentTailcardRouteSelector -> "/\$${this.name}"
+        is PathSegmentTailcardRouteSelector -> "/\${${this.name}}"
         is TrailingSlashRouteSelector -> "/"
         else -> ""
     }

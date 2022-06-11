@@ -25,6 +25,15 @@ val ktorVersion = "2.0.1"
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
 dependencies {
+
+    // Security
+    implementation("com.google.protobuf:protobuf-java:3.18.2")
+    implementation("io.netty:netty-codec-http:4.1.71.Final")
+    implementation("io.netty:netty-common:4.1.77.Final")
+    implementation("com.google.oauth-client:google-oauth-client:1.33.3")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.13.3")
+    // End Security
+
     api(project(":db"))
     api(project(":mongo"))
     api("io.ktor:ktor-server-auth-jvm:$ktorVersion")
@@ -53,12 +62,13 @@ dependencies {
     api("org.apache.commons:commons-email:1.5")
     api("org.apache.commons:commons-vfs2:2.9.0")
     api("com.github.abashev:vfs-s3:4.3.5")
+    api("com.azure:azure-storage-blob:12.17.1")
+    api("com.github.dalet-oss:vfs-azure:4.2.1")
     api("com.charleskorn.kaml:kaml:0.43.0")
     api("com.lightningkite:kotliner-cli:1.0.3")
     api("com.google.firebase:firebase-admin:8.1.0")
 
     implementation("org.bouncycastle:bcprov-jdk15on:1.70")
-    implementation("org.bouncycastle:bcpkix-jdk15on:1.70")
 
     api("io.lettuce:lettuce-core:6.1.8.RELEASE")
     implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")

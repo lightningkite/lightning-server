@@ -1,6 +1,8 @@
 package com.lightningkite.ktorbatteries.files
 
+import com.dalet.vfs2.provider.azure.AzFileObject
 import com.github.vfss3.S3FileObject
+import com.lightningkite.ktorbatteries.auth.makeToken
 import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
 import org.apache.commons.vfs2.FileObject
 import org.apache.commons.vfs2.FileSystemManager
@@ -33,8 +35,31 @@ val FileObject.publicUrl: String
                 getSignedUrl(seconds)
             } ?: URL("https", url.host, url.port, url.file).toString()
         }
+        is AzFileObject -> {
+            val url = FilesSettings.instance.signedUrlExpirationSeconds?.let { seconds ->
+                getSignedUrl(seconds)
+            } ?: URL("https", url.host, url.port, url.file)
+            url.toString()
+        }
         else -> URL("https", url.host, url.port, url.file).toString()
     }
+
+fun FileObject.signedUploadUrl(expirationSeconds: Int = FilesSettings.instance.signedUrlExpirationSeconds ?: (7 * 60)): String {
+    return when(this) {
+        is LocalFile -> {
+            val path = path.relativeTo(Path.of(FilesSettings.instance.storageUrl.removePrefix("file://"))).toString()
+                .replace("\\", "/")
+            "${GeneralServerSettings.instance.publicUrl}/${FilesSettings.instance.userContentPath}/$path?token=${makeToken(path, expirationSeconds * 1000L)}"
+        }
+        is S3FileObject -> {
+            this.uploadUrl(expirationSeconds)
+        }
+        is AzFileObject -> {
+            this.uploadUrl(expirationSeconds)
+        }
+        else -> throw UnsupportedOperationException("No supported upload URL for $this")
+    }
+}
 
 fun getRandomString(length: Int, allowedChars: String): String = (1..length)
     .map { allowedChars.random() }

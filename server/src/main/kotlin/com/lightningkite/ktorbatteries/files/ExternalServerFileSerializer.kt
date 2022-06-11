@@ -1,5 +1,6 @@
 package com.lightningkite.ktorbatteries.files
 
+import com.dalet.vfs2.provider.azure.AzFileObject
 import com.github.vfss3.S3FileObject
 import com.lightningkite.ktorbatteries.client
 import com.lightningkite.ktordb.ServerFile
@@ -42,6 +43,14 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
         if(!raw.startsWith(rootUrl)) throw BadRequestException("The given url ($raw) does not start with the files root ($rootUrl).")
         val newFile = root.resolveFile(raw.removePrefix(rootUrl))
         when(newFile) {
+            is AzFileObject -> {
+                if(FilesSettings.instance.signedUrlExpirationSeconds != null) {
+                    // TODO: A local check like we do for AWS would be more performant
+                    runBlocking {
+                        if(!client.get(raw) { header("Range", "bytes=0-0") }.status.isSuccess()) throw BadRequestException("URL does not appear to be signed properly")
+                    }
+                }
+            }
             is S3FileObject -> {
                 if(FilesSettings.instance.signedUrlExpirationSeconds != null) {
                     val headers = raw.substringAfter('?').split('&').associate {
@@ -92,7 +101,6 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
                 }
             }
         }
-        println("Raw is $raw, and we're good to go!")
         return ServerFile(raw)
     }
 }

@@ -14,8 +14,9 @@ import org.bson.UuidRepresentation
 import org.litote.kmongo.serialization.registerSerializer
 import java.util.*
 
-
+private var fixed = false
 fun fixUuidSerialization() {
+    if(fixed) return
     registerSerializer(ServerFileSerialization)
     registerSerializer(object: KSerializer<UUID> {
         override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("UUIDSerializer", PrimitiveKind.STRING)
@@ -42,4 +43,5 @@ fun fixUuidSerialization() {
             }
         }
     })
+    fixed = true
 }
