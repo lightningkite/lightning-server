@@ -25,17 +25,23 @@ import java.io.StringWriter
 class ForbiddenException : Exception()
 class AuthenticationException : Exception()
 
-fun Application.configureExceptions() {
-    install(StatusPages){
+fun Application.configureExceptions(customExceptions: (StatusPagesConfig.() -> Unit)? = null) {
+    install(StatusPages) {
         exception<ForbiddenException> { call, it ->
-            call.respondText(status = HttpStatusCode.Forbidden, contentType = ContentType.Text.Html, text = HtmlDefaults.basePage("""
+            call.respondText(
+                status = HttpStatusCode.Forbidden, contentType = ContentType.Text.Html, text = HtmlDefaults.basePage(
+                    """
                 <h1>Not Allowed</h1>
                 <p>Sorry, you don't have permission to perform this action.</p>
-            """.trimIndent()))
+            """.trimIndent()
+                )
+            )
         }
         exception<AuthenticationException> { call, it ->
             call.response.cookies.appendExpired(HttpHeaders.Authorization)
-            call.respondText(status = HttpStatusCode.Unauthorized, contentType = ContentType.Text.Html, text = HtmlDefaults.basePage("""
+            call.respondText(
+                status = HttpStatusCode.Unauthorized, contentType = ContentType.Text.Html, text = HtmlDefaults.basePage(
+                    """
                 <h1>Log-in Issue</h1>
                 <p>Something is wrong with your log-in.  Please log in again.</p>
             """.trimIndent()))
@@ -66,6 +72,7 @@ fun Application.configureExceptions() {
             """.trimIndent()))
             call.reportException(it)
         }
+        customExceptions?.invoke(this)
     }
 }
 
