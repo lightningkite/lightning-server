@@ -12,6 +12,10 @@ val KSClassDeclaration.usesSub: Boolean
                     packageName.startsWith("java.time") ||
                     packageName.startsWith("java.util") ||
                     packageName.startsWith("kotlin") -> false
+            packageName == "com.lightningkite.ktordb" && (
+                    this.simpleName.asString() == "Condition" ||
+                    this.simpleName.asString() == "Modification"
+            ) -> false
 //            packageName.startsWith("kotlin.Byte") ||
 //            packageName.startsWith("kotlin.Short") ||
 //            packageName.startsWith("kotlin.Int") ||
