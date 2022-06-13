@@ -68,7 +68,8 @@ dependencies {
     api("com.lightningkite:kotliner-cli:1.0.3")
     api("com.google.firebase:firebase-admin:8.1.0")
 
-    implementation("org.bouncycastle:bcprov-jdk15on:1.70")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.71")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.71")
 
     api("io.lettuce:lettuce-core:6.1.8.RELEASE")
     implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
