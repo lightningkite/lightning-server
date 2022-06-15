@@ -32,7 +32,7 @@ val FileObject.publicUrl: String
         }"
         is S3FileObject -> {
             FilesSettings.instance.signedUrlExpirationSeconds?.let { seconds ->
-                getSignedUrl(seconds)
+                unstupidSignUrl(seconds)
             } ?: URL("https", url.host, url.port, url.file).toString()
         }
         is AzFileObject -> {

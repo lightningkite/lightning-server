@@ -79,9 +79,10 @@ inline fun <reified USER> Route.healthCheck(path: String = "health-check", featu
     )
 }
 
-@Deprecated("Use new api endpoint instead", ReplaceWith("healthCheckPage"))
+@Deprecated("Use new api endpoint instead", ReplaceWith("healthCheck"))
 fun Route.configureHealth(path: String = "health-check", features: List<HealthCheckable>) = healthCheckPage(path, features)
-@Deprecated("Use new api endpoint instead", ReplaceWith("healthCheckPage"))
+
+@Deprecated("Use new api endpoint instead", ReplaceWith("healthCheck"))
 @KtorDsl
 fun Route.healthCheckPage(path: String = "health-check", features: List<HealthCheckable>) {
     get(path) {
