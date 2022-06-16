@@ -23,9 +23,18 @@ import kotlin.reflect.KClassifier
 import kotlin.reflect.KType
 import kotlin.reflect.KTypeProjection
 
+/**
+ * The database object created and defined by the DatabaseSettings.
+ * Use this to create FieldCollections and access the database.
+ */
 var database: Database by SetOnce()
 
-
+/**
+ * Settings that define what database to use and how to connect to it.
+ *
+ * @param url Defines the type and connection to the database. examples are ram, ram-preload, ram-unsafe-persist, mongodb-test, mongodb-file, mongodb
+ * @param databaseName The name of the database to connect to.
+ */
 @Serializable
 data class DatabaseSettings(
     val url: String = "mongodb-file://${File("./local/mongo").absolutePath}",

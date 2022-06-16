@@ -29,6 +29,9 @@ data class AutoAdminSection<USER, T: HasId<*>>(
     }
 }
 
+/**
+ * Creates the End point for the Admin Index, which will direct the user to each of the models available.
+ */
 @KtorDsl
 fun Route.adminIndex(path: String = "admin") = route(path) {
     get {
@@ -49,20 +52,24 @@ fun Route.adminIndex(path: String = "admin") = route(path) {
     }
 }
 
+
+/**
+ * Shortcut to create each of the endpoints required for the Auto Admin
+ */
 @KtorDsl
-inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.adminPages(
+inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> Route.adminPages(
     path: String = "",
     noinline defaultItem: (USER) -> T,
     noinline getCollection: suspend (principal: USER) -> FieldCollection<T>
 ) = route(path) {
     AutoAdminSection.known.add(
         AutoAdminSection(
-        route = this,
-        type = typeOf<T>(),
-        userType = typeOf<USER>(),
-        defaultItem = defaultItem,
-        getCollection = getCollection,
-    ))
+            route = this,
+            type = typeOf<T>(),
+            userType = typeOf<USER>(),
+            defaultItem = defaultItem,
+            getCollection = getCollection,
+        ))
     get("{id}") {
         val secured = getCollection(call.user<USER>())
         val item = secured.get(this.context.parameters["id"]!!.parseUrlPartOrBadRequest())

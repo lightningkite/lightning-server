@@ -24,6 +24,21 @@ data class OauthResponse(
     val id_token: String? = null
 )
 
+
+/**
+ * A shortcut function for setting up an OAuth method.
+ * It will set up a login and callback endpoint for the method.
+ *
+ * @param niceName A readable name for this method
+ * @param codeName Used as the path as well as the key for the oauth config found in AuthSettings.
+ * @param authUrl The url to redirect the user upon auth request. This will be the third parties auth url.
+ * @param getTokenUrl The third parties url for retrieving their verification token.
+ * @param scope The oath Scope.
+ * @param additionalParams Any additional parameters to add to the third party url.
+ * @param defaultLanding The final page to direct the user after authenticating.
+ * @param secretTransform An optional lambda that allows any custom transformations on the client_secret before being used.
+ * @param remoteTokenToUserId A lambda that will return the userId given the token from the third party.
+ */
 @KtorDsl
 inline fun Route.oauth(
     niceName: String,
@@ -33,7 +48,7 @@ inline fun Route.oauth(
     scope: String,
     additionalParams: String = "",
     defaultLanding: String = "",
-    crossinline secretTransform: (String)->String = { it },
+    crossinline secretTransform: (String) -> String = { it },
     crossinline remoteTokenToUserId: suspend (OauthResponse)->String
 ) = route(codeName) {
     val settings = AuthSettings.instance.oauth[codeName] ?: return@route

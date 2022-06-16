@@ -15,7 +15,12 @@ import kotlinx.serialization.properties.decodeFromStringMap
 import kotlinx.serialization.properties.encodeToStringMap
 import java.util.*
 
-// Creates websocket listening end points for a model
+/**
+ * Creates a websocket end point to receive live updates for the model.
+ *
+ * @param path The route the websocket endpoint exists on.
+ * @param getCollection A lambda that returns the field collection for the model given the calls principal
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 @KtorDsl
 inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.restApiWebsocket(
@@ -42,9 +47,26 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
     }
 }
 
-// Calls all three of the endpoint type functions
+
+/**
+ * Creates a Restful API for the model provided.
+ * The functionalities include:
+ * listing items,
+ * getting a single item,
+ * posting an item,
+ * posting many items,
+ * putting an item,
+ * putting many items,
+ * patching an item,
+ * patching many items,
+ * deleting an item,
+ * deleting many items.
+ *
+ * @param path The route the websocket endpoint exists on.
+ * @param getCollection A lambda that returns the field collection for the model given the calls principal
+ */
 @KtorDsl
-inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.restApi(
+inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> Route.restApi(
     path: String = "",
     crossinline getCollection: suspend (principal: USER) -> FieldCollection<T>
 ) = route(path) {

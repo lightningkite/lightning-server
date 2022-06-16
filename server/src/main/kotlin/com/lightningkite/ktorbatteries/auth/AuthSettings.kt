@@ -12,6 +12,17 @@ import java.security.SecureRandom
 import java.time.Duration
 import java.util.*
 
+/**
+ * AuthSettings holds the values required to setup JWT Authentication.
+ * This will be used by nearly every function in the auth package.
+ * @param authDomain Used in cookies as the domain
+ * @param jwtAudience Used in a JWT claim to help identify JWTs
+ * @param jwtIssuer Used in a JWT claim to help identify JWTs
+ * @param jwtRealm Used to define a realm that gets set in the header WWW-Authenticate
+ * @param jwtExpirationMilliseconds The default expiration for tokens. This can be overridden for a specific token.
+ * @param jwtSecret THis should be a long and complicated String. The jwtSecret should never be shared since it is what's used to sign JWTs.
+ * @param oauth will define what external services you will allow to authenticate through.
+ */
 @Serializable
 data class AuthSettings(
     val authDomain: String? = null,
