@@ -21,7 +21,6 @@ import org.litote.kmongo.coroutine.CoroutineClient
 import org.litote.kmongo.coroutine.coroutine
 import org.litote.kmongo.coroutine.toList
 import org.litote.kmongo.reactivestreams.KMongo
-import org.litote.kmongo.serialization.registerSerializer
 import org.slf4j.LoggerFactory
 import java.io.File
 

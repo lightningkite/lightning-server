@@ -18,6 +18,9 @@ import kotlinx.serialization.Transient
 import org.slf4j.LoggerFactory
 import java.io.File
 
+/**
+ * ExceptionSettings is used to configure reporting unhandled exceptions to a Sentry server.
+ */
 @Serializable
 data class ExceptionSettings(
     val sentryDsn: String? = null
@@ -33,6 +36,7 @@ data class ExceptionSettings(
 
     override val healthCheckName: String
         get() = "Error Monitoring"
+
     override suspend fun healthCheck(): HealthStatus {
         return when {
             sentryDsn != null ->

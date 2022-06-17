@@ -169,7 +169,7 @@ fun AuthenticationConfig.quickJwt(
 }
 
 /**
- * Creates a JWT with the id as claim "userId" and an expiration date of `expiration`, or the default provided in AuthSettings.
+ * Creates a JWT with the id as claim "userId" and an expiration date of [expiration], or the default provided in AuthSettings.
  * jwtAudience and jwtIssuer from AuthSettings will be added to this token.
  * It will be signed using the jwtSecret from AuthSettings
  *

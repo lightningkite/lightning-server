@@ -15,6 +15,16 @@ import org.apache.commons.vfs2.auth.StaticUserAuthenticator
 import org.apache.commons.vfs2.impl.DefaultFileSystemConfigBuilder
 import java.io.File
 
+/**
+ * FileSettings defines where server files and user content is stored. This used ApacheVFS which allows the filesystem to be
+ * a variety of sources. For now this is set up to handle a local file system, a s3 bucket, or an azure blob container.
+ *
+ * @param storageUrl Defines where the file system is. This follows ApacheVFS standards.
+ * @param key Used only by Azure right now. Used to authenticate with Azure.
+ * @param userContentPath A path you wish all file paths to be prefixed with.
+ * @param signedUrlExpirationSeconds When dealing with secured filesystems that require url signing this will determine how long pre-signed URLs will be valid for.
+ */
+
 @Serializable
 data class FilesSettings(
     val storageUrl: String = "file://${File("./local/files").absolutePath}",
@@ -47,5 +57,6 @@ data class FilesSettings(
     } catch (e: Exception) {
         HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
     }
+
     val root get() = VFS.getManager().resolveFile(instance.storageUrl)
 }

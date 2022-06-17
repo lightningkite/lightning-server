@@ -14,6 +14,9 @@ import kotlinx.serialization.modules.serializersModuleOf
 import kotlinx.serialization.properties.Properties
 import nl.adaptivity.xmlutil.serialization.XML
 
+/**
+ * A place to hold all the support Serialization types.
+ */
 object Serialization {
     var module: SerializersModule by SetOnce {
         ClientModule.overwriteWith(serializersModuleOf(ExternalServerFileSerializer))

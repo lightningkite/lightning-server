@@ -21,6 +21,10 @@ import java.security.MessageDigest
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
+/**
+ * Used to serialize and deserialize a ServerFile as a String. This will also handle security for ServerFiles.
+ * If security is required it will serialize as a pre-signed URL. It will also check deserializing of url to confirm it is valid.
+ */
 object ExternalServerFileSerializer: KSerializer<ServerFile> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ServerFile", PrimitiveKind.STRING)
 

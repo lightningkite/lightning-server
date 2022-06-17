@@ -9,6 +9,9 @@ import org.apache.commons.vfs2.FileSystemException
 import org.apache.commons.vfs2.FileType
 import java.util.*
 
+/**
+ * A patch that allows generating a pre-signed upload url to s3
+ */
 fun S3FileObject.uploadUrl(seconds: Int): String {
     return object: S3FileObject(this.name, this.fileSystem as S3FileSystem) {
         fun uploadUrl(seconds: Int): String {
@@ -50,6 +53,9 @@ fun S3FileObject.uploadUrl(seconds: Int): String {
     }.uploadUrl(seconds)
 }
 
+/**
+ * A patch to prevent generating a signed url from making external calls which will be slow.
+ */
 fun S3FileObject.unstupidSignUrl(seconds: Int): String {
     return object : S3FileObject(this.name, this.fileSystem as S3FileSystem) {
         fun unstupidSignUrl(expireInSeconds: Int): String {

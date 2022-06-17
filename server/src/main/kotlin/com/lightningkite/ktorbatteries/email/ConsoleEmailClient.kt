@@ -1,5 +1,8 @@
 package com.lightningkite.ktorbatteries.email
 
+/**
+ * An email client that will simply print out everything to the console
+ */
 object ConsoleEmailClient : EmailClient {
     override suspend fun send(
         subject: String,

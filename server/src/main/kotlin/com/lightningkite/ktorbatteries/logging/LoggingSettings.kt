@@ -14,7 +14,15 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
 
-
+/**
+ * LoggingSettings configures what the logging of the server should look like.
+ * This has a lot of customizability though it can be complicated.
+ * You can tell it what files to log to, if logs get printed to the console, and what packages you want to log.
+ * This uses ch.qos.logback:logback-classic, so you can reference its docs for custom file patterns.
+ *
+ * @param default will log everything from all packages unless specified otherwise.
+ * @param logger is where you can be more specific logging for certain packages. Additive will state if default should also log that package still.
+ */
 @Serializable
 data class LoggingSettings(
     val default: ContextSettings? = ContextSettings(null, true, "INFO", false),

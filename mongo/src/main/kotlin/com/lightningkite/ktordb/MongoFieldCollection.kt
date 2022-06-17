@@ -13,6 +13,9 @@ import org.litote.kmongo.MongoOperator
 import org.litote.kmongo.coroutine.CoroutineCollection
 import java.util.concurrent.TimeUnit
 
+/**
+ * MongoFieldCollection implements FieldCollection specifically for a MongoDB server.
+ */
 class MongoFieldCollection<Model: Any>(
     val wraps: CoroutineCollection<Model>
 ): FieldCollection<Model> {
