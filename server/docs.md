@@ -5,10 +5,23 @@ Ktor Batteries Server has a lot of nifty features. Here is a brief list of thing
 
 - `loadSettings()` loads server settings
 
-### Email
+Settings singletons:
 
-- `email.send()` sends an email
+- `GeneralServerSettings`
+- `AuthSettings`
+- `FilesSettings`
+- `LoggingSettings`
+- `DatabaseSettings`
+- `ExceptionSettings`
+- `EmailSettings`
 
+## Server Setup
+
+-  `configureFiles()`
+-  `configureSerialization()`
+-  `configureExceptions()`
+-  `configureAuth()`
+-  `install()`
 
 ## Database
 Ktor Batteries provides a `database` singleton that is used to handle the database. `FieldCollection`s are used to store information into the database.
@@ -62,6 +75,10 @@ You can add additional information to the token using:
 
 These can be used to store information relevant to the token across different routes.
 You can parse a token validated with `checkToken()` to retrieve that information using the associated get methods (*e.g. `getClaim()` to access the claim attribute set with `withClaim()`*).
+
+## Email
+
+- `email.send()` sends an email
 
 ## Convenience
 
