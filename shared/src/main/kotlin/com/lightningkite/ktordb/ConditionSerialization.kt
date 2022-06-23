@@ -18,7 +18,7 @@ import kotlin.reflect.KProperty1
 import kotlin.reflect.full.allSupertypes
 import kotlin.reflect.jvm.jvmErasure
 
-fun <K, V> KSerializer<K>.fieldSerializer(property: DataClassProperty<K, V>): KSerializer<V>? {
+fun <K, V> KSerializer<K>.fieldSerializer(property: KProperty1<K, V>): KSerializer<V>? {
     val index = this.descriptor.elementNames.indexOf(property.name)
     @Suppress("UNCHECKED_CAST")
     return (this as? GeneratedSerializer<*>)?.childSerializers()?.get(index) as? KSerializer<V>
@@ -65,13 +65,13 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
     }
     if (inner is GeneratedSerializer<*> && inner.descriptor.kind == StructureKind.CLASS) {
         val childSerializers = inner.childSerializers()
-        inner.descriptor.capturedKClass
+        val fields = inner.attemptGrabFields()
         for (index in 0 until inner.descriptor.elementsCount) {
             val name = inner.descriptor.getElementName(index)
-            val prop = inner.fields[name]
+            val prop = fields[name]
             register(
                 OnFieldSerializer<Any, Any?>(
-                    prop as DataClassProperty<Any, Any?>,
+                    prop as KProperty1<Any, Any?>,
                     Condition.serializer(childSerializers[index]) as KSerializer<Condition<Any?>>
                 )
             )
@@ -121,7 +121,7 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
 class ConditionSerializer<Inner>(inner: KSerializer<Inner>) : KSerializer<Condition<Inner>> by getCond(inner)
 
 class OnFieldSerializer<K : Any, V>(
-    val field: DataClassProperty<K, V>,
+    val field: KProperty1<K, V>,
     val conditionSerializer: KSerializer<Condition<V>>
 ) : KSerializer<Condition.OnField<K, V>> {
     override fun deserialize(decoder: Decoder): Condition.OnField<K, V> {

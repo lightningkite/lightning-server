@@ -11,12 +11,7 @@ interface HasId<ID : Comparable<ID>> {
 }
 
 object HasIdFields {
-    fun <T: HasId<ID>, ID: Comparable<ID>> _id() = DataClassProperty<T, ID>(
-        name = "_id",
-        get = { it._id },
-        set = { _, _ -> fatalError() },
-        compare = compareBy { it._id }
-    )
+    fun <T: HasId<ID>, ID: Comparable<ID>> _id() = T::_id
 }
 
 @SwiftProtocolExtends("Codable", "Hashable")
