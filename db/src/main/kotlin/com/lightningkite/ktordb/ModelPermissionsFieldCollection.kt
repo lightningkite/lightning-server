@@ -89,14 +89,14 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         aggregate: Aggregate,
         condition: Condition<Model>,
         property: DataClassProperty<Model, N>
-    ): Double = base.aggregate(aggregate, condition and permissions.read, property)
+    ): Double? = base.aggregate(aggregate, condition and permissions.read, property)
 
-    override suspend fun <N : Number, Key> groupAggregate(
+    override suspend fun <N: Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
         groupBy: DataClassProperty<Model, Key>,
         property: DataClassProperty<Model, N>
-    ): Map<Key, Double> = base.groupAggregate(aggregate, condition and permissions.read and (permissions.readFields[groupBy]?.condition ?: Condition.Always()), groupBy, property)
+    ): Map<Key, Double?> = base.groupAggregate(aggregate, condition and permissions.read and (permissions.readFields[groupBy]?.condition ?: Condition.Always()), groupBy, property)
 }
 
 fun <Model: Any> FieldCollection<Model>.withPermissions(permissions: ModelPermissions<Model>): FieldCollection<Model> = ModelPermissionsFieldCollection(this, permissions)

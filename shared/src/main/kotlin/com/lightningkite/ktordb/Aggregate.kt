@@ -19,15 +19,17 @@ fun Aggregate.aggregator(): Aggregator = when(this) {
 
 interface Aggregator {
     fun consume(value: Double)
-    fun complete(): Double
+    fun complete(): Double?
 }
 
 class SumAggregator: Aggregator {
     var current: Double = 0.0
+    var anyFound = false
     override fun consume(value: Double) {
+        anyFound = true
         current += value
     }
-    override fun complete(): Double = current
+    override fun complete(): Double? = if(anyFound) current else null
 }
 class AverageAggregator: Aggregator {
     var count: Int = 0
@@ -36,7 +38,7 @@ class AverageAggregator: Aggregator {
         count++
         current += (value - current) / count
     }
-    override fun complete(): Double = current
+    override fun complete(): Double? = if(count == 0) null else current
 }
 class StandardDeviationSampleAggregator: Aggregator {
     var count: Int = 0
@@ -49,7 +51,7 @@ class StandardDeviationSampleAggregator: Aggregator {
         val delta2 = value - mean
         m2 += delta1 * delta2
     }
-    override fun complete(): Double = if(count < 2) 0.0 else sqrt(m2 / (count - 1))
+    override fun complete(): Double? = if(count < 2) null else sqrt(m2 / (count - 1))
 }
 class StandardDeviationPopulationAggregator: Aggregator {
     var count: Int = 0
@@ -62,10 +64,10 @@ class StandardDeviationPopulationAggregator: Aggregator {
         val delta2 = value - mean
         m2 += delta1 * delta2
     }
-    override fun complete(): Double = if(count == 0) 0.0 else sqrt(m2 / count)
+    override fun complete(): Double? = if(count == 0) null else sqrt(m2 / count)
 }
 
-fun Sequence<Double>.aggregate(aggregate: Aggregate): Double {
+fun Sequence<Double>.aggregate(aggregate: Aggregate): Double? {
     val aggregator = aggregate.aggregator()
     for(item in this) {
         aggregator.consume(item)
@@ -73,7 +75,7 @@ fun Sequence<Double>.aggregate(aggregate: Aggregate): Double {
     return aggregator.complete()
 }
 
-fun <GROUP: IsHashable> Sequence<Pair<GROUP, Double>>.aggregate(aggregate: Aggregate): Map<GROUP, Double> {
+fun <GROUP: IsHashable> Sequence<Pair<GROUP, Double>>.aggregate(aggregate: Aggregate): Map<GROUP, Double?> {
     val aggregators = HashMap<GROUP, Aggregator>()
     for(entry in this) {
         aggregators.getOrPut(entry.first) { aggregate.aggregator() }.consume(entry.second)

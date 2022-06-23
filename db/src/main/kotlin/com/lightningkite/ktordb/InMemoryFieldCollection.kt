@@ -161,13 +161,13 @@ open class InMemoryFieldCollection<Model : Any>(val data: MutableList<Model> = A
         aggregate: Aggregate,
         condition: Condition<Model>,
         property: DataClassProperty<Model, N>
-    ): Double = data.asSequence().map { property.get(it).toDouble() }.aggregate(aggregate)
+    ): Double? = data.asSequence().map { property.get(it).toDouble() }.aggregate(aggregate)
 
-    override suspend fun <N : Number, Key> groupAggregate(
+    override suspend fun <N: Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
         groupBy: DataClassProperty<Model, Key>,
         property: DataClassProperty<Model, N>,
-    ): Map<Key, Double> = data.asSequence().map { groupBy.get(it) to property.get(it).toDouble() }.aggregate(aggregate)
+    ): Map<Key, Double?> = data.asSequence().mapNotNull { groupBy.get(it) to (property.get(it)?.toDouble() ?: return@mapNotNull null) }.aggregate(aggregate)
 }
 

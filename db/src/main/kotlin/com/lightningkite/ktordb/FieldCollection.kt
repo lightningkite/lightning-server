@@ -74,13 +74,13 @@ interface FieldCollection<Model: Any> {
         aggregate: Aggregate,
         condition: Condition<Model> = Condition.Always(),
         property: DataClassProperty<Model, N>
-    ): Double
+    ): Double?
 
-    suspend fun <N: Number, Key> groupAggregate(
+    suspend fun <N: Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model> = Condition.Always(),
         groupBy: DataClassProperty<Model, Key>,
         property: DataClassProperty<Model, N>
-    ): Map<Key, Double>
+    ): Map<Key, Double?>
 
 }

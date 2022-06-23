@@ -112,13 +112,13 @@ open class SecuredFieldCollection<Model: Any>(
         aggregate: Aggregate,
         condition: Condition<Model>,
         property: DataClassProperty<Model, N>
-    ): Double = wraps.aggregate(aggregate, condition and rules.read(condition), property)
+    ): Double? = wraps.aggregate(aggregate, condition and rules.read(condition), property)
 
-    override suspend fun <N : Number, Key> groupAggregate(
+    override suspend fun <N: Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
         groupBy: DataClassProperty<Model, Key>,
         property: DataClassProperty<Model, N>
-    ): Map<Key, Double> = wraps.groupAggregate(aggregate, condition and rules.read(condition) and rules.sortAllowed(SortPart(groupBy)), groupBy, property)
+    ): Map<Key, Double?> = wraps.groupAggregate(aggregate, condition and rules.read(condition) and rules.sortAllowed(SortPart(groupBy)), groupBy, property)
 }
 

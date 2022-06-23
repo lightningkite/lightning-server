@@ -180,26 +180,26 @@ class MongoFieldCollection<Model: Any>(
         aggregate: Aggregate,
         condition: Condition<Model>,
         property: DataClassProperty<Model, N>
-    ): Double {
+    ): Double? {
         return wraps.aggregate<BsonDocument>(match(condition.bson()), group(null, aggregate.asValueBson(property.name)))
             .toList()
             .map {
-                it.getNumber("value").doubleValue()
+                if(it.isNull("value")) null
+                else it.getNumber("value").doubleValue()
             }
             .firstOrNull()
-            ?: 0.0
     }
 
-    override suspend fun <N : Number, Key> groupAggregate(
+    override suspend fun <N: Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
         groupBy: DataClassProperty<Model, Key>,
         property: DataClassProperty<Model, N>
-    ): Map<Key, Double> {
+    ): Map<Key, Double?> {
         return wraps.aggregate<BsonDocument>(match(condition.bson()), group("\$" + groupBy.name, aggregate.asValueBson(property.name)))
             .toList()
             .associate {
-                MongoDatabase.bson.load(KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!), it)._id to it.getNumber("value").doubleValue()
+                MongoDatabase.bson.load(KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!), it)._id to (if(it.isNull("value")) null else it.getNumber("value").doubleValue())
             }
     }
 }

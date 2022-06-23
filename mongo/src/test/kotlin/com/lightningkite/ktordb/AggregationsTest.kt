@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.fail
 
 class AggregationsTest: MongoTest() {
     @Test
@@ -23,12 +24,23 @@ class AggregationsTest: MongoTest() {
         ))
         for(type in Aggregate.values()) {
             val control = c.all().toList().asSequence().map { it.int.toDouble() }.aggregate(type)
-            val test: Double = c.aggregate(type, property = LargeTestModelFields.int)
+            val test: Double? = c.aggregate(type, property = LargeTestModelFields.int)
+            if(control == null || test == null) fail()
             assertEquals(control, test, 0.0000001)
         }
         for(type in Aggregate.values()) {
             val control = c.all().toList().asSequence().map { it.byte to it.int.toDouble() }.aggregate(type)
-            val test: Map<Byte, Double> = c.groupAggregate(type, property = LargeTestModelFields.int, groupBy = LargeTestModelFields.byte)
+            val test: Map<Byte, Double?> = c.groupAggregate(type, property = LargeTestModelFields.int, groupBy = LargeTestModelFields.byte)
+            assertEquals(control, test)
+        }
+        for(type in Aggregate.values()) {
+            val control = c.all().toList().asSequence().map { it.int.toDouble() }.filter { false }.aggregate(type)
+            val test: Double? = c.aggregate(type, property = LargeTestModelFields.int, condition = Condition.Never())
+            assertEquals(control, test)
+        }
+        for(type in Aggregate.values()) {
+            val control = c.all().toList().asSequence().map { it.byte to it.int.toDouble() }.filter { false }.aggregate(type)
+            val test: Map<Byte, Double?> = c.groupAggregate(type, property = LargeTestModelFields.int, groupBy = LargeTestModelFields.byte, condition = Condition.Never())
             assertEquals(control, test)
         }
         run {
