@@ -33,11 +33,48 @@ Ktor Batteries Server has a lot of nifty features. Here is a brief list of thing
 
 #### Member Functions
 
-- `FieldCollection.insertOne()` adds an item to the collection
-- `FieldCollection.get()` gets the item with a given id
-- `FieldCollection.find()` gets multiple items from the collection based on a `condition`
-- `FieldCollection.findOneAndUpdateById()` modifies the item with a given id
-- `FieldCollection.postCreate()` specifies code to be run after an item is added to the collection
+##### Insert
+
+- `insertOne()` adds an item to the collection
+- `insertMany()` adds multiple items to the collection
+
+##### Get
+
+- `get()` gets an item from from collection
+- `getMany()` gets multiple items from the collection
+- `find()` gets multiple items from the collection
+
+##### Update
+
+- `updateOne()` modifies an item in the collection
+- `updateMany()` modifies multiple items in the collection
+- `updateOneById()` modifies an item in the collection
+- `findOneAndUpdate()` modifies an item in the collection
+- `findOneAndUpdateById()` modifies an item in the collection
+
+##### Replace
+
+- `replaceOne()` replaces an item in the collection
+- `replaceOneById()` replaces an item in the collection
+
+##### Delete
+
+- `deleteOne()` deletes an item in the collection
+- `deleteMany()` deletes multiple items in the collection
+- `deleteOneById()` deletes an item in the collection
+
+##### Upsert
+
+- `upsertOne()`
+- `upsertOneById()`
+
+##### Execution
+
+- `postChange()`
+- `preDelete()`
+- `postDelete()`
+- `preCreate()` executes code before an item is added to the collection
+- `postCreate()` executes code after an item is added to the collection
 
 #### Convenience
 
