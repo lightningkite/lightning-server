@@ -5,13 +5,13 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 
 ## Settings singletons
 
-- `GeneralServerSettings` configures general server settings
-- `AuthSettings` configures server-wide authentication settings
-- `FilesSettings` configures server file settings
-- `LoggingSettings` configures server logging settings
-- `DatabaseSettings` configures database settings
-- `ExceptionSettings` configures server exception settings
-- `EmailSettings` configures server email settings
+- `GeneralServerSettings`
+- `AuthSettings`
+- `FilesSettings`
+- `LoggingSettings`
+- `DatabaseSettings`
+- `ExceptionSettings`
+- `EmailSettings`
 
 ## Server Setup
 
@@ -40,7 +40,7 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 
 ##### Get
 
-- `get()` gets an item from from collection
+- `get()` gets an item from the collection
 - `getMany()` gets multiple items from the collection
 - `find()` gets multiple items from the collection
 
@@ -135,7 +135,7 @@ To test against existing data in the database, you can use a `condition`.
 
 - `AllElements()` returns true if the given condition is true for all elements in a given list
 - `AnyElements()` returns true if the given condition is true for any element in a given list
-- `SizesEquals()` returns true if the given integer is the size of a given list
+- `SizesEquals()` returns true if the given integer is equal to the size of a given list
 - `Exists()` returns true if the given key exists in a given map
 - `OnKey()`
 - `OnField()`
