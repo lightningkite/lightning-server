@@ -12,6 +12,9 @@ import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.modules.SerializersModule
 
+/**
+ * A shortcut function for setting up ContentNegotiation and adding all the current supported serialization types.
+ */
 fun Application.configureSerialization() {
     install(ContentNegotiation) {
         serializationPatch(ContentType.Application.Json, Serialization.json)
@@ -24,6 +27,7 @@ fun Application.configureSerialization() {
             override val serializersModule: SerializersModule get() = Serialization.module
             override fun <T> decodeFromByteArray(deserializer: DeserializationStrategy<T>, bytes: ByteArray): T =
                 Serialization.bson.load(deserializer, bytes)
+
             override fun <T> encodeToByteArray(serializer: SerializationStrategy<T>, value: T): ByteArray =
                 Serialization.bson.dump(serializer, value)
         })

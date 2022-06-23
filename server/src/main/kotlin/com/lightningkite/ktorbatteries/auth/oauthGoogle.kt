@@ -14,6 +14,12 @@ import io.ktor.util.*
 import kotlinx.serialization.Serializable
 import java.util.*
 
+/**
+ * A shortcut function that sets up OAuth for Google accounts specifically.
+ *
+ * @param defaultLanding The final page to send the user after authentication.
+ * @param emailToId A lambda that returns the users ID given an email.
+ */
 @KtorDsl
 fun Route.oauthGoogle(
     defaultLanding: String = GeneralServerSettings.instance.publicUrl,

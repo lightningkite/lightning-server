@@ -1,6 +1,9 @@
 package com.lightningkite.ktorbatteries.notifications
 
-
+/**
+ * The concrete implementation of NotificationInterface that will not send any notifications but just print them to the console.
+ * This is useful for debugging and development.
+ */
 object ConsoleNotificationInterface : NotificationInterface {
     override suspend fun send(
         targets: List<String>,

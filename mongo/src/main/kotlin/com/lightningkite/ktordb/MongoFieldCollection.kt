@@ -20,6 +20,9 @@ import org.litote.kmongo.match
 import java.util.concurrent.TimeUnit
 import kotlin.reflect.KType
 
+/**
+ * MongoFieldCollection implements FieldCollection specifically for a MongoDB server.
+ */
 class MongoFieldCollection<Model: Any>(
     val serializer: KSerializer<Model>,
     val wraps: CoroutineCollection<Model>

@@ -10,6 +10,13 @@ import kotlinx.serialization.encodeToString
 import java.io.File
 import kotlin.system.exitProcess
 
+/**
+ * A helper function for loading in your settings object from the file.
+ * If the file does not exist it will use the result from [makeDefaultSettings] to created one then shutdown the process.
+ *
+ * @param settingsFile the location of the file to decode [SETTINGS] from.
+ * @param makeDefaultSettings a lambda to retrieve a default example of [SETTINGS] to encode to a file.
+ */
 inline fun <reified SETTINGS> loadSettings(settingsFile: File, makeDefaultSettings: () -> SETTINGS): SETTINGS {
     if (!settingsFile.exists()) {
         settingsFile.writeText(
@@ -28,6 +35,9 @@ inline fun <reified SETTINGS> loadSettings(settingsFile: File, makeDefaultSettin
     }
 }
 
+/**
+ * A helper function to start a Ktor server using GeneralServerSettings and the provided Module.
+ */
 fun runServer(module: Application.() -> Unit) = embeddedServer(
     factory = CIO,
     port = GeneralServerSettings.instance.port,

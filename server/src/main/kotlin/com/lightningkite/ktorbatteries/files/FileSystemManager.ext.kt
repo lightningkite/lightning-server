@@ -15,6 +15,9 @@ import kotlin.io.path.relativeTo
 
 private const val allowedChars = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"
 
+/**
+ * Will generate a Public facing URL that does not account for any security.
+ */
 val FileObject.publicUrlUnsigned: String
     get() = when(this) {
         is LocalFile -> "${GeneralServerSettings.instance.publicUrl}/${FilesSettings.instance.userContentPath}/${
@@ -24,6 +27,9 @@ val FileObject.publicUrlUnsigned: String
         else -> URL("https", url.host, url.port, url.file).toString()
     }
 
+/**
+ * Will generate a Public facing URL that will account for security.
+ */
 val FileObject.publicUrl: String
     get() = when(this) {
         is LocalFile -> "${GeneralServerSettings.instance.publicUrl}/${FilesSettings.instance.userContentPath}/${
@@ -44,6 +50,9 @@ val FileObject.publicUrl: String
         else -> URL("https", url.host, url.port, url.file).toString()
     }
 
+/**
+ * Generates a URL that will allow a direct upload of a file to the Filesystem.
+ */
 fun FileObject.signedUploadUrl(expirationSeconds: Int = FilesSettings.instance.signedUrlExpirationSeconds ?: (7 * 60)): String {
     return when(this) {
         is LocalFile -> {

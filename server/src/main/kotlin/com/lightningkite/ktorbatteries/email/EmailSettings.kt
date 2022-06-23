@@ -11,7 +11,13 @@ import java.io.InputStreamReader
 import java.util.*
 import javax.net.ssl.SSLSocketFactory
 
-
+/**
+ * EmailSettings defines where to send emails, and any credentials that may be required to do so.
+ * There are two options currently with email. You can send it to the console, or you can use SMTP to send real emails.
+ *
+ * @param option An Enum defining where to send email. This can be "Console" or "Smtp"
+ * @param smtp Required only if [option] is Smtp. These are the SMTP Credentials you wish to use to send real emails
+ */
 @Serializable
 data class EmailSettings(
     val option: EmailClientOption = EmailClientOption.Console,

@@ -1,25 +1,25 @@
 package com.lightningkite.ktorbatteries.mongo
 
-import com.lightningkite.kotlinercli.cli
+import com.github.jershell.kbson.UUIDSerializer
 import com.lightningkite.ktorbatteries.SettingSingleton
 import com.lightningkite.ktorbatteries.db.database
 import com.lightningkite.ktorbatteries.serverhealth.HealthCheckable
 import com.lightningkite.ktorbatteries.serverhealth.HealthStatus
 import com.lightningkite.ktordb.database
 import com.lightningkite.ktordb.embeddedMongo
-import com.lightningkite.ktordb.fixUuidSerialization
+import com.lightningkite.ktordb.registerRequiredSerializers
 import com.lightningkite.ktordb.testMongo
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import kotlinx.coroutines.withTimeout
-import org.bson.Document
 import org.bson.UuidRepresentation
-import org.litote.kmongo.coroutine.CoroutineDatabase
-import org.litote.kmongo.coroutine.coroutine
-import org.litote.kmongo.coroutine.toList
 import org.litote.kmongo.reactivestreams.KMongo
 import java.io.File
 
+@Deprecated(
+    "Use DatabaseSettings instead.",
+    replaceWith = ReplaceWith("DatabaseSettings", "com.lightningkite.ktorbatteries.db.DatabaseSettings")
+)
 @kotlinx.serialization.Serializable
 data class MongoSettings(
     val url: String = "file://${File("./local/mongo").absolutePath}",
@@ -41,7 +41,7 @@ data class MongoSettings(
 
     companion object : SettingSingleton<MongoSettings>() {
         init {
-            fixUuidSerialization()
+            registerRequiredSerializers()
         }
     }
 

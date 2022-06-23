@@ -5,6 +5,10 @@ import com.google.firebase.messaging.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+
+/**
+ * The concrete implementation of NotificationInterface that will use Firebase Messaging to send push notifications to clients.
+ */
 object FcmNotificationInterface : NotificationInterface {
     /**
      * Sends a simple notification and data. No custom options are set beyond what is provided.

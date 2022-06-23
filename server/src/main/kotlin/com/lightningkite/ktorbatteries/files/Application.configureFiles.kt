@@ -10,10 +10,14 @@ import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
 import org.apache.commons.vfs2.provider.local.LocalFileSystem
 
+/**
+ * This will check FileSettings location and if it is a LocalFileSystem it will set up static files to point at that location.
+ * Also
+ */
 fun Application.configureFiles() {
-    routing {
-        val root = FilesSettings.instance.root
-        if (root.fileSystem is LocalFileSystem) {
+    val root = FilesSettings.instance.root
+    if (root.fileSystem is LocalFileSystem) {
+        routing {
             static(FilesSettings.instance.userContentPath) {
                 files(root.path.toString())
             }

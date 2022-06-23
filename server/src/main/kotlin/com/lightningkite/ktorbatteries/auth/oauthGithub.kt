@@ -15,6 +15,12 @@ import io.ktor.util.*
 import kotlinx.serialization.Serializable
 import java.util.*
 
+/**
+ * A shortcut function that sets up OAuth for GitHub accounts specifically.
+ *
+ * @param defaultLanding The final page to send the user after authentication.
+ * @param emailToId A lambda that returns the users ID given an email.
+ */
 @KtorDsl
 fun Route.oauthGithub(
     defaultLanding: String = GeneralServerSettings.instance.publicUrl,

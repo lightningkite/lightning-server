@@ -9,6 +9,9 @@ import org.apache.commons.mail.MultiPartEmail
 import org.apache.commons.mail.SimpleEmail
 import javax.mail.Authenticator
 
+/**
+ * An email client that will send real emails through SMTP.
+ */
 class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
     override suspend fun send(
         subject: String,

@@ -7,6 +7,13 @@ import io.ktor.server.routing.*
 import io.ktor.util.*
 
 
+/**
+ * A shortcut function that sets up a restful api for the model provided, live updating websocket endpoints, and the development admin pages.
+ *
+ * @param path The route prefix for the collection
+ * @param defaultItem A default instance of the model used in the admins create forms.
+ * @param getCollection A lambda that returns the field collection for the model given the calls principal
+ */
 @KtorDsl
 inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Route.autoCollection(
     path: String,

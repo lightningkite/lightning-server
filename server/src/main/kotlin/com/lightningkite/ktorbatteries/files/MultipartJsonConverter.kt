@@ -32,6 +32,13 @@ import org.apache.commons.vfs2.VFS
 import java.nio.ByteBuffer
 import kotlin.io.use
 
+/**
+ * MultipartJsonConverter allows for a combination of Json and Files to be uploaded at the same time.
+ * The structure of the data should be a multipart upload where one part named "__json" holds all the json you want to upload,
+ * and then the other parts are the files you wish to upload, named after the field they should be uploaded to.
+ * If you are dealing with embedded objects use dot notation in your part name. This converter will handled uploading
+ * the files to the filesystem and putting the new ServerFile into the json before deserializing into the object expected.
+ */
 class MultipartJsonConverter(val json: Json) : ContentConverter {
     val jsonKey = "__json"
     override suspend fun deserialize(charset: Charset, typeInfo: TypeInfo, content: ByteReadChannel): Any? = try{

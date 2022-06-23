@@ -25,6 +25,11 @@ import java.io.StringWriter
 class ForbiddenException : Exception()
 class AuthenticationException : Exception()
 
+/**
+ * Configures the StatusPages plugin. It automatically handles common exceptions such as forbidden, not found, and bad request.
+ * If ExceptionSettings is set with a sentryDsn then any unspecified exceptions will be reported to Sentry.
+ * customExceptions allows you to define your own custom exception handling.
+ */
 fun Application.configureExceptions(customExceptions: (StatusPagesConfig.() -> Unit)? = null) {
     install(StatusPages) {
         exception<ForbiddenException> { call, it ->
@@ -65,6 +70,7 @@ fun Application.configureExceptions(customExceptions: (StatusPagesConfig.() -> U
                 <p>We can't read or write in that format.  Sorry!</p>
             """.trimIndent()))
         }
+        customExceptions?.invoke(this)
         exception<Exception> { call, it ->
             call.respondText(status = HttpStatusCode.InternalServerError, contentType = ContentType.Text.Html, text = HtmlDefaults.basePage("""
                 <h1>Oh no!</h1>
@@ -72,7 +78,6 @@ fun Application.configureExceptions(customExceptions: (StatusPagesConfig.() -> U
             """.trimIndent()))
             call.reportException(it)
         }
-        customExceptions?.invoke(this)
     }
 }
 
@@ -87,14 +92,19 @@ private fun Any?.simpleUserTag(): String = when(this) {
     is HasId<*> -> this._id.toString()
     else -> toString()
 }
-private fun Any?.simpleUserId(): String = when(this) {
+
+private fun Any?.simpleUserId(): String = when (this) {
     null -> "anonymous"
     is BoxPrincipal<*> -> this.user.simpleUserId()
     is HasId<*> -> this._id.toString()
     else -> toString()
 }
+
+/**
+ * Will report an Exception to Sentry if the ExceptionSettings.sentryDsn is provided
+ */
 fun ApplicationCall.reportException(throwable: Throwable) {
-    if(ExceptionSettings.instance.sentryDsn != null) {
+    if (ExceptionSettings.instance.sentryDsn != null) {
         val ctx = Sentry.getContext()
         val p = principal<Principal>()
         ctx.clear()
@@ -131,27 +141,3 @@ fun ApplicationCall.reportException(throwable: Throwable) {
         throwable.printStackTrace()
     }
 }
-
-/**
- * Register exception [handler] for exception type [T] and it's children.
- * If debug mode is on, the stack trace is emitted.
- */
-//public inline fun <reified T : Throwable> StatusPagesConfig.on(
-//    code: HttpStatusCode,
-//    noinline release: suspend ApplicationCall.(T) -> Unit = { call.respondText(it.message ?: it::class.simpleName ?: "Unknown Error") }
-//): Unit {
-//    if(GeneralServerSettings.instance.debug) {
-//        exception(T::class.java) {
-//            println("Handling $it")
-//            val writer = StringWriter()
-//            PrintWriter(writer).use { w -> it.printStackTrace(w) }
-//            call.respondText(writer.toString(), ContentType.Text.Plain, code)
-//        }
-//    } else {
-//        exception(T::class.java) {
-//            println("Handling $it for release")
-//            this.call.response.status(code)
-//            release(it)
-//        }
-//    }
-//}

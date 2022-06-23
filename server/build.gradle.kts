@@ -21,37 +21,49 @@ repositories {
     mavenCentral()
 }
 
-val ktorVersion = "2.0.1"
+val ktorVersion = "2.0.2"
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
 dependencies {
 
     // Security
-    implementation("com.google.protobuf:protobuf-java:3.18.2")
-    implementation("io.netty:netty-codec-http:4.1.71.Final")
+    implementation("com.google.protobuf:protobuf-java:3.21.1")
+    implementation("io.netty:netty-codec-http:4.1.77.Final")
     implementation("io.netty:netty-common:4.1.77.Final")
-    implementation("com.google.oauth-client:google-oauth-client:1.33.3")
+    implementation("com.google.oauth-client:google-oauth-client:1.34.1")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.13.3")
     // End Security
 
     api(project(":db"))
     api(project(":mongo"))
+
+    api("io.sentry:sentry:1.7.30")
+    api("io.sentry:sentry-logback:1.7.30")
+    implementation("ch.qos.logback:logback-classic:1.2.11")
+
+    api("com.lightningkite:kotliner-cli:1.0.3")
+    implementation("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
+
     api("io.ktor:ktor-server-auth-jvm:$ktorVersion")
     api("io.ktor:ktor-server-websockets-jvm:$ktorVersion")
     api("io.ktor:ktor-server-content-negotiation-jvm:$ktorVersion")
     api("io.ktor:ktor-server-core-jvm:$ktorVersion")
     api("io.ktor:ktor-server-auth-jwt-jvm:$ktorVersion")
     api("io.ktor:ktor-server-cio-jvm:$ktorVersion")
-    implementation("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.1")
-    implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.4.5")
-    implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.7.5")
+    api("io.ktor:ktor-server-cors:$ktorVersion")
     api("io.ktor:ktor-server-status-pages:$ktorVersion")
 
     api("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     api("io.ktor:ktor-client-cio:$ktorVersion")
+
+    implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-server-html-builder-jvm:$ktorVersion")
+
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.2")
+    implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.4.6")
+    implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.7.5")
 
     api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     api("io.ktor:ktor-serialization-kotlinx-cbor:$ktorVersion")
@@ -64,30 +76,24 @@ dependencies {
     api("com.github.abashev:vfs-s3:4.3.5")
     api("com.azure:azure-storage-blob:12.17.1")
     api("com.github.dalet-oss:vfs-azure:4.2.1")
-    api("com.charleskorn.kaml:kaml:0.43.0")
-    api("com.lightningkite:kotliner-cli:1.0.3")
-    api("com.google.firebase:firebase-admin:8.1.0")
+    api("com.charleskorn.kaml:kaml:0.45.0")
+    api("com.google.firebase:firebase-admin:8.2.0")
 
     implementation("org.bouncycastle:bcprov-jdk18on:1.71")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.71")
 
     api("io.lettuce:lettuce-core:6.1.8.RELEASE")
-    implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
-    implementation("io.ktor:ktor-server-html-builder-jvm:$ktorVersion")
+
     testImplementation("io.ktor:ktor-server-auth-jvm:$ktorVersion")
     testImplementation("io.ktor:ktor-server-auth-jwt-jvm:$ktorVersion")
     testImplementation("io.ktor:ktor-server-test-host-jvm:$ktorVersion")
     testImplementation("io.ktor:ktor-server-content-negotiation-jvm:$ktorVersion")
     testImplementation("io.ktor:ktor-server-cio-jvm:$ktorVersion")
 
-    api("io.sentry:sentry:1.7.30")
-    api("io.sentry:sentry-logback:1.7.30")
+    testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
 
     kspTest(project(":processor"))
 
-    testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
-
-    implementation("ch.qos.logback:logback-classic:1.2.11")
 }
 
 ksp {

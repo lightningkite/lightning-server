@@ -3,6 +3,10 @@ package com.lightningkite.ktorbatteries.email
 import java.io.File
 import java.net.URL
 
+/**
+ * Attachment is used by EmailClients for attaching files to an email, whether they be
+ * a local file for uploading, or a remote file for embedding.
+ */
 sealed interface Attachment {
     val description: String
     val name: String

@@ -31,6 +31,19 @@ import kotlinx.coroutines.flow.singleOrNull
 import kotlinx.serialization.Serializable
 import java.util.*
 
+/**
+ * A Shortcut function to define authentication on the server. This will set up magic link login, no passwords.
+ * This will set up JWT authentication using quickJwt.
+ * It will setup routing for: emailMagicLinkEndpoint, oauthGoogle, oauthGithub, oauthApple, refreshTokenEndpoint, and self
+ * It will handle getting the user by their ID or their email.
+ *
+ * @param path The path you wish all endpoints to be prefixed with
+ * @param onNewUser An optional lambda that returns a new user provided an email. This allows quick user creation if a login email is requested but the email has not been used before.
+ * @param landing The url you wish users to be sent to in their login emails.
+ * @param emailSubject The subject of the login emails that will be sent out.
+ * @param template A lambda to return what the email to send will be given the email and the login link.
+ */
+
 inline fun <reified USER, reified ID : Comparable<ID>> Application.configureAuth(
     path: String = "auth",
     crossinline onNewUser: suspend (email: String) -> USER? = { null },
@@ -52,6 +65,19 @@ inline fun <reified USER, reified ID : Comparable<ID>> Application.configureAuth
     template = template
 )
 
+
+/**
+ * A Shortcut function to define authentication on the server. This will set up magic link login, no passwords.
+ * This will set up JWT authentication using quickJwt.
+ * It will setup routing for: emailMagicLinkEndpoint, oauthGoogle, oauthGithub, oauthApple, refreshTokenEndpoint, and self
+ *
+ * @param path The path you wish all endpoints to be prefixed with
+ * @param userById A lambda that should return the user being authenticated by their id.
+ * @param userByEmail A lambda that should return the user being authenticated by their email.
+ * @param landing The url you wish users to be sent to in their login emails.
+ * @param emailSubject The subject of the login emails that will be sent out.
+ * @param template A lambda to return what the email to send will be given the email and the login link.
+ */
 inline fun <reified USER : HasId<ID>, reified ID : Comparable<ID>> Application.configureAuth(
     path: String = "auth",
     crossinline userById: suspend (id: String) -> USER,
@@ -142,6 +168,14 @@ fun AuthenticationConfig.quickJwt(
     }
 }
 
+/**
+ * Creates a JWT with the id as claim "userId" and an expiration date of [expiration], or the default provided in AuthSettings.
+ * jwtAudience and jwtIssuer from AuthSettings will be added to this token.
+ * It will be signed using the jwtSecret from AuthSettings
+ *
+ * @param id Used as the claim "userId" in the JWT returned
+ * @param expiration Optional expiration date. Default from AuthSettings will be used if null
+ */
 fun makeToken(id: String, expiration: Long? = null): String {
     return JWT.create()
         .withAudience(AuthSettings.instance.jwtAudience)
@@ -156,6 +190,14 @@ fun makeToken(id: String, expiration: Long? = null): String {
         .sign(Algorithm.HMAC256(AuthSettings.instance.jwtSecret))
 }
 
+
+/**
+ * Creates a JWT and allows for custom set up on the builder through the extension lambda provided.
+ * jwtAudience and jwtIssuer from AuthSettings will be added to this token.
+ * It will be signed using the jwtSecret from AuthSettings
+ *
+ * @param additionalSetup Extension lambda on JWTCreator.Builder that returns the builder.
+ */
 fun makeToken(additionalSetup: JWTCreator.Builder.() -> JWTCreator.Builder = { this }): String {
     return JWT.create()
         .withAudience(AuthSettings.instance.jwtAudience)
@@ -165,6 +207,11 @@ fun makeToken(additionalSetup: JWTCreator.Builder.() -> JWTCreator.Builder = { t
         .sign(Algorithm.HMAC256(AuthSettings.instance.jwtSecret))
 }
 
+/**
+ * Verifies the provided token using the jwtSecret, jwtAudience, and jwtIssuer from AuthSettings.
+ *
+ * @param token A JWT to be verified
+ */
 fun checkToken(token: String): DecodedJWT? = try {
     JWT
         .require(Algorithm.HMAC256(AuthSettings.instance.jwtSecret))
@@ -180,6 +227,12 @@ fun checkToken(token: String): DecodedJWT? = try {
 @Serializable
 data class EmailRequest(val email: String)
 
+
+/**
+ * A lambda that returns a bare-bones email message for login emails that provides a link to log in and uses the project name as a signature.
+ *
+ * @param token A JWT to be verified
+ */
 val defaultLoginEmailTemplate: (suspend (email: String, link: String) -> String) = { email: String, link: String ->
     """
         <!DOCTYPE html>
@@ -194,6 +247,17 @@ val defaultLoginEmailTemplate: (suspend (email: String, link: String) -> String)
         """.trimIndent()
 }
 
+
+/**
+ * A second style of function for setting up the login request end point.
+ * It creates the route that will send out login emails to the users.
+ *
+ * @param path The path the route will be hosted at.
+ * @param emailToId A lambda that will return the users id as a string given an email.
+ * @param landing The url you wish users to be sent to in their login emails.
+ * @param emailSubject The subject of the login emails that will be sent out.
+ * @param template A lambda to return what the email to send will be given the email and the login link.
+ */
 @KtorDsl
 fun Route.emailMagicLinkEndpoint(
     path: String = "login-email",
@@ -208,6 +272,16 @@ fun Route.emailMagicLinkEndpoint(
     template = template
 )
 
+
+/**
+ * A shortcut function for defining the login email request end point.
+ * It creates the route that will send out login emails to the users.
+ *
+ * @param path The path the route will be hosted at.
+ * @param makeLink A lambda that will return the login link for the user given their email.
+ * @param emailSubject The subject of the login emails that will be sent out.
+ * @param template A lambda to return what the email to send will be given the email and the login link.
+ */
 @KtorDsl
 fun Route.emailMagicLinkEndpoint(
     path: String = "login-email",
@@ -234,10 +308,21 @@ fun Route.emailMagicLinkEndpoint(
     )
 }
 
+/**
+ * A shortcut function for defining an endpoint that return a new JWT for an authenticated User.
+ *
+ * @param path The path the route will be hosted at.
+ */
 @KtorDsl
 inline fun <reified USER : HasId<ID>, reified ID : Comparable<ID>> Route.refreshTokenEndpoint(path: String = "refresh-token") =
     refreshTokenEndpoint<USER>(path) { makeToken(it._id.toString()) }
 
+/**
+ * A shortcut function for defining an endpoint that return a new JWT for an authenticated User.
+ *
+ * @param path The path the route will be hosted at.
+ * @param principalToToken A lambda that will return a new token given the Principle from the call.
+ */
 @KtorDsl
 inline fun <reified USER> Route.refreshTokenEndpoint(
     path: String = "refresh-token",

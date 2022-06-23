@@ -11,7 +11,6 @@ import org.litote.kmongo.coroutine.CoroutineClient
 import org.litote.kmongo.coroutine.coroutine
 import org.litote.kmongo.coroutine.toList
 import org.litote.kmongo.reactivestreams.KMongo
-import org.litote.kmongo.serialization.registerSerializer
 import org.slf4j.LoggerFactory
 import java.io.File
 import de.flapdoodle.embed.mongo.Command
@@ -29,7 +28,6 @@ fun embeddedMongo(replFile: File = File("./build/embeddedMongo"), port: Int = 54
     = embeddedMongo(false, replFile, port)
 
 private fun embeddedMongo(deleteAfter: Boolean, replFile: File, port: Int): MongoClient {
-    registerSerializer(UUIDSerializer)
     val starter = MongodStarter.getInstance(
         Defaults.runtimeConfigFor(Command.MongoD, LoggerFactory.getLogger("embeddedMongo"))
             .processOutput(ProcessOutput.silent())

@@ -15,7 +15,12 @@ import java.security.Security
 import java.security.interfaces.ECPrivateKey
 import java.util.*
 
-
+/**
+ * A shortcut function that sets up OAuth for Apple accounts specifically.
+ *
+ * @param defaultLanding The final page to send the user after authentication.
+ * @param emailToId A lambda that returns the users ID given an email.
+ */
 @KtorDsl
 fun Route.oauthApple(
     defaultLanding: String = GeneralServerSettings.instance.publicUrl,

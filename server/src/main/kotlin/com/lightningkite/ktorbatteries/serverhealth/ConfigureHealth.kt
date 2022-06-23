@@ -54,7 +54,13 @@ data class ServerHealth(
     )
 }
 
-
+/**
+ * A route for accessing status of features, external service connections, and general server information.
+ * Examples of features that can be checked on are Email, Database, and Exception Reporting.
+ *
+ * @param path The path you wish the endpoint to be at.
+ * @param features A list of `HealthCheckable` features that you want reports on.
+ */
 inline fun <reified USER> Route.healthCheck(path: String = "health-check", features: List<HealthCheckable>, crossinline allowed: suspend (USER)->Boolean) {
     get(
         path = path,
