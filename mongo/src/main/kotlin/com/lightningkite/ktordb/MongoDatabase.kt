@@ -13,7 +13,7 @@ import kotlin.reflect.KType
 
 class MongoDatabase(val database: CoroutineDatabase) : Database {
     init {
-        fixUuidSerialization()
+        registerRequiredSerializers()
     }
     constructor(client: MongoClient, databaseName: String):this(client.getDatabase(databaseName).coroutine){}
 
