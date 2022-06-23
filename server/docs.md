@@ -44,7 +44,7 @@ Ktor Batteries Server has a lot of nifty features. Here is a brief list of thing
 - `getMany()` gets multiple items from the collection
 - `find()` gets multiple items from the collection
 
-##### Update
+##### Modify
 
 - `updateOne()` modifies an item in the collection
 - `updateMany()` modifies multiple items in the collection
@@ -76,12 +76,47 @@ Ktor Batteries Server has a lot of nifty features. Here is a brief list of thing
 - `preCreate()` executes code before an item is added to the collection
 - `postCreate()` executes code after an item is added to the collection
 
-#### Convenience
+#### Miscellaneous
 
 - `autoCollection()` is an automatic system that provides a simple web interface and default endpoints for managing a `FieldCollection`
 
 ### Condition
 To test against existing data in the database, you can use a `condition`.
+
+#### Member Functions
+
+##### Infix Function Shorthands
+
+###### Comparison
+
+- `eq` is shorthand for `Equal()`
+- `neq` is shorthand for `NotEqual()`
+- `ne` is shorthand for `NotEqual()`
+- `gt` is shorthand for `GreaterThan()`
+- `lt` is shorthand for `LessThan()`
+- `gte` is shorthand for `GreaterThanOrEqual()`
+- `lte` is shorthand for `LessThanOrEqual()`
+
+###### Relativity
+
+- `inside` is shorthand for to `Inside()`
+- `nin` is shorthand for `NotInside()`
+- `notIn` is shorthand for `NotInside()`
+- `contains` is shorthand for `Search()`
+
+###### Bitwise
+
+- `allClear` is shorthand for `IntBitsClear()`
+- `allSet` is shorthand for `IntBitsSet()`
+- `anyClear` is shorthand for `IntBitsAnyClear()`
+- `anySet` is shorthand for `IntBitsAnySet()`
+
+###### Miscellaneous
+
+- `all` is shorthand for `AllElements()`
+- `any` is shorthand for `AnyElements()`
+- `sizesEquals` is shorthand for `SizesEquals()`
+- `containsKey` is shorthand for `Exists()`
 
 ### Modification
 To modify existing data in the database, you can use a `modification`.
