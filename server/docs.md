@@ -199,9 +199,7 @@ You can inherit functionality from multiple pre-defined interfaces.
 - `HasId` provides an id
 - `HasEmail` provides an email address
 
-## Authentication
-
-### Tokens
+## Tokens
 Tokens can be used to authenticate http calls across the server.
 
 - `makeToken()` creates a token
@@ -211,10 +209,17 @@ Tokens can be used to authenticate http calls across the server.
 - `getClaim()` gets a claim from a validated token
 - `getSubject()` gets a claim with the key "subject" from a validated token
 
+## Exceptions
+Ktor-Batteries provides exceptions you can use.
+
+- `ForbiddenException()` responds with an http status code of forbidden
+- `AuthenticationException()` responds with an http status code of unauthorized
+
 ## Email
 
+- `email` is a singleton that handles server email
 - `email.send()` sends an email
 
-## Miscellaneous
+## Additional Convenience
 
-- `apiHelp()` auto-generates basic documentation on a server's endpoints
+- `apiHelp()` auto-generates basic documentation on the server's endpoints
