@@ -7,9 +7,9 @@ import kotlin.reflect.KProperty1
 data class ModelPermissions<Model>(
     val create: Condition<Model>,
     val read: Condition<Model>,
-    val readFields: Map<PartialDataClassProperty<*>, Read<Model, *>> = mapOf(),
+    val readFields: Map<KProperty1<Model, *>, Read<Model, *>> = mapOf(),
     val update: Condition<Model>,
-    val updateFields: Map<PartialDataClassProperty<*>, Update<Model, *>> = mapOf(),
+    val updateFields: Map<KProperty1<Model, *>, Update<Model, *>> = mapOf(),
     val delete: Condition<Model>,
     val maxQueryTimeMs: Long = 1_000L
 ) {
@@ -21,7 +21,7 @@ data class ModelPermissions<Model>(
         @Suppress("UNCHECKED_CAST")
         fun mask(model: Model): Model {
             return if(condition(model)) model
-            else property.set(model, mask)
+            else property.setCopy(model, mask)
         }
     }
     data class Update<Model, Field>(

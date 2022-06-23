@@ -67,7 +67,7 @@ class TableGenerator(
                         tab {
                             ksClassDeclarations
                                 .forEach {
-                                    appendLine("    ${it.simpleName}Fields")
+                                    appendLine("    prepare${it.simpleName}Fields()")
                                 }
                         }
                         appendLine("}")

@@ -22,18 +22,25 @@ class SerializationTest {
         prepareModels()
     }
 
+    @Test fun executionTest() {
+        val modification = modification<User> { it.age assign 22 }
+        val model = User(email = "joseph@lightningkite.com")
+        assertEquals(22, modification(model).age)
+    }
+
     @Test fun demoConditions() {
         Condition.Equal(2).cycle()
-        (User.chain.email eq "Dan").cycle()
-        (Post.chain.content eq "Lightning Kite").cycle()
+        (startChain<User>().email eq "Dan").cycle()
+        (startChain<User>().email eq "Dan").cycle()
+        (startChain<Post>().content eq "Lightning Kite").cycle()
     }
     @Test fun demoModifications() {
         Modification.Assign(2).cycle()
-        (User.chain.email assign "Dan").cycle()
-        (Post.chain.content assign "Lightning Kite").cycle()
+        (startChain<User>().email assign "Dan").cycle()
+        (startChain<Post>().content assign "Lightning Kite").cycle()
     }
     @Test fun demoSorts() {
-        listOf(SortPart(UserFields.email), SortPart(UserFields.age, ascending = false)).cycle()
+        listOf(SortPart(User::email), SortPart(User::age, ascending = false)).cycle()
     }
     @Test fun hackTest() {
         println(serializer<List<Int>>().listElement())
@@ -41,15 +48,13 @@ class SerializationTest {
         println(serializer<Int?>().nullElement())
     }
 
-    @OptIn(InternalSerializationApi::class)
     @Test fun cursedTest() {
-        Cursed.Inside.serializer(serializer<Int>()).fields = InsideFields.get<Int>().fields
         condition<Cursed.Inside<Int>> { it.item eq 2 }.cycle()
         condition<Cursed> { it.insideClass.item eq UUID.randomUUID() }.cycle()
     }
 
     @Test fun conditions() {
-        val sampleCondition = LargeTestModel.chain.int eq 2
+        val sampleCondition = startChain<LargeTestModel>().int eq 2
         val sampleInstance = LargeTestModel()
         Condition.Never<LargeTestModel>().cycle()
         Condition.Always<LargeTestModel>().cycle()
@@ -60,43 +65,43 @@ class SerializationTest {
         Condition.NotEqual(sampleInstance).cycle()
         Condition.Inside(listOf(sampleInstance)).cycle()
         Condition.NotInside(listOf(sampleInstance)).cycle()
-        (LargeTestModel.chain.int gt 2).cycle()
-        (LargeTestModel.chain.int lt 2).cycle()
-        (LargeTestModel.chain.int gte 2).cycle()
-        (LargeTestModel.chain.int lte 2).cycle()
-        (LargeTestModel.chain.string.contains("asdf", ignoreCase = true)).cycle()
-        (LargeTestModel.chain.int.allClear(1)).cycle()
-        (LargeTestModel.chain.int.allSet(1)).cycle()
-        (LargeTestModel.chain.int.anyClear(1)).cycle()
-        (LargeTestModel.chain.int.anySet(1)).cycle()
-        (LargeTestModel.chain.list.all { it eq 2 }).cycle()
-        (LargeTestModel.chain.list.any { it eq 2 }).cycle()
-        (LargeTestModel.chain.list.sizesEquals(2)).cycle()
-        (LargeTestModel.chain.map.containsKey("asdf")).cycle()
-        LargeTestModel.chain.intNullable.notNull.gt(4).cycle()
+        (startChain<LargeTestModel>().int gt 2).cycle()
+        (startChain<LargeTestModel>().int lt 2).cycle()
+        (startChain<LargeTestModel>().int gte 2).cycle()
+        (startChain<LargeTestModel>().int lte 2).cycle()
+        (startChain<LargeTestModel>().string.contains("asdf", ignoreCase = true)).cycle()
+        (startChain<LargeTestModel>().int.allClear(1)).cycle()
+        (startChain<LargeTestModel>().int.allSet(1)).cycle()
+        (startChain<LargeTestModel>().int.anyClear(1)).cycle()
+        (startChain<LargeTestModel>().int.anySet(1)).cycle()
+        (startChain<LargeTestModel>().list.all { it eq 2 }).cycle()
+        (startChain<LargeTestModel>().list.any { it eq 2 }).cycle()
+        (startChain<LargeTestModel>().list.sizesEquals(2)).cycle()
+        (startChain<LargeTestModel>().map.containsKey("asdf")).cycle()
+        startChain<LargeTestModel>().intNullable.notNull.gt(4).cycle()
     }
 
     @Test fun modifications() {
-        ((LargeTestModel.chain.int assign 2) then (LargeTestModel.chain.boolean assign true)).cycle()
-        (LargeTestModel.chain.intNullable.notNull + 1).cycle()
-        (LargeTestModel.chain.int assign 2).cycle()
-        (LargeTestModel.chain.int coerceAtMost 2).cycle()
-        (LargeTestModel.chain.int coerceAtLeast 2).cycle()
-        (LargeTestModel.chain.int + 2).cycle()
-        (LargeTestModel.chain.int * 2).cycle()
-        (LargeTestModel.chain.string + "asdf").cycle()
-        (LargeTestModel.chain.list + listOf(1, 2, 3)).cycle()
-        (LargeTestModel.chain.list.addUnique(listOf(1, 2, 3))).cycle()
-        (LargeTestModel.chain.list.removeAll { it eq 2 }).cycle()
-        (LargeTestModel.chain.list.removeAll(listOf(1, 2))).cycle()
-        (LargeTestModel.chain.list.dropFirst()).cycle()
-        (LargeTestModel.chain.list.dropLast()).cycle()
-        (LargeTestModel.chain.list.map { it + 2 }).cycle()
-        (LargeTestModel.chain.map + mapOf("c" to 3)).cycle()
-        (LargeTestModel.chain.map.modifyByKey(mapOf(
+        ((startChain<LargeTestModel>().int assign 2) then (startChain<LargeTestModel>().boolean assign true)).cycle()
+        (startChain<LargeTestModel>().intNullable.notNull + 1).cycle()
+        (startChain<LargeTestModel>().int assign 2).cycle()
+        (startChain<LargeTestModel>().int coerceAtMost 2).cycle()
+        (startChain<LargeTestModel>().int coerceAtLeast 2).cycle()
+        (startChain<LargeTestModel>().int + 2).cycle()
+        (startChain<LargeTestModel>().int * 2).cycle()
+        (startChain<LargeTestModel>().string + "asdf").cycle()
+        (startChain<LargeTestModel>().list + listOf(1, 2, 3)).cycle()
+        (startChain<LargeTestModel>().list.addUnique(listOf(1, 2, 3))).cycle()
+        (startChain<LargeTestModel>().list.removeAll { it eq 2 }).cycle()
+        (startChain<LargeTestModel>().list.removeAll(listOf(1, 2))).cycle()
+        (startChain<LargeTestModel>().list.dropFirst()).cycle()
+        (startChain<LargeTestModel>().list.dropLast()).cycle()
+        (startChain<LargeTestModel>().list.map { it + 2 }).cycle()
+        (startChain<LargeTestModel>().map + mapOf("c" to 3)).cycle()
+        (startChain<LargeTestModel>().map.modifyByKey(mapOf(
             "c" to { it + 1 }
         ))).cycle()
-        (LargeTestModel.chain.map.removeKeys(setOf("a"))).cycle()
+        (startChain<LargeTestModel>().map.removeKeys(setOf("a"))).cycle()
     }
 
     private inline fun <reified T> Condition<T>.cycle() {

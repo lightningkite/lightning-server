@@ -14,20 +14,22 @@ import kotlinx.serialization.encoding.Encoder
 class SortPartSerializer<T>(val inner: KSerializer<T>): KSerializer<SortPart<T>> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("SortPart<${inner.descriptor.serialName}>", PrimitiveKind.STRING)
 
+    val fields = inner.attemptGrabFields()
+
     override fun deserialize(decoder: Decoder): SortPart<T> {
         val value = decoder.decodeString()
         val descending = value.startsWith('-')
         val name = value.removePrefix("-")
-        val prop = inner.fields[name]
+        val prop = fields[name]
         @Suppress("UNCHECKED_CAST")
-        val typedProp = prop as PartialDataClassProperty<T>
+        val typedProp = prop as KProperty1Partial<T>
         return SortPart(typedProp, !descending)
     }
 
     override fun serialize(encoder: Encoder, value: SortPart<T>) {
         if(value.ascending)
-            encoder.encodeString(value.field.name)
+            encoder.encodeString(value.field.property.name)
         else
-            encoder.encodeString("-" + value.field.name)
+            encoder.encodeString("-" + value.field.property.name)
     }
 }

@@ -25,6 +25,7 @@ fun <K, V> KSerializer<K>.fieldSerializer(property: KProperty1<K, V>): KSerializ
 }
 
 private val serializers = HashMap<KSerializer<*>, KSerializer<*>>()
+@Suppress("UNCHECKED_CAST")
 private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<Inner>> = serializers.getOrPut(inner) {
     val map = LinkedHashMap<String, KSerializer<out Condition<Inner>>>()
     fun register(serializer: KSerializer<out Condition<*>>) {
@@ -68,10 +69,10 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
         val fields = inner.attemptGrabFields()
         for (index in 0 until inner.descriptor.elementsCount) {
             val name = inner.descriptor.getElementName(index)
-            val prop = fields[name]
+            val prop = fields[name]!!
             register(
                 OnFieldSerializer<Any, Any?>(
-                    prop as KProperty1<Any, Any?>,
+                    prop.property as KProperty1<Any, Any?>,
                     Condition.serializer(childSerializers[index]) as KSerializer<Condition<Any?>>
                 )
             )

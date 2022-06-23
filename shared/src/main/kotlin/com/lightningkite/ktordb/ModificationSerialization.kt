@@ -14,10 +14,12 @@ import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 import kotlinx.serialization.internal.GeneratedSerializer
 import java.util.*
+import kotlin.reflect.KProperty1
 import kotlin.reflect.full.allSupertypes
 import kotlin.reflect.jvm.jvmErasure
 
 private val serializers = HashMap<KSerializer<*>, KSerializer<*>>()
+@Suppress("UNCHECKED_CAST")
 private fun <Inner> getMod(inner: KSerializer<Inner>): KSerializer<Modification<Inner>> = serializers.getOrPut(inner) {
     val map = LinkedHashMap<String, KSerializer<out Modification<Inner>>>()
     fun register(serializer: KSerializer<out Modification<*>>) {
@@ -51,14 +53,13 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): KSerializer<Modification<
     }
     if (inner is GeneratedSerializer<*> && inner.descriptor.kind == StructureKind.CLASS) {
         val childSerializers = inner.childSerializers()
-        val type =
-            inner::class.allSupertypes.find { it.classifier == GeneratedSerializer::class }!!.arguments[0].type!!.jvmErasure
+        val fields = inner.attemptGrabFields()
         for (index in 0 until inner.descriptor.elementsCount) {
             val name = inner.descriptor.getElementName(index)
-            val prop = inner.fields[name]
+            val prop = fields[name]!!.property
             register(
                 OnFieldSerializer2<Any, Any?>(
-                    prop as DataClassProperty<Any, Any?>,
+                    prop as KProperty1<Any, Any?>,
                     Modification.serializer(childSerializers[index]) as KSerializer<Modification<Any?>>
                 )
             )
@@ -102,7 +103,7 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): KSerializer<Modification<
 class ModificationSerializer<Inner>(inner: KSerializer<Inner>) : KSerializer<Modification<Inner>> by getMod(inner)
 
 class OnFieldSerializer2<K : Any, V>(
-    val field: DataClassProperty<K, V>,
+    val field: KProperty1<K, V>,
     val modificationSerializer: KSerializer<Modification<V>>
 ) : KSerializer<Modification.OnField<K, V>> {
     override fun deserialize(decoder: Decoder): Modification.OnField<K, V> {

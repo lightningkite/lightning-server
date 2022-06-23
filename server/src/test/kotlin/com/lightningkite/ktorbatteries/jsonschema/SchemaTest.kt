@@ -44,7 +44,7 @@ class SchemaTest {
     @Test
     fun params() {
         println(
-            Properties.encodeToStringMap(Post.chain.condition { (it.author eq "Bill") and (it.title eq "Bills Greatest") }).entries.joinToString(
+            Properties.encodeToStringMap(condition<Post> { (it.author eq "Bill") and (it.title eq "Bills Greatest") }).entries.joinToString(
                 "&"
             ) { it.key + "=" + URLEncoder.encode(it.value, Charsets.UTF_8) })
     }

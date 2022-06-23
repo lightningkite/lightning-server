@@ -10,13 +10,17 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.internal.GeneratedSerializer
 import java.lang.reflect.ParameterizedType
+import java.lang.reflect.Type
+import java.lang.reflect.TypeVariable
 import kotlin.reflect.full.memberProperties
 import kotlin.reflect.KProperty1
 
 @Serializer(KProperty1::class)
-class KPropertySerializer<T>(val inner: KSerializer<T>): KSerializer<KProperty1Partial<T>> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("KProperty1Partial<${inner.descriptor.serialName}>", PrimitiveKind.STRING)
+class KPropertyPartialSerializer<T>(val inner: KSerializer<T>) : KSerializer<KProperty1Partial<T>> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("KProperty1Partial<${inner.descriptor.serialName}>", PrimitiveKind.STRING)
 
     @Suppress("UNCHECKED_CAST")
     val fields = inner.attemptGrabFields()
@@ -28,18 +32,28 @@ class KPropertySerializer<T>(val inner: KSerializer<T>): KSerializer<KProperty1P
     }
 
     override fun serialize(encoder: Encoder, value: KProperty1Partial<T>) {
-        encoder.encodeString(value.name)
+        encoder.encodeString(value.property.name)
     }
 }
 
-fun <T> KSerializer<T>.attemptGrabFields(): Map<String, KProperty1<T, *>> = this::class.java.genericSuperclass.let { it as ParameterizedType }.actualTypeArguments.first().let {
-    var current = it
-    while(true) {
-        when(current) {
-            is Class<*> -> break
-            is ParameterizedType -> current = current.rawType
-            else -> TODO(current.toString())
-        }
+@OptIn(InternalSerializationApi::class)
+fun <T> KSerializer<T>.attemptGrabFields(): Map<String, KProperty1Partial<T>> = this::class.java.genericInterfaces
+    .asSequence()
+    .filterIsInstance<ParameterizedType>()
+    .filter { it.rawType == GeneratedSerializer::class.java }
+    .first()
+    .actualTypeArguments
+    .first()
+    .clazz()
+    .kotlin
+    .memberProperties
+    .associate {
+        @Suppress("UNCHECKED_CAST")
+        it.name to KProperty1Partial(it as KProperty1<T, *>)
     }
-    current as Class<*>
-}.kotlin.memberProperties.associate { it.name to (it as KProperty1Partial<T>) }
+
+private fun Type.clazz(): Class<*> = when (this) {
+    is ParameterizedType -> this.rawType.clazz()
+    is Class<*> -> this
+    else -> TODO()
+}
