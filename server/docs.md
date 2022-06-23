@@ -25,76 +25,73 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 
 - `database` is a singleton that handles the database
 - `database.collection()` returns a `FieldCollection` from the database
+- `autoCollection()` automatically provides a simple web interface and default endpoints for managing a `FieldCollection`
 
-### FieldCollection
+## FieldCollection
 `FieldCollection` is a collection used to store similar information to the database.
 
 - `FieldCollection.withPermissions()` creates a `FieldCollection` with access permissions
 
-#### Members
+### Members
 
-##### Insert
+#### Insert
 
-- `insertOne()` adds an item to the collection
-- `insertMany()` adds multiple items to the collection
+- `insertOne()` adds an element to the collection
+- `insertMany()` adds multiple elements to the collection
 
-##### Get
+#### Get
 
-- `get()` gets an item from the collection
-- `getMany()` gets multiple items from the collection
-- `find()` gets multiple items from the collection
+- `get()` gets an element from the collection
+- `getMany()` gets multiple elements from the collection
+- `find()` gets multiple elements from the collection
 
-##### Modify
+#### Modify
 
-- `updateOne()` modifies an item in the collection
-- `updateMany()` modifies multiple items in the collection
-- `updateOneById()` modifies an item in the collection
-- `findOneAndUpdate()` modifies an item in the collection
-- `findOneAndUpdateById()` modifies an item in the collection
+- `updateOne()` modifies an element in the collection
+- `updateMany()` modifies multiple elements in the collection
+- `updateOneById()` modifies an element in the collection
+- `findOneAndUpdate()` modifies an element in the collection
+- `findOneAndUpdateById()` modifies an element in the collection
 
-##### Replace
+#### Replace
 
-- `replaceOne()` replaces an item in the collection
-- `replaceOneById()` replaces an item in the collection
+- `replaceOne()` replaces an element in the collection
+- `replaceOneById()` replaces an element in the collection
 
-##### Delete
+#### Delete
 
-- `deleteOne()` deletes an item in the collection
-- `deleteMany()` deletes multiple items in the collection
-- `deleteOneById()` deletes an item in the collection
+- `deleteOne()` deletes an element in the collection
+- `deleteMany()` deletes multiple elements in the collection
+- `deleteOneById()` deletes an element in the collection
 
-##### Upsert
+#### Upsert
 
 - `upsertOne()`
 - `upsertOneById()`
 
-##### Execution
+#### Execution
 
 - `postChange()`
 - `preDelete()`
 - `postDelete()`
-- `preCreate()` executes code before an item is added to the collection
-- `postCreate()` executes code after an item is added to the collection
+- `preCreate()` executes code before an element is added to the collection
+- `postCreate()` executes code after an element is added to the collection
 
-#### Miscellaneous
-
-- `autoCollection()` is an automatic system that provides a simple web interface and default endpoints for managing a `FieldCollection`
-
-### Condition
+## Condition
 To test against existing data in the database, you can use a `condition`.
 
-#### Members
+### Members
 
-##### Comparison
+#### Comparison
 
-- `Equal()` returns true if the given values are equal
-- `NotEqual()` returns true if the given values are not equal
-- `GreaterThan()` returns true if the given value is greater than a given value
-- `LessThan()` returns true if the given value is less than a given value
-- `GreaterThanOrEqual()` returns true if the given value is greater than or equal to a given value
-- `LessThanOrEqual()` returns true if the given value is less than or equal to a given value
+- `Equal()` returns true if the given values are equivalent
+- `NotEqual()` returns true if the given values are not equivalent
+- `GreaterThan()` returns true if the given number is greater than another number
+- `LessThan()` returns true if the given number is less than another number
+- `GreaterThanOrEqual()` returns true if the given number is greater than or equal to another number
+- `LessThanOrEqual()` returns true if the given number is less than or equal to another number
 
-###### Shorthands
+Shorthands:
 
 - `eq` is shorthand for `Equal()`
 - `neq` is shorthand for `NotEqual()`
@@ -104,58 +101,66 @@ To test against existing data in the database, you can use a `condition`.
 - `gte` is shorthand for `GreaterThanOrEqual()`
 - `lte` is shorthand for `LessThanOrEqual()`
 
-##### Relativity
+#### Relativity
 
 - `Inside()` returns true if the given value is inside a given list
-- `NotInside()` returns true if the given value is not inside a give list
+- `NotInside()` returns true if the given value is not inside a given list
 - `Search()`
 
-###### Shorthands
+Shorthands:
 
 - `inside` is shorthand for to `Inside()`
 - `nin` is shorthand for `NotInside()`
 - `notIn` is shorthand for `NotInside()`
 - `contains` is shorthand for `Search()`
 
-##### Bitwise
+#### Bitwise
 
 - `IntBitsClear()`
 - `IntBitsSet()`
 - `IntBitsAnyClear()`
 - `IntBitsAnySet()`
 
-###### Shorthands
+Shorthands:
 
 - `allClear` is shorthand for `IntBitsClear()`
 - `allSet` is shorthand for `IntBitsSet()`
 - `anyClear` is shorthand for `IntBitsAnyClear()`
 - `anySet` is shorthand for `IntBitsAnySet()`
 
-##### Miscellaneous
+#### Miscellaneous
 
-- `AllElements()` returns true if the given condition is true for all elements in a given list
-- `AnyElements()` returns true if the given condition is true for any element in a given list
+- `AllElements()` returns true if the given `condition` is true for all elements in a given list
+- `AnyElements()` returns true if the given `condition` is true for any element in a given list
 - `SizesEquals()` returns true if the given integer is equal to the size of a given list
-- `Exists()` returns true if the given key exists in a given map
+- `Exists()` returns true if the given key is inside a given map
 - `OnKey()`
 - `OnField()`
 - `IfNotNull()` returns true if the given value is not null
 
-###### Shorthands
+Shorthands:
 
 - `all` is shorthand for `AllElements()`
 - `any` is shorthand for `AnyElements()`
 - `sizesEquals` is shorthand for `SizesEquals()`
 - `containsKey` is shorthand for `Exists()`
 
-### Modification
+## Modification
 To modify existing data in the database, you can use a `modification`.
 
-#### Members
+### Members
 
-##### Infix Function Shorthands
+- `then` strings multiple modification calls together
 
-###### Set
+#### Set
+
+- `Assign()` sets the given value to another value
+- `CoerceAtMost()` restricts a given number to a given maximum
+- `CoerceAtLeast()` restricts a given number to a given minimum
+- `Increment()` increments a given number by another number
+- `Multiply()` multiplies a given number by another number
+
+Shorthands:
 
 - `assign` is shorthand for `Assign()`
 - `coerceAtMost` is shorthand for `CoerceAtMost()`
@@ -163,7 +168,17 @@ To modify existing data in the database, you can use a `modification`.
 - `plus` is shorthand for `Increment()`
 - `times` is shorthand for `Multiply()`
 
-###### Array Operations
+#### Array Operations
+
+- `AppendString()` appends a given string to another string
+- `AppendList()` appends a given list to another list
+- `AppendSet()` appends a given set to another set
+- `Remove()` removes elements from a given list based on a `condition`
+- `RemoveInstances()` removes elements from a given list that are equivalent to elements from another list
+- `DropFirst()` removes the first element from a given list
+- `DropLast()` removes the last element from a given list
+
+Shorthands:
 
 - `plus` is shorthand for `AppendString()`
 - `plus` is shorthand for `AppendList()`
