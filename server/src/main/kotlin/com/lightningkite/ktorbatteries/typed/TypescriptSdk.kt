@@ -29,7 +29,11 @@ object TypescriptSdk {
         "EntryChange",
         "ListChange",
         "Modification",
-        "Condition"
+        "Condition",
+        "GroupCountQuery",
+        "AggregateQuery",
+        "GroupAggregateQuery",
+        "Aggregate",
     )
 
     fun sdkFile(out: Appendable) = with(out) {

@@ -20,3 +20,27 @@ export interface ListChange<T> {
     old?: T | null
     new?: T | null
 }
+export interface GroupCountQuery<Model>{
+    condition?: Condition<Model>
+    groupBy: keyof Model
+}
+
+export interface AggregateQuery<Model>{
+    aggregate: Aggregate,
+    condition?: Condition<Model>
+    property: keyof Model
+}
+
+export interface GroupAggregateQuery<Model>{
+    aggregate: Aggregate,
+    condition?: Condition<Model>
+    groupBy: keyof Model,
+    property: keyof Model
+}
+
+export enum Aggregate {
+    Sum = "Sum",
+    Average = "Average",
+    StandardDeviationSample = "StandardDeviationSample",
+    StandardDeviationPopulation = "StandardDeviationPopulation",
+}
