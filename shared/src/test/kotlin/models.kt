@@ -116,3 +116,13 @@ data class EmbeddedMap(
     override val _id: UUID = UUID.randomUUID(),
     var map: Map<String, RecursiveEmbed>,
 ) : HasId<UUID>
+
+@DatabaseModel
+@Serializable
+data class Cursed(
+    override val _id: UUID = UUID.randomUUID(),
+    val insideClass: Inside<UUID>
+): HasId<UUID> {
+    @Serializable
+    data class Inside<T>(val item: T)
+}

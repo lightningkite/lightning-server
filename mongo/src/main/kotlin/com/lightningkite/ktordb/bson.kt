@@ -2,6 +2,7 @@ package com.lightningkite.ktordb
 
 import com.lightningkite.ktordb.*
 import com.mongodb.client.model.UpdateOptions
+import org.bson.BsonDocument
 import org.bson.Document
 import java.util.concurrent.atomic.AtomicInteger
 

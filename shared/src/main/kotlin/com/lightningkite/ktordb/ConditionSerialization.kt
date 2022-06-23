@@ -18,6 +18,12 @@ import kotlin.reflect.KProperty1
 import kotlin.reflect.full.allSupertypes
 import kotlin.reflect.jvm.jvmErasure
 
+fun <K, V> KSerializer<K>.fieldSerializer(property: DataClassProperty<K, V>): KSerializer<V>? {
+    val index = this.descriptor.elementNames.indexOf(property.name)
+    @Suppress("UNCHECKED_CAST")
+    return (this as? GeneratedSerializer<*>)?.childSerializers()?.get(index) as? KSerializer<V>
+}
+
 private val serializers = HashMap<KSerializer<*>, KSerializer<*>>()
 private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<Inner>> = serializers.getOrPut(inner) {
     val map = LinkedHashMap<String, KSerializer<out Condition<Inner>>>()
@@ -59,6 +65,7 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
     }
     if (inner is GeneratedSerializer<*> && inner.descriptor.kind == StructureKind.CLASS) {
         val childSerializers = inner.childSerializers()
+        inner.descriptor.capturedKClass
         for (index in 0 until inner.descriptor.elementsCount) {
             val name = inner.descriptor.getElementName(index)
             val prop = inner.fields[name]

@@ -79,20 +79,11 @@ data class DatabaseSettings(
 class InMemoryDatabase(val premadeData: JsonObject? = null): Database {
     val collections = HashMap<String, FieldCollection<*>>()
     @Suppress("UNCHECKED_CAST")
-    override fun <T : Any> collection(clazz: KClass<T>, name: String): FieldCollection<T>
+    override fun <T : Any> collection(type: KType, name: String): FieldCollection<T>
             = collections.getOrPut(name) {
         val made = InMemoryFieldCollection<T>()
         premadeData?.get(name)?.let {
-            val data = Serialization.json.decodeFromJsonElement(ListSerializer(Serialization.json.serializersModule.serializer(object: KType {
-                override val annotations: List<Annotation>
-                    get() = listOf()
-                override val arguments: List<KTypeProjection>
-                    get() = listOf()
-                override val classifier: KClassifier
-                    get() = clazz
-                override val isMarkedNullable: Boolean
-                    get() = false
-            }) as KSerializer<T>), it)
+            val data = Serialization.json.decodeFromJsonElement(ListSerializer(Serialization.json.serializersModule.serializer(type) as KSerializer<T>), it)
             made.data.addAll(data)
         }
         made
@@ -105,17 +96,8 @@ class InMemoryUnsafePersistenceDatabase(val folder: File): Database {
     }
     val collections = HashMap<String, FieldCollection<*>>()
     @Suppress("UNCHECKED_CAST")
-    override fun <T : Any> collection(clazz: KClass<T>, name: String): FieldCollection<T>
+    override fun <T : Any> collection(type: KType, name: String): FieldCollection<T>
             = collections.getOrPut(name) {
-        InMemoryUnsafePersistentFieldCollection(Serialization.json, Serialization.json.serializersModule.serializer(object: KType {
-            override val annotations: List<Annotation>
-                get() = listOf()
-            override val arguments: List<KTypeProjection>
-                get() = listOf()
-            override val classifier: KClassifier
-                get() = clazz
-            override val isMarkedNullable: Boolean
-                get() = false
-        }) as KSerializer<T>, folder.resolve(name))
+        InMemoryUnsafePersistentFieldCollection(Serialization.json, Serialization.json.serializersModule.serializer(type) as KSerializer<T>, folder.resolve(name))
     } as FieldCollection<T>
 }

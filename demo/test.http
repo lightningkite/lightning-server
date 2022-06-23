@@ -19,3 +19,43 @@ Accept: application/json
 Content-Type: application/json
 
 "josephivie@gmail.com"
+
+
+### Get count
+GET http://0.0.0.0:8080/test-model/rest/count?number.LessThan=2000
+Accept: application/json
+
+### Get count2
+POST http://0.0.0.0:8080/test-model/rest/count
+Accept: application/json
+Content-Type: application/json
+
+{ "number": { "LessThan": 2000 }}
+
+### Get group count
+POST http://0.0.0.0:8080/test-model/rest/group-count
+Accept: application/json
+Content-Type: application/json
+
+{
+  "groupBy": "name",
+  "condition": { "Always": true }
+}
+
+### Get aggregate
+POST http://0.0.0.0:8080/test-model/rest/aggregate
+Accept: application/json
+Content-Type: application/json
+
+{ "property": "number", "aggregate": "Average" }
+
+### Get group aggregate
+POST http://0.0.0.0:8080/test-model/rest/group-aggregate
+Accept: application/json
+Content-Type: application/json
+
+{
+  "groupBy": "name",
+  "property": "number",
+  "aggregate": "Average"
+}

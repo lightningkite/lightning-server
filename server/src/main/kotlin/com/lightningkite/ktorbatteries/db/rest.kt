@@ -266,6 +266,64 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID: Comparable<ID>> Rou
             Unit
         }
     )
+
+    get(
+        path = "count",
+        summary = "Count",
+        description = "Gets the total number of ${modelName}s matching the given condition.",
+        errorCases = listOf(),
+        implementation = { user: USER, condition: Condition<T> ->
+            getCollection(user)
+                .count(condition)
+        }
+    )
+    post(
+        path = "count",
+        summary = "Count",
+        description = "Gets the total number of ${modelName}s matching the given condition.",
+        errorCases = listOf(),
+        implementation = { user: USER, condition: Condition<T> ->
+            getCollection(user)
+                .count(condition)
+        }
+    )
+
+    post(
+        path = "group-count",
+        summary = "Group Count",
+        description = "Gets the total number of ${modelName}s matching the given condition divided by group.",
+        errorCases = listOf(),
+        implementation = { user: USER, condition: GroupCountQuery<T> ->
+            @Suppress("UNCHECKED_CAST")
+            getCollection(user)
+                .groupCount(condition.condition, condition.groupBy as DataClassProperty<T, Any?>)
+                .mapKeys { it.key.toString() }
+        }
+    )
+
+    post(
+        path = "aggregate",
+        summary = "Aggregate",
+        description = "Aggregates a property of ${modelName}s matching the given condition.",
+        errorCases = listOf(),
+        implementation = { user: USER, condition: AggregateQuery<T> ->
+            @Suppress("UNCHECKED_CAST")
+            getCollection(user)
+                .aggregate(condition.aggregate, condition.condition, condition.property as DataClassProperty<T, Number>)
+        }
+    )
+
+    post(
+        path = "group-aggregate",
+        summary = "Group Aggregate",
+        description = "Aggregates a property of ${modelName}s matching the given condition divided by group.",
+        errorCases = listOf(),
+        implementation = { user: USER, condition: GroupAggregateQuery<T> ->
+            getCollection(user)
+                .groupAggregate(condition.aggregate, condition.condition, condition.groupBy as DataClassProperty<T, Any?>, condition.property as DataClassProperty<T, Number>)
+                .mapKeys { it.key.toString() }
+        }
+    )
 }
 
 

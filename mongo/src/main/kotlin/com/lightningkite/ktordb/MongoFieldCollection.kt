@@ -1,19 +1,27 @@
 package com.lightningkite.ktordb
 
-import com.mongodb.client.model.FindOneAndUpdateOptions
-import com.mongodb.client.model.ReplaceOptions
-import com.mongodb.client.model.ReturnDocument
-import com.mongodb.client.model.Sorts
+import org.litote.kmongo.serialization.*
+import com.github.jershell.kbson.KBson
+import com.mongodb.client.model.*
 import com.mongodb.client.result.DeleteResult
 import com.mongodb.client.result.InsertManyResult
 import com.mongodb.client.result.InsertOneResult
 import com.mongodb.client.result.UpdateResult
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.serializer
+import org.bson.BsonDocument
 import org.litote.kmongo.MongoOperator
 import org.litote.kmongo.coroutine.CoroutineCollection
+import org.litote.kmongo.coroutine.aggregate
+import org.litote.kmongo.group
+import org.litote.kmongo.match
 import java.util.concurrent.TimeUnit
+import kotlin.reflect.KType
 
 class MongoFieldCollection<Model: Any>(
+    val serializer: KSerializer<Model>,
     val wraps: CoroutineCollection<Model>
 ): FieldCollection<Model> {
 
@@ -139,4 +147,56 @@ class MongoFieldCollection<Model: Any>(
         condition: Condition<Model>
     ): Flow<EntryChange<Model>> = wraps.watch(condition)
 
+
+    @Serializable
+    data class KeyHolder<Key>(val _id: Key)
+
+    override suspend fun count(condition: Condition<Model>): Int {
+        return wraps.countDocuments(condition.bson()).toInt()
+    }
+
+    override suspend fun <Key> groupCount(
+        condition: Condition<Model>,
+        groupBy: DataClassProperty<Model, Key>
+    ): Map<Key, Int> {
+        return wraps.aggregate<BsonDocument>(match(condition.bson()), group("\$" + groupBy.name, Accumulators.sum("count", 1)))
+            .toList()
+            .associate {
+                MongoDatabase.bson.load(KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!), it)._id to it.getNumber("count").intValue()
+            }
+    }
+
+    private fun Aggregate.asValueBson(propertyName: String) = when(this) {
+        Aggregate.Sum -> Accumulators.sum("value", "\$" + propertyName)
+        Aggregate.Average -> Accumulators.avg("value", "\$" + propertyName)
+        Aggregate.StandardDeviationPopulation -> Accumulators.stdDevPop("value", "\$" + propertyName)
+        Aggregate.StandardDeviationSample -> Accumulators.stdDevSamp("value", "\$" + propertyName)
+    }
+
+    override suspend fun <N : Number> aggregate(
+        aggregate: Aggregate,
+        condition: Condition<Model>,
+        property: DataClassProperty<Model, N>
+    ): Double {
+        return wraps.aggregate<BsonDocument>(match(condition.bson()), group(null, aggregate.asValueBson(property.name)))
+            .toList()
+            .map {
+                it.getNumber("value").doubleValue()
+            }
+            .firstOrNull()
+            ?: 0.0
+    }
+
+    override suspend fun <N : Number, Key> groupAggregate(
+        aggregate: Aggregate,
+        condition: Condition<Model>,
+        groupBy: DataClassProperty<Model, Key>,
+        property: DataClassProperty<Model, N>
+    ): Map<Key, Double> {
+        return wraps.aggregate<BsonDocument>(match(condition.bson()), group("\$" + groupBy.name, aggregate.asValueBson(property.name)))
+            .toList()
+            .associate {
+                MongoDatabase.bson.load(KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!), it)._id to it.getNumber("value").doubleValue()
+            }
+    }
 }

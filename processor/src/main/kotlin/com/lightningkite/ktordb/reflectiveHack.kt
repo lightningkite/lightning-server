@@ -1,6 +1,7 @@
 package com.lightningkite.ktordb
 
 import com.google.devtools.ksp.symbol.KSFile
+import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeReference
 import org.jetbrains.kotlin.psi.KtFile
 

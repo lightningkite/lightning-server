@@ -3,7 +3,10 @@ package com.lightningkite.ktordb
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
-import java.util.*
+import kotlin.reflect.typeOf
+
+suspend fun <Model : Any>
+        FieldCollection<Model>.all() = find(condition = Condition.Always())
 
 suspend fun <Model : Any>
         FieldCollection<Model>.updateMany(
@@ -11,7 +14,7 @@ suspend fun <Model : Any>
 ) = updateMany(mass.condition, mass.modification)
 
 
-suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
+suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
         FieldCollection<Model>.updateOneById(
     id: ID,
     modification: Modification<Model>
@@ -19,7 +22,7 @@ suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
     return updateOne(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), modification)
 }
 
-suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
+suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
         FieldCollection<Model>.findOneAndUpdateById(
     id: ID,
     modification: Modification<Model>
@@ -27,34 +30,34 @@ suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
     return findOneAndUpdate(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), modification)
 }
 
-suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
+suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
         FieldCollection<Model>.deleteOneById(
     id: ID
 ): Boolean {
     return deleteOne(Condition.OnField(HasIdFields._id(), Condition.Equal(id)))
 }
 
-suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
+suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
         FieldCollection<Model>.replaceOneById(
     id: ID,
     model: Model
 ) = replaceOne(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), model)
 
-suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
+suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
         FieldCollection<Model>.upsertOneById(
     id: ID,
     model: Model
 ) = upsertOne(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), model)
 
 
-suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
+suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
         FieldCollection<Model>.get(
     id: ID
 ): Model? {
     return find(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), limit = 1).firstOrNull()
 }
 
-suspend fun <Model : HasId<ID>, ID: Comparable<ID>>
+suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
         FieldCollection<Model>.getMany(
     ids: List<ID>
 ): List<Model> {
@@ -74,6 +77,7 @@ suspend fun <Model : Any>
     limit: Int = Int.MAX_VALUE,
     maxQueryMs: Long = 15_000
 ): Flow<Model> = find(condition(startChain()), orderBy, skip, limit, maxQueryMs)
+
 suspend fun <Model : Any>
         FieldCollection<Model>.replaceOne(
     condition: (chain: PropChain<Model, Model>) -> Condition<Model>,

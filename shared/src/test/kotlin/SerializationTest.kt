@@ -41,6 +41,13 @@ class SerializationTest {
         println(serializer<Int?>().nullElement())
     }
 
+    @OptIn(InternalSerializationApi::class)
+    @Test fun cursedTest() {
+        Cursed.Inside.serializer(serializer<Int>()).fields = InsideFields.get<Int>().fields
+        condition<Cursed.Inside<Int>> { it.item eq 2 }.cycle()
+        condition<Cursed> { it.insideClass.item eq UUID.randomUUID() }.cycle()
+    }
+
     @Test fun conditions() {
         val sampleCondition = LargeTestModel.chain.int eq 2
         val sampleInstance = LargeTestModel()

@@ -3,6 +3,7 @@ package com.lightningkite.ktorbatteries.typed
 import com.lightningkite.ktorbatteries.routes.fullPath
 import com.lightningkite.ktorbatteries.routes.maybeMethod
 import com.lightningkite.ktorbatteries.serialization.Serialization
+import com.lightningkite.ktordb.nullElement
 import io.ktor.http.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.descriptors.*
@@ -39,6 +40,8 @@ object TypescriptSdk {
             if(!seen.add(at)) return
             val real = if(at.kind == SerialKind.CONTEXTUAL)
                 Serialization.json.serializersModule.getContextualDescriptor(at)!!
+            else if(at.isNullable)
+                at.nullElement()!!
             else
                 at
             if(real.serialName.startsWith("com.lightningkite.ktordb") || real.serialName in skipSet) return
@@ -119,19 +122,19 @@ object TypescriptSdk {
         appendLine()
         appendLine()
 
-        val byUserType = safeDocumentables.groupBy { it.userType?.classifier as? KClass<*> }
+        val byUserType = safeDocumentables.groupBy { it.userType }
         val userTypes = byUserType.keys.filterNotNull()
         userTypes.forEach { userType ->
             val byGroup = ((byUserType[userType] ?: listOf()) + (byUserType[null] ?: listOf())).groupBy { it.docGroup }
             val groups = byGroup.keys.filterNotNull()
-            val sessionClassName = "${userType.simpleName}Session"
+            val sessionClassName = "${(userType.classifier as KClass<*>).simpleName}Session"
             appendLine("export class $sessionClassName {")
             appendLine("    constructor(public api: Api, public ${userType.userTypeTokenName()}: string) {}")
             for (entry in byGroup[null] ?: listOf()) {
                 append("    ")
-                this.functionHeader(entry, skipAuth = true)
+                this.functionHeader(entry, skipAuth = true, overrideUserType = userType)
                 append(" { return this.api.")
-                functionCall(entry, skipAuth = false, authUsesThis = true)
+                functionCall(entry, skipAuth = false, authUsesThis = true, overrideUserType = userType)
                 appendLine(" } ")
             }
             for (group in groups) {
@@ -140,11 +143,11 @@ object TypescriptSdk {
                 appendLine("        userToken: this.userToken,")
                 for (entry in byGroup[group]!!) {
                     append("        ")
-                    this.functionHeader(entry, skipAuth = true)
+                    this.functionHeader(entry, skipAuth = true, overrideUserType = userType)
                     append(" { return this.api.")
                     append(group.groupToPartName())
                     append(".")
-                    functionCall(entry, skipAuth = false, authUsesThis = true)
+                    functionCall(entry, skipAuth = false, authUsesThis = true, overrideUserType = userType)
                     appendLine(" }, ")
                 }
                 appendLine("    }")
@@ -214,10 +217,10 @@ private fun KType?.userTypeTokenName(): String = (this?.classifier as? KClass<An
 private fun KClass<*>.userTypeTokenName(): String =
     simpleName?.replaceFirstChar { it.lowercase() }?.plus("Token") ?: "token"
 
-private fun Appendable.functionHeader(documentable: Documentable, skipAuth: Boolean = false) {
+private fun Appendable.functionHeader(documentable: Documentable, skipAuth: Boolean = false, overrideUserType: KType? = null) {
     append("${documentable.functionName}(")
     var argComma = false
-    arguments(documentable, skipAuth).forEach {
+    arguments(documentable, skipAuth, overrideUserType).forEach {
         if (argComma) append(", ")
         else argComma = true
         append(it.name)
@@ -244,10 +247,10 @@ private fun Appendable.functionHeader(documentable: Documentable, skipAuth: Bool
     }
 }
 
-private fun Appendable.functionCall(documentable: Documentable, skipAuth: Boolean = false, authUsesThis: Boolean = false) {
+private fun Appendable.functionCall(documentable: Documentable, skipAuth: Boolean = false, authUsesThis: Boolean = false, overrideUserType: KType? = null) {
     append("${documentable.functionName}(")
     var argComma = false
-    arguments(documentable, skipAuth).forEach {
+    arguments(documentable, skipAuth, overrideUserType).forEach {
         if (argComma) append(", ")
         else argComma = true
         if(it.name == documentable.userType.userTypeTokenName() && authUsesThis) {
@@ -265,10 +268,10 @@ private data class TArg(
     val default: String? = null
 )
 
-private fun arguments(documentable: Documentable, skipAuth: Boolean = false): List<TArg> = when (documentable) {
+private fun arguments(documentable: Documentable, skipAuth: Boolean = false, overrideUserType: KType? = null): List<TArg> = when (documentable) {
     is ApiEndpoint<*, *, *> -> listOfNotNull(
         documentable.userType?.takeUnless { skipAuth }?.let {
-            TArg(name = it.userTypeTokenName(), stringType = "string")
+            TArg(name = (overrideUserType ?: it).userTypeTokenName(), stringType = "string")
         }?.let(::listOf),
         generateSequence(documentable.route) { it.parent }.toList().reversed()
             .mapNotNull { it.selector as? PathSegmentParameterRouteSelector }
@@ -281,7 +284,7 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false): Li
     ).flatten()
     is ApiWebsocket<*, *, *> -> listOfNotNull(
         documentable.userType?.takeUnless { skipAuth }?.let {
-            TArg(name = it.userTypeTokenName(), stringType = "String")
+            TArg(name = (overrideUserType ?: it).userTypeTokenName(), stringType = "String")
         }?.let(::listOf),
         generateSequence(documentable.route) { it.parent }.toList().reversed()
             .mapNotNull { it.selector as? PathSegmentParameterRouteSelector }

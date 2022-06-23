@@ -5,6 +5,7 @@ import com.lightningkite.khrysalis.SharedCode
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
+@Serializable(PartialDataClassPropertySerializer::class)
 abstract class PartialDataClassProperty<K> {
     abstract val name: String
     abstract fun anyGet(k: K): Any?

@@ -36,6 +36,12 @@ class SchemaTest {
     }
 
     @Test
+    fun condition() {
+        prepareModels()
+        println(Json.encodeToSchema(Condition.serializer(Post.serializer())))
+    }
+
+    @Test
     fun params() {
         println(
             Properties.encodeToStringMap(Post.chain.condition { (it.author eq "Bill") and (it.title eq "Bills Greatest") }).entries.joinToString(

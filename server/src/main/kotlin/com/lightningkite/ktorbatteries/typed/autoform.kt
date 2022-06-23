@@ -136,7 +136,8 @@ fun FlowContent.jsFormUntyped(
                     disable_properties: true,
                     form_name_root: "$title",
                     collapsed: $collapsed,
-                    schema: ${Serialization.json.encodeToSchema(Serialization.module.serializer(type))}
+                    schema: ${Serialization.json.encodeToSchema(Serialization.module.serializer(type))},
+                    max_depth: 5
                 });
                 ${
                 if (defaultValue != null) "${jsEditorName}.on('ready', () => ${jsEditorName}.setValue(${

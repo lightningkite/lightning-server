@@ -28,3 +28,11 @@ fun KSerializer<*>.nullElement(): KSerializer<*>? {
         return theoreticalMethod.get(this) as KSerializer<*>
     } catch(e: Exception) { return null }
 }
+
+fun SerialDescriptor.nullElement(): SerialDescriptor? {
+    try {
+        val theoreticalMethod = this::class.java.getDeclaredField("original")
+        try { theoreticalMethod.isAccessible = true } catch(e: Exception) {}
+        return theoreticalMethod.get(this) as SerialDescriptor
+    } catch(e: Exception) { return null }
+}

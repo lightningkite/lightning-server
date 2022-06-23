@@ -6,6 +6,8 @@ data class MongoFields(
     val declaration: KSClassDeclaration
 ) {
     val packageName: String get() = declaration.packageName.asString()
+    val typeReference: String get() = declaration.safeLocalReference() + (declaration.typeParameters.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.name.asString() } ?: "")
+    val classReference: String get() = declaration.safeLocalReference()
     val simpleName: String get() = declaration.simpleName.getShortName()
     val fields by lazy { declaration.fields() }
     val hasId by lazy { declaration.superTypes.any { it.resolve().declaration.qualifiedName?.asString() == "com.lightningkite.ktordb.HasId" } }
@@ -19,9 +21,11 @@ data class MongoFields(
         .flatMap { it.allSubs(handled) }
 
     fun write(out: TabAppendable) = with(out) {
+        var useContextualFor = listOf<String>()
         declaration.containingFile?.annotations?.forEach {
             when (it.shortName.asString()) {
                 "UseContextualSerialization" -> {
+                    it.resolve().arguments
                     appendLine(
                         "@file:${it.shortName.asString()}(${
                             it.arguments.first().let { argument ->
@@ -30,6 +34,7 @@ data class MongoFields(
                                     ?.removePrefix("[")
                                     ?.removeSuffix("]")
                                     ?.split(", ")
+                                    ?.also { useContextualFor = it }
                                     ?.joinToString { "$it::class" }
                             }
                         })"
@@ -54,6 +59,7 @@ data class MongoFields(
                 }
             }
         }
+        appendLine("@file:OptIn(ExperimentalSerializationApi::class, InternalSerializationApi::class)")
         appendLine()
         appendLine("package ${packageName}")
         appendLine()
@@ -62,7 +68,10 @@ data class MongoFields(
             ?.plus(
                 listOf(
                     "com.lightningkite.ktordb.*",
+                    "kotlin.reflect.*",
                     "kotlinx.serialization.*",
+                    "kotlinx.serialization.builtins.*",
+                    "kotlinx.serialization.internal.GeneratedSerializer",
                     "java.time.*",
                     "java.util.*",
                 )
@@ -70,27 +79,107 @@ data class MongoFields(
             ?.distinct()
             ?.forEach { appendLine("import $it") }
         appendLine()
-        appendLine("object ${simpleName}Fields {")
-        tab {
-            for (field in fields) {
-                if(comparable.asStarProjectedType().isAssignableFrom(field.kotlinType.resolve())) {
-                    appendLine("val ${field.name} = DataClassProperty<$simpleName, ${field.kotlinType.toKotlin()}>(\"${field.name}\", {it.${field.name}}, {it, v -> it.copy(${field.name} = v)}, compareBy { it.${field.name} })")
-                } else {
-                    appendLine("val ${field.name} = DataClassProperty<$simpleName, ${field.kotlinType.toKotlin()}>(\"${field.name}\", {it.${field.name}}, {it, v -> it.copy(${field.name} = v)})")
-                }
-            }
-            appendLine("init {")
+        if(declaration.typeParameters.isEmpty()) {
+            appendLine("object ${simpleName}Fields {")
             tab {
-                appendLine("$simpleName.serializer().fields = mapOf(${fields.joinToString { """"${it.name}" to ${it.name} """ }})")
+                for (field in fields) {
+                    append("val ")
+                    append(field.name)
+                    append(" = DataClassProperty<")
+                    append(typeReference)
+                    append(", ")
+                    append(field.kotlinType.toKotlin())
+                    append(">(\"")
+                    append(field.name)
+                    append("\", {it.")
+                    append(field.name)
+                    append("}, {it, v -> it.copy(")
+                    append(field.name)
+                    append(" = v)}")
+                    if(comparable.asStarProjectedType().isAssignableFrom(field.kotlinType.resolve())) {
+                        appendLine(", compareBy { it.${field.name} })")
+                    } else {
+                        appendLine(")")
+                    }
+                }
+                appendLine("init {")
+                tab {
+                    appendLine("val serializer = $classReference.serializer() as GeneratedSerializer<$typeReference>")
+                    appendLine("serializer.fields = mapOf(${fields.joinToString { """"${it.name}" to ${it.name} """ }})")
+                    if(fields.any {
+                            val t = it.kotlinType.resolve()
+                            t.arguments.isNotEmpty() && (t.declaration as? KSClassDeclaration)?.usesSub == true
+                    }) {
+                        appendLine("val subtypes = serializer.childSerializers()")
+                        fields.forEachIndexed { index, field ->
+                            val t = field.kotlinType.resolve()
+                            if (t.arguments.isNotEmpty() && (t.declaration as? KSClassDeclaration)?.usesSub == true) {
+                                appendLine("subtypes[$index].fields = ${t.declaration.simpleName.asString()}Fields.get<${t.arguments.joinToString { it.type!!.toKotlin() }}>().fields")
+                            }
+                        }
+                    }
+                }
+                appendLine("}")
             }
             appendLine("}")
+            appendLine()
+            for (field in fields) {
+                appendLine("val <K> PropChain<K, $typeReference>.${field.name}: PropChain<K, ${field.kotlinType.toKotlin()}> get() = this[${simpleName}Fields.${field.name}]")
+            }
+            appendLine("val ${classReference}.Companion.chain: PropChain<$typeReference, $typeReference> get() = startChain()")
+        } else {
+            append("class ${simpleName}Fields")
+            append(declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() })
+            appendLine("(")
+            tab {
+                for (field in fields) {
+                    append("val ")
+                    append(field.name)
+                    append(": DataClassProperty<")
+                    append(typeReference)
+                    append(", ")
+                    append(field.kotlinType.toKotlin())
+                    appendLine(">,")
+                }
+            }
+            appendLine(") {")
+            tab {
+                appendLine("val fields get(): Map<String, PartialDataClassProperty<$typeReference>> = mapOf(${fields.joinToString { """"${it.name}" to ${it.name} """ }})")
+                appendLine("companion object {")
+                tab {
+                    appendLine("val known = HashMap<List<KType>, ${simpleName}Fields${declaration.typeParameters.joinToString(", ", "<", ">") { "*" }}>()")
+                    appendLine("@Suppress(\"UNCHECKED_CAST\")")
+                    appendLine("inline fun ${declaration.typeParameters.joinToString(", ", "<", ">") { "reified " + it.name.asString() }} get(): ${simpleName}Fields${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }} = known.getOrPut(listOf(${declaration.typeParameters.joinToString(", ") { "typeOf<T>()" }})) {")
+                    tab {
+                        appendLine("val result = ${simpleName}Fields${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}(")
+                        for (field in fields) {
+                            append(field.name)
+                            append(" = DataClassProperty(\"")
+                            append(field.name)
+                            append("\", {it.")
+                            append(field.name)
+                            append("}, {it, v -> it.copy(")
+                            append(field.name)
+                            append(" = v)}")
+                            if(comparable.asStarProjectedType().isAssignableFrom(field.kotlinType.resolve())) {
+                                appendLine(", compareBy { it.${field.name} }),")
+                            } else {
+                                appendLine("),")
+                            }
+                        }
+                        appendLine(")")
+                        appendLine("result")
+                    }
+                    appendLine("} as ${simpleName}Fields${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}")
+                }
+                appendLine("}")
+            }
+            appendLine("}")
+
+            for (field in fields) {
+                appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { "reified " + it.name.asString() }}> PropChain<ROOT, $typeReference>.${field.name}: PropChain<ROOT, ${field.kotlinType.toKotlin()}> get() = this[${simpleName}Fields.get${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}().${field.name}]")
+            }
         }
-        appendLine("}")
-        appendLine()
-        for (field in fields) {
-            appendLine("val <K> PropChain<K, $simpleName>.${field.name}: PropChain<K, ${field.kotlinType.toKotlin()}> get() = this[${simpleName}Fields.${field.name}]")
-        }
-        appendLine("val ${simpleName}.Companion.chain: PropChain<$simpleName, $simpleName> get() = startChain()")
     }
 }
 

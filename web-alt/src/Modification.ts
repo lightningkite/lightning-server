@@ -1,6 +1,5 @@
 import {Condition} from "./Condition";
 
-type SubModification<T, K extends keyof T> = { K: Modification<T[K]> }
 export type Modification<T> =
     { Chain: Array<Modification<T>> }
     | { IfNotNull: Modification<T> }
@@ -23,4 +22,4 @@ export type Modification<T> =
     | { Combine: T }
     | { ModifyByKey: Record<string, Modification<any>> }
     | { RemoveKeys: Array<string> }
-    | SubModification<T, any>
+    | { [P in keyof T]?: Modification<T[P]> }

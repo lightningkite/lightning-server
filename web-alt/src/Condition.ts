@@ -1,5 +1,3 @@
-type SubCondition<T, K extends keyof T> = { K: Condition<T[K]> }
-
 export type Condition<T> =
     { Never: boolean }
     | { Always: boolean }
@@ -29,4 +27,8 @@ export type Condition<T> =
     | { SizesEquals: number }
     | { Exists: boolean }
     | { IfNotNull: Condition<T> }
-    | SubCondition<T, any>
+    | { [P in keyof T]?: Condition<T[P]> }
+
+interface Thing {
+    _id: string
+}

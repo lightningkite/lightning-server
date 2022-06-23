@@ -43,6 +43,7 @@ class TableGenerator(
             }
 
         seen.clear()
+
         allDatabaseModels
             .flatMap { MongoFields(it).allSubs(seen) }
             .distinct()
@@ -66,7 +67,7 @@ class TableGenerator(
                         tab {
                             ksClassDeclarations
                                 .forEach {
-                                    appendLine("${it.simpleName}Fields")
+                                    appendLine("    ${it.simpleName}Fields")
                                 }
                         }
                         appendLine("}")

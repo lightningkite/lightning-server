@@ -2,6 +2,7 @@ package com.lightningkite.ktordb
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlin.reflect.KType
 
 open class ModelPermissionsFieldCollection<Model : Any>(
     val base: FieldCollection<Model>,
@@ -74,6 +75,28 @@ open class ModelPermissionsFieldCollection<Model : Any>(
 
     override suspend fun watch(condition: Condition<Model>): Flow<EntryChange<Model>> = base.watch(condition and permissions.read)
         .map { it.map { permissions.mask(it) } }
+
+    override suspend fun count(condition: Condition<Model>): Int = base.count(condition and permissions.read)
+
+    override suspend fun <Key> groupCount(
+        condition: Condition<Model>,
+        groupBy: DataClassProperty<Model, Key>
+    ): Map<Key, Int> {
+        return base.groupCount(condition and permissions.read and (permissions.readFields[groupBy]?.condition ?: Condition.Always()), groupBy)
+    }
+
+    override suspend fun <N : Number> aggregate(
+        aggregate: Aggregate,
+        condition: Condition<Model>,
+        property: DataClassProperty<Model, N>
+    ): Double = base.aggregate(aggregate, condition and permissions.read, property)
+
+    override suspend fun <N : Number, Key> groupAggregate(
+        aggregate: Aggregate,
+        condition: Condition<Model>,
+        groupBy: DataClassProperty<Model, Key>,
+        property: DataClassProperty<Model, N>
+    ): Map<Key, Double> = base.groupAggregate(aggregate, condition and permissions.read and (permissions.readFields[groupBy]?.condition ?: Condition.Always()), groupBy, property)
 }
 
 fun <Model: Any> FieldCollection<Model>.withPermissions(permissions: ModelPermissions<Model>): FieldCollection<Model> = ModelPermissionsFieldCollection(this, permissions)

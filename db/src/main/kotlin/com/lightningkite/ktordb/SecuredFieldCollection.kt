@@ -3,6 +3,7 @@ package com.lightningkite.ktordb
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
+import kotlin.reflect.KType
 
 open class SecuredFieldCollection<Model: Any>(
     open val wraps: FieldCollection<Model>,
@@ -97,5 +98,27 @@ open class SecuredFieldCollection<Model: Any>(
             val new = it.new?.let { rules.mask(it) }
             EntryChange(old, new)
         }
+
+    override suspend fun count(condition: Condition<Model>): Int = wraps.count(condition and rules.read(condition))
+
+    override suspend fun <Key> groupCount(
+        condition: Condition<Model>,
+        groupBy: DataClassProperty<Model, Key>
+    ): Map<Key, Int> {
+        return wraps.groupCount(condition and rules.read(condition) and rules.sortAllowed(SortPart(groupBy)), groupBy)
+    }
+
+    override suspend fun <N : Number> aggregate(
+        aggregate: Aggregate,
+        condition: Condition<Model>,
+        property: DataClassProperty<Model, N>
+    ): Double = wraps.aggregate(aggregate, condition and rules.read(condition), property)
+
+    override suspend fun <N : Number, Key> groupAggregate(
+        aggregate: Aggregate,
+        condition: Condition<Model>,
+        groupBy: DataClassProperty<Model, Key>,
+        property: DataClassProperty<Model, N>
+    ): Map<Key, Double> = wraps.groupAggregate(aggregate, condition and rules.read(condition) and rules.sortAllowed(SortPart(groupBy)), groupBy, property)
 }
 

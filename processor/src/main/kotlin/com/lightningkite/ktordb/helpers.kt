@@ -46,10 +46,14 @@ val KSDeclaration.importSafeName: String
         else -> this.qualifiedName!!.asString()
     }
 
+fun KSDeclaration.safeLocalReference(): String = qualifiedName!!.asString().split('.').dropWhile { it.firstOrNull()?.isLowerCase() == true }.joinToString(".")
+
 fun KSTypeReference.toKotlin(annotations: Sequence<KSAnnotation>? = null): String =
     this.resolve().toKotlin(annotations ?: this.resolve().annotations)
 
 fun KSType.toKotlin(annotations: Sequence<KSAnnotation> = this.annotations): String {
+    (this.declaration as? KSTypeParameter)?.let { return it.name.asString() }
+
     val annotationString = annotations.joinToString(" ") {
         it.toString()
     }.let { if (it.isBlank()) "" else "$it " }
@@ -57,7 +61,7 @@ fun KSType.toKotlin(annotations: Sequence<KSAnnotation> = this.annotations): Str
     return if (declaration.qualifiedName!!.asString() == "com.lightningkite.ktordb.UUIDFor") {
         "${annotationString}UUIDFor<*>"
     } else {
-        annotationString + (declaration.simpleName.asString() + if (arguments.isNotEmpty() && this.declaration !is KSTypeAlias) {
+        annotationString + (declaration.safeLocalReference() + if (arguments.isNotEmpty() && this.declaration !is KSTypeAlias) {
             arguments.joinToString(", ", "<", ">") { it.type?.toKotlin() ?: "*" }
         } else "")
     } + if (isMarkedNullable) "?" else ""
