@@ -1,9 +1,17 @@
 # Ktor Batteries Server Feature Docs
 Ktor Batteries Server has a lot of nifty features. Here is a list of things to get you started.
 
-- `loadSettings()` loads server settings
+## Server Setup
 
-## Settings singletons
+- `runServer()` runs the server
+- `loadSettings()` loads server settings
+- `configureFiles()`
+- `configureSerialization()`
+- `configureExceptions()`
+- `configureAuth()`
+- `install()`
+
+## Server Settings Singletons
 
 - `GeneralServerSettings`
 - `AuthSettings`
@@ -12,14 +20,6 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 - `DatabaseSettings`
 - `ExceptionSettings`
 - `EmailSettings`
-
-## Server Setup
-
--  `configureFiles()`
--  `configureSerialization()`
--  `configureExceptions()`
--  `configureAuth()`
--  `install()`
 
 ## Database
 
@@ -91,7 +91,7 @@ To test against existing data in the database, you can use a `condition`.
 - `GreaterThanOrEqual()` returns true if the given number is greater than or equal to another number
 - `LessThanOrEqual()` returns true if the given number is less than or equal to another number
 
-Shorthands:
+*Shorthands:*
 
 - `eq` is shorthand for `Equal()`
 - `neq` is shorthand for `NotEqual()`
@@ -107,7 +107,7 @@ Shorthands:
 - `NotInside()` returns true if the given value is not inside a given list
 - `Search()`
 
-Shorthands:
+*Shorthands:*
 
 - `inside` is shorthand for to `Inside()`
 - `nin` is shorthand for `NotInside()`
@@ -121,7 +121,7 @@ Shorthands:
 - `IntBitsAnyClear()`
 - `IntBitsAnySet()`
 
-Shorthands:
+*Shorthands:*
 
 - `allClear` is shorthand for `IntBitsClear()`
 - `allSet` is shorthand for `IntBitsSet()`
@@ -138,7 +138,7 @@ Shorthands:
 - `OnField()`
 - `IfNotNull()` returns true if the given value is not null
 
-Shorthands:
+*Shorthands:*
 
 - `all` is shorthand for `AllElements()`
 - `any` is shorthand for `AnyElements()`
@@ -160,7 +160,7 @@ To modify existing data in the database, you can use a `modification`.
 - `Increment()` increments a given number by another number
 - `Multiply()` multiplies a given number by another number
 
-Shorthands:
+*Shorthands:*
 
 - `assign` is shorthand for `Assign()`
 - `coerceAtMost` is shorthand for `CoerceAtMost()`
@@ -178,7 +178,7 @@ Shorthands:
 - `DropFirst()` removes the first element from a given list
 - `DropLast()` removes the last element from a given list
 
-Shorthands:
+*Shorthands:*
 
 - `plus` is shorthand for `AppendString()`
 - `plus` is shorthand for `AppendList()`
