@@ -1,5 +1,5 @@
 # Ktor Batteries Server Feature Docs
-Ktor Batteries Server has a lot of nifty features. Here is a brief list of things to get you started.
+Ktor Batteries Server has a lot of nifty features. Here is a list of things to get you started.
 
 - `loadSettings()` loads server settings
 
@@ -120,6 +120,27 @@ To test against existing data in the database, you can use a `condition`.
 
 ### Modification
 To modify existing data in the database, you can use a `modification`.
+
+#### Member Functions
+
+##### Infix Function Shorthands
+
+###### Set
+
+- `assign` is shorthand for `Assign()`
+- `coerceAtMost` is shorthand for `CoerceAtMost()`
+- `coerceAtLeast` is shorthand for `CoerceAtLeast()`
+- `plus` is shorthand for `Increment()`
+- `times` is shorthand for `Multiply()`
+
+###### Array Operations
+
+- `plus` is shorthand for `AppendString()`
+- `plus` is shorthand for `AppendList()`
+- `addAll` is shorthand for `AppendList()`
+- `addUnique` is shorthand for `AppendSet()`
+- `removeAll` is shorthand for `Remove()`
+- `removeAll` is shorthand for `RemoveInstances()`
 
 ## Models
 Models are used to access data from the `database` as well as from the body of http calls.
