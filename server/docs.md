@@ -31,7 +31,7 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 
 - `FieldCollection.withPermissions()` creates a `FieldCollection` with access permissions
 
-#### Member Functions
+#### Members
 
 ##### Insert
 
@@ -83,11 +83,18 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 ### Condition
 To test against existing data in the database, you can use a `condition`.
 
-#### Member Functions
+#### Members
 
-##### Infix Function Shorthands
+##### Comparison
 
-###### Comparison
+- `Equal()` returns true if the given values are equal
+- `NotEqual()` returns true if the given values are not equal
+- `GreaterThan()` returns true if the given value is greater than a given value
+- `LessThan()` returns true if the given value is less than a given value
+- `GreaterThanOrEqual()` returns true if the given value is greater than or equal to a given value
+- `LessThanOrEqual()` returns true if the given value is less than or equal to a given value
+
+###### Shorthands
 
 - `eq` is shorthand for `Equal()`
 - `neq` is shorthand for `NotEqual()`
@@ -97,21 +104,44 @@ To test against existing data in the database, you can use a `condition`.
 - `gte` is shorthand for `GreaterThanOrEqual()`
 - `lte` is shorthand for `LessThanOrEqual()`
 
-###### Relativity
+##### Relativity
+
+- `Inside()` returns true if the given value is inside a given list
+- `NotInside()` returns true if the given value is not inside a give list
+- `Search()`
+
+###### Shorthands
 
 - `inside` is shorthand for to `Inside()`
 - `nin` is shorthand for `NotInside()`
 - `notIn` is shorthand for `NotInside()`
 - `contains` is shorthand for `Search()`
 
-###### Bitwise
+##### Bitwise
+
+- `IntBitsClear()`
+- `IntBitsSet()`
+- `IntBitsAnyClear()`
+- `IntBitsAnySet()`
+
+###### Shorthands
 
 - `allClear` is shorthand for `IntBitsClear()`
 - `allSet` is shorthand for `IntBitsSet()`
 - `anyClear` is shorthand for `IntBitsAnyClear()`
 - `anySet` is shorthand for `IntBitsAnySet()`
 
-###### Miscellaneous
+##### Miscellaneous
+
+- `AllElements()` returns true if the given condition is true for all elements in a given list
+- `AnyElements()` returns true if the given condition is true for any element in a given list
+- `SizesEquals()` returns true if the given integer is the size of a given list
+- `Exists()` returns true if the given key exists in a given map
+- `OnKey()`
+- `OnField()`
+- `IfNotNull()` returns true if the given value is not null
+
+###### Shorthands
 
 - `all` is shorthand for `AllElements()`
 - `any` is shorthand for `AnyElements()`
@@ -121,7 +151,7 @@ To test against existing data in the database, you can use a `condition`.
 ### Modification
 To modify existing data in the database, you can use a `modification`.
 
-#### Member Functions
+#### Members
 
 ##### Infix Function Shorthands
 
