@@ -27,66 +27,68 @@ fun <K, V> KSerializer<K>.fieldSerializer(property: KProperty1<K, V>): KSerializ
 private val serializers = HashMap<KSerializer<*>, KSerializer<*>>()
 @Suppress("UNCHECKED_CAST")
 private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<Inner>> = serializers.getOrPut(inner) {
-    val map = LinkedHashMap<String, KSerializer<out Condition<Inner>>>()
-    fun register(serializer: KSerializer<out Condition<*>>) {
-        map[serializer.descriptor.serialName] = (serializer as KSerializer<out Condition<Inner>>)
-    }
-    register(Condition.Never.serializer(inner))
-    register(Condition.Always.serializer(inner))
-    register(Condition.And.serializer(inner))
-    register(Condition.Or.serializer(inner))
-    register(Condition.Not.serializer(inner))
-    register(Condition.Equal.serializer(inner))
-    register(Condition.NotEqual.serializer(inner))
-    register(Condition.Inside.serializer(inner))
-    register(Condition.NotInside.serializer(inner))
-    register(Condition.GreaterThan.serializer(inner))
-    register(Condition.LessThan.serializer(inner))
-    register(Condition.GreaterThanOrEqual.serializer(inner))
-    register(Condition.LessThanOrEqual.serializer(inner))
-    if (inner == String.serializer()) register(Condition.Search.serializer())
-    if (inner == Int.serializer()) {
-        register(Condition.IntBitsClear.serializer())
-        register(Condition.IntBitsSet.serializer())
-        register(Condition.IntBitsAnyClear.serializer())
-        register(Condition.IntBitsAnySet.serializer())
-    }
-    if (inner.descriptor.kind == StructureKind.LIST) {
-        inner.listElement()?.let { element ->
-            register(Condition.AllElements.serializer(element))
-            register(Condition.AnyElements.serializer(element))
-            register(Condition.SizesEquals.serializer(element))
-        }
-    }
-    if (inner.descriptor.kind == StructureKind.MAP) {
-        inner.mapValueElement()?.let { element ->
-            register(Condition.Exists.serializer(element))
-            register(Condition.OnKey.serializer(element))
-        }
-    }
-    if (inner is GeneratedSerializer<*> && inner.descriptor.kind == StructureKind.CLASS) {
-        val childSerializers = inner.childSerializers()
-        val fields = inner.attemptGrabFields()
-        for (index in 0 until inner.descriptor.elementsCount) {
-            val name = inner.descriptor.getElementName(index)
-            val prop = fields[name]!!
-            register(
-                OnFieldSerializer<Any, Any?>(
-                    prop.property as KProperty1<Any, Any?>,
-                    Condition.serializer(childSerializers[index]) as KSerializer<Condition<Any?>>
-                )
-            )
-        }
-    }
-    if (inner.descriptor.isNullable) {
-        inner.nullElement()?.let { element ->
-            register(Condition.IfNotNull.serializer(element))
-        }
-    }
     MySealedClassSerializer(
         "com.lightningkite.ktordb.Condition<${inner.descriptor.serialName}>",
         Condition::class as KClass<Condition<Inner>>,
-        map
+        {
+            val map = LinkedHashMap<String, KSerializer<out Condition<Inner>>>()
+            fun register(serializer: KSerializer<out Condition<*>>) {
+                map[serializer.descriptor.serialName] = (serializer as KSerializer<out Condition<Inner>>)
+            }
+            register(Condition.Never.serializer(inner))
+            register(Condition.Always.serializer(inner))
+            register(Condition.And.serializer(inner))
+            register(Condition.Or.serializer(inner))
+            register(Condition.Not.serializer(inner))
+            register(Condition.Equal.serializer(inner))
+            register(Condition.NotEqual.serializer(inner))
+            register(Condition.Inside.serializer(inner))
+            register(Condition.NotInside.serializer(inner))
+            register(Condition.GreaterThan.serializer(inner))
+            register(Condition.LessThan.serializer(inner))
+            register(Condition.GreaterThanOrEqual.serializer(inner))
+            register(Condition.LessThanOrEqual.serializer(inner))
+            if (inner == String.serializer()) register(Condition.Search.serializer())
+            if (inner == Int.serializer()) {
+                register(Condition.IntBitsClear.serializer())
+                register(Condition.IntBitsSet.serializer())
+                register(Condition.IntBitsAnyClear.serializer())
+                register(Condition.IntBitsAnySet.serializer())
+            }
+            if (inner.descriptor.kind == StructureKind.LIST) {
+                inner.listElement()?.let { element ->
+                    register(Condition.AllElements.serializer(element))
+                    register(Condition.AnyElements.serializer(element))
+                    register(Condition.SizesEquals.serializer(element))
+                }
+            }
+            if (inner.descriptor.kind == StructureKind.MAP) {
+                inner.mapValueElement()?.let { element ->
+                    register(Condition.Exists.serializer(element))
+                    register(Condition.OnKey.serializer(element))
+                }
+            }
+            if (inner is GeneratedSerializer<*> && inner.descriptor.kind == StructureKind.CLASS) {
+                val childSerializers = inner.childSerializers()
+                val fields = inner.attemptGrabFields()
+                for (index in 0 until inner.descriptor.elementsCount) {
+                    val name = inner.descriptor.getElementName(index)
+                    val prop = fields[name]!!
+                    register(
+                        OnFieldSerializer<Any, Any?>(
+                            prop.property as KProperty1<Any, Any?>,
+                            Condition.serializer(childSerializers[index]) as KSerializer<Condition<Any?>>
+                        )
+                    )
+                }
+            }
+            if (inner.descriptor.isNullable) {
+                inner.nullElement()?.let { element ->
+                    register(Condition.IfNotNull.serializer(element))
+                }
+            }
+            map
+        }
     ) {
         when (it) {
             is Condition.Never -> "Never"

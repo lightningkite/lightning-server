@@ -21,59 +21,61 @@ import kotlin.reflect.jvm.jvmErasure
 private val serializers = HashMap<KSerializer<*>, KSerializer<*>>()
 @Suppress("UNCHECKED_CAST")
 private fun <Inner> getMod(inner: KSerializer<Inner>): KSerializer<Modification<Inner>> = serializers.getOrPut(inner) {
-    val map = LinkedHashMap<String, KSerializer<out Modification<Inner>>>()
-    fun register(serializer: KSerializer<out Modification<*>>) {
-        map[serializer.descriptor.serialName] = (serializer as KSerializer<out Modification<Inner>>)
-    }
-    register(Modification.Chain.serializer(inner))
-    register(Modification.IfNotNull.serializer(inner))
-    register(Modification.Assign.serializer(inner))
-    register(Modification.CoerceAtMost.serializer(inner))
-    register(Modification.CoerceAtLeast.serializer(inner))
-    register(Modification.Increment.serializer(inner))
-    register(Modification.Multiply.serializer(inner))
-    if (inner == String.serializer()) register(Modification.AppendString.serializer())
-    if (inner.descriptor.kind == StructureKind.LIST) {
-        inner.listElement()?.let { element ->
-            register(Modification.AppendList.serializer(element))
-            register(Modification.AppendSet.serializer(element))
-            register(Modification.Remove.serializer(element))
-            register(Modification.RemoveInstances.serializer(element))
-            register(Modification.DropFirst.serializer(element))
-            register(Modification.DropLast.serializer(element))
-            register(Modification.PerElement.serializer(element))
-        }
-    }
-    if (inner.descriptor.kind == StructureKind.MAP) {
-        inner.mapValueElement()?.let { element ->
-            register(Modification.Combine.serializer(element))
-            register(Modification.ModifyByKey.serializer(element))
-            register(Modification.RemoveKeys.serializer(element))
-        }
-    }
-    if (inner is GeneratedSerializer<*> && inner.descriptor.kind == StructureKind.CLASS) {
-        val childSerializers = inner.childSerializers()
-        val fields = inner.attemptGrabFields()
-        for (index in 0 until inner.descriptor.elementsCount) {
-            val name = inner.descriptor.getElementName(index)
-            val prop = fields[name]!!.property
-            register(
-                OnFieldSerializer2<Any, Any?>(
-                    prop as KProperty1<Any, Any?>,
-                    Modification.serializer(childSerializers[index]) as KSerializer<Modification<Any?>>
-                )
-            )
-        }
-    }
-    if (inner.descriptor.isNullable) {
-        inner.nullElement()?.let { element ->
-            register(Modification.IfNotNull.serializer(element))
-        }
-    }
     MySealedClassSerializer(
         "com.lightningkite.ktordb.Modification<${inner.descriptor.serialName}>",
         Modification::class as KClass<Modification<Inner>>,
-        map
+        {
+            val map = LinkedHashMap<String, KSerializer<out Modification<Inner>>>()
+            fun register(serializer: KSerializer<out Modification<*>>) {
+                map[serializer.descriptor.serialName] = (serializer as KSerializer<out Modification<Inner>>)
+            }
+            register(Modification.Chain.serializer(inner))
+            register(Modification.IfNotNull.serializer(inner))
+            register(Modification.Assign.serializer(inner))
+            register(Modification.CoerceAtMost.serializer(inner))
+            register(Modification.CoerceAtLeast.serializer(inner))
+            register(Modification.Increment.serializer(inner))
+            register(Modification.Multiply.serializer(inner))
+            if (inner == String.serializer()) register(Modification.AppendString.serializer())
+            if (inner.descriptor.kind == StructureKind.LIST) {
+                inner.listElement()?.let { element ->
+                    register(Modification.AppendList.serializer(element))
+                    register(Modification.AppendSet.serializer(element))
+                    register(Modification.Remove.serializer(element))
+                    register(Modification.RemoveInstances.serializer(element))
+                    register(Modification.DropFirst.serializer(element))
+                    register(Modification.DropLast.serializer(element))
+                    register(Modification.PerElement.serializer(element))
+                }
+            }
+            if (inner.descriptor.kind == StructureKind.MAP) {
+                inner.mapValueElement()?.let { element ->
+                    register(Modification.Combine.serializer(element))
+                    register(Modification.ModifyByKey.serializer(element))
+                    register(Modification.RemoveKeys.serializer(element))
+                }
+            }
+            if (inner is GeneratedSerializer<*> && inner.descriptor.kind == StructureKind.CLASS) {
+                val childSerializers = inner.childSerializers()
+                val fields = inner.attemptGrabFields()
+                for (index in 0 until inner.descriptor.elementsCount) {
+                    val name = inner.descriptor.getElementName(index)
+                    val prop = fields[name]!!.property
+                    register(
+                        OnFieldSerializer2<Any, Any?>(
+                            prop as KProperty1<Any, Any?>,
+                            Modification.serializer(childSerializers[index]) as KSerializer<Modification<Any?>>
+                        )
+                    )
+                }
+            }
+            if (inner.descriptor.isNullable) {
+                inner.nullElement()?.let { element ->
+                    register(Modification.IfNotNull.serializer(element))
+                }
+            }
+            map
+        }
     ) {
         when (it) {
             is Modification.Chain -> "Chain"

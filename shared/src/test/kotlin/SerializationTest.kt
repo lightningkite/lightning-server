@@ -53,6 +53,14 @@ class SerializationTest {
         condition<Cursed> { it.insideClass.item eq UUID.randomUUID() }.cycle()
     }
 
+    @Test fun metaTest() {
+        condition<MetaModel> { it.number eq 22 }.cycle()
+        condition<MetaModel> { it.condition eq condition<MetaModel> { it.number eq 22 } }.cycle()
+        modification<MetaModel> { it.number assign 22 }.cycle()
+        modification<MetaModel> { it.condition assign condition<MetaModel> { it.number eq 22 } }.cycle()
+        modification<MetaModel> { it.modification assign modification<MetaModel> { it.number assign 22 } }.cycle()
+    }
+
     @Test fun conditions() {
         val sampleCondition = startChain<LargeTestModel>().int eq 2
         val sampleInstance = LargeTestModel()
