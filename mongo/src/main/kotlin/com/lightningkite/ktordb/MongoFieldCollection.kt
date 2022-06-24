@@ -7,26 +7,31 @@ import com.mongodb.client.result.DeleteResult
 import com.mongodb.client.result.InsertManyResult
 import com.mongodb.client.result.InsertOneResult
 import com.mongodb.client.result.UpdateResult
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.serializer
 import org.bson.BsonDocument
-import org.litote.kmongo.MongoOperator
+import org.bson.Document
+import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
 import org.litote.kmongo.coroutine.aggregate
-import org.litote.kmongo.group
-import org.litote.kmongo.match
 import java.util.concurrent.TimeUnit
+import kotlin.reflect.KProperty1
 import kotlin.reflect.KType
 
 /**
  * MongoFieldCollection implements FieldCollection specifically for a MongoDB server.
  */
-class MongoFieldCollection<Model: Any>(
+class MongoFieldCollection<Model : Any>(
     val serializer: KSerializer<Model>,
     val wraps: CoroutineCollection<Model>
-): FieldCollection<Model> {
+) : FieldCollection<Model> {
 
     override suspend fun find(
         condition: Condition<Model>,
@@ -78,13 +83,13 @@ class MongoFieldCollection<Model: Any>(
         model: Model
     ): Model? {
         val r = wraps.replaceOne(condition.bson(), model)
-        if(r.matchedCount == 0L) return null
+        if (r.matchedCount == 0L) return null
         return model
     }
 
     override suspend fun upsertOne(condition: Condition<Model>, model: Model): Model? {
         val r = wraps.replaceOne(condition.bson(), model, ReplaceOptions().upsert(true))
-        if(r.matchedCount == 0L) return null
+        if (r.matchedCount == 0L) return null
         return model
     }
 
@@ -160,16 +165,22 @@ class MongoFieldCollection<Model: Any>(
 
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
-        groupBy: DataClassProperty<Model, Key>
+        groupBy: KProperty1<Model, Key>
     ): Map<Key, Int> {
-        return wraps.aggregate<BsonDocument>(match(condition.bson()), group("\$" + groupBy.name, Accumulators.sum("count", 1)))
+        return wraps.aggregate<BsonDocument>(
+            match(condition.bson()),
+            group("\$" + groupBy.name, Accumulators.sum("count", 1))
+        )
             .toList()
             .associate {
-                MongoDatabase.bson.load(KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!), it)._id to it.getNumber("count").intValue()
+                MongoDatabase.bson.load(
+                    KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!),
+                    it
+                )._id to it.getNumber("count").intValue()
             }
     }
 
-    private fun Aggregate.asValueBson(propertyName: String) = when(this) {
+    private fun Aggregate.asValueBson(propertyName: String) = when (this) {
         Aggregate.Sum -> Accumulators.sum("value", "\$" + propertyName)
         Aggregate.Average -> Accumulators.avg("value", "\$" + propertyName)
         Aggregate.StandardDeviationPopulation -> Accumulators.stdDevPop("value", "\$" + propertyName)
@@ -179,27 +190,127 @@ class MongoFieldCollection<Model: Any>(
     override suspend fun <N : Number> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        property: DataClassProperty<Model, N>
+        property: KProperty1<Model, N>
     ): Double? {
         return wraps.aggregate<BsonDocument>(match(condition.bson()), group(null, aggregate.asValueBson(property.name)))
             .toList()
             .map {
-                if(it.isNull("value")) null
+                if (it.isNull("value")) null
                 else it.getNumber("value").doubleValue()
             }
             .firstOrNull()
     }
 
-    override suspend fun <N: Number?, Key> groupAggregate(
+    override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        groupBy: DataClassProperty<Model, Key>,
-        property: DataClassProperty<Model, N>
+        groupBy: KProperty1<Model, Key>,
+        property: KProperty1<Model, N>
     ): Map<Key, Double?> {
-        return wraps.aggregate<BsonDocument>(match(condition.bson()), group("\$" + groupBy.name, aggregate.asValueBson(property.name)))
+        return wraps.aggregate<BsonDocument>(
+            match(condition.bson()),
+            group("\$" + groupBy.name, aggregate.asValueBson(property.name))
+        )
             .toList()
             .associate {
-                MongoDatabase.bson.load(KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!), it)._id to (if(it.isNull("value")) null else it.getNumber("value").doubleValue())
+                MongoDatabase.bson.load(
+                    KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!),
+                    it
+                )._id to (if (it.isNull("value")) null else it.getNumber("value").doubleValue())
             }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    suspend fun handleIndexes(scope: CoroutineScope) {
+        val existingIndices = wraps.listIndexes<Document>()
+        val requireCompletion = ArrayList<Job>()
+        fun handleDescriptor(descriptor: SerialDescriptor) {
+            descriptor.annotations.forEach {
+                when (it) {
+                    is UniqueSet -> {
+                        requireCompletion += scope.launch {
+                            wraps.ensureIndex(Sorts.ascending(it.fields.toList()), IndexOptions().unique(true))
+                        }
+                    }
+                    is IndexSet -> {
+                        scope.launch {
+                            wraps.ensureIndex(
+                                Sorts.ascending(it.fields.toList()),
+                                IndexOptions().unique(false).background(true)
+                            )
+                        }
+                    }
+                    is TextIndex -> {
+                        requireCompletion += scope.launch {
+                            wraps.ensureIndex(documentOf(*it.fields.map { it to "text" }.toTypedArray()), IndexOptions().name("${wraps.namespace.fullName}TextIndex"))
+                        }
+                    }
+                    is NamedUniqueSet -> {
+                        requireCompletion += scope.launch {
+                            wraps.ensureIndex(
+                                Sorts.ascending(it.fields.toList()),
+                                IndexOptions().unique(true).name(it.indexName)
+                            )
+                        }
+                    }
+                    is NamedIndexSet -> {
+                        scope.launch {
+                            wraps.ensureIndex(
+                                Sorts.ascending(it.fields.toList()),
+                                IndexOptions().unique(false).name(it.indexName).background(true)
+                            )
+                        }
+                    }
+                    is NamedTextIndex -> {
+                        requireCompletion += scope.launch {
+                            wraps.ensureIndex(documentOf(*it.fields.map { it to "text" }.toTypedArray()))
+                        }
+                    }
+                }
+            }
+            (0 until descriptor.elementsCount).forEach { index ->
+                val sub = descriptor.getElementDescriptor(index)
+                if (sub.kind == StructureKind.CLASS) handleDescriptor(sub)
+                descriptor.getElementAnnotations(index).forEach {
+                    when (it) {
+                        is NamedIndex -> {
+                            scope.launch {
+                                wraps.ensureIndex(
+                                    Sorts.ascending(descriptor.getElementName(index)),
+                                    IndexOptions().unique(false).name(it.indexName.takeUnless { it.isBlank() })
+                                        .background(true)
+                                )
+                            }
+                        }
+                        is Index -> {
+                            scope.launch {
+                                wraps.ensureIndex(
+                                    Sorts.ascending(descriptor.getElementName(index)),
+                                    IndexOptions().unique(false).background(true)
+                                )
+                            }
+                        }
+                        is NamedUnique -> {
+                            requireCompletion += scope.launch {
+                                wraps.ensureIndex(
+                                    Sorts.ascending(descriptor.getElementName(index)),
+                                    IndexOptions().unique(true).name(it.indexName.takeUnless { it.isBlank() })
+                                )
+                            }
+                        }
+                        is Unique -> {
+                            requireCompletion += scope.launch {
+                                wraps.ensureIndex(
+                                    Sorts.ascending(descriptor.getElementName(index)),
+                                    IndexOptions().unique(true)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        handleDescriptor(serializer.descriptor)
+        requireCompletion.forEach { it.join() }
     }
 }

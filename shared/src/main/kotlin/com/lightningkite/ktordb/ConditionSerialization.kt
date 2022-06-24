@@ -48,7 +48,11 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
             register(Condition.LessThan.serializer(inner))
             register(Condition.GreaterThanOrEqual.serializer(inner))
             register(Condition.LessThanOrEqual.serializer(inner))
-            if (inner == String.serializer()) register(Condition.Search.serializer())
+            register(Condition.FullTextSearch.serializer(inner))
+            if (inner == String.serializer()){
+                register(Condition.StringContains.serializer())
+                register(Condition.RegexMatches.serializer())
+            }
             if (inner == Int.serializer()) {
                 register(Condition.IntBitsClear.serializer())
                 register(Condition.IntBitsSet.serializer())
@@ -88,7 +92,8 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
                 }
             }
             map
-        }
+        },
+        alternateReadNames = mapOf("Search" to "StringContains")
     ) {
         when (it) {
             is Condition.Never -> "Never"
@@ -104,7 +109,9 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
             is Condition.LessThan -> "LessThan"
             is Condition.GreaterThanOrEqual -> "GreaterThanOrEqual"
             is Condition.LessThanOrEqual -> "LessThanOrEqual"
-            is Condition.Search -> "Search"
+            is Condition.StringContains -> "StringContains"
+            is Condition.RegexMatches -> "RegexMatches"
+            is Condition.FullTextSearch -> "FullTextSearch"
             is Condition.IntBitsClear -> "IntBitsClear"
             is Condition.IntBitsSet -> "IntBitsSet"
             is Condition.IntBitsAnyClear -> "IntBitsAnyClear"

@@ -5,6 +5,7 @@ package com.lightningkite.ktordb
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
+import kotlinx.serialization.json.JsonNames
 import kotlin.IllegalStateException
 import kotlin.reflect.KClass
 
@@ -12,19 +13,29 @@ public class MySealedClassSerializer<T : Any>(
     serialName: String,
     val baseClass: KClass<T>,
     val getSerializerMap: () -> Map<String, KSerializer<out T>>,
+    val alternateReadNames: Map<String, String> = mapOf(),
     val getName: (T) -> String
 ) : KSerializer<T> {
     private val serializerMap by lazy { getSerializerMap() }
     private val indexToName by lazy { serializerMap.keys.toTypedArray() }
-    private val nameToIndex by lazy { indexToName.withIndex().associate { it.value to it.index } }
+    private val nameToIndex by lazy {
+        val map = HashMap<String, Int>()
+        indexToName.withIndex().forEach { map[it.value] = it.index }
+        alternateReadNames.forEach {
+            map[it.key] = map[it.value]!!
+        }
+        map
+    }
     private val serializers by lazy { indexToName.map { serializerMap[it]!! }.toTypedArray() }
     private fun getIndex(item: T): Int = nameToIndex[getName(item)]
         ?: throw IllegalStateException("No serializer inside ${descriptor.serialName} found for ${getName(item)}; available: ${indexToName.joinToString()}")
 
     override val descriptor: SerialDescriptor = defer(serialName, StructureKind.CLASS) {
         buildClassSerialDescriptor(serialName) {
-            for (s in serializers) {
-                element(s.descriptor.serialName, s.descriptor, isOptional = true)
+            val reversedAlternates = alternateReadNames.entries.groupBy { it.value }.mapValues { it.value.map { it.key } }
+            for ((index, s) in serializers.withIndex()) {
+                element(s.descriptor.serialName, s.descriptor, isOptional = true, annotations = indexToName[index].let { reversedAlternates[it] }
+                    ?.let { listOf(JsonNames(*it.toTypedArray())) } ?: listOf())
             }
         }
     }

@@ -44,7 +44,19 @@ fun Condition<*>.dump(into: Document = Document(), key: String?): Document {
         is Condition.IntBitsSet -> into.sub(key)["\$bitsAnySet"] = mask
         is Condition.Not -> TODO("Condition inversion is not supported yet")
         is Condition.OnKey<*> -> condition.dump(into, if (key == null) this.key else "$key.${this.key}")
-        is Condition.Search -> into["\$text"] = documentOf(
+        is Condition.StringContains -> {
+            into.sub(key).also {
+                it["\$regex"] = Regex.fromLiteral(this.value).pattern
+                it["\$options"] = if(this.ignoreCase) "i" else ""
+            }
+        }
+        is Condition.RegexMatches -> {
+            into.sub(key).also {
+                it["\$regex"] = this.pattern
+                it["\$options"] = if(this.ignoreCase) "i" else ""
+            }
+        }
+        is Condition.FullTextSearch -> into["\$text"] = documentOf(
             "\$search" to value,
             "\$caseSensitive" to !this.ignoreCase
         )
