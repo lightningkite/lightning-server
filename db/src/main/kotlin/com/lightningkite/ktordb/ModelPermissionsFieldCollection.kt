@@ -16,7 +16,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         maxQueryMs: Long
     ): Flow<Model> {
         val sortImposedConditions = orderBy
-            .mapNotNull { permissions.readFields[it.field]?.condition }
+            .mapNotNull { permissions.readFields[it.field.property]?.condition }
             .let { Condition.And(it) }
         return base.find(
             condition = condition and permissions.read and sortImposedConditions,

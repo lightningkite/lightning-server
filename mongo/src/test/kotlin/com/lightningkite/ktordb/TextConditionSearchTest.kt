@@ -19,32 +19,32 @@ class TextConditionSearchTest: MongoTest() {
         collection.insertOne(value2)
 
         var query = "One"
-        var condition = LargeTestModel.chain.string.contains(query, false)
+        var condition = startChain<LargeTestModel>().string.contains(query, false)
         var results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "one"
-        condition = LargeTestModel.chain.string.contains(query, false)
+        condition = startChain<LargeTestModel>().string.contains(query, false)
         results = collection.find(condition).toList()
         assertFalse(results.contains(value1))
 
         query = "one"
-        condition = LargeTestModel.chain.string.contains(query, true)
+        condition = startChain<LargeTestModel>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "four two"
-        condition = LargeTestModel.chain.string.contains(query, true)
+        condition = startChain<LargeTestModel>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "four five"
-        condition = LargeTestModel.chain.string.contains(query, true)
+        condition = startChain<LargeTestModel>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value2)
 
         query = "three five"
-        condition = LargeTestModel.chain.string.contains(query, true)
+        condition = startChain<LargeTestModel>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
         assertContains(results, value2)

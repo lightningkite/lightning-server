@@ -4,19 +4,16 @@ package com.lightningkite.ktordb
 import com.lightningkite.khrysalis.*
 import kotlinx.serialization.Serializable
 import java.util.*
+import kotlin.reflect.KProperty1
 
 @SwiftProtocolExtends("Codable", "Hashable")
 interface HasId<ID : Comparable<ID>> {
     val _id: ID
 }
 
+@Suppress("UNCHECKED_CAST")
 object HasIdFields {
-    fun <T: HasId<ID>, ID: Comparable<ID>> _id() = DataClassProperty<T, ID>(
-        name = "_id",
-        get = { it._id },
-        set = { _, _ -> fatalError() },
-        compare = compareBy { it._id }
-    )
+    fun <T: HasId<ID>, ID: Comparable<ID>> _id() = HasId<ID>::_id as KProperty1<T, ID>
 }
 
 @SwiftProtocolExtends("Codable", "Hashable")
@@ -24,11 +21,7 @@ interface HasEmail {
     val email: String
 }
 
+@Suppress("UNCHECKED_CAST")
 object HasEmailFields {
-    fun <T: HasEmail> email() = DataClassProperty<T, String>(
-        name = "email",
-        get = { it.email },
-        set = { _, _ -> fatalError() },
-        compare = compareBy { it.email }
-    )
+    fun <T: HasEmail> email() = HasEmail::email as KProperty1<T, String>
 }

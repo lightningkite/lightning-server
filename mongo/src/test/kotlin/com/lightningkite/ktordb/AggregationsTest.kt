@@ -24,28 +24,28 @@ class AggregationsTest: MongoTest() {
         ))
         for(type in Aggregate.values()) {
             val control = c.all().toList().asSequence().map { it.int.toDouble() }.aggregate(type)
-            val test: Double? = c.aggregate(type, property = LargeTestModelFields.int)
+            val test: Double? = c.aggregate(type, property = LargeTestModel::int)
             if(control == null || test == null) fail()
             assertEquals(control, test, 0.0000001)
         }
         for(type in Aggregate.values()) {
             val control = c.all().toList().asSequence().map { it.byte to it.int.toDouble() }.aggregate(type)
-            val test: Map<Byte, Double?> = c.groupAggregate(type, property = LargeTestModelFields.int, groupBy = LargeTestModelFields.byte)
+            val test: Map<Byte, Double?> = c.groupAggregate(type, property = LargeTestModel::int, groupBy = LargeTestModel::byte)
             assertEquals(control, test)
         }
         for(type in Aggregate.values()) {
             val control = c.all().toList().asSequence().map { it.int.toDouble() }.filter { false }.aggregate(type)
-            val test: Double? = c.aggregate(type, property = LargeTestModelFields.int, condition = Condition.Never())
+            val test: Double? = c.aggregate(type, property = LargeTestModel::int, condition = Condition.Never())
             assertEquals(control, test)
         }
         for(type in Aggregate.values()) {
             val control = c.all().toList().asSequence().map { it.byte to it.int.toDouble() }.filter { false }.aggregate(type)
-            val test: Map<Byte, Double?> = c.groupAggregate(type, property = LargeTestModelFields.int, groupBy = LargeTestModelFields.byte, condition = Condition.Never())
+            val test: Map<Byte, Double?> = c.groupAggregate(type, property = LargeTestModel::int, groupBy = LargeTestModel::byte, condition = Condition.Never())
             assertEquals(control, test)
         }
         run {
             val control = c.all().toList().asSequence().groupingBy { it.byte }.eachCount()
-            val test: Map<Byte, Int> = c.groupCount(groupBy = LargeTestModelFields.byte)
+            val test: Map<Byte, Int> = c.groupCount(groupBy = LargeTestModel::byte)
             assertEquals(control, test)
         }
         run {

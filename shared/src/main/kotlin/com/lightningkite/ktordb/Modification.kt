@@ -4,6 +4,7 @@ package com.lightningkite.ktordb
 
 import com.lightningkite.khrysalis.*
 import kotlinx.serialization.*
+import kotlin.reflect.KProperty1
 
 @Serializable(ModificationSerializer::class)
 // Why is this class open instead of sealed?  See https://github.com/Kotlin/kotlinx.serialization/issues/1843
@@ -57,6 +58,7 @@ open class Modification<T: IsCodableAndHashable> protected constructor()  {
     @Serializable(ModificationMultiplySerializer::class)
     data class Multiply<T: Number>(val by: T): Modification<T>() {
         override fun invoke(on: T): T = on * by
+        @Suppress("UNCHECKED_CAST")
         override fun invokeDefault(): T = when(by) {
             is Byte -> 0.toByte() as T
             is Short -> 0.toShort() as T
@@ -141,8 +143,8 @@ open class Modification<T: IsCodableAndHashable> protected constructor()  {
         override fun invokeDefault(): Map<String, T> = mapOf()
     }
 
-    data class OnField<K: IsCodableAndHashable, V: IsCodableAndHashable>(val key: DataClassProperty<K, V>, val modification: Modification<V>): Modification<K>() {
-        override fun invoke(on: K): K = key.set(on, modification(key.get(on)))
+    data class OnField<K: IsCodableAndHashable, V: IsCodableAndHashable>(val key: KProperty1<K, V>, val modification: Modification<V>): Modification<K>() {
+        override fun invoke(on: K): K = key.setCopy(on, modification(key.get(on)))
         override fun invokeDefault(): K {
             fatalError("Cannot mutate a field that doesn't exist")
         }

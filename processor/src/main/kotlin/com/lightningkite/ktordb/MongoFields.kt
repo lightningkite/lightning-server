@@ -80,104 +80,26 @@ data class MongoFields(
             ?.forEach { appendLine("import $it") }
         appendLine()
         if(declaration.typeParameters.isEmpty()) {
-            appendLine("object ${simpleName}Fields {")
+            appendLine("fun prepare${simpleName}Fields() {")
             tab {
                 for (field in fields) {
-                    append("val ")
-                    append(field.name)
-                    append(" = DataClassProperty<")
-                    append(typeReference)
-                    append(", ")
-                    append(field.kotlinType.toKotlin())
-                    append(">(\"")
-                    append(field.name)
-                    append("\", {it.")
-                    append(field.name)
-                    append("}, {it, v -> it.copy(")
-                    append(field.name)
-                    append(" = v)}")
-                    if(comparable.asStarProjectedType().isAssignableFrom(field.kotlinType.resolve())) {
-                        appendLine(", compareBy { it.${field.name} })")
-                    } else {
-                        appendLine(")")
-                    }
+                    appendLine("$classReference::${field.name}.setCopyImplementation { original, value -> original.copy(${field.name} = value) }")
                 }
-                appendLine("init {")
-                tab {
-                    appendLine("val serializer = $classReference.serializer() as GeneratedSerializer<$typeReference>")
-                    appendLine("serializer.fields = mapOf(${fields.joinToString { """"${it.name}" to ${it.name} """ }})")
-                    if(fields.any {
-                            val t = it.kotlinType.resolve()
-                            t.arguments.isNotEmpty() && (t.declaration as? KSClassDeclaration)?.usesSub == true
-                    }) {
-                        appendLine("val subtypes = serializer.childSerializers()")
-                        fields.forEachIndexed { index, field ->
-                            val t = field.kotlinType.resolve()
-                            if (t.arguments.isNotEmpty() && (t.declaration as? KSClassDeclaration)?.usesSub == true) {
-                                appendLine("subtypes[$index].fields = ${t.declaration.simpleName.asString()}Fields.get<${t.arguments.joinToString { it.type!!.toKotlin() }}>().fields")
-                            }
-                        }
-                    }
-                }
-                appendLine("}")
             }
             appendLine("}")
-            appendLine()
             for (field in fields) {
-                appendLine("val <K> PropChain<K, $typeReference>.${field.name}: PropChain<K, ${field.kotlinType.toKotlin()}> get() = this[${simpleName}Fields.${field.name}]")
+                appendLine("val <K> PropChain<K, $typeReference>.${field.name}: PropChain<K, ${field.kotlinType.toKotlin()}> get() = this[${classReference}::${field.name}]")
             }
-            appendLine("val ${classReference}.Companion.chain: PropChain<$typeReference, $typeReference> get() = startChain()")
         } else {
-            append("class ${simpleName}Fields")
-            append(declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() })
-            appendLine("(")
+            appendLine("fun prepare${simpleName}Fields() {")
             tab {
                 for (field in fields) {
-                    append("val ")
-                    append(field.name)
-                    append(": DataClassProperty<")
-                    append(typeReference)
-                    append(", ")
-                    append(field.kotlinType.toKotlin())
-                    appendLine(">,")
+                    appendLine("$classReference<${declaration.typeParameters.joinToString(", ") { it.bounds.firstOrNull()?.toKotlin() ?: "Any?" }}>::${field.name}.setCopyImplementation { original, value -> original.copy(${field.name} = value) }")
                 }
-            }
-            appendLine(") {")
-            tab {
-                appendLine("val fields get(): Map<String, PartialDataClassProperty<$typeReference>> = mapOf(${fields.joinToString { """"${it.name}" to ${it.name} """ }})")
-                appendLine("companion object {")
-                tab {
-                    appendLine("val known = HashMap<List<KType>, ${simpleName}Fields${declaration.typeParameters.joinToString(", ", "<", ">") { "*" }}>()")
-                    appendLine("@Suppress(\"UNCHECKED_CAST\")")
-                    appendLine("inline fun ${declaration.typeParameters.joinToString(", ", "<", ">") { "reified " + it.name.asString() }} get(): ${simpleName}Fields${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }} = known.getOrPut(listOf(${declaration.typeParameters.joinToString(", ") { "typeOf<T>()" }})) {")
-                    tab {
-                        appendLine("val result = ${simpleName}Fields${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}(")
-                        for (field in fields) {
-                            append(field.name)
-                            append(" = DataClassProperty(\"")
-                            append(field.name)
-                            append("\", {it.")
-                            append(field.name)
-                            append("}, {it, v -> it.copy(")
-                            append(field.name)
-                            append(" = v)}")
-                            if(comparable.asStarProjectedType().isAssignableFrom(field.kotlinType.resolve())) {
-                                appendLine(", compareBy { it.${field.name} }),")
-                            } else {
-                                appendLine("),")
-                            }
-                        }
-                        appendLine(")")
-                        appendLine("result")
-                    }
-                    appendLine("} as ${simpleName}Fields${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}")
-                }
-                appendLine("}")
             }
             appendLine("}")
-
             for (field in fields) {
-                appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { "reified " + it.name.asString() }}> PropChain<ROOT, $typeReference>.${field.name}: PropChain<ROOT, ${field.kotlinType.toKotlin()}> get() = this[${simpleName}Fields.get${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}().${field.name}]")
+                appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { "reified " + it.name.asString() }}> PropChain<ROOT, $typeReference>.${field.name}: PropChain<ROOT, ${field.kotlinType.toKotlin()}> get() = this[${classReference}${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}::${field.name}]")
             }
         }
     }

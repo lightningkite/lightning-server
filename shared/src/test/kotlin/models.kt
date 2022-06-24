@@ -126,3 +126,12 @@ data class Cursed(
     @Serializable
     data class Inside<T>(val item: T)
 }
+
+@DatabaseModel
+@Serializable
+data class MetaModel(
+    override val _id: UUID = UUID.randomUUID(),
+    val number: Int = 22,
+    val condition: Condition<MetaModel> = Condition.Always(),
+    val modification: Modification<MetaModel> = Modification.Chain(listOf())
+): HasId<UUID>

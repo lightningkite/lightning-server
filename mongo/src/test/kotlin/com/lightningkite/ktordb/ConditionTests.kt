@@ -20,7 +20,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.boolean eq true
+        val condition = startChain<LargeTestModel>().boolean eq true
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -35,7 +35,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.boolean ne true
+        val condition = startChain<LargeTestModel>().boolean ne true
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -50,7 +50,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.booleanNullable.notNull eq true
+        val condition = startChain<LargeTestModel>().booleanNullable.notNull eq true
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -65,7 +65,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.booleanNullable eq null
+        val condition = startChain<LargeTestModel>().booleanNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -79,7 +79,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.list eq listOf(7, 8, 9)
+        val condition = startChain<LargeTestModel>().list eq listOf(7, 8, 9)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -94,7 +94,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.list ne listOf(7, 8, 9)
+        val condition = startChain<LargeTestModel>().list ne listOf(7, 8, 9)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -109,7 +109,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.listNullable.notNull eq listOf(7, 8, 9)
+        val condition = startChain<LargeTestModel>().listNullable.notNull eq listOf(7, 8, 9)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -124,7 +124,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.listNullable eq null
+        val condition = startChain<LargeTestModel>().listNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -138,7 +138,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.map eq mapOf("c" to 3)
+        val condition = startChain<LargeTestModel>().map eq mapOf("c" to 3)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -153,7 +153,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.map ne mapOf("c" to 3)
+        val condition = startChain<LargeTestModel>().map ne mapOf("c" to 3)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -168,7 +168,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.mapNullable.notNull eq mapOf("c" to 3)
+        val condition = startChain<LargeTestModel>().mapNullable.notNull eq mapOf("c" to 3)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -183,7 +183,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.mapNullable eq null
+        val condition = startChain<LargeTestModel>().mapNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -197,7 +197,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.byte eq 3.toByte()
+        val condition = startChain<LargeTestModel>().byte eq 3.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -212,7 +212,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.byte ne 3.toByte()
+        val condition = startChain<LargeTestModel>().byte ne 3.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -227,7 +227,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.byteNullable.notNull eq 3.toByte()
+        val condition = startChain<LargeTestModel>().byteNullable.notNull eq 3.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -242,7 +242,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.byteNullable eq null
+        val condition = startChain<LargeTestModel>().byteNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -256,7 +256,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.short eq 3.toShort()
+        val condition = startChain<LargeTestModel>().short eq 3.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -271,7 +271,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.short ne 3.toShort()
+        val condition = startChain<LargeTestModel>().short ne 3.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -286,7 +286,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.shortNullable.notNull eq 3.toShort()
+        val condition = startChain<LargeTestModel>().shortNullable.notNull eq 3.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -301,7 +301,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.shortNullable eq null
+        val condition = startChain<LargeTestModel>().shortNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -315,7 +315,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.int eq 3
+        val condition = startChain<LargeTestModel>().int eq 3
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -330,7 +330,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.int ne 3
+        val condition = startChain<LargeTestModel>().int ne 3
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -345,7 +345,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.intNullable.notNull eq 3
+        val condition = startChain<LargeTestModel>().intNullable.notNull eq 3
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -360,7 +360,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.intNullable eq null
+        val condition = startChain<LargeTestModel>().intNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -374,7 +374,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.long eq 3L
+        val condition = startChain<LargeTestModel>().long eq 3L
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -389,7 +389,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.long ne 3L
+        val condition = startChain<LargeTestModel>().long ne 3L
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -404,7 +404,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.longNullable.notNull eq 3L
+        val condition = startChain<LargeTestModel>().longNullable.notNull eq 3L
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -419,7 +419,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.longNullable eq null
+        val condition = startChain<LargeTestModel>().longNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -433,7 +433,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.float eq 3f
+        val condition = startChain<LargeTestModel>().float eq 3f
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -448,7 +448,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.float ne 3f
+        val condition = startChain<LargeTestModel>().float ne 3f
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -463,7 +463,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.floatNullable.notNull eq 3f
+        val condition = startChain<LargeTestModel>().floatNullable.notNull eq 3f
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -478,7 +478,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.floatNullable eq null
+        val condition = startChain<LargeTestModel>().floatNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -492,7 +492,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.double eq 3.0
+        val condition = startChain<LargeTestModel>().double eq 3.0
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -507,7 +507,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.double ne 3.0
+        val condition = startChain<LargeTestModel>().double ne 3.0
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -522,7 +522,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.doubleNullable.notNull eq 3.0
+        val condition = startChain<LargeTestModel>().doubleNullable.notNull eq 3.0
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -537,7 +537,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.doubleNullable eq null
+        val condition = startChain<LargeTestModel>().doubleNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -551,7 +551,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.string eq "aca"
+        val condition = startChain<LargeTestModel>().string eq "aca"
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -566,7 +566,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.string ne "aca"
+        val condition = startChain<LargeTestModel>().string ne "aca"
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -581,7 +581,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.stringNullable.notNull eq "aca"
+        val condition = startChain<LargeTestModel>().stringNullable.notNull eq "aca"
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -596,7 +596,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.stringNullable eq null
+        val condition = startChain<LargeTestModel>().stringNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -610,7 +610,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.instant eq Instant.ofEpochMilli(15000L)
+        val condition = startChain<LargeTestModel>().instant eq Instant.ofEpochMilli(15000L)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -625,7 +625,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.instant ne Instant.ofEpochMilli(15000L)
+        val condition = startChain<LargeTestModel>().instant ne Instant.ofEpochMilli(15000L)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -640,7 +640,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.instantNullable.notNull eq Instant.ofEpochMilli(15000L)
+        val condition = startChain<LargeTestModel>().instantNullable.notNull eq Instant.ofEpochMilli(15000L)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -655,7 +655,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.instantNullable eq null
+        val condition = startChain<LargeTestModel>().instantNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -669,7 +669,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.boolean inside listOf<Boolean>(true)
+        val condition = startChain<LargeTestModel>().boolean inside listOf<Boolean>(true)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -684,7 +684,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.booleanNullable.notNull inside listOf<Boolean>(true)
+        val condition = startChain<LargeTestModel>().booleanNullable.notNull inside listOf<Boolean>(true)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -699,7 +699,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.boolean notIn listOf<Boolean>(true)
+        val condition = startChain<LargeTestModel>().boolean notIn listOf<Boolean>(true)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -713,7 +713,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.byte inside listOf<Byte>(3.toByte())
+        val condition = startChain<LargeTestModel>().byte inside listOf<Byte>(3.toByte())
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -728,7 +728,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.byteNullable.notNull inside listOf<Byte>(3.toByte())
+        val condition = startChain<LargeTestModel>().byteNullable.notNull inside listOf<Byte>(3.toByte())
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -743,7 +743,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.byte notIn listOf<Byte>(3.toByte())
+        val condition = startChain<LargeTestModel>().byte notIn listOf<Byte>(3.toByte())
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -757,7 +757,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.short inside listOf<Short>(3.toShort())
+        val condition = startChain<LargeTestModel>().short inside listOf<Short>(3.toShort())
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -772,7 +772,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.shortNullable.notNull inside listOf<Short>(3.toShort())
+        val condition = startChain<LargeTestModel>().shortNullable.notNull inside listOf<Short>(3.toShort())
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -787,7 +787,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.short notIn listOf<Short>(3.toShort())
+        val condition = startChain<LargeTestModel>().short notIn listOf<Short>(3.toShort())
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -801,7 +801,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.int inside listOf<Int>(3)
+        val condition = startChain<LargeTestModel>().int inside listOf<Int>(3)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -816,7 +816,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.intNullable.notNull inside listOf<Int>(3)
+        val condition = startChain<LargeTestModel>().intNullable.notNull inside listOf<Int>(3)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -831,7 +831,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.int notIn listOf<Int>(3)
+        val condition = startChain<LargeTestModel>().int notIn listOf<Int>(3)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -845,7 +845,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.long inside listOf<Long>(3L)
+        val condition = startChain<LargeTestModel>().long inside listOf<Long>(3L)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -860,7 +860,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.longNullable.notNull inside listOf<Long>(3L)
+        val condition = startChain<LargeTestModel>().longNullable.notNull inside listOf<Long>(3L)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -875,7 +875,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.long notIn listOf<Long>(3L)
+        val condition = startChain<LargeTestModel>().long notIn listOf<Long>(3L)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -889,7 +889,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.float inside listOf<Float>(3f)
+        val condition = startChain<LargeTestModel>().float inside listOf<Float>(3f)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -904,7 +904,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.floatNullable.notNull inside listOf<Float>(3f)
+        val condition = startChain<LargeTestModel>().floatNullable.notNull inside listOf<Float>(3f)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -919,7 +919,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.float notIn listOf<Float>(3f)
+        val condition = startChain<LargeTestModel>().float notIn listOf<Float>(3f)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -933,7 +933,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.double inside listOf<Double>(3.0)
+        val condition = startChain<LargeTestModel>().double inside listOf<Double>(3.0)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -948,7 +948,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.doubleNullable.notNull inside listOf<Double>(3.0)
+        val condition = startChain<LargeTestModel>().doubleNullable.notNull inside listOf<Double>(3.0)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -963,7 +963,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.double notIn listOf<Double>(3.0)
+        val condition = startChain<LargeTestModel>().double notIn listOf<Double>(3.0)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -977,7 +977,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.string inside listOf<String>("aca")
+        val condition = startChain<LargeTestModel>().string inside listOf<String>("aca")
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -992,7 +992,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.stringNullable.notNull inside listOf<String>("aca")
+        val condition = startChain<LargeTestModel>().stringNullable.notNull inside listOf<String>("aca")
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -1007,7 +1007,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.string notIn listOf<String>("aca")
+        val condition = startChain<LargeTestModel>().string notIn listOf<String>("aca")
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1021,7 +1021,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.instant inside listOf<Instant>(Instant.ofEpochMilli(15000L))
+        val condition = startChain<LargeTestModel>().instant inside listOf<Instant>(Instant.ofEpochMilli(15000L))
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1036,7 +1036,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.instantNullable.notNull inside listOf<Instant>(Instant.ofEpochMilli(15000L))
+        val condition = startChain<LargeTestModel>().instantNullable.notNull inside listOf<Instant>(Instant.ofEpochMilli(15000L))
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -1051,7 +1051,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = LargeTestModel.chain.instant notIn listOf<Instant>(Instant.ofEpochMilli(15000L))
+        val condition = startChain<LargeTestModel>().instant notIn listOf<Instant>(Instant.ofEpochMilli(15000L))
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1067,7 +1067,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.byte gt 2.toByte()
+        val condition = startChain<LargeTestModel>().byte gt 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1085,7 +1085,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.byte lt 2.toByte()
+        val condition = startChain<LargeTestModel>().byte lt 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1103,7 +1103,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.byte gte 2.toByte()
+        val condition = startChain<LargeTestModel>().byte gte 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1121,7 +1121,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.byte lte 2.toByte()
+        val condition = startChain<LargeTestModel>().byte lte 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1141,7 +1141,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.byteNullable.notNull gt 2.toByte()
+        val condition = startChain<LargeTestModel>().byteNullable.notNull gt 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1162,7 +1162,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.byteNullable.notNull lt 2.toByte()
+        val condition = startChain<LargeTestModel>().byteNullable.notNull lt 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1183,7 +1183,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.byteNullable.notNull gte 2.toByte()
+        val condition = startChain<LargeTestModel>().byteNullable.notNull gte 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1204,7 +1204,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.byteNullable.notNull lte 2.toByte()
+        val condition = startChain<LargeTestModel>().byteNullable.notNull lte 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1222,7 +1222,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.short gt 2.toShort()
+        val condition = startChain<LargeTestModel>().short gt 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1240,7 +1240,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.short lt 2.toShort()
+        val condition = startChain<LargeTestModel>().short lt 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1258,7 +1258,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.short gte 2.toShort()
+        val condition = startChain<LargeTestModel>().short gte 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1276,7 +1276,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.short lte 2.toShort()
+        val condition = startChain<LargeTestModel>().short lte 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1296,7 +1296,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.shortNullable.notNull gt 2.toShort()
+        val condition = startChain<LargeTestModel>().shortNullable.notNull gt 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1317,7 +1317,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.shortNullable.notNull lt 2.toShort()
+        val condition = startChain<LargeTestModel>().shortNullable.notNull lt 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1338,7 +1338,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.shortNullable.notNull gte 2.toShort()
+        val condition = startChain<LargeTestModel>().shortNullable.notNull gte 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1359,7 +1359,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.shortNullable.notNull lte 2.toShort()
+        val condition = startChain<LargeTestModel>().shortNullable.notNull lte 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1377,7 +1377,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.int gt 2
+        val condition = startChain<LargeTestModel>().int gt 2
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1395,7 +1395,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.int lt 2
+        val condition = startChain<LargeTestModel>().int lt 2
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1413,7 +1413,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.int gte 2
+        val condition = startChain<LargeTestModel>().int gte 2
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1431,7 +1431,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.int lte 2
+        val condition = startChain<LargeTestModel>().int lte 2
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1451,7 +1451,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.intNullable.notNull gt 2
+        val condition = startChain<LargeTestModel>().intNullable.notNull gt 2
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1472,7 +1472,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.intNullable.notNull lt 2
+        val condition = startChain<LargeTestModel>().intNullable.notNull lt 2
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1493,7 +1493,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.intNullable.notNull gte 2
+        val condition = startChain<LargeTestModel>().intNullable.notNull gte 2
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1514,7 +1514,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.intNullable.notNull lte 2
+        val condition = startChain<LargeTestModel>().intNullable.notNull lte 2
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1532,7 +1532,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.long gt 2L
+        val condition = startChain<LargeTestModel>().long gt 2L
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1550,7 +1550,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.long lt 2L
+        val condition = startChain<LargeTestModel>().long lt 2L
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1568,7 +1568,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.long gte 2L
+        val condition = startChain<LargeTestModel>().long gte 2L
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1586,7 +1586,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.long lte 2L
+        val condition = startChain<LargeTestModel>().long lte 2L
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1606,7 +1606,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.longNullable.notNull gt 2L
+        val condition = startChain<LargeTestModel>().longNullable.notNull gt 2L
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1627,7 +1627,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.longNullable.notNull lt 2L
+        val condition = startChain<LargeTestModel>().longNullable.notNull lt 2L
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1648,7 +1648,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.longNullable.notNull gte 2L
+        val condition = startChain<LargeTestModel>().longNullable.notNull gte 2L
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1669,7 +1669,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.longNullable.notNull lte 2L
+        val condition = startChain<LargeTestModel>().longNullable.notNull lte 2L
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1687,7 +1687,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.float gt 2f
+        val condition = startChain<LargeTestModel>().float gt 2f
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1705,7 +1705,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.float lt 2f
+        val condition = startChain<LargeTestModel>().float lt 2f
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1723,7 +1723,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.float gte 2f
+        val condition = startChain<LargeTestModel>().float gte 2f
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1741,7 +1741,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.float lte 2f
+        val condition = startChain<LargeTestModel>().float lte 2f
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1761,7 +1761,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.floatNullable.notNull gt 2f
+        val condition = startChain<LargeTestModel>().floatNullable.notNull gt 2f
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1782,7 +1782,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.floatNullable.notNull lt 2f
+        val condition = startChain<LargeTestModel>().floatNullable.notNull lt 2f
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1803,7 +1803,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.floatNullable.notNull gte 2f
+        val condition = startChain<LargeTestModel>().floatNullable.notNull gte 2f
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1824,7 +1824,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.floatNullable.notNull lte 2f
+        val condition = startChain<LargeTestModel>().floatNullable.notNull lte 2f
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1842,7 +1842,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.double gt 2.0
+        val condition = startChain<LargeTestModel>().double gt 2.0
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1860,7 +1860,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.double lt 2.0
+        val condition = startChain<LargeTestModel>().double lt 2.0
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1878,7 +1878,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.double gte 2.0
+        val condition = startChain<LargeTestModel>().double gte 2.0
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1896,7 +1896,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.double lte 2.0
+        val condition = startChain<LargeTestModel>().double lte 2.0
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1916,7 +1916,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.doubleNullable.notNull gt 2.0
+        val condition = startChain<LargeTestModel>().doubleNullable.notNull gt 2.0
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1937,7 +1937,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.doubleNullable.notNull lt 2.0
+        val condition = startChain<LargeTestModel>().doubleNullable.notNull lt 2.0
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1958,7 +1958,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.doubleNullable.notNull gte 2.0
+        val condition = startChain<LargeTestModel>().doubleNullable.notNull gte 2.0
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1979,7 +1979,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.doubleNullable.notNull lte 2.0
+        val condition = startChain<LargeTestModel>().doubleNullable.notNull lte 2.0
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1997,7 +1997,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.string gt "aba"
+        val condition = startChain<LargeTestModel>().string gt "aba"
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -2015,7 +2015,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.string lt "aba"
+        val condition = startChain<LargeTestModel>().string lt "aba"
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -2033,7 +2033,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.string gte "aba"
+        val condition = startChain<LargeTestModel>().string gte "aba"
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -2051,7 +2051,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.string lte "aba"
+        val condition = startChain<LargeTestModel>().string lte "aba"
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -2071,7 +2071,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.stringNullable.notNull gt "aba"
+        val condition = startChain<LargeTestModel>().stringNullable.notNull gt "aba"
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -2092,7 +2092,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.stringNullable.notNull lt "aba"
+        val condition = startChain<LargeTestModel>().stringNullable.notNull lt "aba"
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -2113,7 +2113,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.stringNullable.notNull gte "aba"
+        val condition = startChain<LargeTestModel>().stringNullable.notNull gte "aba"
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -2134,7 +2134,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.stringNullable.notNull lte "aba"
+        val condition = startChain<LargeTestModel>().stringNullable.notNull lte "aba"
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -2152,7 +2152,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.instant gt Instant.ofEpochMilli(10000L)
+        val condition = startChain<LargeTestModel>().instant gt Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -2170,7 +2170,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.instant lt Instant.ofEpochMilli(10000L)
+        val condition = startChain<LargeTestModel>().instant lt Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -2188,7 +2188,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.instant gte Instant.ofEpochMilli(10000L)
+        val condition = startChain<LargeTestModel>().instant gte Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -2206,7 +2206,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = LargeTestModel.chain.instant lte Instant.ofEpochMilli(10000L)
+        val condition = startChain<LargeTestModel>().instant lte Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -2226,7 +2226,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.instantNullable.notNull gt Instant.ofEpochMilli(10000L)
+        val condition = startChain<LargeTestModel>().instantNullable.notNull gt Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -2247,7 +2247,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.instantNullable.notNull lt Instant.ofEpochMilli(10000L)
+        val condition = startChain<LargeTestModel>().instantNullable.notNull lt Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -2268,7 +2268,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.instantNullable.notNull gte Instant.ofEpochMilli(10000L)
+        val condition = startChain<LargeTestModel>().instantNullable.notNull gte Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -2289,7 +2289,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = LargeTestModel.chain.instantNullable.notNull lte Instant.ofEpochMilli(10000L)
+        val condition = startChain<LargeTestModel>().instantNullable.notNull lte Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -2308,7 +2308,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(matching, default)
         collection.insertOne(matching)
         collection.insertOne(default)
-        val condition = LargeTestModel.chain.embedded.value1 eq "asdf"
+        val condition = startChain<LargeTestModel>().embedded.value1 eq "asdf"
         val results = collection.find(condition).toList()
         assertContains(results, matching)
         assertTrue(default !in results)
@@ -2325,7 +2325,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(allOut)
-        val condition = LargeTestModel.chain.list.all { it lt 4 }
+        val condition = startChain<LargeTestModel>().list.all { it lt 4 }
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(allOut !in results)
@@ -2342,7 +2342,7 @@ class ConditionTests : MongoTest() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(allOut)
-        val condition = LargeTestModel.chain.list.any { it lt 4 }
+        val condition = startChain<LargeTestModel>().list.any { it lt 4 }
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertContains(results, higher)
@@ -2355,12 +2355,12 @@ class ConditionTests : MongoTest() {
         val item1 = LargeTestModel(listEmbedded = listOf(ClassUsedForEmbedding(value2 = 1), ClassUsedForEmbedding(value1 = "Other String", value2 = 3)))
         val item2 = LargeTestModel(listEmbedded = listOf(ClassUsedForEmbedding(value2 = 2), ClassUsedForEmbedding(value1 = "five", value2 = 3)))
         collection.insertMany(listOf(item1, item2))
-        var condition = LargeTestModel.chain.listEmbedded.any { it.value1 eq "five" }
+        var condition = startChain<LargeTestModel>().listEmbedded.any { it.value1 eq "five" }
         var results = collection.find(condition).toList()
         assertEquals(1, results.size)
         assertEquals(item2, results.first())
 
-        condition = LargeTestModel.chain.listEmbedded.any { it.value2 lt 2 }
+        condition = startChain<LargeTestModel>().listEmbedded.any { it.value2 lt 2 }
         results = collection.find(condition).toList()
         assertEquals(1, results.size)
         assertEquals(item1, results.first())
@@ -2373,7 +2373,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(matchingSize, notMatchingSize)
         collection.insertOne(matchingSize)
         collection.insertOne(notMatchingSize)
-        val condition = LargeTestModel.chain.list.sizesEquals(3)
+        val condition = startChain<LargeTestModel>().list.sizesEquals(3)
         val results = collection.find(condition).toList()
         assertContains(results, matchingSize)
         assertTrue(notMatchingSize !in results)
@@ -2388,7 +2388,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(matching, notMatching)
         collection.insertOne(matching)
         collection.insertOne(notMatching)
-        val condition = LargeTestModel.chain.map.containsKey("a")
+        val condition = startChain<LargeTestModel>().map.containsKey("a")
         println(condition.bson().json)
         val results = collection.find(condition).toList()
         println(results.joinToString("\n"))
@@ -2404,7 +2404,7 @@ class ConditionTests : MongoTest() {
         val manualList = listOf(matching, notMatching)
         collection.insertOne(matching)
         collection.insertOne(notMatching)
-        val condition = LargeTestModel.chain.map["a"] gt 32
+        val condition = startChain<LargeTestModel>().map["a"] gt 32
         val results = collection.find(condition).toList()
         assertContains(results, matching)
         assertTrue(notMatching !in results)
@@ -2420,12 +2420,12 @@ class ConditionTests : MongoTest() {
         val nullItem = LargeTestModel(stringNullable = null)
         collection.insertMany(listOf(notNullItem, nullItem))
 
-        var condition = LargeTestModel.chain.stringNullable ne null
+        var condition = startChain<LargeTestModel>().stringNullable ne null
         var result = collection.find(condition).toList()
         assertEquals(1, result.size)
         assertEquals(notNullItem, result.first())
 
-        condition = LargeTestModel.chain.stringNullable eq null
+        condition = startChain<LargeTestModel>().stringNullable eq null
         result = collection.find(condition).toList()
         assertEquals(1, result.size)
         assertEquals(nullItem, result.first())

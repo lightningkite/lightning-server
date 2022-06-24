@@ -19,7 +19,7 @@ class SecurityTests : MongoTest() {
         val myPosts = Post.mongo.forUser(user1)
         val dansPosts = Post.mongo.forUser(otherUser)
         GlobalScope.launch {
-            myPosts.watch(Post.chain.let { Post.chain.author eq user1._id }).collect {
+            myPosts.watch(startChain<Post>().let { startChain<Post>().author eq user1._id }).collect {
             }
         }
         delay(1000L)
@@ -27,8 +27,8 @@ class SecurityTests : MongoTest() {
         dansPosts.insertOne(Post(author = otherUser._id, content = "OtherUser post"))
         myPosts.insertOne(Post(author = user1._id, content = "Another User1 Post"))
         myPosts.updateMany(
-            Post.chain.content eq "User1 post",
-            Post.chain.content assign "User1 post updated"
+            startChain<Post>().content eq "User1 post",
+            startChain<Post>().content assign "User1 post updated"
         )
         delay(1000L)
     }

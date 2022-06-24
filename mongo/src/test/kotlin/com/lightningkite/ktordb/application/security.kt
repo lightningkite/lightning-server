@@ -5,7 +5,7 @@ import java.util.*
 
 fun User.Companion.openPermissions(forUser: User): ModelPermissions<User> {
     val noOne = Condition.Never<User>()
-    val me = User.chain._id eq forUser._id
+    val me = startChain<User>()._id eq forUser._id
     val anyone = Condition.Always<User>()
     return ModelPermissions<User>(
         create = anyone,
@@ -17,7 +17,7 @@ fun User.Companion.openPermissions(forUser: User): ModelPermissions<User> {
 
 fun User.Companion.selfWithoutCreate(forUser: User): ModelPermissions<User> {
     val noOne = Condition.Never<User>()
-    val me = User.chain._id eq forUser._id
+    val me = startChain<User>()._id eq forUser._id
     val anyone = Condition.Always<User>()
     return ModelPermissions<User>(
         create = noOne,
@@ -35,13 +35,13 @@ fun Post.Companion.permissions(forUser: User): ModelPermissions<Post> {
         create = anyone,
         read = anyone,
         readFields = listOf(
-            ModelPermissions.Read(PostFields.at, noOne, 0L),
-            ModelPermissions.Read(PostFields.author, noOne, UUID.randomUUID()),
+            ModelPermissions.Read(Post::at, noOne, 0L),
+            ModelPermissions.Read(Post::author, noOne, UUID.randomUUID()),
         ).associateBy { it.property },
         update = author,
         updateFields = listOf(
-            ModelPermissions.Update(PostFields.at, noOne),
-            ModelPermissions.Update(PostFields.author, noOne),
+            ModelPermissions.Update(Post::at, noOne),
+            ModelPermissions.Update(Post::author, noOne),
         ).associateBy { it.property },
         delete = noOne
     )

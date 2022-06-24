@@ -10,23 +10,23 @@ class ReferenceFieldTests {
 
 //    @Test
 //    fun testReferenceFields() {
-//        val condition = LargeTestModel.chain.list eq listOf()
-//        assertTrue(condition.referencesField(LargeTestModel.fields.list))
-//        assertFalse(condition.referencesField(LargeTestModel.fields.int))
+//        val condition = startChain<LargeTestModel>().list eq listOf()
+//        assertTrue(condition.referencesField(LargeTestModel.::list))
+//        assertFalse(condition.referencesField(LargeTestModel.::int))
 //
-//        val modification = LargeTestModel.chain.list assign listOf()
-//        assertTrue(modification.referencesField(LargeTestModel.fields.list))
-//        assertFalse(modification.referencesField(LargeTestModel.fields.int))
+//        val modification = startChain<LargeTestModel>().list assign listOf()
+//        assertTrue(modification.referencesField(LargeTestModel.::list))
+//        assertFalse(modification.referencesField(LargeTestModel.::int))
 //    }
 //
 //    @Test
 //    fun extraction() {
-//        val condition = (LargeTestModel.chain.string eq "asdf") and (LargeTestModel.chain.int inside listOf(
+//        val condition = (startChain<LargeTestModel>().string eq "asdf") and (startChain<LargeTestModel>().int inside listOf(
 //            1,
 //            2,
 //            3
-//        ) or (LargeTestModel.chain.int eq 4))
-//        val extracted = condition.forField(LargeTestModelFields.int)
+//        ) or (startChain<LargeTestModel>().int eq 4))
+//        val extracted = condition.forField(LargeTestModel::int)
 //        println(extracted)
 //    }
 }

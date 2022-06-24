@@ -2,13 +2,14 @@
 package com.lightningkite.ktordb
 
 import com.lightningkite.khrysalis.*
+import kotlin.reflect.KProperty1
 
 fun <T: IsCodableAndHashable> startChain(): PropChain<T, T> = PropChain({it}, {it})
 class PropChain<From: IsCodableAndHashable, To: IsCodableAndHashable>(
     val mapCondition: (Condition<To>)->Condition<From>,
     val mapModification: (Modification<To>)-> Modification<From>
 ) {
-    operator fun <V : IsCodableAndHashable> get(prop: DataClassProperty<To, V>): PropChain<From, V> = PropChain(
+    operator fun <V : IsCodableAndHashable> get(prop: KProperty1<To, V>): PropChain<From, V> = PropChain(
         mapCondition = { mapCondition(Condition.OnField(prop, it)) },
         mapModification = { mapModification(Modification.OnField(prop, it)) }
     )

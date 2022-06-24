@@ -30,13 +30,13 @@ class FiltersTest: MongoTest() {
             val filtered = allPosts.filter { condition(it) }.sortedBy { it.content }
             assertEquals(filtered, fromDb, "Condition ${condition.bson().toJson()} failed")
         }
-        checkCondition(Post.chain.content eq "Joe post")
-        checkCondition(Post.chain.content neq "Joe post")
-        checkCondition(Post.chain.content inside listOf("Joe post", "Dan post"))
-        checkCondition(Post.chain.content nin listOf("Joe post", "Dan post"))
-        checkCondition(Post.chain.content gt "Joe post")
-        checkCondition(Post.chain.content lt "Joe post")
-        checkCondition(Post.chain.content gte "Joe post")
-        checkCondition(Post.chain.content lte "Joe post")
+        checkCondition(startChain<Post>().content eq "Joe post")
+        checkCondition(startChain<Post>().content neq "Joe post")
+        checkCondition(startChain<Post>().content inside listOf("Joe post", "Dan post"))
+        checkCondition(startChain<Post>().content nin listOf("Joe post", "Dan post"))
+        checkCondition(startChain<Post>().content gt "Joe post")
+        checkCondition(startChain<Post>().content lt "Joe post")
+        checkCondition(startChain<Post>().content gte "Joe post")
+        checkCondition(startChain<Post>().content lte "Joe post")
     }
 }

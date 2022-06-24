@@ -51,9 +51,9 @@ class MongoFieldCollection<Model: Any>(
                 else
                     it.sort(Sorts.orderBy(orderBy.map {
                         if (it.ascending)
-                            Sorts.ascending(it.field.name)
+                            Sorts.ascending(it.field.property.name)
                         else
-                            Sorts.descending(it.field.name)
+                            Sorts.descending(it.field.property.name)
                     }))
             }
             .toFlow()
