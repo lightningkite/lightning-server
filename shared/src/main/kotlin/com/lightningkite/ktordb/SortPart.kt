@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 import kotlin.reflect.KProperty1
 
 @Serializable(SortPartSerializer::class)
+@Description("The name of the property to sort by.  Prepend a '-' if you wish to sort descending.")
 data class SortPart<T: IsCodableAndHashable>(
     val field: KProperty1Partial<T>,
     val ascending: Boolean = true

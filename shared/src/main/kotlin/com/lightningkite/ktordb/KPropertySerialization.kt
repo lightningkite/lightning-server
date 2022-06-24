@@ -2,12 +2,14 @@
 
 package com.lightningkite.ktordb
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.internal.GeneratedSerializer
@@ -19,8 +21,20 @@ import kotlin.reflect.KProperty1
 
 @Serializer(KProperty1::class)
 class KPropertyPartialSerializer<T>(val inner: KSerializer<T>) : KSerializer<KProperty1Partial<T>> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("KProperty1Partial<${inner.descriptor.serialName}>", PrimitiveKind.STRING)
+    @OptIn(ExperimentalSerializationApi::class)
+    override val descriptor: SerialDescriptor = object: SerialDescriptor {
+        override val kind: SerialKind = PrimitiveKind.STRING
+        override val serialName: String = "KProperty1Partial<${inner.descriptor.serialName}>"
+        override val elementsCount: Int get() = 0
+        override fun getElementName(index: Int): String = error()
+        override fun getElementIndex(name: String): Int = error()
+        override fun isElementOptional(index: Int): Boolean = error()
+        override fun getElementDescriptor(index: Int): SerialDescriptor = error()
+        override fun getElementAnnotations(index: Int): List<Annotation> = error()
+        override fun toString(): String = "PrimitiveDescriptor($serialName)"
+        private fun error(): Nothing = throw IllegalStateException("Primitive descriptor does not have elements")
+        override val annotations: List<Annotation> = KProperty1::class.annotations
+    }
 
     @Suppress("UNCHECKED_CAST")
     val fields = inner.attemptGrabFields()

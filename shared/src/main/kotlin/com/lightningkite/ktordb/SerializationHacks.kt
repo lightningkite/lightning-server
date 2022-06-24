@@ -26,6 +26,8 @@ fun KSerializer<*>.mapValueElement(): KSerializer<*>? {
 
 fun KSerializer<*>.nullElement(): KSerializer<*>? {
     try {
+        val type = this::class.java
+        if(!type.name.contains("Null")) return null
         val theoreticalMethod = this::class.java.getDeclaredField("serializer")
         try { theoreticalMethod.isAccessible = true } catch(e: Exception) {}
         return theoreticalMethod.get(this) as KSerializer<*>
@@ -57,6 +59,18 @@ internal fun defer(serialName: String, kind: SerialKind, deferred: () -> SerialD
     override fun getElementAnnotations(index: Int): List<Annotation> = original.getElementAnnotations(index)
     override fun getElementDescriptor(index: Int): SerialDescriptor = original.getElementDescriptor(index)
     override fun isElementOptional(index: Int): Boolean = original.isElementOptional(index)
+
+    @ExperimentalSerializationApi
+    override val annotations: List<Annotation>
+        get() = original.annotations
+
+    @ExperimentalSerializationApi
+    override val isInline: Boolean
+        get() = original.isInline
+
+    @ExperimentalSerializationApi
+    override val isNullable: Boolean
+        get() = original.isNullable
 }
 
 internal fun <T> defer(deferred: () -> KSerializer<T>): KSerializer<T> = object : KSerializer<T> {

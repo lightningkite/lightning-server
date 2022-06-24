@@ -12,11 +12,13 @@ import kotlin.reflect.KClass
 public class MySealedClassSerializer<T : Any>(
     serialName: String,
     val baseClass: KClass<T>,
-    val getSerializerMap: () -> Map<String, KSerializer<out T>>,
+    private val getSerializerMap: () -> Map<String, KSerializer<out T>>,
     val alternateReadNames: Map<String, String> = mapOf(),
+    val annotations: List<Annotation> = listOf(),
     val getName: (T) -> String
 ) : KSerializer<T> {
-    private val serializerMap by lazy { getSerializerMap() }
+
+    val serializerMap by lazy { getSerializerMap() }
     private val indexToName by lazy { serializerMap.keys.toTypedArray() }
     private val nameToIndex by lazy {
         val map = HashMap<String, Int>()
@@ -31,7 +33,10 @@ public class MySealedClassSerializer<T : Any>(
         ?: throw IllegalStateException("No serializer inside ${descriptor.serialName} found for ${getName(item)}; available: ${indexToName.joinToString()}")
 
     override val descriptor: SerialDescriptor = defer(serialName, StructureKind.CLASS) {
+        println("HEY I AM HERE $annotations")
         buildClassSerialDescriptor(serialName) {
+            this.annotations = this@MySealedClassSerializer.annotations
+            println("Annotations are ${this.annotations}")
             val reversedAlternates = alternateReadNames.entries.groupBy { it.value }.mapValues { it.value.map { it.key } }
             for ((index, s) in serializers.withIndex()) {
                 element(s.descriptor.serialName, s.descriptor, isOptional = true, annotations = indexToName[index].let { reversedAlternates[it] }

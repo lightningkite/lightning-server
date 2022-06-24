@@ -76,7 +76,7 @@ fun List<ResolvedAnnotation>.byName(
 
 fun KSAnnotation.resolve(): ResolvedAnnotation {
     val type = this.annotationType.resolve().declaration as KSClassDeclaration
-    val params = type.primaryConstructor!!.parameters
+    val params = type.primaryConstructor?.parameters ?: listOf()
     return ResolvedAnnotation(
         type = type,
         arguments = this.arguments.withIndex().associate {

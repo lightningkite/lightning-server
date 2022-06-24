@@ -93,7 +93,8 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
             }
             map
         },
-        alternateReadNames = mapOf("Search" to "StringContains")
+        alternateReadNames = mapOf("Search" to "StringContains"),
+        annotations = Condition::class.annotations
     ) {
         when (it) {
             is Condition.Never -> "Never"
@@ -128,7 +129,7 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
     }
 } as KSerializer<Condition<Inner>>
 
-class ConditionSerializer<Inner>(inner: KSerializer<Inner>) : KSerializer<Condition<Inner>> by getCond(inner)
+class ConditionSerializer<Inner>(val inner: KSerializer<Inner>) : KSerializer<Condition<Inner>> by getCond(inner)
 
 class OnFieldSerializer<K : Any, V>(
     val field: KProperty1<K, V>,

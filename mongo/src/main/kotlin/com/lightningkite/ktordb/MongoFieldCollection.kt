@@ -222,7 +222,6 @@ class MongoFieldCollection<Model : Any>(
 
     @OptIn(ExperimentalSerializationApi::class)
     suspend fun handleIndexes(scope: CoroutineScope) {
-        val existingIndices = wraps.listIndexes<Document>()
         val requireCompletion = ArrayList<Job>()
         fun handleDescriptor(descriptor: SerialDescriptor) {
             descriptor.annotations.forEach {

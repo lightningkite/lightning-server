@@ -8,10 +8,12 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import org.slf4j.LoggerFactory
@@ -26,7 +28,20 @@ import javax.crypto.spec.SecretKeySpec
  * If security is required it will serialize as a pre-signed URL. It will also check deserializing of url to confirm it is valid.
  */
 object ExternalServerFileSerializer: KSerializer<ServerFile> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ServerFile", PrimitiveKind.STRING)
+    @OptIn(ExperimentalSerializationApi::class)
+    override val descriptor: SerialDescriptor = object: SerialDescriptor {
+        override val kind: SerialKind = PrimitiveKind.STRING
+        override val serialName: String = "ServerFile"
+        override val elementsCount: Int get() = 0
+        override fun getElementName(index: Int): String = error()
+        override fun getElementIndex(name: String): Int = error()
+        override fun isElementOptional(index: Int): Boolean = error()
+        override fun getElementDescriptor(index: Int): SerialDescriptor = error()
+        override fun getElementAnnotations(index: Int): List<Annotation> = error()
+        override fun toString(): String = "PrimitiveDescriptor($serialName)"
+        private fun error(): Nothing = throw IllegalStateException("Primitive descriptor does not have elements")
+        override val annotations: List<Annotation> = ServerFile::class.annotations
+    }
 
     override fun serialize(encoder: Encoder, value: ServerFile) {
         val root = FilesSettings.instance.root

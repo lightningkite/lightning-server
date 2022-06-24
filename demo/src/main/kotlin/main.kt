@@ -10,7 +10,6 @@ import com.lightningkite.ktorbatteries.exceptions.ExceptionSettings
 import com.lightningkite.ktorbatteries.exceptions.configureExceptions
 import com.lightningkite.ktorbatteries.files.FilesSettings
 import com.lightningkite.ktorbatteries.files.configureFiles
-import com.lightningkite.ktorbatteries.jsonschema.JsonSchema
 import com.lightningkite.ktorbatteries.logging.LoggingSettings
 import com.lightningkite.ktorbatteries.mongo.MongoSettings
 import com.lightningkite.ktorbatteries.mongo.mongoDb
@@ -49,7 +48,7 @@ data class TestModel(
     val timestamp: Instant = Instant.now(),
     val name: String = "No Name",
     val number: Int = 3123,
-    @JsonSchema.Format("jodit") val content: String = "",
+    @JsonSchemaFormat("jodit") val content: String = "",
     val file: ServerFile? = null
 ) : HasId<UUID>
 
@@ -113,6 +112,5 @@ fun main(vararg args: String) {
                 }
             }
         }
-        TypescriptSdk.sdkFile(System.out)
     }
 }

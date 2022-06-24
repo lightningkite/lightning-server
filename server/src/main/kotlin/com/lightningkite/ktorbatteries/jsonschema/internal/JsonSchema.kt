@@ -1,26 +1,14 @@
 package com.lightningkite.ktorbatteries.jsonschema.internal
 
-import com.fasterxml.jackson.databind.ser.std.NullSerializer
-import com.lightningkite.ktorbatteries.jsonschema.JsonSchema
-import com.lightningkite.ktorbatteries.jsonschema.JsonSchema.*
-import com.lightningkite.ktorbatteries.jsonschema.JsonSchema.IntRange
 import com.lightningkite.ktorbatteries.jsonschema.JsonType
 import com.lightningkite.ktorbatteries.serialization.Serialization
-import com.lightningkite.ktordb.LazyRenamedSerialDescriptor
-import com.lightningkite.ktordb.ServerFile
-import com.lightningkite.ktordb.nullElement
+import com.lightningkite.ktordb.*
 import kotlinx.serialization.*
-import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.json.*
-import kotlinx.serialization.modules.SerializersModuleCollector
 import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.LocalTime
-import java.time.ZonedDateTime
-import java.util.UUID
-import kotlin.reflect.KClass
 
 @PublishedApi
 internal inline val SerialDescriptor.jsonLiteral
@@ -82,7 +70,7 @@ internal fun SerialDescriptor.jsonSchemaObjectMap(definitions: JsonSchemaDefinit
 
         val filteredAnnotation = annotations.filter { annotation ->
             when (annotation) {
-                is Description, is Definition, is NoDefinition -> false
+                is Description, is JsonSchemaDefinition, is JsonSchemaNoDefinition -> false
                 else -> true
             }
         }
@@ -156,7 +144,7 @@ internal fun SerialDescriptor.jsonSchemaArray(
 
         val filteredAnnotation = annotations.filter { annotation ->
             when (annotation) {
-                is Description, is Definition, is NoDefinition -> false
+                is Description, is JsonSchemaDefinition, is JsonSchemaNoDefinition -> false
                 else -> true
             }
         }
@@ -170,18 +158,12 @@ internal fun SerialDescriptor.jsonSchemaString(
     annotations: List<Annotation> = listOf()
 ): JsonObject {
     return jsonSchemaElement(annotations) {
-        val pattern = annotations.lastOfInstance<Pattern>()?.pattern ?: ""
-        val enum = annotations.lastOfInstance<StringEnum>()?.values ?: arrayOf()
-        val format = annotations.lastOfInstance<Format>()?.format
+        val pattern = annotations.lastOfInstance<ExpectedPattern>()?.pattern ?: ""
+        val format = annotations.lastOfInstance<JsonSchemaFormat>()?.format
 
         if (pattern.isNotEmpty()) {
             it["pattern"] = pattern
         }
-
-        if (enum.isNotEmpty()) {
-            it["enum"] = enum.toList()
-        }
-
         format?.let { f ->
             it["format"] = f
         }
@@ -198,7 +180,7 @@ internal fun SerialDescriptor.jsonSchemaNumber(
                 .lastOfInstance<FloatRange>()
                 ?.let { it.min as Number to it.max as Number }
             PrimitiveKind.BYTE, PrimitiveKind.SHORT, PrimitiveKind.INT, PrimitiveKind.LONG -> annotations
-                .lastOfInstance<IntRange>()
+                .lastOfInstance<IntegerRange>()
                 ?.let { it.min as Number to it.max as Number }
             else -> error("$kind is not a Number")
         }
@@ -331,15 +313,13 @@ internal fun JsonObjectBuilder.applyJsonSchemaDefaults(
     if (annotations.isNotEmpty()) {
         val description = annotations
             .filterIsInstance<Description>()
-            .joinToString("\n") {
-                it.lines.joinToString("\n")
-            }
+            .joinToString("\n") {it.text}
 
         if (description.isNotEmpty()) {
             this["description"] = description
         }
 
-        annotations.lastOfInstance<Options>()?.let {
+        annotations.lastOfInstance<JsonSchemaOptions>()?.let {
             this["options"] = Serialization.json.parseToJsonElement(it.json) as JsonObject
         }
     }
@@ -381,7 +361,7 @@ internal class JsonSchemaDefinitions(private val isEnabled: Boolean = true) {
         val (descriptor, annotations) = key
 
         return annotations
-            .lastOfInstance<Definition>()?.id
+            .lastOfInstance<JsonSchemaDefinition>()?.id
             ?.takeIf(String::isNotEmpty)
             ?: (descriptor.hashCode().toLong() shl 32 xor annotations.hashCode().toLong())
                 .toString(36)
@@ -390,7 +370,7 @@ internal class JsonSchemaDefinitions(private val isEnabled: Boolean = true) {
 
     fun canGenerateDefinitions(key: Key): Boolean {
         return key.annotations.any {
-            it !is JsonSchema.NoDefinition && it is Definition
+            it !is JsonSchemaNoDefinition && it is JsonSchemaDefinition
         }
     }
 
