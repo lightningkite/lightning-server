@@ -3,7 +3,7 @@ package com.lightningkite.ktordb
 import kotlin.reflect.KProperty1
 
 
-fun Condition<*>.referencesField(field: DataClassProperty<*, *>): Boolean = when (this) {
+fun Condition<*>.referencesField(field: KProperty1<*, *>): Boolean = when (this) {
     is Condition.OnField<*, *> -> this.key.name == field.name || this.condition.referencesField(field)
     is Condition.And -> conditions.any { it.referencesField(field) }
     is Condition.Or -> conditions.any { it.referencesField(field) }
@@ -14,7 +14,7 @@ fun Condition<*>.referencesField(field: DataClassProperty<*, *>): Boolean = when
     is Condition.IfNotNull<*> -> condition.referencesField(field)
     else -> false
 }
-fun Modification<*>.referencesField(field: DataClassProperty<*, *>): Boolean = when (this) {
+fun Modification<*>.referencesField(field: KProperty1<*, *>): Boolean = when (this) {
     is Modification.Chain -> modifications.any { it.referencesField(field) }
     is Modification.IfNotNull -> modification.referencesField(field)
     is Modification.PerElement<*> -> condition.referencesField(field)
@@ -23,7 +23,7 @@ fun Modification<*>.referencesField(field: DataClassProperty<*, *>): Boolean = w
     else -> false
 }
 
-fun Modification<*>.referencesFieldRead(field: DataClassProperty<*, *>): Boolean = when (this) {
+fun Modification<*>.referencesFieldRead(field: KProperty1<*, *>): Boolean = when (this) {
     is Modification.Chain -> modifications.any { it.referencesFieldRead(field) }
     is Modification.Remove<*> -> this.condition.referencesField(field)
     is Modification.PerElement<*> -> condition.referencesField(field)
@@ -32,10 +32,10 @@ fun Modification<*>.referencesFieldRead(field: DataClassProperty<*, *>): Boolean
     else -> false
 }
 
-fun <T, V> Condition<T>.forField(field: DataClassProperty<T, V>): Condition<V> =
+fun <T, V> Condition<T>.forField(field: KProperty1<T, V>): Condition<V> =
     forFieldOrNull(field) ?: Condition.Always()
 
-fun <T, V> Condition<T>.forFieldOrNull(field: DataClassProperty<T, V>): Condition<V>? {
+fun <T, V> Condition<T>.forFieldOrNull(field: KProperty1<T, V>): Condition<V>? {
     return when (this) {
         is Condition.And -> conditions.mapNotNull { it.forFieldOrNull(field) }.takeUnless { it.isEmpty() }
             ?.let { Condition.And(it) }

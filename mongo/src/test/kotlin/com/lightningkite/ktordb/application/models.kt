@@ -18,7 +18,7 @@ lateinit var defaultMongo: MongoDatabase
 @Serializable
 data class User(
     override val _id: UUID = UUID.randomUUID(),
-    var email: String,
+    @Unique var email: String,
     var age: Long = 0,
     var friends: List<UUIDFor<User>> = listOf()
 ) : HasId<UUID> {
@@ -95,12 +95,13 @@ val EmbeddedNullable.Companion.mongo get() = defaultMongo.collection<EmbeddedNul
 
 @DatabaseModel
 @Serializable
+@TextIndex(fields = ["string"])
 data class LargeTestModel(
     override val _id: UUID = UUID.randomUUID(),
     var boolean: Boolean = false,
     var byte: Byte = 0,
     var short: Short = 0,
-    var int: Int = 0,
+    @Index var int: Int = 0,
     var long: Long = 0,
     var float: Float = 0f,
     var double: Double = 0.0,

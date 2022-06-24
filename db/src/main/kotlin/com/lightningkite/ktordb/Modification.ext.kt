@@ -1,7 +1,9 @@
 package com.lightningkite.ktordb
 
+import kotlin.reflect.KProperty1
 
-fun <T, V> Modification<T>.forFieldOrNull(field: DataClassProperty<T, V>): Modification<V>? {
+
+fun <T, V> Modification<T>.forFieldOrNull(field: KProperty1<T, V>): Modification<V>? {
     return when (this) {
         is Modification.Chain -> modifications.mapNotNull { it.forFieldOrNull(field) }.takeUnless { it.isEmpty() }
             ?.let { Modification.Chain(it) }
@@ -10,7 +12,7 @@ fun <T, V> Modification<T>.forFieldOrNull(field: DataClassProperty<T, V>): Modif
     }
 }
 
-fun <T, V> Modification<T>.vet(field: DataClassProperty<T, V>, onModification: (Modification<V>) -> Unit) {
+fun <T, V> Modification<T>.vet(field: KProperty1<T, V>, onModification: (Modification<V>) -> Unit) {
     when (this) {
         is Modification.Assign -> onModification(Modification.Assign(field.get(this.value)))
         is Modification.Chain -> modifications.forEach { it.vet(field, onModification) }

@@ -22,6 +22,12 @@ class SerializationTest {
         prepareModels()
     }
 
+    @Test fun oldSearchStyle() {
+        myJson.decodeFromString<Condition<String>>("""
+            { "Search": { "value": "asdf" } }
+        """.trimIndent())
+    }
+
     @Test fun executionTest() {
         val modification = modification<User> { it.age assign 22 }
         val model = User(email = "joseph@lightningkite.com")

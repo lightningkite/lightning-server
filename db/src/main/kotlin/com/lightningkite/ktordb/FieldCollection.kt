@@ -1,6 +1,7 @@
 package com.lightningkite.ktordb
 
 import kotlinx.coroutines.flow.Flow
+import kotlin.reflect.KProperty1
 import kotlin.reflect.KType
 
 interface FieldCollection<Model: Any> {
@@ -67,20 +68,20 @@ interface FieldCollection<Model: Any> {
 
     suspend fun <Key> groupCount(
         condition: Condition<Model> = Condition.Always(),
-        groupBy: DataClassProperty<Model, Key>
+        groupBy: KProperty1<Model, Key>
     ): Map<Key, Int>
 
     suspend fun <N: Number> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model> = Condition.Always(),
-        property: DataClassProperty<Model, N>
+        property: KProperty1<Model, N>
     ): Double?
 
     suspend fun <N: Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model> = Condition.Always(),
-        groupBy: DataClassProperty<Model, Key>,
-        property: DataClassProperty<Model, N>
+        groupBy: KProperty1<Model, Key>,
+        property: KProperty1<Model, N>
     ): Map<Key, Double?>
 
 }
