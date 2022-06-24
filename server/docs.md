@@ -1,5 +1,5 @@
 # Ktor Batteries Server Feature Docs
-Ktor Batteries Server has a lot of nifty features. Here is a list of things to get you started.
+Ktor Batteries Server has a lot of nifty features. Here is a list of things to get you started, or to be used as a reference.
 
 ## Server Setup
 
