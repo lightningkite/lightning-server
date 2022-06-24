@@ -14,6 +14,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.serialization.properties.decodeFromStringMap
 import kotlinx.serialization.properties.encodeToStringMap
 import java.util.*
+import kotlin.reflect.KProperty1
 
 /**
  * Creates a websocket end point to receive live updates for the model.
@@ -318,7 +319,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> Ro
         implementation = { user: USER, condition: GroupCountQuery<T> ->
             @Suppress("UNCHECKED_CAST")
             getCollection(user)
-                .groupCount(condition.condition, condition.groupBy as DataClassProperty<T, Any?>)
+                .groupCount(condition.condition, condition.groupBy as KProperty1<T, Any?>)
                 .mapKeys { it.key.toString() }
         }
     )
@@ -331,7 +332,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> Ro
         implementation = { user: USER, condition: AggregateQuery<T> ->
             @Suppress("UNCHECKED_CAST")
             getCollection(user)
-                .aggregate(condition.aggregate, condition.condition, condition.property as DataClassProperty<T, Number>)
+                .aggregate(condition.aggregate, condition.condition, condition.property as KProperty1<T, Number>)
         }
     )
 
@@ -342,7 +343,9 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> Ro
         errorCases = listOf(),
         implementation = { user: USER, condition: GroupAggregateQuery<T> ->
             getCollection(user)
-                .groupAggregate(condition.aggregate, condition.condition, condition.groupBy as DataClassProperty<T, Any?>, condition.property as DataClassProperty<T, Number>)
+                .groupAggregate(condition.aggregate, condition.condition,
+                    condition.groupBy as KProperty1<T, Any?>, condition.property as KProperty1<T, Number>
+                )
                 .mapKeys { it.key.toString() }
         }
     )

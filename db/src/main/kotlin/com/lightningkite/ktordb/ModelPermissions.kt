@@ -14,7 +14,7 @@ data class ModelPermissions<Model>(
     val maxQueryTimeMs: Long = 1_000L
 ) {
     data class Read<Model, Field>(
-        val property: DataClassProperty<Model, Field>,
+        val property: KProperty1<Model, Field>,
         val condition: Condition<Model>,
         val mask: Field
     ) {
@@ -25,7 +25,7 @@ data class ModelPermissions<Model>(
         }
     }
     data class Update<Model, Field>(
-        val property: DataClassProperty<Model, Field>,
+        val property: KProperty1<Model, Field>,
         val condition: Condition<Model>
     )
 

@@ -53,11 +53,14 @@ infix fun <K : IsCodableAndHashable> PropChain<K, Int>.anyClear(mask: Int) =
 
 infix fun <K : IsCodableAndHashable> PropChain<K, Int>.anySet(mask: Int) = mapCondition(Condition.IntBitsAnySet(mask))
 infix fun <K : IsCodableAndHashable> PropChain<K, String>.contains(value: String) =
-    mapCondition(Condition.Search(value, ignoreCase = true))
+    mapCondition(Condition.StringContains(value, ignoreCase = true))
 
 @JsName("xPropChainContainsCased")
 fun <K : IsCodableAndHashable> PropChain<K, String>.contains(value: String, ignoreCase: Boolean) =
-    mapCondition(Condition.Search(value, ignoreCase = ignoreCase))
+    mapCondition(Condition.StringContains(value, ignoreCase = ignoreCase))
+
+fun <K : IsCodableAndHashable> PropChain<K, K>.fullTextSearch(value: String, ignoreCase: Boolean) =
+    mapCondition(Condition.FullTextSearch(value, ignoreCase = ignoreCase))
 
 inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, List<T>>.all(condition: (PropChain<T, T>) -> Condition<T>) =
     mapCondition(Condition.AllElements(startChain<T>().let(condition)))

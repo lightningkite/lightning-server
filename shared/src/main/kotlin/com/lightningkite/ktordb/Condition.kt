@@ -3,6 +3,7 @@
 package com.lightningkite.ktordb
 
 import com.lightningkite.khrysalis.*
+import jdk.jshell.spi.ExecutionControl.NotImplementedException
 import kotlinx.serialization.*
 import kotlin.reflect.KProperty1
 
@@ -91,8 +92,20 @@ open class Condition<T: IsCodableAndHashable> protected constructor()  {
     data class LessThanOrEqual<T: ComparableCodableAndHashable<T>>(val value: T): Condition<T>() { override fun invoke(on: T): Boolean = on <= value }
 
     @Serializable
-    @SerialName("Search")
-    data class Search(val value: String, val ignoreCase: Boolean): Condition<String>() { override fun invoke(on: String): Boolean = on.contains(value, ignoreCase) }
+    @SerialName("StringContains")
+    data class StringContains(val value: String, val ignoreCase: Boolean = false): Condition<String>() { override fun invoke(on: String): Boolean = on.contains(value, ignoreCase) }
+
+    @Serializable
+    @SerialName("FullTextSearch")
+    data class FullTextSearch<T>(val value: String, val ignoreCase: Boolean = false): Condition<T>() { override fun invoke(on: T): Boolean = fatalError("Not Implemented locally") }
+
+    @Serializable
+    @SerialName("RegexMatches")
+    data class RegexMatches(val pattern: String, val ignoreCase: Boolean = false): Condition<String>() {
+        @Transient
+        val regex = Regex(pattern, if(ignoreCase) setOf(RegexOption.IGNORE_CASE) else setOf())
+        override fun invoke(on: String): Boolean = regex.matches(on)
+    }
 
     @Serializable(ConditionIntBitsClearSerializer::class)
     @SerialName("IntBitsClear")

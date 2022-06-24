@@ -3,6 +3,7 @@ package com.lightningkite.ktordb
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
+import kotlin.reflect.KProperty1
 import kotlin.reflect.KType
 
 open class SecuredFieldCollection<Model: Any>(
@@ -103,7 +104,7 @@ open class SecuredFieldCollection<Model: Any>(
 
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
-        groupBy: DataClassProperty<Model, Key>
+        groupBy: KProperty1<Model, Key>
     ): Map<Key, Int> {
         return wraps.groupCount(condition and rules.read(condition) and rules.sortAllowed(SortPart(groupBy)), groupBy)
     }
@@ -111,14 +112,14 @@ open class SecuredFieldCollection<Model: Any>(
     override suspend fun <N : Number> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        property: DataClassProperty<Model, N>
+        property: KProperty1<Model, N>
     ): Double? = wraps.aggregate(aggregate, condition and rules.read(condition), property)
 
     override suspend fun <N: Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        groupBy: DataClassProperty<Model, Key>,
-        property: DataClassProperty<Model, N>
+        groupBy: KProperty1<Model, Key>,
+        property: KProperty1<Model, N>
     ): Map<Key, Double?> = wraps.groupAggregate(aggregate, condition and rules.read(condition) and rules.sortAllowed(SortPart(groupBy)), groupBy, property)
 }
 

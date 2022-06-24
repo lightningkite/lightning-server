@@ -31,7 +31,7 @@ abstract class MongoTest {
         @BeforeClass @JvmStatic
         fun start() {
             mongoClient = testMongo()
-            defaultMongo = mongoClient!!.database("default")
+            defaultMongo = mongoClient!!.database("default", ensureIndexesReady = true)
         }
 
         @AfterClass @JvmStatic
