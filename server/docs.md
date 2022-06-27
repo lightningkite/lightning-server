@@ -25,7 +25,7 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 
 - `database` is a singleton that handles the database
 - `database.collection()` returns a `FieldCollection` from the database
-- `autoCollection()` automatically provides a simple web interface and default endpoints for managing a `FieldCollection`
+- `autoCollection()` is a shortcut function for setting up restful endpoints for a `FieldCollection`, as well as an html admin portal
 
 ## FieldCollection
 `FieldCollection` is a collection used to store similar information to the database.
