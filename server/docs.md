@@ -84,66 +84,37 @@ To test against existing data in the database, you can use a `condition`.
 
 #### Comparison
 
-- `Equal()` returns true if the given values are equivalent
-- `NotEqual()` returns true if the given values are not equivalent
-- `GreaterThan()` returns true if the given number is greater than another number
-- `LessThan()` returns true if the given number is less than another number
-- `GreaterThanOrEqual()` returns true if the given number is greater than or equal to another number
-- `LessThanOrEqual()` returns true if the given number is less than or equal to another number
-
-*Shorthands:*
-
-- `eq` is shorthand for `Equal()`
-- `neq` is shorthand for `NotEqual()`
-- `ne` is shorthand for `NotEqual()`
-- `gt` is shorthand for `GreaterThan()`
-- `lt` is shorthand for `LessThan()`
-- `gte` is shorthand for `GreaterThanOrEqual()`
-- `lte` is shorthand for `LessThanOrEqual()`
+- `eq` (equal) returns true if the given values are equivalent
+- `neq` (not equal) returns true if the given values are not equivalent
+- `ne` (not equal) returns true if the given values are not equivalent
+- `gt` (greater than) returns true if the given number is greater than another number
+- `lt` (less than) returns true if the given number is less than another number
+- `gte` (greater than or equal) returns true if the given number is greater than or equal to another number
+- `lte` (less than or equal) returns true if the given number is less than or equal to another number
 
 #### Relativity
 
-- `Inside()` returns true if the given value is inside a given list
-- `NotInside()` returns true if the given value is not inside a given list
-- `Search()`
-
-*Shorthands:*
-
-- `inside` is shorthand for to `Inside()`
-- `nin` is shorthand for `NotInside()`
-- `notIn` is shorthand for `NotInside()`
+- `inside` returns true if the given value is inside a given list
+- `nin` (not in) returns true if the given value is not inside a given list
+- `notIn` returns true if the given value is not inside a given list
 - `contains` is shorthand for `Search()`
 
 #### Bitwise
 
-- `IntBitsClear()`
-- `IntBitsSet()`
-- `IntBitsAnyClear()`
-- `IntBitsAnySet()`
-
-*Shorthands:*
-
-- `allClear` is shorthand for `IntBitsClear()`
-- `allSet` is shorthand for `IntBitsSet()`
-- `anyClear` is shorthand for `IntBitsAnyClear()`
-- `anySet` is shorthand for `IntBitsAnySet()`
+- `allClear`
+- `allSet`
+- `anyClear`
+- `anySet`
 
 #### Miscellaneous
 
-- `AllElements()` returns true if the given `condition` is true for all elements in a given list
-- `AnyElements()` returns true if the given `condition` is true for any element in a given list
-- `SizesEquals()` returns true if the given integer is equal to the size of a given list
-- `Exists()` returns true if the given key is inside a given map
+- `all` returns true if the given `condition` is true for all elements in a given list
+- `any` returns true if the given `condition` is true for any element in a given list
+- `sizesEquals` returns true if the given integer is equal to the size of a given list
+- `containsKey` returns true if the given key is inside a given map
 - `OnKey()`
 - `OnField()`
 - `IfNotNull()` returns true if the given value is not null
-
-*Shorthands:*
-
-- `all` is shorthand for `AllElements()`
-- `any` is shorthand for `AnyElements()`
-- `sizesEquals` is shorthand for `SizesEquals()`
-- `containsKey` is shorthand for `Exists()`
 
 ## Modification
 To modify existing data in the database, you can use a `modification`.
@@ -154,38 +125,22 @@ To modify existing data in the database, you can use a `modification`.
 
 #### Set
 
-- `Assign()` sets the given value to another value
-- `CoerceAtMost()` restricts a given number to a given maximum
-- `CoerceAtLeast()` restricts a given number to a given minimum
-- `Increment()` increments a given number by another number
-- `Multiply()` multiplies a given number by another number
-
-*Shorthands:*
-
-- `assign` is shorthand for `Assign()`
-- `coerceAtMost` is shorthand for `CoerceAtMost()`
-- `coerceAtLeast` is shorthand for `CoerceAtLeast()`
-- `plus` is shorthand for `Increment()`
-- `times` is shorthand for `Multiply()`
+- `assign` sets the given value to another value
+- `coerceAtMost` restricts a given number to a given maximum
+- `coerceAtLeast` restricts a given number to a given minimum
+- `plus` increments a given number by another number
+- `times` multiplies a given number by another number
 
 #### Array Operations
 
-- `AppendString()` appends a given string to another string
-- `AppendList()` appends a given list to another list
-- `AppendSet()` appends a given set to another set
-- `Remove()` removes elements from a given list based on a `condition`
-- `RemoveInstances()` removes elements from a given list that are equivalent to elements from another list
+- `plus` appends a given string to another string
+- `plus` appends a given list to another list
+- `addAll` is shorthand for `AppendList()`
+- `addUnique` appends a given set to another set
+- `removeAll` removes elements from a given list based on a `condition`
+- `removeAll` removes elements from a given list that are equivalent to elements from another list
 - `DropFirst()` removes the first element from a given list
 - `DropLast()` removes the last element from a given list
-
-*Shorthands:*
-
-- `plus` is shorthand for `AppendString()`
-- `plus` is shorthand for `AppendList()`
-- `addAll` is shorthand for `AppendList()`
-- `addUnique` is shorthand for `AppendSet()`
-- `removeAll` is shorthand for `Remove()`
-- `removeAll` is shorthand for `RemoveInstances()`
 
 ## Models
 Models are used to access data from the `database` as well as from the body of http calls.
