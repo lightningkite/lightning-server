@@ -28,7 +28,7 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 - `autoCollection()` is a shortcut function for setting up restful endpoints for a `FieldCollection`, as well as an html admin portal
 
 ## FieldCollection
-`FieldCollection` is a collection used to store similar information to the database.
+`FieldCollection` is an abstract class for interacting with a database, and on a specific collection/table.
 
 - `FieldCollection.withPermissions()` creates a `FieldCollection` with access permissions
 
