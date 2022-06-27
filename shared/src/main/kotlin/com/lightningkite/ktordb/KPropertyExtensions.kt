@@ -10,7 +10,8 @@ fun <T, V> KProperty1<T, V>.setCopyImplementation(impl: (original: T, value: V) 
 }
 fun <T, V> KProperty1<T, V>.setCopy(original: T, value: V): T {
     @Suppress("UNCHECKED_CAST")
-    return KProperty1_setCopyImplementation[this]!!(original, value) as T
+    val impl = KProperty1_setCopyImplementation[this] ?: throw Error("setCopy implementation not present for $this.  Did you forget to call prepareModels()?")
+    return impl(original, value) as T
 }
 
 @kotlinx.serialization.Serializable(KPropertyPartialSerializer::class)
