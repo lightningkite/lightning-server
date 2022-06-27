@@ -37,6 +37,9 @@ dependencies {
     api(project(":db"))
     api(project(":mongo"))
 
+    api("org.signal:embedded-redis:0.8.3")
+
+
     api("io.sentry:sentry:1.7.30")
     api("io.sentry:sentry-logback:1.7.30")
     implementation("ch.qos.logback:logback-classic:1.2.11")

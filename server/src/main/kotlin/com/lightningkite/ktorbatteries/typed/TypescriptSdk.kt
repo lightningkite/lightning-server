@@ -39,34 +39,9 @@ object TypescriptSdk {
     fun sdkFile(out: Appendable) = with(out) {
         appendLine("import { ${skipSet.joinToString()} } from '@lightningkite/ktor-batteries-simplified'")
         appendLine()
-        val seen: HashSet<SerialDescriptor> = HashSet()
-        fun onAllTypes(at: SerialDescriptor, action: (SerialDescriptor)->Unit) {
-            if(!seen.add(at)) return
-            val real = if(at.kind == SerialKind.CONTEXTUAL)
-                Serialization.json.serializersModule.getContextualDescriptor(at)!!
-            else if(at.isNullable)
-                at.nullElement()!!
-            else
-                at
-            if(real.serialName.startsWith("com.lightningkite.ktordb") || real.serialName in skipSet) return
-            action(real)
-            real.elementDescriptors.forEach { onAllTypes(it, action) }
-        }
-        val types = HashSet<SerialDescriptor>()
-        safeDocumentables.asSequence().flatMap {
-            sequenceOf(it.inputType, it.outputType)
-        }
-            .filterNotNull()
-            .map { Serialization.json.serializersModule.serializer(it).descriptor }
-            .map {
-                if(it.kind == SerialKind.CONTEXTUAL)
-                    Serialization.json.serializersModule.getContextualDescriptor(it)!!
-                else
-                    it
-            }
-            .forEach { onAllTypes(it) { types.add(it) } }
-        types
-            .filter { !it.serialName.endsWith("?") }
+        ApiEndpoint.usedTypes()
+            .sortedBy { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') }
+            .map { it.descriptor }
             .forEach {
                 when(it.kind) {
                     is StructureKind.CLASS -> {
@@ -136,7 +111,7 @@ object TypescriptSdk {
             appendLine("    constructor(public api: Api, public ${userType.userTypeTokenName()}: string) {}")
             for (entry in byGroup[null] ?: listOf()) {
                 append("    ")
-                this.functionHeader(entry, skipAuth = true, overrideUserType = userType)
+                this.functionHeader(entry, skipAuth = true)
                 append(" { return this.api.")
                 functionCall(entry, skipAuth = false, authUsesThis = true, overrideUserType = userType)
                 appendLine(" } ")
@@ -144,10 +119,10 @@ object TypescriptSdk {
             for (group in groups) {
                 appendLine("    readonly ${group.groupToPartName()} = {")
                 appendLine("        api: this.api,")
-                appendLine("        userToken: this.userToken,")
+                appendLine("        ${userType.userTypeTokenName()}: this.${userType.userTypeTokenName()},")
                 for (entry in byGroup[group]!!) {
                     append("        ")
-                    this.functionHeader(entry, skipAuth = true, overrideUserType = userType)
+                    this.functionHeader(entry, skipAuth = true)
                     append(" { return this.api.")
                     append(group.groupToPartName())
                     append(".")

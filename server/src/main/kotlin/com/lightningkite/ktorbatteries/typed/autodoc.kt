@@ -78,26 +78,10 @@ fun Route.apiHelp(path: String = "docs") = route(path) {
 
                 h2 { +"Types" }
 
-                val seen: HashSet<String> = HashSet()
-                fun onAllTypes(at: KSerializer<*>, action: (KSerializer<*>) -> Unit) {
-                    val real = (at.nullElement() ?: at).uncontextualize()
-                    if (!seen.add(real.descriptor.serialName.substringBefore('<'))) return
-                    action(real)
-                    real.subAndChildSerializers().forEach { onAllTypes(it, action) }
-                }
-
-                val types = HashMap<String, KSerializer<*>>()
-                routes.values.asSequence().flatMap {
-                    sequenceOf(it.inputType, it.outputType)
-                }
-                    .filterNotNull()
-                    .map { Serialization.json.serializersModule.serializer(it) }
-                    .forEach { onAllTypes(it) { types[it.descriptor.serialName.substringBefore('<')] = it } }
-                types.values
+                ApiEndpoint.usedTypes()
                     .sortedBy { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') }
                     .forEach { serializer ->
                         val desc = serializer.descriptor
-                        println("Documenting $desc with annotations ${desc.annotations}")
                         when (desc.kind) {
                             StructureKind.CLASS -> {
                                 documentType(serializer) {
@@ -162,6 +146,24 @@ fun Route.apiHelp(path: String = "docs") = route(path) {
             }
         }
     }
+}
+
+fun ApiEndpoint.Companion.usedTypes(): Collection<KSerializer<*>> {
+    val seen: HashSet<String> = HashSet()
+    fun onAllTypes(at: KSerializer<*>, action: (KSerializer<*>) -> Unit) {
+        val real = (at.nullElement() ?: at).uncontextualize()
+        if (!seen.add(real.descriptor.serialName.substringBefore('<'))) return
+        action(real)
+        real.subAndChildSerializers().forEach { onAllTypes(it, action) }
+    }
+    val types = HashMap<String, KSerializer<*>>()
+    this.known.asSequence().flatMap {
+        sequenceOf(it.inputType, it.outputType)
+    }
+        .filterNotNull()
+        .map { Serialization.json.serializersModule.serializer(it) }
+        .forEach { onAllTypes(it) { types[it.descriptor.serialName.substringBefore('<')] = it } }
+    return types.values
 }
 
 private fun KSerializer<*>.subSerializers(): Array<KSerializer<*>> = listElement()?.let { arrayOf(it) }
