@@ -3,23 +3,22 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 
 ## Server Setup
 
-- `runServer()` runs the server
-- `loadSettings()` loads server settings
-- `configureFiles()`
-- `configureSerialization()`
-- `configureExceptions()`
-- `configureAuth()`
-- `install()`
+- `runServer()` runs a server based on the loaded server settings
+- `loadSettings()` loads the server settings
+- `configureFiles()` sets up basic system directories
+- `configureSerialization()` sets up content negotiation
+- `configureExceptions()` sets up StatusPages for basic exception handling
+- `configureAuth()` sets up server authetication
 
 ## Server Settings Singletons
 
-- `GeneralServerSettings`
-- `AuthSettings`
-- `FilesSettings`
-- `LoggingSettings`
-- `DatabaseSettings`
-- `ExceptionSettings`
-- `EmailSettings`
+- `GeneralServerSettings` is a class containing basic server settings
+- `AuthSettings` is a data class containing required settings for server authentication
+- `FilesSettings` is a data class containing settings for defining where and how files for the server are stored
+- `LoggingSettings` is a data class containing settings for customizing server logging
+- `DatabaseSettings` is a data class containing settings for what database the server will use
+- `ExceptionSettings` is a data class containing settings for how unhandled exceptions are reported
+- `EmailSettings` is a data class containing settings for the server email
 
 ## Database
 
@@ -66,14 +65,14 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 
 #### Upsert
 
-- `upsertOne()`
-- `upsertOneById()`
+- `upsertOne()` modifies an element in the collection if it exists or creates a new element if it does not
+- `upsertOneById()` modifies an element in the collection if it exists or creates a new element if it does not
 
 #### Execution
 
-- `postChange()`
-- `preDelete()`
-- `postDelete()`
+- `postChange()` modifies an element after an element is added to the collection
+- `preDelete()` deletes an element after an element is added to the collection
+- `postDelete()` deletes an element after an element is added to the collection
 - `preCreate()` executes code before an element is added to the collection
 - `postCreate()` executes code after an element is added to the collection
 
@@ -112,8 +111,6 @@ To test against existing data in the database, you can use a `condition`.
 - `any` returns true if the given `condition` is true for any element in a given list
 - `sizesEquals` returns true if the given integer is equal to the size of a given list
 - `containsKey` returns true if the given key is inside a given map
-- `OnKey()`
-- `OnField()`
 - `IfNotNull()` returns true if the given value is not null
 
 ## Modification
