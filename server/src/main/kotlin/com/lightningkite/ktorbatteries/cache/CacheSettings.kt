@@ -1,6 +1,7 @@
-package com.lightningkite.ktorbatteries.pubsub
+package com.lightningkite.ktorbatteries.cache
 
 import com.lightningkite.ktorbatteries.SettingSingleton
+import com.lightningkite.ktorbatteries.pubsub.pubSub
 import com.lightningkite.ktorbatteries.serverhealth.HealthCheckable
 import com.lightningkite.ktorbatteries.serverhealth.HealthStatus
 import io.lettuce.core.RedisClient
@@ -8,23 +9,22 @@ import kotlinx.serialization.Serializable
 import redis.embedded.RedisServer
 
 @Serializable
-data class PubSubSettings(
+data class CacheSettings(
     val uri: String = "local"
 ): HealthCheckable {
-    companion object : SettingSingleton<PubSubSettings>()
+    companion object : SettingSingleton<CacheSettings>()
 
     init {
         instance = this
     }
-
-    override suspend fun healthCheck(): HealthStatus = pubSub.healthCheck()
-    override val healthCheckName: String get() = pubSub.healthCheckName
+    override suspend fun healthCheck(): HealthStatus = cache.healthCheck()
+    override val healthCheckName: String get() = cache.healthCheckName
 }
 
-val pubSub: PubSubInterface by lazy {
-    val uri = PubSubSettings.instance.uri
+val cache: CacheInterface by lazy {
+    val uri = CacheSettings.instance.uri
     when {
-        uri == "local" -> LocalPubSub
+        uri == "local" -> LocalCache
         uri == "redis" -> {
             val redisServer = RedisServer.builder()
                 .port(6379)
@@ -35,9 +35,9 @@ val pubSub: PubSubInterface by lazy {
                 .setting("maxmemory 128M")
                 .build()
             redisServer.start()
-            RedisPubSub(RedisClient.create("redis://127.0.0.1:6378"))
+            RedisCache(RedisClient.create("redis://127.0.0.1:6378"))
         }
-        uri.startsWith("redis://") -> RedisPubSub(RedisClient.create(uri))
+        uri.startsWith("redis://") -> RedisCache(RedisClient.create(uri))
         else -> throw NotImplementedError("PubSub URI $uri not recognized")
     }
 }

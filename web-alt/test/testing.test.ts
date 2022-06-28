@@ -1,8 +1,11 @@
-import {Condition, evaluateCondition, evaluateModification} from "../src";
+import {and, or, condition, Condition, evaluateCondition, evaluateModification} from "../src";
 
 interface TestType {
     numbers: Array<number>
-    name: string
+    name: string,
+    sub: {
+        count: number
+    }
 }
 
 test('Valid condition types work', () => {
@@ -12,7 +15,10 @@ test('Valid condition types work', () => {
 })
 let item: TestType = {
     numbers: [1, 2, 3, 4],
-    name: "Bob"
+    name: "Bob",
+    sub: {
+        count: 22
+    }
 }
 test('Equal true', () => { expect(evaluateCondition({ name: { Equal: "Bob" } }, item)).toBe(true) })
 test('Equal false', () => { expect(evaluateCondition({ name: { Equal: "Bobby" } }, item)).toBe(false) })
@@ -41,10 +47,37 @@ test('Inside', () => { expect(evaluateCondition({ name: { Inside: ["Bob", "Bobby
 test('Inside false', () => { expect(evaluateCondition({ name: { Inside: ["Dude", "Guy"] } }, item)).toBe(false) })
 test('Not Inside', () => { expect(evaluateCondition({ name: { NotInside: ["Bob", "Bobby"] } }, item)).toBe(false) })
 test('Not Inside false', () => { expect(evaluateCondition({ name: { NotInside: ["Dude", "Guy"] } }, item)).toBe(true) })
-test('Search', () => { expect(evaluateCondition({ name: { Search: { value: "ob", ignoreCase: true } } }, item)).toBe(true) })
-test('Search false', () => { expect(evaluateCondition({ name: { Search: { value: "as", ignoreCase: true } } }, item)).toBe(false) })
-test('Search case sensitive', () => { expect(evaluateCondition({ name: { Search: { value: "bo", ignoreCase: false } } }, item)).toBe(false) })
+test('StringContains', () => { expect(evaluateCondition({ name: { StringContains: { value: "ob", ignoreCase: true } } }, item)).toBe(true) })
+test('StringContains false', () => { expect(evaluateCondition({ name: { StringContains: { value: "as", ignoreCase: true } } }, item)).toBe(false) })
+test('StringContains case sensitive', () => { expect(evaluateCondition({ name: { StringContains: { value: "bo", ignoreCase: false } } }, item)).toBe(false) })
 test('Any', () => { expect(evaluateCondition({ numbers: { AnyElements: { GreaterThan: 3 } } }, item)).toBe(true) })
 test('All', () => { expect(evaluateCondition({ numbers: { AllElements: { GreaterThan: 3 } } }, item)).toBe(false) })
 
 test('Assign', () => { expect(evaluateModification({ name: { Assign: "asdf"} }, item).name).toBe("asdf") })
+
+test('buildCondition and', () => {
+    expect(and<TestType>({
+        "name:Equal": "Test",
+        "sub.count:GreaterThan": 2,
+    })).toMatchObject({
+        And: [
+            { name: { Equal: "Test" }},
+            { sub: { count: { GreaterThan: 2 }}}
+        ]
+    })
+})
+test('buildCondition or', () => {
+    expect(or<TestType>({
+        "name:Equal": "Test",
+        "sub.count:GreaterThan": 2,
+    })).toMatchObject({
+        Or: [
+            { name: { Equal: "Test" }},
+            { sub: { count: { GreaterThan: 2 }}}
+        ]
+    })
+})
+test('buildCondition condition', () => {
+    const c: Condition<TestType> = condition("sub.count:GreaterThan", 2)
+    expect(c).toMatchObject({ sub: { count: { GreaterThan: 2 }}})
+})
