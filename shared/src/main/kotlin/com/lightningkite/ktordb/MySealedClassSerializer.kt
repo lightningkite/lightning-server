@@ -24,7 +24,7 @@ public class MySealedClassSerializer<T : Any>(
         val map = HashMap<String, Int>()
         indexToName.withIndex().forEach { map[it.value] = it.index }
         alternateReadNames.forEach {
-            map[it.key] = map[it.value]!!
+            map[it.value]?.let { o -> map[it.key] = o }
         }
         map
     }
@@ -33,10 +33,8 @@ public class MySealedClassSerializer<T : Any>(
         ?: throw IllegalStateException("No serializer inside ${descriptor.serialName} found for ${getName(item)}; available: ${indexToName.joinToString()}")
 
     override val descriptor: SerialDescriptor = defer(serialName, StructureKind.CLASS) {
-        println("HEY I AM HERE $annotations")
         buildClassSerialDescriptor(serialName) {
             this.annotations = this@MySealedClassSerializer.annotations
-            println("Annotations are ${this.annotations}")
             val reversedAlternates = alternateReadNames.entries.groupBy { it.value }.mapValues { it.value.map { it.key } }
             for ((index, s) in serializers.withIndex()) {
                 element(s.descriptor.serialName, s.descriptor, isOptional = true, annotations = indexToName[index].let { reversedAlternates[it] }
