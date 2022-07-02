@@ -1,6 +1,6 @@
 @file:SharedCode
 @file:UseContextualSerialization(UUID::class, Instant::class)
-package com.lightningkite.ktordb
+package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.SharedCode
 import kotlinx.serialization.Contextual

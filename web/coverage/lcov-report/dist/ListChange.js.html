@@ -109,7 +109,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.xEntryChangeListChange = exports.ListChange = void 0;
 const khrysalis_runtime_1 = require("@lightningkite/khrysalis-runtime");
-//! Declares com.lightningkite.ktordb.ListChange
+//! Declares com.lightningkite.lightningdb.ListChange
 class ListChange {
 <span class="fstat-no" title="function not covered" >    co</span>nstructor(wholeList = <span class="branch-0 cbranch-no" title="branch not covered" >null,</span> old = <span class="branch-0 cbranch-no" title="branch not covered" >null,</span> _new = <span class="branch-0 cbranch-no" title="branch not covered" >null)</span> {
 <span class="cstat-no" title="statement not covered" >        this.wholeList = wholeList;</span>
@@ -121,7 +121,7 @@ class ListChange {
 exports.ListChange = ListChange;
 ListChange.properties = ["wholeList", "old", "_new"];
 (0, khrysalis_runtime_1.setUpDataClass)(ListChange);
-//! Declares com.lightningkite.ktordb.listChange&gt;com.lightningkite.ktordb.EntryChangecom.lightningkite.ktordb.listChange.T
+//! Declares com.lightningkite.lightningdb.listChange&gt;com.lightningkite.lightningdb.EntryChangecom.lightningkite.lightningdb.listChange.T
 function <span class="fstat-no" title="function not covered" >xEntryChangeListChange(</span>this_) {
 <span class="cstat-no" title="statement not covered" >    return new ListChange(undefined, this_.old, this_._new);</span>
 }

@@ -4,7 +4,7 @@ exports.MockFullReadModelApi = void 0;
 const FullReadModelApi_1 = require("../FullReadModelApi");
 const MockObserveModelApi_1 = require("./MockObserveModelApi");
 const MockReadModelApi_1 = require("./MockReadModelApi");
-//! Declares com.lightningkite.ktordb.mock.MockFullReadModelApi
+//! Declares com.lightningkite.lightningdb.mock.MockFullReadModelApi
 class MockFullReadModelApi extends FullReadModelApi_1.FullReadModelApi {
     constructor(table) {
         super();

@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LiveReadModelApi = void 0;
 const ReadModelApi_1 = require("../ReadModelApi");
 const rxjs_plus_1 = require("@lightningkite/rxjs-plus");
-//! Declares com.lightningkite.ktordb.live.LiveReadModelApi
+//! Declares com.lightningkite.lightningdb.live.LiveReadModelApi
 class LiveReadModelApi extends ReadModelApi_1.ReadModelApi {
     constructor(url, token, serializer) {
         super();

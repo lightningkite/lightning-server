@@ -4,7 +4,7 @@ exports.LiveFullReadModelApi = void 0;
 const FullReadModelApi_1 = require("../FullReadModelApi");
 const LiveObserveModelApi_1 = require("./LiveObserveModelApi");
 const LiveReadModelApi_1 = require("./LiveReadModelApi");
-//! Declares com.lightningkite.ktordb.live.LiveFullReadModelApi
+//! Declares com.lightningkite.lightningdb.live.LiveFullReadModelApi
 class LiveFullReadModelApi extends FullReadModelApi_1.FullReadModelApi {
     constructor(read, observe) {
         super();
@@ -14,7 +14,7 @@ class LiveFullReadModelApi extends FullReadModelApi_1.FullReadModelApi {
 }
 exports.LiveFullReadModelApi = LiveFullReadModelApi;
 (function (LiveFullReadModelApi) {
-    //! Declares com.lightningkite.ktordb.live.LiveFullReadModelApi.Companion
+    //! Declares com.lightningkite.lightningdb.live.LiveFullReadModelApi.Companion
     class Companion {
         constructor() {
         }

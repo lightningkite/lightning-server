@@ -1,26 +1,27 @@
 @file:UseContextualSerialization(Instant::class, UUID::class, ServerFile::class)
 
-package com.lightningkite.ktorbatteries.demo
+package com.lightningkite.lightningserver.demo
 
-import com.lightningkite.ktorbatteries.auth.*
-import com.lightningkite.ktorbatteries.client
-import com.lightningkite.ktorbatteries.db.*
-import com.lightningkite.ktorbatteries.email.EmailSettings
-import com.lightningkite.ktorbatteries.exceptions.ExceptionSettings
-import com.lightningkite.ktorbatteries.exceptions.configureExceptions
-import com.lightningkite.ktorbatteries.files.FilesSettings
-import com.lightningkite.ktorbatteries.files.configureFiles
-import com.lightningkite.ktorbatteries.logging.LoggingSettings
-import com.lightningkite.ktorbatteries.mongo.MongoSettings
-import com.lightningkite.ktorbatteries.mongo.mongoDb
-import com.lightningkite.ktorbatteries.serialization.Serialization
-import com.lightningkite.ktorbatteries.serialization.configureSerialization
-import com.lightningkite.ktorbatteries.serverhealth.healthCheckPage
-import com.lightningkite.ktorbatteries.settings.GeneralServerSettings
-import com.lightningkite.ktorbatteries.settings.loadSettings
-import com.lightningkite.ktorbatteries.settings.runServer
-import com.lightningkite.ktorbatteries.typed.*
-import com.lightningkite.ktordb.*
+import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.client
+import com.lightningkite.lightningserver.db.*
+import com.lightningkite.lightningserver.email.EmailSettings
+import com.lightningkite.lightningserver.exceptions.ExceptionSettings
+import com.lightningkite.lightningserver.files.FilesSettings
+import com.lightningkite.lightningserver.logging.LoggingSettings
+import com.lightningkite.lightningserver.mongo.MongoSettings
+import com.lightningkite.lightningserver.mongo.mongoDb
+import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.settings.GeneralServerSettings
+import com.lightningkite.lightningserver.settings.loadSettings
+import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.core.routing
+import com.lightningkite.lightningserver.http.Http
+import com.lightningkite.lightningserver.http.get
+import com.lightningkite.lightningserver.http.handler
+import com.lightningkite.lightningserver.ktor.runServer
+import com.lightningkite.lightningserver.serverhealth.healthCheck
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -76,41 +77,24 @@ fun main(vararg args: String) {
     loadSettings(File("settings.yaml")) { Settings() }
     println("Settings loaded")
     prepareModels()
-    runServer {
-        configureFiles()
-        configureSerialization()
-        configureExceptions()
-        configureAuth(onNewUser = { User(email = it) })
-        install(WebSockets)
-        if(GeneralServerSettings.instance.debug) {
-            install(CallLogging)
+    routing {
+        path("test-model") {
+            path("rest").restApi { user: User? -> TestModel.table }
+            path("admin").adminPages(::TestModel) { user: User? -> TestModel.table }
         }
-        routing {
-            authenticate(optional = true) {
-                autoCollection("test-model", { TestModel() }, { user: User? -> TestModel.table })
-                get {
-                    val user = call.user<User?>()
-                    call.respondText("Welcome, ${user?.email ?: "anon"}!")
-                }
-                adminIndex()
-                apiHelp()
-
-                get(
-                    path = "test-primitive",
-                    summary = "Get Test Primitive",
-                    errorCases = listOf(),
-                    implementation = { input: Unit -> "42 is great" }
-                )
-                healthCheckPage(path = "health-check", features = listOf(
-                    EmailSettings.instance,
-                    ExceptionSettings.instance,
-                    FilesSettings.instance,
-                    DatabaseSettings.instance,
-                ))
-                get("die") {
-                    throw Exception("OUCH")
-                }
-            }
-        }
+        path("docs").apiHelp()
+        path("health").healthCheck(listOf(
+            EmailSettings.instance,
+            ExceptionSettings.instance,
+            FilesSettings.instance,
+            DatabaseSettings.instance,
+        )) { user: Unit -> true }
+        path("test-primitive").get.typed(
+            summary = "Get Test Primitive",
+            errorCases = listOf(),
+            implementation = { user: User?, input: Unit -> "42 is great" }
+        )
+        path("die").get.handler { throw Exception("OUCH") }
     }
+    runServer()
 }

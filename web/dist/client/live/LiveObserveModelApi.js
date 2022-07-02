@@ -8,7 +8,7 @@ const ObserveModelApi_1 = require("../ObserveModelApi");
 const sockets_1 = require("./sockets");
 const khrysalis_runtime_1 = require("@lightningkite/khrysalis-runtime");
 const operators_1 = require("rxjs/operators");
-//! Declares com.lightningkite.ktordb.live.LiveObserveModelApi
+//! Declares com.lightningkite.lightningdb.live.LiveObserveModelApi
 class LiveObserveModelApi extends ObserveModelApi_1.ObserveModelApi {
     constructor(openSocket) {
         super();
@@ -24,7 +24,7 @@ class LiveObserveModelApi extends ObserveModelApi_1.ObserveModelApi {
 }
 exports.LiveObserveModelApi = LiveObserveModelApi;
 (function (LiveObserveModelApi) {
-    //! Declares com.lightningkite.ktordb.live.LiveObserveModelApi.Companion
+    //! Declares com.lightningkite.lightningdb.live.LiveObserveModelApi.Companion
     class Companion {
         constructor() {
         }
@@ -41,7 +41,7 @@ exports.LiveObserveModelApi = LiveObserveModelApi;
     Companion.INSTANCE = new Companion();
     LiveObserveModelApi.Companion = Companion;
 })(LiveObserveModelApi = exports.LiveObserveModelApi || (exports.LiveObserveModelApi = {}));
-//! Declares com.lightningkite.ktordb.live.toListObservable>io.reactivex.rxjava3.core.Observablecom.lightningkite.ktordb.ListChangecom.lightningkite.ktordb.live.toListObservable.T
+//! Declares com.lightningkite.lightningdb.live.toListObservable>io.reactivex.rxjava3.core.Observablecom.lightningkite.lightningdb.ListChangecom.lightningkite.lightningdb.live.toListObservable.T
 function xObservableToListObservable(this_, ordering) {
     const localList = [];
     return this_.pipe((0, operators_1.map)((it) => {

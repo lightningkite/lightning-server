@@ -1,90 +1,90 @@
 @lightningkite/ktor-batteries
-com.lightningkite.ktordb.plus>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.plus.K, kotlin.collections.Listcom.lightningkite.ktordb.plus.T
-com.lightningkite.ktordb.addAll>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.addAll.K, kotlin.collections.Listcom.lightningkite.ktordb.addAll.T
-com.lightningkite.ktordb.live.WebSocketIsh
-com.lightningkite.ktordb.times>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.times.K, com.lightningkite.ktordb.times.T
-com.lightningkite.ktordb.HasId
-com.lightningkite.ktordb.Modification
-com.lightningkite.ktordb.never>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.never.K, com.lightningkite.ktordb.never.K
-com.lightningkite.ktordb.condition>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.condition.K, com.lightningkite.ktordb.condition.T
-com.lightningkite.ktordb.neq>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.neq.K, com.lightningkite.ktordb.neq.T
-com.lightningkite.ktordb.EntryChange
-com.lightningkite.ktordb.live.multiplexedSocket
-com.lightningkite.ktordb.mock.MockTable
-com.lightningkite.ktordb.lt>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.lt.K, com.lightningkite.ktordb.lt.T
-com.lightningkite.ktordb.MultiplexMessage
-com.lightningkite.ktordb.coerceAtMost>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.coerceAtMost.K, com.lightningkite.ktordb.coerceAtMost.T
-com.lightningkite.ktordb.FullReadModelApi
-com.lightningkite.ktordb.modifyByKey>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.modifyByKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.ktordb.modifyByKey.T
-com.lightningkite.ktordb.allClear>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.allClear.K, kotlin.Int
-com.lightningkite.ktordb.any>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.any.K, kotlin.collections.Listcom.lightningkite.ktordb.any.T
-com.lightningkite.ktordb.live._overrideWebSocketProvider
-com.lightningkite.ktordb.Query
-com.lightningkite.ktordb.live.toListObservable>io.reactivex.rxjava3.core.Observablecom.lightningkite.ktordb.ListChangecom.lightningkite.ktordb.live.toListObservable.T
-com.lightningkite.ktordb.SignalData
-com.lightningkite.ktordb.sizesEquals>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.sizesEquals.K, kotlin.collections.Listcom.lightningkite.ktordb.sizesEquals.T
-com.lightningkite.ktordb.plus>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.plus.K, com.lightningkite.ktordb.plus.T
-com.lightningkite.ktordb.WriteModelApi
-com.lightningkite.ktordb.addUnique>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.addUnique.K, kotlin.collections.Listcom.lightningkite.ktordb.addUnique.T
-com.lightningkite.ktordb.removeAll>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.removeAll.K, kotlin.collections.Listcom.lightningkite.ktordb.removeAll.T
-com.lightningkite.ktordb.mock.MockReadModelApi
-com.lightningkite.ktordb.mock.MockFullReadModelApi
-com.lightningkite.ktordb.plus>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.plus.K, kotlin.collections.Mapkotlin.String, com.lightningkite.ktordb.plus.T
-com.lightningkite.ktordb.map>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.map.K, kotlin.collections.Listcom.lightningkite.ktordb.map.T
-com.lightningkite.ktordb.notNull>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.notNull.K, com.lightningkite.ktordb.notNull.T
-com.lightningkite.ktordb.PropChain
-com.lightningkite.ktordb.coerceAtLeast>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.coerceAtLeast.K, com.lightningkite.ktordb.coerceAtLeast.T
-com.lightningkite.ktordb.inside>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.inside.K, com.lightningkite.ktordb.inside.T
-com.lightningkite.ktordb.contains>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.contains.K, kotlin.String
-com.lightningkite.ktordb.live.toListObservable
-com.lightningkite.ktordb.modification
-com.lightningkite.ktordb.live.LiveCompleteModelApi
-com.lightningkite.ktordb.modification>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.modification.K, com.lightningkite.ktordb.modification.T
-com.lightningkite.ktordb.ObserveModelApi
-com.lightningkite.ktordb.mock.ItemNotFound
-com.lightningkite.ktordb.gte>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.gte.K, com.lightningkite.ktordb.gte.T
-com.lightningkite.ktordb.mock.MockWriteModelApi
-com.lightningkite.ktordb.live.sharedSocket
-com.lightningkite.ktordb.live.MultiplexedWebsocketPart
-com.lightningkite.ktordb.removeKeys>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.removeKeys.K, kotlin.collections.Mapkotlin.String, com.lightningkite.ktordb.removeKeys.T
-com.lightningkite.ktordb.Condition
-com.lightningkite.ktordb.mock.MockCompleteModelApi
-com.lightningkite.ktordb.MassModification
-com.lightningkite.ktordb.PartialDataClassProperty
-com.lightningkite.ktordb.anySet>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.anySet.K, kotlin.Int
-com.lightningkite.ktordb.CompleteModelApi
-com.lightningkite.ktordb.plus>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.plus.K, kotlin.String
-com.lightningkite.ktordb.all>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.all.K, kotlin.collections.Listcom.lightningkite.ktordb.all.T
-com.lightningkite.ktordb.HasIdFields
-com.lightningkite.ktordb.allSet>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.allSet.K, kotlin.Int
-com.lightningkite.ktordb.ne>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.ne.K, com.lightningkite.ktordb.ne.T
-com.lightningkite.ktordb.mock.MockObserveModelApi
-com.lightningkite.ktordb.listChange>com.lightningkite.ktordb.EntryChangecom.lightningkite.ktordb.listChange.T
-com.lightningkite.ktordb.ReadModelApi
-com.lightningkite.ktordb.condition
-com.lightningkite.ktordb.assign>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.assign.K, com.lightningkite.ktordb.assign.T
-com.lightningkite.ktordb.eq>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.eq.K, com.lightningkite.ktordb.eq.T
-com.lightningkite.ktordb.live.LiveObserveModelApi
-com.lightningkite.ktordb.containsKey>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.containsKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.ktordb.containsKey.T
-com.lightningkite.ktordb.HasEmail
-com.lightningkite.ktordb.live.LiveWriteModelApi
-com.lightningkite.ktordb.always>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.always.K, com.lightningkite.ktordb.always.K
-com.lightningkite.ktordb.anyClear>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.anyClear.K, kotlin.Int
-com.lightningkite.ktordb.gt>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.gt.K, com.lightningkite.ktordb.gt.T
-com.lightningkite.ktordb.dropFirst>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.dropFirst.K, kotlin.collections.Listcom.lightningkite.ktordb.dropFirst.T
-com.lightningkite.ktordb.map>com.lightningkite.ktordb.EntryChangecom.lightningkite.ktordb.map.T
-com.lightningkite.ktordb.lte>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.lte.K, com.lightningkite.ktordb.lte.T
-com.lightningkite.ktordb.live.LiveReadModelApi
-com.lightningkite.ktordb.SortPart
-com.lightningkite.ktordb.live.LiveFullReadModelApi
-com.lightningkite.ktordb.nin>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.nin.K, com.lightningkite.ktordb.nin.T
-com.lightningkite.ktordb.ListChange
-com.lightningkite.ktordb.notIn>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.notIn.K, com.lightningkite.ktordb.notIn.T
-com.lightningkite.ktordb.UUIDFor
-com.lightningkite.ktordb.DataClassProperty
-com.lightningkite.ktordb.startChain
-com.lightningkite.ktordb.dropLast>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.dropLast.K, kotlin.collections.Listcom.lightningkite.ktordb.dropLast.T
-com.lightningkite.ktordb.mapIf>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.mapIf.K, kotlin.collections.Listcom.lightningkite.ktordb.mapIf.T
-com.lightningkite.ktordb.comparator>kotlin.collections.Listcom.lightningkite.ktordb.SortPartcom.lightningkite.ktordb.comparator.T
-com.lightningkite.ktordb.get>com.lightningkite.ktordb.PropChaincom.lightningkite.ktordb.get.K, kotlin.collections.Mapkotlin.String, com.lightningkite.ktordb.get.T
-com.lightningkite.ktordb.HasEmailFields
+com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.plus.K, kotlin.collections.Listcom.lightningkite.lightningdb.plus.T
+com.lightningkite.lightningdb.addAll>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.addAll.K, kotlin.collections.Listcom.lightningkite.lightningdb.addAll.T
+com.lightningkite.lightningdb.live.WebSocketIsh
+com.lightningkite.lightningdb.times>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.times.K, com.lightningkite.lightningdb.times.T
+com.lightningkite.lightningdb.HasId
+com.lightningkite.lightningdb.Modification
+com.lightningkite.lightningdb.never>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.never.K, com.lightningkite.lightningdb.never.K
+com.lightningkite.lightningdb.condition>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.condition.K, com.lightningkite.lightningdb.condition.T
+com.lightningkite.lightningdb.neq>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.neq.K, com.lightningkite.lightningdb.neq.T
+com.lightningkite.lightningdb.EntryChange
+com.lightningkite.lightningdb.live.multiplexedSocket
+com.lightningkite.lightningdb.mock.MockTable
+com.lightningkite.lightningdb.lt>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.lt.K, com.lightningkite.lightningdb.lt.T
+com.lightningkite.lightningdb.MultiplexMessage
+com.lightningkite.lightningdb.coerceAtMost>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.coerceAtMost.K, com.lightningkite.lightningdb.coerceAtMost.T
+com.lightningkite.lightningdb.FullReadModelApi
+com.lightningkite.lightningdb.modifyByKey>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.modifyByKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.modifyByKey.T
+com.lightningkite.lightningdb.allClear>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.allClear.K, kotlin.Int
+com.lightningkite.lightningdb.any>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.any.K, kotlin.collections.Listcom.lightningkite.lightningdb.any.T
+com.lightningkite.lightningdb.live._overrideWebSocketProvider
+com.lightningkite.lightningdb.Query
+com.lightningkite.lightningdb.live.toListObservable>io.reactivex.rxjava3.core.Observablecom.lightningkite.lightningdb.ListChangecom.lightningkite.lightningdb.live.toListObservable.T
+com.lightningkite.lightningdb.SignalData
+com.lightningkite.lightningdb.sizesEquals>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.sizesEquals.K, kotlin.collections.Listcom.lightningkite.lightningdb.sizesEquals.T
+com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.plus.K, com.lightningkite.lightningdb.plus.T
+com.lightningkite.lightningdb.WriteModelApi
+com.lightningkite.lightningdb.addUnique>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.addUnique.K, kotlin.collections.Listcom.lightningkite.lightningdb.addUnique.T
+com.lightningkite.lightningdb.removeAll>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.removeAll.K, kotlin.collections.Listcom.lightningkite.lightningdb.removeAll.T
+com.lightningkite.lightningdb.mock.MockReadModelApi
+com.lightningkite.lightningdb.mock.MockFullReadModelApi
+com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.plus.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.plus.T
+com.lightningkite.lightningdb.map>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.map.K, kotlin.collections.Listcom.lightningkite.lightningdb.map.T
+com.lightningkite.lightningdb.notNull>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.notNull.K, com.lightningkite.lightningdb.notNull.T
+com.lightningkite.lightningdb.PropChain
+com.lightningkite.lightningdb.coerceAtLeast>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.coerceAtLeast.K, com.lightningkite.lightningdb.coerceAtLeast.T
+com.lightningkite.lightningdb.inside>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.inside.K, com.lightningkite.lightningdb.inside.T
+com.lightningkite.lightningdb.contains>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.contains.K, kotlin.String
+com.lightningkite.lightningdb.live.toListObservable
+com.lightningkite.lightningdb.modification
+com.lightningkite.lightningdb.live.LiveCompleteModelApi
+com.lightningkite.lightningdb.modification>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.modification.K, com.lightningkite.lightningdb.modification.T
+com.lightningkite.lightningdb.ObserveModelApi
+com.lightningkite.lightningdb.mock.ItemNotFound
+com.lightningkite.lightningdb.gte>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.gte.K, com.lightningkite.lightningdb.gte.T
+com.lightningkite.lightningdb.mock.MockWriteModelApi
+com.lightningkite.lightningdb.live.sharedSocket
+com.lightningkite.lightningdb.live.MultiplexedWebsocketPart
+com.lightningkite.lightningdb.removeKeys>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.removeKeys.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.removeKeys.T
+com.lightningkite.lightningdb.Condition
+com.lightningkite.lightningdb.mock.MockCompleteModelApi
+com.lightningkite.lightningdb.MassModification
+com.lightningkite.lightningdb.PartialDataClassProperty
+com.lightningkite.lightningdb.anySet>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.anySet.K, kotlin.Int
+com.lightningkite.lightningdb.CompleteModelApi
+com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.plus.K, kotlin.String
+com.lightningkite.lightningdb.all>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.all.K, kotlin.collections.Listcom.lightningkite.lightningdb.all.T
+com.lightningkite.lightningdb.HasIdFields
+com.lightningkite.lightningdb.allSet>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.allSet.K, kotlin.Int
+com.lightningkite.lightningdb.ne>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.ne.K, com.lightningkite.lightningdb.ne.T
+com.lightningkite.lightningdb.mock.MockObserveModelApi
+com.lightningkite.lightningdb.listChange>com.lightningkite.lightningdb.EntryChangecom.lightningkite.lightningdb.listChange.T
+com.lightningkite.lightningdb.ReadModelApi
+com.lightningkite.lightningdb.condition
+com.lightningkite.lightningdb.assign>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.assign.K, com.lightningkite.lightningdb.assign.T
+com.lightningkite.lightningdb.eq>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.eq.K, com.lightningkite.lightningdb.eq.T
+com.lightningkite.lightningdb.live.LiveObserveModelApi
+com.lightningkite.lightningdb.containsKey>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.containsKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.containsKey.T
+com.lightningkite.lightningdb.HasEmail
+com.lightningkite.lightningdb.live.LiveWriteModelApi
+com.lightningkite.lightningdb.always>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.always.K, com.lightningkite.lightningdb.always.K
+com.lightningkite.lightningdb.anyClear>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.anyClear.K, kotlin.Int
+com.lightningkite.lightningdb.gt>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.gt.K, com.lightningkite.lightningdb.gt.T
+com.lightningkite.lightningdb.dropFirst>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.dropFirst.K, kotlin.collections.Listcom.lightningkite.lightningdb.dropFirst.T
+com.lightningkite.lightningdb.map>com.lightningkite.lightningdb.EntryChangecom.lightningkite.lightningdb.map.T
+com.lightningkite.lightningdb.lte>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.lte.K, com.lightningkite.lightningdb.lte.T
+com.lightningkite.lightningdb.live.LiveReadModelApi
+com.lightningkite.lightningdb.SortPart
+com.lightningkite.lightningdb.live.LiveFullReadModelApi
+com.lightningkite.lightningdb.nin>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.nin.K, com.lightningkite.lightningdb.nin.T
+com.lightningkite.lightningdb.ListChange
+com.lightningkite.lightningdb.notIn>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.notIn.K, com.lightningkite.lightningdb.notIn.T
+com.lightningkite.lightningdb.UUIDFor
+com.lightningkite.lightningdb.DataClassProperty
+com.lightningkite.lightningdb.startChain
+com.lightningkite.lightningdb.dropLast>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.dropLast.K, kotlin.collections.Listcom.lightningkite.lightningdb.dropLast.T
+com.lightningkite.lightningdb.mapIf>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.mapIf.K, kotlin.collections.Listcom.lightningkite.lightningdb.mapIf.T
+com.lightningkite.lightningdb.comparator>kotlin.collections.Listcom.lightningkite.lightningdb.SortPartcom.lightningkite.lightningdb.comparator.T
+com.lightningkite.lightningdb.get>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.get.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.get.T
+com.lightningkite.lightningdb.HasEmailFields

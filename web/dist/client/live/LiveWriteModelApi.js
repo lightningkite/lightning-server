@@ -4,7 +4,7 @@ exports.LiveWriteModelApi = void 0;
 const WriteModelApi_1 = require("../WriteModelApi");
 const rxjs_plus_1 = require("@lightningkite/rxjs-plus");
 const rxjs_1 = require("rxjs");
-//! Declares com.lightningkite.ktordb.live.LiveWriteModelApi
+//! Declares com.lightningkite.lightningdb.live.LiveWriteModelApi
 class LiveWriteModelApi extends WriteModelApi_1.WriteModelApi {
     constructor(url, token, serializer) {
         super();

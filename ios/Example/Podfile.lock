@@ -11,7 +11,7 @@ PODS:
   - DKImagePickerController/Resource (4.3.2)
   - IBPCollectionViewCompositionalLayout (0.6.9)
   - KhrysalisRuntime (0.7.1)
-  - KtorBatteries (0.7.1):
+  - lightningserver (0.7.1):
     - KhrysalisRuntime
     - RxSwiftPlus/Http
   - LifecycleHooks (0.6.2)
@@ -84,7 +84,7 @@ PODS:
 
 DEPENDENCIES:
   - KhrysalisRuntime (from `../../../khrysalis/KhrysalisRuntime.podspec`)
-  - KtorBatteries (from `../../`)
+  - lightningserver (from `../../`)
   - RxCoreLocation (from `https://github.com/RxSwiftCommunity/RxCoreLocation.git`, branch `master`)
   - RxSwift (from `../../../RxSwift/RxSwift.podspec`)
   - RxSwiftPlus (from `../../../RxSwiftPlus/RxSwiftPlus.podspec`)
@@ -106,7 +106,7 @@ SPEC REPOS:
 EXTERNAL SOURCES:
   KhrysalisRuntime:
     :path: "../../../khrysalis/KhrysalisRuntime.podspec"
-  KtorBatteries:
+  lightningserver:
     :path: "../../"
   RxCoreLocation:
     :branch: master
@@ -129,7 +129,7 @@ SPEC CHECKSUMS:
   DKImagePickerController: b5eb7f7a388e4643264105d648d01f727110fc3d
   IBPCollectionViewCompositionalLayout: bbb29e39ac564666a8c3cdb6633ed944b6feb55b
   KhrysalisRuntime: 3a72ac3c2ceaef60b9f9733ed02f1e247081f8b2
-  KtorBatteries: 5a4534a0a2bb89cf0911f62afd0d176b31263548
+  lightningserver: 5a4534a0a2bb89cf0911f62afd0d176b31263548
   LifecycleHooks: 246984e8ef036a8c717298166845bb999b245f5b
   M13Checkbox: 6f59404540ac98ba83a3d1afac335895a40c6a5d
   RxCocoa: 4baf94bb35f2c0ab31bc0cb9f1900155f646ba42

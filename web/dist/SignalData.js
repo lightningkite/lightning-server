@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SignalData = void 0;
 const khrysalis_runtime_1 = require("@lightningkite/khrysalis-runtime");
-//! Declares com.lightningkite.ktordb.SignalData
+//! Declares com.lightningkite.lightningdb.SignalData
 class SignalData {
     constructor(item, created, deleted) {
         this.item = item;

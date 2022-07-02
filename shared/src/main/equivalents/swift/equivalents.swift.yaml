@@ -1,23 +1,23 @@
-- id: com.lightningkite.ktordb.fields
+- id: com.lightningkite.lightningdb.fields
   type: get
   template:
     pattern: 'try getDataClassProperties(type: ~this~)'
-    imports: [ KtorBatteries ]
+    imports: [ lightningserver ]
 
-- id: com.lightningkite.ktordb.fields
+- id: com.lightningkite.lightningdb.fields
   type: set
   template:
     pattern: 'registerDataClassProperties(type: ~this~, properties: ~value~)'
-    imports: [ KtorBatteries ]
+    imports: [ lightningserver ]
 
-- id: com.lightningkite.ktordb.ServerFile
+- id: com.lightningkite.lightningdb.ServerFile
   type: type
   template: 'String'
 
-- id: com.lightningkite.ktordb.ServerFile
+- id: com.lightningkite.lightningdb.ServerFile
   type: typeRef
   template: 'String'
 
-- id: com.lightningkite.ktordb.ServerFile.location
+- id: com.lightningkite.lightningdb.ServerFile.location
   type: get
   template: ~this~

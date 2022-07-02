@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.xEntryChangeListChange = exports.ListChange = void 0;
 const khrysalis_runtime_1 = require("@lightningkite/khrysalis-runtime");
-//! Declares com.lightningkite.ktordb.ListChange
+//! Declares com.lightningkite.lightningdb.ListChange
 class ListChange {
     constructor(wholeList = null, old = null, _new = null) {
         this.wholeList = wholeList;
@@ -14,7 +14,7 @@ class ListChange {
 exports.ListChange = ListChange;
 ListChange.properties = ["wholeList", "old", "_new"];
 (0, khrysalis_runtime_1.setUpDataClass)(ListChange);
-//! Declares com.lightningkite.ktordb.listChange>com.lightningkite.ktordb.EntryChangecom.lightningkite.ktordb.listChange.T
+//! Declares com.lightningkite.lightningdb.listChange>com.lightningkite.lightningdb.EntryChangecom.lightningkite.lightningdb.listChange.T
 function xEntryChangeListChange(this_) {
     return new ListChange(undefined, this_.old, this_._new);
 }

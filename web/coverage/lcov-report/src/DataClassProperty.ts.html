@@ -97,13 +97,13 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Package: com.lightningkite.ktordb
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Package: com.lightningkite.lightningdb
 // Managed here.
 import {Comparator, DataClass, hashString, tryCastClass} from '@lightningkite/khrysalis-runtime'
 &nbsp;
-//! Declares com.lightningkite.ktordb.PartialDataClassProperty
+//! Declares com.lightningkite.lightningdb.PartialDataClassProperty
 export type PartialDataClassProperty&lt;T&gt; = keyof T &amp; string
-//! Declares com.lightningkite.ktordb.DataClassProperty
+//! Declares com.lightningkite.lightningdb.DataClassProperty
 export type DataClassProperty&lt;T, V&gt; = keyof { [ P in keyof T as T[P] extends V ? P : never ] : P } &amp; keyof T &amp; string;
 &nbsp;
 export function <span class="fstat-no" title="function not covered" >keyGet&lt;</span>K, V&gt;(on: K, key: DataClassProperty&lt;K, V&gt;): V {

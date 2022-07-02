@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReadModelApi = void 0;
-//! Declares com.lightningkite.ktordb.ReadModelApi
+//! Declares com.lightningkite.lightningdb.ReadModelApi
 class ReadModelApi {
     constructor() {
     }

@@ -1,13 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HasEmailFields = exports.HasIdFields = exports.HasId = void 0;
-//! Declares com.lightningkite.ktordb.HasId
+//! Declares com.lightningkite.lightningdb.HasId
 class HasId {
     constructor() {
     }
 }
 exports.HasId = HasId;
-//! Declares com.lightningkite.ktordb.HasIdFields
+//! Declares com.lightningkite.lightningdb.HasIdFields
 class HasIdFields {
     constructor() {
     }
@@ -17,7 +17,7 @@ class HasIdFields {
 }
 exports.HasIdFields = HasIdFields;
 HasIdFields.INSTANCE = new HasIdFields();
-//! Declares com.lightningkite.ktordb.HasEmailFields
+//! Declares com.lightningkite.lightningdb.HasEmailFields
 class HasEmailFields {
     constructor() {
     }

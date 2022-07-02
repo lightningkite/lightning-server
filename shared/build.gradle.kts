@@ -41,9 +41,9 @@ kotlin {
 }
 
 khrysalis {
-    iosProjectName = "KtorBatteries"
+    iosProjectName = "lightningserver"
     iosProjectFolder = rootDir.resolve("ios")
-    iosSourceFolder = rootDir.resolve("ios/KtorBatteries/Classes/shared")
+    iosSourceFolder = rootDir.resolve("ios/lightningserver/Classes/shared")
     webProjectName = "@lightningkite/ktor-batteries"
     webProjectFolder = rootDir.resolve("web")
     webSourceFolder = rootDir.resolve("web/src")

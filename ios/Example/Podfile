@@ -2,15 +2,15 @@ use_frameworks!
 
 platform :ios, '11.0'
 
-target 'KtorBatteries_Example' do
-  pod 'KtorBatteries', :path => '../../'
+target 'lightningserver_Example' do
+  pod 'lightningserver', :path => '../../'
   pod 'KhrysalisRuntime', :path => '../../../khrysalis/KhrysalisRuntime.podspec'
   pod 'XmlToXibRuntime', :path => '../../../android-xml-to-ios-xib/XmlToXibRuntime.podspec'
   pod 'RxSwift', :path => '../../../RxSwift/RxSwift.podspec'
   pod 'RxSwiftPlus', :path => '../../../RxSwiftPlus/RxSwiftPlus.podspec'
   pod "RxCoreLocation", :git => 'https://github.com/RxSwiftCommunity/RxCoreLocation.git', :branch => 'master'
 
-  target 'KtorBatteries_Tests' do
+  target 'lightningserver_Tests' do
     inherit! :search_paths
 
     

@@ -6,7 +6,7 @@ const khrysalis_runtime_1 = require("@lightningkite/khrysalis-runtime");
 const iter_tools_es_1 = require("iter-tools-es");
 const rxjs_1 = require("rxjs");
 const operators_1 = require("rxjs/operators");
-//! Declares com.lightningkite.ktordb.mock.MockTable
+//! Declares com.lightningkite.lightningdb.mock.MockTable
 class MockTable {
     constructor() {
         this.data = new khrysalis_runtime_1.EqualOverrideMap([]);

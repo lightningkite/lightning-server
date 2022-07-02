@@ -7,14 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		3DDD95EB0D44DCC870D20749 /* Pods_KtorBatteries_Tests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A0C9C61DF30755E88830C933 /* Pods_KtorBatteries_Tests.framework */; };
+		3DDD95EB0D44DCC870D20749 /* Pods_lightningserver_Tests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A0C9C61DF30755E88830C933 /* Pods_lightningserver_Tests.framework */; };
 		607FACD61AFB9204008FA782 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607FACD51AFB9204008FA782 /* AppDelegate.swift */; };
 		607FACD81AFB9204008FA782 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607FACD71AFB9204008FA782 /* ViewController.swift */; };
 		607FACDB1AFB9204008FA782 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 607FACD91AFB9204008FA782 /* Main.storyboard */; };
 		607FACDD1AFB9204008FA782 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 607FACDC1AFB9204008FA782 /* Images.xcassets */; };
 		607FACE01AFB9204008FA782 /* LaunchScreen.xib in Resources */ = {isa = PBXBuildFile; fileRef = 607FACDE1AFB9204008FA782 /* LaunchScreen.xib */; };
 		607FACEC1AFB9204008FA782 /* Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607FACEB1AFB9204008FA782 /* Tests.swift */; };
-		FE8114EAF8DDF8A5DA58BCFF /* Pods_KtorBatteries_Example.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C3F1B0A6EF32526C1C17D6BF /* Pods_KtorBatteries_Example.framework */; };
+		FE8114EAF8DDF8A5DA58BCFF /* Pods_lightningserver_Example.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C3F1B0A6EF32526C1C17D6BF /* Pods_lightningserver_Example.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -23,30 +23,30 @@
 			containerPortal = 607FACC81AFB9204008FA782 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 607FACCF1AFB9204008FA782;
-			remoteInfo = KtorBatteries;
+			remoteInfo = lightningserver;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		607FACD01AFB9204008FA782 /* KtorBatteries_Example.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KtorBatteries_Example.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		607FACD01AFB9204008FA782 /* lightningserver_Example.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = lightningserver_Example.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		607FACD41AFB9204008FA782 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		607FACD51AFB9204008FA782 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		607FACD71AFB9204008FA782 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
 		607FACDA1AFB9204008FA782 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		607FACDC1AFB9204008FA782 /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
 		607FACDF1AFB9204008FA782 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/LaunchScreen.xib; sourceTree = "<group>"; };
-		607FACE51AFB9204008FA782 /* KtorBatteries_Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KtorBatteries_Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		607FACE51AFB9204008FA782 /* lightningserver_Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = lightningserver_Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		607FACEA1AFB9204008FA782 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		607FACEB1AFB9204008FA782 /* Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests.swift; sourceTree = "<group>"; };
-		74B7662C72B9A0C8CAA51757 /* Pods-KtorBatteries_Example.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-KtorBatteries_Example.debug.xcconfig"; path = "Target Support Files/Pods-KtorBatteries_Example/Pods-KtorBatteries_Example.debug.xcconfig"; sourceTree = "<group>"; };
+		74B7662C72B9A0C8CAA51757 /* Pods-lightningserver_Example.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-lightningserver_Example.debug.xcconfig"; path = "Target Support Files/Pods-lightningserver_Example/Pods-lightningserver_Example.debug.xcconfig"; sourceTree = "<group>"; };
 		9ED8378AB2CFFB231442596A /* LICENSE */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = LICENSE; path = ../LICENSE; sourceTree = "<group>"; };
-		A0C9C61DF30755E88830C933 /* Pods_KtorBatteries_Tests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_KtorBatteries_Tests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		BABA4E75F95A645DFB8C4885 /* KtorBatteries.podspec */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = KtorBatteries.podspec; path = ../KtorBatteries.podspec; sourceTree = "<group>"; };
-		BDD77F0E7784D3480D6675B8 /* Pods-KtorBatteries_Tests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-KtorBatteries_Tests.debug.xcconfig"; path = "Target Support Files/Pods-KtorBatteries_Tests/Pods-KtorBatteries_Tests.debug.xcconfig"; sourceTree = "<group>"; };
-		C3F1B0A6EF32526C1C17D6BF /* Pods_KtorBatteries_Example.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_KtorBatteries_Example.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		A0C9C61DF30755E88830C933 /* Pods_lightningserver_Tests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_lightningserver_Tests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		BABA4E75F95A645DFB8C4885 /* lightningserver.podspec */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = lightningserver.podspec; path = ../lightningserver.podspec; sourceTree = "<group>"; };
+		BDD77F0E7784D3480D6675B8 /* Pods-lightningserver_Tests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-lightningserver_Tests.debug.xcconfig"; path = "Target Support Files/Pods-lightningserver_Tests/Pods-lightningserver_Tests.debug.xcconfig"; sourceTree = "<group>"; };
+		C3F1B0A6EF32526C1C17D6BF /* Pods_lightningserver_Example.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_lightningserver_Example.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		CD620AFDFE8DE6FC10910CB7 /* README.md */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../README.md; sourceTree = "<group>"; };
-		DDA24AEEEE2897FC767287C8 /* Pods-KtorBatteries_Tests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-KtorBatteries_Tests.release.xcconfig"; path = "Target Support Files/Pods-KtorBatteries_Tests/Pods-KtorBatteries_Tests.release.xcconfig"; sourceTree = "<group>"; };
-		DDEB67D1B8B44F00827E19BE /* Pods-KtorBatteries_Example.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-KtorBatteries_Example.release.xcconfig"; path = "Target Support Files/Pods-KtorBatteries_Example/Pods-KtorBatteries_Example.release.xcconfig"; sourceTree = "<group>"; };
+		DDA24AEEEE2897FC767287C8 /* Pods-lightningserver_Tests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-lightningserver_Tests.release.xcconfig"; path = "Target Support Files/Pods-lightningserver_Tests/Pods-lightningserver_Tests.release.xcconfig"; sourceTree = "<group>"; };
+		DDEB67D1B8B44F00827E19BE /* Pods-lightningserver_Example.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-lightningserver_Example.release.xcconfig"; path = "Target Support Files/Pods-lightningserver_Example/Pods-lightningserver_Example.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -54,7 +54,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FE8114EAF8DDF8A5DA58BCFF /* Pods_KtorBatteries_Example.framework in Frameworks */,
+				FE8114EAF8DDF8A5DA58BCFF /* Pods_lightningserver_Example.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -62,7 +62,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3DDD95EB0D44DCC870D20749 /* Pods_KtorBatteries_Tests.framework in Frameworks */,
+				3DDD95EB0D44DCC870D20749 /* Pods_lightningserver_Tests.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,10 +72,10 @@
 		3AFD1A2976B914F7DBEC1134 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				74B7662C72B9A0C8CAA51757 /* Pods-KtorBatteries_Example.debug.xcconfig */,
-				DDEB67D1B8B44F00827E19BE /* Pods-KtorBatteries_Example.release.xcconfig */,
-				BDD77F0E7784D3480D6675B8 /* Pods-KtorBatteries_Tests.debug.xcconfig */,
-				DDA24AEEEE2897FC767287C8 /* Pods-KtorBatteries_Tests.release.xcconfig */,
+				74B7662C72B9A0C8CAA51757 /* Pods-lightningserver_Example.debug.xcconfig */,
+				DDEB67D1B8B44F00827E19BE /* Pods-lightningserver_Example.release.xcconfig */,
+				BDD77F0E7784D3480D6675B8 /* Pods-lightningserver_Tests.debug.xcconfig */,
+				DDA24AEEEE2897FC767287C8 /* Pods-lightningserver_Tests.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -84,7 +84,7 @@
 			isa = PBXGroup;
 			children = (
 				607FACF51AFB993E008FA782 /* Podspec Metadata */,
-				607FACD21AFB9204008FA782 /* Example for KtorBatteries */,
+				607FACD21AFB9204008FA782 /* Example for lightningserver */,
 				607FACE81AFB9204008FA782 /* Tests */,
 				607FACD11AFB9204008FA782 /* Products */,
 				3AFD1A2976B914F7DBEC1134 /* Pods */,
@@ -95,13 +95,13 @@
 		607FACD11AFB9204008FA782 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				607FACD01AFB9204008FA782 /* KtorBatteries_Example.app */,
-				607FACE51AFB9204008FA782 /* KtorBatteries_Tests.xctest */,
+				607FACD01AFB9204008FA782 /* lightningserver_Example.app */,
+				607FACE51AFB9204008FA782 /* lightningserver_Tests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		607FACD21AFB9204008FA782 /* Example for KtorBatteries */ = {
+		607FACD21AFB9204008FA782 /* Example for lightningserver */ = {
 			isa = PBXGroup;
 			children = (
 				607FACD51AFB9204008FA782 /* AppDelegate.swift */,
@@ -111,8 +111,8 @@
 				607FACDE1AFB9204008FA782 /* LaunchScreen.xib */,
 				607FACD31AFB9204008FA782 /* Supporting Files */,
 			);
-			name = "Example for KtorBatteries";
-			path = KtorBatteries;
+			name = "Example for lightningserver";
+			path = lightningserver;
 			sourceTree = "<group>";
 		};
 		607FACD31AFB9204008FA782 /* Supporting Files */ = {
@@ -143,7 +143,7 @@
 		607FACF51AFB993E008FA782 /* Podspec Metadata */ = {
 			isa = PBXGroup;
 			children = (
-				BABA4E75F95A645DFB8C4885 /* KtorBatteries.podspec */,
+				BABA4E75F95A645DFB8C4885 /* lightningserver.podspec */,
 				CD620AFDFE8DE6FC10910CB7 /* README.md */,
 				9ED8378AB2CFFB231442596A /* LICENSE */,
 			);
@@ -153,8 +153,8 @@
 		93F6C114043C3AB2FEA347C5 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				C3F1B0A6EF32526C1C17D6BF /* Pods_KtorBatteries_Example.framework */,
-				A0C9C61DF30755E88830C933 /* Pods_KtorBatteries_Tests.framework */,
+				C3F1B0A6EF32526C1C17D6BF /* Pods_lightningserver_Example.framework */,
+				A0C9C61DF30755E88830C933 /* Pods_lightningserver_Tests.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -162,9 +162,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		607FACCF1AFB9204008FA782 /* KtorBatteries_Example */ = {
+		607FACCF1AFB9204008FA782 /* lightningserver_Example */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 607FACEF1AFB9204008FA782 /* Build configuration list for PBXNativeTarget "KtorBatteries_Example" */;
+			buildConfigurationList = 607FACEF1AFB9204008FA782 /* Build configuration list for PBXNativeTarget "lightningserver_Example" */;
 			buildPhases = (
 				81130AB482049FEE65D52930 /* [CP] Check Pods Manifest.lock */,
 				607FACCC1AFB9204008FA782 /* Sources */,
@@ -176,14 +176,14 @@
 			);
 			dependencies = (
 			);
-			name = KtorBatteries_Example;
-			productName = KtorBatteries;
-			productReference = 607FACD01AFB9204008FA782 /* KtorBatteries_Example.app */;
+			name = lightningserver_Example;
+			productName = lightningserver;
+			productReference = 607FACD01AFB9204008FA782 /* lightningserver_Example.app */;
 			productType = "com.apple.product-type.application";
 		};
-		607FACE41AFB9204008FA782 /* KtorBatteries_Tests */ = {
+		607FACE41AFB9204008FA782 /* lightningserver_Tests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 607FACF21AFB9204008FA782 /* Build configuration list for PBXNativeTarget "KtorBatteries_Tests" */;
+			buildConfigurationList = 607FACF21AFB9204008FA782 /* Build configuration list for PBXNativeTarget "lightningserver_Tests" */;
 			buildPhases = (
 				6B6C37C12B11AB867ED95A09 /* [CP] Check Pods Manifest.lock */,
 				607FACE11AFB9204008FA782 /* Sources */,
@@ -195,9 +195,9 @@
 			dependencies = (
 				607FACE71AFB9204008FA782 /* PBXTargetDependency */,
 			);
-			name = KtorBatteries_Tests;
+			name = lightningserver_Tests;
 			productName = Tests;
-			productReference = 607FACE51AFB9204008FA782 /* KtorBatteries_Tests.xctest */;
+			productReference = 607FACE51AFB9204008FA782 /* lightningserver_Tests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -223,7 +223,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 607FACCB1AFB9204008FA782 /* Build configuration list for PBXProject "KtorBatteries" */;
+			buildConfigurationList = 607FACCB1AFB9204008FA782 /* Build configuration list for PBXProject "lightningserver" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
@@ -237,8 +237,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				607FACCF1AFB9204008FA782 /* KtorBatteries_Example */,
-				607FACE41AFB9204008FA782 /* KtorBatteries_Tests */,
+				607FACCF1AFB9204008FA782 /* lightningserver_Example */,
+				607FACE41AFB9204008FA782 /* lightningserver_Tests */,
 			);
 		};
 /* End PBXProject section */
@@ -270,12 +270,12 @@
 			files = (
 			);
 			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-KtorBatteries_Example/Pods-KtorBatteries_Example-frameworks.sh",
+				"${PODS_ROOT}/Target Support Files/Pods-lightningserver_Example/Pods-lightningserver_Example-frameworks.sh",
 				"${BUILT_PRODUCTS_DIR}/Cosmos/Cosmos.framework",
 				"${BUILT_PRODUCTS_DIR}/DKCamera/DKCamera.framework",
 				"${BUILT_PRODUCTS_DIR}/DKImagePickerController/DKImagePickerController.framework",
 				"${BUILT_PRODUCTS_DIR}/IBPCollectionViewCompositionalLayout/IBPCollectionViewCompositionalLayout.framework",
-				"${BUILT_PRODUCTS_DIR}/KtorBatteries/KtorBatteries.framework",
+				"${BUILT_PRODUCTS_DIR}/lightningserver/lightningserver.framework",
 				"${BUILT_PRODUCTS_DIR}/KhrysalisRuntime/KhrysalisRuntime.framework",
 				"${BUILT_PRODUCTS_DIR}/LifecycleHooks/LifecycleHooks.framework",
 				"${BUILT_PRODUCTS_DIR}/M13Checkbox/M13Checkbox.framework",
@@ -294,7 +294,7 @@
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/DKCamera.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/DKImagePickerController.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/IBPCollectionViewCompositionalLayout.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/KtorBatteries.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/lightningserver.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/KhrysalisRuntime.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/LifecycleHooks.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/M13Checkbox.framework",
@@ -309,7 +309,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-KtorBatteries_Example/Pods-KtorBatteries_Example-frameworks.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-lightningserver_Example/Pods-lightningserver_Example-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		6B6C37C12B11AB867ED95A09 /* [CP] Check Pods Manifest.lock */ = {
@@ -327,7 +327,7 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-KtorBatteries_Tests-checkManifestLockResult.txt",
+				"$(DERIVED_FILE_DIR)/Pods-lightningserver_Tests-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -349,7 +349,7 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-KtorBatteries_Example-checkManifestLockResult.txt",
+				"$(DERIVED_FILE_DIR)/Pods-lightningserver_Example-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -381,7 +381,7 @@
 /* Begin PBXTargetDependency section */
 		607FACE71AFB9204008FA782 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 607FACCF1AFB9204008FA782 /* KtorBatteries_Example */;
+			target = 607FACCF1AFB9204008FA782 /* lightningserver_Example */;
 			targetProxy = 607FACE61AFB9204008FA782 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -509,11 +509,11 @@
 		};
 		607FACF01AFB9204008FA782 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 74B7662C72B9A0C8CAA51757 /* Pods-KtorBatteries_Example.debug.xcconfig */;
+			baseConfigurationReference = 74B7662C72B9A0C8CAA51757 /* Pods-lightningserver_Example.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				DEVELOPMENT_TEAM = LJPST6SMJY;
-				INFOPLIST_FILE = KtorBatteries/Info.plist;
+				INFOPLIST_FILE = lightningserver/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.5;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MODULE_NAME = ExampleApp;
@@ -526,11 +526,11 @@
 		};
 		607FACF11AFB9204008FA782 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = DDEB67D1B8B44F00827E19BE /* Pods-KtorBatteries_Example.release.xcconfig */;
+			baseConfigurationReference = DDEB67D1B8B44F00827E19BE /* Pods-lightningserver_Example.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				DEVELOPMENT_TEAM = LJPST6SMJY;
-				INFOPLIST_FILE = KtorBatteries/Info.plist;
+				INFOPLIST_FILE = lightningserver/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.5;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MODULE_NAME = ExampleApp;
@@ -543,7 +543,7 @@
 		};
 		607FACF31AFB9204008FA782 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = BDD77F0E7784D3480D6675B8 /* Pods-KtorBatteries_Tests.debug.xcconfig */;
+			baseConfigurationReference = BDD77F0E7784D3480D6675B8 /* Pods-lightningserver_Tests.debug.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = LJPST6SMJY;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -560,13 +560,13 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_SWIFT3_OBJC_INFERENCE = Default;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/KtorBatteries_Example.app/KtorBatteries_Example";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/lightningserver_Example.app/lightningserver_Example";
 			};
 			name = Debug;
 		};
 		607FACF41AFB9204008FA782 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = DDA24AEEEE2897FC767287C8 /* Pods-KtorBatteries_Tests.release.xcconfig */;
+			baseConfigurationReference = DDA24AEEEE2897FC767287C8 /* Pods-lightningserver_Tests.release.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = LJPST6SMJY;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -579,14 +579,14 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_SWIFT3_OBJC_INFERENCE = Default;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/KtorBatteries_Example.app/KtorBatteries_Example";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/lightningserver_Example.app/lightningserver_Example";
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		607FACCB1AFB9204008FA782 /* Build configuration list for PBXProject "KtorBatteries" */ = {
+		607FACCB1AFB9204008FA782 /* Build configuration list for PBXProject "lightningserver" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				607FACED1AFB9204008FA782 /* Debug */,
@@ -595,7 +595,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		607FACEF1AFB9204008FA782 /* Build configuration list for PBXNativeTarget "KtorBatteries_Example" */ = {
+		607FACEF1AFB9204008FA782 /* Build configuration list for PBXNativeTarget "lightningserver_Example" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				607FACF01AFB9204008FA782 /* Debug */,
@@ -604,7 +604,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		607FACF21AFB9204008FA782 /* Build configuration list for PBXNativeTarget "KtorBatteries_Tests" */ = {
+		607FACF21AFB9204008FA782 /* Build configuration list for PBXNativeTarget "lightningserver_Tests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				607FACF31AFB9204008FA782 /* Debug */,

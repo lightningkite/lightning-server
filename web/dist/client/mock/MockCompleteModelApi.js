@@ -5,7 +5,7 @@ const CompleteModelApi_1 = require("../CompleteModelApi");
 const MockObserveModelApi_1 = require("./MockObserveModelApi");
 const MockReadModelApi_1 = require("./MockReadModelApi");
 const MockWriteModelApi_1 = require("./MockWriteModelApi");
-//! Declares com.lightningkite.ktordb.mock.MockCompleteModelApi
+//! Declares com.lightningkite.lightningdb.mock.MockCompleteModelApi
 class MockCompleteModelApi extends CompleteModelApi_1.CompleteModelApi {
     constructor(table) {
         super();

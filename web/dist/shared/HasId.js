@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HasIdFields = void 0;
-//! Declares com.lightningkite.ktordb.HasIdFields
+//! Declares com.lightningkite.lightningdb.HasIdFields
 class HasIdFields {
     constructor() {
     }

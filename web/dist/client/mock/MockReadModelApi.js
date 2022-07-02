@@ -6,7 +6,7 @@ const ReadModelApi_1 = require("../ReadModelApi");
 const ItemNotFound_1 = require("./ItemNotFound");
 const khrysalis_runtime_1 = require("@lightningkite/khrysalis-runtime");
 const rxjs_1 = require("rxjs");
-//! Declares com.lightningkite.ktordb.mock.MockReadModelApi
+//! Declares com.lightningkite.lightningdb.mock.MockReadModelApi
 class MockReadModelApi extends ReadModelApi_1.ReadModelApi {
     constructor(table) {
         super();

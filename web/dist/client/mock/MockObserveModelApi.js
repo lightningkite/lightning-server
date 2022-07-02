@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MockObserveModelApi = void 0;
 const ObserveModelApi_1 = require("../ObserveModelApi");
 const rxjs_1 = require("rxjs");
-//! Declares com.lightningkite.ktordb.mock.MockObserveModelApi
+//! Declares com.lightningkite.lightningdb.mock.MockObserveModelApi
 class MockObserveModelApi extends ObserveModelApi_1.ObserveModelApi {
     constructor(table) {
         super();

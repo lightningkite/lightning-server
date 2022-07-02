@@ -1,5 +1,5 @@
 import XCTest
-import KtorBatteries
+import lightningserver
 import KhrysalisRuntime
 
 class Tests: XCTestCase {

@@ -4,7 +4,7 @@ exports.MockWriteModelApi = void 0;
 const WriteModelApi_1 = require("../WriteModelApi");
 const ItemNotFound_1 = require("./ItemNotFound");
 const rxjs_1 = require("rxjs");
-//! Declares com.lightningkite.ktordb.mock.MockWriteModelApi
+//! Declares com.lightningkite.lightningdb.mock.MockWriteModelApi
 class MockWriteModelApi extends WriteModelApi_1.WriteModelApi {
     constructor(table) {
         super();

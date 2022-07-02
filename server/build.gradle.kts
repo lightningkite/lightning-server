@@ -95,6 +95,7 @@ dependencies {
 
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
 
+    ksp(project(":processor"))
     kspTest(project(":processor"))
 
 }
@@ -104,6 +105,9 @@ ksp {
 }
 
 kotlin {
+    sourceSets.main {
+        kotlin.srcDir("build/generated/ksp/main/kotlin")
+    }
     sourceSets.test {
         kotlin.srcDir("build/generated/ksp/test/kotlin")
     }

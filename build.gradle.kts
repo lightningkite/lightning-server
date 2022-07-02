@@ -18,7 +18,7 @@ buildscript {
     }
 }
 allprojects {
-    group = "com.lightningkite.ktorbatteries"
+    group = "com.lightningkite.lightningserver"
     repositories {
 //        mavenLocal()
         mavenCentral()

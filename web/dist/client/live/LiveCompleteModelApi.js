@@ -5,7 +5,7 @@ const CompleteModelApi_1 = require("../CompleteModelApi");
 const LiveObserveModelApi_1 = require("./LiveObserveModelApi");
 const LiveReadModelApi_1 = require("./LiveReadModelApi");
 const LiveWriteModelApi_1 = require("./LiveWriteModelApi");
-//! Declares com.lightningkite.ktordb.live.LiveCompleteModelApi
+//! Declares com.lightningkite.lightningdb.live.LiveCompleteModelApi
 class LiveCompleteModelApi extends CompleteModelApi_1.CompleteModelApi {
     constructor(read, write, observe) {
         super();
@@ -16,7 +16,7 @@ class LiveCompleteModelApi extends CompleteModelApi_1.CompleteModelApi {
 }
 exports.LiveCompleteModelApi = LiveCompleteModelApi;
 (function (LiveCompleteModelApi) {
-    //! Declares com.lightningkite.ktordb.live.LiveCompleteModelApi.Companion
+    //! Declares com.lightningkite.lightningdb.live.LiveCompleteModelApi.Companion
     class Companion {
         constructor() {
         }

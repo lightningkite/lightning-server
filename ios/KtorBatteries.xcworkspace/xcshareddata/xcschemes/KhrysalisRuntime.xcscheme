@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "5EAABE96233EC33F007E7CED"
-               BuildableName = "KtorBatteries.framework"
-               BlueprintName = "KtorBatteries"
-               ReferencedContainer = "container:KtorBatteries.xcodeproj">
+               BuildableName = "lightningserver.framework"
+               BlueprintName = "lightningserver"
+               ReferencedContainer = "container:lightningserver.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "5EAABE9F233EC33F007E7CED"
-               BuildableName = "KtorBatteriesTests.xctest"
-               BlueprintName = "KtorBatteriesTests"
-               ReferencedContainer = "container:KtorBatteries.xcodeproj">
+               BuildableName = "lightningserverTests.xctest"
+               BlueprintName = "lightningserverTests"
+               ReferencedContainer = "container:lightningserver.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -61,9 +61,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "5EAABE96233EC33F007E7CED"
-            BuildableName = "KtorBatteries.framework"
-            BlueprintName = "KtorBatteries"
-            ReferencedContainer = "container:KtorBatteries.xcodeproj">
+            BuildableName = "lightningserver.framework"
+            BlueprintName = "lightningserver"
+            ReferencedContainer = "container:lightningserver.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </ProfileAction>

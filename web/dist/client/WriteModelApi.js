@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WriteModelApi = void 0;
-//! Declares com.lightningkite.ktordb.WriteModelApi
+//! Declares com.lightningkite.lightningdb.WriteModelApi
 class WriteModelApi {
     constructor() {
     }

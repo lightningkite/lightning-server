@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalSerializationApi::class)
 
-package com.lightningkite.ktordb
+package com.lightningkite.lightningdb
 
 import kotlinx.serialization.*
 import kotlinx.serialization.internal.GeneratedSerializer

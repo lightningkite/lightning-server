@@ -1,6 +1,6 @@
 //
 //  AppDelegate.swift
-//  KtorBatteries
+//  lightningserver
 //
 //  Created by Joseph on 11/06/2021.
 //  Copyright (c) 2021 Joseph. All rights reserved.
