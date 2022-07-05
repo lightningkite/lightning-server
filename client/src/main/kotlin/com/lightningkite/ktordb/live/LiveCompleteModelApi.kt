@@ -22,8 +22,8 @@ class LiveCompleteModelApi<Model : HasId<UUID>>(
             token: String,
             headers: Map<String, String> = mapOf(),
         ): LiveCompleteModelApi<Model> = LiveCompleteModelApi(
-            read = LiveReadModelApi("$root$path", token, headers, defaultJsonMapper.serializersModule.serializer()),
-            write = LiveWriteModelApi("$root$path", token, headers, defaultJsonMapper.serializersModule.serializer()),
+            read = LiveReadModelApi.create(root, path, token, headers),
+            write = LiveWriteModelApi.create(root, path, token, headers),
             observe = LiveObserveModelApi.create(multiplexSocketUrl, token, headers, path)
         )
     }
