@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import io.ktor.server.auth.*
 import io.ktor.server.plugins.*
 import io.ktor.util.*
@@ -43,8 +44,9 @@ import kotlin.reflect.KProperty1
  */
 @LightningServerDsl
 inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> ServerPath.restApi(
-    noinline getCollection: suspend (principal: USER) -> FieldCollection<T>
-) = restApi(AuthInfo(), Serialization.module.serializer(), Serialization.module.serializer(), getCollection)
+    noinline database: ()->Database,
+    noinline getCollection: suspend Database.(principal: USER) -> FieldCollection<T>
+) = restApi(AuthInfo(), serializerOrContextual(), serializerOrContextual(), database, getCollection)
 
 /**
  * Creates a Restful API for the model provided.
@@ -68,7 +70,8 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
     authInfo: AuthInfo<USER>,
     serializer: KSerializer<T>,
     idSerializer: KSerializer<ID>,
-    getCollection: suspend (principal: USER) -> FieldCollection<T>
+    database: ()->Database,
+    getCollection: suspend Database.(principal: USER) -> FieldCollection<T>
 ) {
     val modelName = serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
     this.docName = modelName
@@ -80,7 +83,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         description = "Gets a list of ${modelName}s.",
         errorCases = listOf(),
         implementation = { user: USER, input: Query<T> ->
-            getCollection(user)
+            database().getCollection(user)
                 .query(input)
                 .toList()
         }
@@ -96,7 +99,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         description = "Gets a list of ${modelName}s that match the given query.",
         errorCases = listOf(),
         implementation = { user: USER, input: Query<T> ->
-            getCollection(user)
+            database().getCollection(user)
                 .query(input)
                 .toList()
         }
@@ -123,7 +126,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
             )
         ),
         implementation = { user: USER, id: ID, input: Unit ->
-            getCollection(user)
+            database().getCollection(user)
                 .get(id)
                 ?: throw NotFoundException()
         }
@@ -138,7 +141,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         errorCases = listOf(),
         successCode = HttpStatus.Created,
         implementation = { user: USER, values: List<T> ->
-            getCollection(user)
+            database().getCollection(user)
                 .insertMany(values)
         }
     )
@@ -152,7 +155,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         errorCases = listOf(),
         successCode = HttpStatus.Created,
         implementation = { user: USER, value: T ->
-            getCollection(user)
+            database().getCollection(user)
                 .insertOne(value)
         }
     )
@@ -167,7 +170,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         errorCases = listOf(),
         successCode = HttpStatus.Created,
         implementation = { user: USER, id: ID, value: T ->
-            getCollection(user)
+            database().getCollection(user)
                 .upsertOneById(id, value)
                 .new
                 ?: throw NotFoundException()
@@ -183,7 +186,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         description = "Modifies many ${modelName}s at the same time by ID.",
         errorCases = listOf(),
         implementation = { user: USER, values: List<T> ->
-            val db = getCollection(user)
+            val db = database().getCollection(user)
             values.map { db.replaceOneById(it._id, it) }.mapNotNull { it.new }
         }
     )
@@ -208,7 +211,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
             )
         ),
         implementation = { user: USER, id: ID, value: T ->
-            getCollection(user)
+            database().getCollection(user)
                 .replaceOneById(id, value)
                 .new
                 ?: throw NotFoundException()
@@ -223,7 +226,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         description = "Modifies many ${modelName}s at the same time.  Returns the number of changed items.",
         errorCases = listOf(),
         implementation = { user: USER, input: MassModification<T> ->
-            getCollection(user)
+            database().getCollection(user)
                 .updateManyIgnoringResult(input)
         }
     )
@@ -248,7 +251,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
             )
         ),
         implementation = { user: USER, id: ID, input: Modification<T> ->
-            getCollection(user)
+            database().getCollection(user)
                 .updateOneById(id, input)
                 .also { if (it.old == null && it.new == null) throw NotFoundException() }
         }
@@ -274,7 +277,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
             )
         ),
         implementation = { user: USER, id: ID, input: Modification<T> ->
-            getCollection(user)
+            database().getCollection(user)
                 .updateOneById(id, input)
                 .also { if (it.old == null && it.new == null) throw NotFoundException() }
                 .new!!
@@ -289,7 +292,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         description = "Deletes all matching ${modelName}s, returning the number of deleted items.",
         errorCases = listOf(),
         implementation = { user: USER, filter: Condition<T> ->
-            getCollection(user)
+            database().getCollection(user)
                 .deleteManyIgnoringOld(filter)
         }
     )
@@ -314,7 +317,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
             )
         ),
         implementation = { user: USER, id: ID, _: Unit ->
-            if (!getCollection(user)
+            if (!database().getCollection(user)
                     .deleteOneById(id)
             ) {
                 throw NotFoundException()
@@ -331,7 +334,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         description = "Gets the total number of ${modelName}s matching the given condition.",
         errorCases = listOf(),
         implementation = { user: USER, condition: Condition<T> ->
-            getCollection(user)
+            database().getCollection(user)
                 .count(condition)
         }
     )
@@ -343,7 +346,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         description = "Gets the total number of ${modelName}s matching the given condition.",
         errorCases = listOf(),
         implementation = { user: USER, condition: Condition<T> ->
-            getCollection(user)
+            database().getCollection(user)
                 .count(condition)
         }
     )
@@ -357,7 +360,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         errorCases = listOf(),
         implementation = { user: USER, condition: GroupCountQuery<T> ->
             @Suppress("UNCHECKED_CAST")
-            getCollection(user)
+            database().getCollection(user)
                 .groupCount(condition.condition, condition.groupBy.property as KProperty1<T, Any?>)
                 .mapKeys { it.key.toString() }
         }
@@ -372,7 +375,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         errorCases = listOf(),
         implementation = { user: USER, condition: AggregateQuery<T> ->
             @Suppress("UNCHECKED_CAST")
-            getCollection(user)
+            database().getCollection(user)
                 .aggregate(condition.aggregate, condition.condition, condition.property.property as KProperty1<T, Number>)
         }
     )
@@ -386,7 +389,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         errorCases = listOf(),
         implementation = { user: USER, condition: GroupAggregateQuery<T> ->
             @Suppress("UNCHECKED_CAST")
-            getCollection(user)
+            database().getCollection(user)
                 .groupAggregate(condition.aggregate, condition.condition,
                     condition.groupBy.property as KProperty1<T, Any?>, condition.property.property as KProperty1<T, Number>
                 )

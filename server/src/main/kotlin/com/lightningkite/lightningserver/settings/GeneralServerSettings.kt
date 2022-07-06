@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.settings
 
-import com.lightningkite.lightningserver.SettingSingleton
 import kotlinx.serialization.Serializable
 
 /**
@@ -23,11 +22,6 @@ data class GeneralServerSettings(
     val debug: Boolean = false,
     val cors: List<String>? = null
 ) {
-    init {
-
-    }
-
-    companion object: SettingSingleton<GeneralServerSettings>()
-
-    init { instance = this }
 }
+
+val generalSettings = setting("general", GeneralServerSettings())

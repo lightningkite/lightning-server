@@ -2,12 +2,10 @@ package com.lightningkite.lightningserver.settings
 
 import com.charleskorn.kaml.Yaml
 import com.lightningkite.lightningdb.ClientModule
-import io.ktor.server.application.*
-import io.ktor.server.cio.*
-import io.ktor.server.engine.*
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.system.exitProcess
 
 /**
@@ -17,20 +15,25 @@ import kotlin.system.exitProcess
  * @param settingsFile the location of the file to decode [SETTINGS] from.
  * @param makeDefaultSettings a lambda to retrieve a default example of [SETTINGS] to encode to a file.
  */
-inline fun <reified SETTINGS> loadSettings(settingsFile: File, makeDefaultSettings: () -> SETTINGS): SETTINGS {
+fun loadSettings(settingsFile: File): Settings {
     if (!settingsFile.exists()) {
+        Settings.populateDefaults()
         settingsFile.writeText(
-            Yaml().encodeToString(makeDefaultSettings())
+            Yaml().encodeToString(Settings)
         )
 
         println("Need a settings file - example generated at ${settingsFile.absolutePath}.")
         exitProcess(1)
     }
     try {
-        return Yaml(ClientModule).decodeFromString<SETTINGS>(settingsFile.readText())
+        return Yaml(ClientModule).decodeFromString<Settings>(settingsFile.readText())
     } catch (e: Exception) {
-        println("Settings were incorrect - see error below.")
+        val suggested = settingsFile.absoluteFile.parentFile.resolve(settingsFile.nameWithoutExtension + ".suggested.yml")
+        println("Settings were incorrect.  Suggested updates are inside ${suggested.absolutePath}.")
+        Settings.populateDefaults()
+        suggested.writeText(Yaml(ClientModule).encodeToString(Settings))
         e.printStackTrace()
         exitProcess(1)
     }
 }
+

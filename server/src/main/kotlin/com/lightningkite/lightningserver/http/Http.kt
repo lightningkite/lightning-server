@@ -1,11 +1,14 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
-import com.lightningkite.lightningserver.serialization.toHttpContent
-import com.lightningkite.lightningserver.settings.GeneralServerSettings
+import com.lightningkite.lightningserver.exceptions.exceptionSettings
+import com.lightningkite.lightningserver.logging.loggingSettings
+import com.lightningkite.lightningserver.settings.generalSettings
+import com.lightningkite.lightningserver.tasks.Tasks
 
 object Http {
-    val routes = mutableMapOf<HttpRoute, suspend (HttpRequest) -> HttpResponse>()
+    var fixEndingSlash: Boolean = true
+    val routes = mutableMapOf<HttpEndpoint, suspend (HttpRequest) -> HttpResponse>()
     var exception: suspend (HttpRequest, Exception) -> HttpResponse =
         { request, exception ->
 
@@ -17,16 +20,17 @@ object Http {
         }
 }
 
-suspend fun HttpRoute.test(
+suspend fun HttpEndpoint.test(
     parts: Map<String, String> = mapOf(),
     wildcard: String? = null,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
     body: HttpContent? = null,
-    domain: String = GeneralServerSettings.instance.publicUrl.substringAfter("://").substringBefore("/"),
-    protocol: String = GeneralServerSettings.instance.publicUrl.substringBefore("://"),
+    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
+    protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "0.0.0.0"
 ): HttpResponse {
+    Tasks.startup()
     val req = HttpRequest(
         route = this,
         parts = parts,

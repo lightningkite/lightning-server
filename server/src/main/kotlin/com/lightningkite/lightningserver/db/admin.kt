@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.parse
+import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import kotlinx.coroutines.flow.toList
 import kotlinx.html.*
 import kotlinx.serialization.KSerializer
@@ -55,12 +56,14 @@ fun ServerPath.adminIndex() {
  */
 @LightningServerDsl
 inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> ServerPath.adminPages(
+    noinline database: ()->Database,
     noinline defaultItem: (USER) -> T,
-    noinline getCollection: suspend (principal: USER) -> FieldCollection<T>
+    noinline getCollection: suspend Database.(principal: USER) -> FieldCollection<T>
 ): Unit = adminPages(
+    database = database,
     authInfo = AuthInfo(),
-    serializer = Serialization.module.serializer(),
-    idSerializer = Serialization.module.serializer(),
+    serializer = serializerOrContextual(),
+    idSerializer = serializerOrContextual(),
     defaultItem = defaultItem,
     getCollection = getCollection
 )
@@ -71,15 +74,16 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> Se
  */
 @LightningServerDsl
 fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.adminPages(
+    database: ()->Database,
     authInfo: AuthInfo<USER>,
     serializer: KSerializer<T>,
     idSerializer: KSerializer<ID>,
     defaultItem: (USER) -> T,
-    getCollection: suspend (principal: USER) -> FieldCollection<T>
+    getCollection: suspend Database.(principal: USER) -> FieldCollection<T>
 ) {
     val name = serializer.descriptor.serialName.substringAfterLast('.')
     get("{id}/").handler {
-        val secured = getCollection(authInfo.checker(it.rawUser()))
+        val secured = database().getCollection(authInfo.checker(it.rawUser()))
         val item = secured.get(it.parts["id"]!!.parseUrlPartOrBadRequest(idSerializer))
         HttpResponse.html {
             head { includeFormScript() }
@@ -114,7 +118,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.adminPages(
         }
     }
     post("{id}/delete/").handler {
-        getCollection(authInfo.checker(it.rawUser())).deleteOneById(
+        database().getCollection(authInfo.checker(it.rawUser())).deleteOneById(
             it.parts["id"]!!.parseUrlPartOrBadRequest(
                 idSerializer
             )
@@ -123,7 +127,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.adminPages(
     }
     post("{id}/").handler {
         val item: T = it.body!!.parse(serializer)
-        getCollection(authInfo.checker(it.rawUser())).replaceOneById(
+        database().getCollection(authInfo.checker(it.rawUser())).replaceOneById(
             it.parts["id"]!!.parseUrlPartOrBadRequest(
                 idSerializer
             ), item
@@ -153,11 +157,11 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.adminPages(
     }
     post("create/").handler {
         val item: T = it.body!!.parse(serializer)
-        getCollection(authInfo.checker(it.rawUser())).insertOne(item)
+        database().getCollection(authInfo.checker(it.rawUser())).insertOne(item)
         HttpResponse.redirectToGet("..")
     }
     get("/").handler {
-        val secured = getCollection(authInfo.checker(it.rawUser()))
+        val secured = database().getCollection(authInfo.checker(it.rawUser()))
         val items = secured.query(
             Query(
                 condition = Condition.Always(),
@@ -204,7 +208,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.adminPages(
                 type = serializer,
                 authInfo = authInfo,
                 defaultItem = defaultItem,
-                getCollection = getCollection,
+                getCollection = { database().getCollection(it) },
             )
         )
     }

@@ -1,19 +1,19 @@
 package com.lightningkite.lightningserver.ktor
 
 import com.lightningkite.lightningserver.HtmlDefaults
-import com.lightningkite.lightningserver.cache.cache
+import com.lightningkite.lightningserver.cache.CacheInterface
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.cache.setIfNotExists
-import com.lightningkite.lightningserver.exceptions.ExceptionSettings
+import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.exceptions.reportException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.pubsub.PubSubInterface
 import com.lightningkite.lightningserver.pubsub.get
-import com.lightningkite.lightningserver.pubsub.pubSub
 import com.lightningkite.lightningserver.schedule.Schedule
 import com.lightningkite.lightningserver.schedule.Scheduler
-import com.lightningkite.lightningserver.settings.GeneralServerSettings
+import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.websocket.WebSockets
 import io.ktor.http.*
@@ -44,7 +44,7 @@ import kotlin.collections.HashMap
 import com.lightningkite.lightningserver.core.ContentType as HttpContentType
 import com.lightningkite.lightningserver.http.HttpMethod as MyHttpMethod
 
-fun Application.lightningServer() {
+fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) {
     try {
         install(io.ktor.server.websocket.WebSockets)
         install(CORS) {
@@ -58,9 +58,9 @@ fun Application.lightningServer() {
             allowHeaders { true }
             exposedHeaders.addAll(CorsSimpleResponseHeaders)
 
-            GeneralServerSettings.instance.cors?.forEach {
+            generalSettings().cors?.forEach {
                 allowHost(it, listOf("http", "https", "ws", "wss"))
-            } ?: if (GeneralServerSettings.instance.debug) anyHost()
+            } ?: if (generalSettings().debug) anyHost()
         }
         install(StatusPages) {
             exception<Exception> { call, it ->
@@ -68,7 +68,7 @@ fun Application.lightningServer() {
             <h1>Oh no!</h1>
             <p>Something went wrong.  We're terribly sorry.  If this continues, see if you can contact the developer.</p>
         """.trimIndent()))
-                call.adapt(HttpRoute(call.request.path(), MyHttpMethod(call.request.httpMethod.value))).reportException(it)
+                call.adapt(HttpEndpoint(call.request.path(), MyHttpMethod(call.request.httpMethod.value))).reportException(it)
             }
         }
         Http.routes.forEach { entry ->
@@ -79,7 +79,7 @@ fun Application.lightningServer() {
                         val result = try {
                             entry.value(request)
                         } catch (e: Exception) {
-                            if(GeneralServerSettings.instance.debug) e.printStackTrace()
+                            if(generalSettings().debug) e.printStackTrace()
                             Http.exception(request, e)
                         }
                         for (header in result.headers.entries) {
@@ -167,7 +167,7 @@ fun Application.lightningServer() {
                         try {
                             it.handler()
                         } catch (t: Throwable) {
-                            ExceptionSettings.instance.report(t)
+                            exceptionSettings().report(t)
                         }
                         val nextRun = when (val s = it.schedule) {
                             is Schedule.Daily -> ZonedDateTime.of(LocalDate.now().plusDays(1), s.time, s.zone)
@@ -188,6 +188,7 @@ fun Application.lightningServer() {
             GlobalScope.launch { a.implementation(this, b) }
         }
         WebSockets.engineSendMethod = { id, frame -> pubSub.get<String>("ws-$id").emit(frame) }
+        Tasks.startup()
     } catch (t: Throwable) {
         t.printStackTrace()
     }
@@ -196,11 +197,11 @@ fun Application.lightningServer() {
 /**
  * A helper function to start a Ktor server using GeneralServerSettings and the provided Module.
  */
-fun runServer() = embeddedServer(
+fun runServer(pubSub: PubSubInterface, cache: CacheInterface) = embeddedServer(
     factory = CIO,
-    port = GeneralServerSettings.instance.port,
-    host = GeneralServerSettings.instance.host,
-    module = Application::lightningServer,
+    port = generalSettings().port,
+    host = generalSettings().host,
+    module = { lightningServer(pubSub, cache) },
     watchPaths = listOf("classes")
 ).start(wait = true)
 
@@ -212,7 +213,7 @@ private fun HttpContentType.adapt(): ContentType =
 
 private fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
 
-private suspend fun ApplicationCall.adapt(route: HttpRoute): HttpRequest {
+private suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
     val parts = HashMap<String, String>()
     var wildcard: String? = null
     parameters.forEach { s, strings ->

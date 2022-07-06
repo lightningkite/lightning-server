@@ -3,12 +3,10 @@ package com.lightningkite.lightningserver.serialization
 import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
-import com.lightningkite.lightningserver.files.FilesSettings
-import com.lightningkite.lightningserver.files.publicUrl
-import com.lightningkite.lightningserver.files.resolveFileWithUniqueName
-import com.lightningkite.lightningserver.files.upload
+import com.lightningkite.lightningserver.files.*
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.settings.Settings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -34,7 +32,9 @@ fun <T> HttpRequest.queryParameters(serializer: KSerializer<T>): T {
     )
 }
 
-suspend inline fun <reified T> HttpContent.parse(): T = parse(Serialization.module.serializer())
+var parsingFileSettings: (()->FilesSettings)? = null
+
+suspend inline fun <reified T> HttpContent.parse(): T = parse(serializerOrContextual())
 suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
     try {
         @Suppress("UNCHECKED_CAST")
@@ -117,7 +117,7 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
                                 //}
                                 part.content.stream()
                                     .use { input ->
-                                        FilesSettings.instance.root.resolveFileWithUniqueName(
+                                        parsingFileSettings!!().root.resolveFileWithUniqueName(
                                             "files/${part.filename}"
                                         ).upload(input)
                                     }
@@ -148,7 +148,7 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
 }
 
 suspend inline fun <reified T> T.toHttpContent(acceptedTypes: List<ContentType>): HttpContent? =
-    toHttpContent(acceptedTypes, Serialization.module.serializer())
+    toHttpContent(acceptedTypes, serializerOrContextual())
 
 suspend fun <T> T.toHttpContent(acceptedTypes: List<ContentType>, serializer: KSerializer<T>): HttpContent? {
     if(this == Unit) return null

@@ -4,13 +4,13 @@ import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.lightningkite.lightningserver.SetOnce
-import com.lightningkite.lightningserver.SettingSingleton
 import com.lightningkite.lightningserver.notifications.ConsoleNotificationInterface
 import com.lightningkite.lightningserver.notifications.FcmNotificationInterface
 import com.lightningkite.lightningserver.notifications.NotificationImplementation
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import com.lightningkite.lightningdb.Database
+import com.lightningkite.lightningserver.settings.setting
 import io.ktor.util.logging.*
 import io.sentry.Sentry
 import kotlinx.serialization.Serializable
@@ -25,10 +25,8 @@ import java.io.File
 data class ExceptionSettings(
     val sentryDsn: String? = null
 ) : HealthCheckable {
-    companion object : SettingSingleton<ExceptionSettings>({ExceptionSettings()})
 
     init {
-        ExceptionSettings.instance = this
         sentryDsn?.let {
             Sentry.init(it)
         }
@@ -62,3 +60,5 @@ data class ExceptionSettings(
         }
     }
 }
+
+val exceptionSettings = setting("exceptions", ExceptionSettings())

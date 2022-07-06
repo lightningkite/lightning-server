@@ -1,12 +1,11 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningserver.SetOnce
-import com.lightningkite.lightningserver.SettingSingleton
-import com.lightningkite.lightningserver.mongo.mongoDb
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.settings.setting
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import kotlinx.coroutines.withTimeout
@@ -24,12 +23,6 @@ import kotlin.reflect.KType
 import kotlin.reflect.KTypeProjection
 
 /**
- * The database object created and defined by the DatabaseSettings.
- * Use this to create FieldCollections and access the database.
- */
-var database: Database by SetOnce()
-
-/**
  * Settings that define what database to use and how to connect to it.
  *
  * @param url Defines the type and connection to the database. examples are ram, ram-preload, ram-unsafe-persist, mongodb-test, mongodb-file, mongodb
@@ -39,51 +32,30 @@ var database: Database by SetOnce()
 data class DatabaseSettings(
     val url: String = "mongodb-file://${File("./local/mongo").absolutePath}",
     val databaseName: String = "default"
-) : HealthCheckable {
-    val db by lazy {
-        when {
-            url == "ram" -> InMemoryDatabase()
-            url == "ram-preload" -> InMemoryDatabase(Serialization.json.parseToJsonElement(File(url.substringAfter("://")).readText()) as? JsonObject)
-            url == "ram-unsafe-persist" -> InMemoryUnsafePersistenceDatabase(File(url.substringAfter("://")))
-            url == "mongodb-test" -> testMongo().database(databaseName)
-            url.startsWith("mongodb-file:") -> embeddedMongo(File(url.removePrefix("mongodb-file://"))).database(databaseName)
-            url.startsWith("mongodb:") -> KMongo.createClient(
-                MongoClientSettings.builder()
-                    .applyConnectionString(ConnectionString(url))
-                    .uuidRepresentation(UuidRepresentation.STANDARD)
-                    .build()
-            ).database(databaseName)
-            else -> throw IllegalArgumentException("MongoDB connection style not recognized: got $url but only understand: " +
-                    "ram\n" +
-                    "ram-preload\n" +
-                    "ram-unsafe-persist\n" +
-                    "mongodb-test\n" +
-                    "mongodb-file:\n" +
-                    "mongodb:"
-            )
-        }
-    }
+): ()->Database {
 
-    companion object : SettingSingleton<DatabaseSettings>() {
+    override fun invoke(): Database = when {
+        url == "ram" -> InMemoryDatabase()
+        url == "ram-preload" -> InMemoryDatabase(Serialization.json.parseToJsonElement(File(url.substringAfter("://")).readText()) as? JsonObject)
+        url == "ram-unsafe-persist" -> InMemoryUnsafePersistenceDatabase(File(url.substringAfter("://")))
+        url == "mongodb-test" -> testMongo().database(databaseName)
+        url.startsWith("mongodb-file:") -> embeddedMongo(File(url.removePrefix("mongodb-file://"))).database(databaseName)
+        url.startsWith("mongodb:") -> KMongo.createClient(
+            MongoClientSettings.builder()
+                .applyConnectionString(ConnectionString(url))
+                .uuidRepresentation(UuidRepresentation.STANDARD)
+                .build()
+        ).database(databaseName)
+        else -> throw IllegalArgumentException("MongoDB connection style not recognized: got $url but only understand: " +
+                "ram\n" +
+                "ram-preload\n" +
+                "ram-unsafe-persist\n" +
+                "mongodb-test\n" +
+                "mongodb-file:\n" +
+                "mongodb:"
+        )
     }
-
-    init {
-        DatabaseSettings.instance = this
-        database = db
-    }
-
-    override val healthCheckName: String get() = "Database"
-    override suspend fun healthCheck(): HealthStatus =
-        try {
-            withTimeout(5000L) {
-                mongoDb.database.listCollectionNames()
-                HealthStatus(HealthStatus.Level.OK)
-            }
-        } catch (e: Exception) {
-            HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
-        }
 }
-
 
 class InMemoryDatabase(val premadeData: JsonObject? = null): Database {
     val collections = HashMap<String, FieldCollection<*>>()

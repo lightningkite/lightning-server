@@ -1,9 +1,9 @@
 package com.lightningkite.lightningserver.websocket
 
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.settings.GeneralServerSettings
+import com.lightningkite.lightningserver.settings.generalSettings
+import com.lightningkite.lightningserver.tasks.Tasks
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -27,7 +27,15 @@ object WebSockets {
     data class MessageEvent(val id: String, val content: String)
     data class DisconnectEvent(val id: String)
     var engineSendMethod: suspend (id: String, content: String)->Unit = { _, _ -> throw IllegalStateException("No engine-defined send method for websockets.") }
-    suspend fun send(id: String, content: String): Unit = engineSendMethod(id, content)
+    private var engineSendMethodTestingOverride: (suspend (id: String, content: String)->Unit)? = null
+    suspend fun sendListener(action: suspend (id: String, content: String)->Unit, forBlock: suspend ()->Unit) {
+        engineSendMethodTestingOverride = action
+        forBlock()
+        engineSendMethodTestingOverride = null
+    }
+    suspend fun send(id: String, content: String): Unit {
+        (engineSendMethodTestingOverride ?: engineSendMethod)(id, content)
+    }
 
     interface Handler {
         suspend fun connect(event: ConnectEvent)
@@ -42,11 +50,12 @@ suspend fun ServerPath.test(
     wildcard: String? = null,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
-    domain: String = GeneralServerSettings.instance.publicUrl.substringAfter("://").substringBefore("/"),
-    protocol: String = GeneralServerSettings.instance.publicUrl.substringBefore("://"),
+    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
+    protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "0.0.0.0",
     test: suspend VirtualSocket.()->Unit
 ) {
+    Tasks.startup()
     val id = "TEST-${UUID.randomUUID()}"
     val req = WebSockets.ConnectEvent(
         path = this,
@@ -62,32 +71,34 @@ suspend fun ServerPath.test(
     val h = WebSockets.handlers[this]!!
 
     val channel = Channel<String>(20)
-    val oldMethod = WebSockets.engineSendMethod
-    WebSockets.engineSendMethod = { id, content ->
-        println("$id <-- $content")
-        channel.send(content)
-    }
-    coroutineScope {
-        val connectHandle = async {
-            println("Connecting $id...")
-            h.connect(req)
-            println("Connected $id.")
+    WebSockets.sendListener(
+        action = { id, content ->
+            println("$id <-- $content")
+            channel.send(content)
+        },
+        forBlock = {
+            coroutineScope {
+                val connectHandle = async {
+                    println("Connecting $id...")
+                    h.connect(req)
+                    println("Connected $id.")
+                }
+                val testHandle = async {
+                    test(
+                        VirtualSocket(
+                            incoming = channel,
+                            send = {
+                                println("$id --> $it")
+                                h.message(WebSockets.MessageEvent(id, it))
+                            }
+                        )
+                    )
+                    println("Disconnecting $id...")
+                    h.disconnect(WebSockets.DisconnectEvent(id))
+                    println("Disconnected $id.")
+                }
+                listOf(connectHandle, testHandle).awaitAll()
+            }
         }
-        val testHandle = async {
-            test(
-                VirtualSocket(
-                    incoming = channel,
-                    send = {
-                        println("$id --> $it")
-                        h.message(WebSockets.MessageEvent(id, it))
-                    }
-                )
-            )
-            println("Disconnecting $id...")
-            h.disconnect(WebSockets.DisconnectEvent(id))
-            println("Disconnected $id.")
-        }
-        listOf(connectHandle, testHandle).awaitAll()
-    }
-    WebSockets.engineSendMethod = oldMethod
+    )
 }

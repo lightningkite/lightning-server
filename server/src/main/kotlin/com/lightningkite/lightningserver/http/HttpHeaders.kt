@@ -53,7 +53,7 @@ data class HttpHeaders(val entries: List<Pair<String, String>>) {
             expiresAt: Instant? = null,
             maxAge: Int? = null,
             domain: String? = null,
-            path: String? = null,
+            path: String? = "/",
             secure: Boolean = false,
             httpOnly: Boolean = false,
             sameSite: SameSite? = null

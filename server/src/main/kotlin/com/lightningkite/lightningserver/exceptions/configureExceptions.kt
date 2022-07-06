@@ -7,6 +7,7 @@ import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.auth.rawUser
 import com.lightningkite.lightningserver.auth.user
 import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.settings.generalSettings
 import com.mongodb.MongoWriteException
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
@@ -45,8 +46,8 @@ private fun Any?.simpleUserId(): String = when (this) {
  * Will report an Exception to Sentry if the ExceptionSettings.sentryDsn is provided
  */
 suspend fun HttpRequest.reportException(throwable: Throwable) {
-    if(GeneralServerSettings.instance.debug) throwable.printStackTrace()
-    if (ExceptionSettings.instance.sentryDsn != null) {
+    if(generalSettings().debug) throwable.printStackTrace()
+    if (exceptionSettings().sentryDsn != null) {
         val ctx = Sentry.getContext()
         val p = this.rawUser()
         ctx.clear()
@@ -63,7 +64,7 @@ suspend fun HttpRequest.reportException(throwable: Throwable) {
             "null",
             -1,
             null,
-            GeneralServerSettings.instance.publicUrl.startsWith("https"),
+            generalSettings().publicUrl.startsWith("https"),
             false,
             "",
             "",

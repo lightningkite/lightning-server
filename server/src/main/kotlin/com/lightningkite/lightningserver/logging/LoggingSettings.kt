@@ -8,11 +8,10 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.ConsoleAppender
 import ch.qos.logback.core.rolling.RollingFileAppender
 import ch.qos.logback.core.rolling.TimeBasedRollingPolicy
-import com.lightningkite.lightningserver.SettingSingleton
+import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.Serializable
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.io.File
 
 /**
  * LoggingSettings configures what the logging of the server should look like.
@@ -74,20 +73,13 @@ data class LoggingSettings(
     }
 
     init {
-
-    }
-
-    companion object : SettingSingleton<LoggingSettings>()
-
-    init {
-        instance = this
         val logCtx: LoggerContext = LoggerFactory.getILoggerFactory() as LoggerContext
-        if (default == null)
-            logCtx.getLogger(Logger.ROOT_LOGGER_NAME).detachAndStopAllAppenders()
-        logCtx.getLogger(Logger.ROOT_LOGGER_NAME).detachAppender("console")
+        logCtx.getLogger(Logger.ROOT_LOGGER_NAME).detachAndStopAllAppenders()
         default?.apply(Logger.ROOT_LOGGER_NAME, logCtx.getLogger(Logger.ROOT_LOGGER_NAME))
         for (sub in (logger ?: mapOf())) {
             sub.value.apply(sub.key, logCtx.getLogger(sub.key))
         }
     }
 }
+
+val loggingSettings = setting("logging", LoggingSettings())

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.http
 
+import com.lightningkite.lightningserver.core.ContentType
 import kotlinx.html.HTML
 
 data class HttpResponse(
@@ -39,6 +40,15 @@ data class HttpResponse(
             builder: HTML.()->Unit
         ) = HttpResponse(
             body = HttpContent.Html(builder),
+            status = status,
+            headers = headers
+        )
+        fun plainText(
+            text: String,
+            status: HttpStatus = HttpStatus.OK,
+            headers: HttpHeaders.Builder.()->Unit = {}
+        ) = HttpResponse(
+            body = HttpContent.Text(text, ContentType.Text.Plain),
             status = status,
             headers = headers
         )

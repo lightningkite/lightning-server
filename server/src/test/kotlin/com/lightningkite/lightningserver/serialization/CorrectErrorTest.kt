@@ -1,33 +1,16 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.lightningserver.SetOnce
-import com.lightningkite.lightningserver.auth.AuthSettings
-import com.lightningkite.lightningserver.db.database
-import com.lightningkite.lightningserver.email.EmailSettings
-import com.lightningkite.lightningserver.exceptions.ExceptionSettings
-import com.lightningkite.lightningserver.files.FilesSettings
-import com.lightningkite.lightningserver.logging.LoggingSettings
 import com.lightningkite.lightningserver.settings.GeneralServerSettings
-import com.lightningkite.lightningdb.ClientModule
-import com.lightningkite.lightningdb.HasEmail
-import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.core.routing
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.junit.Test
-import java.util.*
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class CorrectErrorTest {
     @Serializable
@@ -35,9 +18,6 @@ class CorrectErrorTest {
         val number: Int = 0
     )
     @Test fun testBadRequest() {
-        SetOnce.allowOverwrite {
-            GeneralServerSettings()
-        }
         val t = ServerPath("test").post.typed(
             summary = "Test endpoint",
             errorCases = listOf(),

@@ -3,39 +3,25 @@
 package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.db.*
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.exceptions.ExceptionSettings
 import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.logging.LoggingSettings
-import com.lightningkite.lightningserver.mongo.MongoSettings
-import com.lightningkite.lightningserver.mongo.mongoDb
-import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.settings.loadSettings
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.routing
-import com.lightningkite.lightningserver.http.Http
+import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.handler
 import com.lightningkite.lightningserver.ktor.runServer
+import com.lightningkite.lightningserver.pubsub.LocalPubSub
+import com.lightningkite.lightningserver.serialization.parsingFileSettings
 import com.lightningkite.lightningserver.serverhealth.healthCheck
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
-import io.ktor.server.application.*
-import io.ktor.server.auth.*
-import io.ktor.server.auth.Principal
-import io.ktor.server.plugins.*
-import io.ktor.server.plugins.callloging.*
-import io.ktor.server.plugins.statuspages.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
-import io.ktor.server.websocket.*
-import io.ktor.util.*
+import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.*
 import java.io.File
 import java.lang.Exception
@@ -60,41 +46,41 @@ data class User(
     override val email: String
 ) : HasId<UUID>, HasEmail
 
-val TestModel.Companion.table get() = database.collection<TestModel>("TestModel")
+object Server{
 
-@Serializable
-data class Settings(
-    val general: GeneralServerSettings = GeneralServerSettings(),
-    val auth: AuthSettings = AuthSettings(),
-    val files: FilesSettings = FilesSettings(),
-    val logging: LoggingSettings = LoggingSettings(),
-    val database: DatabaseSettings = DatabaseSettings(),
-    val email: EmailSettings = EmailSettings(),
-    val exception: ExceptionSettings = ExceptionSettings(),
-)
+    val database = setting("database", DatabaseSettings())
+    val email = setting("email", EmailSettings())
+    val jwtSigner = setting("jwt", JwtSigner())
+    val files = setting("files", FilesSettings())
+
+    init {
+        parsingFileSettings = files
+        prepareModels()
+    }
+
+    init {
+        routing {
+            get.handler { HttpResponse.plainText("Hello ${it.rawUser()}") }
+            path("auth").authEndpoints(jwtSigner = jwtSigner, database = database, email = email, onNewUser = { User(email = it) })
+            path("test-model") {
+                path("rest").restApi(database) { user: User? -> database().collection<TestModel>("TestModel") }
+                path("rest").restApiWebsocket<User, TestModel, UUID>(database, { it.collection<TestModel>() as AbstractSignalFieldCollection<TestModel> }, { this })
+                path("admin").adminPages(database, {user: User? -> TestModel()}) { user: User? -> database().collection<TestModel>("TestModel") }
+            }
+            path("docs").apiHelp()
+            path("test-primitive").get.typed(
+                summary = "Get Test Primitive",
+                errorCases = listOf(),
+                implementation = { user: User?, input: Unit -> "42 is great" }
+            )
+            path("die").get.handler { throw Exception("OUCH") }
+        }
+    }
+}
 
 fun main(vararg args: String) {
-    loadSettings(File("settings.yaml")) { Settings() }
+    Server
+    loadSettings(File("settings.yaml"))
     println("Settings loaded")
-    prepareModels()
-    routing {
-        path("test-model") {
-            path("rest").restApi { user: User? -> TestModel.table }
-            path("admin").adminPages(::TestModel) { user: User? -> TestModel.table }
-        }
-        path("docs").apiHelp()
-        path("health").healthCheck(listOf(
-            EmailSettings.instance,
-            ExceptionSettings.instance,
-            FilesSettings.instance,
-            DatabaseSettings.instance,
-        )) { user: Unit -> true }
-        path("test-primitive").get.typed(
-            summary = "Get Test Primitive",
-            errorCases = listOf(),
-            implementation = { user: User?, input: Unit -> "42 is great" }
-        )
-        path("die").get.handler { throw Exception("OUCH") }
-    }
-    runServer()
+    runServer(LocalPubSub, LocalCache)
 }

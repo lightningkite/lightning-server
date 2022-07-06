@@ -8,7 +8,9 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.parse
+import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.settings.GeneralServerSettings
+import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.websocket.VirtualSocket
 import com.lightningkite.lightningserver.websocket.WebSocketClose
 import com.lightningkite.lightningserver.websocket.WebSockets
@@ -82,8 +84,8 @@ inline fun <reified USER, reified INPUT, reified OUTPUT> ServerPath.typedWebsock
     noinline disconnect: suspend ApiWebsocket<USER, INPUT, OUTPUT>.(WebSockets.DisconnectEvent) -> Unit = {}
 ): ApiWebsocket<USER, INPUT, OUTPUT> = typedWebsocket(
     authInfo = AuthInfo(),
-    inputType = Serialization.module.serializer(),
-    outputType = Serialization.module.serializer(),
+    inputType = serializerOrContextual(),
+    outputType = serializerOrContextual(),
     summary = summary,
             description = description,
             errorCases = errorCases,
@@ -126,8 +128,8 @@ suspend fun <USER, INPUT, OUTPUT> ApiWebsocket<USER, INPUT, OUTPUT>.test(
     wildcard: String? = null,
     queryParameters: List<Pair<String, String>> = listOf(),
     headers: HttpHeaders = HttpHeaders.EMPTY,
-    domain: String = GeneralServerSettings.instance.publicUrl.substringAfter("://").substringBefore("/"),
-    protocol: String = GeneralServerSettings.instance.publicUrl.substringBefore("://"),
+    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
+    protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "0.0.0.0",
     test: suspend TypedVirtualSocket<INPUT, OUTPUT>.()->Unit
 ) {
@@ -144,6 +146,7 @@ suspend fun <USER, INPUT, OUTPUT> ApiWebsocket<USER, INPUT, OUTPUT>.test(
             coroutineScope {
                 val job = launch {
                     for(it in incoming) {
+                        println("Parsing $it")
                         channel.send(Serialization.json.decodeFromString(outputType, it))
                     }
                 }

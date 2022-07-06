@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.email
 
-import com.lightningkite.lightningserver.SettingSingleton
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
+import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import java.io.BufferedReader
@@ -22,9 +22,9 @@ import javax.net.ssl.SSLSocketFactory
 data class EmailSettings(
     val option: EmailClientOption = EmailClientOption.Console,
     val smtp: SmtpConfig? = null
-) : HealthCheckable {
-    @Transient
-    val emailClient: EmailClient = when (option) {
+) : ()->EmailClient {
+
+    override fun invoke(): EmailClient = when (option) {
         EmailClientOption.Console -> ConsoleEmailClient
         EmailClientOption.Smtp -> SmtpEmailClient(
             smtp
@@ -34,26 +34,7 @@ data class EmailSettings(
 
     @Transient
     var sendEmailDuringTests: Boolean = false
-
-    companion object : SettingSingleton<EmailSettings>()
-
-    init {
-        instance = this
-    }
-
-    override val healthCheckName: String get() = "Email"
-    override suspend fun healthCheck(): HealthStatus {
-        return try {
-            emailClient.send("Test Message", listOf("test@example.com"), "Test Message", null)
-            HealthStatus(HealthStatus.Level.OK)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
-        }
-    }
 }
-
-val email: EmailClient get() = EmailSettings.instance.emailClient
 
 @Serializable
 enum class EmailClientOption {

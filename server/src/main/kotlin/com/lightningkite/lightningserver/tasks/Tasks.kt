@@ -22,8 +22,16 @@ data class Task<INPUT>(
 
 object Tasks {
     val tasks = HashMap<String, Task<*>>()
+    val startupActions = HashSet<()->Unit>()
     @Suppress("OPT_IN_USAGE")
     var engineStartImplementation: (Task<Any?>, Any?) -> Unit = { a, b ->
         GlobalScope.launch { a.implementation(this, b) }
+    }
+    var isStarted = false
+        private set
+    fun startup() {
+        if(isStarted) return
+        isStarted = true
+        startupActions.forEach { it() }
     }
 }

@@ -2,12 +2,11 @@ package com.lightningkite.lightningserver.files
 
 import com.dalet.vfs2.provider.azure.AzFileObject
 import com.github.vfss3.S3FileObject
-import com.lightningkite.lightningserver.auth.AuthSettings
+import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.settings.GeneralServerSettings
+import com.lightningkite.lightningserver.settings.generalSettings
 import org.apache.commons.vfs2.FileObject
-import org.apache.commons.vfs2.FileSystemManager
 import org.apache.commons.vfs2.provider.local.LocalFile
-import java.io.File
 import java.io.InputStream
 import java.net.URL
 import java.nio.file.Path
@@ -20,8 +19,8 @@ private const val allowedChars = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOP
  */
 val FileObject.publicUrlUnsigned: String
     get() = when(this) {
-        is LocalFile -> "${GeneralServerSettings.instance.publicUrl}/${FilesSettings.userContentPath}/${
-            path.relativeTo(Path.of(FilesSettings.instance.storageUrl.removePrefix("file://"))).toString()
+        is LocalFile -> "${generalSettings().publicUrl}/${FilesSettings.userContentPath}/${
+            path.relativeTo(Path.of(FilesSettings.getSettings(this)!!.storageUrl.removePrefix("file://"))).toString()
                 .replace("\\", "/")
         }"
         else -> URL("https", url.host, url.port, url.file).toString()
@@ -32,17 +31,17 @@ val FileObject.publicUrlUnsigned: String
  */
 val FileObject.publicUrl: String
     get() = when(this) {
-        is LocalFile -> "${GeneralServerSettings.instance.publicUrl}/${FilesSettings.userContentPath}/${
-            path.relativeTo(Path.of(FilesSettings.instance.storageUrl.removePrefix("file://"))).toString()
+        is LocalFile -> "${generalSettings().publicUrl}/${FilesSettings.userContentPath}/${
+            path.relativeTo(Path.of(FilesSettings.getSettings(this)!!.storageUrl.removePrefix("file://"))).toString()
                 .replace("\\", "/")
         }"
         is S3FileObject -> {
-            FilesSettings.instance.signedUrlExpirationSeconds?.let { seconds ->
+            FilesSettings.getSettings(this)!!.signedUrlExpirationSeconds?.let { seconds ->
                 unstupidSignUrl(seconds)
             } ?: URL("https", url.host, url.port, url.file).toString()
         }
         is AzFileObject -> {
-            val url = FilesSettings.instance.signedUrlExpirationSeconds?.let { seconds ->
+            val url = FilesSettings.getSettings(this)!!.signedUrlExpirationSeconds?.let { seconds ->
                 getSignedUrl(seconds)
             } ?: URL("https", url.host, url.port, url.file)
             url.toString()
@@ -53,12 +52,12 @@ val FileObject.publicUrl: String
 /**
  * Generates a URL that will allow a direct upload of a file to the Filesystem.
  */
-fun FileObject.signedUploadUrl(expirationSeconds: Int = FilesSettings.instance.signedUrlExpirationSeconds ?: (7 * 60)): String {
+fun FileObject.signedUploadUrl(expirationSeconds: Int = FilesSettings.getSettings(this)!!.signedUrlExpirationSeconds ?: (7 * 60)): String {
     return when(this) {
         is LocalFile -> {
-            val path = path.relativeTo(Path.of(FilesSettings.instance.storageUrl.removePrefix("file://"))).toString()
+            val path = path.relativeTo(Path.of(FilesSettings.getSettings(this)!!.storageUrl.removePrefix("file://"))).toString()
                 .replace("\\", "/")
-            "${GeneralServerSettings.instance.publicUrl}/${FilesSettings.userContentPath}/$path?token=${AuthSettings.instance.token(path, expirationSeconds * 1000L)}"
+            "${generalSettings().publicUrl}/${FilesSettings.userContentPath}/$path?token=${FilesSettings.getSettings(this)!!.jwtSigner.token(path, expirationSeconds * 1000L)}"
         }
         is S3FileObject -> {
             this.uploadUrl(expirationSeconds)

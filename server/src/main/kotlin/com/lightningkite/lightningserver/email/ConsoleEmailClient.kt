@@ -11,7 +11,6 @@ object ConsoleEmailClient : EmailClient {
         htmlMessage: String?,
         attachments: List<Attachment>
     ) {
-        if (to.isEmpty() || (System.getenv("test") == "true" && !EmailSettings.instance.sendEmailDuringTests)) return
         println(buildString {
             appendLine("-----EMAIL-----")
             appendLine(subject)

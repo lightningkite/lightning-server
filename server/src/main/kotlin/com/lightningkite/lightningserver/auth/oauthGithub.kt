@@ -3,12 +3,10 @@ package com.lightningkite.lightningserver.auth
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.http.HttpRoute
-import com.lightningkite.lightningserver.settings.GeneralServerSettings
+import com.lightningkite.lightningserver.http.HttpEndpoint
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
-import io.ktor.http.ContentType
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.response.*
@@ -25,9 +23,11 @@ import java.util.*
  */
 @LightningServerDsl
 fun ServerPath.oauthGithub(
-    landingRoute: HttpRoute,
+    jwtSigner: ()->JwtSigner,
+    landingRoute: HttpEndpoint,
     emailToId: suspend (String) -> String
 ) = oauth(
+    jwtSigner = jwtSigner,
     landingRoute = landingRoute,
     niceName = "GitHub",
     codeName = "github",

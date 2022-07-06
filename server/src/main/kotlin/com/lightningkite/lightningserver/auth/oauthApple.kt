@@ -4,8 +4,8 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.http.HttpRoute
-import com.lightningkite.lightningserver.settings.GeneralServerSettings
+import com.lightningkite.lightningserver.http.HttpEndpoint
+import com.lightningkite.lightningserver.settings.setting
 import io.ktor.server.plugins.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
@@ -26,30 +26,37 @@ import java.util.*
  */
 @LightningServerDsl
 fun ServerPath.oauthApple(
-    landingRoute: HttpRoute,
+    jwtSigner: ()->JwtSigner,
+    landingRoute: HttpEndpoint,
     emailToId: suspend (String) -> String
 ) {
     Security.addProvider(BouncyCastleProvider())
-    val settings = AuthSettings.instance.oauth["apple"] ?: return
-    val teamId = settings.secret.substringBefore("|")
-    val keyString = settings.secret.substringAfter("|")
-    val algorithm = run {
-        val pk = JcaPEMKeyConverter().getPrivateKey(PEMParser(StringReader("""
-            -----BEGIN PRIVATE KEY-----
-            ${keyString.replace(" ", "")}
-            -----END PRIVATE KEY-----
-        """.trimIndent())).use { it.readObject() as PrivateKeyInfo })
-        Algorithm.ECDSA256(null, pk as ECPrivateKey)
-    }
+    val settings = setting<OauthProviderCredentials?>("oauth-apple", null)
     return oauth(
-    landingRoute = landingRoute,
+        jwtSigner = jwtSigner,
+        landingRoute = landingRoute,
         niceName = "Apple",
         codeName = "apple",
         authUrl = "https://appleid.apple.com/auth/authorize",
         getTokenUrl = "https://appleid.apple.com/auth/token",
         scope = "email",
-        additionalParams="&response_mode=form_post",
+        additionalParams = "&response_mode=form_post",
         secretTransform = {
+            val settings = settings() ?: throw NotFoundException("Oauth is not configured for Apple.")
+            val teamId = settings.secret.substringBefore("|")
+            val keyString = settings.secret.substringAfter("|")
+            val algorithm = run {
+                val pk = JcaPEMKeyConverter().getPrivateKey(PEMParser(
+                    StringReader(
+                        """
+                            -----BEGIN PRIVATE KEY-----
+                            ${keyString.replace(" ", "")}
+                            -----END PRIVATE KEY-----
+                        """.trimIndent()
+                    )
+                ).use { it.readObject() as PrivateKeyInfo })
+                Algorithm.ECDSA256(null, pk as ECPrivateKey)
+            }
             JWT.create()
                 .withIssuer(teamId)
                 .withIssuedAt(Date())
@@ -61,7 +68,9 @@ fun ServerPath.oauthApple(
     ) {
         val id = (it.id_token ?: throw BadRequestException("No id_token found in response"))
         val decoded = JWT.decode(id)
-        if(!decoded.getClaim("email_verified").asBoolean()) throw BadRequestException("Apple has not verified the email address.")
+        if (!decoded.getClaim("email_verified")
+                .asBoolean()
+        ) throw BadRequestException("Apple has not verified the email address.")
         emailToId(decoded.getClaim("email").asString())
     }
 }

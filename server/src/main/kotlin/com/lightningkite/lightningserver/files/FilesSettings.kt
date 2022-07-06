@@ -1,20 +1,23 @@
 package com.lightningkite.lightningserver.files
 
 import com.dalet.vfs2.provider.azure.AzFileProvider
-import com.lightningkite.lightningserver.SettingSingleton
-import com.lightningkite.lightningserver.auth.AuthSettings
+import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.routing
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
+import com.lightningkite.lightningserver.settings.setting
 import io.ktor.server.plugins.*
 import kotlinx.serialization.Serializable
+import org.apache.commons.vfs2.FileObject
+import org.apache.commons.vfs2.FileSystem
 import org.apache.commons.vfs2.VFS
 import org.apache.commons.vfs2.auth.StaticUserAuthenticator
 import org.apache.commons.vfs2.impl.DefaultFileSystemConfigBuilder
 import org.apache.commons.vfs2.provider.local.LocalFileSystem
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * FileSettings defines where server files and user content is stored. This used ApacheVFS which allows the filesystem to be
@@ -30,10 +33,19 @@ import java.io.File
 data class FilesSettings(
     val storageUrl: String = "file://${File("./local/files").absolutePath}",
     val key: String? = null,
-    val signedUrlExpirationSeconds: Int? = null
-) : HealthCheckable {
-    companion object : SettingSingleton<FilesSettings>() {
+    val signedUrlExpirationSeconds: Int? = null,
+    val jwtSigner: JwtSigner = JwtSigner()
+) {
+    companion object {
         const val userContentPath: String = "user-content"
+        private val systemToSettings = ConcurrentHashMap<FileSystem, FilesSettings>()
+        fun getSettings(file: FileObject): FilesSettings? = systemToSettings[file.fileSystem]
+    }
+
+    val root by lazy {
+        VFS.getManager().resolveFile(storageUrl).apply {
+            systemToSettings[this.fileSystem] = this@FilesSettings
+        }
     }
 
     init {
@@ -43,7 +55,6 @@ data class FilesSettings(
             DefaultFileSystemConfigBuilder.getInstance().setUserAuthenticator(AzFileProvider.getDefaultFileSystemOptions(), auth)
             println(DefaultFileSystemConfigBuilder.getInstance().getUserAuthenticator(AzFileProvider.getDefaultFileSystemOptions()))
         }
-        instance = this
 
         if(root is LocalFileSystem) {
             routing {
@@ -60,7 +71,7 @@ data class FilesSettings(
                         )
                     }
                     post.handler {
-                        val location = AuthSettings.instance.verify<String>(it.queryParameter("token") ?: throw BadRequestException("No token provided"))
+                        val location = jwtSigner.verify<String>(it.queryParameter("token") ?: throw BadRequestException("No token provided"))
                         if(location != it.wildcard) throw BadRequestException("Token does not match file")
                         if(it.wildcard.contains("..")) throw IllegalStateException()
                         val file = root.resolveFile(it.wildcard).content
@@ -71,20 +82,5 @@ data class FilesSettings(
             }
         }
     }
-
-    override val healthCheckName: String get() = "Storage"
-    override suspend fun healthCheck(): HealthStatus = try {
-        root
-            .resolveFile("healthCheck.txt")
-            .use { file ->
-                file.content.outputStream
-                    .buffered()
-                    .use { out -> "Health Check".toByteArray().inputStream().copyTo(out) }
-            }
-        HealthStatus(HealthStatus.Level.OK)
-    } catch (e: Exception) {
-        HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
-    }
-
-    val root get() = VFS.getManager().resolveFile(instance.storageUrl)
 }
+

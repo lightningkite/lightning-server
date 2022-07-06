@@ -5,6 +5,8 @@ import com.lightningkite.lightningserver.auth.AuthInfo
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.serialization.serializerOrContextual
+import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.ApiWebsocket
 import com.lightningkite.lightningserver.typed.typedWebsocket
@@ -17,12 +19,14 @@ import kotlinx.serialization.*
 
 @LightningServerDsl
 inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> ServerPath.restApiWebsocket(
-    baseCollection: AbstractSignalFieldCollection<T>,
+    noinline database: ()->Database,
+    noinline baseCollection: (Database)->AbstractSignalFieldCollection<T> = { database().collection<T>() as AbstractSignalFieldCollection<T> },
     noinline collection: suspend FieldCollection<T>.(USER) -> FieldCollection<T>
 ): ApiWebsocket<USER, Query<T>, ListChange<T>> = restApiWebsocket(
     AuthInfo(),
-    Serialization.module.serializer(),
-    Serialization.module.serializer(),
+    serializerOrContextual(),
+    serializerOrContextual(),
+    database,
     baseCollection,
     collection
 )
@@ -32,13 +36,14 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
     authInfo: AuthInfo<USER>,
     serializer: KSerializer<T>,
     userSerializer: KSerializer<USER>,
-    baseCollection: AbstractSignalFieldCollection<T>,
+    database: ()->Database,
+    baseCollection: (Database)->AbstractSignalFieldCollection<T>,
     collection: suspend FieldCollection<T>.(USER) -> FieldCollection<T>
 ): ApiWebsocket<USER, Query<T>, ListChange<T>> {
     prepareModels()
     val modelName = serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
     val modelIdentifier = serializer.descriptor.serialName
-    val subscriptionDb = database.collection<__WebSocketDatabaseChangeSubscription>()
+    fun subscriptionDb() = database().collection<__WebSocketDatabaseChangeSubscription>()
     return typedWebsocket<USER, Query<T>, ListChange<T>>(
         authInfo = authInfo,
         inputType = Query.serializer(serializer),
@@ -47,7 +52,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
         description = "Gets a changing list of ${modelName}s that match the given query.",
         errorCases = listOf(),
         connect = { event ->
-            subscriptionDb.insertOne(
+            subscriptionDb().insertOne(
                 __WebSocketDatabaseChangeSubscription(
                     _id = event.id,
                     databaseId = modelIdentifier,
@@ -57,19 +62,19 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             )
         },
         message = { event ->
-            val existing = subscriptionDb.get(event.id) ?: return@typedWebsocket
+            val existing = subscriptionDb().get(event.id) ?: return@typedWebsocket
             val user = Serialization.json.decodeFromString(userSerializer, existing.user)
-            val p = collection(baseCollection, user)
+            val p = collection(baseCollection(database()), user)
             val q = event.content.copy(condition = p.fullCondition(event.content.condition))
             val c = Serialization.json.encodeToString(Query.serializer(serializer), q)
-            subscriptionDb.updateOne(
+            subscriptionDb().updateOne(
                 condition = condition { it._id eq event.id },
                 modification = modification { it.condition assign c }
             )
-            send(event.id, ListChange(wholeList = baseCollection.collection(user).query(q).toList()))
+            send(event.id, ListChange(wholeList = baseCollection(database()).collection(user).query(q).toList()))
         },
         disconnect = { event ->
-            subscriptionDb.deleteMany(condition { it._id eq event.id })
+            subscriptionDb().deleteMany(condition { it._id eq event.id })
         }
     ).apply {
         val sendWsChanges = task(
@@ -77,9 +82,9 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             CollectionChanges.serializer(serializer)
         ) { changes: CollectionChanges<T> ->
             val asyncs = ArrayList<Deferred<Unit>>()
-            subscriptionDb.find(condition { it.databaseId eq modelIdentifier }).collect {
+            subscriptionDb().find(condition { it.databaseId eq modelIdentifier }).collect {
                 asyncs += async {
-                    val p = collection(baseCollection, Serialization.json.decodeFromString(userSerializer, it.user))
+                    val p = collection(baseCollection(database()), Serialization.json.decodeFromString(userSerializer, it.user))
                     val c = Serialization.json.decodeFromString(Query.serializer(serializer), it.condition)
                     for (entry in changes.changes) {
                         send(it._id, ListChange(
@@ -92,7 +97,9 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             }
             asyncs.awaitAll()
         }
-        baseCollection.signals.add { changes -> sendWsChanges(changes) }
+        Tasks.startupActions.add {
+            baseCollection(database()).signals.add { changes -> sendWsChanges(changes) }
+        }
     }
 }
 

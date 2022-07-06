@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.pubsub
 
-import com.lightningkite.lightningserver.SettingSingleton
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
+import com.lightningkite.lightningserver.settings.setting
 import io.lettuce.core.RedisClient
 import kotlinx.serialization.Serializable
 import redis.embedded.RedisServer
@@ -10,20 +10,8 @@ import redis.embedded.RedisServer
 @Serializable
 data class PubSubSettings(
     val uri: String = "local"
-): HealthCheckable {
-    companion object : SettingSingleton<PubSubSettings>()
-
-    init {
-        instance = this
-    }
-
-    override suspend fun healthCheck(): HealthStatus = pubSub.healthCheck()
-    override val healthCheckName: String get() = pubSub.healthCheckName
-}
-
-val pubSub: PubSubInterface by lazy {
-    val uri = PubSubSettings.instance.uri
-    when {
+): ()->PubSubInterface {
+    override fun invoke(): PubSubInterface = when {
         uri == "local" -> LocalPubSub
         uri == "redis" -> {
             val redisServer = RedisServer.builder()

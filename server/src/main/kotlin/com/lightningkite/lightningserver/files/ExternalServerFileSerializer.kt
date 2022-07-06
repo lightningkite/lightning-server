@@ -16,6 +16,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import org.apache.commons.vfs2.VFS
 import org.slf4j.LoggerFactory
 import java.math.BigInteger
 import java.net.URLDecoder
@@ -44,26 +45,28 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
     }
 
     override fun serialize(encoder: Encoder, value: ServerFile) {
-        val root = FilesSettings.instance.root
-        val rootUrl = root.publicUrlUnsigned
-        if(!value.location.startsWith(rootUrl)) {
-            LoggerFactory.getLogger("com.lightningkite.lightningserver.files").warn("The given url (${value.location}) does not start with the files root ($rootUrl).")
+        val f = VFS.getManager().resolveFile(value.location)
+        val files = FilesSettings.getSettings(f)
+        if(files == null) {
+            LoggerFactory.getLogger("com.lightningkite.lightningserver.files").warn("The given url (${value.location}) does not start with any files root.")
             encoder.encodeString(value.location)
         } else {
-            val newFile = root.resolveFile(value.location.removePrefix(rootUrl).substringBefore('?'))
+            val newFile = files.root.resolveFile(value.location.removePrefix(files.root.publicUrlUnsigned).substringBefore('?'))
             encoder.encodeString(newFile.publicUrl)
         }
     }
 
     override fun deserialize(decoder: Decoder): ServerFile {
-        val root = FilesSettings.instance.root
-        val rootUrl = root.publicUrlUnsigned
         val raw = decoder.decodeString()
+        val f = VFS.getManager().resolveFile(raw)
+        val files = FilesSettings.getSettings(f) ?:  throw BadRequestException("The given url ($raw) does not start with any files root.")
+        val root = files.root
+        val rootUrl = root.publicUrlUnsigned
         if(!raw.startsWith(rootUrl)) throw BadRequestException("The given url ($raw) does not start with the files root ($rootUrl).")
         val newFile = root.resolveFile(raw.removePrefix(rootUrl))
         when(newFile) {
             is AzFileObject -> {
-                if(FilesSettings.instance.signedUrlExpirationSeconds != null) {
+                if(files.signedUrlExpirationSeconds != null) {
                     // TODO: A local check like we do for AWS would be more performant
                     runBlocking {
                         if(!client.get(raw) { header("Range", "bytes=0-0") }.status.isSuccess()) throw BadRequestException("URL does not appear to be signed properly")
@@ -71,12 +74,12 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
                 }
             }
             is S3FileObject -> {
-                if(FilesSettings.instance.signedUrlExpirationSeconds != null) {
+                if(files.signedUrlExpirationSeconds != null) {
                     val headers = raw.substringAfter('?').split('&').associate {
                         URLDecoder.decode(it.substringBefore('='), Charsets.UTF_8) to URLDecoder.decode(it.substringAfter('=', ""), Charsets.UTF_8)
                     }
-                    val accessKey = FilesSettings.instance.storageUrl.substringAfter("://").substringBefore('@', "").substringBefore(':')
-                    val secretKey = FilesSettings.instance.storageUrl.substringAfter("://").substringBefore('@', "").substringAfter(':').substringBefore(':')
+                    val accessKey = files.storageUrl.substringAfter("://").substringBefore('@', "").substringBefore(':')
+                    val secretKey = files.storageUrl.substringAfter("://").substringBefore('@', "").substringAfter(':').substringBefore(':')
                     val region = raw.substringAfter("://s3-").substringBefore(".amazonaws.com")
                     val bucket = raw.substringAfter("amazonaws.com/").substringBefore('/')
                     val objectPath = "/" + raw.substringAfter("amazonaws.com/").substringBefore("?")

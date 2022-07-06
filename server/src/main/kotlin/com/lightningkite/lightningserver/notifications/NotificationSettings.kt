@@ -5,9 +5,9 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
-import com.lightningkite.lightningserver.SettingSingleton
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
+import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import java.io.File
@@ -27,12 +27,7 @@ data class NotificationSettings(
     val implementation: NotificationImplementation = NotificationImplementation.Console,
     val credentials: String? = null
 //) : HealthCheckable {
-) {
-    companion object : SettingSingleton<NotificationSettings>()
-
-    init {
-        instance = this
-    }
+): ()->NotificationInterface {
 
     @Transient
     var sendNotificationsDuringTests: Boolean = false
@@ -54,6 +49,8 @@ data class NotificationSettings(
         }
     }
 
+    override fun invoke(): NotificationInterface = notifications
+
 //    override suspend fun healthCheck(): HealthStatus =
 //        when (implementation) {
 //            NotificationImplementation.Console -> HealthStatus("Notifications", true)
@@ -72,8 +69,6 @@ data class NotificationSettings(
 //        }
 
 }
-
-val notifications: NotificationInterface get() = NotificationSettings.instance.notifications
 
 enum class NotificationImplementation {
     Console, FCM

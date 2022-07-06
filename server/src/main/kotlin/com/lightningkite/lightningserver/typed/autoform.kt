@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.jsonschema.encodeToSchema
 import com.lightningkite.lightningserver.jsonschema.internal.createJsonSchema
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningdb.ServerFile
+import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import io.ktor.util.*
 import kotlinx.html.*
 import kotlinx.serialization.KSerializer
@@ -50,7 +51,7 @@ inline fun <reified T> FORM.insideHtmlForm(
     jsEditorName: String,
     defaultValue: T? = null,
     collapsed: Boolean = false,
-): Unit = insideHtmlForm(title, jsEditorName, Serialization.module.serializer(), defaultValue, collapsed)
+): Unit = insideHtmlForm(title, jsEditorName, serializerOrContextual(), defaultValue, collapsed)
 fun <T> FORM.insideHtmlForm(
     title: String,
     jsEditorName: String,

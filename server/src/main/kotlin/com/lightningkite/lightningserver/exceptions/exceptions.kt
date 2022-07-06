@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.exceptions
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.serialization.toHttpContent
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
@@ -18,7 +19,7 @@ open class HttpStatusException(
         suspend fun toHttpContent(acceptedTypes: List<ContentType>): HttpContent? = data.toHttpContent(acceptedTypes, serializer)
     }
     companion object {
-        inline fun <reified T> toBody(value: T): Body<T> = Body(value, serializer())
+        inline fun <reified T> toBody(value: T): Body<T> = Body(value, serializerOrContextual())
     }
     suspend fun toResponse(request: HttpRequest): HttpResponse = HttpResponse(
         status = status,

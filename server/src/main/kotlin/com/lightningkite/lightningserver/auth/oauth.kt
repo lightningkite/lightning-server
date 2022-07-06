@@ -4,11 +4,13 @@ import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.BadRequestException
+import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.http.HttpRoute
+import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.handler
-import com.lightningkite.lightningserver.settings.GeneralServerSettings
+import com.lightningkite.lightningserver.settings.generalSettings
+import com.lightningkite.lightningserver.settings.setting
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -43,7 +45,8 @@ data class OauthResponse(
  */
 @LightningServerDsl
 inline fun ServerPath.oauth(
-    landingRoute: HttpRoute,
+    noinline jwtSigner: ()->JwtSigner,
+    landingRoute: HttpEndpoint,
     niceName: String,
     codeName: String,
     authUrl: String,
@@ -54,19 +57,21 @@ inline fun ServerPath.oauth(
     crossinline remoteTokenToUserId: suspend (OauthResponse)->String
 ) {
     val landing = landingRoute
-    val settings = AuthSettings.instance.oauth[codeName] ?: return
+    val settings = setting<OauthProviderCredentials?>("oauth-$codeName", null)
     val callbackRoute = get("callback")
     get("login").handler { request ->
+        val settings = settings() ?: throw NotFoundException("Oauth for $niceName is not configured.")
         HttpResponse.redirectToGet("""
                     $authUrl?
                     response_type=code&
                     scope=$scope&
-                    redirect_uri=${GeneralServerSettings.instance.publicUrl + callbackRoute.toString()}&
+                    redirect_uri=${generalSettings().publicUrl + callbackRoute.toString()}&
                     client_id=${settings.id}
                     $additionalParams
                 """.trimIndent().replace("\n", ""))
     }
     callbackRoute.handler { request ->
+        val settings = settings() ?: throw NotFoundException("Oauth for $niceName is not configured.")
         request.queryParameter("error")?.let {
             throw BadRequestException("Got error code '${it}' from $niceName.")
         } ?: request.queryParameter("code")?.let { code ->
@@ -75,13 +80,13 @@ inline fun ServerPath.oauth(
                     parameter("code", code)
                     parameter("client_id", settings.id)
                     parameter("client_secret", secretTransform(settings.secret))
-                    parameter("redirect_uri", GeneralServerSettings.instance.publicUrl + callbackRoute.toString())
+                    parameter("redirect_uri", generalSettings().publicUrl + callbackRoute.toString())
                     parameter("grant_type", "authorization_code")
                 }
                 accept(ContentType.Application.Json)
             }.body()
 
-            HttpResponse.redirectToGet(GeneralServerSettings.instance.publicUrl + landing.toString() + "?jwt=${AuthSettings.instance.token(remoteTokenToUserId(response))}")
+            HttpResponse.redirectToGet(generalSettings().publicUrl + landing.toString() + "?jwt=${jwtSigner().token(remoteTokenToUserId(response))}")
         } ?: throw IllegalStateException()
     }
 }
