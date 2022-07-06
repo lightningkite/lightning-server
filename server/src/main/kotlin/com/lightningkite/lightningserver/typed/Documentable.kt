@@ -6,21 +6,14 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.AuthInfo
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.Http
-import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.websocket.WebSockets
-import io.ktor.server.routing.*
-import kotlinx.html.*
-import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.capturedKClass
 import kotlinx.serialization.internal.GeneratedSerializer
-import kotlinx.serialization.serializer
-import kotlin.reflect.KType
 
 interface Documentable {
     val path: ServerPath
@@ -29,7 +22,7 @@ interface Documentable {
     val authInfo: AuthInfo<*>
 
     companion object {
-        val endpoints get() = Http.routes.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *>>()
+        val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *>>()
         val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *, *>>()
         val all get() = endpoints + websockets
         val usedTypes: Collection<KSerializer<*>> get() {

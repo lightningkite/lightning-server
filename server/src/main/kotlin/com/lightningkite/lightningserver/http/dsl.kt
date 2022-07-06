@@ -33,14 +33,14 @@ fun ServerPath.head(path: String): HttpEndpoint = HttpEndpoint(this.path(path), 
 
 @LightningServerDsl
 fun HttpEndpoint.handler(handler: suspend (HttpRequest) -> HttpResponse): HttpEndpoint {
-    Http.routes[this] = handler
+    Http.endpoints[this] = handler
     if(Http.fixEndingSlash) fixEnding()
     return this
 }
 
 @LightningServerDsl
 fun HttpEndpoint.fixEnding(): HttpEndpoint {
-    Http.routes[this.copy(path.copy(after = when(path.after) {
+    Http.endpoints[this.copy(path.copy(after = when(path.after) {
         ServerPath.Afterwards.TrailingSlash -> ServerPath.Afterwards.None
         ServerPath.Afterwards.None -> ServerPath.Afterwards.TrailingSlash
         ServerPath.Afterwards.ChainedWildcard -> ServerPath.Afterwards.ChainedWildcard

@@ -1,14 +1,12 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
-import com.lightningkite.lightningserver.exceptions.exceptionSettings
-import com.lightningkite.lightningserver.logging.loggingSettings
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 
 object Http {
     var fixEndingSlash: Boolean = true
-    val routes = mutableMapOf<HttpEndpoint, suspend (HttpRequest) -> HttpResponse>()
+    val endpoints = mutableMapOf<HttpEndpoint, suspend (HttpRequest) -> HttpResponse>()
     var exception: suspend (HttpRequest, Exception) -> HttpResponse =
         { request, exception ->
 
@@ -43,7 +41,7 @@ suspend fun HttpEndpoint.test(
         sourceIp = sourceIp,
     )
     return try {
-        Http.routes[this]!!.invoke(req)
+        Http.endpoints[this]!!.invoke(req)
     } catch(e: HttpStatusException) {
         e.toResponse(req)
     }

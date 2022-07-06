@@ -71,7 +71,7 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                 call.adapt(HttpEndpoint(call.request.path(), MyHttpMethod(call.request.httpMethod.value))).reportException(it)
             }
         }
-        Http.routes.forEach { entry ->
+        Http.endpoints.forEach { entry ->
             routing {
                 route(entry.key.path.toString(), HttpMethod.parse(entry.key.method.toString())) {
                     handle {

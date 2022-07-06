@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
-import java.io.File
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
@@ -151,7 +150,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
     appendLine()
 }.toString()
 
-private val Documentable.Companion.safeDocumentables get() = (Http.routes.values.filterIsInstance<ApiEndpoint<*, *, *>>().filter { it.route.method != HttpMethod.GET || it.inputType == Unit.serializer() } + WebSockets.handlers.values.filterIsInstance<ApiWebsocket<*, *, *>>())
+private val Documentable.Companion.safeDocumentables get() = (Http.endpoints.values.filterIsInstance<ApiEndpoint<*, *, *>>().filter { it.route.method != HttpMethod.GET || it.inputType == Unit.serializer() } + WebSockets.handlers.values.filterIsInstance<ApiWebsocket<*, *, *>>())
     .distinctBy { it.docGroup.toString() + "/" + it.summary }
 
 private class CodeEmitter(val packageName: String, val body: StringBuilder = StringBuilder()): Appendable by body {
