@@ -5,26 +5,11 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 
 - `runServer()` runs a server based on the loaded server settings
 - `loadSettings()` loads the server settings
-- `configureFiles()` sets up basic system directories
-- `configureSerialization()` sets up content negotiation
-- `configureExceptions()` sets up StatusPages for basic exception handling
-- `configureAuth()` sets up server authetication
+- `authEndpoints()` sets up server-wide authentication
 
 ## Server Settings Singletons
 
-- `GeneralServerSettings` is a class containing basic server settings
-- `AuthSettings` is a data class containing required settings for server authentication
-- `FilesSettings` is a data class containing settings for defining where and how files for the server are stored
-- `LoggingSettings` is a data class containing settings for customizing server logging
-- `DatabaseSettings` is a data class containing settings for what database the server will use
-- `ExceptionSettings` is a data class containing settings for how unhandled exceptions are reported
-- `EmailSettings` is a data class containing settings for the server email
-
 ## Database
-
-- `database` is a singleton that handles the database
-- `database.collection()` returns a `FieldCollection` from the database
-- `autoCollection()` is a shortcut function for setting up restful endpoints for a `FieldCollection`, as well as an html admin portal
 
 ## FieldCollection
 `FieldCollection` is an abstract class for interacting with a database, and on a specific collection/table.
@@ -42,6 +27,7 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 
 - `get()` gets an element from the collection
 - `getMany()` gets multiple elements from the collection
+- `findOne()` gets an element from the collection
 - `find()` gets multiple elements from the collection
 
 #### Modify
@@ -49,8 +35,6 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 - `updateOne()` modifies an element in the collection
 - `updateMany()` modifies multiple elements in the collection
 - `updateOneById()` modifies an element in the collection
-- `findOneAndUpdate()` modifies an element in the collection
-- `findOneAndUpdateById()` modifies an element in the collection
 
 #### Replace
 
