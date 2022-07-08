@@ -20,7 +20,7 @@ class LiveFullReadModelApi<Model : HasId<UUID>>(
             token: String,
             headers: Map<String, String> = mapOf(),
         ): LiveFullReadModelApi<Model> = LiveFullReadModelApi(
-            read = LiveReadModelApi("$root$path", token, headers, defaultJsonMapper.serializersModule.serializer()),
+            read = LiveReadModelApi.create(root, path, token, headers),
             observe = LiveObserveModelApi.create(multiplexSocketUrl, token, headers, path)
         )
     }
