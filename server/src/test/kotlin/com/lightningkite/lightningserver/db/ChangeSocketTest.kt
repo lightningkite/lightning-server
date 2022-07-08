@@ -28,10 +28,15 @@ class ChangeSocketTest {
         runBlocking {
             ws.test {
                 this.send(Query())
-                assertEquals(withTimeout(100L) { println("Waiting for item"); incoming.receive().also { println("Got $it") } }, ListChange(wholeList = listOf()))
+                assertEquals(withTimeout(1000L) { println("Waiting for item"); incoming.receive().also { println("Got $it") } }, ListChange(wholeList = listOf()))
                 val newThing = TestThing()
-                database().collection<TestThing>().insertOne(newThing)
-                assertEquals(withTimeout(100L) { incoming.receive() }, ListChange(new = newThing))
+                println("Sending update")
+                val r = async {
+                    delay(10)
+                    database().collection<TestThing>().insertOne(newThing)
+                }
+                assertEquals(withTimeout(1000L) { println("Waiting for item"); incoming.receive().also { println("Got $it") } }, ListChange(new = newThing))
+                r.await()
             }
         }
     }

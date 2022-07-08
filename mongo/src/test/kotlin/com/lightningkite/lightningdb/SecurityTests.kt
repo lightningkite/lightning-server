@@ -18,10 +18,6 @@ class SecurityTests : MongoTest() {
     fun test(): Unit = runBlocking {
         val myPosts = Post.mongo.forUser(user1)
         val dansPosts = Post.mongo.forUser(otherUser)
-        GlobalScope.launch {
-            myPosts.watch(startChain<Post>().let { startChain<Post>().author eq user1._id }).collect {
-            }
-        }
         delay(1000L)
         myPosts.insertOne(Post(author = user1._id, content = "User1 post"))
         dansPosts.insertOne(Post(author = otherUser._id, content = "OtherUser post"))

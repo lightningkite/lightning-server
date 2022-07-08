@@ -5,6 +5,8 @@ import com.lightningkite.lightningserver.cache.CacheInterface
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.cache.setIfNotExists
+import com.lightningkite.lightningserver.engine.LocalEngine
+import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.exceptions.reportException
 import com.lightningkite.lightningserver.http.*
@@ -184,11 +186,7 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
             }
         }
         Tasks.tasks  // No registration necessary
-        Tasks.engineStartImplementation = { a, b ->
-            @Suppress("OPT_IN_USAGE")
-            GlobalScope.launch { a.implementation(this, b) }
-        }
-        WebSockets.engineSendMethod = { id, frame -> pubSub.get<String>("ws-$id").emit(frame) }
+        engine = LocalEngine(pubSub)
         Tasks.startup()
     } catch (t: Throwable) {
         t.printStackTrace()

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.tasks
 
+import com.lightningkite.lightningserver.engine.engine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -17,15 +18,15 @@ data class Task<INPUT>(
         Tasks.tasks[name] = this
     }
     @Suppress("UNCHECKED_CAST")
-    operator fun invoke(input: INPUT) = Tasks.engineStartImplementation(this as Task<Any?>, input)
+    operator fun invoke(input: INPUT) = engine.launchTask(this as Task<Any?>, input)
 }
 
 object Tasks {
     val tasks = HashMap<String, Task<*>>()
-    val startupActions = HashSet<()->Unit>()
-    @Suppress("OPT_IN_USAGE")
-    var engineStartImplementation: (Task<Any?>, Any?) -> Unit = { a, b ->
-        GlobalScope.launch { a.implementation(this, b) }
+    private val startupActions = HashSet<()->Unit>()
+    fun startup(action: ()->Unit) {
+        if(isStarted) action()
+        else startupActions.add(action)
     }
     var isStarted = false
         private set
@@ -33,5 +34,6 @@ object Tasks {
         if(isStarted) return
         isStarted = true
         startupActions.forEach { it() }
+        startupActions.clear()
     }
 }

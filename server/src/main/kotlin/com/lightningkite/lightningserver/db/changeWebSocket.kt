@@ -97,7 +97,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             }
             asyncs.awaitAll()
         }
-        Tasks.startupActions.add {
+        Tasks.startup {
             baseCollection(database()).signals.add { changes -> sendWsChanges(changes) }
         }
     }

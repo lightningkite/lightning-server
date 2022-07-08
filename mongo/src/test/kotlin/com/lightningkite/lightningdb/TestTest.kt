@@ -19,29 +19,6 @@ class TestTest: MongoTest() {
         val myPosts = Post.mongo.forUser(me)
         val dansPosts = Post.mongo.forUser(dan)
 
-        val listenerCount = 100
-        val expectedEvents = 3
-        val changeCount = AtomicInteger()
-        val started = AtomicInteger()
-
-        val listeners = (0 until listenerCount).map { GlobalScope.launch {
-            var myCount = 0
-            try {
-                myPosts.watch(startChain<Post>().let { it.author eq me._id })
-                    .onStart {
-                        started.incrementAndGet()
-                    }.collect {
-                    changeCount.incrementAndGet()
-                    myCount++
-                }
-            } catch(e: CancellationException) {
-                println("Cancelled $it, got ${expectedEvents}")
-            }
-        } }
-        repeat(4) {
-            delay(100L)
-        }
-
         myPosts.insertOne(Post(author = me._id, content = "Joe post"))
         dansPosts.insertOne(Post(author = dan._id, content = "Dan post"))
         myPosts.insertOne(Post(author = me._id, content = "Another Joe Post"))
@@ -49,16 +26,5 @@ class TestTest: MongoTest() {
             startChain<Post>().content eq "Joe post",
             startChain<Post>().content assign "Joe post updated"
         )
-        repeat(20) {
-            delay(5L)
-        }
-        listeners.forEach { it.cancelAndJoin() }
-//        measureNanoTime {
-//            repeat(1000) {
-//                println("Iter $it")
-//                myPosts.insertOne(Post(author = me._id, content = "Test Description 2"))
-//                myPosts.find(Post::always()).collect {  }
-//            }
-//        }.let { println("${it / 1_000_000} millis") }
     }
 }

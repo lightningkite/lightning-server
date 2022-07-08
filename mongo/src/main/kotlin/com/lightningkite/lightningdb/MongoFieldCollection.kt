@@ -263,7 +263,9 @@ class MongoFieldCollection<Model : Any>(
     @OptIn(ExperimentalSerializationApi::class)
     suspend fun handleIndexes(scope: CoroutineScope) {
         val requireCompletion = ArrayList<Job>()
+        val seen = HashSet<SerialDescriptor>()
         fun handleDescriptor(descriptor: SerialDescriptor) {
+            if(!seen.add(descriptor)) return
             descriptor.annotations.forEach {
                 when (it) {
                     is UniqueSet -> {
