@@ -69,7 +69,7 @@ suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
         FieldCollection<Model>.getMany(
     ids: List<ID>
 ): List<Model> {
-    return find(Condition.OnField(HasIdFields._id(), Condition.Inside(ids)), limit = 1).toList()
+    return find(Condition.OnField(HasIdFields._id(), Condition.Inside(ids))).toList()
 }
 
 suspend fun <Model : Any>

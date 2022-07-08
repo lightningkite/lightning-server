@@ -22,8 +22,8 @@ val kotlinVersion:String by project
 dependencies {
     api(project(":shared"))
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1")
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.3")
 
     kspTest(project(":processor"))
     testImplementation(project(":client"))
