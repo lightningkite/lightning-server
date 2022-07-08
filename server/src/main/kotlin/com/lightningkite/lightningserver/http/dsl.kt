@@ -34,7 +34,7 @@ fun ServerPath.head(path: String): HttpEndpoint = HttpEndpoint(this.path(path), 
 @LightningServerDsl
 fun HttpEndpoint.handler(handler: suspend (HttpRequest) -> HttpResponse): HttpEndpoint {
     Http.endpoints[this] = handler
-    if(Http.fixEndingSlash) fixEnding()
+    if(Http.fixEndingSlash && this.path.after != ServerPath.Afterwards.ChainedWildcard) fixEnding()
     return this
 }
 
@@ -43,7 +43,7 @@ fun HttpEndpoint.fixEnding(): HttpEndpoint {
     Http.endpoints[this.copy(path.copy(after = when(path.after) {
         ServerPath.Afterwards.TrailingSlash -> ServerPath.Afterwards.None
         ServerPath.Afterwards.None -> ServerPath.Afterwards.TrailingSlash
-        ServerPath.Afterwards.ChainedWildcard -> ServerPath.Afterwards.ChainedWildcard
+        ServerPath.Afterwards.ChainedWildcard -> throw IllegalArgumentException()
     }))] = {
         HttpResponse.pathMoved(this.path.toString())
     }

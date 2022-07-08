@@ -118,7 +118,7 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
                                 part.content.stream()
                                     .use { input ->
                                         parsingFileSettings!!().root.resolveFileWithUniqueName(
-                                            "files/${part.filename}"
+                                            "uploaded/${part.filename}"
                                         ).upload(input)
                                     }
                                     .let {

@@ -23,7 +23,8 @@ open class HttpStatusException(
     }
     suspend fun toResponse(request: HttpRequest): HttpResponse = HttpResponse(
         status = status,
-        body = body?.toHttpContent(request.headers.accept)
+        body = body?.toHttpContent(request.headers.accept),
+        headers = headers
     )
 }
 

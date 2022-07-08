@@ -31,10 +31,13 @@ val FileObject.publicUrlUnsigned: String
  */
 val FileObject.publicUrl: String
     get() = when(this) {
-        is LocalFile -> "${generalSettings().publicUrl}/${FilesSettings.userContentPath}/${
-            path.relativeTo(Path.of(FilesSettings.getSettings(this)!!.storageUrl.removePrefix("file://"))).toString()
-                .replace("\\", "/")
-        }"
+        is LocalFile -> {
+            println("$path relative to ${Path.of(FilesSettings.getSettings(this)!!.storageUrl.removePrefix("file://"))}")
+            "${generalSettings().publicUrl}/${FilesSettings.userContentPath}/${
+                path.relativeTo(Path.of(FilesSettings.getSettings(this)!!.storageUrl.removePrefix("file://"))).toString()
+                    .replace("\\", "/")
+            }"
+        }
         is S3FileObject -> {
             FilesSettings.getSettings(this)!!.signedUrlExpirationSeconds?.let { seconds ->
                 unstupidSignUrl(seconds)

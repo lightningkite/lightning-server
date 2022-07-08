@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 @Serializable
 data class FilesSettings(
-    val storageUrl: String = "file://${File("./local/files").absolutePath}",
+    val storageUrl: String = "file://${File("./local/files/").absolutePath}",
     val key: String? = null,
     val signedUrlExpirationSeconds: Int? = null,
     val jwtSigner: JwtSigner = JwtSigner()
@@ -56,11 +56,11 @@ data class FilesSettings(
             println(DefaultFileSystemConfigBuilder.getInstance().getUserAuthenticator(AzFileProvider.getDefaultFileSystemOptions()))
         }
 
-        if(root is LocalFileSystem) {
+        if(root.fileSystem is LocalFileSystem) {
             routing {
-                path(userContentPath + "/*").apply{
+                path("$userContentPath/{...}").apply{
                     get.handler {
-                        if(it.wildcard?.contains('.') != false) throw IllegalStateException()
+                        if(it.wildcard?.contains("..") != false) throw IllegalStateException()
                         val file = root.resolveFile(it.wildcard).content
                         HttpResponse(
                             body = HttpContent.Stream(

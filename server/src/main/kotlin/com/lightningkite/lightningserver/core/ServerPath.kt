@@ -12,7 +12,7 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
 
         companion object {
             fun fromString(string: String): Afterwards {
-                if(string.endsWith("/*"))
+                if(string.endsWith("/{...}"))
                     return ChainedWildcard
                 else if(string.endsWith("/"))
                     return TrailingSlash
@@ -34,6 +34,7 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
             fun fromString(string: String): List<Segment> {
                 return string.split('/')
                     .filter { it.isNotBlank() }
+                    .filter { it != "{...}" }
                     .map {
                         if (it.startsWith("{"))
                             Segment.Wildcard(it.removePrefix("{").removeSuffix("}"))
@@ -61,6 +62,6 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
     override fun toString(): String = "/" + segments.joinToString("/") + when(after) {
         Afterwards.None -> ""
         Afterwards.TrailingSlash -> "/"
-        Afterwards.ChainedWildcard -> "/*"
+        Afterwards.ChainedWildcard -> "/{...}"
     }
 }

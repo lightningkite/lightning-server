@@ -4,6 +4,7 @@ import com.dalet.vfs2.provider.azure.AzFileObject
 import com.github.vfss3.S3FileObject
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningdb.ServerFile
+import com.lightningkite.lightningserver.settings.Settings
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.server.plugins.*
@@ -44,9 +45,11 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
         override val annotations: List<Annotation> = ServerFile::class.annotations
     }
 
+    private val lookup by lazy { Settings.current().values.filterIsInstance<FilesSettings>().map { it.root.publicUrlUnsigned to it } }
+    private fun lookupSettings(publicUrl: String): FilesSettings? = lookup.firstOrNull { publicUrl.startsWith(it.first) }?.second
+
     override fun serialize(encoder: Encoder, value: ServerFile) {
-        val f = VFS.getManager().resolveFile(value.location)
-        val files = FilesSettings.getSettings(f)
+        val files = lookupSettings(value.location)
         if(files == null) {
             LoggerFactory.getLogger("com.lightningkite.lightningserver.files").warn("The given url (${value.location}) does not start with any files root.")
             encoder.encodeString(value.location)
@@ -58,8 +61,7 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
 
     override fun deserialize(decoder: Decoder): ServerFile {
         val raw = decoder.decodeString()
-        val f = VFS.getManager().resolveFile(raw)
-        val files = FilesSettings.getSettings(f) ?:  throw BadRequestException("The given url ($raw) does not start with any files root.")
+        val files = lookupSettings(raw) ?:  throw BadRequestException("The given url ($raw) does not start with any files root.")
         val root = files.root
         val rootUrl = root.publicUrlUnsigned
         if(!raw.startsWith(rootUrl)) throw BadRequestException("The given url ($raw) does not start with the files root ($rootUrl).")

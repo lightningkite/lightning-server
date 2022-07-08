@@ -98,6 +98,8 @@ dependencies {
     ksp(project(":processor"))
     kspTest(project(":processor"))
 
+    implementation("com.hashicorp:cdktf:0.12.0-pre.28")
+    implementation("software.constructs:constructs:10.0.5")
 }
 
 ksp {

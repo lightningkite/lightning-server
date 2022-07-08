@@ -73,7 +73,8 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
         }
         Http.endpoints.forEach { entry ->
             routing {
-                route(entry.key.path.toString(), HttpMethod.parse(entry.key.method.toString())) {
+                val routeString = entry.key.path.toString().replace("{...}", "{tailcard...}")
+                route(routeString, HttpMethod.parse(entry.key.method.toString())) {
                     handle {
                         val request = call.adapt(entry.key)
                         val result = try {
@@ -217,8 +218,8 @@ private suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
     val parts = HashMap<String, String>()
     var wildcard: String? = null
     parameters.forEach { s, strings ->
-        if (strings.size > 1) wildcard = strings.joinToString("/")
-        parts[s] = strings.single()
+        if (s == "tailcard") wildcard = strings.joinToString("/")
+        parts[s] = strings.joinToString("/")
     }
     return HttpRequest(
         route = route,
