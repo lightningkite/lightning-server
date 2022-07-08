@@ -21,12 +21,12 @@ val kotlinVersion:String by project
 dependencies {
     api(project(":db"))
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.1")
-    implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.4.5")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.2")
+    implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.4.6")
     implementation("com.github.jershell:kbson:0.4.4")
     api("org.litote.kmongo:kmongo-coroutine-serialization:4.5.1")
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.3")
 
     kspTest(project(":processor"))
     testImplementation(project(":client"))
