@@ -12,6 +12,10 @@ import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.getContextualDescriptor
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonPrimitive
 import java.security.SecureRandom
 import java.time.Duration
@@ -42,15 +46,24 @@ data class JwtSigner(
 ) {
 
     inline fun <reified T> token(subject: T, expireDuration: Long? = expirationMilliseconds): String = token(serializerOrContextual(), subject, expireDuration)
-    fun <T> token(serializer: KSerializer<T>, subject: T, expireDuration: Long? = expirationMilliseconds): String = JWT.create()
-        .withAudience(generalSettings().publicUrl)
-        .withIssuer(generalSettings().publicUrl)
-        .withIssuedAt(Date())
-        .also {
-            if (expireDuration != null)
-                it.withExpiresAt(Date(System.currentTimeMillis() + expireDuration))
-        }
-        .withClaim(PublicClaims.SUBJECT, (Serialization.json.encodeToJsonElement(serializer, subject) as JsonPrimitive).content)
+    fun <T> token(serializer: KSerializer<T>, subject: T, expireDuration: Long? = expirationMilliseconds): String =
+        JWT.create()
+            .withAudience(generalSettings().publicUrl)
+            .withIssuer(generalSettings().publicUrl)
+            .withIssuedAt(Date())
+            .also {
+                if (expireDuration != null)
+                    it.withExpiresAt(Date(System.currentTimeMillis() + expireDuration))
+            }
+            .let {
+                if (serializer.isPrimitive())
+                    it.withClaim(
+                        PublicClaims.SUBJECT,
+                        (Serialization.json.encodeToJsonElement(serializer, subject) as JsonPrimitive).content
+                    )
+                else
+                    it.withClaim(PublicClaims.SUBJECT, Serialization.json.encodeToString(serializer, subject))
+            }
         .sign(Algorithm.HMAC256(secret))
 
     inline fun <reified T> verify(token: String): T = verify(serializerOrContextual(), token)
@@ -61,7 +74,13 @@ data class JwtSigner(
                 .withIssuer(generalSettings().publicUrl)
                 .build()
                 .verify(token)
-            Serialization.json.decodeFromJsonElement(serializer, JsonPrimitive(v.subject ?: v.getClaim(userIdKey).asString()))
+            if (serializer.isPrimitive())
+                Serialization.json.decodeFromJsonElement(
+                    serializer,
+                    JsonPrimitive(v.subject ?: v.getClaim(userIdKey).asString())
+                )
+            else
+                Serialization.json.decodeFromString(serializer, v.subject ?: v.getClaim(userIdKey).asString())
         } catch (e: JWTVerificationException) {
             throw UnauthorizedException(
                 body = "Invalid token $token: ${e.message}",
@@ -72,6 +91,18 @@ data class JwtSigner(
                 body = "Invalid token $token: ${e.message}",
                 cause = e
             )
+        }
+    }
+
+    private fun KSerializer<*>.isPrimitive(): Boolean {
+        var current = this.descriptor
+        while (true) {
+            when (current.kind) {
+                is PrimitiveKind -> return true
+                SerialKind.CONTEXTUAL -> current =
+                    Serialization.json.serializersModule.getContextualDescriptor(current)!!
+                else -> return false
+            }
         }
     }
 
