@@ -45,7 +45,14 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
         }
     }
 
-    val parent: ServerPath get() = ServerPath(segments.dropLast(1))
+    val parent: ServerPath? get() {
+        return when {
+            after == Afterwards.ChainedWildcard -> ServerPath(segments, Afterwards.TrailingSlash)
+            after == Afterwards.TrailingSlash -> ServerPath(segments, Afterwards.None)
+            segments.isEmpty() -> null
+            else -> ServerPath(segments.dropLast(1))
+        }
+    }
 
     constructor(string: String) : this(
         segments = Segment.fromString(string),

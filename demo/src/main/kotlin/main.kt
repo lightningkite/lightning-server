@@ -77,7 +77,7 @@ object Server {
                 jwtSigner = jwtSigner,
                 database = database,
                 email = email,
-                onNewUser = { User(email = it) })
+                onNewUser = { User(email = it) }).authEndpointExtensionHtml()
             path("test-model") {
                 path("rest").restApi(database) { user: User? -> database().collection<TestModel>("TestModel") }
                 path("rest").restApiWebsocket<User, TestModel, UUID>(

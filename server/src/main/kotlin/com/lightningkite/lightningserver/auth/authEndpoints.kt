@@ -2,6 +2,8 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.HtmlDefaults
+import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.email.EmailClient
 import com.lightningkite.lightningserver.exceptions.NotFoundException
@@ -26,13 +28,21 @@ import kotlinx.serialization.Serializable
  * @param emailSubject The subject of the login emails that will be sent out.
  * @param template A lambda to return what the email to send will be given the email and the login link.
  */
-
+@LightningServerDsl
 inline fun <reified USER, reified ID : Comparable<ID>> ServerPath.authEndpoints(
     noinline jwtSigner: () -> JwtSigner,
     noinline database: () -> Database,
     noinline email: () -> EmailClient,
     crossinline onNewUser: suspend (email: String) -> USER? = { null },
     landing: String = "/",
+    noinline handleToken: suspend HttpRequest.(token: String)->HttpResponse = { token ->
+        HttpResponse.redirectToGet(
+            to = queryParameter("destination") ?: landing,
+            headers = {
+                setCookie(HttpHeader.Authorization, token)
+            }
+        )
+    },
     noinline emailSubject: ()->String = { "${generalSettings().projectName} Log In" },
     noinline template: (suspend (email: String, link: String) -> String) = HtmlDefaults.defaultLoginEmailTemplate
 ) where USER : HasEmail, USER : HasId<ID> = authEndpoints(
@@ -51,6 +61,7 @@ inline fun <reified USER, reified ID : Comparable<ID>> ServerPath.authEndpoints(
         ?: throw NotFoundException()
     },
     landing = landing,
+    handleToken = handleToken,
     emailSubject = emailSubject,
     template = template
 )
@@ -68,6 +79,7 @@ inline fun <reified USER, reified ID : Comparable<ID>> ServerPath.authEndpoints(
  * @param emailSubject The subject of the login emails that will be sent out.
  * @param template A lambda to return what the email to send will be given the email and the login link.
  */
+@LightningServerDsl
 inline fun <reified USER: Any, reified ID> ServerPath.authEndpoints(
     noinline jwtSigner: () -> JwtSigner,
     noinline email: () -> EmailClient,
@@ -75,6 +87,14 @@ inline fun <reified USER: Any, reified ID> ServerPath.authEndpoints(
     crossinline userById: suspend (id: ID) -> USER,
     crossinline userByEmail: suspend (email: String) -> USER,
     landing: String = "/",
+    noinline handleToken: suspend HttpRequest.(token: String)->HttpResponse = { token ->
+        HttpResponse.redirectToGet(
+            to = queryParameter("destination") ?: landing,
+            headers = {
+                setCookie(HttpHeader.Authorization, token)
+            }
+        )
+    },
     crossinline emailSubject: ()->String = { "${generalSettings().projectName} Log In" },
     noinline template: (suspend (email: String, link: String) -> String) = HtmlDefaults.defaultLoginEmailTemplate
 ): ServerPath {
@@ -87,14 +107,9 @@ inline fun <reified USER: Any, reified ID> ServerPath.authEndpoints(
 
     docName = "Auth"
     val landingRoute: HttpEndpoint = get("login-landing")
-    landingRoute.handler { call ->
-        val token = call.queryParameter("jwt")!!
-        HttpResponse.redirectToGet(
-            to = call.queryParameter("destination") ?: landing,
-            headers = {
-                setCookie(HttpHeader.Authorization, token)
-            }
-        )
+    landingRoute.handler {
+        val token = it.queryParameter("jwt")!!
+        it.handleToken(token)
     }
     post("login-email").typed(
         summary = "Email Login Link",
@@ -133,6 +148,37 @@ inline fun <reified USER: Any, reified ID> ServerPath.authEndpoints(
     return this
 }
 
-//TODO: Move?
-@Serializable
-data class EmailRequest(val email: String)
+@LightningServerDsl
+fun ServerPath.authEndpointExtensionHtml(): ServerPath {
+    val loginEmail = post("login-email")
+    get("login-email/").handler {
+        HttpResponse(
+            body = HttpContent.Text(
+                string = HtmlDefaults.basePage("""
+                    <form action='form-post/' enctype='application/x-www-form-urlencoded' method='post'>
+                        <p>Log in or sign up via email magic link</p>
+                        <input type='email' name='email'/>
+                        <button type='submit'>Submit</button>
+                    </form>
+                """.trimIndent()),
+                type = ContentType.Text.Html
+            )
+        )
+    }
+    post("login-email/form-post/").handler {
+        val basis = Http.endpoints[loginEmail]!!(it.copy(body = HttpContent.Text("\"${it.queryParameter("email")}\"", ContentType.Application.Json)))
+        if(basis.status.success) {
+            HttpResponse(
+                body = HttpContent.Text(
+                    string = HtmlDefaults.basePage("""
+                    <p>Success!  An email has been sent with a link to log in.</p>
+                """.trimIndent()),
+                    type = ContentType.Text.Html
+                )
+            )
+        } else {
+            basis
+        }
+    }
+    return this
+}

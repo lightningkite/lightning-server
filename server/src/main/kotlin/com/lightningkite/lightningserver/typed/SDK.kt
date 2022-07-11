@@ -6,8 +6,27 @@ import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
+import java.io.OutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
+
+fun Documentable.Companion.kotlinSdk(packageName: String, stream: OutputStream) {
+    ZipOutputStream(stream).use { zip ->
+        zip.putNextEntry(ZipEntry("sdk/Api.kt"))
+        zip.write(kotlinApi(packageName).toByteArray())
+        zip.closeEntry()
+
+        zip.putNextEntry(ZipEntry("sdk/Sessions.kt"))
+        zip.write(kotlinSessions(packageName).toByteArray())
+        zip.closeEntry()
+
+        zip.putNextEntry(ZipEntry("sdk/LiveApi.kt"))
+        zip.write(kotlinLiveApi(packageName).toByteArray())
+        zip.closeEntry()
+    }
+}
 
 fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(packageName).apply {
     imports.add("io.reactivex.rxjava3.core.Single")

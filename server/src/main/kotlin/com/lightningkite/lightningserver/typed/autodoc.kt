@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.*
@@ -17,124 +18,149 @@ import kotlinx.serialization.serializer
 import kotlin.reflect.KType
 
 @LightningServerDsl
-fun ServerPath.apiHelp() = get.handler { request ->
-    val rootRoute = this
-    HttpResponse(body = HttpContent.Html {
-        head { title("Index") }
-        body {
-            h1 { +"API Docs" }
-            h2 { +"Endpoints" }
-            for (api in Documentable.endpoints) {
-                h3 {
-                    +(api.route.method.toString())
-                    +" "
-                    +api.route.path.toString()
-                    +" - "
-                    +api.summary
-                }
+fun ServerPath.apiHelp(packageName: String = "com.mypackage"): HttpEndpoint {
+    get("sdk.ts").handler {
+        HttpResponse(
+            HttpContent.Text(
+                string = buildString { Documentable.typescriptSdk(this) },
+                type = ContentType.Text.Plain
+            )
+        )
+    }
+    get("sdk.zip").handler {
+        HttpResponse(
+            HttpContent.OutStream(
+                write = { Documentable.kotlinSdk(packageName, it) },
+                type = ContentType.Application.Zip
+            )
+        )
+    }
+    return this.copy(after = ServerPath.Afterwards.TrailingSlash).get.handler { request ->
+        val rootRoute = this
+        HttpResponse(body = HttpContent.Html {
+            head { title("Index") }
+            body {
+                h1 { +"API Docs" }
                 div {
-                    p { +api.description }
-                    p {
-                        +"Input: "
-                        api.inputType.let {
-                            type(it)
-                        } ?: run {
-                            +"N/A"
-                        }
+                    h2 { +"Links" }
+                    ol {
+                        li { a(href = "sdk.ts") { +"Typescript SDK" }}
+                        li { a(href = "sdk.zip") { +"Kotlin SDK" }}
                     }
-                    p {
-                        +"Output: "
-                        api.outputType.let {
-                            type(it)
-                        } ?: run {
-                            +"N/A"
-                        }
+                }
+                h2 { +"Endpoints" }
+                for (api in Documentable.endpoints) {
+                    h3 {
+                        +(api.route.method.toString())
+                        +" "
+                        +api.route.path.toString()
+                        +" - "
+                        +api.summary
                     }
-                    p {
-                        api.authInfo.type?.let {
-                            if (api.authInfo.required) {
-                                +"You need to be authenticated as a: "
-                                +it
-                            } else {
-                                +"You may be authenticated as a: "
-                                +it
+                    div {
+                        p { +api.description }
+                        p {
+                            +"Input: "
+                            api.inputType.let {
+                                type(it)
+                            } ?: run {
+                                +"N/A"
                             }
-                        } ?: run {
-                            +"This endpoint requires no authentication."
+                        }
+                        p {
+                            +"Output: "
+                            api.outputType.let {
+                                type(it)
+                            } ?: run {
+                                +"N/A"
+                            }
+                        }
+                        p {
+                            api.authInfo.type?.let {
+                                if (api.authInfo.required) {
+                                    +"You need to be authenticated as a: "
+                                    +it
+                                } else {
+                                    +"You may be authenticated as a: "
+                                    +it
+                                }
+                            } ?: run {
+                                +"This endpoint requires no authentication."
+                            }
                         }
                     }
                 }
-            }
 
-            h2 { +"Types" }
+                h2 { +"Types" }
 
-            Documentable.usedTypes
-                .sortedBy { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') }
-                .forEach { serializer ->
-                    val desc = serializer.descriptor
-                    when (desc.kind) {
-                        StructureKind.CLASS -> {
-                            documentType(serializer) {
-                                for ((index, part) in ((serializer as? GeneratedSerializer<*>)?.childSerializers()
-                                    ?: arrayOf()).withIndex()) {
-                                    p {
-                                        +desc.getElementName(index)
-                                        +": "
-                                        type(part)
-                                    }
-                                }
-                            }
-                        }
-                        SerialKind.ENUM -> {
-                            documentType(serializer) {
-                                p {
-                                    +"A string containing one of the following values:"
-                                }
-                                ul {
-                                    for (index in 0 until desc.elementsCount) {
-                                        li {
+                Documentable.usedTypes
+                    .sortedBy { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') }
+                    .forEach { serializer ->
+                        val desc = serializer.descriptor
+                        when (desc.kind) {
+                            StructureKind.CLASS -> {
+                                documentType(serializer) {
+                                    for ((index, part) in ((serializer as? GeneratedSerializer<*>)?.childSerializers()
+                                        ?: arrayOf()).withIndex()) {
+                                        p {
                                             +desc.getElementName(index)
+                                            +": "
+                                            type(part)
                                         }
                                     }
                                 }
                             }
-                        }
-                        PrimitiveKind.BOOLEAN -> {
-                            documentType(serializer) {
-                                +"A JSON boolean, either true or false."
+                            SerialKind.ENUM -> {
+                                documentType(serializer) {
+                                    p {
+                                        +"A string containing one of the following values:"
+                                    }
+                                    ul {
+                                        for (index in 0 until desc.elementsCount) {
+                                            li {
+                                                +desc.getElementName(index)
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                        }
-                        PrimitiveKind.STRING -> {
-                            documentType(serializer) {
-                                +"A JSON string."
+                            PrimitiveKind.BOOLEAN -> {
+                                documentType(serializer) {
+                                    +"A JSON boolean, either true or false."
+                                }
                             }
-                        }
-                        PrimitiveKind.BYTE,
-                        PrimitiveKind.CHAR,
-                        PrimitiveKind.SHORT,
-                        PrimitiveKind.INT,
-                        PrimitiveKind.LONG,
-                        PrimitiveKind.FLOAT,
-                        PrimitiveKind.DOUBLE -> {
-                            documentType(serializer) {
-                                +"A JSON number."
+                            PrimitiveKind.STRING -> {
+                                documentType(serializer) {
+                                    +"A JSON string."
+                                }
                             }
-                        }
-                        StructureKind.LIST -> {
-                            documentType(serializer) {
-                                +"A JSON array."
+                            PrimitiveKind.BYTE,
+                            PrimitiveKind.CHAR,
+                            PrimitiveKind.SHORT,
+                            PrimitiveKind.INT,
+                            PrimitiveKind.LONG,
+                            PrimitiveKind.FLOAT,
+                            PrimitiveKind.DOUBLE -> {
+                                documentType(serializer) {
+                                    +"A JSON number."
+                                }
                             }
-                        }
-                        StructureKind.MAP -> {
-                            documentType(serializer) {
-                                +"A JSON object, also known as a map or dictionary."
+                            StructureKind.LIST -> {
+                                documentType(serializer) {
+                                    +"A JSON array."
+                                }
                             }
+                            StructureKind.MAP -> {
+                                documentType(serializer) {
+                                    +"A JSON object, also known as a map or dictionary."
+                                }
+                            }
+                            else -> {}
                         }
-                        else -> {}
                     }
-                }
-        }
-    })
+            }
+        })
+    }
 }
 
 fun FlowContent.documentType(serializer: KSerializer<*>, body: FlowContent.()->Unit) {

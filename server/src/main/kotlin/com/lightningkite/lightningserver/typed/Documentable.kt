@@ -14,6 +14,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.capturedKClass
 import kotlinx.serialization.internal.GeneratedSerializer
+import kotlin.reflect.full.primaryConstructor
 
 interface Documentable {
     val path: ServerPath

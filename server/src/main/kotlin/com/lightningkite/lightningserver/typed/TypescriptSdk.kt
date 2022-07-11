@@ -17,7 +17,7 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
 fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
-    val safeDocumentables = endpoints.filter { it.inputType == Unit.serializer() || it.route.method != HttpMethod.GET }
+    val safeDocumentables = endpoints.filter { it.inputType == Unit.serializer() || it.route.method != HttpMethod.GET }.toList()
     appendLine("import { ${skipSet.joinToString()} } from '@lightningkite/ktor-batteries-simplified'")
     appendLine()
     usedTypes
@@ -54,15 +54,20 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
                 }
             }
         }
+    println("Types done")
 
     appendLine()
     appendLine()
     appendLine()
 
+    println("gathering groups: $safeDocumentables")
     val byGroup = safeDocumentables.groupBy { it.docGroup }
+    println("groups built $byGroup")
     val groups = byGroup.keys.filterNotNull()
+    println("groups $groups")
     appendLine("export interface Api {")
     for (group in groups) {
+        println("Handling group $group")
         appendLine("    readonly ${group.groupToPartName()}: {")
         for (entry in byGroup[group]!!) {
             append("        ")
@@ -71,12 +76,14 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         }
         appendLine("    }")
     }
+    println("Handling null group")
     for (entry in byGroup[null] ?: listOf()) {
         append("    ")
         this.functionHeader(entry)
         appendLine()
     }
     appendLine("}")
+    println("API done")
 
     appendLine()
     appendLine()
@@ -115,6 +122,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         appendLine("}")
         appendLine()
     }
+    println("Sessions done")
 
     appendLine()
     appendLine()
@@ -167,6 +175,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         appendLine("    }")
     }
     appendLine("}")
+    println("Live done")
     appendLine()
 }
 
