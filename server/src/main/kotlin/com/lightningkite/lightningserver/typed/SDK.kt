@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
+import java.io.File
 import java.io.OutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -26,6 +27,12 @@ fun Documentable.Companion.kotlinSdk(packageName: String, stream: OutputStream) 
         zip.write(kotlinLiveApi(packageName).toByteArray())
         zip.closeEntry()
     }
+}
+
+fun Documentable.Companion.kotlinSdkLocal(packageName: String, root: File = File("../client/src/main/java")) {
+    root.resolve("api/Api.kt").writeText(kotlinApi(packageName))
+    root.resolve("api/Sessions.kt").writeText(kotlinSessions(packageName))
+    root.resolve("api/LiveApi.kt").writeText(kotlinLiveApi(packageName))
 }
 
 fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(packageName).apply {
