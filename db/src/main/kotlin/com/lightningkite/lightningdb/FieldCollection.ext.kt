@@ -11,7 +11,7 @@ suspend fun <Model : Any>
         FieldCollection<Model>.findOne(condition: Condition<Model>): Model? = find(condition = condition, limit = 1).firstOrNull()
 
 suspend fun <Model : Any>
-        FieldCollection<Model>.insertOne(model: Model): Model = insert(listOf(model)).first()
+        FieldCollection<Model>.insertOne(model: Model): Model? = insert(listOf(model)).firstOrNull()
 
 suspend fun <Model : Any>
         FieldCollection<Model>.insertMany(models: List<Model>): List<Model> = insert(models)
