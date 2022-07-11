@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.auth.AuthInfo
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
+import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
