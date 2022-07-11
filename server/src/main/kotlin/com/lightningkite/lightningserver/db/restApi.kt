@@ -9,6 +9,8 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.AuthInfo
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.exceptions.ForbiddenException
+import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
@@ -157,6 +159,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         implementation = { user: USER, value: T ->
             database().getCollection(user)
                 .insertOne(value)
+                ?: throw ForbiddenException("Value was not posted as requested.")
         }
     )
 

@@ -34,11 +34,11 @@ data class AuthInfo<USER>(
 inline fun <reified USER> AuthInfo() = if(USER::class == Unit::class) AuthInfo<USER>(checker = { Unit as USER }, type = null, required = false)
 else AuthInfo<USER>(
     checker = { raw ->
-        raw?.let { it as? USER } ?: try {
+        try {
             raw as USER
-        } catch(e: Exception) {
+        } catch (e: Exception) {
             throw UnauthorizedException(
-                if(raw == null) "You need to be authorized to use this." else "You need to be a ${USER::class.simpleName} to use this.",
+                if (raw == null) "You need to be authorized to use this." else "You need to be a ${USER::class.simpleName} to use this.",
                 cause = e
             )
         }
