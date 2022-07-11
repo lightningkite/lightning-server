@@ -103,5 +103,6 @@ fun main(vararg args: String) {
     Server
     loadSettings(File("settings.yaml"))
     println("Settings loaded")
-    runServer(LocalPubSub, LocalCache)
+    println(Documentable.kotlinApi("test"))
+//    runServer(LocalPubSub, LocalCache)
 }

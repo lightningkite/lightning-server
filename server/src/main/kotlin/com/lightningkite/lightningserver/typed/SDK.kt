@@ -1,11 +1,16 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningdb.listElement
+import com.lightningkite.lightningdb.mapValueElement
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.websocket.WebSockets
+import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.StructureKind
 import java.io.File
 import java.io.OutputStream
 import java.util.zip.ZipEntry
@@ -30,9 +35,9 @@ fun Documentable.Companion.kotlinSdk(packageName: String, stream: OutputStream) 
 }
 
 fun Documentable.Companion.kotlinSdkLocal(packageName: String, root: File = File("../client/src/main/java")) {
-    root.resolve("api/Api.kt").writeText(kotlinApi(packageName))
-    root.resolve("api/Sessions.kt").writeText(kotlinSessions(packageName))
-    root.resolve("api/LiveApi.kt").writeText(kotlinLiveApi(packageName))
+    root.resolve("Api.kt").writeText(kotlinApi(packageName))
+    root.resolve("Sessions.kt").writeText(kotlinSessions(packageName))
+    root.resolve("LiveApi.kt").writeText(kotlinLiveApi(packageName))
 }
 
 fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(packageName).apply {
@@ -40,6 +45,10 @@ fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(
     imports.add("io.reactivex.rxjava3.core.Observable")
     imports.add("com.lightningkite.rx.okhttp.*")
     imports.add("com.lightningkite.lightningdb.live.*")
+    imports.add("com.lightningkite.lightningdb.*")
+    imports.add("java.util.UUID")
+    imports.add("java.util.Optional")
+    imports.add("java.time.*")
     val byGroup = safeDocumentables
         .distinctBy { it.docGroup.toString() + "/" + it.summary }.groupBy { it.docGroup }
     val groups = byGroup.keys.filterNotNull()
@@ -70,6 +79,10 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
     imports.add("io.reactivex.rxjava3.core.Observable")
     imports.add("com.lightningkite.rx.okhttp.*")
     imports.add("com.lightningkite.lightningdb.live.*")
+    imports.add("com.lightningkite.lightningdb.*")
+    imports.add("java.util.UUID")
+    imports.add("java.util.Optional")
+    imports.add("java.time.*")
     val byUserType = safeDocumentables.groupBy { it.authInfo.type }
     val userTypes = byUserType.keys.filterNotNull()
     userTypes.forEach { userType ->
@@ -112,6 +125,10 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
     imports.add("com.lightningkite.rx.kotlin")
     imports.add("com.lightningkite.rx.okhttp.*")
     imports.add("com.lightningkite.lightningdb.live.*")
+    imports.add("com.lightningkite.lightningdb.*")
+    imports.add("java.util.UUID")
+    imports.add("java.util.Optional")
+    imports.add("java.time.*")
     val byGroup = safeDocumentables.groupBy { it.docGroup }
     val groups = byGroup.keys.filterNotNull()
     appendLine("class LiveApi(val httpUrl: String, val socketUrl: String = httpUrl): Api {")
@@ -212,6 +229,18 @@ private fun String.groupToInterfaceName(): String = replaceFirstChar { it.upperc
 private fun String.groupToPartName(): String = replaceFirstChar { it.lowercase() }
 private fun String.userTypeTokenName(): String = this.substringAfterLast('.').replaceFirstChar { it.lowercase() }.plus("Token")
 
+private fun KSerializer<*>.kotlinTypeString(emitter: CodeEmitter): String {
+    return when {
+        this.descriptor.kind == StructureKind.MAP -> "Map<String, ${this.mapValueElement()!!.kotlinTypeString(emitter)}>"
+        this.descriptor.kind == StructureKind.LIST -> "List<${this.listElement()!!.kotlinTypeString(emitter)}>"
+        this is ContextualSerializer<*> -> this.uncontextualize().kotlinTypeString(emitter)
+        else -> {
+            descriptor.serialName.substringBefore('<').removeSuffix("?").takeIf { it.contains('.') }?.let { emitter.imports.add(it) }
+            descriptor.serialName.substringBefore('<').substringAfterLast('.') + (subSerializers().takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.kotlinTypeString(emitter) } ?: "")
+        }
+    }
+}
+
 private fun CodeEmitter.functionHeader(documentable: Documentable, skipAuth: Boolean = false) {
     append("fun ${documentable.functionName}(")
     var argComma = false
@@ -220,20 +249,24 @@ private fun CodeEmitter.functionHeader(documentable: Documentable, skipAuth: Boo
         else argComma = true
         append(it.name)
         append(": ")
-        it.type?.let { append(it.descriptor.serialName) } ?: append(it.stringType ?: "Never")
+        it.type?.let { append(it.kotlinTypeString(this)) } ?: append(it.stringType ?: "Never")
     }
     append("): ")
     when (documentable) {
         is ApiEndpoint<*, *, *> -> {
             append("Single<")
-            append(documentable.outputType.descriptor.serialName)
+            append(documentable.outputType.kotlinTypeString(this).let {
+                if(it.endsWith("?"))
+                    "Optional<${it.removeSuffix("?")}>"
+                else it
+            })
             append(">")
         }
         is ApiWebsocket<*, *, *> -> {
             append("Observable<WebSocketIsh<")
-            append(documentable.inputType.descriptor.serialName)
+            append(documentable.inputType.kotlinTypeString(this))
             append(", ")
-            append(documentable.outputType.descriptor.serialName)
+            append(documentable.outputType.kotlinTypeString(this))
             append(">>")
         }
         else -> TODO()

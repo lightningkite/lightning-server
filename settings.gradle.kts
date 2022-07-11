@@ -1,4 +1,4 @@
-rootProject.name = "ktor-batteries"
+rootProject.name = "lightning-server"
 
 
 pluginManagement {
