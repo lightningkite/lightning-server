@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.files
 
+import com.dalet.vfs2.provider.azure.AzConstants
 import com.dalet.vfs2.provider.azure.AzFileProvider
+import com.github.vfss3.S3FileProvider
 import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.routing
@@ -15,6 +17,7 @@ import org.apache.commons.vfs2.FileSystem
 import org.apache.commons.vfs2.VFS
 import org.apache.commons.vfs2.auth.StaticUserAuthenticator
 import org.apache.commons.vfs2.impl.DefaultFileSystemConfigBuilder
+import org.apache.commons.vfs2.impl.DefaultFileSystemManager
 import org.apache.commons.vfs2.provider.local.LocalFileSystem
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -40,10 +43,17 @@ data class FilesSettings(
         const val userContentPath: String = "user-content"
         private val systemToSettings = ConcurrentHashMap<FileSystem, FilesSettings>()
         fun getSettings(file: FileObject): FilesSettings? = systemToSettings[file.fileSystem]
+        val manager by lazy {
+            DefaultFileSystemManager().apply {
+                addProvider(AzConstants.AZBSSCHEME, AzFileProvider())
+                addProvider("s3", S3FileProvider())
+                init()
+            }
+        }
     }
 
     val root by lazy {
-        VFS.getManager().resolveFile(storageUrl).apply {
+        manager.resolveFile(storageUrl).apply {
             systemToSettings[this.fileSystem] = this@FilesSettings
         }
     }
