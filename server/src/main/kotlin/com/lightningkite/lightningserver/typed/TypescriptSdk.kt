@@ -1,5 +1,8 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningdb.ServerFile
+import com.lightningkite.lightningdb.listElement
+import com.lightningkite.lightningdb.mapValueElement
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningdb.nullElement
 import com.lightningkite.lightningserver.core.ServerPath
@@ -8,6 +11,7 @@ import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.websocket.WebSockets
 import io.ktor.http.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.*
@@ -18,35 +22,35 @@ import kotlin.reflect.KType
 
 fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     val safeDocumentables = endpoints.filter { it.inputType == Unit.serializer() || it.route.method != HttpMethod.GET }.toList()
-    appendLine("import { ${skipSet.joinToString()} } from '@lightningkite/ktor-batteries-simplified'")
+    appendLine("import { ${skipSet.joinToString()}, apiCall, Path } from '@lightningkite/ktor-batteries-simplified'")
     appendLine()
     usedTypes
         .sortedBy { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') }
-        .map { it.descriptor }
+        .filter { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') !in skipSet }
         .forEach {
-            when(it.kind) {
+            when(it.descriptor.kind) {
                 is StructureKind.CLASS -> {
                     append("export interface ")
-                    it.write(out)
+                    it.write().let { out.append(it) }
                     appendLine(" {")
-                    for(index in 0 until it.elementsCount) {
+                    it.subAndChildSerializers().forEachIndexed { index, sub ->
                         append("    ")
-                        append(it.getElementName(index))
+                        append(it.descriptor.getElementName(index))
                         append(": ")
-                        it.getElementDescriptor(index).write(out)
+                        out.append(sub.write())
                         appendLine()
                     }
                     appendLine("}")
                 }
                 is SerialKind.ENUM -> {
                     append("export enum ")
-                    it.write(out)
+                    it.write().let { out.append(it) }
                     appendLine(" {")
-                    for(index in 0 until it.elementsCount) {
+                    for(index in 0 until it.descriptor.elementsCount) {
                         append("    ")
-                        append(it.getElementName(index))
+                        append(it.descriptor.getElementName(index))
                         append(" = \"")
-                        it.getElementDescriptor(index).write(out)
+                        append(it.descriptor.getElementName(index))
                         append("\",")
                         appendLine()
                     }
@@ -54,20 +58,15 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
                 }
             }
         }
-    println("Types done")
 
     appendLine()
     appendLine()
     appendLine()
 
-    println("gathering groups: $safeDocumentables")
     val byGroup = safeDocumentables.groupBy { it.docGroup }
-    println("groups built $byGroup")
     val groups = byGroup.keys.filterNotNull()
-    println("groups $groups")
     appendLine("export interface Api {")
     for (group in groups) {
-        println("Handling group $group")
         appendLine("    readonly ${group.groupToPartName()}: {")
         for (entry in byGroup[group]!!) {
             append("        ")
@@ -76,14 +75,12 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         }
         appendLine("    }")
     }
-    println("Handling null group")
     for (entry in byGroup[null] ?: listOf()) {
         append("    ")
         this.functionHeader(entry)
         appendLine()
     }
     appendLine("}")
-    println("API done")
 
     appendLine()
     appendLine()
@@ -122,7 +119,6 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         appendLine("}")
         appendLine()
     }
-    println("Sessions done")
 
     appendLine()
     appendLine()
@@ -138,18 +134,20 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
             append("        ")
             this.functionHeader(entry, skipAuth = false)
             appendLine(" {")
-            appendLine("            return fetch(`\${this.httpUrl}${entry.route.path.escaped}`, {")
+            val hasInput = entry.inputType != Unit.serializer()
+            appendLine("            return apiCall(`\${this.httpUrl}${entry.route.path.escaped}`, ${if(hasInput) "input" else "undefined"}, {")
             appendLine("                method: \"${entry.route.method}\",")
             entry.authInfo.type?.let {
                 appendLine("                headers: { \"Authorization\": `Bearer \${${entry.authInfo.type.userTypeTokenName()}}` },")
             }
-            entry.inputType.takeUnless { it == Unit.serializer() }?.let {
-                appendLine("                body: JSON.stringify(input)")
+            append("            }, ")
+            if(entry.inputType.descriptor.hasServerFile()) {
+                    appendLine("            files")
             }
             entry.outputType.takeUnless { it == Unit.serializer() }?.let {
-                appendLine("            }).then(x => x.json())")
+                appendLine("            ).then(x => x.json())")
             } ?: run {
-                appendLine("            }).then(x => undefined)")
+                appendLine("            ).then(x => undefined)")
             }
             appendLine("        },")
         }
@@ -159,26 +157,33 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         append("    ")
         this.functionHeader(entry, skipAuth = false)
         appendLine(" {")
-        appendLine("        return fetch(`\${this.httpUrl}${entry.route.path.escaped}`, {")
+        val hasInput = entry.inputType != Unit.serializer()
+        appendLine("        return apiCall(`\${this.httpUrl}${entry.route.path.escaped}`, ${if(hasInput) "input" else "undefined"}, {")
         appendLine("            method: \"${entry.route.method}\",")
         entry.authInfo.type?.let {
             appendLine("            headers: { \"Authorization\": `Bearer \${${entry.authInfo.type.userTypeTokenName()}}` },")
         }
-        entry.inputType.takeUnless { it == Unit.serializer() }?.let {
-            appendLine("            body: JSON.stringify(input)")
+        append("            }, ")
+        if(entry.inputType.descriptor.hasServerFile()) {
+                appendLine("            files")
         }
         entry.outputType.takeUnless { it == Unit.serializer() }?.let {
-            appendLine("        }).then(x => x.json())")
+            appendLine("        ).then(x => x.json())")
         } ?: run {
-            appendLine("        }).then(x => undefined)")
+            appendLine("        ).then(x => undefined)")
         }
         appendLine("    }")
     }
     appendLine("}")
-    println("Live done")
     appendLine()
 }
 
+private val serverFileDescriptor = Serialization.module.getContextual(ServerFile::class)?.descriptor
+private fun SerialDescriptor.hasServerFile(seen: HashSet<SerialDescriptor> = HashSet()): Boolean {
+    val t = if(this.kind == SerialKind.CONTEXTUAL) Serialization.module.getContextualDescriptor(this)!!
+    else this
+    return t == serverFileDescriptor || (t.elementDescriptors.any { !seen.add(it) || it.hasServerFile(seen) })
+}
 
 private val skipSet = setOf(
     "Query",
@@ -205,21 +210,22 @@ private fun Appendable.functionHeader(documentable: Documentable, skipAuth: Bool
         if (argComma) append(", ")
         else argComma = true
         append(it.name)
+        if(it.optional) append('?')
         append(": ")
-        it.type?.write(this) ?: it.stringType?.let { append(it) }
+        it.type?.write()?.let { append(it) } ?: it.stringType?.let { append(it) }
     }
     append("): ")
     when (documentable) {
         is ApiEndpoint<*, *, *> -> {
             append("Promise<")
-            documentable.outputType.write(this)
+            documentable.outputType.write().let { append(it) }
             append(">")
         }
         is ApiWebsocket<*, *, *> -> {
             append("Observable<WebSocketIsh<")
-            documentable.inputType.write(this)
+            documentable.inputType.write().let { append(it) }
             append(", ")
-            documentable.outputType.write(this)
+            documentable.outputType.write().let { append(it) }
             append(">>")
         }
         else -> TODO()
@@ -244,7 +250,8 @@ private data class TArg(
     val name: String,
     val type: KSerializer<*>? = null,
     val stringType: String? = null,
-    val default: String? = null
+    val default: String? = null,
+    val optional: Boolean = false
 )
 
 private fun arguments(documentable: Documentable, skipAuth: Boolean = false, overrideUserType: String? = null): List<TArg> = when (documentable) {
@@ -258,7 +265,10 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false, ove
             },
         documentable.inputType.takeUnless { it == Unit.serializer() }?.let {
             TArg(name = "input", type = it)
-        }?.let(::listOf)
+        }?.let(::listOf),
+        if(documentable.inputType.descriptor.hasServerFile())
+            listOf(TArg(name = "files", stringType = "Record<Path<${documentable.inputType.write()}>, File>", optional = true))
+        else null
     ).flatten()
     is ApiWebsocket<*, *, *> -> listOfNotNull(
         documentable.authInfo.type?.takeUnless { skipAuth }?.let {
@@ -273,13 +283,8 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false, ove
 }
 
 
-private fun KSerializer<*>.write(out: Appendable): Unit = descriptor.write(out)
-private fun SerialDescriptor.write(out: Appendable): Unit {
-    if(this == Unit.serializer().descriptor) {
-        out.append("void")
-        return
-    }
-    when (kind) {
+private fun KSerializer<*>.write(): String = if(this == Unit.serializer()) "void" else StringBuilder().also { out ->
+    when (descriptor.kind) {
         PrimitiveKind.BOOLEAN -> out.append("boolean")
         PrimitiveKind.BYTE,
         PrimitiveKind.SHORT,
@@ -290,35 +295,28 @@ private fun SerialDescriptor.write(out: Appendable): Unit {
         PrimitiveKind.CHAR,
         PrimitiveKind.STRING -> out.append("string")
         StructureKind.LIST -> {
-            out.append("Array<")
-            this.getElementDescriptor(0).write(out)
-            out.append(">")
+            out.append("Array<${this.listElement()!!.write()}>")
         }
         StructureKind.MAP -> {
-            out.append("Record<")
-            this.getElementDescriptor(0).write(out)
-            out.append(", ")
-            this.getElementDescriptor(1).write(out)
-            out.append(">")
+            out.append("Record")
+            listOf("string", this.mapValueElement()!!.write()).joinToString(", ", "<", ">").let {
+                out.append(it)
+            }
         }
         SerialKind.CONTEXTUAL -> {
-            Serialization.json.serializersModule.getContextualDescriptor(this)?.write(out) ?: out.append(this.serialName.substringAfterLast('.'))
+            this.uncontextualize().write().let { out.append(it) }
         }
         is PolymorphicKind,
         StructureKind.OBJECT,
         SerialKind.ENUM,
         StructureKind.CLASS -> {
-            out.append(serialName.substringBefore('<').substringAfterLast('.').removeSuffix("?"))
-            serialName.substringAfter('<', "").takeUnless { it.isEmpty() }
-                ?.removeSuffix(">")
-                ?.split(",")
-                ?.map { it.trim() }
-                ?.map { it.substringAfterLast('.') }
-                ?.joinToString(", ", "<", ">")
-                ?.let { out.append(it.replace("?", " | null | undefined")) }
+            out.append(descriptor.serialName.substringBefore('<').substringAfterLast('.').removeSuffix("?"))
+            this.subSerializers().takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.write() }?.let {
+                out.append(it)
+            }
         }
     }
-    if(this.isNullable) out.append(" | null | undefined")
-}
+    if(descriptor.isNullable) out.append(" | null | undefined")
+}.toString()
 
 private fun String.userTypeTokenName(): String = this.substringAfterLast('.').replaceFirstChar { it.lowercase() }.plus("Token")
