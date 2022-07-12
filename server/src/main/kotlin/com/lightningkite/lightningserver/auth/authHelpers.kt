@@ -43,7 +43,7 @@ else AuthInfo<USER>(
             )
         }
     },
-    type = typeOf<USER>().toString().substringBefore('<').substringAfterLast('.'),
+    type = typeOf<USER>().toString().substringBefore('<').substringAfterLast('.').removeSuffix("?"),
     required = !typeOf<USER>().isMarkedNullable
 )
 typealias TypeCheckOrUnauthorized<USER> = HttpRequest.()->USER
