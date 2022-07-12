@@ -155,7 +155,7 @@ inline fun <USER, INPUT : Any, OUTPUT> HttpEndpoint.typed(
         errorCases = errorCases,
         routeTypes = mapOf(),
         successCode = successCode,
-        implementation = { user: USER, input: INPUT, pathSegments ->
+        implementation = { user: USER, input: INPUT, _ ->
             implementation(
                 user,
                 input,

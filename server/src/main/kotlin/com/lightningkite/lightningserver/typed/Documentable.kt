@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.capturedKClass
 import kotlinx.serialization.internal.GeneratedSerializer
@@ -27,10 +28,10 @@ interface Documentable {
         val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *, *>>()
         val all get() = endpoints + websockets
         val usedTypes: Collection<KSerializer<*>> get() {
-                val seen: HashSet<String> = HashSet()
+                val seen: HashSet<SerialDescriptor> = HashSet()
                 fun onAllTypes(at: KSerializer<*>, action: (KSerializer<*>) -> Unit) {
                     val real = (at.nullElement() ?: at).uncontextualize()
-                    if (!seen.add(real.descriptor.serialName.substringBefore('<'))) return
+                    if (!seen.add(real.descriptor)) return
                     action(real)
                     real.subAndChildSerializers().forEach { onAllTypes(it, action) }
                 }

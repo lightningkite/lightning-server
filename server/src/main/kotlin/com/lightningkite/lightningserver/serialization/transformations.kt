@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.serialization
 
+import com.lightningkite.lightningdb.LazyRenamedSerialDescriptor
 import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
@@ -9,15 +10,12 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.settings.Settings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerializationException
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.getContextualDescriptor
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.json.*
-import kotlinx.serialization.serializer
 
 
 private val multipartJsonKey = "__json"
@@ -103,7 +101,7 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
                                 }
                             }
                             is HttpContent.Multipart.Part.DataItem -> {
-                                if (part.filename.isBlank()) return@collect
+                                if (part.filename.isBlank()) throw BadRequestException("File name not provided")
                                 val path = part.key.split('.')
                                 if (!serializer.isFile(path)) throw BadRequestException("${part.key} is not a ServerFile.")
                                 if (part.headers.contentType == null) throw BadRequestException("Content type not provided for uploaded file")
@@ -125,7 +123,7 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
                                         var current: MutableMap<String, Any?> = overrideData
                                         for (pathPart in path.dropLast(1)) {
                                             @Suppress("UNCHECKED_CAST")
-                                            current = current[pathPart] as? MutableMap<String, Any?> ?: HashMap()
+                                            current = current.getOrPut(pathPart) { HashMap<String, Any?>() } as MutableMap<String, Any?>
                                         }
                                         current[path.last()] = JsonPrimitive(it.publicUrl)
                                     }
@@ -133,8 +131,11 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
                         }
                     }
                     if (baselineJson is JsonObject) {
+                        println("Baseline: $baselineJson")
+                        println("overrideData: $overrideData")
                         baselineJson.jsonObject.writeInto(mainData)
                         mainData.putAll(overrideData)
+                        println("mainData: $mainData")
                         Serialization.json.decodeFromJsonElement(serializer, mainData.toJsonObject())
                     } else throw BadRequestException("")
                 }
@@ -185,16 +186,13 @@ suspend fun <T> T.toHttpContent(acceptedTypes: List<ContentType>, serializer: KS
 @OptIn(ExperimentalSerializationApi::class)
 private fun KSerializer<*>.isFile(parts: List<String>): Boolean {
     var current = this.descriptor
-    for (part in parts.dropLast(1)) {
+    for (part in parts) {
         val index = current.getElementIndex(part)
         if (index == CompositeDecoder.UNKNOWN_NAME) return false
         current = current.getElementDescriptor(index)
     }
-    var descriptor = current.getElementDescriptor(current.getElementIndex(parts.last()))
-    if (descriptor.kind == SerialKind.CONTEXTUAL) {
-        descriptor = Serialization.module.getContextualDescriptor(descriptor)!!
-    }
-    return descriptor == Serialization.module.getContextual(ServerFile::class)?.descriptor
+    return current.serialName.removeSuffix("?") == ContextualSerializer(ServerFile::class).descriptor.serialName.removeSuffix("?") ||
+            (current as? LazyRenamedSerialDescriptor)?.getter?.invoke()?.serialName?.removeSuffix("?") == ContextualSerializer(ServerFile::class).descriptor.serialName.removeSuffix("?")
 }
 
 @Suppress("UNCHECKED_CAST")

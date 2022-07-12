@@ -14,13 +14,19 @@ import kotlinx.serialization.Serializable
  * @param cors defines a list of domains that are allows to communicate to the server. A `null` value with debug being true will allow ALL communications.
  */
 @Serializable
+data class CorsSettings(
+    val allowedDomains: List<String> = listOf(),
+    val allowedHeaders: List<String> = listOf(),
+)
+
+@Serializable
 data class GeneralServerSettings(
     val projectName: String = "My Project",
     val host: String = "0.0.0.0",
     val port: Int = 8080,
     val publicUrl: String = "http://$host:$port",
     val debug: Boolean = false,
-    val cors: List<String>? = null
+    val cors: CorsSettings? = null
 ) {
 }
 

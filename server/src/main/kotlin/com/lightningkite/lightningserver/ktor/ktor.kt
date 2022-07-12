@@ -57,20 +57,34 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
             allowMethod(HttpMethod.Patch)
             allowMethod(HttpMethod.Delete)
 
-            allowHeaders { true }
+            allowHeader(io.ktor.http.HttpHeaders.ContentType)
+            allowHeader(io.ktor.http.HttpHeaders.Authorization)
+
             exposedHeaders.addAll(CorsSimpleResponseHeaders)
 
-            generalSettings().cors?.forEach {
+            generalSettings().cors?.allowedDomains?.forEach {
                 allowHost(it, listOf("http", "https", "ws", "wss"))
             } ?: if (generalSettings().debug) anyHost()
+
+            generalSettings().cors?.allowedHeaders?.forEach {
+                allowHeader(it)
+            } ?: if (generalSettings().debug)
+                allowHeaders { true }
         }
         install(StatusPages) {
             exception<Exception> { call, it ->
-                call.respondText(status = HttpStatusCode.InternalServerError, contentType = ContentType.Text.Html, text = HtmlDefaults.basePage("""
+                call.respondText(
+                    status = HttpStatusCode.InternalServerError,
+                    contentType = ContentType.Text.Html,
+                    text = HtmlDefaults.basePage(
+                        """
             <h1>Oh no!</h1>
             <p>Something went wrong.  We're terribly sorry.  If this continues, see if you can contact the developer.</p>
-        """.trimIndent()))
-                call.adapt(HttpEndpoint(call.request.path(), MyHttpMethod(call.request.httpMethod.value))).reportException(it)
+        """.trimIndent()
+                    )
+                )
+                call.adapt(HttpEndpoint(call.request.path(), MyHttpMethod(call.request.httpMethod.value)))
+                    .reportException(it)
             }
         }
         Http.endpoints.forEach { entry ->
@@ -82,7 +96,6 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                         val result = try {
                             entry.value(request)
                         } catch (e: Exception) {
-                            if(generalSettings().debug) e.printStackTrace()
                             Http.exception(request, e)
                         }
                         for (header in result.headers.entries) {

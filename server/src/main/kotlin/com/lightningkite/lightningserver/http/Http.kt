@@ -13,6 +13,7 @@ object Http {
             if (exception is HttpStatusException) {
                 exception.toResponse(request)
             } else {
+                exception.printStackTrace()
                 HttpResponse(status = HttpStatus.InternalServerError)
             }
         }

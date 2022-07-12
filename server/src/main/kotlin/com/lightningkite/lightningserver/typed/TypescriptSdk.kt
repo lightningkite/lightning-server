@@ -1,3 +1,5 @@
+@file:OptIn(InternalSerializationApi::class)
+
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.ServerFile
@@ -12,9 +14,11 @@ import com.lightningkite.lightningserver.websocket.WebSockets
 import io.ktor.http.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.ContextualSerializer
+import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.internal.GeneratedSerializer
 import kotlinx.serialization.serializer
 import java.io.File
 import kotlin.reflect.KClass
@@ -33,7 +37,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
                     append("export interface ")
                     it.write().let { out.append(it) }
                     appendLine(" {")
-                    it.subAndChildSerializers().forEachIndexed { index, sub ->
+                    (it as? GeneratedSerializer<*>)?.childSerializers()?.forEachIndexed { index, sub ->
                         append("    ")
                         append(it.descriptor.getElementName(index))
                         append(": ")

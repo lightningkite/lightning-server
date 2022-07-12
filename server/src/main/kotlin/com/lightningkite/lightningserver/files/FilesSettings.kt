@@ -66,7 +66,7 @@ data class FilesSettings(
             println(DefaultFileSystemConfigBuilder.getInstance().getUserAuthenticator(AzFileProvider.getDefaultFileSystemOptions()))
         }
 
-        if(root.fileSystem is LocalFileSystem) {
+        if(storageUrl.startsWith("file://")) {
             routing {
                 path("$userContentPath/{...}").apply{
                     get.handler {

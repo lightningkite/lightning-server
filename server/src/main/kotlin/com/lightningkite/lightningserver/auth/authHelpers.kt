@@ -14,7 +14,7 @@ inline fun <reified T> HttpRequest.jwt(jwtSigner: JwtSigner): T? = jwt(jwtSigner
 fun <T> HttpRequest.jwt(jwtSigner: JwtSigner, serializer: KSerializer<T>): T? =
     (headers[HttpHeader.Authorization]?.removePrefix("Bearer ") ?: headers.cookies[HttpHeader.Authorization]?.removePrefix("Bearer "))?.let {
         try {
-            jwtSigner.verify<T>(serializer, it)
+            jwtSigner.verify(serializer, it)
         } catch(e: UnauthorizedException) {
             throw UnauthorizedException(
                 body = e.body,

@@ -91,7 +91,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.adminPages(
                 form(method = FormMethod.post) {
                     id = "data-form"
                     insideHtmlForm(
-                        title = name ?: "Model",
+                        title = name,
                         jsEditorName = "editor",
                         serializer = serializer,
                         defaultValue = item,
@@ -142,7 +142,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.adminPages(
                 form(method = FormMethod.post) {
                     id = "data-form"
                     insideHtmlForm<T>(
-                        title = name ?: "Model",
+                        title = name,
                         jsEditorName = "editor",
                         serializer = serializer,
                         defaultValue = defaultItem(user),

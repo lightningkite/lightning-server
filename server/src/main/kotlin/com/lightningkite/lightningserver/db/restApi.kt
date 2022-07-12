@@ -239,7 +239,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         inputType = Modification.serializer(serializer),
         outputType = EntryChange.serializer(serializer),
         routeType = idSerializer,
-        summary = "Modify",
+        summary = "Modify with Diff",
         description = "Modifies a ${modelName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
@@ -265,7 +265,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApi(
         inputType = Modification.serializer(serializer),
         outputType = serializer,
         routeType = idSerializer,
-        summary = "Modify With Diff",
+        summary = "Modify",
         description = "Modifies a ${modelName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
             ApiEndpoint.ErrorCase(
