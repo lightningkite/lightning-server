@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.core
 data class ContentType(val type: String, val subtype: String) {
     constructor(string: String) : this(
         string.substringBefore('/'),
-        string.substringAfter('/').takeWhile { !it.isWhitespace() })
+        string.substringAfter('/').takeWhile { !it.isWhitespace() && it != ';' })
 
     override fun toString(): String = "$type/$subtype"
 

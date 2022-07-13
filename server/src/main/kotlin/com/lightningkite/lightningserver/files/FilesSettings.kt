@@ -18,6 +18,8 @@ import org.apache.commons.vfs2.VFS
 import org.apache.commons.vfs2.auth.StaticUserAuthenticator
 import org.apache.commons.vfs2.impl.DefaultFileSystemConfigBuilder
 import org.apache.commons.vfs2.impl.DefaultFileSystemManager
+import org.apache.commons.vfs2.provider.LocalFileProvider
+import org.apache.commons.vfs2.provider.local.DefaultLocalFileProvider
 import org.apache.commons.vfs2.provider.local.LocalFileSystem
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -47,6 +49,7 @@ data class FilesSettings(
             DefaultFileSystemManager().apply {
                 addProvider(AzConstants.AZBSSCHEME, AzFileProvider())
                 addProvider("s3", S3FileProvider())
+                addProvider("file", DefaultLocalFileProvider())
                 init()
             }
         }

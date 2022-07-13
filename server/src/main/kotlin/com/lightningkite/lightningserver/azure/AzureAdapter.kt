@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.flowOf
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
+import java.nio.charset.Charset
 import java.util.*
 import com.lightningkite.lightningserver.http.HttpStatus as HttpStatus1
 
@@ -24,10 +25,11 @@ abstract class AzureAdapter {
     }
 
     open fun http(
-        request: HttpRequestMessage<Optional<ByteArray>>,
+        request: HttpRequestMessage<Optional<String>>,
         context: ExecutionContext
     ): HttpResponseMessage {
         logger.debug("--> ${request.uri} ${request.httpMethod}")
+        println("request.body is ${request.body}")
         val response = try {
             runBlocking {
                 val lookup = request.uri.path.removePrefix("/api")
@@ -46,9 +48,9 @@ abstract class AzureAdapter {
                     queryParameters = request.queryParameters.entries.map { it.toPair() },
                     headers = inHeaders,
                     body = if (inHeaders.contentType == ContentType.MultiPart.FormData) {
-                        ByteArrayInputStream(request.body.get()).toMultipartContent(inHeaders.contentType!!)
+                        ByteArrayInputStream(request.body.get().toByteArray(Charset.defaultCharset())).toMultipartContent(inHeaders.contentType!!)
                     } else if (request.body.isPresent)
-                        HttpContent.Binary(
+                        HttpContent.Text(
                             request.body.get(),
                             inHeaders.contentType ?: ContentType.Application.Json
                         )

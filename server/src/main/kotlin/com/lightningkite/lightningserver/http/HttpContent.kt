@@ -11,6 +11,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
+import java.nio.charset.Charset
 
 sealed class HttpContent {
     abstract suspend fun stream(): InputStream
@@ -19,7 +20,7 @@ sealed class HttpContent {
     abstract val type: ContentType
 
     data class Text(val string: String, override val type: ContentType) : HttpContent() {
-        val bytes = string.toByteArray()
+        val bytes = string.toByteArray(Charset.defaultCharset())
         override suspend fun stream(): InputStream = ByteArrayInputStream(bytes)
         override val length: Long get() = bytes.size.toLong()
     }
