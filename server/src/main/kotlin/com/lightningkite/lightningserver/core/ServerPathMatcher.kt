@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.core
 
+import com.lightningkite.lightningserver.http.HttpEndpointMatcher
+
 class ServerPathMatcher(paths: Sequence<ServerPath>) {
     data class Node(
         val path: ServerPath?,
@@ -61,6 +63,7 @@ class ServerPathMatcher(paths: Sequence<ServerPath>) {
         val wildcards = ArrayList<String>()
         var current = root
         val soFar = arrayListOf<Node>()
+        var beyond = false
         for (part in pathParts) {
             soFar.add(current)
 //            println("Current is $current, looking for $part")
@@ -75,10 +78,24 @@ class ServerPathMatcher(paths: Sequence<ServerPath>) {
                 wildcards.add(part)
                 continue
             }
+            beyond = true
             break
         }
 //        println("Stopped at $current")
-        return if (endingSlash) {
+        return if(beyond) {
+//            println("Searching for wildcard ending")
+            soFar.asReversed().asSequence().mapNotNull {
+                it.chainedWildcard?.let {
+                    Match(
+                        path = it,
+                        parts = it.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(wildcards)
+                            .associate { it.first.name to it.second },
+                        wildcard = pathParts.drop(it.segments.size)
+                            .joinToString("/") + (if (endingSlash) "/" else "")
+                    )
+                }
+            }.firstOrNull()
+        } else if (endingSlash) {
 //            println("Pulling trailingSlash")
             current.trailingSlash?.let {
                 Match(

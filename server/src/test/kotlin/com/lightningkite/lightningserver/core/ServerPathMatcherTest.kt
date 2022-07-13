@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.core
 
+import com.lightningkite.lightningserver.http.HttpMethod
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -28,6 +29,7 @@ class ServerPathMatcherTest {
         val matcher = ServerPathMatcher(paths.asSequence())
         assertEquals(ServerPathMatcher.Match(root, mapOf(), null), matcher.match(""))
         assertEquals(ServerPathMatcher.Match(test, mapOf(), null), matcher.match("test"))
+        assertEquals(null, matcher.match("asdf"))
         assertEquals(ServerPathMatcher.Match(testSlash, mapOf(), null), matcher.match("test/"))
         assertEquals(ServerPathMatcher.Match(testA, mapOf(), null), matcher.match("test/a"))
         assertEquals(ServerPathMatcher.Match(testAB, mapOf(), null), matcher.match("test/a/b"))
