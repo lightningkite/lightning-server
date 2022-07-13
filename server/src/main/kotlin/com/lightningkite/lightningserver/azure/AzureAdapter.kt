@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.azure
 
 import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.serialization.toMultipartContent
@@ -38,26 +39,29 @@ abstract class AzureAdapter {
                     return@runBlocking HttpResponse(status = HttpStatus1.NotFound)
                 }
                 val inHeaders = HttpHeaders(request.headers)
-                val result = Http.endpoints[match.endpoint]!!.invoke(
-                    HttpRequest(
-                        route = match.endpoint,
-                        parts = match.parts,
-                        wildcard = match.wildcard,
-                        queryParameters = request.queryParameters.entries.map { it.toPair() },
-                        headers = inHeaders,
-                        body = if (inHeaders.contentType == ContentType.MultiPart.FormData) {
-                            ByteArrayInputStream(request.body.get()).toMultipartContent(inHeaders.contentType!!)
-                        } else if (request.body.isPresent)
-                            HttpContent.Binary(
-                                request.body.get(),
-                                inHeaders.contentType ?: ContentType.Application.Json
-                            )
-                        else null,
-                        domain = request.uri.host,
-                        sourceIp = inHeaders[HttpHeader.XForwardedFor] ?: "255.255.255.255",
-                        protocol = request.uri.scheme
-                    )
+                val request2 = HttpRequest(
+                    route = match.endpoint,
+                    parts = match.parts,
+                    wildcard = match.wildcard,
+                    queryParameters = request.queryParameters.entries.map { it.toPair() },
+                    headers = inHeaders,
+                    body = if (inHeaders.contentType == ContentType.MultiPart.FormData) {
+                        ByteArrayInputStream(request.body.get()).toMultipartContent(inHeaders.contentType!!)
+                    } else if (request.body.isPresent)
+                        HttpContent.Binary(
+                            request.body.get(),
+                            inHeaders.contentType ?: ContentType.Application.Json
+                        )
+                    else null,
+                    domain = request.uri.host,
+                    sourceIp = inHeaders[HttpHeader.XForwardedFor] ?: "255.255.255.255",
+                    protocol = request.uri.scheme
                 )
+                val result = try {
+                    Http.endpoints[match.endpoint]!!.invoke(request2)
+                } catch(e: HttpStatusException) {
+                    e.toResponse(request2)
+                }
                 logger.debug("<-- ${request.uri} ${request.httpMethod} ${result.status}")
                 result
             }
