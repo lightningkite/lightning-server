@@ -129,11 +129,12 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     appendLine()
 
     appendLine("export class LiveApi implements Api {")
-    appendLine("    public constructor(public httpUrl: String, public socketUrl: String = httpUrl) {}")
+    appendLine("    public constructor(public httpUrl: String, public socketUrl: String = httpUrl, public extraHeaders: Record<string, string> = {}) {}")
     for (group in groups) {
         appendLine("    readonly ${group.groupToPartName()} = {")
         appendLine("        httpUrl: this.httpUrl,")
         appendLine("        socketUrl: this.socketUrl,")
+        appendLine("        extraHeaders: this.extraHeaders,")
         for (entry in byGroup[group]!!) {
             append("        ")
             this.functionHeader(entry, skipAuth = false)
@@ -142,7 +143,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
             appendLine("            return apiCall(`\${this.httpUrl}${entry.route.path.escaped}`, ${if(hasInput) "input" else "undefined"}, {")
             appendLine("                method: \"${entry.route.method}\",")
             entry.authInfo.type?.let {
-                appendLine("                headers: { \"Authorization\": `Bearer \${${entry.authInfo.type.userTypeTokenName()}}` },")
+                appendLine("                headers: { ...this.extraHeaders, \"Authorization\": `Bearer \${${entry.authInfo.type.userTypeTokenName()}}` },")
             }
             append("            }, ")
             if(entry.inputType.descriptor.hasServerFile()) {
@@ -165,7 +166,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         appendLine("        return apiCall(`\${this.httpUrl}${entry.route.path.escaped}`, ${if(hasInput) "input" else "undefined"}, {")
         appendLine("            method: \"${entry.route.method}\",")
         entry.authInfo.type?.let {
-            appendLine("            headers: { \"Authorization\": `Bearer \${${entry.authInfo.type.userTypeTokenName()}}` },")
+            appendLine("            headers: { ...this.extraHeaders, \"Authorization\": `Bearer \${${entry.authInfo.type.userTypeTokenName()}}` },")
         }
         append("            }, ")
         if(entry.inputType.descriptor.hasServerFile()) {
