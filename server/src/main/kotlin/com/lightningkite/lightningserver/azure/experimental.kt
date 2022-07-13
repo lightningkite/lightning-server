@@ -14,7 +14,7 @@ import kotlinx.serialization.serializer
 
 
 
-private fun terraformAzure(projectName: String = "project", appendable: Appendable) {
+fun terraformAzure(projectName: String = "project", appendable: Appendable) {
     val namePrefix = "${projectName}_\${var.deployment_name}"
     val dependencies = ArrayList<String>()
     val appSettings = ArrayList<String>()
@@ -78,11 +78,23 @@ private fun terraformAzure(projectName: String = "project", appendable: Appendab
           ]
         }
         
+        resource "azurerm_service_plan" "service_plan" {
+          name                = "${namePrefix}_service_plan"
+          resource_group_name = azurerm_resource_group.resources.name
+          location            = azurerm_resource_group.resources.location
+          os_type             = "Linux"
+          sku_name            = "Y1"
+        
+          depends_on = [
+            azurerm_resource_group.resources
+          ]
+        }
+        
         resource "azurerm_application_insights" "insights" {
           name                = "${namePrefix}_app_insights"
           location            = azurerm_resource_group.resources.location
           resource_group_name = azurerm_resource_group.resources.name
-          application_type    = var.service_runtime
+          application_type    = "java"
 
           depends_on = [
             azurerm_resource_group.resources
@@ -322,7 +334,7 @@ private fun terraformAzure(projectName: String = "project", appendable: Appendab
                     ####
                     
                     variable "${setting.key}" {
-                      default = jsondecode("${setting.value.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.default).replace("\"", "\\\"") }}")"
+                      default = jsondecode("${setting.value.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.default).replace("\"", "\\\"") }}")
                     }
                 """.trimIndent())
                 appSettings.add("""${setting.key} = var.${setting.key}""".trimIndent())
@@ -347,7 +359,7 @@ private fun terraformAzure(projectName: String = "project", appendable: Appendab
           storage_account_name       = azurerm_storage_account.function_storage.name
           storage_account_access_key = azurerm_storage_account.function_storage.primary_access_key
 
-          service_plan_id = azurerm_service_plan.slate.id
+          service_plan_id = azurerm_service_plan.service_plan.id
 
           app_settings = {
             "FUNCTIONS_EXTENSION_VERSION"    = "~3"

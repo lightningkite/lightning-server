@@ -12,6 +12,7 @@ import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.settings.loadSettings
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.azure.terraformAzure
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.routing
@@ -101,8 +102,9 @@ object Server {
 
 fun main(vararg args: String) {
     Server
-    loadSettings(File("settings.yaml"))
-    println("Settings loaded")
+//    loadSettings(File("settings.yaml"))
+//    println("Settings loaded")
 //    println(Documentable.kotlinApi("test"))
-    runServer(LocalPubSub, LocalCache)
+//    runServer(LocalPubSub, LocalCache)
+    println(buildString { terraformAzure("demo", this) })
 }

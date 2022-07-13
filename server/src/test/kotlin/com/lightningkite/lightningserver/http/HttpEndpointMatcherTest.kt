@@ -31,6 +31,7 @@ class HttpEndpointMatcherTest {
         val matcher = HttpEndpointMatcher(paths.asSequence())
         assertEquals(HttpEndpointMatcher.Match(root, mapOf(), null), matcher.match("", HttpMethod.GET))
         assertEquals(HttpEndpointMatcher.Match(test, mapOf(), null), matcher.match("test", HttpMethod.GET))
+        assertEquals(null, matcher.match("asdf", HttpMethod.GET))
         assertEquals(HttpEndpointMatcher.Match(testSlash, mapOf(), null), matcher.match("test/", HttpMethod.GET))
         assertEquals(HttpEndpointMatcher.Match(testA, mapOf(), null), matcher.match("test/a", HttpMethod.GET))
         assertEquals(HttpEndpointMatcher.Match(testAB, mapOf(), null), matcher.match("test/a/b", HttpMethod.GET))

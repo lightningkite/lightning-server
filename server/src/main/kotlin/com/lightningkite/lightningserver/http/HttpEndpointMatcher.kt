@@ -60,6 +60,7 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
         val wildcards = ArrayList<String>()
         var current = root
         val soFar = arrayListOf<Node>()
+        var beyond = false
         for (part in pathParts) {
             soFar.add(current)
 //            println("Current is $current, looking for $part")
@@ -74,10 +75,23 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
                 wildcards.add(part)
                 continue
             }
+            beyond = true
             break
         }
 //        println("Stopped at $current")
-        return if (endingSlash) {
+        return if(beyond) {
+//            println("Searching for wildcard ending")
+            soFar.asReversed().asSequence().mapNotNull {
+                it.chainedWildcard.get(method)?.let {
+                    Match(
+                        endpoint = it,
+                        parts = it.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(wildcards)
+                            .associate { it.first.name to it.second },
+                        wildcard = pathParts.drop(it.path.segments.size).joinToString("/") + (if (endingSlash) "/" else "")
+                    )
+                }
+            }.firstOrNull()
+        } else if (endingSlash) {
 //            println("Pulling trailingSlash")
             current.trailingSlash.get(method)?.let {
                 Match(
