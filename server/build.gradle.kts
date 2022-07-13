@@ -47,6 +47,8 @@ dependencies {
     api("com.lightningkite:kotliner-cli:1.0.3")
     implementation("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
 
+    api("com.microsoft.azure.functions:azure-functions-java-library:2.0.1")
+
     api("io.ktor:ktor-server-auth-jvm:$ktorVersion")
     api("io.ktor:ktor-server-websockets-jvm:$ktorVersion")
     api("io.ktor:ktor-server-content-negotiation-jvm:$ktorVersion")

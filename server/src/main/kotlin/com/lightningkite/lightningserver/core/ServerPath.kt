@@ -71,4 +71,33 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
         Afterwards.TrailingSlash -> "/"
         Afterwards.ChainedWildcard -> "/{...}"
     }
+
+    data class Match(
+        val path: ServerPath,
+        val parts: Map<String, String>,
+        val wildcard: String?
+    )
+
+    fun match(pathParts: List<String>, endingSlash: Boolean): Match? {
+        if(segments.size > pathParts.size) return null
+        if(after != Afterwards.ChainedWildcard && pathParts.size != segments.size) return null
+        when(after) {
+            Afterwards.None -> if(endingSlash) return null
+            Afterwards.TrailingSlash -> if(!endingSlash) return null
+            Afterwards.ChainedWildcard -> {}
+        }
+        val parts = HashMap<String, String>()
+        segments.asSequence().zip(pathParts.asSequence())
+            .forEach {
+                when(val s = it.first) {
+                    is Segment.Constant -> if(s.value != it.second) return null
+                    is Segment.Wildcard -> parts[s.name] = it.second
+                }
+            }
+        return Match(
+            path = this,
+            parts = parts,
+            wildcard = if(after == Afterwards.ChainedWildcard) pathParts.drop(segments.size).joinToString("/") + (if(endingSlash) "/" else "") else null
+        )
+    }
 }

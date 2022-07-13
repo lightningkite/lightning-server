@@ -9,7 +9,9 @@ import redis.embedded.RedisServer
 
 @Serializable
 data class CacheSettings(
-    val uri: String = "local"
+    val uri: String = "local",
+    val connectionString: String? = null,
+    val databaseNumber: Int? = null
 ): HealthCheckable, ()->CacheInterface {
     override suspend fun healthCheck(): HealthStatus = cache.healthCheck()
     override val healthCheckName: String get() = cache.healthCheckName
@@ -28,7 +30,7 @@ data class CacheSettings(
                 redisServer.start()
                 RedisCache(RedisClient.create("redis://127.0.0.1:6378"))
             }
-            uri.startsWith("redis://") -> RedisCache(RedisClient.create(uri))
+            uri.startsWith("redis://") -> RedisCache(RedisClient.create(uri + (connectionString ?: "")))
             else -> throw NotImplementedError("PubSub URI $uri not recognized")
         }
     }

@@ -223,9 +223,9 @@ private fun ContentType.adapt(): HttpContentType =
 private fun HttpContentType.adapt(): ContentType =
     ContentType(contentType = type, contentSubtype = subtype)
 
-private fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
+internal fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
 
-private suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
+internal suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
     val parts = HashMap<String, String>()
     var wildcard: String? = null
     parameters.forEach { s, strings ->
@@ -242,47 +242,7 @@ private suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
             val ktorType = request.contentType()
             val myType = ktorType.adapt()
             if (ktorType.contentType == "multipart")
-                HttpContent.Multipart(object : Flow<HttpContent.Multipart.Part> {
-                    override suspend fun collect(collector: FlowCollector<HttpContent.Multipart.Part>) {
-                        receiveMultipart().forEachPart {
-                            collector.emit(
-                                when (it) {
-                                    is PartData.FormItem -> HttpContent.Multipart.Part.FormItem(
-                                        it.name ?: "",
-                                        it.value
-                                    )
-                                    is PartData.FileItem -> {
-                                        val h = it.headers.adapt()
-                                        HttpContent.Multipart.Part.DataItem(
-                                            key = it.name ?: "",
-                                            filename = it.originalFileName ?: "",
-                                            headers = h,
-                                            content = HttpContent.Stream(
-                                                it.streamProvider,
-                                                h.contentLength,
-                                                it.contentType?.adapt() ?: HttpContentType.Application.OctetStream
-                                            )
-                                        )
-                                    }
-                                    is PartData.BinaryItem -> {
-                                        val h = it.headers.adapt()
-                                        HttpContent.Multipart.Part.DataItem(
-                                            key = it.name ?: "",
-                                            filename = "",
-                                            headers = h,
-                                            content = HttpContent.Stream(
-                                                { it.provider().asStream() },
-                                                h.contentLength,
-                                                it.contentType?.adapt() ?: HttpContentType.Application.OctetStream
-                                            )
-                                        )
-                                    }
-                                    is PartData.BinaryChannelItem -> TODO()
-                                }
-                            )
-                        }
-                    }
-                }, myType)
+                receiveMultipart().adapt(myType)
             else {
                 HttpContent.Stream(
                     { receiveStream() },
@@ -296,4 +256,47 @@ private suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
         protocol = request.origin.scheme,
         sourceIp = request.origin.remoteHost
     )
+}
+internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.ContentType): HttpContent.Multipart {
+    return HttpContent.Multipart(object : Flow<HttpContent.Multipart.Part> {
+        override suspend fun collect(collector: FlowCollector<HttpContent.Multipart.Part>) {
+            this@adapt.forEachPart {
+                collector.emit(
+                    when (it) {
+                        is PartData.FormItem -> HttpContent.Multipart.Part.FormItem(
+                            it.name ?: "",
+                            it.value
+                        )
+                        is PartData.FileItem -> {
+                            val h = it.headers.adapt()
+                            HttpContent.Multipart.Part.DataItem(
+                                key = it.name ?: "",
+                                filename = it.originalFileName ?: "",
+                                headers = h,
+                                content = HttpContent.Stream(
+                                    it.streamProvider,
+                                    h.contentLength,
+                                    it.contentType?.adapt() ?: HttpContentType.Application.OctetStream
+                                )
+                            )
+                        }
+                        is PartData.BinaryItem -> {
+                            val h = it.headers.adapt()
+                            HttpContent.Multipart.Part.DataItem(
+                                key = it.name ?: "",
+                                filename = "",
+                                headers = h,
+                                content = HttpContent.Stream(
+                                    { it.provider().asStream() },
+                                    h.contentLength,
+                                    it.contentType?.adapt() ?: HttpContentType.Application.OctetStream
+                                )
+                            )
+                        }
+                        is PartData.BinaryChannelItem -> TODO()
+                    }
+                )
+            }
+        }
+    }, myType)
 }

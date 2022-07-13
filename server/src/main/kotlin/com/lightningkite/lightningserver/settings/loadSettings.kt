@@ -2,8 +2,10 @@ package com.lightningkite.lightningserver.settings
 
 import com.charleskorn.kaml.Yaml
 import com.lightningkite.lightningdb.ClientModule
+import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.properties.decodeFromStringMap
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.system.exitProcess
@@ -35,5 +37,16 @@ fun loadSettings(settingsFile: File): Settings {
         e.printStackTrace()
         exitProcess(1)
     }
+}
+
+/**
+ * A helper function for loading in your settings object from the file.
+ * If the file does not exist it will use the result from [makeDefaultSettings] to created one then shutdown the process.
+ *
+ * @param settingsFile the location of the file to decode [SETTINGS] from.
+ * @param makeDefaultSettings a lambda to retrieve a default example of [SETTINGS] to encode to a file.
+ */
+fun loadSettings(environmentVariablePrefix: String): Settings {
+    return Serialization.properties.decodeFromStringMap<Settings>(System.getenv())
 }
 
