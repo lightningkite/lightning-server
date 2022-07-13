@@ -62,14 +62,15 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
 
             exposedHeaders.addAll(CorsSimpleResponseHeaders)
 
-            generalSettings().cors?.allowedDomains?.forEach {
-                allowHost(it, listOf("http", "https", "ws", "wss"))
-            } ?: if (generalSettings().debug) anyHost()
+            generalSettings().cors?.let{
+                it.allowedDomains.forEach {
+                    allowHost(it, listOf("http", "https", "ws", "wss"))
+                }
+                it.allowedHeaders.forEach {
+                    allowHeader(it)
+                }
+            }
 
-            generalSettings().cors?.allowedHeaders?.forEach {
-                allowHeader(it)
-            } ?: if (generalSettings().debug)
-                allowHeaders { true }
         }
         install(StatusPages) {
             exception<Exception> { call, it ->

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.settings
 
+import com.lightningkite.lightningserver.http.HttpHeader
 import kotlinx.serialization.Serializable
 
 /**
@@ -26,7 +27,7 @@ data class GeneralServerSettings(
     val port: Int = 8080,
     val publicUrl: String = "http://$host:$port",
     val debug: Boolean = false,
-    val cors: CorsSettings? = null
+    val cors: CorsSettings? = if(debug) CorsSettings(allowedDomains = listOf("*"), allowedHeaders = listOf("*", HttpHeader.Authorization)) else null
 ) {
 }
 
