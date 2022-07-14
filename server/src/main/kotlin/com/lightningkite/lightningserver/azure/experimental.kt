@@ -330,7 +330,7 @@ fun terraformAzure(projectName: String = "project", appendable: Appendable) {
                 appendable.appendLine("""
                     
                     ####
-                    # ${setting.key}: JwtSigner
+                    # ${setting.key}
                     ####
                     
                     variable "${setting.key}" {

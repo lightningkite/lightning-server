@@ -1,20 +1,23 @@
-# Ktor Batteries
+# Lightning Server
 
 A project that drastically speeds up server development by automating the creation of RESTful APIs from models.
 
+Built to work for all common serverless platforms.
+
 ## TODO
 
-- [ ] Trailing slash regularization
-- [ ] Performance Monitoring
-- [ ] SMS through Twilio
-- [ ] Cache through Redis
-- [ ] JVM server detail configuration?
-- [ ] Auto Admin
-  - [ ] Foreign Keys in Editor
-  - [ ] Files in Editor
-  - [X] Delete
-  - [ ] Filter List
-  - [ ] Sort List
-  - [ ] Multiple Pages
-  - [ ] CSS 
-- [ ] OpenAPI documentation
+- [ ] Azure Terraform & settings loading
+- [ ] Azure Websockets
+- [ ] Azure Schedules
+- [ ] Azure Tasks
+- [ ] AWS Terraform & settings loading
+- [ ] AWS Websockets
+- [ ] AWS Schedules
+- [ ] AWS Tasks
+- [ ] Remove as many dependencies as possible
+  - [ ] Ktor
+  - [ ] Lettuce (Redis)
+  - [ ] KMongo
+  - [ ] FCM
+  - [ ] Azure VFS
+  - [ ] S3 VFS

@@ -60,6 +60,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
                     }
                     appendLine("}")
                 }
+                else -> {}
             }
         }
 
@@ -93,8 +94,8 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     val byUserType = safeDocumentables.groupBy { it.authInfo.type }
     val userTypes = byUserType.keys.filterNotNull()
     userTypes.forEach { userType ->
-        val byGroup = ((byUserType[userType] ?: listOf()) + (byUserType[null] ?: listOf())).groupBy { it.docGroup }
-        val groups = byGroup.keys.filterNotNull()
+        @Suppress("NAME_SHADOWING") val byGroup = ((byUserType[userType] ?: listOf()) + (byUserType[null] ?: listOf())).groupBy { it.docGroup }
+        @Suppress("NAME_SHADOWING") val groups = byGroup.keys.filterNotNull()
         val sessionClassName = "${userType.substringAfterLast('.')}Session"
         appendLine("export class $sessionClassName {")
         appendLine("    constructor(public api: Api, public ${userType.userTypeTokenName()}: string) {}")
@@ -204,6 +205,7 @@ private val skipSet = setOf(
 )
 private fun String.groupToInterfaceName(): String = replaceFirstChar { it.uppercase() } + "Api"
 private fun String.groupToPartName(): String = replaceFirstChar { it.lowercase() }
+@Suppress("UNCHECKED_CAST")
 private fun KType?.userTypeTokenName(): String = (this?.classifier as? KClass<Any>)?.userTypeTokenName() ?: "token"
 private fun KClass<*>.userTypeTokenName(): String =
     simpleName?.replaceFirstChar { it.lowercase() }?.plus("Token") ?: "token"
