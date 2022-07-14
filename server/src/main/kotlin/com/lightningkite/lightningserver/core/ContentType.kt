@@ -127,4 +127,32 @@ data class ContentType(val type: String, val subtype: String) {
         public val OGG: ContentType = ContentType("video", "ogg")
         public val QuickTime: ContentType = ContentType("video", "quicktime")
     }
+
+    companion object {
+        val fileExtensions = mapOf(
+            Application.Cbor to "cbor",
+            Application.Json to "json",
+            Application.Bson to "bson",
+            Application.JavaScript to "js",
+            Application.Xml to "xml",
+            Application.Zip to "zip",
+            Audio.MP4 to "mp4",
+            Audio.MPEG to "mpeg",
+            Audio.OGG to "ogg",
+            Video.MPEG to "mpeg",
+            Video.MP4 to "mp4",
+            Video.OGG to "ogg",
+            Video.QuickTime to "mov",
+            Text.Plain to "txt",
+            Text.CSS to "css",
+            Text.CSV to "csv",
+            Text.Html to "html",
+            Text.JavaScript to "js",
+            Text.Xml to "xml",
+            Image.GIF to "gif",
+            Image.JPEG to "jpg",
+            Image.PNG to "png",
+            Image.SVG to "svg",
+        )
+    }
 }

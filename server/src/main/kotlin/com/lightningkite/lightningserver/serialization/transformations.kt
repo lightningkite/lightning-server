@@ -131,11 +131,8 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
                         }
                     }
                     if (baselineJson is JsonObject) {
-                        println("Baseline: $baselineJson")
-                        println("overrideData: $overrideData")
                         baselineJson.jsonObject.writeInto(mainData)
                         mainData.putAll(overrideData)
-                        println("mainData: $mainData")
                         Serialization.json.decodeFromJsonElement(serializer, mainData.toJsonObject())
                     } else throw BadRequestException("")
                 }
