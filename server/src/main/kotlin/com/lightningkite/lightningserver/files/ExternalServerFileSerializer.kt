@@ -4,6 +4,8 @@ import com.dalet.vfs2.provider.azure.AzFileObject
 import com.github.vfss3.S3FileObject
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningdb.ServerFile
+import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.serialization.parsingFileSettings
 import com.lightningkite.lightningserver.settings.Settings
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -19,9 +21,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import org.apache.commons.vfs2.VFS
 import org.slf4j.LoggerFactory
+import java.io.ByteArrayInputStream
 import java.math.BigInteger
 import java.net.URLDecoder
 import java.security.MessageDigest
+import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
@@ -61,37 +65,49 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
 
     override fun deserialize(decoder: Decoder): ServerFile {
         val raw = decoder.decodeString()
-        val files = lookupSettings(raw) ?:  throw BadRequestException("The given url ($raw) does not start with any files root.")
-        val root = files.root
-        val rootUrl = root.publicUrlUnsigned
-        if(!raw.startsWith(rootUrl)) throw BadRequestException("The given url ($raw) does not start with the files root ($rootUrl).")
-        val newFile = root.resolveFile(raw.removePrefix(rootUrl))
-        when(newFile) {
-            is AzFileObject -> {
-                if(files.signedUrlExpirationSeconds != null) {
-                    // TODO: A local check like we do for AWS would be more performant
-                    runBlocking {
-                        if(!client.get(raw) { header("Range", "bytes=0-0") }.status.isSuccess()) throw BadRequestException("URL does not appear to be signed properly")
+        if(raw.startsWith("data:")) {
+            val type = ContentType(raw.removePrefix("data:").substringBefore(';'))
+            val base64 = raw.substringAfter("base64,")
+            val data = Base64.getDecoder().decode(base64)
+            val file = parsingFileSettings!!().root.resolveFileWithUniqueName(
+                "uploaded/file.${ContentType.fileExtensions[type] ?: "bin"}"
+            )
+            file.upload(ByteArrayInputStream(data))
+            file to parsingFileSettings!!()
+            return ServerFile(file.publicUrlUnsigned)
+        } else {
+            val files = lookupSettings(raw) ?:  throw BadRequestException("The given url ($raw) does not start with any files root.")
+            val root = files.root
+            val rootUrl = root.publicUrlUnsigned
+            if(!raw.startsWith(rootUrl)) throw BadRequestException("The given url ($raw) does not start with the files root ($rootUrl).")
+            val newFile = root.resolveFile(raw.removePrefix(rootUrl))
+
+            when(newFile) {
+                is AzFileObject -> {
+                    if(files.signedUrlExpirationSeconds != null) {
+                        // TODO: A local check like we do for AWS would be more performant
+                        runBlocking {
+                            if(!client.get(raw) { header("Range", "bytes=0-0") }.status.isSuccess()) throw BadRequestException("URL does not appear to be signed properly")
+                        }
                     }
                 }
-            }
-            is S3FileObject -> {
-                if(files.signedUrlExpirationSeconds != null) {
-                    val headers = raw.substringAfter('?').split('&').associate {
-                        URLDecoder.decode(it.substringBefore('='), Charsets.UTF_8) to URLDecoder.decode(it.substringAfter('=', ""), Charsets.UTF_8)
-                    }
-                    val accessKey = files.storageUrl.substringAfter("://").substringBefore('@', "").substringBefore(':')
-                    val secretKey = files.storageUrl.substringAfter("://").substringBefore('@', "").substringAfter(':').substringBefore(':')
-                    val region = raw.substringAfter("://s3-").substringBefore(".amazonaws.com")
-                    val bucket = raw.substringAfter("amazonaws.com/").substringBefore('/')
-                    val objectPath = "/" + raw.substringAfter("amazonaws.com/").substringBefore("?")
-                    val date = headers["X-Amz-Date"]!!
-                    val algorithm = headers["X-Amz-Algorithm"]!!
-                    val expires = headers["X-Amz-Expires"]!!
-                    val credential = headers["X-Amz-Credential"]!!
-                    val scope = credential.substringAfter("/")
+                is S3FileObject -> {
+                    if(files.signedUrlExpirationSeconds != null) {
+                        val headers = raw.substringAfter('?').split('&').associate {
+                            URLDecoder.decode(it.substringBefore('='), Charsets.UTF_8) to URLDecoder.decode(it.substringAfter('=', ""), Charsets.UTF_8)
+                        }
+                        val accessKey = files.storageUrl.substringAfter("://").substringBefore('@', "").substringBefore(':')
+                        val secretKey = files.storageUrl.substringAfter("://").substringBefore('@', "").substringAfter(':').substringBefore(':')
+                        val region = raw.substringAfter("://s3-").substringBefore(".amazonaws.com")
+                        val bucket = raw.substringAfter("amazonaws.com/").substringBefore('/')
+                        val objectPath = "/" + raw.substringAfter("amazonaws.com/").substringBefore("?")
+                        val date = headers["X-Amz-Date"]!!
+                        val algorithm = headers["X-Amz-Algorithm"]!!
+                        val expires = headers["X-Amz-Expires"]!!
+                        val credential = headers["X-Amz-Credential"]!!
+                        val scope = credential.substringAfter("/")
 
-                    val canonicalRequest = """
+                        val canonicalRequest = """
                     GET
                     $objectPath
                     ${raw.substringAfter('?').substringBefore("&X-Amz-Signature=").split('&').sorted().joinToString("&")}
@@ -101,31 +117,32 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
                     UNSIGNED-PAYLOAD
                 """.trimIndent()
 
-                    val toSignString = """
+                        val toSignString = """
                     $algorithm
                     $date
                     $scope
                     ${canonicalRequest.sha256()}
                 """.trimIndent()
 
-                    val signingKey = "AWS4$secretKey".toByteArray()
-                        .let { date.substringBefore('T').toByteArray().mac(it) }
-                        .let { region.toByteArray().mac(it) }
-                        .let { "s3".toByteArray().mac(it) }
-                        .let { "aws4_request".toByteArray().mac(it) }
+                        val signingKey = "AWS4$secretKey".toByteArray()
+                            .let { date.substringBefore('T').toByteArray().mac(it) }
+                            .let { region.toByteArray().mac(it) }
+                            .let { "s3".toByteArray().mac(it) }
+                            .let { "aws4_request".toByteArray().mac(it) }
 
 
-                    val signature = toSignString.toByteArray().mac(signingKey).toHex()
+                        val signature = toSignString.toByteArray().mac(signingKey).toHex()
 
-                    if(signature != headers["X-Amz-Signature"]!!) {
-                        runBlocking {
-                            if(!client.get(raw) { header("Range", "bytes=0-0") }.status.isSuccess()) throw BadRequestException("URL does not appear to be signed properly")
+                        if(signature != headers["X-Amz-Signature"]!!) {
+                            runBlocking {
+                                if(!client.get(raw) { header("Range", "bytes=0-0") }.status.isSuccess()) throw BadRequestException("URL does not appear to be signed properly")
+                            }
                         }
                     }
                 }
             }
+            return ServerFile(raw)
         }
-        return ServerFile(raw)
     }
 }
 
