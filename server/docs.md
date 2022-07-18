@@ -1,5 +1,5 @@
-# Ktor Batteries Server Feature Docs
-Ktor Batteries Server has a lot of nifty features. Here is a list of things to get you started, or to be used as a reference.
+# Lightning Server Feature Docs
+Lightning Server has a lot of nifty features. Here is a list of things to get you started, or to be used as a reference.
 
 ## Server Setup
 
@@ -146,7 +146,7 @@ Tokens can be used to authenticate http calls across the server.
 - `getSubject()` gets a claim with the key "subject" from a validated token
 
 ## Exceptions
-Ktor-Batteries provides exceptions you can use.
+Lightning Server provides exceptions you can use.
 
 - `ForbiddenException()` responds with an http status code of forbidden
 - `AuthenticationException()` responds with an http status code of unauthorized
