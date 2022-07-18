@@ -12,9 +12,15 @@ pluginManagement {
 }
 
 include(":client")
-include(":db")
 include(":demo")
-include(":mongo")
 include(":processor")
 include(":shared")
 include(":server")
+include(":server-aws")
+include(":server-azure")
+include(":server-core")
+include(":server-firebase")
+include(":server-ktor")
+include(":server-mongo")
+include(":server-redis")
+include(":server-sentry")
