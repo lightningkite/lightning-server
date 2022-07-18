@@ -59,9 +59,6 @@ dependencies {
 
     testImplementation("com.auth0:java-jwt:3.19.2")
 
-    implementation("org.bouncycastle:bcprov-jdk18on:1.71")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.71")
-
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
 
     ksp(project(":processor"))
