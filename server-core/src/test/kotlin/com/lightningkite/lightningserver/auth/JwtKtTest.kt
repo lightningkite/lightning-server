@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
+import java.time.Duration
 import java.time.Instant
 import java.util.*
 
@@ -30,7 +31,7 @@ class JwtKtTest {
             .sign(Algorithm.HMAC256(secret))
         println(auth0Made)
         val hasher = SecureHasher.HS256(secret.toByteArray())
-        val myToken = Serialization.json.encodeJwt(hasher, String.serializer(), subject, 60, issuedAt = time)
+        val myToken = Serialization.json.encodeJwt(hasher, String.serializer(), subject, Duration.ofSeconds(60), issuedAt = time)
         println(myToken)
         Serialization.json.decodeJwt(hasher, String.serializer(), auth0Made)
         auth0Checker.verify(myToken)

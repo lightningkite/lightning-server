@@ -180,7 +180,7 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                     }
                     delay((upcomingRun - System.currentTimeMillis()).coerceAtLeast(1L))
                     if (cache.setIfNotExists(it.name + "-lock", true)) {
-                        cache.set(it.name + "-lock", true, Duration.ofHours(1).toMillis())
+                        cache.set(it.name + "-lock", true, Duration.ofHours(1))
                         try {
                             it.handler()
                         } catch (t: Throwable) {

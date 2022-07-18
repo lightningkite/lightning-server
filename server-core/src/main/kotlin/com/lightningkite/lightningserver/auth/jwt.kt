@@ -19,6 +19,7 @@ import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
 import java.io.StringReader
 import java.security.Signature
 import java.security.interfaces.ECPrivateKey
+import java.time.Duration
 import java.time.Instant
 import java.util.Base64
 import javax.crypto.Mac
@@ -88,7 +89,7 @@ fun <T> Json.encodeJwt(
     hasher: SecureHasher,
     serializer: KSerializer<T>,
     subject: T,
-    expireSeconds: Long,
+    expire: Duration,
     issuer: String = generalSettings().publicUrl,
     audience: String? = generalSettings().publicUrl,
     issuedAt: Instant = Instant.now()
@@ -104,7 +105,7 @@ fun <T> Json.encodeJwt(
             (encodeToJsonElement(serializer, subject) as JsonPrimitive).content
         else
             encodeToString(serializer, subject),
-        exp = issuedAt.toEpochMilli() / 1000 + expireSeconds
+        exp = issuedAt.toEpochMilli() / 1000 + expire.seconds
     )).toByteArray()))
     val soFar = this.toString()
     append('.')
@@ -126,6 +127,8 @@ fun <T> Json.decodeJwt(
     val header: JwtHeader = decodeFromString(Base64.getUrlDecoder().decode(parts[0]).toString(Charsets.UTF_8))
     val claims: JwtClaims = decodeFromString(Base64.getUrlDecoder().decode(parts[1]).toString(Charsets.UTF_8))
     val textSubject = claims.sub ?: claims.userId ?: throw JwtException("JWT does not have a subject.")
+    if(System.currentTimeMillis() / 1000L > claims.exp) throw JwtException("JWT has expired.")
+    requireAudience?.let { if(claims.aud != it) throw JwtException("JWT has expired.") }
     return if (serializer.isPrimitive())
         decodeFromJsonElement(
             serializer,

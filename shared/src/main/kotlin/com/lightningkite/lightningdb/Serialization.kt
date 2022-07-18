@@ -56,6 +56,15 @@ object OffsetDateTimeSerializer: KSerializer<OffsetDateTime> {
     override fun serialize(encoder: Encoder, value: OffsetDateTime) = encoder.encodeString(value.toString())
 }
 
+object DurationSerializer: KSerializer<Duration> {
+    override fun deserialize(decoder: Decoder): Duration {
+        val raw = decoder.decodeString()
+        return raw.toLongOrNull()?.let { Duration.ofMillis(it) } ?: Duration.parse(raw)
+    }
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Duration", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: Duration) = encoder.encodeString(value.toString())
+}
+
 val ClientModule = SerializersModule {
     contextual(UUID::class, UUIDSerializer)
     contextual(Instant::class, InstantSerializer)
@@ -64,4 +73,5 @@ val ClientModule = SerializersModule {
     contextual(LocalTime::class, LocalTimeSerializer)
     contextual(OffsetDateTime::class, OffsetDateTimeSerializer)
     contextual(ServerFile::class, ServerFileSerialization)
+    contextual(Duration::class, DurationSerializer)
 }

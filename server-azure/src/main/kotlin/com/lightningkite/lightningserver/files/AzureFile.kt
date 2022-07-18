@@ -90,8 +90,8 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
         return client.blobUrl + "?" + client.generateSas(signatureValues)
     }
 
-    override fun uploadUrl(timeoutMilliseconds: Long): String {
-        val offsetDateTime = OffsetDateTime.now().plus(Duration.ofMillis(timeoutMilliseconds))
+    override fun uploadUrl(timeout: Duration): String {
+        val offsetDateTime = OffsetDateTime.now().plus(timeout)
         val sasPermission = BlobSasPermission().setWritePermission(true).setCreatePermission(true).setAddPermission(true)
 
         val signatureValues = BlobServiceSasSignatureValues(offsetDateTime, sasPermission)

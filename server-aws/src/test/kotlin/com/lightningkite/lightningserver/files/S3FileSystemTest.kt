@@ -12,6 +12,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import software.amazon.awssdk.regions.Region
 import java.io.File
+import java.time.Duration
 import kotlin.test.assertContains
 
 class S3FileSystemTest {
@@ -33,7 +34,7 @@ class S3FileSystemTest {
             assertContains(testFile.parent!!.list()!!.also { println(it) }, testFile)
             assert(testFile.signedUrl.startsWith(testFile.url))
             assert(client.get(testFile.signedUrl).status.isSuccess())
-            assert(client.put(testFile.uploadUrl(30000)) { setBody(TextContent(message, io.ktor.http.ContentType.Text.Plain)) }.status.isSuccess())
+            assert(client.put(testFile.uploadUrl(Duration.ofHours(1))) { setBody(TextContent(message, io.ktor.http.ContentType.Text.Plain)) }.status.isSuccess())
         }
     }
 }

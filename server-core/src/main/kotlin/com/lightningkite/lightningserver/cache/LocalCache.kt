@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.cache
 
 import kotlinx.serialization.KSerializer
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 object LocalCache: CacheInterface {
@@ -10,8 +11,8 @@ object LocalCache: CacheInterface {
     @Suppress("UNCHECKED_CAST")
     override suspend fun <T> get(key: String, serializer: KSerializer<T>): T? = entries[key]?.takeIf { it.expires == null || it.expires > System.currentTimeMillis() }?.value as? T
 
-    override suspend fun <T> set(key: String, value: T, serializer: KSerializer<T>, timeToLiveMilliseconds: Long?) {
-        entries[key] = Entry(value, timeToLiveMilliseconds?.let { System.currentTimeMillis() + it })
+    override suspend fun <T> set(key: String, value: T, serializer: KSerializer<T>, timeToLive: Duration?) {
+        entries[key] = Entry(value, timeToLive?.toMillis()?.let { System.currentTimeMillis() + it })
     }
 
     override suspend fun <T> setIfNotExists(

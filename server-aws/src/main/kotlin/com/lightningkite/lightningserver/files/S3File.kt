@@ -159,8 +159,8 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             }
         }.url().toString()
 
-    override fun uploadUrl(timeoutMilliseconds: Long): String = system.signer.presignPutObject {
-        it.signatureDuration(Duration.ofMillis(timeoutMilliseconds))
+    override fun uploadUrl(timeout: Duration): String = system.signer.presignPutObject {
+        it.signatureDuration(timeout)
         it.putObjectRequest {
             it.bucket(system.bucket)
             it.key(path.path)

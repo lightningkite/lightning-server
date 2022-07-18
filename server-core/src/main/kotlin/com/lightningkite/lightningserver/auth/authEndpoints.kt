@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.typed.typed
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.coroutines.flow.singleOrNull
 import kotlinx.serialization.Serializable
+import java.time.Duration
 
 
 /**
@@ -117,7 +118,10 @@ inline fun <reified USER: Any, reified ID> ServerPath.authEndpoints(
         errorCases = listOf(),
         successCode = HttpStatus.NoContent,
         implementation = { user: Unit, address: String ->
-            val jwt = jwtSigner().token(userByEmail(address).let(userId), jwtSigner().emailExpirationMilliseconds)
+            val jwt = jwtSigner().token(
+                userByEmail(address).let(userId),
+                jwtSigner().emailExpiration
+            )
             val link = "${generalSettings().publicUrl}${landingRoute.path}?jwt=$jwt"
             email().send(
                 subject = emailSubject(),

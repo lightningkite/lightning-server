@@ -13,6 +13,7 @@ import kotlinx.serialization.encodeToString
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import redis.embedded.RedisServer
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 class RedisCache(val client: RedisClient): CacheInterface {
@@ -41,8 +42,8 @@ class RedisCache(val client: RedisClient): CacheInterface {
         return connection.get(key).awaitFirstOrNull()?.let { Serialization.json.decodeFromString(serializer, it) }
     }
 
-    override suspend fun <T> set(key: String, value: T, serializer: KSerializer<T>, timeToLiveMilliseconds: Long?) {
-        connection.set(key, Serialization.json.encodeToString(serializer, value), SetArgs().let { timeToLiveMilliseconds?.let { t -> it.ex(t) } ?: it }).collect {}
+    override suspend fun <T> set(key: String, value: T, serializer: KSerializer<T>, timeToLive: Duration?) {
+        connection.set(key, Serialization.json.encodeToString(serializer, value), SetArgs().let { timeToLive?.toMillis()?.let { t -> it.ex(t) } ?: it }).collect {}
     }
 
     override suspend fun <T> setIfNotExists(

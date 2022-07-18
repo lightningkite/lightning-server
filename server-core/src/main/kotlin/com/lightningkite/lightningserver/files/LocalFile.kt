@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.settings.generalSettings
 import java.io.File
 import java.io.InputStream
+import java.time.Duration
 import java.time.Instant
 import kotlin.io.path.inputStream
 
@@ -59,7 +60,7 @@ class LocalFile(val system: LocalFileSystem, val file: File): FileObject {
 
     override val signedUrl: String get() = system.signer.token(file.relativeTo(system.rootFile))
 
-    override fun uploadUrl(timeoutMilliseconds: Long): String = system.signer.token(file.relativeTo(system.rootFile), timeoutMilliseconds)
+    override fun uploadUrl(timeout: Duration): String = system.signer.token(file.relativeTo(system.rootFile), timeout)
 
     override fun toString(): String = file.toString()
 

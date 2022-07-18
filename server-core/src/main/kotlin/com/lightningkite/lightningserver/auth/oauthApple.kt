@@ -18,6 +18,7 @@ import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
 import java.io.StringReader
 import java.security.Security
 import java.security.interfaces.ECPrivateKey
+import java.time.Duration
 import java.util.*
 
 /**
@@ -51,7 +52,7 @@ fun ServerPath.oauthApple(
                 hasher = SecureHasher.ECDSA256(keyString),
                 serializer = String.serializer(),
                 subject = settings.id,
-                expireSeconds = 60L * 60L * 24L,
+                expire = Duration.ofDays(1),
                 issuer = teamId,
                 audience = "https://appleid.apple.com"
             )

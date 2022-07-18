@@ -6,6 +6,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import java.io.InputStream
+import java.time.Duration
 
 interface FileObject {
     fun resolve(path: String): FileObject
@@ -22,6 +23,6 @@ interface FileObject {
     }
     val url: String
     val signedUrl: String
-    fun uploadUrl(timeoutMilliseconds: Long): String
+    fun uploadUrl(timeout: Duration): String
 }
 

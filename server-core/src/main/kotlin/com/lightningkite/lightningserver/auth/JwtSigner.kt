@@ -1,3 +1,4 @@
+@file:UseContextualSerialization(Duration::class)
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
@@ -5,12 +6,10 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.settings.setting
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.getContextualDescriptor
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonPrimitive
 import java.security.SecureRandom
 import java.time.Duration
@@ -28,8 +27,8 @@ private val availableCharacters =
  */
 @Serializable
 data class JwtSigner(
-    val expirationMilliseconds: Long = Duration.ofDays(365).toMillis(),
-    val emailExpirationMilliseconds: Long = Duration.ofHours(1).toMillis(),
+    val expiration: Duration = Duration.ofDays(365),
+    val emailExpiration: Duration = Duration.ofHours(1),
     val secret: String = buildString {
         val rand = SecureRandom.getInstanceStrong()
         repeat(64) {
@@ -45,9 +44,15 @@ data class JwtSigner(
     @kotlinx.serialization.Transient
     val hasher = SecureHasher.HS256(secret.toByteArray())
 
-    inline fun <reified T> token(subject: T, expireDuration: Long? = expirationMilliseconds): String = token(serializerOrContextual(), subject, expireDuration ?: expirationMilliseconds)
-    fun <T> token(serializer: KSerializer<T>, subject: T, expireDuration: Long = expirationMilliseconds): String =
-        Serialization.json.encodeJwt(hasher, serializer, subject, expirationMilliseconds / 1000, issuer ?: generalSettings().publicUrl, audience ?: generalSettings().publicUrl)
+    @Deprecated("Use the version with duration instead", ReplaceWith("token(subject, Duration.ofMillis(expireDuration))", "java.time.Duration"))
+    inline fun <reified T> token(subject: T, expireDuration: Long): String = token(serializerOrContextual(), subject, Duration.ofMillis(expireDuration))
+    @Deprecated("Use the version with duration instead", ReplaceWith("token(serializer, subject, Duration.ofMillis(expireDuration))", "java.time.Duration"))
+    fun <T> token(serializer: KSerializer<T>, subject: T, expireDuration: Long): String =
+        token(serializer, subject, Duration.ofMillis(expireDuration))
+
+    inline fun <reified T> token(subject: T, expireDuration: Duration = expiration): String = token(serializerOrContextual(), subject, expireDuration)
+    fun <T> token(serializer: KSerializer<T>, subject: T, expireDuration: Duration = expiration): String =
+        Serialization.json.encodeJwt(hasher, serializer, subject, expireDuration, issuer ?: generalSettings().publicUrl, audience ?: generalSettings().publicUrl)
 
     inline fun <reified T> verify(token: String): T = verify(serializerOrContextual(), token)
     fun <T> verify(serializer: KSerializer<T>, token: String): T {

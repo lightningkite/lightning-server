@@ -11,6 +11,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
+import java.time.Duration
 import kotlin.test.assertContains
 
 class AzureFileSystemTest {
@@ -33,7 +34,7 @@ class AzureFileSystemTest {
             assertContains(testFile.parent!!.list()!!.also { println(it) }, testFile)
             assert(testFile.signedUrl.startsWith(testFile.url))
             assert(client.get(testFile.signedUrl).status.isSuccess())
-            assert(client.put(testFile.uploadUrl(30000)) {
+            assert(client.put(testFile.uploadUrl(Duration.ofHours(1))) {
                 header("x-ms-blob-type", "BlockBlob")
                 setBody(TextContent(message, io.ktor.http.ContentType.Text.Plain))
             }.status.isSuccess())
