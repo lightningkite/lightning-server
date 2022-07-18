@@ -141,7 +141,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                 appendLine("        url = \"\$httpUrl${entry.route.path.escaped}\",")
                 appendLine("        method = HttpClient.${entry.route.method},")
                 entry.authInfo.type?.let {
-                    appendLine("        headers = mapOf(\"Authorization\" to \"Bearer ${it.userTypeTokenName()}\"),")
+                    appendLine("        headers = mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
                 }
                 entry.inputType.takeUnless { it == Unit.serializer() }?.let {
                     appendLine("        body = input.toJsonRequestBody()")
