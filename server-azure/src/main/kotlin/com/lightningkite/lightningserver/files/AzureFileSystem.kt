@@ -36,7 +36,7 @@ class AzureFileSystem(
                     account = account,
                     container = container,
                     key = key,
-                    signedUrlExpirationSeconds = it.signedUrlExpirationSeconds ?: Duration.ofDays(1).toSeconds().toInt()
+                    signedUrlExpirationSeconds = (it.signedUrlExpiration ?: Duration.ofDays(1)).toSeconds().toInt()
                 )
             }
         }

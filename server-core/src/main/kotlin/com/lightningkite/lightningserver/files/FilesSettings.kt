@@ -1,3 +1,4 @@
+@file:UseContextualSerialization(Duration::class)
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.auth.JwtSigner
@@ -9,7 +10,9 @@ import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import com.lightningkite.lightningserver.settings.Pluggable
 import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseContextualSerialization
 import java.io.File
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -26,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap
 data class FilesSettings(
     val storageUrl: String = "file://${File("./local/files/").absolutePath}",
     val key: String? = null,
-    val signedUrlExpirationSeconds: Int? = null,
+    val signedUrlExpiration: Duration? = null,
     val jwtSigner: JwtSigner = JwtSigner()
 ) : () -> FileSystem {
     companion object : Pluggable<FilesSettings, FileSystem>() {

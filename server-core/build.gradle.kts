@@ -55,7 +55,9 @@ dependencies {
     api("com.github.jershell:kbson:0.4.4")
 
     api("org.apache.commons:commons-email:1.5")
-    api("com.charleskorn.kaml:kaml:0.45.0")
+
+    implementation("org.bouncycastle:bcprov-jdk18on:1.71")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.71")
 
     testImplementation("com.auth0:java-jwt:3.19.2")
 

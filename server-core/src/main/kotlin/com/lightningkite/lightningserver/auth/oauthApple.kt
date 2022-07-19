@@ -12,12 +12,6 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonPrimitive
-import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.bouncycastle.openssl.PEMParser
-import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
-import java.io.StringReader
-import java.security.Security
-import java.security.interfaces.ECPrivateKey
 import java.time.Duration
 import java.util.*
 
@@ -33,7 +27,6 @@ fun ServerPath.oauthApple(
     landingRoute: HttpEndpoint,
     emailToId: suspend (String) -> String
 ) {
-    Security.addProvider(BouncyCastleProvider())
     val settings = setting<OauthProviderCredentials?>("oauth-apple", null)
     return oauth(
         jwtSigner = jwtSigner,
