@@ -1,37 +1,48 @@
 # Lightning Server Feature Docs
-Lightning Server has a lot of nifty features. Here is a list of things to get you started, or to be used as a reference.
+**Lightning Server has a lot of nifty features. Here is a list of things to get you started, or to be used as a reference.**
 
-## Server Setup
-- `runServer()` runs a server based on the loaded server settings
-- `loadSettings()` loads the server's settings
-- `authEndpoints()` is a shortcut that generates a few endpoints to simplify server authentication
+`runServer()` run the server based on settings loaded from a `settings.yaml` file in the project's root directory
 
 ## Settings
-- `setting()` loads a setting and returns a relavent object
+
+
+`setting()` loads a setting and returns a relavent object.
+
+*Once you have set up your server's settings, you can call `loadSettings()` to generate a `settings.yaml` file or use an already existing one. If there is a discrepency between the `settings.yaml` file and the settings delared in code, `loadSettings()` will output a file with suggested settings.*
 
 ## FilesSettings
-- `FilesSettings` contains the default settings for server files
+
+
+`FilesSettings` contains the default settings for server files.
 
 ## Database
-- `DatabaseSettings` contains the default settings for a `Database`
 
-## JwtSigner
-JSON Web Tokens (JWT) are used to authenticate http calls across the server. You use a `JwtSigner` to create and verify these tokens
-- `JwtSigner` contains the default settings for a token signer
+
+`DatabaseSettings` contains the default settings for a `Database`.
+
+## JwtSigner and Server Authentication
+**JSON Web Tokens (JWT) are used to authenticate http calls across the server. You use a `JwtSigner` to create and verify these tokens.**
+
+`JwtSigner` contains the default settings for a token signer.
+
+*Once you have set up JwtSigners for your server, you can call `authEndpoints()` to generate a few endpoints to simplify server authentication.*
 
 ### Members
 - `token()` creates a token
 - `verify()` validates an existing token
 
 ## EmailClient
-- `EmailSettings` contains the default settings for the server's email
+
+
+`EmailSettings` contains the default settings for the server's email.
 
 ### Members
 - `send()` sends an email
 
 ## FieldCollection
-`FieldCollection` is an abstract class for interacting with a database, and on a specific collection/table.
-- `FieldCollection.withPermissions()` creates a `FieldCollection` with access permissions
+**`FieldCollection` is an abstract class for interacting with a database, and on a specific collection/table.**
+
+`FieldCollection.withPermissions()` creates a `FieldCollection` with access permissions.
 
 ### Members
 - `insertOne()` adds an element to the collection
@@ -69,7 +80,7 @@ JSON Web Tokens (JWT) are used to authenticate http calls across the server. You
 - `postCreate()` executes code after an element is added to the collection
 
 ## Condition
-To test against existing data in the database, you can use a `condition`.
+**`Condition`s are used to test against existing data in the database.**
 
 ### Members
 - `eq` (equal) returns true if the given values are equivalent
@@ -97,10 +108,9 @@ To test against existing data in the database, you can use a `condition`.
 - `any` returns true if the given `condition` is true for any element in a given list
 - `sizesEquals` returns true if the given integer is equal to the size of a given list
 - `containsKey` returns true if the given key is inside a given map
-- `IfNotNull()` returns true if the given value is not null
 
 ## Modification
-To modify existing data in the database, you can use a `modification`.
+**`Modification`s are used to modify existing data in a database.**
 
 ### Members
 - `then` strings multiple modification calls together
@@ -123,10 +133,13 @@ To modify existing data in the database, you can use a `modification`.
 - `DropLast()` removes the last element from a given list
 
 ## Models
-Models are kotlin data classes used to access and serialize data from the `database` as well as from the body of http calls.
+**Models are kotlin data classes used to access and serialize data from a `database` as well as from the bodies of http calls.**
 
+### Annotations
 - `@Serializable` makes a data class serializable
-- `@DatabaseModel` makes a model interchangeable with data in the database
+- `@DatabaseModel` makes a data class interchangeable with data in the database
+
+*Once you have set up your data classes, you can call `prepareModels()` to generate serialization code for each data class with the `@Serializable` annotation.*
 
 ### Interfaces
 A data class can inherit functionality from multiple pre-defined interfaces.
