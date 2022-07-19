@@ -79,7 +79,7 @@ data class FilesSettings(
                             body = HttpContent.Stream(
                                 getStream = { file.inputStream },
                                 length = file.size,
-                                type = ContentType(file.contentInfo.contentType)
+                                type = file.contentInfo.contentType?.let { ContentType(it) } ?: ContentType.Application.OctetStream
                             ),
                         )
                     }
