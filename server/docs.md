@@ -12,11 +12,13 @@ Calling `setting()` loads a setting and returns a relavent object for later use.
 
 <pre><code>val files = setting(name = "files", default = FilesSettings())</code></pre>
 
-You can also change the default values like this:
+You can also change the settings from their default values like this:
 
-<pre><code>val files = setting(name = "files", default = FilesSettings()).apply {
-  //modification code
+<pre><code>private fun setup() {
+   parsingFileSettings = files
 }</code></pre>
+
+**TODO: ^ This block needs more description**
 
 Once you have set up your server's settings, you can call `loadSettings()` to generate a `settings.yaml` file or to use an already existing one. If there is a discrepency between the `settings.yaml` file and the settings delared in code a file with suggested settings will be generated and output to the project's root directory.
 
