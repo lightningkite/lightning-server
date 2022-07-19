@@ -1,27 +1,39 @@
 # Lightning Server Feature Docs
+
 **Lightning Server has a lot of nifty features. Here is a list of things to get you started, or to be used as a reference.**
 
 `runServer()` run the server based on settings loaded from a `settings.yaml` file in the project's root directory
 
 ## Settings
 
+**TODO: ADD DESCRIPTION**
 
-`setting()` loads a setting and returns a relavent object.
+Calling `setting()` loads a setting and returns a relavent object for later use. Here is an example of how you could load the FilesSettings setting:
 
-*Once you have set up your server's settings, you can call `loadSettings()` to generate a `settings.yaml` file or use an already existing one. If there is a discrepency between the `settings.yaml` file and the settings delared in code, `loadSettings()` will output a file with suggested settings.*
+<pre><code>val files = setting(name = "files", default = FilesSettings())</code></pre>
+
+You can also change the default values like this:
+
+<pre><code>val files = setting(name = "files", default = FilesSettings()).apply {
+  //modification code
+}</code></pre>
+
+Once you have set up your server's settings, you can call `loadSettings()` to generate a `settings.yaml` file or to use an already existing one. If there is a discrepency between the `settings.yaml` file and the settings delared in code a file with suggested settings will be generated and output to the project's root directory.
 
 ## FilesSettings
 
+**TODO: ADD DESCRIPTION**
 
-`FilesSettings` contains the default settings for server files. Here's an example of how you can create this setting:
-- `val files = setting(name = "files", default = FilesSettings())`
+`FilesSettings` contains the default settings for server files.
 
 ## Database
 
+**TODO: ADD DESCRIPTION**
 
 `DatabaseSettings` contains the default settings for a `Database`.
 
 ## JwtSigner and Server Authentication
+
 **JSON Web Tokens (JWT) are used to authenticate http calls across the server. You use a `JwtSigner` to create and verify these tokens.**
 
 `JwtSigner` contains the default settings for a token signer.
@@ -34,6 +46,7 @@
 
 ## EmailClient
 
+**TODO: ADD DESCRIPTION**
 
 `EmailSettings` contains the default settings for the server's email.
 
@@ -41,6 +54,7 @@
 - `send()` sends an email
 
 ## FieldCollection
+
 **`FieldCollection` is an abstract class for interacting with a database, and on a specific collection/table.**
 
 `FieldCollection.withPermissions()` creates a `FieldCollection` with access permissions.
@@ -81,6 +95,7 @@
 - `postCreate()` executes code after an element is added to the collection
 
 ## Condition
+
 **`Condition`s are used to test against existing data in the database.**
 
 ### Members
@@ -113,6 +128,7 @@
 - `containsKey` returns true if the given key is inside a given map
 
 ## Modification
+
 **`Modification`s are used to modify existing data in a database.**
 
 ### Members
@@ -136,6 +152,7 @@
 - `DropLast()` removes the last element from a given list
 
 ## Models
+
 **Models are kotlin data classes used to access and serialize data from a `database` as well as from the bodies of http calls.**
 
 ### Annotations
@@ -151,7 +168,8 @@ A data class can inherit functionality from multiple pre-defined interfaces.
 - `HasEmail` provides an email address field
 
 ## Exceptions
-Lightning Server provides exceptions you can use.
+
+**TODO: ADD DESCRIPTION**
 
 - `BadRequestException()` responds with an http status code of 400
 - `UnauthorizedException()` responds with an http status code of 401
