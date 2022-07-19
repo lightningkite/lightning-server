@@ -13,7 +13,8 @@
 ## FilesSettings
 
 
-`FilesSettings` contains the default settings for server files.
+`FilesSettings` contains the default settings for server files. Here's an example of how you can create this setting:
+- `val files = setting(name = "files", default = FilesSettings())`
 
 ## Database
 
@@ -83,6 +84,8 @@
 **`Condition`s are used to test against existing data in the database.**
 
 ### Members
+- `and` strings multiple conditions together
+
 - `eq` (equal) returns true if the given values are equivalent
 - `neq` (not equal) returns true if the given values are not equivalent
 - `ne` (not equal) returns true if the given values are not equivalent
@@ -95,7 +98,7 @@
 - `inside` returns true if the given value is inside a given list
 - `nin` (not in) returns true if the given value is not inside a given list
 - `notIn` returns true if the given value is not inside a given list
-- `contains` is shorthand for `Search()`
+- `contains` returns true if the given value is inside a given list
 <br>
 
 - `allClear`
