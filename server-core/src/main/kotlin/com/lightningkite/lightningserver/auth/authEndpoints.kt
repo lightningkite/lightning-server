@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.typed.typed
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.coroutines.flow.singleOrNull
 import kotlinx.serialization.Serializable
+import java.net.URLDecoder
 import java.time.Duration
 
 
@@ -170,7 +171,13 @@ fun ServerPath.authEndpointExtensionHtml(): ServerPath {
         )
     }
     post("login-email/form-post/").handler {
-        val basis = Http.endpoints[loginEmail]!!(it.copy(body = HttpContent.Text("\"${it.queryParameter("email")}\"", ContentType.Application.Json)))
+        val basis = try {
+            val content = it.body!!.text().split('&').associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }.get("email")!!
+            Http.endpoints[loginEmail]!!(it.copy(body = HttpContent.Text("\"${content}\"", ContentType.Application.Json)))
+        } catch(e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
         if(basis.status.success) {
             HttpResponse(
                 body = HttpContent.Text(

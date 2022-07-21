@@ -6,3 +6,4 @@ node_modules
 java_pid*.hprof
 local
 settings.yaml
+.terraform

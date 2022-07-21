@@ -100,7 +100,7 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
                                 }
                             }
                             is HttpContent.Multipart.Part.DataItem -> {
-                                if (part.filename.isBlank()) throw BadRequestException("File name not provided")
+                                if (part.filename.isBlank()) return@collect
                                 val path = part.key.split('.')
                                 if (!serializer.isFile(path)) throw BadRequestException("${part.key} is not a ServerFile.")
                                 if (part.headers.contentType == null) throw BadRequestException("Content type not provided for uploaded file")

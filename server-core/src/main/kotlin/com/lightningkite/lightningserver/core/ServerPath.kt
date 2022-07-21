@@ -100,4 +100,10 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
             wildcard = if(after == Afterwards.ChainedWildcard) pathParts.drop(segments.size).joinToString("/") + (if(endingSlash) "/" else "") else null
         )
     }
+
+    fun toggleEndingSlash() = copy(after = when(after) {
+        ServerPath.Afterwards.TrailingSlash -> ServerPath.Afterwards.None
+        ServerPath.Afterwards.None -> ServerPath.Afterwards.TrailingSlash
+        ServerPath.Afterwards.ChainedWildcard -> throw IllegalArgumentException()
+    })
 }

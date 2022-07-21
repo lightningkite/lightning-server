@@ -1,20 +1,19 @@
 package com.lightningkite.lightningserver.ktor
 
-import com.lightningkite.lightningserver.HtmlDefaults
-import com.lightningkite.lightningserver.cache.CacheInterface
-import com.lightningkite.lightningserver.cache.get
-import com.lightningkite.lightningserver.cache.set
-import com.lightningkite.lightningserver.cache.setIfNotExists
+import com.lightningkite.lightningdb.MultiplexMessage
+import com.lightningkite.lightningserver.cache.*
+import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.core.ServerPathMatcher
 import com.lightningkite.lightningserver.engine.LocalEngine
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
-import com.lightningkite.lightningserver.exceptions.reportException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.pubsub.PubSubInterface
 import com.lightningkite.lightningserver.pubsub.get
 import com.lightningkite.lightningserver.schedule.Schedule
 import com.lightningkite.lightningserver.schedule.Scheduler
+import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.websocket.WebSockets
@@ -34,19 +33,19 @@ import io.ktor.server.websocket.*
 import io.ktor.util.*
 import io.ktor.utils.io.jvm.javaio.*
 import io.ktor.websocket.*
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import org.slf4j.LoggerFactory
 import java.time.*
 import java.util.*
 import kotlin.collections.HashMap
 import com.lightningkite.lightningserver.core.ContentType as HttpContentType
-import com.lightningkite.lightningserver.http.HttpMethod as MyHttpMethod
 
 fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) {
+    val logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.ktor.lightningServer")
     try {
         install(io.ktor.server.websocket.WebSockets)
         install(CORS) {
@@ -169,6 +168,94 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                 }
             }
         }
+        routing {
+            val wsMatcher = ServerPathMatcher(WebSockets.handlers.keys.asSequence())
+            webSocket {
+                val parts = HashMap<String, String>()
+                var wildcard: String? = null
+                call.parameters.forEach { s, strings ->
+                    if (strings.size > 1) wildcard = strings.joinToString("/")
+                    parts[s] = strings.single()
+                }
+                val id = UUID.randomUUID().toString()
+                val connectEvent = WebSockets.ConnectEvent(
+                    path = ServerPath.root,
+                    parts = parts,
+                    wildcard = wildcard,
+                    queryParameters = call.request.queryParameters.flattenEntries(),
+                    id = id,
+                    headers = call.request.headers.adapt(),
+                    domain = call.request.origin.host,
+                    protocol = call.request.origin.scheme,
+                    sourceIp = call.request.origin.remoteHost
+                )
+                val jobs = HashMap<String, Job>()
+                try {
+                    for (incoming in this.incoming) {
+                        val message = Serialization.json.decodeFromString<MultiplexMessage>((incoming as Frame.Text).readText())
+                        val cacheId = "ws/$id/${message.channel}"
+                        when {
+                            message.start -> {
+                                val path = message.path!!
+                                val match = wsMatcher.match(path)
+                                if (match == null) { logger.warn("match is null!"); continue }
+                                val handler = WebSockets.handlers[match.path]
+                                if (handler == null) { logger.warn("handler is null!"); continue }
+                                cache.set(cacheId, path)
+                                jobs[message.channel] = launch {
+                                    pubSub.get<String>(cacheId).collect {
+                                        send(it)
+                                    }
+                                }
+                                try {
+                                    handler.connect(
+                                        connectEvent.copy(
+                                            path = match.path,
+                                            parts = match.parts,
+                                            wildcard = match.wildcard,
+                                            id = cacheId
+                                        )
+                                    )
+                                    send(Serialization.json.encodeToString(message))
+                                } catch(e: Exception) {
+                                    send(Serialization.json.encodeToString(message.copy(error = e.message)))
+                                }
+                            }
+                            message.end -> {
+                                val path = cache.get<String>(cacheId)
+                                if (path == null) { logger.warn("path at $cacheId is null!"); continue }
+                                val match = wsMatcher.match(path)
+                                if (match == null) { logger.warn("match is null!"); continue }
+                                val handler = WebSockets.handlers[match.path]
+                                if (handler == null) { logger.warn("handler is null!"); continue }
+                                jobs[message.channel]?.cancel()
+                                try {
+                                    handler.disconnect(WebSockets.DisconnectEvent(cacheId))
+                                    send(Serialization.json.encodeToString(message))
+                                } catch(e: Exception) {
+                                    send(Serialization.json.encodeToString(message.copy(error = e.message)))
+                                }
+                            }
+                            message.data != null -> {
+                                val path = cache.get<String>(cacheId)
+                                if (path == null) { logger.warn("path at $cacheId is null!"); continue }
+                                val match = wsMatcher.match(path)
+                                if (match == null) { logger.warn("match is null!"); continue }
+                                val handler = WebSockets.handlers[match.path]
+                                if (handler == null) { logger.warn("handler is null!"); continue }
+                                try {
+                                    handler.message(WebSockets.MessageEvent(cacheId, message.data ?: continue))
+                                } catch(e: Exception) {
+                                    send(Serialization.json.encodeToString(message.copy(error = e.message)))
+                                }
+                            }
+                        }
+                    }
+                } finally {
+                    jobs.values.forEach { it.cancelAndJoin() }
+                }
+            }
+        }
         Scheduler.schedules.forEach {
             @Suppress("OPT_IN_USAGE")
             GlobalScope.launch {
@@ -234,7 +321,7 @@ internal suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
         parts[s] = strings.joinToString("/")
     }
     return HttpRequest(
-        route = route,
+        endpoint = route,
         parts = parts,
         wildcard = wildcard,
         queryParameters = request.queryParameters.flattenEntries(),
@@ -242,10 +329,10 @@ internal suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
         body = run {
             val ktorType = request.contentType()
             val myType = ktorType.adapt()
-            val stream = receiveStream()
             if (ktorType.contentType == "multipart")
                 receiveMultipart().adapt(myType)
             else {
+                val stream = receiveStream()
                 HttpContent.Stream(
                     { stream },
                     request.contentLength(),

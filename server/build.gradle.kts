@@ -31,6 +31,7 @@ dependencies {
     api(project(":server-core"))
     api(project(":server-ktor"))
     api(project(":server-mongo"))
+    api(project(":server-memcached"))
     api(project(":server-redis"))
 //    api(project(":server-sentry"))
 

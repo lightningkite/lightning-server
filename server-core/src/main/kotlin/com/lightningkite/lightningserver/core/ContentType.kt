@@ -171,4 +171,12 @@ data class ContentType(val type: String, val subtype: String) {
         fun fromExtension(extension: String) = fromFileExtension[extension.lowercase()] ?: Application.OctetStream
     }
     val extension: String? get() = toFileExtension[this]
+    val isText: Boolean get() = when(this) {
+        Application.Json -> true
+        Application.Xml -> true
+        Application.JavaScript -> true
+        Application.ProblemJson -> true
+        Application.ProblemXml -> true
+        else -> this.type == "text"
+    }
 }

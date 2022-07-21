@@ -12,8 +12,10 @@ import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.settings.loadSettings
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.aws.terraformAws
 import com.lightningkite.lightningserver.azure.terraformAzure
 import com.lightningkite.lightningserver.cache.LocalCache
+import com.lightningkite.lightningserver.cache.MemcachedCache
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.routing
 import com.lightningkite.lightningserver.http.HttpResponse
@@ -59,6 +61,8 @@ object Server {
     val files = setting("files", FilesSettings())
 
     init {
+        MongoDatabase
+        MemcachedCache
         parsingFileSettings = files
         prepareModels()
     }
@@ -102,9 +106,10 @@ object Server {
 
 fun main(vararg args: String) {
     Server
-//    loadSettings(File("settings.yaml"))
+    loadSettings(File("settings.json"))
 //    println("Settings loaded")
 //    println(Documentable.kotlinApi("test"))
-//    runServer(LocalPubSub, LocalCache)
-    println(buildString { terraformAzure("demo", this) })
+    runServer(LocalPubSub, LocalCache)
+//    File("demo/aws.tf").writeText(buildString { terraformAws("com.lightningkite.lightningserver.demo.AwsHandler", "demo", this) })
+//    println(buildString { terraformAzure("demo", this) })
 }
