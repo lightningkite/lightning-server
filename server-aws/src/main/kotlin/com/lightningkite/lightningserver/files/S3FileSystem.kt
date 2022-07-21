@@ -50,7 +50,7 @@ class S3FileSystem(
                         })
                     } else DefaultCredentialsProvider.create(),
                     bucket,
-                    it.signedUrlExpirationSeconds
+                    it.signedUrlExpiration?.toSeconds()?.toInt()
                 )
             }
         }

@@ -1,13 +1,11 @@
 package com.lightningkite.lightningserver.settings
 
-import com.charleskorn.kaml.Yaml
-import com.lightningkite.lightningdb.ClientModule
 import com.lightningkite.lightningserver.serialization.Serialization
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.properties.decodeFromStringMap
 import java.io.File
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.system.exitProcess
 
 /**
@@ -19,21 +17,27 @@ import kotlin.system.exitProcess
  */
 fun loadSettings(settingsFile: File): Settings {
     if (!settingsFile.exists()) {
+        val json = Json {
+            encodeDefaults = true
+            serializersModule = Serialization.module
+        }
         Settings.populateDefaults()
-        settingsFile.writeText(
-            Yaml().encodeToString(Settings)
-        )
+        settingsFile.writeText(json.encodeToString(Settings))
 
         println("Need a settings file - example generated at ${settingsFile.absolutePath}.")
         exitProcess(1)
     }
     try {
-        return Yaml(ClientModule).decodeFromString<Settings>(settingsFile.readText())
+        return Serialization.json.decodeFromStream(settingsFile.inputStream())
     } catch (e: Exception) {
-        val suggested = settingsFile.absoluteFile.parentFile.resolve(settingsFile.nameWithoutExtension + ".suggested.yml")
+        val json = Json {
+            encodeDefaults = true
+            serializersModule = Serialization.module
+        }
+        val suggested = settingsFile.absoluteFile.parentFile.resolve(settingsFile.nameWithoutExtension + ".suggested.json")
         println("Settings were incorrect.  Suggested updates are inside ${suggested.absolutePath}.")
         Settings.populateDefaults()
-        suggested.writeText(Yaml(ClientModule).encodeToString(Settings))
+        suggested.writeText(json.encodeToString(Settings))
         e.printStackTrace()
         exitProcess(1)
     }

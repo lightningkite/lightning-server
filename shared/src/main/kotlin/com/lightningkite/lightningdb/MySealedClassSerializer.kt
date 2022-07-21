@@ -46,10 +46,10 @@ public class MySealedClassSerializer<T : Any>(
     override fun deserialize(decoder: Decoder): T {
         return decoder.decodeStructure(descriptor) {
             val index = decodeElementIndex(descriptor)
-            if (index == CompositeDecoder.DECODE_DONE) throw IllegalStateException()
-            if (index == CompositeDecoder.UNKNOWN_NAME) throw IllegalStateException()
+            if (index == CompositeDecoder.DECODE_DONE) throw SerializationException("Single key expected, but received none.")
+            if (index == CompositeDecoder.UNKNOWN_NAME) throw SerializationException("Unknown key received.")
             val result = decodeSerializableElement(descriptor, index, serializers[index])
-            assert(decodeElementIndex(descriptor) == CompositeDecoder.DECODE_DONE)
+            if(decodeElementIndex(descriptor) != CompositeDecoder.DECODE_DONE) throw SerializationException("Single key expected, but received multiple.")
             result
         }
     }

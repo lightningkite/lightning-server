@@ -64,7 +64,7 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
             runBlocking {
                 file.write(HttpContent.Binary(data, type))
             }
-            return ServerFile(file.signedUrl)
+            return ServerFile(file.url)
         } else {
             val file = FileSystem.resolve(raw.substringBefore('?')) ?: throw BadRequestException("The given url ($raw) does not start with any files root.")
             if(file.checkSignature(raw.substringAfter('?')))
