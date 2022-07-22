@@ -49,7 +49,6 @@ inline fun <reified T: Comparable<T>> String.parseUrlPartOrBadRequest(): T = par
 fun <T: Comparable<T>> String.parseUrlPartOrBadRequest(serializer: KSerializer<T>): T = try {
     Serialization.properties.decodeFromStringMap(IdHolder.serializer(serializer), mapOf("id" to this)).id
 } catch(e: Exception) {
-    e.printStackTrace()
     throw BadRequestException("ID ${this} could not be parsed as a ${serializer.descriptor.serialName}.")
 }
 

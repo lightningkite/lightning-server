@@ -242,10 +242,10 @@ internal suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
         body = run {
             val ktorType = request.contentType()
             val myType = ktorType.adapt()
-            val stream = receiveStream()
             if (ktorType.contentType == "multipart")
                 receiveMultipart().adapt(myType)
             else {
+                val stream = receiveStream()
                 HttpContent.Stream(
                     { stream },
                     request.contentLength(),

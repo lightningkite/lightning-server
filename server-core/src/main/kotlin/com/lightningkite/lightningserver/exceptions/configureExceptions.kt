@@ -71,6 +71,6 @@ suspend fun HttpRequest.reportException(throwable: Throwable) {
 //        Sentry.capture(throwable)
 //        ctx.clear()
 //    } else {
-        throwable.printStackTrace()
+//        throwable.printStackTrace()
 //    }
 }
