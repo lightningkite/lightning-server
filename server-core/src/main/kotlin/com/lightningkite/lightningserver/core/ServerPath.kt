@@ -56,7 +56,7 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
 
     constructor(string: String) : this(
         segments = Segment.fromString(string),
-        after = Afterwards.fromString(string)
+        after = if(string.trim() == "/") Afterwards.None else Afterwards.fromString(string)
     )
 
     @LightningServerDsl

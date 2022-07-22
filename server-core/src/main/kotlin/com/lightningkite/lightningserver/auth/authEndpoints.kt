@@ -9,13 +9,12 @@ import com.lightningkite.lightningserver.email.EmailClient
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.routes.docName
+import com.lightningkite.lightningserver.serialization.serializerOrContextual
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.typed
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.coroutines.flow.singleOrNull
-import kotlinx.serialization.Serializable
 import java.net.URLDecoder
-import java.time.Duration
 
 
 /**
@@ -110,8 +109,8 @@ inline fun <reified USER: Any, reified ID> ServerPath.authEndpoints(
     docName = "Auth"
     val landingRoute: HttpEndpoint = get("login-landing")
     landingRoute.handler {
-        val token = it.queryParameter("jwt")!!
-        it.handleToken(token)
+        val subject = jwtSigner().verify(serializerOrContextual<ID>(), it.queryParameter("jwt")!!)
+        it.handleToken(jwtSigner().token(subject))
     }
     post("login-email").typed(
         summary = "Email Login Link",

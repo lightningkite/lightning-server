@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.core.ServerPathMatcher
 
 class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
     data class Node(
@@ -56,6 +57,14 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
 
     fun match(string: String, method: HttpMethod): Match? = match(string.split('/').filter { it.isNotEmpty() }, string.endsWith('/'), method)
     fun match(pathParts: List<String>, endingSlash: Boolean, method: HttpMethod): Match? {
+        if(pathParts.isEmpty())
+            return (root.path[method] ?: root.trailingSlash[method] ?: root.chainedWildcard[method])?.let {
+                Match(
+                    it,
+                    mapOf(),
+                    if (it.path.after == ServerPath.Afterwards.ChainedWildcard) "" else null
+                )
+            }
 //        println("Navigating $pathParts with ending slash $endingSlash")
         val wildcards = ArrayList<String>()
         var current = root
@@ -82,7 +91,7 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
         return if(beyond) {
 //            println("Searching for wildcard ending")
             soFar.asReversed().asSequence().mapNotNull {
-                it.chainedWildcard.get(method)?.let {
+                it.chainedWildcard[method]?.let {
                     Match(
                         endpoint = it,
                         parts = it.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(wildcards)
@@ -93,7 +102,7 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
             }.firstOrNull()
         } else if (endingSlash) {
 //            println("Pulling trailingSlash")
-            current.trailingSlash.get(method)?.let {
+            current.trailingSlash[method]?.let {
                 Match(
                     endpoint = it,
                     parts = it.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(wildcards)
@@ -103,7 +112,7 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
             }
         } else {
 //            println("Pulling path")
-            current.path.get(method)?.let {
+            current.path[method]?.let {
                 Match(
                     endpoint = it,
                     parts = it.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(wildcards)
@@ -114,7 +123,7 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
         } ?: run {
 //            println("Searching for wildcard ending")
             soFar.asReversed().asSequence().mapNotNull {
-                it.chainedWildcard.get(method)?.let {
+                it.chainedWildcard[method]?.let {
                     Match(
                         endpoint = it,
                         parts = it.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(wildcards)

@@ -29,6 +29,10 @@ data class GeneralServerSettings(
     val debug: Boolean = false,
     val cors: CorsSettings? = if(debug) CorsSettings(allowedDomains = listOf("*"), allowedHeaders = listOf("*", HttpHeader.Authorization)) else null
 ) {
+    fun absolutePathAdjustment(string: String): String {
+        return if(string.startsWith("/")) "/" + publicUrl.substringAfter("://").substringAfter("/", "") + string
+        else string
+    }
 }
 
 val generalSettings = setting("general", GeneralServerSettings())

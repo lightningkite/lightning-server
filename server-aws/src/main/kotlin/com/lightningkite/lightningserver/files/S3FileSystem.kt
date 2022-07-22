@@ -57,4 +57,8 @@ class S3FileSystem(
     }
 
     override val root: FileObject = S3File(this, File(""))
+
+    init {
+        FileSystem.register(this)
+    }
 }

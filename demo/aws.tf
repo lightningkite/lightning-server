@@ -49,6 +49,12 @@ module "vpc" {
   enable_vpn_gateway = false
 }
 
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id = "${module.vpc.vpc_id}"
+  service_name = "com.amazonaws.${var.deployment_location}.s3"
+  route_table_ids = module.vpc.public_route_table_ids
+}
+
 resource "aws_api_gateway_account" "main" {
   cloudwatch_role_arn = aws_iam_role.cloudwatch.arn
 }
@@ -106,14 +112,26 @@ resource "aws_security_group" "internal" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = module.vpc.private_subnets_cidr_blocks
+    cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks)
   }
 
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = module.vpc.private_subnets_cidr_blocks
+    cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks)
+  }
+}
+
+resource "aws_security_group" "access_outside" {
+  name   = "demo-${var.deployment_name}-access-outside"
+  vpc_id = "${module.vpc.vpc_id}"
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks     = ["0.0.0.0/0"]
   }
 }
 
@@ -338,19 +356,21 @@ resource "aws_lambda_function" "main" {
   s3_bucket = aws_s3_bucket.lambda_bucket.id
   s3_key    = aws_s3_object.app_storage.key
 
-  memory_size = "2096"
-
   runtime = "java11"
   handler = "com.lightningkite.lightningserver.demo.AwsHandler"
+  
+  memory_size = "2048"
+  timeout = 30
+  # memory_size = "1024"
 
   source_code_hash = filesha256(local.lambda_source)
 
   role = aws_iam_role.main_exec.arn
-  depends_on = []
+  depends_on = [aws_s3_object.app_storage]
   
   vpc_config {
     subnet_ids = module.vpc.public_subnets
-    security_group_ids = [aws_security_group.internal.id]
+    security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
   }
   
   environment {
@@ -358,11 +378,11 @@ resource "aws_lambda_function" "main" {
       LIGHTNING_SERVER_SETTINGS = jsonencode({
         general = {
             projectName = "demo"
-            publicUrl = aws_apigatewayv2_api.http.api_endpoint
+            publicUrl = aws_apigatewayv2_stage.http.invoke_url
             debug = var.debug
         },
         database = {
-            url = "mongodb://master:${random_password.database.result}@${aws_docdb_cluster_instance.database[0].endpoint}"
+            url = "mongodb://master:${random_password.database.result}@${aws_docdb_cluster_instance.database[0].endpoint}/?retryWrites=false"
             databaseName = "demo-${var.deployment_name}_database"
         },
         jwt = {
@@ -373,7 +393,7 @@ resource "aws_lambda_function" "main" {
         oauth-google = var.oauth-google,
         logging = var.logging,
         files = {
-            storageUrl = "s3://${aws_s3_bucket.files.bucket_regional_domain_name}"
+            storageUrl = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
             signedUrlExpiration = var.files_expiry
         },
         oauth-github = var.oauth-github,
@@ -389,23 +409,6 @@ resource "aws_cloudwatch_log_group" "main" {
   name = "demo-${var.deployment_name}-main-log"
 
   retention_in_days = 30
-}
-
-resource "aws_lambda_permission" "api_gateway" {
-  statement_id  = "AllowExecutionFromAPIGateway"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.main.function_name
-  principal     = "apigateway.amazonaws.com"
-
-  source_arn = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
-}
-resource "aws_lambda_permission" "api_gatewayb" {
-  statement_id  = "AllowExecutionFromAPIGatewayWS"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.main.function_name
-  principal     = "apigateway.amazonaws.com"
-
-  source_arn = "${aws_apigatewayv2_api.ws.execution_arn}/*/*"
 }
 
 ####
@@ -459,6 +462,15 @@ resource "aws_apigatewayv2_route" "http" {
     api_id = aws_apigatewayv2_api.http.id
     route_key = "$default"
     target    = "integrations/${aws_apigatewayv2_integration.http.id}"
+}
+
+resource "aws_lambda_permission" "api_gateway_http" {
+  statement_id  = "AllowExecutionFromAPIGatewayHTTP"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.main.function_name
+  principal     = "apigateway.amazonaws.com"
+
+  source_arn = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
 }
 
             
@@ -528,4 +540,13 @@ resource "aws_apigatewayv2_route" "ws_disconnect" {
 
     route_key = "$disconnect"
     target    = "integrations/${aws_apigatewayv2_integration.ws.id}"
+}
+
+resource "aws_lambda_permission" "api_gateway_ws" {
+  statement_id  = "AllowExecutionFromAPIGatewayWS"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.main.function_name
+  principal     = "apigateway.amazonaws.com"
+
+  source_arn = "${aws_apigatewayv2_api.ws.execution_arn}/*/*"
 }

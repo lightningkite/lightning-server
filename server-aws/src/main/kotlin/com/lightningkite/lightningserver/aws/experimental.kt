@@ -77,6 +77,12 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
           enable_nat_gateway = false
           enable_vpn_gateway = false
         }
+        
+        resource "aws_vpc_endpoint" "s3" {
+          vpc_id = "${'$'}{module.vpc.vpc_id}"
+          service_name = "com.amazonaws.${'$'}{var.deployment_location}.s3"
+          route_table_ids = module.vpc.public_route_table_ids
+        }
 
         resource "aws_api_gateway_account" "main" {
           cloudwatch_role_arn = aws_iam_role.cloudwatch.arn
@@ -135,14 +141,26 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
             from_port   = 0
             to_port     = 0
             protocol    = "-1"
-            cidr_blocks = module.vpc.private_subnets_cidr_blocks
+            cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks)
           }
         
           egress {
             from_port   = 0
             to_port     = 0
             protocol    = "-1"
-            cidr_blocks = module.vpc.private_subnets_cidr_blocks
+            cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks)
+          }
+        }
+
+        resource "aws_security_group" "access_outside" {
+          name   = "$namePrefix-access-outside"
+          vpc_id = "${'$'}{module.vpc.vpc_id}"
+        
+          egress {
+            from_port   = 0
+            to_port     = 0
+            protocol    = "-1"
+            cidr_blocks     = ["0.0.0.0/0"]
           }
         }
         
@@ -194,12 +212,13 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
         }
 
     """.trimIndent())
+    dependencies.add("aws_s3_object.app_storage")
     for(setting in Settings.requirements) {
         when(setting.value.serializer) {
             serializer<GeneralServerSettings>() -> {
                 appSettings.add("""${setting.key} = {
                     projectName = "$projectName"
-                    publicUrl = aws_apigatewayv2_api.http.api_endpoint
+                    publicUrl = aws_apigatewayv2_stage.http.invoke_url
                     debug = var.debug
                 }""".trimIndent())
             }
@@ -263,7 +282,7 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
                     }
                 """.trimIndent())
                 appSettings.add("""${setting.key} = {
-                    storageUrl = "s3://${'$'}{aws_s3_bucket.${setting.key}.bucket_regional_domain_name}"
+                    storageUrl = "s3://${'$'}{aws_s3_bucket.${setting.key}.id}.s3-${'$'}{aws_s3_bucket.${setting.key}.region}.amazonaws.com"
                     signedUrlExpiration = var.${setting.key}_expiry
                 }""".trimIndent())
             }
@@ -316,40 +335,41 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
                 """.trimIndent())
                 //TODO: use config endpoint
                 appSettings.add("""${setting.key} = {
-                    url = "mongodb://master:${'$'}{random_password.${setting.key}.result}@${'$'}{aws_docdb_cluster_instance.${setting.key}[0].endpoint}"
+                    url = "mongodb://master:${'$'}{random_password.${setting.key}.result}@${'$'}{aws_docdb_cluster_instance.${setting.key}[0].endpoint}/?retryWrites=false"
                     databaseName = "${namePrefix}_${setting.key}"
                 }""".trimIndent())
             }
             serializer<CacheSettings>() -> {
-                //TODO
-//                appendable.appendLine("""
-//
-//                    ####
-//                    # ${setting.key}: CacheSettings
-//                    ####
-//
-//                    variable "${setting.key}_node_type" {
-//                      default = "cache.t4g.small"
-//                    }
-//                    variable "${setting.key}_node_count" {
-//                      default = 1
-//                    }
-//
-//                    resource "aws_elasticache_cluster" "${setting.key}" {
-//                      cluster_id           = "${namePrefix}-${setting.key}"
-//                      engine               = "memcached"
-//                      node_type            = var.${setting.key}_node_type
-//                      num_cache_nodes      = var.${setting.key}_node_count
-//                      parameter_group_name = "default.memcached1.4"  # TODO: look at this
-//                      port                 = 11211
-//                      security_group_ids   = ["${'$'}{aws_security_group.${setting.key}.id}"]
-//                    }
-//                """.trimIndent())
-//                appSettings.add("""${setting.key} = {
-//                    url = "memcached://"
-//                    connectionString = "@Microsoft.KeyVault(SecretUri=${'$'}{azurerm_key_vault.vault.vault_uri}secrets/${setting.key}_primaryConnectionString)"
-//                    databaseNumber = var.${setting.key}_databaseNumber
-//                }""".trimIndent())
+                appendable.appendLine("""
+
+                    ####
+                    # ${setting.key}: CacheSettings
+                    ####
+
+                    variable "${setting.key}_node_type" {
+                      default = "cache.t2.micro"
+                    }
+                    variable "${setting.key}_node_count" {
+                      default = 1
+                    }
+
+                    resource "aws_elasticache_cluster" "${setting.key}" {
+                      cluster_id           = "${namePrefix}-${setting.key}"
+                      engine               = "memcached"
+                      node_type            = var.${setting.key}_node_type
+                      num_cache_nodes      = var.${setting.key}_node_count
+                      parameter_group_name = "default.memcached1.6"
+                      port                 = 11211
+                      security_group_ids   = ["${'$'}{aws_security_group.internal.id}"]
+                    }
+                    resource "aws_docdb_subnet_group" "${setting.key}" {
+                      name       = "$namePrefix-${setting.key}"
+                      subnet_ids = module.vpc.private_subnets
+                    }
+                """.trimIndent())
+                appSettings.add("""${setting.key} = {
+                    url = "memcached://${'$'}{aws_elasticache_cluster.${setting.key}.cluster_address}:11211"
+                }""".trimIndent())
             }
             serializer<JwtSigner>() -> {
                 appendable.appendLine("""
@@ -410,7 +430,9 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
           runtime = "java11"
           handler = "$handler"
           
-          memory_size = "2096"
+          memory_size = "2048"
+          timeout = 30
+          # memory_size = "1024"
 
           source_code_hash = filesha256(local.lambda_source)
 
@@ -419,7 +441,7 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
           
           vpc_config {
             subnet_ids = module.vpc.public_subnets
-            security_group_ids = [aws_security_group.internal.id]
+            security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
           }
           
           environment {
@@ -429,8 +451,6 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
               })
             }
           }
-        
-          depends_on = [aws_s3_object.app_storage]
         }
 
         resource "aws_cloudwatch_log_group" "main" {
@@ -496,7 +516,7 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
             target    = "integrations/${'$'}{aws_apigatewayv2_integration.http.id}"
         }
 
-        resource "aws_lambda_permission" "api_gateway" {
+        resource "aws_lambda_permission" "api_gateway_http" {
           statement_id  = "AllowExecutionFromAPIGatewayHTTP"
           action        = "lambda:InvokeFunction"
           function_name = aws_lambda_function.main.function_name
@@ -579,7 +599,7 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
             target    = "integrations/${'$'}{aws_apigatewayv2_integration.ws.id}"
         }
 
-        resource "aws_lambda_permission" "api_gateway" {
+        resource "aws_lambda_permission" "api_gateway_ws" {
           statement_id  = "AllowExecutionFromAPIGatewayWS"
           action        = "lambda:InvokeFunction"
           function_name = aws_lambda_function.main.function_name

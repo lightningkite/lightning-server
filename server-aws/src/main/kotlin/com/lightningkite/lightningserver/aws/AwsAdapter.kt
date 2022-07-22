@@ -222,6 +222,7 @@ abstract class AwsAdapter : RequestStreamHandler {
         } catch (e: HttpStatusException) {
             e.toResponse(request)
         } catch (e: Throwable) {
+            e.printStackTrace()
             HttpResponse.plainText(e.message ?: "?", HttpStatus.InternalServerError)
         }
         val outHeaders = HashMap<String, String>()
@@ -260,116 +261,4 @@ abstract class AwsAdapter : RequestStreamHandler {
             }
         }
     }
-//
-//    override fun handleRequest(input: Map<String, Any?>, context: Context): Any? = runBlocking {
-//        println("Input is $input")
-//        when {
-//            input.containsKey("httpMethod") -> handleHttp(input, context)
-//            is ScheduledEvent -> {
-//                //TODO: Check if source will work for this
-//                Scheduler.schedules.find { it.name == input.source }!!.handler()
-//            }
-//            is Map<*, *> -> {
-//                @Suppress("UNCHECKED_CAST") val input2 = input as Map<String, String>
-//                @Suppress("UNCHECKED_CAST") val task = (Tasks.tasks[input.keys.first()]!! as Task<Any?>)
-//                task.implementation(this@runBlocking, Serialization.json.decodeFromString(task.serializer, input2.values.first()))
-//            }
-//            is APIGatewayV2HTTPEvent -> {
-//            }
-//            is APIGatewayV2WebSocketEvent -> {
-//                val c = input.requestContext
-//                println("WS event c.resourcePath = ${c.resourcePath}")
-//                println("WS event c.routeKey = ${c.routeKey}")
-//                println("WS event c.httpMethod = ${c.httpMethod}")
-//                println("WS event c.resourceId = ${c.resourceId}")
-//                println("WS event c.stage = ${c.stage}")
-//                println("WS event input.path = ${input.path}")
-//                println("WS event input.pathParameters = ${input.pathParameters}")
-//                c.resourcePath
-//                fun fail(body: String? = null) = APIGatewayV2WebSocketResponse().apply {
-//                    statusCode = 404
-//                    this.body = body
-//                }
-//                fun succeed() = APIGatewayV2WebSocketResponse().apply {
-//                    statusCode = 200
-//                }
-//                succeed()
-////                when(c.routeKey) {
-////                    "\$connect" -> succeed()
-////                    "\$disconnect" -> succeed()
-////                    else -> {
-////                        // This is a ping
-////                        if(input.body.isEmpty())
-////                            return@runBlocking succeed()
-////                        val message = Serialization.json.decodeFromString<MultiplexMessage>(input.body)
-////                        val cacheId = c.connectionId + "/" + message.channel
-////                        when {
-////                            message.start -> {
-////                                val path = message.path!!
-////                                val match = wsMatcher.match(path)
-////                                if (match == null) { logger.warn("match is null!"); return@runBlocking fail() }
-////                                val handler = WebSockets.handlers[match.path]
-////                                if (handler == null) { logger.warn("handler is null!"); return@runBlocking fail() }
-////                                cache().set(cacheId, path, Duration.ofHours(1))
-////                                try {
-////                                    handler.connect(
-////                                        WebSockets.ConnectEvent(
-////                                            path = match.path,
-////                                            parts = match.parts,
-////                                            wildcard = match.wildcard,
-////                                            id = cacheId,
-////                                            queryParameters = input.multiValueQueryStringParameters.flatMap { it.value.map { v -> it.key to v } },
-////                                            headers = HttpHeaders(
-////                                                input.multiValueHeaders.flatMap { it.value.map { v -> it.key to v } },
-////                                            ),
-////                                            domain = input.requestContext.domainName,
-////                                            protocol = "https",
-////                                            sourceIp = input.requestContext.identity.sourceIp
-////                                        )
-////                                    )
-////                                    succeed()
-////                                } catch(e: Exception) {
-////                                    fail(Serialization.json.encodeToString(message.copy(error = e.message)))
-////                                }
-////                            }
-////                            message.end -> {
-////                                val path = cache().get<String>(cacheId)
-////                                if (path == null) { logger.warn("path at $cacheId is null!"); return@runBlocking fail() }
-////                                // Reset the cache so it endures longer
-////                                cache().set(cacheId, path, Duration.ofHours(1))
-////                                val match = wsMatcher.match(path)
-////                                if (match == null) { logger.warn("match is null!"); return@runBlocking fail() }
-////                                val handler = WebSockets.handlers[match.path]
-////                                if (handler == null) { logger.warn("handler is null!"); return@runBlocking fail() }
-////                                try {
-////                                    handler.disconnect(WebSockets.DisconnectEvent(cacheId))
-////                                    succeed()
-////                                } catch(e: Exception) {
-////                                    fail(Serialization.json.encodeToString(message.copy(error = e.message)))
-////                                }
-////                            }
-////                            message.data != null -> {
-////                                val path = cache().get<String>(cacheId)
-////                                if (path == null) { logger.warn("path at $cacheId is null!"); return@runBlocking fail() }
-////                                // Reset the cache so it endures longer
-////                                cache().set(cacheId, path, Duration.ofHours(1))
-////                                val match = wsMatcher.match(path)
-////                                if (match == null) { logger.warn("match is null!"); return@runBlocking fail() }
-////                                val handler = WebSockets.handlers[match.path]
-////                                if (handler == null) { logger.warn("handler is null!"); return@runBlocking fail() }
-////                                try {
-////                                    handler.message(WebSockets.MessageEvent(cacheId, message.data ?: return@runBlocking fail()))
-////                                    succeed()
-////                                } catch(e: Exception) {
-////                                    fail(Serialization.json.encodeToString(message.copy(error = e.message)))
-////                                }
-////                            }
-////                            else -> succeed() // This is a ping
-////                        }
-////                    }
-////                }
-//            }
-//            else -> throw UnsupportedOperationException("Not sure how to handle a $input")
-//        }
-//    }
 }

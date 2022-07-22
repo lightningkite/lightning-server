@@ -43,5 +43,9 @@ class AzureFileSystem(
     }
 
     override val root: FileObject = AzureFile(this, File(""))
+
+    init {
+        FileSystem.register(this)
+    }
 }
 

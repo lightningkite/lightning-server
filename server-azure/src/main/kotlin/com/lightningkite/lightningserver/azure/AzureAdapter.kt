@@ -5,7 +5,6 @@ import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.settings.generalSettings
-import com.lightningkite.lightningserver.toMultipartContent
 import com.microsoft.azure.functions.*
 import kotlinx.coroutines.*
 import org.slf4j.Logger
