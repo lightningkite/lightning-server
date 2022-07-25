@@ -25,7 +25,7 @@ class AzureFileSystemTest {
                 return@runBlocking
             }
             AzureFileSystem
-            val system = FilesSettings(credentials.readText(), signedUrlExpirationSeconds = 100)()
+            val system = FilesSettings(credentials.readText(), signedUrlExpiration = Duration.ofSeconds(100))()
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
             testFile.write(HttpContent.Text(message, ContentType.Text.Plain))
