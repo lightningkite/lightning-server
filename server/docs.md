@@ -1,4 +1,4 @@
-# Lightning Server feature docs
+# Lightning Server feature documentation
 
 Lightning Server has a lot of nifty features. Here is a list of things to get you started, or just to be used as a reference.
 
@@ -49,19 +49,66 @@ Once you have set up JwtSigners for your server, you can call `authEndpoints()` 
 
 - `send()` sends an email
 
-## Field Collections
+## Endpoints
 
-`FieldCollection` is an abstract class for interacting with a [database](#databases), and on a specific collection/table. You can access a `FieldCollection` by calling `collection()` on a database you created with [`setting()`](#settings). Here is an example of how to create a basic `FieldCollection` with access permissions for a [model](#models) `User`, given a database called `database`:
+You write your server's endpoints in a `routing {}` lambda. Here is an example of how to create a simple http GET at your server's root url that returns the string "Hello World!":
 
-<pre><code>database().collection().withPermissions(
+<pre><code>routing {
+   get.handler {
+      HttpResponse.plainText("Hello World!")
+   }
+}</code></pre>
+
+- `HttpEndpoint::handler()`
+- `HttpEndpoint::typed()` builds a typed route
+- `ServerPath::apiHelp()` auto-generates basic documentation on the server's endpoints
+- `ServerPath::autoCollection()` auto-generates a restful api for a [`Field Collection`](#field-collections)
+
+<pre><code>routing {
+   path("users").autoCollection(database), {
+      User(
+         name = "John",
+         id = "42",
+         // other user data...
+      )
+   }) { user: User? ->
+      collection<User>().withPermissions(
+         ModelPermissions(
+            create = Condition.Always&ltUser&gt(),
+            read = Condition.Always&ltUser&gt(),
+            update = Condition.Never&ltUser&gt(),
+            delete = Condition.Never&ltUser&gt(),
+         )
+      )
+   }
+}</code></pre>
+
+## Field collections
+
+`FieldCollection` is an abstract class for interacting with a [database](#databases), and on a specific collection/table. You can access a `FieldCollection` by calling `collection()` on a database you created with [`setting()`](#settings). Here is an example of how to create a basic `FieldCollection` with access permissions for an example [model](#models) `User`, given a database called `database`:
+
+<pre><code>database().collection&ltUser&gt().withPermissions(
    ModelPermissions(
-      //permissions here
+      create = Condition.Always&ltUser&gt(),
+      read = Condition.Always&ltUser&gt(),
+      update = Condition.Never&ltUser&gt(),
+      delete = Condition.Never&ltUser&gt(),
    )
 )</code></pre>
 
-`FieldCollection.withPermissions()` creates a `FieldCollection` with access permissions.
+In this example, four basic [conditions](#data-conditions) are set so that everyone can create and read `User` models, but no one can update or delete them.
 
-### Members
+Once you have a field collection with access permissions set, you can do a number of operations on it to create, find, modify, and delete data from it. Here is an example of how you would insert an element into the previously created `FieldCollection`:
+
+<pre><code>database().collection&ltUser&gt().insertOne(
+   User(
+      name = "John", 
+      id = 42,
+      // other user data...
+   )
+)</code></pre>
+
+Here is a list of the operations that `FieldCollection` provides:
 
 - `insertOne()` adds an element to the collection
 - `insertMany()` adds multiple elements to the collection
@@ -87,7 +134,7 @@ Once you have set up JwtSigners for your server, you can call `authEndpoints()` 
 
 ## Data conditions
 
-Conditions are used to test against [database models](#models) in a [database](#databases). They are written using infix functions. Here is a simple condition that tests the equivilancy of string in a database model and a string literal:
+Conditions are used to test against [database models](#models) in a [database](#databases). They are written using infix functions. Here is a simple condition that tests the equivilancy of a string in a database model and a string literal:
 
 <pre><code>condition { user -> user.name eq "John" }</code></pre>
 
@@ -175,7 +222,3 @@ Lightning Server provides several exceptions you can use in the body of your end
 - `UnauthorizedException()` responds with an http status code of 401
 - `ForbiddenException()` responds with an http status code of 403
 - `NotFoundException()` responds with an http status code of 404
-
-## Additional convenience
-
-- `apiHelp()` auto-generates basic documentation on the server's endpoints
