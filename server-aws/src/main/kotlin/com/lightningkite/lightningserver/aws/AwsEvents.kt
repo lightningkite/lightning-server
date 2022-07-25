@@ -52,7 +52,7 @@ data class APIGatewayV2HTTPResponse(
 
 @Serializable
 data class APIGatewayV2WebsocketRequest(
-    val multiValueHeaders: Map<String, List<String>>,
+    val multiValueHeaders: Map<String, List<String>>? = null,
     val multiValueQueryStringParameters: Map<String, List<String>>? = null,
     val requestContext: RequestContext,
     val isBase64Encoded: Boolean,
@@ -115,7 +115,7 @@ internal fun JsonObject.jankMeADataClass(name: String) {
     }
     println(") {")
     entries.filter { it.value is JsonObject }.forEach {
-        (it.value as JsonObject).jankMeADataClass((it.key as String).capitalize())
+        (it.value as JsonObject).jankMeADataClass(it.key.capitalize())
     }
     println("}")
 }

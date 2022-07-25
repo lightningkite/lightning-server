@@ -12,10 +12,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import net.rubyeye.xmemcached.MemcachedClient
-import net.rubyeye.xmemcached.MemcachedSessionLocator
-import net.rubyeye.xmemcached.XMemcachedClient
-import net.rubyeye.xmemcached.XMemcachedClientBuilder
+import net.rubyeye.xmemcached.*
 import net.rubyeye.xmemcached.utils.AddrUtil
 import java.net.InetSocketAddress
 import java.time.Duration
@@ -54,6 +51,17 @@ class MemcachedCache(val client: MemcachedClient): CacheInterface, HealthCheckab
         serializer: KSerializer<T>
     ): Boolean = withContext(Dispatchers.IO) {
         client.add(key, Int.MAX_VALUE, Serialization.json.encodeToString(serializer, value))
+    }
+
+    override suspend fun <T> modify(key: String, serializer: KSerializer<T>, maxTries: Int, modification: (T?) -> T?): Boolean = withContext(Dispatchers.IO) {
+        client.cas(key, Int.MAX_VALUE, object: CASOperation<String> {
+            override fun getMaxTries(): Int = maxTries
+            override fun getNewValue(currentCAS: Long, currentValue: String?): String? {
+                return currentValue?.let { Serialization.json.decodeFromString(serializer, it) }
+                    .let(modification)
+                    ?.let { Serialization.json.encodeToString(serializer, it) }
+            }
+        })
     }
 
     override suspend fun add(key: String, value: Int) = withContext(Dispatchers.IO) {

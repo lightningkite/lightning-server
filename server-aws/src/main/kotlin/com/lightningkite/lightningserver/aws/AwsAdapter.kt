@@ -6,18 +6,32 @@ import com.amazonaws.services.lambda.runtime.RequestStreamHandler
 import com.lightningkite.lightningdb.MultiplexMessage
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.get
+import com.lightningkite.lightningserver.cache.modify
 import com.lightningkite.lightningserver.cache.set
+import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathMatcher
+import com.lightningkite.lightningserver.engine.Engine
+import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
+import com.lightningkite.lightningserver.exceptions.reportException
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pubsub.get
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Task
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.websocket.WebSockets
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -33,6 +47,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.URLEncoder
 import java.time.Duration
 import java.util.*
 
@@ -42,6 +57,44 @@ abstract class AwsAdapter : RequestStreamHandler {
         val httpMatcher by lazy { HttpEndpointMatcher(Http.endpoints.keys.asSequence()) }
         val wsMatcher by lazy { ServerPathMatcher(WebSockets.handlers.keys.asSequence()) }
         val cache by lazy { setting("cache", CacheSettings()) }
+        val configureEngine by lazy {
+            engine = object: Engine {
+                //TODO: Sign V4 request
+                val url = "https://" + generalSettings().wsUrl.removePrefix("wss://") + "/%40connections"
+                override suspend fun sendWebSocketMessage(id: String, content: String) {
+                    if(id.contains('/')) {
+                        //Multiplex
+                        val wsId = id.substringBefore('/')
+                        val channelId = id.substringAfter('/')
+                        val result = client.post("$url/${URLEncoder.encode(wsId, Charsets.UTF_8)}") {
+                            setBody(TextContent(Serialization.json.encodeToString(MultiplexMessage(
+                                channel = channelId,
+                                data = content
+                            )), io.ktor.http.ContentType.Text.Plain))
+                        }
+                        if(!result.status.isSuccess()) {
+                            logger.warn("Failed to send socket message to $id: ${result.status} - ${try { result.bodyAsText() } catch(e: Exception) { "?" }}")
+                        }
+                    } else {
+                        val result = client.post("$url/${URLEncoder.encode(id, Charsets.UTF_8)}") {
+                            setBody(TextContent(content, io.ktor.http.ContentType.Text.Plain))
+                        }
+                        if(!result.status.isSuccess()) {
+                            logger.warn("Failed to send socket message to $id: ${result.status} - ${try { result.bodyAsText() } catch(e: Exception) { "?" }}")
+                        }
+                    }
+                }
+
+                override fun launchTask(task: Task<Any?>, input: Any?) {
+                    TODO("Not yet implemented")
+                }
+            }
+            Unit
+        }
+    }
+
+    init {
+        configureEngine
     }
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context) {
@@ -65,17 +118,18 @@ abstract class AwsAdapter : RequestStreamHandler {
                         asJson.jankMeADataClass("Something")
                     }
                 }
-            } catch(e: Exception) {
+            } catch (e: Exception) {
                 println("Input $asJson had trouble")
                 e.printStackTrace()
             }
         }
     }
 
-    @Suppress("UNREACHABLE_CODE")
+    //    @Suppress("UNREACHABLE_CODE")
     suspend fun handleWebsocket(event: APIGatewayV2WebsocketRequest): APIGatewayV2HTTPResponse {
-        return APIGatewayV2HTTPResponse(200)
-        val headers = HttpHeaders(event.multiValueHeaders.entries.flatMap { it.value.map { v -> it.key to v } })
+        println("Handling $event")
+//        return APIGatewayV2HTTPResponse(200)
+        val headers = HttpHeaders(event.multiValueHeaders?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf())
         val body = event.body?.let { raw ->
             if (event.isBase64Encoded)
                 HttpContent.Binary(
@@ -87,34 +141,57 @@ abstract class AwsAdapter : RequestStreamHandler {
         }
         val queryParams =
             (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v } }
-        val path = headers["x-path"] ?: queryParams.find { it.first == "path" }?.second ?: ""
-        return if(path.isEmpty()) when (event.requestContext.routeKey) {
-            "\$connect" -> APIGatewayV2HTTPResponse(200)
-            "\$disconnect" -> APIGatewayV2HTTPResponse(200)
-            else -> {
-                // This is a ping
-                if (body == null || body.length == 0L)
-                    return APIGatewayV2HTTPResponse(200)
+
+        suspend fun isMultiplex() = cache().get<Boolean>("${event.requestContext.connectionId}-isMultiplex") == true
+        return when (event.requestContext.routeKey) {
+            "\$connect" -> {
+                val path = headers["x-path"] ?: queryParams.find { it.first == "path" }?.second ?: ""
+                val isMultiplex = path.isEmpty()
+                cache().set("${event.requestContext.connectionId}-isMultiplex", isMultiplex)
+                if(isMultiplex) APIGatewayV2HTTPResponse(200)
+                else handleWebsocketConnect(event, event.requestContext.connectionId, path)
+            }
+            "\$disconnect" -> {
+                cache().remove("${event.requestContext.connectionId}-isMultiplex")
+                if(isMultiplex()) {
+                    cache().get<Set<String>>(event.requestContext.connectionId)?.forEach {
+                        handleWebsocketDisconnect(event.requestContext.connectionId + "/" + it)
+                    }
+                    APIGatewayV2HTTPResponse(200)
+                } else handleWebsocketDisconnect(event.requestContext.connectionId)
+            }
+            else -> if (body == null || body.length == 0L)
+                return APIGatewayV2HTTPResponse(200)
+            else if(isMultiplex()) {
                 val message = Serialization.json.decodeFromString<MultiplexMessage>(event.body)
                 val cacheId = event.requestContext.connectionId + "/" + message.channel
                 when {
-                    message.start -> handleWebsocketConnect(event, cacheId, message.path!!)
-                    message.end -> handleWebsocketDisconnect(cacheId)
-                    message.data != null -> handleWebsocketMessage(cacheId, message.data!!)
+                    message.start -> handleWebsocketConnect(event, cacheId, message.path!!).also {
+                        if(it.statusCode == 200) {
+                            cache().modify<Set<String>>(event.requestContext.connectionId, 40) {
+                                it?.plus(message.channel) ?: setOf(message.channel)
+                            }
+                        }
+                    }
+                    message.end -> {
+                        cache().modify<Set<String>>(event.requestContext.connectionId, 40) {
+                            it?.minus(message.channel) ?: setOf(message.channel)
+                        }
+                        handleWebsocketDisconnect(cacheId)
+                    }
+                    message.data != null -> handleWebsocketMessage(event.requestContext.connectionId, message.data!!)
                     else -> APIGatewayV2HTTPResponse(200)
                 }
-            }
-        } else when (event.requestContext.routeKey) {
-            "\$connect" -> handleWebsocketConnect(event, event.requestContext.connectionId, path)
-            "\$disconnect" -> handleWebsocketDisconnect(event.requestContext.connectionId)
-            else -> if (body == null || body.length == 0L)
-                return APIGatewayV2HTTPResponse(200)
-            else
-                handleWebsocketMessage(event.requestContext.connectionId, event.body ?: "")
-            }
+            } else
+                handleWebsocketMessage(event.requestContext.connectionId, event.body)
+        }
     }
 
-    suspend fun handleWebsocketConnect(event: APIGatewayV2WebsocketRequest, cacheId: String, path: String): APIGatewayV2HTTPResponse {
+    suspend fun handleWebsocketConnect(
+        event: APIGatewayV2WebsocketRequest,
+        cacheId: String,
+        path: String
+    ): APIGatewayV2HTTPResponse {
         val match = wsMatcher.match(path)
         if (match == null) {
             logger.warn("match is null!"); return APIGatewayV2HTTPResponse(404)
@@ -131,9 +208,10 @@ abstract class AwsAdapter : RequestStreamHandler {
                     parts = match.parts,
                     wildcard = match.wildcard,
                     id = cacheId,
-                    queryParameters = event.multiValueQueryStringParameters?.flatMap { it.value.map { v -> it.key to v } } ?: listOf(),
+                    queryParameters = event.multiValueQueryStringParameters?.flatMap { it.value.map { v -> it.key to v } }
+                        ?: listOf(),
                     headers = HttpHeaders(
-                        event.multiValueHeaders.flatMap { it.value.map { v -> it.key to v } },
+                        event.multiValueHeaders?.flatMap { it.value.map { v -> it.key to v } } ?: listOf()
                     ),
                     domain = event.requestContext.domainName,
                     protocol = "https",
@@ -142,6 +220,7 @@ abstract class AwsAdapter : RequestStreamHandler {
             )
             return APIGatewayV2HTTPResponse(200)
         } catch (e: Exception) {
+            reportException(e)
             return APIGatewayV2HTTPResponse(500, body = Serialization.json.encodeToString(e.message ?: ""))
         }
     }
@@ -162,6 +241,7 @@ abstract class AwsAdapter : RequestStreamHandler {
             handler.message(WebSockets.MessageEvent(cacheId, content))
             return APIGatewayV2HTTPResponse(200)
         } catch (e: Exception) {
+            reportException(e)
             return APIGatewayV2HTTPResponse(500, body = Serialization.json.encodeToString(e.message ?: ""))
         }
     }
@@ -182,6 +262,7 @@ abstract class AwsAdapter : RequestStreamHandler {
             handler.disconnect(WebSockets.DisconnectEvent(cacheId))
             return APIGatewayV2HTTPResponse(200)
         } catch (e: Exception) {
+            reportException(e)
             return APIGatewayV2HTTPResponse(500, body = Serialization.json.encodeToString(e.message ?: ""))
         }
     }
@@ -219,11 +300,13 @@ abstract class AwsAdapter : RequestStreamHandler {
         )
         val result = try {
             Http.endpoints[match.endpoint]!!.invoke(request)
-        } catch (e: HttpStatusException) {
-            e.toResponse(request)
-        } catch (e: Throwable) {
-            e.printStackTrace()
-            HttpResponse.plainText(e.message ?: "?", HttpStatus.InternalServerError)
+        } catch (e: Exception) {
+            reportException(e)
+            try {
+                Http.exception(request, e)
+            } catch(e: Exception) {
+                HttpResponse.plainText(e.message ?: "?", HttpStatus.InternalServerError)
+            }
         }
         val outHeaders = HashMap<String, String>()
         result.headers.entries.forEach { outHeaders.put(it.first, it.second) }

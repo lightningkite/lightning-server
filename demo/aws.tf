@@ -31,9 +31,23 @@ variable "deployment_location" {
 variable "deployment_name" {
   default = "test"
 }
+variable "basis_domain" {
+}
+variable "subdomain" {
+  default = "api"
+}
 variable "debug" {
   default = false
 }
+
+# locals {
+#     subdomainPrefix = "${var.deployment_name}.${var.subdomain}" 
+#     subdomain = "${var.deployment_name}.${var.subdomain}.${var.basis_domain}"
+# }
+# 
+# data "aws_route53_zone" "main" {
+#   name = var.basis_domain
+# }
 
 module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
@@ -228,6 +242,32 @@ resource "aws_docdb_cluster_instance" "database" {
 }
 
 ####
+# cache: CacheSettings
+####
+
+variable "cache_node_type" {
+  default = "cache.t2.micro"
+}
+variable "cache_node_count" {
+  default = 1
+}
+
+resource "aws_elasticache_cluster" "cache" {
+  cluster_id           = "demo-${var.deployment_name}-cache"
+  engine               = "memcached"
+  node_type            = var.cache_node_type
+  num_cache_nodes      = var.cache_node_count
+  parameter_group_name = "default.memcached1.6"
+  port                 = 11211
+  security_group_ids   = [aws_security_group.internal.id]
+  subnet_group_name    = aws_elasticache_subnet_group.cache.name
+}
+resource "aws_elasticache_subnet_group" "cache" {
+  name       = "demo-${var.deployment_name}-cache"
+  subnet_ids = module.vpc.private_subnets
+}
+
+####
 # jwt: JwtSigner
 ####
 
@@ -332,12 +372,40 @@ variable "exceptions" {
 }
 
 ####
-# email
+# email: EmailSettings
 ####
 
-variable "email" {
-  default = {}
+resource "aws_iam_user" "email" {
+  name = "demo-${var.deployment_name}-email-user"
 }
+
+resource "aws_iam_access_key" "email" {
+  user = aws_iam_user.email.name
+}
+
+data "aws_iam_policy_document" "email" {
+  statement {
+    actions   = ["ses:SendRawEmail"]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_policy" "email" {
+  name = "demo-${var.deployment_name}-email-policy"
+  description = "Allows sending of e-mails via Simple Email Service"
+  policy      = data.aws_iam_policy_document.email.json
+}
+
+resource "aws_iam_user_policy_attachment" "email" {
+  user       = aws_iam_user.email.name
+  policy_arn = aws_iam_policy.email.arn
+}
+variable "email_sender" {
+}
+resource "aws_ses_email_identity" "email" {
+  email = var.email_sender
+}
+
 
 ####
 # oauth-apple
@@ -379,11 +447,15 @@ resource "aws_lambda_function" "main" {
         general = {
             projectName = "demo"
             publicUrl = aws_apigatewayv2_stage.http.invoke_url
+            wsUrl = aws_apigatewayv2_stage.ws.invoke_url
             debug = var.debug
         },
         database = {
             url = "mongodb://master:${random_password.database.result}@${aws_docdb_cluster_instance.database[0].endpoint}/?retryWrites=false"
             databaseName = "demo-${var.deployment_name}_database"
+        },
+        cache = {
+            url = "memcached://${aws_elasticache_cluster.cache.cluster_address}:11211"
         },
         jwt = {
             expirationMilliseconds = var.jwt_expirationMilliseconds 
@@ -398,7 +470,17 @@ resource "aws_lambda_function" "main" {
         },
         oauth-github = var.oauth-github,
         exceptions = var.exceptions,
-        email = var.email,
+        email = {
+            option = "Smtp" 
+            smtp = {
+                hostName = "email-smtp.us-west-2.amazonaws.com"
+                port = 587
+                username = aws_iam_access_key.email.id
+                password = aws_iam_access_key.email.ses_smtp_password_v4
+                useSSL = true
+                fromEmail = aws_ses_email_identity.email.email
+            }
+        },
         oauth-apple = var.oauth-apple
       })
     }
@@ -472,6 +554,29 @@ resource "aws_lambda_permission" "api_gateway_http" {
 
   source_arn = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
 }
+
+
+#resource "aws_route53_record" "cert_api_validations" {
+#  allow_overwrite = true
+#  count           = length(aws_acm_certificate.cert_api.domain_validation_options)
+#  zone_id = aws_route53_zone.api.zone_id
+#  name    = element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_name, count.index)
+#  type    = element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_type, count.index)
+#  records = [element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_value, count.index)]
+#  ttl     = 60
+#}
+
+#resource "aws_route53_record" "http" {
+#  zone_id = aws_route53_zone.main.zone_id
+#  name    = local.subdomain
+#  type    = "A"
+#  
+#  alias {
+#    name                   = aws_apigatewayv2_domain_name.api.domain_name_configuration[0].target_domain_name
+#    zone_id                = aws_apigatewayv2_domain_name.api.domain_name_configuration[0].hosted_zone_id
+#    evaluate_target_health = false
+#  }
+#}
 
             
 

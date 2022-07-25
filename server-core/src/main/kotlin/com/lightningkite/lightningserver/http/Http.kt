@@ -9,7 +9,6 @@ object Http {
     val endpoints = mutableMapOf<HttpEndpoint, suspend (HttpRequest) -> HttpResponse>()
     var exception: suspend (HttpRequest, Exception) -> HttpResponse =
         { request, exception ->
-            println("FRICK")
             if(generalSettings().debug) exception.printStackTrace()
             if (exception is HttpStatusException) {
                 exception.toResponse(request)

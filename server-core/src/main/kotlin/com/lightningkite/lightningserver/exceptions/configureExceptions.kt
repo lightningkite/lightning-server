@@ -35,7 +35,7 @@ private fun Any?.simpleUserId(): String = when (this) {
 /**
  * Will report an Exception to Sentry if the ExceptionSettings.sentryDsn is provided
  */
-suspend fun HttpRequest.reportException(throwable: Throwable) {
+suspend fun Any?.reportException(throwable: Throwable) {
     if(generalSettings().debug) throwable.printStackTrace()
 //    if (exceptionSettings().sentryDsn != null) {
 //        val ctx = Sentry.getContext()

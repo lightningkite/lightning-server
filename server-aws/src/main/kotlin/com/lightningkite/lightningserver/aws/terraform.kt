@@ -14,12 +14,12 @@ import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.serializer
 
 
 
 fun terraformAws(handler: String, projectName: String = "project", appendable: Appendable) {
+    AwsAdapter.cache
     val d = "$"
     val namePrefix = "${projectName}-\${var.deployment_name}"
     val namePrefixSafe = "${projectName.filter { it.isLetterOrDigit() }}\${var.deployment_name}"
@@ -60,9 +60,23 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
         variable "deployment_name" {
           default = "test"
         }
+        variable "basis_domain" {
+        }
+        variable "subdomain" {
+          default = "api"
+        }
         variable "debug" {
           default = false
         }
+        
+        # locals {
+        #     subdomainPrefix = "${'$'}{var.deployment_name}.${'$'}{var.subdomain}" 
+        #     subdomain = "${'$'}{var.deployment_name}.${'$'}{var.subdomain}.${'$'}{var.basis_domain}"
+        # }
+        # 
+        # data "aws_route53_zone" "main" {
+        #   name = var.basis_domain
+        # }
 
         module "vpc" {
           source = "terraform-aws-modules/vpc/aws"
@@ -219,6 +233,7 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
                 appSettings.add("""${setting.key} = {
                     projectName = "$projectName"
                     publicUrl = aws_apigatewayv2_stage.http.invoke_url
+                    wsUrl = aws_apigatewayv2_stage.ws.invoke_url
                     debug = var.debug
                 }""".trimIndent())
             }
@@ -360,9 +375,10 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
                       num_cache_nodes      = var.${setting.key}_node_count
                       parameter_group_name = "default.memcached1.6"
                       port                 = 11211
-                      security_group_ids   = ["${'$'}{aws_security_group.internal.id}"]
+                      security_group_ids   = [aws_security_group.internal.id]
+                      subnet_group_name    = aws_elasticache_subnet_group.${setting.key}.name
                     }
-                    resource "aws_docdb_subnet_group" "${setting.key}" {
+                    resource "aws_elasticache_subnet_group" "${setting.key}" {
                       name       = "$namePrefix-${setting.key}"
                       subnet_ids = module.vpc.private_subnets
                     }
@@ -396,6 +412,58 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
                     secret = random_password.${setting.key}.result
                 }""".trimIndent())
             }
+            serializer<EmailSettings>() -> {
+                appendable.appendLine("""
+                    
+                    ####
+                    # ${setting.key}: EmailSettings
+                    ####
+                    
+                    resource "aws_iam_user" "${setting.key}" {
+                      name = "${namePrefix}-${setting.key}-user"
+                    }
+
+                    resource "aws_iam_access_key" "${setting.key}" {
+                      user = aws_iam_user.${setting.key}.name
+                    }
+
+                    data "aws_iam_policy_document" "${setting.key}" {
+                      statement {
+                        actions   = ["ses:SendRawEmail"]
+                        resources = ["*"]
+                      }
+                    }
+
+                    resource "aws_iam_policy" "${setting.key}" {
+                      name = "${namePrefix}-${setting.key}-policy"
+                      description = "Allows sending of e-mails via Simple Email Service"
+                      policy      = data.aws_iam_policy_document.${setting.key}.json
+                    }
+
+                    resource "aws_iam_user_policy_attachment" "${setting.key}" {
+                      user       = aws_iam_user.${setting.key}.name
+                      policy_arn = aws_iam_policy.${setting.key}.arn
+                    }
+                    variable "${setting.key}_sender" {
+                    }
+                    resource "aws_ses_email_identity" "${setting.key}" {
+                      email = var.${setting.key}_sender
+                    }
+                    
+                """.trimIndent())
+                appSettings.add("""${setting.key} = {
+                    option = "Smtp" 
+                    smtp = {
+                        hostName = "email-smtp.us-west-2.amazonaws.com"
+                        port = 587
+                        username = aws_iam_access_key.${setting.key}.id
+                        password = aws_iam_access_key.${setting.key}.ses_smtp_password_v4
+                        useSSL = true
+                        fromEmail = aws_ses_email_identity.${setting.key}.email
+                    }
+                }""".trimIndent())
+            }
+//            serializer<NotificationSettings>() ->{}
             else -> {
                 appendable.appendLine("""
                     
@@ -409,8 +477,6 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
                 """.trimIndent())
                 appSettings.add("""${setting.key} = var.${setting.key}""".trimIndent())
             }
-//            serializer<EmailSettings>() -> {}  // Azure has no email service, oddly enough
-//            serializer<NotificationSettings>() -> {}  // Azure has no app notification service either
         }
     }
 
@@ -524,6 +590,29 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
 
           source_arn = "${'$'}{aws_apigatewayv2_api.http.execution_arn}/*/*"
         }
+        
+
+        #resource "aws_route53_record" "cert_api_validations" {
+        #  allow_overwrite = true
+        #  count           = length(aws_acm_certificate.cert_api.domain_validation_options)
+        #  zone_id = aws_route53_zone.api.zone_id
+        #  name    = element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_name, count.index)
+        #  type    = element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_type, count.index)
+        #  records = [element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_value, count.index)]
+        #  ttl     = 60
+        #}
+
+        #resource "aws_route53_record" "http" {
+        #  zone_id = aws_route53_zone.main.zone_id
+        #  name    = local.subdomain
+        #  type    = "A"
+        #  
+        #  alias {
+        #    name                   = aws_apigatewayv2_domain_name.api.domain_name_configuration[0].target_domain_name
+        #    zone_id                = aws_apigatewayv2_domain_name.api.domain_name_configuration[0].hosted_zone_id
+        #    evaluate_target_health = false
+        #  }
+        #}
         
         """.trimIndent())
     }
