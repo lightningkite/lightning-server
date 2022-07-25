@@ -20,7 +20,7 @@ Once you have set up your server's settings, you can call `loadSettings()` to ge
 
 `FilesSettings` contains the default [settings](#settings) for server files.
 
-## Database
+## Databases
 
 **TODO: ADD DESCRIPTION**
 
@@ -39,7 +39,7 @@ Once you have set up JwtSigners for your server, you can call `authEndpoints()` 
 - `token()` creates a token
 - `verify()` validates an existing token
 
-## EmailClient
+## Server Email
 
 **TODO: ADD DESCRIPTION**
 
@@ -49,11 +49,11 @@ Once you have set up JwtSigners for your server, you can call `authEndpoints()` 
 
 - `send()` sends an email
 
-## FieldCollection
+## Field Collections
 
-`FieldCollection` is an abstract class for interacting with a [database](#database), and on a specific collection/table. You can access a `FieldCollection` by calling `collection()` on a database you created with [`setting()`](#settings). Here is an example of how to create a basic `FieldCollection` with access permissions for a [model](#models) `User`, given a database called `database`:
+`FieldCollection` is an abstract class for interacting with a [database](#databases), and on a specific collection/table. You can access a `FieldCollection` by calling `collection()` on a database you created with [`setting()`](#settings). Here is an example of how to create a basic `FieldCollection` with access permissions for a [model](#models) `User`, given a database called `database`:
 
-<pre><code>database().collection<User>().withPermissions(
+<pre><code>database().collection().withPermissions(
    ModelPermissions(
       //permissions here
    )
@@ -85,15 +85,15 @@ Once you have set up JwtSigners for your server, you can call `authEndpoints()` 
 - `preCreate()` executes code before an element is added to the collection
 - `postCreate()` executes code after an element is added to the collection
 
-## Condition
+## Data conditions
 
-A `condition` is used to test against existing data in a [database](#database). They is written using infix functions. Here is a simple `condition` that tests equivilancy of two strings:
+Conditions are used to test against [database models](#models) in a [database](#databases). They are written using infix functions. Here is a simple condition that tests the equivilancy of string in a database model and a string literal:
 
-<pre><code>condition { it -> it.name eq "John" }</code></pre>
+<pre><code>condition { user -> user.name eq "John" }</code></pre>
 
-A single `condition` can also test against multiple conditions together using the operators `or` and `and`, which work as expected. Seperate conditions need to be enclosed in parentheses:
+A single condition can also test against multiple conditions together using the operators `and` and `or`, which work as expected. Seperate conditions need to be enclosed in parentheses:
 
-<pre><code>condition { it -> (it.name eq "John") and (it.value eq 42) }</code></pre>
+<pre><code>condition { user -> (user.name eq "John") and (user.id eq 42) }</code></pre>
 
 Here is a list of the operators that `condition` provides:
 
@@ -120,15 +120,15 @@ Here is a list of the operators that `condition` provides:
 - `sizesEquals` returns true if the given integer is equal to the size of a given list
 - `containsKey` returns true if the given key is inside a given map
 
-## Modification
+## Data modifications
 
-A `modification` is used to modify existing data in a [database](#database). Like a [`condition`](#condition), they written using infix functions. Here is a simple `modification` that sets a string to "Test String":
+Modifications are used to modify existing [database models](#models) in a [database](#databases). Like [conditions](#Data conditions), they are written using infix functions. Here is a simple modification that sets a string to "John":
 
-<pre><code>modification { it -> it.name assign "Test String" }</code></pre>
+<pre><code>modification { user -> user.name assign "John" }</code></pre>
 
 A single `modification` can also chain multiple modifications together using the operator `then`. Seperate modifications need to be enclosed in parentheses:
 
-<pre><code>condition { it -> (it.name assign "Test String") then (it.value assign 42) }</code></pre>
+<pre><code>modification { user -> (user.name assign "John") then (user.id assign 42) }</code></pre>
 
 Here is a list of the operators that `modification` provides:
 
@@ -149,7 +149,7 @@ Here is a list of the operators that `modification` provides:
 
 ## Models
 
-Models are data classes used to access and serialize data from a [database](#database) as well as from the bodies of http calls.
+Models are data classes used to access and serialize data from a [database](#databases) as well as from the bodies of http calls.
 
 ### Annotations
 
@@ -160,12 +160,12 @@ Models are data classes used to access and serialize data from a [database](#dat
 
 ### Interfaces
 
-A model can inherit functionality from multiple pre-defined interfaces.
+A model can inherit functionality from multiple predefined interfaces:
 
 - `HasId` provides an id field
 - `HasEmail` provides an email address field
 
-These fields also make it easier to use the model with other systems in Lightning Server. For example, models that inherit from `HasId` can utilize `withPermissions()` in [`FieldCollections`](#fieldcollection)
+These fields also make it easier to use the model with other systems in Lightning Server. For example, models that inherit from `HasId` can utilize `withPermissions()` in [Field Collections](#field-collections)
 
 ## Exceptions
 
