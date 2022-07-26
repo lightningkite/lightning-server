@@ -6,7 +6,7 @@ Lightning Server has a lot of nifty features. Here is a list of things to get yo
 
 ## Settings
 
-**TODO: ADD DESCRIPTION**
+Lightning Server provides a bunch of settings that you can change to get different functionalities from your server. There are settings for server files, databases, server authentication, and server email.
 
 Calling `setting()` loads a setting and returns a relavent object for later use. Here is an example of how you could load the [FilesSettings](#files) setting:
 
@@ -59,6 +59,20 @@ You write your server's endpoints in a `routing {}` lambda. Here is an example o
    }
 }</code></pre>
 
+This next code block returns the name of a logged in user. If the user is not logged in, it will return an http 401 error with the text "You are not logged in" via an [exception](#exceptions).
+
+<pre><code>routing {
+   get.typed (
+      summary = "Get user name",
+      errorCases = listOf(),
+      implementation = { user: User?, _: Unit -&gt
+         user.name ?: throw UnauthorizedException("You are not logged in")
+      }
+   )
+} </code></pre>
+
+**TODO: Add more examples and descriptions of how to program endpoints**
+
 - `HttpEndpoint::handler()`
 - `HttpEndpoint::typed()` builds a typed route
 - `ServerPath::apiHelp()` auto-generates basic documentation on the server's endpoints
@@ -72,7 +86,7 @@ You write your server's endpoints in a `routing {}` lambda. Here is an example o
          // other user data...
       )
    }) { user: User? ->
-      collection<User>().withPermissions(
+      collection&ltUser&gt().withPermissions(
          ModelPermissions(
             create = Condition.Always&ltUser&gt(),
             read = Condition.Always&ltUser&gt(),
@@ -96,7 +110,7 @@ You write your server's endpoints in a `routing {}` lambda. Here is an example o
    )
 )</code></pre>
 
-In this example, four basic [conditions](#data-conditions) are set so that everyone can create and read `User` models, but no one can update or delete them.
+In this example, four basic [conditions](#data-conditions) are set so that anyone can create and read `User` models, but no one can update or delete them.
 
 Once you have a field collection with access permissions set, you can do a number of operations on it to create, find, modify, and delete data from it. Here is an example of how you would insert an element into the previously created `FieldCollection`:
 
