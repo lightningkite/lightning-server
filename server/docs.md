@@ -28,7 +28,7 @@ Once you have set up your server's settings, you can call `loadSettings()` to ge
 
 ## Authentication
 
-JSON Web Tokens (JWT) are used to authenticate http calls across the server. You use a `JwtSigner` to create and verify these tokens.
+JSON Web Tokens (JWT) are used to authenticate HTTP calls across the server. You use a `JwtSigner` to create and verify these tokens.
 
 `JwtSigner` contains the default [settings](#settings) for a token signer.
 
@@ -51,7 +51,7 @@ Once you have set up JwtSigners for your server, you can call `authEndpoints()` 
 
 ## Endpoints
 
-You write your server's endpoints in a `routing {}` lambda. Here is an example of how to create a simple http GET at your server's root url that returns the string "Hello World!":
+You write your server's endpoints in a `routing {}` lambda. Here is an example of how to create a simple HTTP GET at your server's root URL that returns the string "Hello World!":
 
 <pre><code>routing {
    get.handler {
@@ -59,7 +59,7 @@ You write your server's endpoints in a `routing {}` lambda. Here is an example o
    }
 }</code></pre>
 
-This next code block returns the name of a logged in user. If the user is not logged in, it will return an http 401 error with the text "You are not logged in" via an [exception](#exceptions).
+This next code block returns the name of a logged in user. If the user is not logged in, it will return an HTTP 401 error with the text "You are not logged in" via an [exception](#exceptions).
 
 <pre><code>routing {
    get.typed (
@@ -85,7 +85,7 @@ This next code block returns the name of a logged in user. If the user is not lo
          id = "42",
          // other user data...
       )
-   }) { user: User? ->
+   }) { user: User? -&gt
       collection&ltUser&gt().withPermissions(
          ModelPermissions(
             create = Condition.Always&ltUser&gt(),
@@ -150,13 +150,18 @@ Here is a list of the operations that `FieldCollection` provides:
 
 Conditions are used to test against [database models](#models) in a [database](#databases). They are written using infix functions. Here is a simple condition that tests the equivilancy of a string in a database model and a string literal:
 
-<pre><code>condition { user -> user.name eq "John" }</code></pre>
+<pre><code>condition { user -&gt
+   user.name eq "John"
+}</code></pre>
 
-A single condition can also test against multiple conditions together using the operators `and` and `or`, which work as expected. Seperate conditions need to be enclosed in parentheses:
+A single condition can also test against multiple conditions together using the operators `and` and `or`, which work as the operators `&&` and `||` respectively. Seperate conditions need to be enclosed in parentheses:
 
-<pre><code>condition { user -> (user.name eq "John") and (user.id eq 42) }</code></pre>
+<pre><code>condition { user -&gt
+   (user.name eq "John") and
+   (user.id eq 42)
+}</code></pre>
 
-Here is a list of the operators that `condition` provides:
+Here is a list of the operators that you can use in a condition:
 
 - `and` returns true if both of the given conditions are true
 - `or` returns true if either of the given conditions are true
@@ -183,15 +188,20 @@ Here is a list of the operators that `condition` provides:
 
 ## Data modifications
 
-Modifications are used to modify existing [database models](#models) in a [database](#databases). Like [conditions](#Data conditions), they are written using infix functions. Here is a simple modification that sets a string to "John":
+Modifications are used to modify existing [database models](#models) in a [database](#databases). Like [conditions](#data-conditions), they are written using infix functions. Here is a simple modification that sets a string to "John":
 
-<pre><code>modification { user -> user.name assign "John" }</code></pre>
+<pre><code>modification { user -&gt
+   user.name assign "John"
+}</code></pre>
 
-A single `modification` can also chain multiple modifications together using the operator `then`. Seperate modifications need to be enclosed in parentheses:
+A single modification can also chain multiple modifications together using the operator `then`. Seperate modifications need to be enclosed in parentheses:
 
-<pre><code>modification { user -> (user.name assign "John") then (user.id assign 42) }</code></pre>
+<pre><code>modification { user -&gt
+   (user.name assign "John") then
+   (user.id assign 42)
+}</code></pre>
 
-Here is a list of the operators that `modification` provides:
+Here is a list of the operators that you can use in a modification:
 
 - `then` strings multiple modification calls together
 - `assign` sets the given value to another value
@@ -210,7 +220,7 @@ Here is a list of the operators that `modification` provides:
 
 ## Models
 
-Models are data classes used to access and serialize data from a [database](#databases) as well as from the bodies of http calls.
+Models are data classes used to access and serialize data from a [database](#databases) as well as from the bodies of HTTP calls.
 
 ### Annotations
 
@@ -230,9 +240,9 @@ These fields also make it easier to use the model with other systems in Lightnin
 
 ## Exceptions
 
-Lightning Server provides several exceptions you can use in the body of your endpoints. Throwing these exceptions will also automatically return the corrosponding http response.
+Lightning Server provides several exceptions you can use in the body of your endpoints. Throwing these exceptions in the body of an [endpoint](#endpoints) will automatically return the corrosponding HTTP response.
 
-- `BadRequestException()` responds with an http status code of 400
-- `UnauthorizedException()` responds with an http status code of 401
-- `ForbiddenException()` responds with an http status code of 403
-- `NotFoundException()` responds with an http status code of 404
+- `BadRequestException()` responds with an HTTP status code of 400
+- `UnauthorizedException()` responds with an HTTP status code of 401
+- `ForbiddenException()` responds with an HTTP status code of 403
+- `NotFoundException()` responds with an HTTP status code of 404
