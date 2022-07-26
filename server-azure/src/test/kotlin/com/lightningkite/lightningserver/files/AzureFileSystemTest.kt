@@ -19,7 +19,7 @@ class AzureFileSystemTest {
     fun test() {
         TestSettings
         runBlocking {
-            val credentials = File("build/test-credentials.txt")
+            val credentials = File("local/test-credentials.txt")
             if(!credentials.exists()) {
                 println("No credentials to test with at ${credentials.absolutePath}")
                 return@runBlocking

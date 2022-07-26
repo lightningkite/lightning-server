@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.files
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.http.HttpContent
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import java.io.InputStream
@@ -18,7 +19,10 @@ interface FileObject {
     suspend fun delete()
     fun checkSignature(queryParams: String): Boolean {
         return runBlocking {
-            client.head("$url?$queryParams").status.isSuccess()
+            val response = client.get("$url?$queryParams") {
+                header("Range", "0-0")
+            }
+            response.status.isSuccess()
         }
     }
     val url: String

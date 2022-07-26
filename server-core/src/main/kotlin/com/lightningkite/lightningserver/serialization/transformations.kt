@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.files.*
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.toMultipartContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.*
@@ -87,53 +88,51 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
                     )
                 }
             }
-            ContentType.MultiPart.FormData -> when (val body = this) {
-                is HttpContent.Multipart -> {
-                    val mainData = HashMap<String, Any?>()
-                    val overrideData = HashMap<String, Any?>()
-                    var baselineJson: JsonElement = JsonNull
-                    body.parts.collect { part ->
-                        when (part) {
-                            is HttpContent.Multipart.Part.FormItem -> {
-                                if (part.key == multipartJsonKey) {
-                                    baselineJson = Serialization.json.parseToJsonElement(part.value)
-                                }
-                            }
-                            is HttpContent.Multipart.Part.DataItem -> {
-                                if (part.filename.isBlank()) throw BadRequestException("File name not provided")
-                                val path = part.key.split('.')
-                                if (!serializer.isFile(path)) throw BadRequestException("${part.key} is not a ServerFile.")
-                                if (part.headers.contentType == null) throw BadRequestException("Content type not provided for uploaded file")
-                                //if (
-                                //    isFile.allowedTypes
-                                //        .asSequence()
-                                //        .map { ContentType.parse(it) }
-                                //        .none { part.contentType!!.match(it) }
-                                //) {
-                                //    throw BadRequestException("Content type ${part.contentType} doesn't match any of the accepted types: ${isFile.allowedTypes.joinToString()}")
-                                //}
-                                val file = parsingFileSettings!!().root.resolveRandom(
-                                    "uploaded/${part.filename}",
-                                    type.extension ?: "bin"
-                                )
-                                file.write(part.content)
-                                var current: MutableMap<String, Any?> = overrideData
-                                for (pathPart in path.dropLast(1)) {
-                                    @Suppress("UNCHECKED_CAST")
-                                    current =
-                                        current.getOrPut(pathPart) { HashMap<String, Any?>() } as MutableMap<String, Any?>
-                                }
-                                current[path.last()] = JsonPrimitive(file.signedUrl)
+            ContentType.MultiPart.FormData -> {
+                val multipart = this as? HttpContent.Multipart ?: this.stream().toMultipartContent(this.type)
+                val mainData = HashMap<String, Any?>()
+                val overrideData = HashMap<String, Any?>()
+                var baselineJson: JsonElement = JsonNull
+                multipart.parts.collect { part ->
+                    when (part) {
+                        is HttpContent.Multipart.Part.FormItem -> {
+                            if (part.key == multipartJsonKey) {
+                                baselineJson = Serialization.json.parseToJsonElement(part.value)
                             }
                         }
+                        is HttpContent.Multipart.Part.DataItem -> {
+                            if (part.filename.isBlank()) return@collect
+                            val path = part.key.split('.')
+                            if (!serializer.isFile(path)) throw BadRequestException("${part.key} is not a ServerFile.")
+                            if (part.headers.contentType == null) throw BadRequestException("Content type not provided for uploaded file")
+                            //if (
+                            //    isFile.allowedTypes
+                            //        .asSequence()
+                            //        .map { ContentType.parse(it) }
+                            //        .none { part.contentType!!.match(it) }
+                            //) {
+                            //    throw BadRequestException("Content type ${part.contentType} doesn't match any of the accepted types: ${isFile.allowedTypes.joinToString()}")
+                            //}
+                            val file = parsingFileSettings!!().root.resolveRandom(
+                                "uploaded/${part.filename}",
+                                type.extension ?: "bin"
+                            )
+                            file.write(part.content)
+                            var current: MutableMap<String, Any?> = overrideData
+                            for (pathPart in path.dropLast(1)) {
+                                @Suppress("UNCHECKED_CAST")
+                                current =
+                                    current.getOrPut(pathPart) { HashMap<String, Any?>() } as MutableMap<String, Any?>
+                            }
+                            current[path.last()] = JsonPrimitive(file.signedUrl)
+                        }
                     }
-                    if (baselineJson is JsonObject) {
-                        baselineJson.jsonObject.writeInto(mainData)
-                        mainData.putAll(overrideData)
-                        Serialization.json.decodeFromJsonElement(serializer, mainData.toJsonObject())
-                    } else throw BadRequestException("")
                 }
-                else -> throw BadRequestException("Expected multipart body, but got a ${body::class.simpleName}.")
+                if (baselineJson is JsonObject) {
+                    baselineJson.jsonObject.writeInto(mainData)
+                    mainData.putAll(overrideData)
+                    Serialization.json.decodeFromJsonElement(serializer, mainData.toJsonObject())
+                } else throw BadRequestException("")
             }
             else -> throw BadRequestException("Content type ${this.type} not supported.")
         }

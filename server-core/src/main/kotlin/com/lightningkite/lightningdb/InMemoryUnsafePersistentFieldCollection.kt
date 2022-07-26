@@ -13,7 +13,7 @@ class InMemoryUnsafePersistentFieldCollection<Model : Any>(
     val file: File
 ) : InMemoryFieldCollection<Model>(), Closeable {
     init {
-        data.addAll(encoding.decodeFromString(ListSerializer(serializer), file.readText()))
+        data.addAll(encoding.decodeFromString(ListSerializer(serializer), file.takeIf { it.exists() }?.readText() ?: "[]"))
         val shutdownHook = Thread {
             this.close()
         }
@@ -21,7 +21,7 @@ class InMemoryUnsafePersistentFieldCollection<Model : Any>(
     }
 
     override fun close() {
-        file.writeText(encoding.encodeToString(data))
+        file.writeText(encoding.encodeToString(ListSerializer(serializer), data))
     }
 }
 

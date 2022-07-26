@@ -26,9 +26,14 @@ data class GeneralServerSettings(
     val host: String = "0.0.0.0",
     val port: Int = 8080,
     val publicUrl: String = "http://$host:$port",
+    val wsUrl: String = publicUrl,
     val debug: Boolean = false,
     val cors: CorsSettings? = if(debug) CorsSettings(allowedDomains = listOf("*"), allowedHeaders = listOf("*", HttpHeader.Authorization)) else null
 ) {
+    fun absolutePathAdjustment(string: String): String {
+        return if(string.startsWith("/")) "/" + publicUrl.substringAfter("://").substringAfter("/", "") + string
+        else string
+    }
 }
 
 val generalSettings = setting("general", GeneralServerSettings())

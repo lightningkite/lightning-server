@@ -28,10 +28,10 @@ dependencies {
 }
 
 khrysalis {
-    iosProjectName = "lightningserver"
+    iosProjectName = "LightningServer"
     iosProjectFolder = rootDir.resolve("ios")
-    iosSourceFolder = rootDir.resolve("ios/lightningserver/Classes/client")
-    webProjectName = "@lightningkite/ktor-batteries"
+    iosSourceFolder = rootDir.resolve("ios/LightningServer/Classes/client")
+    webProjectName = "@lightningkite/lightning-server"
     webProjectFolder = rootDir.resolve("web")
     webSourceFolder = rootDir.resolve("web/src")
     libraryMode = true

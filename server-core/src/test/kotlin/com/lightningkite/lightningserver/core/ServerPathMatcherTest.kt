@@ -28,6 +28,7 @@ class ServerPathMatcherTest {
         )
         val matcher = ServerPathMatcher(paths.asSequence())
         assertEquals(ServerPathMatcher.Match(root, mapOf(), null), matcher.match(""))
+        assertEquals(ServerPathMatcher.Match(root, mapOf(), null), matcher.match("/"))
         assertEquals(ServerPathMatcher.Match(test, mapOf(), null), matcher.match("test"))
         assertEquals(null, matcher.match("asdf"))
         assertEquals(ServerPathMatcher.Match(testSlash, mapOf(), null), matcher.match("test/"))

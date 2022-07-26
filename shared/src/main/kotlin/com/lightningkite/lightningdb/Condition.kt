@@ -128,7 +128,11 @@ open class Condition<T: IsCodableAndHashable> protected constructor()  {
 
     @Serializable
     @SerialName("FullTextSearch")
-    data class FullTextSearch<T>(val value: String, val ignoreCase: Boolean = false): Condition<T>() { override fun invoke(on: T): Boolean = fatalError("Not Implemented locally") }
+    data class FullTextSearch<T: IsCodableAndHashable>(val value: String, val ignoreCase: Boolean = false): Condition<T>() {
+        override fun invoke(on: T): Boolean {
+            fatalError("Not Implemented locally")
+        }
+    }
 
     @Serializable
     @SerialName("RegexMatches")

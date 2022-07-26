@@ -5,10 +5,8 @@ import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.settings.generalSettings
-import com.lightningkite.lightningserver.toMultipartContent
 import com.microsoft.azure.functions.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.flowOf
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
@@ -64,7 +62,7 @@ abstract class AzureAdapter {
                         return@runBlocking HttpResponse(status = HttpStatus1.NotFound)
                     }
                     val request2 = HttpRequest(
-                        route = match.endpoint,
+                        endpoint = match.endpoint,
                         parts = match.parts,
                         wildcard = match.wildcard,
                         queryParameters = request.queryParameters.entries.map { it.toPair() },

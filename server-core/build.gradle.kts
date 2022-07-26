@@ -54,6 +54,9 @@ dependencies {
     api("io.github.pdvrieze.xmlutil:serialization-jvm:0.84.2")
     api("com.github.jershell:kbson:0.4.4")
 
+    implementation("org.bouncycastle:bcprov-jdk18on:1.71")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.71")
+
     api("org.apache.commons:commons-email:1.5")
 
     implementation("org.bouncycastle:bcprov-jdk18on:1.71")

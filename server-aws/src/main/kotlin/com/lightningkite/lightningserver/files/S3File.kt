@@ -119,9 +119,9 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
 
             val canonicalRequest = """
         GET
-        $objectPath
+        ${"/" + objectPath.removePrefix("/")}
         ${queryParams.substringBefore("&X-Amz-Signature=").split('&').sorted().joinToString("&")}
-        host:s3-${system.region.id()}.amazonaws.com
+        host:${system.bucket}.s3.${system.region.id()}.amazonaws.com
         
         host
         UNSIGNED-PAYLOAD

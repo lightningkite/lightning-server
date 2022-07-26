@@ -1,7 +1,10 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.html.HTML
+import java.io.File
 
 data class HttpResponse(
     val body: HttpContent? = null,
@@ -22,16 +25,15 @@ data class HttpResponse(
     companion object {
         fun redirectToGet(to: String, headers: HttpHeaders.Builder.()->Unit = {}) = HttpResponse(
             status = HttpStatus.SeeOther,
-            headers = { set(HttpHeader.Location, to); headers() },
+            headers = { set(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)); headers() },
         )
         fun pathMoved(to: String, headers: HttpHeaders.Builder.()->Unit = {}) = HttpResponse(
             status = HttpStatus.TemporaryRedirect,
-            headers = { set(HttpHeader.Location, to); headers() },
+            headers = { set(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)); headers() },
         )
-
         fun pathMovedPermanently(to: String, headers: HttpHeaders.Builder.()->Unit = {}) = HttpResponse(
             status = HttpStatus.PermanentRedirect,
-            headers = { set(HttpHeader.Location, to); headers() },
+            headers = { set(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)); headers() },
         )
 
         fun html(

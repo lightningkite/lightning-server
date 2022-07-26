@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.http
 import com.lightningkite.lightningserver.settings.generalSettings
 
 data class HttpRequest(
-    val route: HttpEndpoint,
+    val endpoint: HttpEndpoint,
     val parts: Map<String, String> = mapOf(),
     val wildcard: String? = null,
     val queryParameters: List<Pair<String, String>> = listOf(),

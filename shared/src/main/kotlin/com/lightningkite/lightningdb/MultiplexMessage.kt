@@ -11,5 +11,5 @@ data class MultiplexMessage(
     val start: Boolean = false,
     val end: Boolean = false,
     val data: String? = null,
-//    val error: String? = null
+    val error: String? = null
 )

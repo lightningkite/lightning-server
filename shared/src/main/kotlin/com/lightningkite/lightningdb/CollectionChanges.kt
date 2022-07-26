@@ -31,5 +31,5 @@ fun <T: HasId<ID>, ID: Equatable> List<T>.apply(changes: CollectionChanges<T>): 
 
 // This will not convert well. Manually add the type argument to the return EntryChange on the swift side. "EntryChange<B>"
 inline fun <T: IsCodableAndHashable, B: IsCodableAndHashable> CollectionChanges<T>.map(mapper: (T)->B): CollectionChanges<B> {
-    return CollectionChanges(changes = changes.map { it.map(mapper) }, replace = replace?.map(mapper))
+    return CollectionChanges<B>(changes = changes.map { it.map(mapper) }, replace = replace?.map(mapper))
 }

@@ -101,7 +101,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
             appendLine()
         }
         for(group in groups) {
-            appendLine("    data class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()}, val ${userType.userTypeTokenName()}: String) {")
+            appendLine("    class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()}, val ${userType.userTypeTokenName()}: String) {")
             for(entry in byGroup[group]!!) {
                 append("        ")
                 this.functionHeader(entry, skipAuth = true)
@@ -128,9 +128,9 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
     imports.add("java.time.*")
     val byGroup = safeDocumentables.groupBy { it.docGroup }
     val groups = byGroup.keys.filterNotNull()
-    appendLine("class LiveApi(val httpUrl: String, val socketUrl: String = httpUrl): Api {")
+    appendLine("class LiveApi(val httpUrl: String, val socketUrl: String): Api {")
     for(group in groups) {
-        appendLine("    override val ${group.groupToPartName()}: Live${group.groupToInterfaceName()} = Live${group.groupToInterfaceName()}(httpUrl = httpUrl, socketUrl = socketUrl)")
+        appendLine("    override val ${group.groupToPartName()}: Api.${group.groupToInterfaceName()} = Live${group.groupToInterfaceName()}(httpUrl = httpUrl, socketUrl = socketUrl)")
     }
     for(entry in byGroup[null] ?: listOf()) {
         append("    override ")
@@ -158,7 +158,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
         }
     }
     for(group in groups) {
-        appendLine("    class Live${group.groupToInterfaceName()}(val httpUrl: String, val socketUrl: String = httpUrl): Api.${group.groupToInterfaceName()} {")
+        appendLine("    class Live${group.groupToInterfaceName()}(val httpUrl: String, val socketUrl: String): Api.${group.groupToInterfaceName()} {")
         for(entry in byGroup[group]!!) {
             append("        override ")
             this.functionHeader(entry)
@@ -194,7 +194,7 @@ private val Documentable.Companion.safeDocumentables get() = (Http.endpoints.val
     .distinctBy { it.docGroup.toString() + "/" + it.summary }
 
 private class CodeEmitter(val packageName: String, val body: StringBuilder = StringBuilder()): Appendable by body {
-    val imports = mutableSetOf<String>()
+    val imports = mutableSetOf<String>("com.lightningkite.khrysalis.SharedCode")
     fun append(type: KType) {
         imports.add(type.toString().substringBefore('<').removeSuffix("?"))
         body.append((type.classifier as? KClass<*>)?.simpleName)
@@ -210,6 +210,7 @@ private class CodeEmitter(val packageName: String, val body: StringBuilder = Str
         }
     }
     fun dump(to: Appendable) = with(to) {
+        appendLine("@file:SharedCode")
         appendLine("package $packageName")
         appendLine()
         imports

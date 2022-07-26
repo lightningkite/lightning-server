@@ -59,8 +59,8 @@ infix fun <K : IsCodableAndHashable> PropChain<K, String>.contains(value: String
 fun <K : IsCodableAndHashable> PropChain<K, String>.contains(value: String, ignoreCase: Boolean) =
     mapCondition(Condition.StringContains(value, ignoreCase = ignoreCase))
 
-fun <K : IsCodableAndHashable> PropChain<K, K>.fullTextSearch(value: String, ignoreCase: Boolean) =
-    mapCondition(Condition.FullTextSearch(value, ignoreCase = ignoreCase))
+fun <K : IsCodableAndHashable, V: IsCodableAndHashable> PropChain<K, V>.fullTextSearch(value: String, ignoreCase: Boolean) =
+    mapCondition(Condition.FullTextSearch<V>(value, ignoreCase = ignoreCase))
 
 inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, List<T>>.all(condition: (PropChain<T, T>) -> Condition<T>) =
     mapCondition(Condition.AllElements(startChain<T>().let(condition)))

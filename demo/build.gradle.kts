@@ -1,3 +1,5 @@
+import org.gradle.api.internal.file.archive.ZipFileTree
+
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
@@ -27,5 +29,17 @@ dependencies {
 kotlin {
     sourceSets.main {
         kotlin.srcDir("build/generated/ksp/main/kotlin")
+    }
+}
+
+tasks.create("buildZip", Zip::class.java) {
+    archiveFileName.set("lambda.zip")
+    destinationDirectory.set(project.buildDir.resolve("dist"))
+    val jarTask = tasks.getByName("jar")
+    dependsOn(jarTask)
+    val output = jarTask.outputs.files.find { it.extension == "jar" }!!
+    from(zipTree(output))
+    into("lib") {
+        from(configurations.runtimeClasspath)
     }
 }
