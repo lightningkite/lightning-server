@@ -28,6 +28,7 @@ dependencies {
     api(project(":server-core"))
     api(platform("software.amazon.awssdk:s3:2.17.232"))
     api("software.amazon.awssdk:s3")
+    api("software.amazon.awssdk:apigatewaymanagementapi:2.17.238")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.6.2")
     api("com.amazonaws:aws-lambda-java-core:1.2.1")
     api("com.amazonaws:aws-lambda-java-events:3.11.0")

@@ -12,6 +12,7 @@ export class EntryChange<T extends any> {
     copy: (values: Partial<EntryChange<T>>) => this;
     equals: (other: any) => boolean;
     hashCode: () => number;
+    
 }
 setUpDataClass(EntryChange)
 

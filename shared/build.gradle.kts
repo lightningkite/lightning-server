@@ -38,12 +38,15 @@ kotlin {
     sourceSets.test {
         kotlin.srcDir("build/generated/ksp/test/kotlin")
     }
+    sourceSets.main {
+        kotlin.srcDir("build/generated/ksp/main/kotlin")
+    }
 }
 
 khrysalis {
-    iosProjectName = "lightningserver"
+    iosProjectName = "LightningServer"
     iosProjectFolder = rootDir.resolve("ios")
-    iosSourceFolder = rootDir.resolve("ios/lightningserver/Classes/shared")
+    iosSourceFolder = rootDir.resolve("ios/LightningServer/Classes/shared")
     webProjectName = "@lightningkite/ktor-batteries"
     webProjectFolder = rootDir.resolve("web")
     webSourceFolder = rootDir.resolve("web/src")

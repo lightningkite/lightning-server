@@ -23,6 +23,9 @@ class DynamoDbCollection<T: Any>(val table: DynamoDbAsyncClient, val serializer:
         limit: Int,
         maxQueryMs: Long
     ): Flow<T> {
+        table.queryPaginator {
+            it.
+        }
         table.query {
             it.tableName(tableName)
             it.limit(limit)

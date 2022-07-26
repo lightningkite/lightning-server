@@ -4,10 +4,10 @@ import { ReifiedType, setUpDataClass } from '@lightningkite/khrysalis-runtime'
 
 //! Declares com.lightningkite.lightningdb.MultiplexMessage
 export class MultiplexMessage {
-    public constructor(public readonly channel: string, public readonly path: (string | null) = null, public readonly start: boolean = false, public readonly end: boolean = false, public readonly data: (string | null) = null) {
+    public constructor(public readonly channel: string, public readonly path: (string | null) = null, public readonly start: boolean = false, public readonly end: boolean = false, public readonly data: (string | null) = null, public readonly error: (string | null) = null) {
     }
-    public static properties = ["channel", "path", "start", "end", "data"]
-    public static propertyTypes() { return {channel: [String], path: [String], start: [Boolean], end: [Boolean], data: [String]} }
+    public static properties = ["channel", "path", "start", "end", "data", "error"]
+    public static propertyTypes() { return {channel: [String], path: [String], start: [Boolean], end: [Boolean], data: [String], error: [String]} }
     copy: (values: Partial<MultiplexMessage>) => this;
     equals: (other: any) => boolean;
     hashCode: () => number;

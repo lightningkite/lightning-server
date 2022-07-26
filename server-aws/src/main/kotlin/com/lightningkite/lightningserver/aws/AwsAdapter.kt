@@ -34,6 +34,7 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -45,6 +46,10 @@ import kotlinx.serialization.json.encodeToStream
 import kotlinx.serialization.json.jsonObject
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
+import software.amazon.awssdk.core.SdkBytes
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.apigatewaymanagementapi.ApiGatewayManagementApiAsyncClient
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.URLEncoder
@@ -59,28 +64,34 @@ abstract class AwsAdapter : RequestStreamHandler {
         val cache by lazy { setting("cache", CacheSettings()) }
         val configureEngine by lazy {
             engine = object: Engine {
-                //TODO: Sign V4 request
+                val apiGatewayManagement = ApiGatewayManagementApiAsyncClient.builder()
+                    .region(Region.US_WEST_2) //TODO - setting
+                    .build()
                 val url = "https://" + generalSettings().wsUrl.removePrefix("wss://") + "/%40connections"
                 override suspend fun sendWebSocketMessage(id: String, content: String) {
                     if(id.contains('/')) {
                         //Multiplex
                         val wsId = id.substringBefore('/')
                         val channelId = id.substringAfter('/')
-                        val result = client.post("$url/${URLEncoder.encode(wsId, Charsets.UTF_8)}") {
-                            setBody(TextContent(Serialization.json.encodeToString(MultiplexMessage(
+                        val result = apiGatewayManagement.postToConnection {
+                            it.connectionId(wsId)
+                            it.data(SdkBytes.fromUtf8String(Serialization.json.encodeToString(MultiplexMessage(
                                 channel = channelId,
                                 data = content
-                            )), io.ktor.http.ContentType.Text.Plain))
-                        }
-                        if(!result.status.isSuccess()) {
-                            logger.warn("Failed to send socket message to $id: ${result.status} - ${try { result.bodyAsText() } catch(e: Exception) { "?" }}")
+                            ))))
+                        }.await()
+                        val r = result.sdkHttpResponse()
+                        if(!r.isSuccessful) {
+                            logger.warn("Failed to send socket message to $id: ${r.statusCode()} - ${try { r.statusText().get() } catch(e: Exception) { "?" }}")
                         }
                     } else {
-                        val result = client.post("$url/${URLEncoder.encode(id, Charsets.UTF_8)}") {
-                            setBody(TextContent(content, io.ktor.http.ContentType.Text.Plain))
-                        }
-                        if(!result.status.isSuccess()) {
-                            logger.warn("Failed to send socket message to $id: ${result.status} - ${try { result.bodyAsText() } catch(e: Exception) { "?" }}")
+                        val result = apiGatewayManagement.postToConnection {
+                            it.connectionId(id)
+                            it.data(SdkBytes.fromUtf8String(content))
+                        }.await()
+                        val r = result.sdkHttpResponse()
+                        if(!r.isSuccessful) {
+                            logger.warn("Failed to send socket message to $id: ${r.statusCode()} - ${try { r.statusText().get() } catch(e: Exception) { "?" }}")
                         }
                     }
                 }
