@@ -51,7 +51,7 @@ Once you have set up JwtSigners for your server, you can call `authEndpoints()` 
 
 ## Endpoints
 
-You write your server's endpoints in a `routing {}` lambda. Here is an example of how to create a simple HTTP GET at your server's root URL that returns the string "Hello World!":
+You write your server's endpoints in a `routing {}` lambda. Here is an example of how to create a simple HTTP `get` at your server's root URL that returns the string "Hello World!":
 
 <pre><code>routing {
    get.handler {
