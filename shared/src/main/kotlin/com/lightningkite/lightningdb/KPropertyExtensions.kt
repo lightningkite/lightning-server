@@ -19,8 +19,3 @@ fun <T, V> KProperty1<T, V>.setCopy(original: T, value: V): T {
 data class KProperty1Partial<T>(val property: KProperty1<T, *>) {
     val compare: Comparator<T> = compareBy { property.get(it) as? Comparable<*> }
 }
-
-@Deprecated("Reference KProperty instead", ReplaceWith("KProperty1Partial<T>"))
-typealias PartialDataClassProperty<T> = KProperty1Partial<T>
-@Deprecated("Reference KProperty instead", ReplaceWith("KProperty1<T, V>", "kotlin.reflect.KProperty1"))
-typealias DataClassProperty<T, V> = KProperty1<T, V>

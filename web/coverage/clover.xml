@@ -533,7 +533,7 @@
         <line num="476" count="0" type="cond" truecount="0" falsecount="2"/>
         <line num="478" count="1" type="stmt"/>
       </file>
-      <file name="DataClassProperty.ts" path="/home/jivie/Projects/ktor-kmongo/web/src/shared/DataClassProperty.ts">
+      <file name="TProperty1Extensions.ts" path="/home/jivie/Projects/ktor-kmongo/web/src/shared/TProperty1Extensions.ts">
         <metrics statements="6" coveredstatements="2" conditionals="0" coveredconditionals="0" methods="2" coveredmethods="0"/>
         <line num="10" count="1" type="stmt"/>
         <line num="11" count="0" type="stmt"/>

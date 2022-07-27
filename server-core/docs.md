@@ -146,7 +146,7 @@ Tokens can be used to authenticate http calls across the server.
 - `getSubject()` gets a claim with the key "subject" from a validated token
 
 ## Exceptions
-Ktor-Batteries provides exceptions you can use.
+Lightning-server provides exceptions you can use.
 
 - `ForbiddenException()` responds with an http status code of forbidden
 - `AuthenticationException()` responds with an http status code of unauthorized

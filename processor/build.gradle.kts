@@ -20,9 +20,9 @@ dependencies {
 }
 
 standardPublishing {
-    name.set("Ktor-Batteries-Processor")
+    name.set("Lightning-server-Processor")
     description.set("A tool for communication between a server and a client built around Ktor Servers")
-    github("lightningkite", "ktor-batteries")
+    github("lightningkite", "lightning-server")
 
     licenses {
         mit()

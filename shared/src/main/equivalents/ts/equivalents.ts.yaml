@@ -1,75 +1,28 @@
 - id: com.lightningkite.lightningdb.fields
   type: get
-  template: '((~this~ as any)._fields as Map<string, PartialDataClassProperty<~T0~>>)'
+  template: '((~this~ as any)._fields as Map<string, keyof ~T0~ & string>)'
 - id: com.lightningkite.lightningdb.fields
   type: set
   template: '(~this~ as any)._fields = ~value~'
 
-- id: com.lightningkite.lightningdb.DataClassProperty
-  type: call
-  template: '~0~'
+- id: com.lightningkite.lightningdb.KProperty1Partial
+  type: type
+  template: (keyof ~T0~ & string)
 
-- id: com.lightningkite.lightningdb.DataClassProperty
+- id: com.lightningkite.lightningdb.KProperty1Partial
   type: typeRef
-  template: 'String'
+  template: String
 
-- id: com.lightningkite.lightningdb.PartialDataClassProperty
-  type: typeRef
-  template: 'String'
-
-- id: com.lightningkite.lightningdb.PartialDataClassProperty.name
-  type: get
-  template: ~this~
-
-- id: com.lightningkite.lightningdb.PartialDataClassProperty.anyGet
+- id: com.lightningkite.lightningdb.KProperty1Partial
   type: call
-  template:
-    pattern: keyGet(~0~, ~this~)
-    imports:
-      keyGet: '@lightningkite/ktor-batteries|db/DataClassProperty'
+  template: ~0~
 
-- id: com.lightningkite.lightningdb.PartialDataClassProperty.anySet
-  type: call
-  template:
-    pattern: keySet(~0~, ~this~, ~1~)
-    imports:
-      keySet: '@lightningkite/ktor-batteries|db/DataClassProperty'
-
-- id: com.lightningkite.lightningdb.PartialDataClassProperty.compare
+- id: com.lightningkite.lightningdb.KProperty1Partial.compare
   type: get
   template:
-    pattern: compareBy(~this~ as keyof T)
+    pattern: 'compareBy(~this~)'
     imports:
       compareBy: '@lightningkite/khrysalis-runtime'
-
-- id: com.lightningkite.lightningdb.PartialDataClassProperty.hashCode
-  type: call
-  template:
-    pattern: hashString(~this~)
-    imports:
-      hashString: '@lightningkite/khrysalis-runtime'
-
-- id: com.lightningkite.lightningdb.PartialDataClassProperty.equals
-  type: call
-  template: (~this~ === ~0~)
-
-- id: com.lightningkite.lightningdb.PartialDataClassProperty.toString
-  type: call
-  template: ~this~
-
-- id: com.lightningkite.lightningdb.DataClassProperty.get
-  type: call
-  template:
-    pattern: keyGet(~0~, ~this~)
-    imports:
-      keyGet: '@lightningkite/ktor-batteries|db/DataClassProperty'
-
-- id: com.lightningkite.lightningdb.DataClassProperty.set
-  type: call
-  template:
-    pattern: keySet(~0~, ~this~, ~1~)
-    imports:
-      keySet: '@lightningkite/ktor-batteries|db/DataClassProperty'
 
 - id: com.lightningkite.lightningdb.ServerFile
   type: type
@@ -82,3 +35,14 @@
 - id: com.lightningkite.lightningdb.ServerFile.location
   type: get
   template: ~this~
+
+- id: com.lightningkite.lightningdb.setCopyImplementation
+  type: call
+  template: ''
+
+- id: com.lightningkite.lightningdb.setCopy
+  type: call
+  template:
+    pattern: keySet(~0~, ~this~, ~1~)
+    imports:
+      keySet: '@lightningkite/lightning-server|db/TProperty1Extensions'

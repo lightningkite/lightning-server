@@ -6,16 +6,17 @@ exports.MultiplexMessage = void 0;
 const khrysalis_runtime_1 = require("@lightningkite/khrysalis-runtime");
 //! Declares com.lightningkite.lightningdb.MultiplexMessage
 class MultiplexMessage {
-    constructor(channel, path = null, start = false, end = false, data = null) {
+    constructor(channel, path = null, start = false, end = false, data = null, error = null) {
         this.channel = channel;
         this.path = path;
         this.start = start;
         this.end = end;
         this.data = data;
+        this.error = error;
     }
-    static propertyTypes() { return { channel: [String], path: [String], start: [Boolean], end: [Boolean], data: [String] }; }
+    static propertyTypes() { return { channel: [String], path: [String], start: [Boolean], end: [Boolean], data: [String], error: [String] }; }
 }
 exports.MultiplexMessage = MultiplexMessage;
-MultiplexMessage.properties = ["channel", "path", "start", "end", "data"];
+MultiplexMessage.properties = ["channel", "path", "start", "end", "data", "error"];
 (0, khrysalis_runtime_1.setUpDataClass)(MultiplexMessage);
 //# sourceMappingURL=MultiplexMessage.js.map

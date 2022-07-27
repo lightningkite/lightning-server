@@ -1,5 +1,4 @@
-import { DataClassProperty } from './DataClassProperty';
-import { ReifiedType } from '@lightningkite/khrysalis-runtime';
+import { ReifiedType, TProperty1 } from '@lightningkite/khrysalis-runtime';
 export declare class Condition<T extends any> {
     protected constructor();
     hashCode(): number;
@@ -184,18 +183,51 @@ export declare namespace Condition {
     }
 }
 export declare namespace Condition {
-    class Search extends Condition<string> {
+    class StringContains extends Condition<string> {
         readonly value: string;
         readonly ignoreCase: boolean;
-        constructor(value: string, ignoreCase: boolean);
+        constructor(value: string, ignoreCase?: boolean);
         static properties: string[];
         static propertyTypes(): {
             value: StringConstructor[];
             ignoreCase: BooleanConstructor[];
         };
-        copy: (values: Partial<Search>) => this;
+        copy: (values: Partial<StringContains>) => this;
         equals: (other: any) => boolean;
         hashCode: () => number;
+        invoke(on: string): boolean;
+    }
+}
+export declare namespace Condition {
+    class FullTextSearch<T extends any> extends Condition<T> {
+        readonly value: string;
+        readonly ignoreCase: boolean;
+        constructor(value: string, ignoreCase?: boolean);
+        static properties: string[];
+        static propertyTypes(T: ReifiedType): {
+            value: StringConstructor[];
+            ignoreCase: BooleanConstructor[];
+        };
+        copy: (values: Partial<FullTextSearch<T>>) => this;
+        equals: (other: any) => boolean;
+        hashCode: () => number;
+        invoke(on: T): boolean;
+    }
+}
+export declare namespace Condition {
+    class RegexMatches extends Condition<string> {
+        readonly pattern: string;
+        readonly ignoreCase: boolean;
+        constructor(pattern: string, ignoreCase?: boolean);
+        static properties: string[];
+        static propertyTypes(): {
+            pattern: StringConstructor[];
+            ignoreCase: BooleanConstructor[];
+        };
+        copy: (values: Partial<RegexMatches>) => this;
+        equals: (other: any) => boolean;
+        hashCode: () => number;
+        readonly regex: RegExp;
         invoke(on: string): boolean;
     }
 }
@@ -329,9 +361,9 @@ export declare namespace Condition {
 }
 export declare namespace Condition {
     class OnField<K extends any, V extends any> extends Condition<K> {
-        readonly key: DataClassProperty<K, V>;
+        readonly key: TProperty1<K, V>;
         readonly condition: Condition<V>;
-        constructor(key: DataClassProperty<K, V>, condition: Condition<V>);
+        constructor(key: TProperty1<K, V>, condition: Condition<V>);
         static properties: string[];
         static propertyTypes(K: ReifiedType, V: ReifiedType): {
             key: (StringConstructor | ReifiedType<unknown>)[];

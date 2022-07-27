@@ -1,7 +1,6 @@
 import {Condition} from './Condition'
 import {Modification} from './Modification'
-import {compareBy, DataClass, parseObject, ReifiedType} from "@lightningkite/khrysalis-runtime";
-import {DataClassProperty, PartialDataClassProperty} from "./DataClassProperty";
+import {compareBy, DataClass, parseObject, ReifiedType, TProperty1} from "@lightningkite/khrysalis-runtime";
 import {SortPart} from "./SortPart";
 
 (Condition as any).fromJSON = <T>(data: Record<string, any>, types: Array<ReifiedType>): Condition<T> => {
@@ -34,8 +33,10 @@ import {SortPart} from "./SortPart";
             return new Condition.GreaterThanOrEqual(parseObject(data.GreaterThanOrEqual, type))
         case "LessThanOrEqual":
             return new Condition.LessThanOrEqual(parseObject(data.LessThanOrEqual, type))
-        case "Search":
-            return parseObject(data.Search, [Condition.Search])
+        case "StringContains":
+            return parseObject(data.StringContains, [Condition.StringContains])
+        case "FullTextSearch":
+            return parseObject(data.FullTextSearch, [Condition.FullTextSearch])
         case "IntBitsClear":
             return new Condition.IntBitsClear(data.IntBitsClear as number) as unknown as Condition<T>
         case "IntBitsSet":
@@ -60,7 +61,7 @@ import {SortPart} from "./SortPart";
             const baseType = type[0]
             const propTypes = baseType.propertyTypes(type.slice(1))
             const innerType = propTypes[key]
-            return new Condition.OnField(key as DataClassProperty<T, unknown>, parseObject(data[key], [Condition, innerType]))
+            return new Condition.OnField(key as TProperty1<T, unknown>, parseObject(data[key], [Condition, innerType]))
     }
 }
 
@@ -103,8 +104,11 @@ import {SortPart} from "./SortPart";
 (Condition.LessThanOrEqual as any).prototype.toJSON = function (this: Condition.LessThanOrEqual<any>): Record<string, any> {
     return {LessThanOrEqual: this.value}
 };
-(Condition.Search as any).prototype.toJSON = function (this: Condition.Search): Record<string, any> {
-    return {Search: {value: this.value, ignoreCase: this.ignoreCase}}
+(Condition.StringContains as any).prototype.toJSON = function (this: Condition.StringContains): Record<string, any> {
+    return {StringContains: {value: this.value, ignoreCase: this.ignoreCase}}
+};
+(Condition.FullTextSearch as any).prototype.toJSON = function (this: Condition.FullTextSearch<any>): Record<string, any> {
+    return {FullTextSearch: {value: this.value, ignoreCase: this.ignoreCase}}
 };
 (Condition.IntBitsClear as any).prototype.toJSON = function (this: Condition.IntBitsClear): Record<string, any> {
     return {IntBitsClear: this.mask}
@@ -186,7 +190,7 @@ import {SortPart} from "./SortPart";
             const baseType = type[0]
             const propTypes = baseType.propertyTypes(type.slice(1))
             const innerType = propTypes[key]
-            return new Modification.OnField(key as DataClassProperty<T, unknown>, parseObject(data[key], [Modification, innerType]))
+            return new Modification.OnField(key as TProperty1<T, unknown>, parseObject(data[key], [Modification, innerType]))
     }
 }
 
@@ -253,5 +257,5 @@ import {SortPart} from "./SortPart";
 (SortPart as any).fromJSON = <T>(value: string, types: Array<ReifiedType>): SortPart<T> => {
     const descending = value.startsWith('-')
     const realName = descending ? value.substring(1) : value
-    return new SortPart<T>(realName as PartialDataClassProperty<T>, !descending)
+    return new SortPart<T>(realName as (keyof T & string), !descending)
 }

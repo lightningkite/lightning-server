@@ -1,4 +1,3 @@
-import { EntryChange } from './EntryChange';
 import { ReifiedType } from '@lightningkite/khrysalis-runtime';
 export declare class ListChange<T extends any> {
     readonly wholeList: (Array<T> | null);
@@ -18,4 +17,3 @@ export declare class ListChange<T extends any> {
     equals: (other: any) => boolean;
     hashCode: () => number;
 }
-export declare function xEntryChangeListChange<T extends any>(this_: EntryChange<T>): ListChange<T>;

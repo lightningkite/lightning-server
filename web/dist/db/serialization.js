@@ -34,8 +34,10 @@ Condition_1.Condition.fromJSON = (data, types) => {
             return new Condition_1.Condition.GreaterThanOrEqual((0, khrysalis_runtime_1.parseObject)(data.GreaterThanOrEqual, type));
         case "LessThanOrEqual":
             return new Condition_1.Condition.LessThanOrEqual((0, khrysalis_runtime_1.parseObject)(data.LessThanOrEqual, type));
-        case "Search":
-            return (0, khrysalis_runtime_1.parseObject)(data.Search, [Condition_1.Condition.Search]);
+        case "StringContains":
+            return (0, khrysalis_runtime_1.parseObject)(data.StringContains, [Condition_1.Condition.StringContains]);
+        case "FullTextSearch":
+            return (0, khrysalis_runtime_1.parseObject)(data.FullTextSearch, [Condition_1.Condition.FullTextSearch]);
         case "IntBitsClear":
             return new Condition_1.Condition.IntBitsClear(data.IntBitsClear);
         case "IntBitsSet":
@@ -102,8 +104,11 @@ Condition_1.Condition.GreaterThanOrEqual.prototype.toJSON = function () {
 Condition_1.Condition.LessThanOrEqual.prototype.toJSON = function () {
     return { LessThanOrEqual: this.value };
 };
-Condition_1.Condition.Search.prototype.toJSON = function () {
-    return { Search: { value: this.value, ignoreCase: this.ignoreCase } };
+Condition_1.Condition.StringContains.prototype.toJSON = function () {
+    return { StringContains: { value: this.value, ignoreCase: this.ignoreCase } };
+};
+Condition_1.Condition.FullTextSearch.prototype.toJSON = function () {
+    return { FullTextSearch: { value: this.value, ignoreCase: this.ignoreCase } };
 };
 Condition_1.Condition.IntBitsClear.prototype.toJSON = function () {
     return { IntBitsClear: this.mask };

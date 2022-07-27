@@ -23,7 +23,7 @@ exports.LiveCompleteModelApi = LiveCompleteModelApi;
         constructor() {
         }
         create(Model, root, multiplexSocketUrl, path, token, headers = new Map([])) {
-            return new LiveCompleteModelApi(new LiveReadModelApi_1.LiveReadModelApi(`${root}${path}`, token, headers, Model), new LiveWriteModelApi_1.LiveWriteModelApi(`${root}${path}`, token, headers, Model), LiveObserveModelApi_1.LiveObserveModelApi.Companion.INSTANCE.create(Model, multiplexSocketUrl, token, headers, path));
+            return new LiveCompleteModelApi(LiveReadModelApi_1.LiveReadModelApi.Companion.INSTANCE.create(Model, root, path, token, headers), LiveWriteModelApi_1.LiveWriteModelApi.Companion.INSTANCE.create(Model, root, path, token, headers), LiveObserveModelApi_1.LiveObserveModelApi.Companion.INSTANCE.create(Model, multiplexSocketUrl, token, headers, path));
         }
     }
     Companion.INSTANCE = new Companion();
