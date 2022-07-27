@@ -1,7 +1,6 @@
 @file:SharedCode
 package com.lightningkite.lightningdb
 
-import com.lightningkite.khrysalis.IsHashable
 import com.lightningkite.khrysalis.SharedCode
 import kotlin.math.sqrt
 
