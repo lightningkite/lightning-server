@@ -7,3 +7,4 @@ java_pid*.hprof
 local
 settings.yaml
 .terraform
+*.tfstate
