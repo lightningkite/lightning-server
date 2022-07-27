@@ -47,16 +47,16 @@ khrysalis {
     iosProjectName = "LightningServer"
     iosProjectFolder = rootDir.resolve("ios")
     iosSourceFolder = rootDir.resolve("ios/LightningServer/Classes/shared")
-    webProjectName = "@lightningkite/ktor-batteries"
+    webProjectName = "@lightningkite/lightning-server"
     webProjectFolder = rootDir.resolve("web")
     webSourceFolder = rootDir.resolve("web/src")
     libraryMode = true
 }
 
 standardPublishing {
-    name.set("Ktor-Batteries-Shared")
+    name.set("Lightning-server-Shared")
     description.set("A tool for communication between a server and a client built around Ktor servers.")
-    github("lightningkite", "ktor-batteries")
+    github("lightningkite", "lightning-server")
 
     licenses {
         mit()

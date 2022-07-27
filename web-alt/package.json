@@ -1,5 +1,5 @@
 {
-  "name": "@lightningkite/ktor-batteries-simplified",
+  "name": "@lightningkite/lightning-server-simplified",
   "version": "0.1.6",
   "description": "",
   "main": "dist/index.js",
@@ -31,7 +31,7 @@
   "author": "Lightning Kite",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lightningkite/ktor-batteries.git"
+    "url": "git+https://github.com/lightningkite/lightning-server.git"
   },
   "keywords": [
     "batteries",
@@ -40,7 +40,7 @@
   ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/lightningkite/ktor-batteries/issues"
+    "url": "https://github.com/lightningkite/lightning-server/issues"
   },
-  "homepage": "https://github.com/lightningkite/ktor-batteries#readme"
+  "homepage": "https://github.com/lightningkite/lightning-server#readme"
 }

@@ -1,0 +1,54 @@
+{
+  "database": {
+    "url": "mongodb://master:E0Vm8dELQnxeBYTGuyvhqB0s1zmy5mlE@demo-test-database.cluster-ca9aa9iabzgd.us-west-2.docdb.amazonaws.com:27017/?replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false",
+    "databaseName": "default"
+  },
+  "email": {
+    "option": "Console",
+    "smtp": null
+  },
+  "exceptions": {
+    "sentryDsn": null
+  },
+  "files": {
+    "storageUrl": "file:///home/jivie/Projects/lightning-server/./local/files",
+    "key": null,
+    "signedUrlExpiration": null,
+    "jwtSigner": {
+      "expiration": "PT8760H",
+      "emailExpiration": "PT1H",
+      "secret": "H7*d~Zyi*+7unX!aQx&,,:K7zfTBQDJ`{aH0U?*M?Em#i&&UT8LkD2a[p6^>?cZ;",
+      "issuer": null,
+      "audience": null
+    }
+  },
+  "general": {
+    "projectName": "My Project",
+    "host": "0.0.0.0",
+    "port": 8080,
+    "publicUrl": "http://0.0.0.0:8080",
+    "debug": true,
+    "cors": {
+      "allowedDomains": ["*"]
+    }
+  },
+  "jwt": {
+    "expiration": "PT8760H",
+    "emailExpiration": "PT1H",
+    "secret": "JbXnKiT<K{8m]K(mAll^a!=M`x{W=!GUQ34aPw1ph@{CW:6u0^5[s)UcdSv!6ZWh",
+    "issuer": null,
+    "audience": null
+  },
+  "logging": {
+    "default": {
+      "filePattern": null,
+      "toConsole": true,
+      "level": "INFO",
+      "additive": false
+    },
+    "logger": null
+  },
+  "oauth-apple": null,
+  "oauth-github": null,
+  "oauth-google": null
+}

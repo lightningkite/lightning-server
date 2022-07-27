@@ -38,9 +38,9 @@ khrysalis {
 }
 
 standardPublishing {
-    name.set("Ktor-Batteries-Client")
+    name.set("Lightning-server-Client")
     description.set("The client side of communication between server and client.")
-    github("lightningkite", "ktor-batteries")
+    github("lightningkite", "lightning-server")
 
     licenses {
         mit()

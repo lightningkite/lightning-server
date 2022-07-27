@@ -25,7 +25,7 @@ export namespace LiveCompleteModelApi {
         public static INSTANCE = new Companion();
         
         public create<Model extends HasId<string>>(Model: Array<any>, root: string, multiplexSocketUrl: string, path: string, token: string, headers: Map<string, string> = new Map([])): LiveCompleteModelApi<Model> {
-            return new LiveCompleteModelApi<Model>(new LiveReadModelApi<Model>(`${root}${path}`, token, headers, Model), new LiveWriteModelApi<Model>(`${root}${path}`, token, headers, Model), LiveObserveModelApi.Companion.INSTANCE.create<Model>(Model, multiplexSocketUrl, token, headers, path));
+            return new LiveCompleteModelApi<Model>(LiveReadModelApi.Companion.INSTANCE.create<Model>(Model, root, path, token, headers), LiveWriteModelApi.Companion.INSTANCE.create<Model>(Model, root, path, token, headers), LiveObserveModelApi.Companion.INSTANCE.create<Model>(Model, multiplexSocketUrl, token, headers, path));
         }
     }
 }

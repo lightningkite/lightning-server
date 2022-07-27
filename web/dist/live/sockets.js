@@ -69,7 +69,7 @@ function multiplexedSocket(url, path, inType, outType, onSetup = (it) => { }) {
     return sharedSocket(url).pipe((0, operators_1.map)((it) => {
         //            println("Setting up socket to $shortUrl with $path")
         lastSocket = it;
-        it.write.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, true, undefined, undefined)), binary: null });
+        it.write.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, true, undefined, undefined, undefined)), binary: null });
         const part = new MultiplexedWebsocketPart(it.read.pipe((0, rxjs_1.map)((it) => {
             const text = it.text;
             if (text === null) {
@@ -84,7 +84,7 @@ function multiplexedSocket(url, path, inType, outType, onSetup = (it) => { }) {
             }
             return message.channel === channel ? message.data : null;
         }), (0, rxjs_1.filter)(rxjs_plus_1.isNonNull)), (message) => {
-            it.write.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, undefined, undefined, undefined, message)), binary: null });
+            it.write.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, undefined, undefined, undefined, message, undefined)), binary: null });
         });
         const typedPart = new WebSocketIsh(part.messages.pipe((0, rxjs_1.map)((it) => (rxjs_plus_1.JSON2.parse(it, inType))), (0, rxjs_1.filter)(rxjs_plus_1.isNonNull)), (m) => {
             part.send(JSON.stringify(m));
@@ -96,7 +96,7 @@ function multiplexedSocket(url, path, inType, outType, onSetup = (it) => { }) {
         //            println("Disconnecting channel on socket to $shortUrl with $path")
         const temp41 = ((_a = lastSocket === null || lastSocket === void 0 ? void 0 : lastSocket.write) !== null && _a !== void 0 ? _a : null);
         if (temp41 !== null) {
-            temp41.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, undefined, true, undefined)), binary: null });
+            temp41.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, undefined, true, undefined, undefined)), binary: null });
         }
         ;
     }));

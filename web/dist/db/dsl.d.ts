@@ -1,16 +1,13 @@
 import { Condition } from './Condition';
-import { DataClassProperty } from './DataClassProperty';
 import { Modification } from './Modification';
-import { Comparable } from '@lightningkite/khrysalis-runtime';
+import { Comparable, TProperty1 } from '@lightningkite/khrysalis-runtime';
 export declare function startChain<T extends any>(): PropChain<T, T>;
 export declare class PropChain<From extends any, To extends any> {
     readonly mapCondition: ((a: Condition<To>) => Condition<From>);
     readonly mapModification: ((a: Modification<To>) => Modification<From>);
     constructor(mapCondition: ((a: Condition<To>) => Condition<From>), mapModification: ((a: Modification<To>) => Modification<From>));
-    get<V extends any>(prop: DataClassProperty<To, V>): PropChain<From, V>;
-    hashCode(): number;
+    get<V extends any>(prop: TProperty1<To, V>): PropChain<From, V>;
     toString(): string;
-    equals(other: (any | null)): boolean;
 }
 export declare function condition<T extends any>(setup: ((a: PropChain<T, T>) => Condition<T>)): Condition<T>;
 export declare function modification<T extends any>(setup: ((a: PropChain<T, T>) => Modification<T>)): Modification<T>;
@@ -32,6 +29,7 @@ export declare function xPropChainAnyClear<K extends any>(this_: PropChain<K, nu
 export declare function xPropChainAnySet<K extends any>(this_: PropChain<K, number>, mask: number): Condition<K>;
 export declare function xPropChainContains<K extends any>(this_: PropChain<K, string>, value: string): Condition<K>;
 export declare function xPropChainContainsCased<K extends any>(this_: PropChain<K, string>, value: string, ignoreCase: boolean): Condition<K>;
+export declare function xPropChainFullTextSearch<K extends any, V extends any>(this_: PropChain<K, V>, value: string, ignoreCase: boolean): Condition<K>;
 export declare function xPropChainAll<K extends any, T extends any>(this_: PropChain<K, Array<T>>, condition: ((a: PropChain<T, T>) => Condition<T>)): Condition<K>;
 export declare function xPropChainAny<K extends any, T extends any>(this_: PropChain<K, Array<T>>, condition: ((a: PropChain<T, T>) => Condition<T>)): Condition<K>;
 export declare function xPropChainSizesEquals<K extends any, T extends any>(this_: PropChain<K, Array<T>>, count: number): Condition<K>;

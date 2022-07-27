@@ -1220,7 +1220,7 @@ BRF:58
 BRH:25
 end_of_record
 TN:
-SF:src/shared/DataClassProperty.ts
+SF:src/shared/TProperty1Extensions.ts
 FN:10,keyGet
 FN:13,keySet
 FNF:2

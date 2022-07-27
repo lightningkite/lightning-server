@@ -62,7 +62,7 @@ export function multiplexedSocket<IN extends any, OUT extends any>(url: string, 
     return sharedSocket(url).pipe(map((it: WebSocketInterface): WebSocketIsh<IN, OUT> => {
         //            println("Setting up socket to $shortUrl with $path")
         lastSocket = it;
-        it.write.next({ text: JSON.stringify(new MultiplexMessage(channel, path, true, undefined, undefined)), binary: null });
+        it.write.next({ text: JSON.stringify(new MultiplexMessage(channel, path, true, undefined, undefined, undefined)), binary: null });
         const part = new MultiplexedWebsocketPart(it.read.pipe(rMap((it: WebSocketFrame): (string | null) => {
                         const text = it.text
                         if(text === null) { return null }
@@ -71,7 +71,7 @@ export function multiplexedSocket<IN extends any, OUT extends any>(url: string, 
                         if(message === null) { return null }
                         return message.channel === channel ? message.data : null
             }), filter(isNonNull)), (message: string): void => {
-                it.write.next({ text: JSON.stringify(new MultiplexMessage(channel, undefined, undefined, undefined, message)), binary: null });
+                it.write.next({ text: JSON.stringify(new MultiplexMessage(channel, undefined, undefined, undefined, message, undefined)), binary: null });
         });
         const typedPart = new WebSocketIsh<IN, OUT>(part.messages.pipe(rMap((it: string): (IN | null) => (JSON2.parse<IN>(it, inType))), filter(isNonNull)), (m: OUT): void => {
             part.send(JSON.stringify(m));
@@ -82,7 +82,7 @@ export function multiplexedSocket<IN extends any, OUT extends any>(url: string, 
         //            println("Disconnecting channel on socket to $shortUrl with $path")
         const temp41 = (lastSocket?.write ?? null);
         if(temp41 !== null) {
-            temp41.next({ text: JSON.stringify(new MultiplexMessage(channel, path, undefined, true, undefined)), binary: null })
+            temp41.next({ text: JSON.stringify(new MultiplexMessage(channel, path, undefined, true, undefined, undefined)), binary: null })
         };
     }));
 }

@@ -129,9 +129,9 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 
 
 standardPublishing {
-    name.set("Ktor-Batteries-Server")
+    name.set("Lightning-server-Server")
     description.set("A set of tools to fill in/replace what Ktor is lacking in.")
-    github("lightningkite", "ktor-batteries")
+    github("lightningkite", "lightning-server")
 
     licenses {
         mit()

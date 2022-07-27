@@ -1,6 +1,5 @@
 import { Condition } from './Condition';
-import { DataClassProperty } from './DataClassProperty';
-import { ReifiedType } from '@lightningkite/khrysalis-runtime';
+import { ReifiedType, TProperty1 } from '@lightningkite/khrysalis-runtime';
 export declare class Modification<T extends any> {
     protected constructor();
     hashCode(): number;
@@ -271,9 +270,9 @@ export declare namespace Modification {
 }
 export declare namespace Modification {
     class OnField<K extends any, V extends any> extends Modification<K> {
-        readonly key: DataClassProperty<K, V>;
+        readonly key: TProperty1<K, V>;
         readonly modification: Modification<V>;
-        constructor(key: DataClassProperty<K, V>, modification: Modification<V>);
+        constructor(key: TProperty1<K, V>, modification: Modification<V>);
         static properties: string[];
         static propertyTypes(K: ReifiedType, V: ReifiedType): {
             key: (StringConstructor | ReifiedType<unknown>)[];

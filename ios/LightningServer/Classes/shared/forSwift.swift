@@ -88,6 +88,7 @@ fileprivate struct ConditionCodingKeys: CodingKey, Hashable {
     static let GreaterThanOrEqual = ConditionCodingKeys(stringValue: "GreaterThanOrEqual")
     static let LessThanOrEqual = ConditionCodingKeys(stringValue: "LessThanOrEqual")
     static let FullTextSearch = ConditionCodingKeys(stringValue: "FullTextSearch")
+    static let StringContains = ConditionCodingKeys(stringValue: "StringContains")
     static let IntBitsClear = ConditionCodingKeys(stringValue: "IntBitsClear")
     static let IntBitsSet = ConditionCodingKeys(stringValue: "IntBitsSet")
     static let IntBitsAnyClear = ConditionCodingKeys(stringValue: "IntBitsAnyClear")
@@ -237,6 +238,11 @@ extension ConditionLessThanOrEqual: ConditionProtocol {
         try structure.encode(value, forKey: .LessThanOrEqual)
     }
 }
+extension ConditionStringContains: ConditionProtocol {
+    fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ConditionCodingKeys>) throws {
+        try structure.encodeCodable(self, forKey: .StringContains)
+    }
+}
 extension ConditionFullTextSearch: ConditionProtocol {
     fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ConditionCodingKeys>) throws {
         try structure.encodeCodable(self, forKey: .FullTextSearch)
@@ -339,6 +345,8 @@ extension Condition: AltCodable {
             case .LessThanOrEqual:
                 let selfType = (Self.self as! ComparableCondition.Type)
                 return selfType.conditionLessThanOrEqual(try structure.decode(T.self, forKey: key)) as! Self
+            case .StringContains:
+                return ConditionStringContains<String>(try structure.decode(String.self, forKey: key), ignoreCase: true) as! Self
             case .FullTextSearch:
                 return ConditionFullTextSearch<String>(try structure.decode(String.self, forKey: key), ignoreCase: true) as! Self
             case .IntBitsClear:

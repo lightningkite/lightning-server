@@ -25,7 +25,7 @@ import kotlin.reflect.KType
 
 fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     val safeDocumentables = endpoints.filter { it.inputType == Unit.serializer() || it.route.method != HttpMethod.GET }.toList()
-    appendLine("import { ${skipSet.joinToString()}, apiCall, Path } from '@lightningkite/ktor-batteries-simplified'")
+    appendLine("import { ${skipSet.joinToString()}, apiCall, Path } from '@lightningkite/lightning-server-simplified'")
     appendLine()
     usedTypes
         .sortedBy { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') }

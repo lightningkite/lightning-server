@@ -17,7 +17,7 @@ data class CollectionChanges<T: IsCodableAndHashable>(
     constructor(old: T? = null, new: T? = null):this(changes = if(old != null || new != null) listOf(EntryChange(old, new)) else listOf())
 }
 
-fun <T: HasId<ID>, ID: Equatable> List<T>.apply(changes: CollectionChanges<T>): List<T> {
+fun <T: HasId<ID>, ID: Comparable<ID>> List<T>.apply(changes: CollectionChanges<T>): List<T> {
     if(changes.replace != null) {
         return changes.replace
     }
