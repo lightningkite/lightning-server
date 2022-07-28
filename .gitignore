@@ -8,3 +8,4 @@ local
 settings.yaml
 .terraform
 *.tfstate
+settings.json
