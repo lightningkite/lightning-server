@@ -346,7 +346,7 @@ extension Condition: AltCodable {
                 let selfType = (Self.self as! ComparableCondition.Type)
                 return selfType.conditionLessThanOrEqual(try structure.decode(T.self, forKey: key)) as! Self
             case .StringContains:
-                return ConditionStringContains<String>(try structure.decode(String.self, forKey: key), ignoreCase: true) as! Self
+                return ConditionStringContains(try structure.decode(String.self, forKey: key), ignoreCase: true) as! Self
             case .FullTextSearch:
                 return ConditionFullTextSearch<String>(try structure.decode(String.self, forKey: key), ignoreCase: true) as! Self
             case .IntBitsClear:

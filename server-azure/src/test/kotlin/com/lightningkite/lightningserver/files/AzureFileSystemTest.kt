@@ -1,13 +1,16 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
+import com.lightningkite.lightningserver.serialization.Serialization
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.encodeToString
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
@@ -25,7 +28,7 @@ class AzureFileSystemTest {
                 return@runBlocking
             }
             AzureFileSystem
-            val system = FilesSettings(credentials.readText(), signedUrlExpiration = Duration.ofSeconds(100))()
+            val system = FilesSettings(credentials.readText(), signedUrlExpiration = Duration.ofDays(1))()
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
             testFile.write(HttpContent.Text(message, ContentType.Text.Plain))
@@ -33,11 +36,14 @@ class AzureFileSystemTest {
             assertNotNull(testFile.info())
             assertContains(testFile.parent!!.list()!!.also { println(it) }, testFile)
             assert(testFile.signedUrl.startsWith(testFile.url))
+            println("testFile.signedUrl: ${testFile.signedUrl}")
             assert(client.get(testFile.signedUrl).status.isSuccess())
             assert(client.put(testFile.uploadUrl(Duration.ofHours(1))) {
                 header("x-ms-blob-type", "BlockBlob")
                 setBody(TextContent(message, io.ktor.http.ContentType.Text.Plain))
             }.status.isSuccess())
+            println(Serialization.json.encodeToString(ServerFile(testFile.url)))
+            assertTrue(Serialization.json.encodeToString(ServerFile(testFile.url)).contains("?"))
         }
     }
 }
