@@ -39,7 +39,7 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
     override fun serialize(encoder: Encoder, value: ServerFile) {
         val file = FileSystem.resolve(value.location)
         if(file == null) {
-            LoggerFactory.getLogger("com.lightningkite.lightningserver.files").warn("The given url (${value.location}) does not start with any files root.")
+            LoggerFactory.getLogger("com.lightningkite.lightningserver.files").warn("The given url (${value.location}) does not start with any files root. Known roots: ${FileSystem.urlRoots}")
             encoder.encodeString(value.location)
         } else {
             encoder.encodeString(file.signedUrl)
