@@ -7,6 +7,7 @@ import com.lightningkite.khrysalis.fatalError
 import kotlinx.serialization.*
 import kotlin.reflect.KClass
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.SetSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.Decoder
@@ -42,8 +43,10 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
             register(Condition.Not.serializer(inner))
             register(Condition.Equal.serializer(inner))
             register(Condition.NotEqual.serializer(inner))
-            register(Condition.Inside.serializer(inner))
-            register(Condition.NotInside.serializer(inner))
+            register(Condition.ListInside.serializer(inner))
+            register(Condition.ListNotInside.serializer(inner))
+            register(Condition.SetInside.serializer(inner))
+            register(Condition.SetNotInside.serializer(inner))
             register(Condition.GreaterThan.serializer(inner))
             register(Condition.LessThan.serializer(inner))
             register(Condition.GreaterThanOrEqual.serializer(inner))
@@ -58,6 +61,13 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
                 register(Condition.IntBitsSet.serializer())
                 register(Condition.IntBitsAnyClear.serializer())
                 register(Condition.IntBitsAnySet.serializer())
+            }
+            if (inner.descriptor.kind == StructureKind.LIST) {
+                inner.listElement()?.let { element ->
+                    register(Condition.AllElements.serializer(element))
+                    register(Condition.AnyElements.serializer(element))
+                    register(Condition.SizesEquals.serializer(element))
+                }
             }
             if (inner.descriptor.kind == StructureKind.LIST) {
                 inner.listElement()?.let { element ->
@@ -104,8 +114,10 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
             is Condition.Not -> "Not"
             is Condition.Equal -> "Equal"
             is Condition.NotEqual -> "NotEqual"
-            is Condition.Inside -> "Inside"
-            is Condition.NotInside -> "NotInside"
+            is Condition.ListInside -> "ListInside"
+            is Condition.ListNotInside -> "ListNotInside"
+            is Condition.SetInside -> "SetInside"
+            is Condition.SetNotInside -> "SetNotInside"
             is Condition.GreaterThan -> "GreaterThan"
             is Condition.LessThan -> "LessThan"
             is Condition.GreaterThanOrEqual -> "GreaterThanOrEqual"
@@ -204,17 +216,29 @@ class ConditionNotEqualSerializer<T: IsEquatable>(val inner: KSerializer<T>) : K
     override fun deserialize(decoder: Decoder): Condition.NotEqual<T> = Condition.NotEqual(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: Condition.NotEqual<T>) = encoder.encodeSerializableValue(to, value.value)
 }
-class ConditionInsideSerializer<T: IsEquatable>(val inner: KSerializer<T>) : KSerializer<Condition.Inside<T>> {
+class ConditionListInsideSerializer<T: IsEquatable>(val inner: KSerializer<T>) : KSerializer<Condition.ListInside<T>> {
     val to by lazy { ListSerializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Inside") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.Inside<T> = Condition.Inside(decoder.decodeSerializableValue(to))
-    override fun serialize(encoder: Encoder, value: Condition.Inside<T>) = encoder.encodeSerializableValue(to, value.values)
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("ListInside") { to.descriptor }
+    override fun deserialize(decoder: Decoder): Condition.ListInside<T> = Condition.ListInside(decoder.decodeSerializableValue(to))
+    override fun serialize(encoder: Encoder, value: Condition.ListInside<T>) = encoder.encodeSerializableValue(to, value.values)
 }
-class ConditionNotInsideSerializer<T: IsEquatable>(val inner: KSerializer<T>) : KSerializer<Condition.NotInside<T>> {
+class ConditionListNotInsideSerializer<T: IsEquatable>(val inner: KSerializer<T>) : KSerializer<Condition.ListNotInside<T>> {
     val to by lazy { ListSerializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("NotInside") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.NotInside<T> = Condition.NotInside(decoder.decodeSerializableValue(to))
-    override fun serialize(encoder: Encoder, value: Condition.NotInside<T>) = encoder.encodeSerializableValue(to, value.values)
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("ListNotInside") { to.descriptor }
+    override fun deserialize(decoder: Decoder): Condition.ListNotInside<T> = Condition.ListNotInside(decoder.decodeSerializableValue(to))
+    override fun serialize(encoder: Encoder, value: Condition.ListNotInside<T>) = encoder.encodeSerializableValue(to, value.values)
+}
+class ConditionSetInsideSerializer<T: IsEquatable>(val inner: KSerializer<T>) : KSerializer<Condition.SetInside<T>> {
+    val to by lazy { SetSerializer(inner) }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("SetInside") { to.descriptor }
+    override fun deserialize(decoder: Decoder): Condition.SetInside<T> = Condition.SetInside(decoder.decodeSerializableValue(to))
+    override fun serialize(encoder: Encoder, value: Condition.SetInside<T>) = encoder.encodeSerializableValue(to, value.values)
+}
+class ConditionSetNotInsideSerializer<T: IsEquatable>(val inner: KSerializer<T>) : KSerializer<Condition.SetNotInside<T>> {
+    val to by lazy { SetSerializer(inner) }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("SetNotInside") { to.descriptor }
+    override fun deserialize(decoder: Decoder): Condition.SetNotInside<T> = Condition.SetNotInside(decoder.decodeSerializableValue(to))
+    override fun serialize(encoder: Encoder, value: Condition.SetNotInside<T>) = encoder.encodeSerializableValue(to, value.values)
 }
 class ConditionGreaterThanSerializer<T: Comparable<T>>(val inner: KSerializer<T>) : KSerializer<Condition.GreaterThan<T>> {
     val to by lazy { inner }

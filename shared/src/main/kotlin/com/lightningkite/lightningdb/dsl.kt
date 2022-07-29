@@ -31,9 +31,12 @@ val <K: IsCodableAndHashable> PropChain<K, K>.never: Condition<K> get() = Condit
 infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.eq(value: T) = mapCondition(Condition.Equal(value))
 infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.neq(value: T) = mapCondition(Condition.NotEqual(value))
 infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.ne(value: T) = mapCondition(Condition.NotEqual(value))
-infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.inside(values: List<T>) = mapCondition(Condition.Inside(values))
-infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.nin(values: List<T>) = mapCondition(Condition.NotInside(values))
-infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.notIn(values: List<T>) = mapCondition(Condition.NotInside(values))
+infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.inside(values: List<T>) = mapCondition(Condition.ListInside(values))
+infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.nin(values: List<T>) = mapCondition(Condition.ListNotInside(values))
+infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.notIn(values: List<T>) = mapCondition(Condition.ListNotInside(values))
+infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.inside(values: Set<T>) = mapCondition(Condition.SetInside(values))
+infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.nin(values: Set<T>) = mapCondition(Condition.SetNotInside(values))
+infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.notIn(values: Set<T>) = mapCondition(Condition.SetNotInside(values))
 infix fun <K : IsCodableAndHashable, T : ComparableCodableAndHashable<T>> PropChain<K, T>.gt(value: T) =
     mapCondition(Condition.GreaterThan(value))
 
@@ -69,6 +72,15 @@ inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<
     mapCondition(Condition.AnyElements(startChain<T>().let(condition)))
 
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, List<T>>.sizesEquals(count: Int) =
+    mapCondition(Condition.SizesEquals(count))
+
+inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.setAll(condition: (PropChain<T, T>) -> Condition<T>) =
+    mapCondition(Condition.AllElements(startChain<T>().let(condition)))
+
+inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.setAny(condition: (PropChain<T, T>) -> Condition<T>) =
+    mapCondition(Condition.AnyElements(startChain<T>().let(condition)))
+
+infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.setSizesEquals(count: Int) =
     mapCondition(Condition.SizesEquals(count))
 
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Map<String, T>>.containsKey(key: String) =

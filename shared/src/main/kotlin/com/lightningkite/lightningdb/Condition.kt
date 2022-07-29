@@ -98,13 +98,21 @@ open class Condition<T: IsCodableAndHashable> protected constructor()  {
     @SerialName("NotEqual")
     data class NotEqual<T: IsCodableAndHashable>(val value: T): Condition<T>() { override fun invoke(on: T): Boolean = on != value }
 
-    @Serializable(ConditionInsideSerializer::class)
-    @SerialName("Inside")
-    data class Inside<T: IsCodableAndHashable>(val values: List<T>): Condition<T>() { override fun invoke(on: T): Boolean = values.contains(on) }
+    @Serializable(ConditionListInsideSerializer::class)
+    @SerialName("ListInside")
+    data class ListInside<T: IsCodableAndHashable>(val values: List<T>): Condition<T>() { override fun invoke(on: T): Boolean = values.contains(on) }
 
-    @Serializable(ConditionNotInsideSerializer::class)
-    @SerialName("NotInside")
-    data class NotInside<T: IsCodableAndHashable>(val values: List<T>): Condition<T>() { override fun invoke(on: T): Boolean = !values.contains(on) }
+    @Serializable(ConditionListNotInsideSerializer::class)
+    @SerialName("ListNotInside")
+    data class ListNotInside<T: IsCodableAndHashable>(val values: List<T>): Condition<T>() { override fun invoke(on: T): Boolean = !values.contains(on) }
+
+    @Serializable(ConditionSetInsideSerializer::class)
+    @SerialName("SetInside")
+    data class SetInside<T: IsCodableAndHashable>(val values: Set<T>): Condition<T>() { override fun invoke(on: T): Boolean = values.contains(on) }
+
+    @Serializable(ConditionSetNotInsideSerializer::class)
+    @SerialName("SetNotInside")
+    data class SetNotInside<T: IsCodableAndHashable>(val values: Set<T>): Condition<T>() { override fun invoke(on: T): Boolean = !values.contains(on) }
 
     @Serializable(ConditionGreaterThanSerializer::class)
     @SerialName("GreaterThan")
@@ -158,17 +166,29 @@ open class Condition<T: IsCodableAndHashable> protected constructor()  {
     @SerialName("IntBitsAnySet")
     data class IntBitsAnySet(val mask: Int): Condition<Int>() { override fun invoke(on: Int): Boolean = on and mask > 0 }
 
-    @Serializable(ConditionAllElementsSerializer::class)
-    @SerialName("AllElements")
-    data class AllElements<E: IsCodableAndHashable>(val condition: Condition<E>): Condition<List<E>>() { override fun invoke(on: List<E>): Boolean = on.all { condition(it) } }
+    @Serializable(ConditionListAllElementsSerializer::class)
+    @SerialName("ListAllElements")
+    data class ListAllElements<E: IsCodableAndHashable>(val condition: Condition<E>): Condition<List<E>>() { override fun invoke(on: List<E>): Boolean = on.all { condition(it) } }
 
-    @Serializable(ConditionAnyElementsSerializer::class)
-    @SerialName("AnyElements")
-    data class AnyElements<E: IsCodableAndHashable>(val condition: Condition<E>): Condition<List<E>>() { override fun invoke(on: List<E>): Boolean = on.any { condition(it) } }
+    @Serializable(ConditionListAnyElementsSerializer::class)
+    @SerialName("ListAnyElements")
+    data class ListAnyElements<E: IsCodableAndHashable>(val condition: Condition<E>): Condition<List<E>>() { override fun invoke(on: List<E>): Boolean = on.any { condition(it) } }
 
-    @Serializable(ConditionSizesEqualsSerializer::class)
-    @SerialName("SizesEquals")
-    data class SizesEquals<E: IsCodableAndHashable>(val count: Int): Condition<List<E>>() { override fun invoke(on: List<E>): Boolean = on.size == count }
+    @Serializable(ConditionListSizesEqualsSerializer::class)
+    @SerialName("ListSizesEquals")
+    data class ListSizesEquals<E: IsCodableAndHashable>(val count: Int): Condition<List<E>>() { override fun invoke(on: List<E>): Boolean = on.size == count }
+
+    @Serializable(ConditionSetAllElementsSerializer::class)
+    @SerialName("SetAllElements")
+    data class SetAllElements<E: IsCodableAndHashable>(val condition: Condition<E>): Condition<Set<E>>() { override fun invoke(on: Set<E>): Boolean = on.all { condition(it) } }
+
+    @Serializable(ConditionSetAnyElementsSerializer::class)
+    @SerialName("SetAnyElements")
+    data class SetAnyElements<E: IsCodableAndHashable>(val condition: Condition<E>): Condition<Set<E>>() { override fun invoke(on: Set<E>): Boolean = on.any { condition(it) } }
+
+    @Serializable(ConditionSetSizesEqualsSerializer::class)
+    @SerialName("SetSizesEquals")
+    data class SetSizesEquals<E: IsCodableAndHashable>(val count: Int): Condition<Set<E>>() { override fun invoke(on: Set<E>): Boolean = on.size == count }
 
     @Serializable(ConditionExistsSerializer::class)
     @SerialName("Exists")
