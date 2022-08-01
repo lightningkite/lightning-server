@@ -72,6 +72,7 @@ suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
     return find(Condition.OnField(HasIdFields._id(), Condition.Inside(ids))).toList()
 }
 
+
 suspend fun <Model : Any>
         FieldCollection<Model>.query(query: Query<Model>): Flow<Model> =
     find(query.condition, query.orderBy, query.skip, query.limit)

@@ -98,21 +98,14 @@ open class Condition<T: IsCodableAndHashable> protected constructor()  {
     @SerialName("NotEqual")
     data class NotEqual<T: IsCodableAndHashable>(val value: T): Condition<T>() { override fun invoke(on: T): Boolean = on != value }
 
-    @Serializable(ConditionListInsideSerializer::class)
+    @Serializable(ConditionInsideSerializer::class)
     @SerialName("ListInside")
-    data class ListInside<T: IsCodableAndHashable>(val values: List<T>): Condition<T>() { override fun invoke(on: T): Boolean = values.contains(on) }
+    data class Inside<T: IsCodableAndHashable>(val values: List<T>): Condition<T>() { override fun invoke(on: T): Boolean = values.contains(on) }
 
-    @Serializable(ConditionListNotInsideSerializer::class)
+    @Serializable(ConditionNotInsideSerializer::class)
     @SerialName("ListNotInside")
-    data class ListNotInside<T: IsCodableAndHashable>(val values: List<T>): Condition<T>() { override fun invoke(on: T): Boolean = !values.contains(on) }
+    data class NotInside<T: IsCodableAndHashable>(val values: List<T>): Condition<T>() { override fun invoke(on: T): Boolean = !values.contains(on) }
 
-    @Serializable(ConditionSetInsideSerializer::class)
-    @SerialName("SetInside")
-    data class SetInside<T: IsCodableAndHashable>(val values: Set<T>): Condition<T>() { override fun invoke(on: T): Boolean = values.contains(on) }
-
-    @Serializable(ConditionSetNotInsideSerializer::class)
-    @SerialName("SetNotInside")
-    data class SetNotInside<T: IsCodableAndHashable>(val values: Set<T>): Condition<T>() { override fun invoke(on: T): Boolean = !values.contains(on) }
 
     @Serializable(ConditionGreaterThanSerializer::class)
     @SerialName("GreaterThan")

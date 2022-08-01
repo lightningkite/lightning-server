@@ -28,8 +28,10 @@ fun Condition<*>.dump(into: Document = Document(), key: String?): Document {
         is Condition.Or -> if(conditions.isEmpty()) into["thisFieldWillNeverExist"] = "no never" else into["\$or"] = conditions.map { it.dump(key = key)  }
         is Condition.Equal -> into.sub(key)["\$eq"] = value
         is Condition.NotEqual -> into.sub(key)["\$ne"] = value
-        is Condition.AllElements<*> -> condition.dump(into.sub(key).sub("\$not").sub("\$elemMatch"), key = "\$not")
-        is Condition.AnyElements<*> -> into.sub(key)["\$elemMatch"] = condition.bson()
+        is Condition.SetAllElements<*> -> condition.dump(into.sub(key).sub("\$not").sub("\$elemMatch"), key = "\$not")
+        is Condition.SetAnyElements<*> -> into.sub(key)["\$elemMatch"] = condition.bson()
+        is Condition.ListAllElements<*> -> condition.dump(into.sub(key).sub("\$not").sub("\$elemMatch"), key = "\$not")
+        is Condition.ListAnyElements<*> -> into.sub(key)["\$elemMatch"] = condition.bson()
         is Condition.Exists<*> -> into[if (key == null) this.key else "$key.${this.key}"] = documentOf("\$exists" to true)
         is Condition.GreaterThan -> into.sub(key)["\$gt"] = value
         is Condition.LessThan -> into.sub(key)["\$lt"] = value
@@ -60,7 +62,8 @@ fun Condition<*>.dump(into: Document = Document(), key: String?): Document {
             "\$search" to value,
             "\$caseSensitive" to !this.ignoreCase
         )
-        is Condition.SizesEquals<*> -> into.sub(key)["\$size"] = count
+        is Condition.SetSizesEquals<*> -> into.sub(key)["\$size"] = count
+        is Condition.ListSizesEquals<*> -> into.sub(key)["\$size"] = count
         is Condition.OnField<*, *> -> condition.dump(into, if (key == null) this.key.name else "$key.${this.key.name}")
     }
     return into
@@ -78,19 +81,30 @@ fun Modification<*>.dump(update: UpdateWithOptions = UpdateWithOptions(), key: S
         is Modification.AppendList<*> -> into.sub("\$push").sub(key)["\$each"] = items
         is Modification.AppendSet<*> -> into.sub("\$addToSet").sub(key)["\$each"] = items
         is Modification.AppendString -> TODO("Appending strings is not supported yet")
-        is Modification.DropFirst<*> -> into["\$pop", key] = -1
-        is Modification.DropLast<*> -> into["\$pop", key] = 1
+        is Modification.SetDropFirst<*> -> into["\$pop", key] = -1
+        is Modification.SetDropLast<*> -> into["\$pop", key] = 1
+        is Modification.ListDropFirst<*> -> into["\$pop", key] = -1
+        is Modification.ListDropLast<*> -> into["\$pop", key] = 1
         is Modification.IfNotNull -> this.modification.dump(update, key)
         is Modification.OnField<*, *> -> modification.dump(update, if (key == null) this.key.name else "$key.${this.key.name}")
-        is Modification.PerElement<*> -> {
+        is Modification.SetPerElement<*> -> {
             val condIdentifier = genName()
             update.options = update.options.arrayFilters(
                 (update.options.arrayFilters ?: listOf()) + condition.dump(key = condIdentifier)
             )
             modification.dump(update, "$key.$[$condIdentifier]")
         }
-        is Modification.Remove<*> -> into["\$pull", key] = condition.bson()
-        is Modification.RemoveInstances<*> -> into["\$pullAll", key] = items
+        is Modification.ListPerElement<*> -> {
+            val condIdentifier = genName()
+            update.options = update.options.arrayFilters(
+                (update.options.arrayFilters ?: listOf()) + condition.dump(key = condIdentifier)
+            )
+            modification.dump(update, "$key.$[$condIdentifier]")
+        }
+        is Modification.RemoveSet<*> -> into["\$pull", key] = condition.bson()
+        is Modification.SetRemoveInstances<*> -> into["\$pullAll", key] = items
+        is Modification.RemoveList<*> -> into["\$pull", key] = condition.bson()
+        is Modification.ListRemoveInstances<*> -> into["\$pullAll", key] = items
         is Modification.Combine<*> -> map.forEach {
             into.sub("\$set")[if (key == null) it.key else "$key.${it.key}"] = it.value
         }

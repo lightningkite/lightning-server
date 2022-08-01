@@ -2381,6 +2381,73 @@ class ConditionTests : MongoTest() {
         Unit
     }
 
+    @Test fun test_Set_all() = runBlocking {
+        val collection = defaultMongo.collection<LargeTestModel>("LargeTestModel_test_Set_all")
+        val lower = LargeTestModel(set = setOf(1, 2, 3))
+        val higher = LargeTestModel(set = setOf(1, 2, 6))
+        val allOut = LargeTestModel(set = setOf(5, 6, 7))
+        val manualSet = setOf(lower, higher, allOut)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        collection.insertOne(allOut)
+        val condition = startChain<LargeTestModel>().set.all { it lt 4 }
+        val results = collection.find(condition).toList()
+        assertContains(results, lower)
+        assertTrue(allOut !in results)
+        assertTrue(higher !in results)
+        assertEquals(manualSet.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    @Test fun test_Set_any() = runBlocking {
+        val collection = defaultMongo.collection<LargeTestModel>("LargeTestModel_test_Set_any")
+        val lower = LargeTestModel(set = setOf(1, 2, 3))
+        val higher = LargeTestModel(set = setOf(1, 2, 6))
+        val allOut = LargeTestModel(set = setOf(5, 6, 7))
+        val manualSet = setOf(lower, higher, allOut)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        collection.insertOne(allOut)
+        val condition = startChain<LargeTestModel>().set.any { it lt 4 }
+        val results = collection.find(condition).toList()
+        assertContains(results, lower)
+        assertContains(results, higher)
+        assertTrue(allOut !in results)
+        assertEquals(manualSet.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    @Test fun test_Set_any_embedded() = runBlocking {
+        val collection = defaultMongo.collection<LargeTestModel>("LargeTestModel_test_Set_any_embedded")
+        val item1 = LargeTestModel(setEmbedded = setOf(ClassUsedForEmbedding(value2 = 1), ClassUsedForEmbedding(value1 = "Other String", value2 = 3)))
+        val item2 = LargeTestModel(setEmbedded = setOf(ClassUsedForEmbedding(value2 = 2), ClassUsedForEmbedding(value1 = "five", value2 = 3)))
+        collection.insertMany(listOf(item1, item2))
+        var condition = startChain<LargeTestModel>().setEmbedded.any { it.value1 eq "five" }
+        var results = collection.find(condition).toList()
+        assertEquals(1, results.size)
+        assertEquals(item2, results.first())
+
+        condition = startChain<LargeTestModel>().setEmbedded.any { it.value2 lt 2 }
+        results = collection.find(condition).toList()
+        assertEquals(1, results.size)
+        assertEquals(item1, results.first())
+        Unit
+    }
+    @Test fun test_Set_size() = runBlocking {
+        val collection = defaultMongo.collection<LargeTestModel>("LargeTestModel_test_Set_size")
+        val matchingSize = LargeTestModel(set = setOf(1, 2, 3))
+        val notMatchingSize = LargeTestModel(set = setOf(1, 2))
+        val manualSet = listOf(matchingSize, notMatchingSize)
+        collection.insertOne(matchingSize)
+        collection.insertOne(notMatchingSize)
+        val condition = startChain<LargeTestModel>().set.sizesEquals(3)
+        val results = collection.find(condition).toList()
+        assertContains(results, matchingSize)
+        assertTrue(notMatchingSize !in results)
+        assertEquals(manualSet.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+
+
+
     @Test fun test_Map_exists() = runBlocking {
         val collection = defaultMongo.collection<LargeTestModel>("LargeTestModel_test_Map_exists")
         val matching = LargeTestModel(map = mapOf("a" to 42))
