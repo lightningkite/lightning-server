@@ -2,13 +2,13 @@
   type: get
   template:
     pattern: 'try getDataClassProperties(type: ~this~)'
-    imports: [ lightningserver ]
+    imports: [ LightningServer ]
 
 - id: com.lightningkite.lightningdb.fields
   type: set
   template:
     pattern: 'registerDataClassProperties(type: ~this~, properties: ~value~)'
-    imports: [ lightningserver ]
+    imports: [ LightningServer ]
 
 - id: com.lightningkite.lightningdb.ServerFile
   type: type
