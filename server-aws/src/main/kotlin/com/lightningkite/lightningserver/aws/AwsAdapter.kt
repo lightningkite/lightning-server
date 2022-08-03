@@ -226,7 +226,7 @@ abstract class AwsAdapter : RequestStreamHandler {
                     ),
                     domain = event.requestContext.domainName,
                     protocol = "https",
-                    sourceIp = event.requestContext.identity.sourceIp
+                    sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0"
                 )
             )
             return APIGatewayV2HTTPResponse(200)

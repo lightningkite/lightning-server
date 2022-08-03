@@ -76,8 +76,8 @@ data class APIGatewayV2WebsocketRequest(
     ) {
         @Serializable
         data class Identity(
-            val userAgent: String,
-            val sourceIp: String,
+            val userAgent: String? = null,
+            val sourceIp: String? = null,
         ) {
         }
     }
