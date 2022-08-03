@@ -46,7 +46,11 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
               version = "~> 2.2.0"
             }
           }
-        
+          backend "s3" {
+            bucket = "${projectName.filter { it.isLetterOrDigit() }}"
+            key    = var.deployment_name
+            region = var.deployment_location
+          }
           required_version = "~> 1.0"
         }
         

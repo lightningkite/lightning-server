@@ -48,20 +48,19 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
     val logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.ktor.lightningServer")
     try {
         install(io.ktor.server.websocket.WebSockets)
-        install(CORS) {
+        generalSettings().cors?.let {
+            install(CORS) {
+                allowMethod(HttpMethod.Post)
+                allowMethod(HttpMethod.Options)
+                allowMethod(HttpMethod.Put)
+                allowMethod(HttpMethod.Patch)
+                allowMethod(HttpMethod.Delete)
 
-            allowMethod(HttpMethod.Post)
-            allowMethod(HttpMethod.Options)
-            allowMethod(HttpMethod.Put)
-            allowMethod(HttpMethod.Patch)
-            allowMethod(HttpMethod.Delete)
+                allowHeader(io.ktor.http.HttpHeaders.ContentType)
+                allowHeader(io.ktor.http.HttpHeaders.Authorization)
 
-            allowHeader(io.ktor.http.HttpHeaders.ContentType)
-            allowHeader(io.ktor.http.HttpHeaders.Authorization)
+                exposedHeaders.addAll(CorsSimpleResponseHeaders)
 
-            exposedHeaders.addAll(CorsSimpleResponseHeaders)
-
-            generalSettings().cors?.let{
                 it.allowedDomains.forEach {
                     allowHost(it, listOf("http", "https", "ws", "wss"))
                 }
@@ -69,7 +68,6 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                     allowHeader(it)
                 }
             }
-
         }
 //        install(StatusPages) {
 //            exception<Exception> { call, it ->
@@ -108,15 +106,18 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                                 b.bytes,
                                 ContentType.parse(b.type.toString())
                             )
+
                             is HttpContent.Text -> call.respondText(b.string, ContentType.parse(b.type.toString()))
                             is HttpContent.OutStream -> call.respondOutputStream(ContentType.parse(b.type.toString())) {
                                 b.write(
                                     this
                                 )
                             }
+
                             is HttpContent.Stream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
                                 b.getStream().copyTo(this)
                             }
+
                             is HttpContent.Multipart -> TODO()
                         }
                     }
@@ -192,15 +193,20 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                 val jobs = HashMap<String, Job>()
                 try {
                     for (incoming in this.incoming) {
-                        val message = Serialization.json.decodeFromString<MultiplexMessage>((incoming as Frame.Text).readText())
+                        val message =
+                            Serialization.json.decodeFromString<MultiplexMessage>((incoming as Frame.Text).readText())
                         val cacheId = "ws/$id/${message.channel}"
                         when {
                             message.start -> {
                                 val path = message.path!!
                                 val match = wsMatcher.match(path)
-                                if (match == null) { logger.warn("match is null!"); continue }
+                                if (match == null) {
+                                    logger.warn("match is null!"); continue
+                                }
                                 val handler = WebSockets.handlers[match.path]
-                                if (handler == null) { logger.warn("handler is null!"); continue }
+                                if (handler == null) {
+                                    logger.warn("handler is null!"); continue
+                                }
                                 cache.set(cacheId, path)
                                 jobs[message.channel] = launch {
                                     pubSub.get<String>(cacheId).collect {
@@ -217,35 +223,49 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                                         )
                                     )
                                     send(Serialization.json.encodeToString(message))
-                                } catch(e: Exception) {
+                                } catch (e: Exception) {
                                     send(Serialization.json.encodeToString(message.copy(error = e.message)))
                                 }
                             }
+
                             message.end -> {
                                 val path = cache.get<String>(cacheId)
-                                if (path == null) { logger.warn("path at $cacheId is null!"); continue }
+                                if (path == null) {
+                                    logger.warn("path at $cacheId is null!"); continue
+                                }
                                 val match = wsMatcher.match(path)
-                                if (match == null) { logger.warn("match is null!"); continue }
+                                if (match == null) {
+                                    logger.warn("match is null!"); continue
+                                }
                                 val handler = WebSockets.handlers[match.path]
-                                if (handler == null) { logger.warn("handler is null!"); continue }
+                                if (handler == null) {
+                                    logger.warn("handler is null!"); continue
+                                }
                                 jobs[message.channel]?.cancel()
                                 try {
                                     handler.disconnect(WebSockets.DisconnectEvent(cacheId))
                                     send(Serialization.json.encodeToString(message))
-                                } catch(e: Exception) {
+                                } catch (e: Exception) {
                                     send(Serialization.json.encodeToString(message.copy(error = e.message)))
                                 }
                             }
+
                             message.data != null -> {
                                 val path = cache.get<String>(cacheId)
-                                if (path == null) { logger.warn("path at $cacheId is null!"); continue }
+                                if (path == null) {
+                                    logger.warn("path at $cacheId is null!"); continue
+                                }
                                 val match = wsMatcher.match(path)
-                                if (match == null) { logger.warn("match is null!"); continue }
+                                if (match == null) {
+                                    logger.warn("match is null!"); continue
+                                }
                                 val handler = WebSockets.handlers[match.path]
-                                if (handler == null) { logger.warn("handler is null!"); continue }
+                                if (handler == null) {
+                                    logger.warn("handler is null!"); continue
+                                }
                                 try {
                                     handler.message(WebSockets.MessageEvent(cacheId, message.data ?: continue))
-                                } catch(e: Exception) {
+                                } catch (e: Exception) {
                                     send(Serialization.json.encodeToString(message.copy(error = e.message)))
                                 }
                             }
@@ -276,6 +296,7 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                         val nextRun = when (val s = it.schedule) {
                             is Schedule.Daily -> ZonedDateTime.of(LocalDate.now().plusDays(1), s.time, s.zone)
                                 .toInstant().toEpochMilli()
+
                             is Schedule.Frequency -> upcomingRun + s.gap.toMillis()
                         }
                         cache.set<Long>(it.name + "-nextRun", nextRun)
@@ -346,6 +367,7 @@ internal suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
         sourceIp = request.origin.remoteHost
     )
 }
+
 internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.ContentType): HttpContent.Multipart {
     return HttpContent.Multipart(object : Flow<HttpContent.Multipart.Part> {
         override suspend fun collect(collector: FlowCollector<HttpContent.Multipart.Part>) {
@@ -356,6 +378,7 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
                             it.name ?: "",
                             it.value
                         )
+
                         is PartData.FileItem -> {
                             val h = it.headers.adapt()
                             HttpContent.Multipart.Part.DataItem(
@@ -369,6 +392,7 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
                                 )
                             )
                         }
+
                         is PartData.BinaryItem -> {
                             val h = it.headers.adapt()
                             HttpContent.Multipart.Part.DataItem(
@@ -382,6 +406,7 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
                                 )
                             )
                         }
+
                         is PartData.BinaryChannelItem -> TODO()
                     }
                 )

@@ -20,7 +20,7 @@ import java.io.File
  */
 @Serializable
 data class NotificationSettings(
-    val implementation: String,
+    val implementation: String = "console",
     val credentials: String? = null
 //) : HealthCheckable {
 ): ()->NotificationInterface {
