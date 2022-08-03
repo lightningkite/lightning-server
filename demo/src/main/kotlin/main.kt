@@ -108,10 +108,10 @@ object Server {
 
 fun main(vararg args: String) {
     Server
-//    loadSettings(File("settings.json"))
-//    runServer(LocalPubSub, LocalCache)
+    loadSettings(File("settings.json"))
+    runServer(LocalPubSub, LocalCache)
 //    println("Settings loaded")
 //    println(Documentable.kotlinApi("test"))
-    File("demo/aws.tf").writeText(buildString { terraformAws("com.lightningkite.lightningserver.demo.AwsHandler", "demo", this) })
+//    File("demo/aws.tf").writeText(buildString { terraformAws("com.lightningkite.lightningserver.demo.AwsHandler", "demo", this) })
 //    println(buildString { terraformAzure("demo", this) })
 }

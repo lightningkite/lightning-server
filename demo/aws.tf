@@ -17,7 +17,11 @@ terraform {
       version = "~> 2.2.0"
     }
   }
-
+  backend "s3" {
+    bucket = "demo"
+    key    = var.deployment_name
+    region = var.deployment_location
+  }
   required_version = "~> 1.0"
 }
 
