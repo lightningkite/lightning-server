@@ -21,7 +21,6 @@ repositories {
     mavenCentral()
 }
 
-val ktorVersion = "2.0.2"
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
 dependencies {

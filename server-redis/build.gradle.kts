@@ -21,14 +21,13 @@ repositories {
     mavenCentral()
 }
 
-val ktorVersion = "2.0.2"
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
 dependencies {
     api(project(":server-core"))
     api("io.lettuce:lettuce-core:6.1.8.RELEASE")
     api("org.signal:embedded-redis:0.8.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.4")
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
     ksp(project(":processor"))
     kspTest(project(":processor"))
