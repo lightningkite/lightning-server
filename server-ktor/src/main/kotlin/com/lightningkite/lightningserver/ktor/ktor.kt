@@ -90,14 +90,12 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                 val routeString = entry.key.path.toString().replace("{...}", "{tailcard...}")
                 route(routeString, HttpMethod.parse(entry.key.method.toString())) {
                     handle {
-                        println("Handling ${entry.key}")
                         val request = call.adapt(entry.key)
                         val result = try {
                             entry.value(request)
                         } catch (e: Exception) {
                             Http.exception(request, e)
                         }
-                        println("Responding with $result")
                         for (header in result.headers.entries) {
                             call.response.header(header.first, header.second)
                         }
