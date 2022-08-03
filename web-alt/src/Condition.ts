@@ -29,15 +29,22 @@ export type Condition<T> =
     | { IntBitsAnyClear: number }
     | { IntBitsAnySet: number }
     | ArrayCondition<T, any>
-    | { SizesEquals: number }
+    | SetCondition<T, any>
     | { Exists: boolean }
     | { IfNotNull: Condition<T> }
     | { [P in keyof T]?: Condition<T[P]> }
 
 type ArrayCondition<T, E> =
-    T extends Array<E> ? ({ AllElements: Condition<E> }
-            | { AnyElements: Condition<E> })
+    T extends Array<E> ? ({ ListAllElements: Condition<E> }
+            | { ListAnyElements: Condition<E> })
+            | { ListSizesEquals: number }
         : never
+
+type SetCondition<T, E> = 
+T extends Set<E> ? ({ SetAllElements: Condition<E> }
+    | { SetAnyElements: Condition<E> })
+    | { SetSizesEquals: number }
+: never   
 
 interface Thing {
     _id: string
@@ -99,12 +106,18 @@ export function evaluateCondition<T>(condition: Condition<T>, model: T): boolean
             return ((model as unknown as number) & value) < value
         case "IntBitsAnySet":
             return ((model as unknown as number) & value) > 0
-        case "AllElements":
+        case "ListAllElements":
             return (model as unknown as Array<any>).every(x => evaluateCondition(value as Condition<any>, x))
-        case "AnyElements":
+        case "ListAnyElements":
             return (model as unknown as Array<any>).some(x => evaluateCondition(value as Condition<any>, x))
-        case "SizesEquals":
+        case "ListSizesEquals":
             return (model as unknown as Array<any>).length === value
+        case "SetAllElements":
+            return Array.from((model as unknown as Set<any>)).every(x => evaluateCondition(value as Condition<any>, x))
+        case "SetAnyElements":
+            return Array.from((model as unknown as Set<any>)).some(x => evaluateCondition(value as Condition<any>, x))
+        case "SetSizesEquals":
+            return (model as unknown as Set<any>).size === value
         case "Exists":
             return true
         case "IfNotNull":
@@ -181,7 +194,8 @@ type ConditionMap<T> = {
     IntBitsSet?: number
     IntBitsAnyClear?: number
     IntBitsAnySet?: number
-    SizesEquals?: number
+    ListSizesEquals?: number
+    SetSizesEquals?: number
     Exists?: boolean
 }
 

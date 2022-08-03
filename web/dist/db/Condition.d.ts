@@ -288,45 +288,87 @@ export declare namespace Condition {
     }
 }
 export declare namespace Condition {
-    class AllElements<E extends any> extends Condition<Array<E>> {
+    class ListAllElements<E extends any> extends Condition<Array<E>> {
         readonly condition: Condition<E>;
         constructor(condition: Condition<E>);
         static properties: string[];
         static propertyTypes(E: ReifiedType): {
             condition: (ReifiedType<unknown> | typeof Condition)[];
         };
-        copy: (values: Partial<AllElements<E>>) => this;
+        copy: (values: Partial<ListAllElements<E>>) => this;
         equals: (other: any) => boolean;
         hashCode: () => number;
         invoke(on: Array<E>): boolean;
     }
 }
 export declare namespace Condition {
-    class AnyElements<E extends any> extends Condition<Array<E>> {
+    class ListAnyElements<E extends any> extends Condition<Array<E>> {
         readonly condition: Condition<E>;
         constructor(condition: Condition<E>);
         static properties: string[];
         static propertyTypes(E: ReifiedType): {
             condition: (ReifiedType<unknown> | typeof Condition)[];
         };
-        copy: (values: Partial<AnyElements<E>>) => this;
+        copy: (values: Partial<ListAnyElements<E>>) => this;
         equals: (other: any) => boolean;
         hashCode: () => number;
         invoke(on: Array<E>): boolean;
     }
 }
 export declare namespace Condition {
-    class SizesEquals<E extends any> extends Condition<Array<E>> {
+    class ListSizesEquals<E extends any> extends Condition<Array<E>> {
         readonly count: number;
         constructor(count: number);
         static properties: string[];
         static propertyTypes(E: ReifiedType): {
             count: NumberConstructor[];
         };
-        copy: (values: Partial<SizesEquals<E>>) => this;
+        copy: (values: Partial<ListSizesEquals<E>>) => this;
         equals: (other: any) => boolean;
         hashCode: () => number;
         invoke(on: Array<E>): boolean;
+    }
+}
+export declare namespace Condition {
+    class SetAllElements<E extends any> extends Condition<Set<E>> {
+        readonly condition: Condition<E>;
+        constructor(condition: Condition<E>);
+        static properties: string[];
+        static propertyTypes(E: ReifiedType): {
+            condition: (ReifiedType<unknown> | typeof Condition)[];
+        };
+        copy: (values: Partial<SetAllElements<E>>) => this;
+        equals: (other: any) => boolean;
+        hashCode: () => number;
+        invoke(on: Set<E>): boolean;
+    }
+}
+export declare namespace Condition {
+    class SetAnyElements<E extends any> extends Condition<Set<E>> {
+        readonly condition: Condition<E>;
+        constructor(condition: Condition<E>);
+        static properties: string[];
+        static propertyTypes(E: ReifiedType): {
+            condition: (ReifiedType<unknown> | typeof Condition)[];
+        };
+        copy: (values: Partial<SetAnyElements<E>>) => this;
+        equals: (other: any) => boolean;
+        hashCode: () => number;
+        invoke(on: Set<E>): boolean;
+    }
+}
+export declare namespace Condition {
+    class SetSizesEquals<E extends any> extends Condition<Set<E>> {
+        readonly count: number;
+        constructor(count: number);
+        static properties: string[];
+        static propertyTypes(E: ReifiedType): {
+            count: NumberConstructor[];
+        };
+        copy: (values: Partial<SetSizesEquals<E>>) => this;
+        equals: (other: any) => boolean;
+        hashCode: () => number;
+        invoke(on: Set<E>): boolean;
     }
 }
 export declare namespace Condition {

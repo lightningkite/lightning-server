@@ -1,4 +1,4 @@
-import {Condition} from "./Condition";
+import { Condition } from "./Condition";
 
 export type Modification<T> =
     { Chain: Array<Modification<T>> }
@@ -9,16 +9,28 @@ export type Modification<T> =
     | { Increment: T }
     | { Multiply: T }
     | { AppendString: T }
-    | { AppendList: T }
-    | { AppendSet: T }
-    | { Remove: Condition<any> }
-    | { RemoveInstances: T }
-    | { DropFirst: boolean }
-    | { DropLast: boolean }
-    | { PerElement: {
-        condition: Condition<any>
-        modification: Modification<any>
-    } }
+    | { ListAppend: T }
+    | { ListRemove: Condition<any> }
+    | { ListRemoveInstances: T }
+    | { ListDropFirst: boolean }
+    | { ListDropLast: boolean }
+    | {
+        ListPerElement: {
+            condition: Condition<any>
+            modification: Modification<any>
+        }
+    }
+    | { SetRemove: Condition<any> }
+    | { SetRemoveInstances: T }
+    | { SetDropFirst: boolean }
+    | { SetDropLast: boolean }
+    | {
+        SetPerElement: {
+            condition: Condition<any>
+            modification: Modification<any>
+        }
+    }
+    | { SetAppend: T }
     | { Combine: T }
     | { ModifyByKey: Record<string, Modification<any>> }
     | { RemoveKeys: Array<string> }
@@ -27,16 +39,16 @@ export type Modification<T> =
 export function evaluateModification<T>(modification: Modification<T>, model: T): T {
     const key = Object.keys(modification)[0]
     const value = (modification as any)[key]
-    switch(key) {
+    switch (key) {
         case "Assign":
             return value
         case "Chain":
             let current = model
-            for(const item of value as Array<Modification<T>>)
+            for (const item of value as Array<Modification<T>>)
                 current = evaluateModification(item, current)
             return current
         case "IfNotNull":
-            if(model !== null && model !== undefined) {
+            if (model !== null && model !== undefined) {
                 return value
             }
             return model
@@ -50,20 +62,30 @@ export function evaluateModification<T>(modification: Modification<T>, model: T)
             throw new Error("Multiply is not supported yet")
         case "AppendString":
             throw new Error("AppendString is not supported yet")
-        case "AppendList":
-            throw new Error("AppendList is not supported yet")
-        case "AppendSet":
-            throw new Error("AppendSet is not supported yet")
-        case "Remove":
-            throw new Error("Remove is not supported yet")
-        case "RemoveInstances":
-            throw new Error("RemoveInstances is not supported yet")
-        case "DropFirst":
-            throw new Error("DropFirst is not supported yet")
-        case "DropLast":
-            throw new Error("DropLast is not supported yet")
-        case "PerElement":
-            throw new Error("PerElement is not supported yet")
+        case "ListAppend":
+            throw new Error("ListAppend is not supported yet")
+        case "ListRemove":
+            throw new Error("ListRemove is not supported yet")
+        case "ListRemoveInstances":
+            throw new Error("ListRemoveInstances is not supported yet")
+        case "ListDropFirst":
+            throw new Error("ListDropFirst is not supported yet")
+        case "ListDropLast":
+            throw new Error("ListDropLast is not supported yet")
+        case "ListPerElement":
+            throw new Error("ListPerElement is not supported yet")
+        case "SetAppend":
+            throw new Error("SetAppend is not supported yet")
+        case "SetRemove":
+            throw new Error("SetRemove is not supported yet")
+        case "SetRemoveInstances":
+            throw new Error("SetRemoveInstances is not supported yet")
+        case "SetDropFirst":
+            throw new Error("SetDropFirst is not supported yet")
+        case "SetDropLast":
+            throw new Error("SetDropLast is not supported yet")
+        case "SetPerElement":
+            throw new Error("SetPerElement is not supported yet")
         case "Combine":
             throw new Error("Combine is not supported yet")
         case "ModifyByKey":
@@ -71,7 +93,7 @@ export function evaluateModification<T>(modification: Modification<T>, model: T)
         case "RemoveKeys":
             throw new Error("RemoveKeys is not supported yet")
         default:
-            const copy: any = {...model}
+            const copy: any = { ...model }
             copy[key] = evaluateModification(value as Modification<any>, (model as any)[key])
             return copy
     }

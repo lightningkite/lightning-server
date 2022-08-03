@@ -46,12 +46,18 @@ Condition_1.Condition.fromJSON = (data, types) => {
             return new Condition_1.Condition.IntBitsAnyClear(data.IntBitsAnyClear);
         case "IntBitsAnySet":
             return new Condition_1.Condition.IntBitsAnySet(data.IntBitsAnySet);
-        case "AllElements":
-            return new Condition_1.Condition.AllElements((0, khrysalis_runtime_1.parseObject)(data.AllElements, [Condition_1.Condition, type[1]]));
-        case "AnyElements":
-            return new Condition_1.Condition.AnyElements((0, khrysalis_runtime_1.parseObject)(data.AnyElements, [Condition_1.Condition, type[1]]));
-        case "SizesEquals":
-            return new Condition_1.Condition.SizesEquals(data.SizesEquals);
+        case "ListAllElements":
+            return new Condition_1.Condition.ListAllElements((0, khrysalis_runtime_1.parseObject)(data.ListAllElements, [Condition_1.Condition, type[1]]));
+        case "ListAnyElements":
+            return new Condition_1.Condition.ListAnyElements((0, khrysalis_runtime_1.parseObject)(data.ListAnyElements, [Condition_1.Condition, type[1]]));
+        case "ListSizesEquals":
+            return new Condition_1.Condition.ListSizesEquals(data.ListSizesEquals);
+        case "SetAllElements":
+            return new Condition_1.Condition.SetAllElements((0, khrysalis_runtime_1.parseObject)(data.SetAllElements, [Condition_1.Condition, type[1]]));
+        case "SetAnyElements":
+            return new Condition_1.Condition.SetAnyElements((0, khrysalis_runtime_1.parseObject)(data.SetAnyElements, [Condition_1.Condition, type[1]]));
+        case "SetSizesEquals":
+            return new Condition_1.Condition.SetSizesEquals(data.SetSizesEquals);
         case "Exists":
             return new Condition_1.Condition.Exists(data.Exists);
         case "OnKey":
@@ -122,14 +128,23 @@ Condition_1.Condition.IntBitsAnyClear.prototype.toJSON = function () {
 Condition_1.Condition.IntBitsAnySet.prototype.toJSON = function () {
     return { IntBitsAnySet: this.mask };
 };
-Condition_1.Condition.AllElements.prototype.toJSON = function () {
-    return { AllElements: this.condition };
+Condition_1.Condition.ListAllElements.prototype.toJSON = function () {
+    return { ListAllElements: this.condition };
 };
-Condition_1.Condition.AnyElements.prototype.toJSON = function () {
-    return { AnyElements: this.condition };
+Condition_1.Condition.ListAnyElements.prototype.toJSON = function () {
+    return { ListAnyElements: this.condition };
 };
-Condition_1.Condition.SizesEquals.prototype.toJSON = function () {
-    return { SizesEquals: this.count };
+Condition_1.Condition.ListSizesEquals.prototype.toJSON = function () {
+    return { ListSizesEquals: this.count };
+};
+Condition_1.Condition.SetAllElements.prototype.toJSON = function () {
+    return { SetAllElements: this.condition };
+};
+Condition_1.Condition.SetAnyElements.prototype.toJSON = function () {
+    return { SetAnyElements: this.condition };
+};
+Condition_1.Condition.SetSizesEquals.prototype.toJSON = function () {
+    return { SetSizesEquals: this.count };
 };
 Condition_1.Condition.Exists.prototype.toJSON = function () {
     return { Exists: this.key };
@@ -165,20 +180,30 @@ Modification_1.Modification.fromJSON = (data, types) => {
             return new Modification_1.Modification.Multiply(data.Multiply);
         case "AppendString":
             return new Modification_1.Modification.AppendString(data.AppendString);
-        case "AppendList":
-            return new Modification_1.Modification.AppendList((0, khrysalis_runtime_1.parseObject)(data.AppendList, [Array, type[1]]));
-        case "AppendSet":
-            return new Modification_1.Modification.AppendSet((0, khrysalis_runtime_1.parseObject)(data.AppendSet, [Array, type[1]]));
-        case "Remove":
-            return new Modification_1.Modification.Remove((0, khrysalis_runtime_1.parseObject)(data.Remove, [Condition_1.Condition, type[1]]));
-        case "RemoveInstances":
-            return new Modification_1.Modification.RemoveInstances((0, khrysalis_runtime_1.parseObject)(data.RemoveInstances, [Array, type[1]]));
-        case "DropFirst":
-            return new Modification_1.Modification.DropFirst();
-        case "DropLast":
-            return new Modification_1.Modification.DropLast();
-        case "PerElement":
-            return (0, khrysalis_runtime_1.parseObject)(data.PerElement, [Modification_1.Modification.PerElement, type[1]]);
+        case "ListAppend":
+            return new Modification_1.Modification.ListAppend((0, khrysalis_runtime_1.parseObject)(data.ListAppend, [Array, type[1]]));
+        case "ListRemove":
+            return new Modification_1.Modification.ListRemove((0, khrysalis_runtime_1.parseObject)(data.ListRemove, [Condition_1.Condition, type[1]]));
+        case "ListRemoveInstances":
+            return new Modification_1.Modification.ListRemoveInstances((0, khrysalis_runtime_1.parseObject)(data.ListRemoveInstances, [Array, type[1]]));
+        case "ListDropFirst":
+            return new Modification_1.Modification.ListDropFirst();
+        case "ListDropLast":
+            return new Modification_1.Modification.ListDropLast();
+        case "SetAppend":
+            return new Modification_1.Modification.SetAppend((0, khrysalis_runtime_1.parseObject)(data.SetAppend, [Array, type[1]]));
+        case "SetRemove":
+            return new Modification_1.Modification.SetRemove((0, khrysalis_runtime_1.parseObject)(data.SetRemove, [Condition_1.Condition, type[1]]));
+        case "SetRemoveInstances":
+            return new Modification_1.Modification.SetRemoveInstances((0, khrysalis_runtime_1.parseObject)(data.SetRemoveInstances, [Array, type[1]]));
+        case "SetDropFirst":
+            return new Modification_1.Modification.SetDropFirst();
+        case "SetDropLast":
+            return new Modification_1.Modification.SetDropLast();
+        case "ListPerElement":
+            return (0, khrysalis_runtime_1.parseObject)(data.PerElement, [Modification_1.Modification.ListPerElement, type[1]]);
+        case "SetPerElement":
+            return (0, khrysalis_runtime_1.parseObject)(data.PerElement, [Modification_1.Modification.SetPerElement, type[1]]);
         case "Combine":
             return new Modification_1.Modification.Combine((0, khrysalis_runtime_1.parseObject)(data.Combine, [Map, [String], type[2]]));
         case "ModifyByKey":
@@ -216,23 +241,35 @@ Modification_1.Modification.Multiply.prototype.toJSON = function () {
 Modification_1.Modification.AppendString.prototype.toJSON = function () {
     return { AppendString: this.value };
 };
-Modification_1.Modification.AppendList.prototype.toJSON = function () {
-    return { AppendList: this.items };
+Modification_1.Modification.ListAppend.prototype.toJSON = function () {
+    return { ListAppend: this.items };
 };
-Modification_1.Modification.AppendSet.prototype.toJSON = function () {
-    return { AppendSet: this.items };
+Modification_1.Modification.ListRemove.prototype.toJSON = function () {
+    return { ListRemove: this.condition };
 };
-Modification_1.Modification.Remove.prototype.toJSON = function () {
-    return { Remove: this.condition };
+Modification_1.Modification.ListRemoveInstances.prototype.toJSON = function () {
+    return { ListRemoveInstances: this.items };
 };
-Modification_1.Modification.RemoveInstances.prototype.toJSON = function () {
-    return { RemoveInstances: this.items };
+Modification_1.Modification.ListDropFirst.prototype.toJSON = function () {
+    return { ListDropFirst: true };
 };
-Modification_1.Modification.DropFirst.prototype.toJSON = function () {
-    return { DropFirst: true };
+Modification_1.Modification.ListDropLast.prototype.toJSON = function () {
+    return { ListDropLast: true };
 };
-Modification_1.Modification.DropLast.prototype.toJSON = function () {
-    return { DropLast: true };
+Modification_1.Modification.SetAppend.prototype.toJSON = function () {
+    return { SetAppend: this.items };
+};
+Modification_1.Modification.SetRemove.prototype.toJSON = function () {
+    return { SetRemove: this.condition };
+};
+Modification_1.Modification.SetRemoveInstances.prototype.toJSON = function () {
+    return { SetRemoveInstances: this.items };
+};
+Modification_1.Modification.SetDropFirst.prototype.toJSON = function () {
+    return { SetDropFirst: true };
+};
+Modification_1.Modification.SetDropLast.prototype.toJSON = function () {
+    return { SetDropLast: true };
 };
 Modification_1.Modification.Combine.prototype.toJSON = function () {
     return { Combine: this.map };

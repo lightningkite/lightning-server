@@ -100,14 +100,14 @@ open class Modification<T: IsCodableAndHashable> protected constructor()  {
         override fun invokeDefault(): String = value
     }
 
-    @Serializable(ModificationAppendListSerializer::class)
-    data class AppendList<T: IsCodableAndHashable>(val items: List<T>): Modification<List<T>>() {
+    @Serializable(ModificationListAppendSerializer::class)
+    data class ListAppend<T: IsCodableAndHashable>(val items: List<T>): Modification<List<T>>() {
         override fun invoke(on: List<T>): List<T> = on + items
         override fun invokeDefault(): List<T> = items
     }
 
-    @Serializable(ModificationRemoveListSerializer::class)
-    data class RemoveList<T: IsCodableAndHashable>(val condition: Condition<T>): Modification<List<T>>() {
+    @Serializable(ModificationListRemoveSerializer::class)
+    data class ListRemove<T: IsCodableAndHashable>(val condition: Condition<T>): Modification<List<T>>() {
         override fun invoke(on: List<T>): List<T> = on.filter { !condition(it) }
         override fun invokeDefault(): List<T> = listOf()
     }
@@ -143,14 +143,14 @@ open class Modification<T: IsCodableAndHashable> protected constructor()  {
         override fun invokeDefault(): List<T> = listOf()
     }
 
-    @Serializable(ModificationAppendSetSerializer::class)
-    data class AppendSet<T: IsCodableAndHashable>(val items: Set<T>): Modification<Set<T>>() {
+    @Serializable(ModificationSetAppendSerializer::class)
+    data class SetAppend<T: IsCodableAndHashable>(val items: Set<T>): Modification<Set<T>>() {
         override fun invoke(on: Set<T>): Set<T> = (on + items)
         override fun invokeDefault(): Set<T> = items
     }
 
-    @Serializable(ModificationRemoveSetSerializer::class)
-    data class RemoveSet<T: IsCodableAndHashable>(val condition: Condition<T>): Modification<Set<T>>() {
+    @Serializable(ModificationSetRemoveSerializer::class)
+    data class SetRemove<T: IsCodableAndHashable>(val condition: Condition<T>): Modification<Set<T>>() {
         override fun invoke(on: Set<T>): Set<T> = on.filter { !condition(it) }.toSet()
         override fun invokeDefault(): Set<T> = setOf()
     }

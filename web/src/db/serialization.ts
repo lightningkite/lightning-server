@@ -45,12 +45,18 @@ import {SortPart} from "./SortPart";
             return new Condition.IntBitsAnyClear(data.IntBitsAnyClear as number) as unknown as Condition<T>
         case "IntBitsAnySet":
             return new Condition.IntBitsAnySet(data.IntBitsAnySet as number) as unknown as Condition<T>
-        case "AllElements":
-            return new Condition.AllElements(parseObject(data.AllElements, [Condition, type[1]])) as unknown as Condition<T>
-        case "AnyElements":
-            return new Condition.AnyElements(parseObject(data.AnyElements, [Condition, type[1]])) as unknown as Condition<T>
-        case "SizesEquals":
-            return new Condition.SizesEquals(data.SizesEquals as number) as unknown as Condition<T>
+        case "ListAllElements":
+            return new Condition.ListAllElements(parseObject(data.ListAllElements, [Condition, type[1]])) as unknown as Condition<T>
+        case "ListAnyElements":
+            return new Condition.ListAnyElements(parseObject(data.ListAnyElements, [Condition, type[1]])) as unknown as Condition<T>
+        case "ListSizesEquals":
+            return new Condition.ListSizesEquals(data.ListSizesEquals as number) as unknown as Condition<T>
+        case "SetAllElements":
+            return new Condition.SetAllElements(parseObject(data.SetAllElements, [Condition, type[1]])) as unknown as Condition<T>
+        case "SetAnyElements":
+            return new Condition.SetAnyElements(parseObject(data.SetAnyElements, [Condition, type[1]])) as unknown as Condition<T>
+        case "SetSizesEquals":
+            return new Condition.SetSizesEquals(data.SetSizesEquals as number) as unknown as Condition<T>
         case "Exists":
             return new Condition.Exists(data.Exists as string) as unknown as Condition<T>
         case "OnKey":
@@ -122,14 +128,23 @@ import {SortPart} from "./SortPart";
 (Condition.IntBitsAnySet as any).prototype.toJSON = function (this: Condition.IntBitsAnySet): Record<string, any> {
     return {IntBitsAnySet: this.mask}
 };
-(Condition.AllElements as any).prototype.toJSON = function (this: Condition.AllElements<any>): Record<string, any> {
-    return {AllElements: this.condition}
+(Condition.ListAllElements as any).prototype.toJSON = function (this: Condition.ListAllElements<any>): Record<string, any> {
+    return {ListAllElements: this.condition}
 };
-(Condition.AnyElements as any).prototype.toJSON = function (this: Condition.AnyElements<any>): Record<string, any> {
-    return {AnyElements: this.condition}
+(Condition.ListAnyElements as any).prototype.toJSON = function (this: Condition.ListAnyElements<any>): Record<string, any> {
+    return {ListAnyElements: this.condition}
 };
-(Condition.SizesEquals as any).prototype.toJSON = function (this: Condition.SizesEquals<any>): Record<string, any> {
-    return {SizesEquals: this.count}
+(Condition.ListSizesEquals as any).prototype.toJSON = function (this: Condition.ListSizesEquals<any>): Record<string, any> {
+    return {ListSizesEquals: this.count}
+};
+(Condition.SetAllElements as any).prototype.toJSON = function (this: Condition.SetAllElements<any>): Record<string, any> {
+    return {SetAllElements: this.condition}
+};
+(Condition.SetAnyElements as any).prototype.toJSON = function (this: Condition.SetAnyElements<any>): Record<string, any> {
+    return {SetAnyElements: this.condition}
+};
+(Condition.SetSizesEquals as any).prototype.toJSON = function (this: Condition.SetSizesEquals<any>): Record<string, any> {
+    return {SetSizesEquals: this.count}
 };
 (Condition.Exists as any).prototype.toJSON = function (this: Condition.Exists<any>): Record<string, any> {
     return {Exists: this.key}
@@ -166,20 +181,30 @@ import {SortPart} from "./SortPart";
             return new Modification.Multiply(data.Multiply as number) as unknown as Modification<T>
         case "AppendString":
             return new Modification.AppendString(data.AppendString as string) as unknown as Modification<T>
-        case "AppendList":
-            return new Modification.AppendList(parseObject<Array<any>>(data.AppendList, [Array, type[1]])) as unknown as Modification<T>
-        case "AppendSet":
-            return new Modification.AppendSet(parseObject<Array<any>>(data.AppendSet, [Array, type[1]])) as unknown as Modification<T>
-        case "Remove":
-            return new Modification.Remove(parseObject(data.Remove, [Condition, type[1]])) as unknown as Modification<T>
-        case "RemoveInstances":
-            return new Modification.RemoveInstances(parseObject<Array<any>>(data.RemoveInstances, [Array, type[1]])) as unknown as Modification<T>
-        case "DropFirst":
-            return new Modification.DropFirst() as unknown as Modification<T>
-        case "DropLast":
-            return new Modification.DropLast() as unknown as Modification<T>
-        case "PerElement":
-            return parseObject(data.PerElement, [Modification.PerElement, type[1]])
+        case "ListAppend":
+            return new Modification.ListAppend(parseObject<Array<any>>(data.ListAppend, [Array, type[1]])) as unknown as Modification<T>
+        case "ListRemove":
+            return new Modification.ListRemove(parseObject(data.ListRemove, [Condition, type[1]])) as unknown as Modification<T>
+        case "ListRemoveInstances":
+            return new Modification.ListRemoveInstances(parseObject<Array<any>>(data.ListRemoveInstances, [Array, type[1]])) as unknown as Modification<T>
+        case "ListDropFirst":
+            return new Modification.ListDropFirst() as unknown as Modification<T>
+        case "ListDropLast":
+            return new Modification.ListDropLast() as unknown as Modification<T>
+        case "SetAppend":
+            return new Modification.SetAppend(parseObject<Set<any>>(data.SetAppend, [Array, type[1]])) as unknown as Modification<T>
+        case "SetRemove":
+            return new Modification.SetRemove(parseObject(data.SetRemove, [Condition, type[1]])) as unknown as Modification<T>
+        case "SetRemoveInstances":
+            return new Modification.SetRemoveInstances(parseObject<Set<any>>(data.SetRemoveInstances, [Array, type[1]])) as unknown as Modification<T>
+        case "SetDropFirst":
+            return new Modification.SetDropFirst() as unknown as Modification<T>
+        case "SetDropLast":
+            return new Modification.SetDropLast() as unknown as Modification<T>
+        case "ListPerElement":
+            return parseObject(data.PerElement, [Modification.ListPerElement, type[1]])
+        case "SetPerElement":
+            return parseObject(data.PerElement, [Modification.SetPerElement, type[1]])
         case "Combine":
             return new Modification.Combine(parseObject<Map<string, any>>(data.Combine, [Map, [String], type[2]])) as unknown as Modification<T>
         case "ModifyByKey":
@@ -218,23 +243,35 @@ import {SortPart} from "./SortPart";
 (Modification.AppendString as any).prototype.toJSON = function (this: Modification.AppendString): Record<string, any> {
     return {AppendString: this.value}
 };
-(Modification.AppendList as any).prototype.toJSON = function (this: Modification.AppendList<any>): Record<string, any> {
-    return {AppendList: this.items}
+(Modification.ListAppend as any).prototype.toJSON = function (this: Modification.ListAppend<any>): Record<string, any> {
+    return {ListAppend: this.items}
 };
-(Modification.AppendSet as any).prototype.toJSON = function (this: Modification.AppendSet<any>): Record<string, any> {
-    return {AppendSet: this.items}
+(Modification.ListRemove as any).prototype.toJSON = function (this: Modification.ListRemove<any>): Record<string, any> {
+    return {ListRemove: this.condition}
 };
-(Modification.Remove as any).prototype.toJSON = function (this: Modification.Remove<any>): Record<string, any> {
-    return {Remove: this.condition}
+(Modification.ListRemoveInstances as any).prototype.toJSON = function (this: Modification.ListRemoveInstances<any>): Record<string, any> {
+    return {ListRemoveInstances: this.items}
 };
-(Modification.RemoveInstances as any).prototype.toJSON = function (this: Modification.RemoveInstances<any>): Record<string, any> {
-    return {RemoveInstances: this.items}
+(Modification.ListDropFirst as any).prototype.toJSON = function (this: Modification.ListDropFirst<any>): Record<string, any> {
+    return {ListDropFirst: true}
 };
-(Modification.DropFirst as any).prototype.toJSON = function (this: Modification.DropFirst<any>): Record<string, any> {
-    return {DropFirst: true}
+(Modification.ListDropLast as any).prototype.toJSON = function (this: Modification.ListDropLast<any>): Record<string, any> {
+    return {ListDropLast: true}
 };
-(Modification.DropLast as any).prototype.toJSON = function (this: Modification.DropLast<any>): Record<string, any> {
-    return {DropLast: true}
+(Modification.SetAppend as any).prototype.toJSON = function (this: Modification.SetAppend<any>): Record<string, any> {
+    return {SetAppend: this.items}
+};
+(Modification.SetRemove as any).prototype.toJSON = function (this: Modification.SetRemove<any>): Record<string, any> {
+    return {SetRemove: this.condition}
+};
+(Modification.SetRemoveInstances as any).prototype.toJSON = function (this: Modification.SetRemoveInstances<any>): Record<string, any> {
+    return {SetRemoveInstances: this.items}
+};
+(Modification.SetDropFirst as any).prototype.toJSON = function (this: Modification.SetDropFirst<any>): Record<string, any> {
+    return {SetDropFirst: true}
+};
+(Modification.SetDropLast as any).prototype.toJSON = function (this: Modification.SetDropLast<any>): Record<string, any> {
+    return {SetDropLast: true}
 };
 (Modification.Combine as any).prototype.toJSON = function (this: Modification.Combine<any>): Record<string, any> {
     return {Combine: this.map}

@@ -51,12 +51,18 @@ function evaluateCondition(condition, model) {
             return (model & value) < value;
         case "IntBitsAnySet":
             return (model & value) > 0;
-        case "AllElements":
+        case "ListAllElements":
             return model.every(x => evaluateCondition(value, x));
-        case "AnyElements":
+        case "ListAnyElements":
             return model.some(x => evaluateCondition(value, x));
-        case "SizesEquals":
+        case "ListSizesEquals":
             return model.length === value;
+        case "SetAllElements":
+            return Array.from(model).every(x => evaluateCondition(value, x));
+        case "SetAnyElements":
+            return Array.from(model).some(x => evaluateCondition(value, x));
+        case "SetSizesEquals":
+            return model.size === value;
         case "Exists":
             return true;
         case "IfNotNull":

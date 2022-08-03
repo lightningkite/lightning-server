@@ -16,22 +16,35 @@ export declare type Modification<T> = {
 } | {
     AppendString: T;
 } | {
-    AppendList: T;
+    ListAppend: T;
 } | {
-    AppendSet: T;
+    ListRemove: Condition<any>;
 } | {
-    Remove: Condition<any>;
+    ListRemoveInstances: T;
 } | {
-    RemoveInstances: T;
+    ListDropFirst: boolean;
 } | {
-    DropFirst: boolean;
+    ListDropLast: boolean;
 } | {
-    DropLast: boolean;
-} | {
-    PerElement: {
+    ListPerElement: {
         condition: Condition<any>;
         modification: Modification<any>;
     };
+} | {
+    SetRemove: Condition<any>;
+} | {
+    SetRemoveInstances: T;
+} | {
+    SetDropFirst: boolean;
+} | {
+    SetDropLast: boolean;
+} | {
+    SetPerElement: {
+        condition: Condition<any>;
+        modification: Modification<any>;
+    };
+} | {
+    SetAppend: T;
 } | {
     Combine: T;
 } | {

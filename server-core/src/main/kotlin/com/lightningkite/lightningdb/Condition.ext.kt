@@ -28,9 +28,9 @@ fun Modification<*>.referencesField(field: KProperty1<*, *>): Boolean = when (th
 
 fun Modification<*>.referencesFieldRead(field: KProperty1<*, *>): Boolean = when (this) {
     is Modification.Chain -> modifications.any { it.referencesFieldRead(field) }
-    is Modification.RemoveSet<*> -> this.condition.referencesField(field)
+    is Modification.SetRemove<*> -> this.condition.referencesField(field)
     is Modification.SetPerElement<*> -> condition.referencesField(field)
-    is Modification.RemoveList<*> -> this.condition.referencesField(field)
+    is Modification.ListRemove<*> -> this.condition.referencesField(field)
     is Modification.ListPerElement<*> -> condition.referencesField(field)
     is Modification.ModifyByKey<*> -> map.values.any { it.referencesFieldRead(field) }
     is Modification.OnField<*, *> -> modification.referencesFieldRead(field)

@@ -78,8 +78,8 @@ fun Modification<*>.dump(update: UpdateWithOptions = UpdateWithOptions(), key: S
         is Modification.CoerceAtMost -> into["\$min", key] = value
         is Modification.Increment -> into["\$inc", key] = by
         is Modification.Multiply -> into["\$mul", key] = by
-        is Modification.AppendList<*> -> into.sub("\$push").sub(key)["\$each"] = items
-        is Modification.AppendSet<*> -> into.sub("\$addToSet").sub(key)["\$each"] = items
+        is Modification.ListAppend<*> -> into.sub("\$push").sub(key)["\$each"] = items
+        is Modification.SetAppend<*> -> into.sub("\$addToSet").sub(key)["\$each"] = items
         is Modification.AppendString -> TODO("Appending strings is not supported yet")
         is Modification.SetDropFirst<*> -> into["\$pop", key] = -1
         is Modification.SetDropLast<*> -> into["\$pop", key] = 1
@@ -101,9 +101,9 @@ fun Modification<*>.dump(update: UpdateWithOptions = UpdateWithOptions(), key: S
             )
             modification.dump(update, "$key.$[$condIdentifier]")
         }
-        is Modification.RemoveSet<*> -> into["\$pull", key] = condition.bson()
+        is Modification.SetRemove<*> -> into["\$pull", key] = condition.bson()
         is Modification.SetRemoveInstances<*> -> into["\$pullAll", key] = items
-        is Modification.RemoveList<*> -> into["\$pull", key] = condition.bson()
+        is Modification.ListRemove<*> -> into["\$pull", key] = condition.bson()
         is Modification.ListRemoveInstances<*> -> into["\$pullAll", key] = items
         is Modification.Combine<*> -> map.forEach {
             into.sub("\$set")[if (key == null) it.key else "$key.${it.key}"] = it.value

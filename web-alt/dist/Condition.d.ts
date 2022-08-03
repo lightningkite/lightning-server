@@ -42,9 +42,7 @@ export declare type Condition<T> = {
     IntBitsAnyClear: number;
 } | {
     IntBitsAnySet: number;
-} | ArrayCondition<T, any> | {
-    SizesEquals: number;
-} | {
+} | ArrayCondition<T, any> | SetCondition<T, any> | {
     Exists: boolean;
 } | {
     IfNotNull: Condition<T>;
@@ -52,10 +50,19 @@ export declare type Condition<T> = {
     [P in keyof T]?: Condition<T[P]>;
 };
 declare type ArrayCondition<T, E> = T extends Array<E> ? ({
-    AllElements: Condition<E>;
+    ListAllElements: Condition<E>;
 } | {
-    AnyElements: Condition<E>;
-}) : never;
+    ListAnyElements: Condition<E>;
+}) | {
+    ListSizesEquals: number;
+} : never;
+declare type SetCondition<T, E> = T extends Set<E> ? ({
+    SetAllElements: Condition<E>;
+} | {
+    SetAnyElements: Condition<E>;
+}) | {
+    SetSizesEquals: number;
+} : never;
 export declare function evaluateCondition<T>(condition: Condition<T>, model: T): boolean;
 declare type PathImpl<T, K extends keyof T> = K extends string ? T[K] extends Record<string, any> ? T[K] extends ArrayLike<any> ? K | `${K}.${PathImpl<T[K], Exclude<keyof T[K], keyof any[]>>}` : K | `${K}.${PathImpl<T[K], keyof T[K]>}` : K : never;
 declare type Path<T> = PathImpl<T, keyof T> | (keyof T & string);
@@ -89,7 +96,8 @@ declare type ConditionMap<T> = {
     IntBitsSet?: number;
     IntBitsAnyClear?: number;
     IntBitsAnySet?: number;
-    SizesEquals?: number;
+    ListSizesEquals?: number;
+    SetSizesEquals?: number;
     Exists?: boolean;
 };
 /**

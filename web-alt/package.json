@@ -1,6 +1,6 @@
 {
   "name": "@lightningkite/lightning-server-simplified",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,7 +14,7 @@
     "@types/sprintf-js": "1.1.x",
     "mersenne-twister": "1.x",
     "@types/mersenne-twister": "1.x",
-    "@lightningkite/khrysalis-runtime": "1.0.0-RC2",
+    "@lightningkite/khrysalis-runtime": "1.0.1",
     "@lightningkite/rxjs-plus": "0.10.3"
   },
   "devDependencies": {
