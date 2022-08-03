@@ -4,7 +4,7 @@ import KhrysalisRuntime
 import RxSwift
 import Foundation
 
-open class ObserveModelApi<Model : Codable & Hashable> {
+public class ObserveModelApi<Model : Codable & Hashable> {
     public init() {
         //Necessary properties should be initialized now
     }

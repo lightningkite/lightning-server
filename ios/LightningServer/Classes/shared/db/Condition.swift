@@ -3,7 +3,7 @@
 import KhrysalisRuntime
 import Foundation
 
-open class Condition<T : Codable & Hashable> : KEquatable, KHashable {
+public class Condition<T : Codable & Hashable> : KEquatable, KHashable {
     public init() {
         //Necessary properties should be initialized now
     }
@@ -26,6 +26,12 @@ open class Condition<T : Codable & Hashable> : KEquatable, KHashable {
         return ConditionNot(self);
     }
     static prefix func !(receiver: Condition<T>) -> ConditionNot<T> { receiver.not() }
+    
+    
+    
+    
+    
+    
     
     
     
@@ -579,7 +585,7 @@ public final class ConditionIntBitsAnySet : Condition<Int>, CustomStringConverti
     override public func invoke(on: Int) -> Bool {
         return on & self.mask > 0;
 } }
-public final class ConditionAllElements<E : Codable & Hashable> : Condition<Array<E>>, CustomStringConvertible {
+public final class ConditionListAllElements<E : Codable & Hashable> : Condition<Array<E>>, CustomStringConvertible {
     public var condition: Condition<E>
     public init(_ condition: Condition<E>) {
         self.condition = condition
@@ -592,15 +598,15 @@ public final class ConditionAllElements<E : Codable & Hashable> : Condition<Arra
         return hasher.finalize()
     }
     override public func equals(other: Any) -> Bool {
-        guard let other = other as? ConditionAllElements else { return false }
+        guard let other = other as? ConditionListAllElements else { return false }
         return self.condition == other.condition
     }
-    public var description: String { return "ConditionAllElements(condition=\(String(kotlin: self.condition)))" }
-    public func copy(_ condition: Condition<E>? = nil) -> ConditionAllElements<E> { return ConditionAllElements(condition ?? self.condition) }
+    public var description: String { return "ConditionListAllElements(condition=\(String(kotlin: self.condition)))" }
+    public func copy(_ condition: Condition<E>? = nil) -> ConditionListAllElements<E> { return ConditionListAllElements(condition ?? self.condition) }
     override public func invoke(on: Array<E>) -> Bool {
         return on.allSatisfy({ (it) -> Bool in self.condition.invoke(on: it) });
 } }
-public final class ConditionAnyElements<E : Codable & Hashable> : Condition<Array<E>>, CustomStringConvertible {
+public final class ConditionListAnyElements<E : Codable & Hashable> : Condition<Array<E>>, CustomStringConvertible {
     public var condition: Condition<E>
     public init(_ condition: Condition<E>) {
         self.condition = condition
@@ -613,15 +619,15 @@ public final class ConditionAnyElements<E : Codable & Hashable> : Condition<Arra
         return hasher.finalize()
     }
     override public func equals(other: Any) -> Bool {
-        guard let other = other as? ConditionAnyElements else { return false }
+        guard let other = other as? ConditionListAnyElements else { return false }
         return self.condition == other.condition
     }
-    public var description: String { return "ConditionAnyElements(condition=\(String(kotlin: self.condition)))" }
-    public func copy(_ condition: Condition<E>? = nil) -> ConditionAnyElements<E> { return ConditionAnyElements(condition ?? self.condition) }
+    public var description: String { return "ConditionListAnyElements(condition=\(String(kotlin: self.condition)))" }
+    public func copy(_ condition: Condition<E>? = nil) -> ConditionListAnyElements<E> { return ConditionListAnyElements(condition ?? self.condition) }
     override public func invoke(on: Array<E>) -> Bool {
         return (on.first(where: { (it) -> Bool in self.condition.invoke(on: it) }) != nil);
 } }
-public final class ConditionSizesEquals<E : Codable & Hashable> : Condition<Array<E>>, CustomStringConvertible {
+public final class ConditionListSizesEquals<E : Codable & Hashable> : Condition<Array<E>>, CustomStringConvertible {
     public var count: Int
     public init(count: Int) {
         self.count = count
@@ -634,12 +640,75 @@ public final class ConditionSizesEquals<E : Codable & Hashable> : Condition<Arra
         return hasher.finalize()
     }
     override public func equals(other: Any) -> Bool {
-        guard let other = other as? ConditionSizesEquals else { return false }
+        guard let other = other as? ConditionListSizesEquals else { return false }
         return self.count == other.count
     }
-    public var description: String { return "ConditionSizesEquals(count=\(String(kotlin: self.count)))" }
-    public func copy(count: Int? = nil) -> ConditionSizesEquals<E> { return ConditionSizesEquals(count: count ?? self.count) }
+    public var description: String { return "ConditionListSizesEquals(count=\(String(kotlin: self.count)))" }
+    public func copy(count: Int? = nil) -> ConditionListSizesEquals<E> { return ConditionListSizesEquals(count: count ?? self.count) }
     override public func invoke(on: Array<E>) -> Bool {
+        return on.count == self.count;
+} }
+public final class ConditionSetAllElements<E : Codable & Hashable> : Condition<Set<E>>, CustomStringConvertible {
+    public var condition: Condition<E>
+    public init(_ condition: Condition<E>) {
+        self.condition = condition
+        super.init()
+        //Necessary properties should be initialized now
+    }
+    override public func hashCode() -> Int {
+        var hasher = Hasher()
+        hasher.combine(condition)
+        return hasher.finalize()
+    }
+    override public func equals(other: Any) -> Bool {
+        guard let other = other as? ConditionSetAllElements else { return false }
+        return self.condition == other.condition
+    }
+    public var description: String { return "ConditionSetAllElements(condition=\(String(kotlin: self.condition)))" }
+    public func copy(_ condition: Condition<E>? = nil) -> ConditionSetAllElements<E> { return ConditionSetAllElements(condition ?? self.condition) }
+    override public func invoke(on: Set<E>) -> Bool {
+        return on.allSatisfy({ (it) -> Bool in self.condition.invoke(on: it) });
+} }
+public final class ConditionSetAnyElements<E : Codable & Hashable> : Condition<Set<E>>, CustomStringConvertible {
+    public var condition: Condition<E>
+    public init(_ condition: Condition<E>) {
+        self.condition = condition
+        super.init()
+        //Necessary properties should be initialized now
+    }
+    override public func hashCode() -> Int {
+        var hasher = Hasher()
+        hasher.combine(condition)
+        return hasher.finalize()
+    }
+    override public func equals(other: Any) -> Bool {
+        guard let other = other as? ConditionSetAnyElements else { return false }
+        return self.condition == other.condition
+    }
+    public var description: String { return "ConditionSetAnyElements(condition=\(String(kotlin: self.condition)))" }
+    public func copy(_ condition: Condition<E>? = nil) -> ConditionSetAnyElements<E> { return ConditionSetAnyElements(condition ?? self.condition) }
+    override public func invoke(on: Set<E>) -> Bool {
+        return (on.first(where: { (it) -> Bool in self.condition.invoke(on: it) }) != nil);
+} }
+public final class ConditionSetSizesEquals<E : Codable & Hashable> : Condition<Set<E>>, CustomStringConvertible {
+    public var count: Int
+    public init(count: Int) {
+        self.count = count
+        super.init()
+        //Necessary properties should be initialized now
+    }
+    override public func hashCode() -> Int {
+        var hasher = Hasher()
+        hasher.combine(count)
+        return hasher.finalize()
+    }
+    override public func equals(other: Any) -> Bool {
+        guard let other = other as? ConditionSetSizesEquals else { return false }
+        return self.count == other.count
+    }
+    public var description: String { return "ConditionSetSizesEquals(count=\(String(kotlin: self.count)))" }
+    public func copy(count: Int? = nil) -> ConditionSetSizesEquals<E> { return ConditionSetSizesEquals(count: count ?? self.count) }
+    override public func invoke(on: Set<E>) -> Bool {
         return on.count == self.count;
 } }
 public final class ConditionExists<V : Codable & Hashable> : Condition<Dictionary<String, V>>, CustomStringConvertible {

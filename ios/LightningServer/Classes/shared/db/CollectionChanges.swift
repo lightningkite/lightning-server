@@ -45,7 +45,7 @@ public final class CollectionChanges<T : Codable & Hashable> : CustomStringConve
 }
 
 public extension Array where Element : HasId {
-    func apply(changes: CollectionChanges<Element>) -> Array<Element> {
+    func apply<ID : Comparable>(changes: CollectionChanges<Element>) -> Array<Element> {
         if changes.replace != nil {
             return changes.replace!
         }

@@ -43,6 +43,6 @@ public final class EntryChange<T : Codable & Hashable> : CustomStringConvertible
 
 public extension EntryChange where T : Codable & Hashable {
     func map<B : Codable & Hashable>(mapper: @escaping (T) -> B) -> EntryChange<B> {
-        return (EntryChange<B>(old: self.old.flatMap { temp71 in (mapper)(temp71) } as B?, new: self.new.flatMap { temp72 in (mapper)(temp72) } as B?) as EntryChange<B>)
+        return (EntryChange<B>(old: self.old.flatMap { temp73 in (mapper)(temp73) } as B?, new: self.new.flatMap { temp74 in (mapper)(temp74) } as B?) as EntryChange<B>)
     }
 }
