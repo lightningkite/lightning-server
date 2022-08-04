@@ -52,6 +52,7 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.apigatewaymanagementapi.ApiGatewayManagementApiAsyncClient
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.URI
 import java.net.URLEncoder
 import java.time.Duration
 import java.util.*
@@ -66,8 +67,8 @@ abstract class AwsAdapter : RequestStreamHandler {
             engine = object: Engine {
                 val apiGatewayManagement = ApiGatewayManagementApiAsyncClient.builder()
                     .region(Region.US_WEST_2) //TODO - setting
+                    .endpointOverride(URI.create("https://" + generalSettings().wsUrl.removePrefix("wss://")))
                     .build()
-                val url = "https://" + generalSettings().wsUrl.removePrefix("wss://") + "/%40connections"
                 override suspend fun sendWebSocketMessage(id: String, content: String) {
                     if(id.contains('/')) {
                         //Multiplex

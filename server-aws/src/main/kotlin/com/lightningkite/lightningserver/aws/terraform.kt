@@ -15,18 +15,31 @@ import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
+import java.io.File
 
-
-
-fun terraformAws(handler: String, projectName: String = "project", appendable: Appendable) {
+fun terraformAws(handler: String, projectName: String = "project", root: File) {
     AwsAdapter.cache
-    val d = "$"
     val namePrefix = "${projectName}-\${var.deployment_name}"
     val namePrefixSafe = "${projectName.filter { it.isLetterOrDigit() }}\${var.deployment_name}"
     val namePrefixPath = "${projectName}/\${var.deployment_name}"
     val dependencies = ArrayList<String>()
     val appSettings = ArrayList<String>()
-    appendable.appendLine("""
+//    root.resolve("base/main.tf").apply { parentFile!!.mkdirs() }
+    val variables = StringBuilder()
+    val main = StringBuilder()
+    val outputs = StringBuilder()
+    variables.appendLine("""
+        variable "deployment_location" {
+          default = "us-west-2"
+        }
+        variable "deployment_name" {
+          default = "test"
+        }
+        variable "debug" {
+          default = false
+        }
+    """.trimIndent())
+    main.appendLine("""
         ####
         # General configuration for an AWS Api http project
         ####
@@ -46,31 +59,11 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
               version = "~> 2.2.0"
             }
           }
-          backend "s3" {
-            bucket = "${projectName.filter { it.isLetterOrDigit() }}"
-            key    = var.deployment_name
-            region = var.deployment_location
-          }
           required_version = "~> 1.0"
         }
         
         provider "aws" {
           region = var.deployment_location
-        }
-        
-        variable "deployment_location" {
-          default = "us-west-2"
-        }
-        variable "deployment_name" {
-          default = "test"
-        }
-        variable "basis_domain" {
-        }
-        variable "subdomain" {
-          default = "api"
-        }
-        variable "debug" {
-          default = false
         }
         
         # locals {
@@ -92,14 +85,20 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
           private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
           public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
         
-          enable_nat_gateway = false
+          enable_nat_gateway = true
           enable_vpn_gateway = false
         }
         
         resource "aws_vpc_endpoint" "s3" {
-          vpc_id = "${'$'}{module.vpc.vpc_id}"
+          vpc_id = module.vpc.vpc_id
           service_name = "com.amazonaws.${'$'}{var.deployment_location}.s3"
           route_table_ids = module.vpc.public_route_table_ids
+        }
+        resource "aws_vpc_endpoint" "executeapi" {
+          vpc_id = module.vpc.vpc_id
+          service_name = "com.amazonaws.${'$'}{var.deployment_location}.execute-api"
+          security_group_ids = [aws_security_group.executeapi.id]
+          vpc_endpoint_type = "Interface"
         }
 
         resource "aws_api_gateway_account" "main" {
@@ -181,6 +180,18 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
             cidr_blocks     = ["0.0.0.0/0"]
           }
         }
+
+        resource "aws_security_group" "executeapi" {
+          name   = "$namePrefix-execute-api"
+          vpc_id = "${'$'}{module.vpc.vpc_id}"
+        
+          ingress {
+            from_port   = 443
+            to_port     = 443
+            protocol    = "tcp"
+            cidr_blocks = [module.vpc.vpc_cidr_block]
+          }
+        }
         
         resource "aws_s3_bucket" "lambda_bucket" {
           bucket_prefix = "${namePrefix}-lambda-bucket"
@@ -192,7 +203,7 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
         }
         
         locals {
-          lambda_source = "build/dist/lambda.zip"
+          lambda_source = "../../build/dist/lambda.zip"
         }
         resource "aws_s3_object" "app_storage" {
           bucket = aws_s3_bucket.lambda_bucket.id
@@ -242,15 +253,16 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
                 }""".trimIndent())
             }
             serializer<FilesSettings>() -> {
-                appendable.appendLine("""
+                variables.appendLine("""
+                    variable "${setting.key}_expiry" {
+                        default = "P1D"
+                    }
+                """.trimIndent())
+                main.appendLine("""
                     
                     ####
                     # ${setting.key}: FilesSettings
                     ####
-                    
-                    variable "${setting.key}_expiry" {
-                        default = "P1D"
-                    }
         
                     resource "aws_s3_bucket" "${setting.key}" {
                       bucket_prefix = "${namePrefix}-${setting.key}"
@@ -306,15 +318,16 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
                 }""".trimIndent())
             }
             serializer<DatabaseSettings>() -> {
-                appendable.appendLine("""
+                variables.appendLine("""
+                    variable "${setting.key}_expiry" {
+                        default = "P1D"
+                    }
+                """.trimIndent())
+                main.appendLine("""
                     
                     ####
                     # ${setting.key}: DatabaseSettings
                     ####
-                    
-                    variable "${setting.key}_expiry" {
-                        default = "P1D"
-                    }
                     resource "random_password" "${setting.key}" {
                       length           = 32
                       special          = true
@@ -359,18 +372,19 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
                 }""".trimIndent())
             }
             serializer<CacheSettings>() -> {
-                appendable.appendLine("""
-
-                    ####
-                    # ${setting.key}: CacheSettings
-                    ####
-
+                variables.appendLine("""
                     variable "${setting.key}_node_type" {
                       default = "cache.t2.micro"
                     }
                     variable "${setting.key}_node_count" {
                       default = 1
                     }
+                """.trimIndent())
+                main.appendLine("""
+
+                    ####
+                    # ${setting.key}: CacheSettings
+                    ####
 
                     resource "aws_elasticache_cluster" "${setting.key}" {
                       cluster_id           = "${namePrefix}-${setting.key}"
@@ -392,18 +406,19 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
                 }""".trimIndent())
             }
             serializer<JwtSigner>() -> {
-                appendable.appendLine("""
-                    
-                    ####
-                    # ${setting.key}: JwtSigner
-                    ####
-                    
+                variables.appendLine("""
                     variable "${setting.key}_expirationMilliseconds" {
                       default = 31540000000
                     }
                     variable "${setting.key}_emailExpirationMilliseconds" {
                       default = 1800000
                     }
+                """.trimIndent())
+                main.appendLine("""
+                    
+                    ####
+                    # ${setting.key}: JwtSigner
+                    ####
                     resource "random_password" "${setting.key}" {
                       length           = 32
                       special          = true
@@ -417,11 +432,19 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
                 }""".trimIndent())
             }
             serializer<EmailSettings>() -> {
-                appendable.appendLine("""
+                variables.appendLine("""
+                    variable "${setting.key}_sender" {
+                    }
+                """.trimIndent())
+                main.appendLine("""
                     
                     ####
                     # ${setting.key}: EmailSettings
                     ####
+                    
+                    resource "aws_ses_email_identity" "${setting.key}" {
+                      email = var.${setting.key}_sender
+                    }
                     
                     resource "aws_iam_user" "${setting.key}" {
                       name = "${namePrefix}-${setting.key}-user"
@@ -448,33 +471,34 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
                       user       = aws_iam_user.${setting.key}.name
                       policy_arn = aws_iam_policy.${setting.key}.arn
                     }
-                    variable "${setting.key}_sender" {
+                    
+                    resource "aws_security_group" "${setting.key}" {
+                      name   = "demo-${'$'}{var.deployment_name}-${setting.key}"
+                      vpc_id = module.vpc.vpc_id
+                    
+                      ingress {
+                        from_port   = 587
+                        to_port     = 587
+                        protocol    = "tcp"
+                        cidr_blocks = [module.vpc.vpc_cidr_block]
+                      }
                     }
-                    resource "aws_ses_email_identity" "${setting.key}" {
-                      email = var.${setting.key}_sender
+                    resource "aws_vpc_endpoint" "${setting.key}" {
+                      vpc_id = module.vpc.vpc_id
+                      service_name = "com.amazonaws.${'$'}{var.deployment_location}.email-smtp"
+                      security_group_ids = [aws_security_group.${setting.key}.id]
+                      vpc_endpoint_type = "Interface"
                     }
                     
                 """.trimIndent())
                 appSettings.add("""${setting.key} = {
-                    option = "Smtp" 
-                    smtp = {
-                        hostName = "email-smtp.us-west-2.amazonaws.com"
-                        port = 587
-                        username = aws_iam_access_key.${setting.key}.id
-                        password = aws_iam_access_key.${setting.key}.ses_smtp_password_v4
-                        useSSL = true
-                        fromEmail = aws_ses_email_identity.${setting.key}.email
-                    }
+                    url = "smtp://${'$'}{aws_iam_access_key.${setting.key}.id}:${'$'}{aws_iam_access_key.${setting.key}.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
+                    fromEmail = var.${setting.key}_sender
                 }""".trimIndent())
             }
 //            serializer<NotificationSettings>() ->{}
             else -> {
-                appendable.appendLine("""
-                    
-                    ####
-                    # ${setting.key}
-                    ####
-                    
+                variables.appendLine("""
                     variable "${setting.key}" {
                       default = ${setting.value.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.default) }}
                     }
@@ -486,7 +510,7 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
 
     // Now we create the outputs.
 
-    appendable.appendLine("""
+    main.appendLine("""
         ####
         # App Declaration
         ####
@@ -504,13 +528,13 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
           timeout = 30
           # memory_size = "1024"
 
-          source_code_hash = filesha256(local.lambda_source)
+          source_code_hash = filebase64sha256(local.lambda_source)
 
           role = aws_iam_role.main_exec.arn
           depends_on = [${dependencies.joinToString()}]
           
           vpc_config {
-            subnet_ids = module.vpc.public_subnets
+            subnet_ids = module.vpc.private_subnets
             security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
           }
           
@@ -531,7 +555,7 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
     """.trimIndent())
 
     if(Http.endpoints.isNotEmpty()) {
-        appendable.appendLine("""
+        main.appendLine("""
         
         ####
         # ApiGateway for Http
@@ -619,10 +643,16 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
         #}
         
         """.trimIndent())
+
+        outputs.appendLine("""
+            output "http_url" {
+              value = aws_apigatewayv2_stage.http.invoke_url
+            }
+        """.trimIndent())
     }
 
     if(WebSockets.handlers.isNotEmpty()) {
-        appendable.appendLine("""
+        main.appendLine("""
                     
         
         ####
@@ -700,8 +730,58 @@ fun terraformAws(handler: String, projectName: String = "project", appendable: A
 
           source_arn = "${'$'}{aws_apigatewayv2_api.ws.execution_arn}/*/*"
         }
+        
+        resource "aws_iam_policy" "api_gateway_ws" {
+          name        = "${namePrefix}-api_gateway_ws"
+          path = "/${namePrefixPath}/api_gateway_ws/"
+          description = "Access to the ${namePrefix}_api_gateway_ws management"
+          policy = jsonencode({
+            Version = "2012-10-17"
+            Statement = [
+              {
+                Action = [
+                  "execute-api:ManageConnections"
+                ]
+                Effect   = "Allow"
+                Resource = "*"
+              },
+            ]
+          })
+        }
+        resource "aws_iam_role_policy_attachment" "api_gateway_ws" {
+          role       = aws_iam_role.main_exec.name
+          policy_arn = aws_iam_policy.api_gateway_ws.arn
+        }
+        
+        """.trimIndent())
+
+        outputs.appendLine("""
+            output "ws_url" {
+              value = aws_apigatewayv2_stage.ws.invoke_url
+            }
         """.trimIndent())
     }
+
+    root.resolve("base/main.tf").apply { parentFile!!.mkdirs() }.writeText(main.toString())
+    root.resolve("base/variables.tf").apply { parentFile!!.mkdirs() }.writeText(variables.toString())
+    root.resolve("base/outputs.tf").apply { parentFile!!.mkdirs() }.writeText(outputs.toString())
+
+    root.resolve("example/main.tf").takeUnless { it.exists() }?.apply { parentFile!!.mkdirs() }?.writeText("""
+        module "Base" {
+          source      = "../base"
+          deployment_location = "us-west-2"
+          deployment_name = "example"
+          debug = true
+          email_sender = "example@example.com"
+        }
+        terraform {
+          backend "s3" {
+            bucket = "${projectName.filter { it.isLetterOrDigit() }}"
+            key    = "example"
+            region = "us-west-2"
+          }
+        }
+    """.trimIndent())
 }
 
 private val HttpEndpoint.terraformName: String get() =

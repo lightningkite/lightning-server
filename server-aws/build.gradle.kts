@@ -26,8 +26,8 @@ val kotlinVersion: String by project
 val khrysalisVersion: String by project
 dependencies {
     api(project(":server-core"))
-    api(platform("software.amazon.awssdk:s3:2.17.232"))
-    api("software.amazon.awssdk:s3")
+    api("software.amazon.awssdk:s3:2.17.232")
+    api("software.amazon.awssdk:ses:2.17.232")
     api("software.amazon.awssdk:apigatewaymanagementapi:2.17.238")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.6.2")
     api("com.amazonaws:aws-lambda-java-core:1.2.1")
