@@ -26,14 +26,17 @@ import com.lightningkite.lightningserver.http.handler
 import com.lightningkite.lightningserver.http.test
 import com.lightningkite.lightningserver.ktor.runServer
 import com.lightningkite.lightningserver.pubsub.LocalPubSub
+import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.parsingFileSettings
 import com.lightningkite.lightningserver.serverhealth.healthCheck
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
+import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.websocket.websocket
 import kotlinx.serialization.*
 import java.io.File
 import java.lang.Exception
+import java.time.Duration
 import java.time.Instant
 import java.util.*
 
@@ -82,6 +85,13 @@ object Server {
     init {
         routing {
             get.handler { HttpResponse.plainText("Hello ${it.rawUser()}") }
+            val task = task("Sample Task") { it: Int ->
+                println("Got input $it in the sample task")
+            }
+            path("run-task").get.handler {
+                task(42)
+                HttpResponse.plainText("OK")
+            }
             path("auth").authEndpoints(
                 jwtSigner = jwtSigner,
                 database = database,
@@ -105,17 +115,20 @@ object Server {
             )
             path("die").get.handler { throw Exception("OUCH") }
         }
+        schedule("test-schedule", Duration.ofMinutes(1)) {
+            println("Hello schedule!")
+        }
     }
 }
 
 fun main(vararg args: String) {
     Server
-//    loadSettings(File("settings.json"))
-//    runServer(LocalPubSub, LocalCache)
+    loadSettings(File("settings.json"))
+    runServer(LocalPubSub, LocalCache)
 
 //    println(Documentable.kotlinApi("test"))
 
-    terraformAws("com.lightningkite.lightningserver.demo.AwsHandler", "demo", File("demo/terraform"))
+//    terraformAws("com.lightningkite.lightningserver.demo.AwsHandler", "demo", File("demo/terraform"))
 
 //    println(buildString { terraformAzure("demo", this) })
 }

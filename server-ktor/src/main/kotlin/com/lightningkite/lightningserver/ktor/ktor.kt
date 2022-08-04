@@ -276,7 +276,7 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                 }
             }
         }
-        Scheduler.schedules.forEach {
+        Scheduler.schedules.values.forEach {
             @Suppress("OPT_IN_USAGE")
             GlobalScope.launch {
                 while (true) {

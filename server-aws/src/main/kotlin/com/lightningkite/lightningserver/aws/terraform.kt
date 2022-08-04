@@ -9,6 +9,8 @@ import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.notifications.NotificationSettings
+import com.lightningkite.lightningserver.schedule.Schedule
+import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.settings.Settings
@@ -16,6 +18,8 @@ import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 import java.io.File
+import java.time.LocalDate
+import java.time.ZonedDateTime
 
 fun terraformAws(handler: String, projectName: String = "project", root: File) {
     AwsAdapter.cache
@@ -98,6 +102,12 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
           vpc_id = module.vpc.vpc_id
           service_name = "com.amazonaws.${'$'}{var.deployment_location}.execute-api"
           security_group_ids = [aws_security_group.executeapi.id]
+          vpc_endpoint_type = "Interface"
+        }
+        resource "aws_vpc_endpoint" "lambdainvoke" {
+          vpc_id = module.vpc.vpc_id
+          service_name = "com.amazonaws.${'$'}{var.deployment_location}.lambda"
+          security_group_ids = [aws_security_group.lambdainvoke.id]
           vpc_endpoint_type = "Interface"
         }
 
@@ -192,6 +202,18 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
             cidr_blocks = [module.vpc.vpc_cidr_block]
           }
         }
+
+        resource "aws_security_group" "lambdainvoke" {
+          name   = "$namePrefix-lambda-invoke"
+          vpc_id = "${'$'}{module.vpc.vpc_id}"
+        
+          ingress {
+            from_port   = 443
+            to_port     = 443
+            protocol    = "tcp"
+            cidr_blocks = [module.vpc.vpc_cidr_block]
+          }
+        }
         
         resource "aws_s3_bucket" "lambda_bucket" {
           bucket_prefix = "${namePrefix}-lambda-bucket"
@@ -238,6 +260,28 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
         resource "aws_iam_role_policy_attachment" "main_policy_vpc" {
           role       = aws_iam_role.main_exec.name
           policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+        }
+        
+        resource "aws_iam_policy" "lambdainvoke" {
+          name        = "${namePrefix}-lambdainvoke"
+          path = "/${namePrefixPath}/lambdainvoke/"
+          description = "Access to the ${namePrefix}_lambdainvoke bucket"
+          policy = jsonencode({
+            Version = "2012-10-17"
+            Statement = [
+              {
+                Action = [
+                  "lambda:InvokeFunction",
+                ]
+                Effect   = "Allow"
+                Resource = "*"
+              },
+            ]
+          })
+        }
+        resource "aws_iam_role_policy_attachment" "lambdainvoke" {
+          role       = aws_iam_role.main_exec.name
+          policy_arn = aws_iam_policy.lambdainvoke.arn
         }
 
     """.trimIndent())
@@ -504,6 +548,58 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
                     }
                 """.trimIndent())
                 appSettings.add("""${setting.key} = var.${setting.key}""".trimIndent())
+            }
+        }
+    }
+
+    if(Scheduler.schedules.isNotEmpty()) {
+        main.appendLine("""
+        """.trimIndent())
+    }
+    Scheduler.schedules.values.forEach {
+        when(val s = it.schedule) {
+            is Schedule.Daily -> {
+                val utcTime = ZonedDateTime.of(LocalDate.now(), s.time, s.zone)
+                main.appendLine("""
+                    resource "aws_cloudwatch_event_rule" "scheduled_task_${it.name}" {
+                      name                = "${namePrefix}_${it.name.filter { it.isLetterOrDigit() || it == '_' }}"
+                      schedule_expression = "cron(${utcTime.minute} ${utcTime.hour} * * ? *)"
+                    }
+                    resource "aws_cloudwatch_event_target" "scheduled_task_${it.name}" {
+                      rule      = aws_cloudwatch_event_rule.scheduled_task_${it.name}.name
+                      target_id = "lambda"
+                      arn       = aws_lambda_function.main.arn
+                      input     = "{\"scheduled\": \"${it.name}\"}"
+                    }
+                    resource "aws_lambda_permission" "scheduled_task_${it.name}" {
+                      statement_id  = "AllowExecutionFromCloudWatch"
+                      action        = "lambda:InvokeFunction"
+                      function_name = aws_lambda_function.main.function_name
+                      principal     = "events.amazonaws.com"
+                      source_arn    = aws_cloudwatch_event_rule.scheduled_task_${it.name}.arn
+                    }
+                """.trimIndent())
+            }
+            is Schedule.Frequency -> {
+                main.appendLine("""
+                    resource "aws_cloudwatch_event_rule" "scheduled_task_${it.name}" {
+                      name                = "${namePrefix}_${it.name.filter { it.isLetterOrDigit() || it == '_' }}"
+                      schedule_expression = "rate(${s.gap.toMinutes()} minute${if(s.gap.toMinutes() > 1) "s" else ""})"
+                    }
+                    resource "aws_cloudwatch_event_target" "scheduled_task_${it.name}" {
+                      rule      = aws_cloudwatch_event_rule.scheduled_task_${it.name}.name
+                      target_id = "lambda"
+                      arn       = aws_lambda_function.main.arn
+                      input     = "{\"scheduled\": \"${it.name}\"}"
+                    }
+                    resource "aws_lambda_permission" "scheduled_task_${it.name}" {
+                      statement_id  = "AllowExecutionFromCloudWatch"
+                      action        = "lambda:InvokeFunction"
+                      function_name = aws_lambda_function.main.function_name
+                      principal     = "events.amazonaws.com"
+                      source_arn    = aws_cloudwatch_event_rule.scheduled_task_${it.name}.arn
+                    }
+                """.trimIndent())
             }
         }
     }

@@ -58,6 +58,12 @@ resource "aws_vpc_endpoint" "executeapi" {
   security_group_ids = [aws_security_group.executeapi.id]
   vpc_endpoint_type = "Interface"
 }
+resource "aws_vpc_endpoint" "lambdainvoke" {
+  vpc_id = module.vpc.vpc_id
+  service_name = "com.amazonaws.${var.deployment_location}.lambda"
+  security_group_ids = [aws_security_group.lambdainvoke.id]
+  vpc_endpoint_type = "Interface"
+}
 
 resource "aws_api_gateway_account" "main" {
   cloudwatch_role_arn = aws_iam_role.cloudwatch.arn
@@ -151,6 +157,18 @@ resource "aws_security_group" "executeapi" {
   }
 }
 
+resource "aws_security_group" "lambdainvoke" {
+  name   = "demo-${var.deployment_name}-lambda-invoke"
+  vpc_id = "${module.vpc.vpc_id}"
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [module.vpc.vpc_cidr_block]
+  }
+}
+
 resource "aws_s3_bucket" "lambda_bucket" {
   bucket_prefix = "demo-${var.deployment_name}-lambda-bucket"
   force_destroy = true
@@ -196,6 +214,28 @@ resource "aws_iam_role_policy_attachment" "main_policy_exec" {
 resource "aws_iam_role_policy_attachment" "main_policy_vpc" {
   role       = aws_iam_role.main_exec.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+resource "aws_iam_policy" "lambdainvoke" {
+  name        = "demo-${var.deployment_name}-lambdainvoke"
+  path = "/demo/${var.deployment_name}/lambdainvoke/"
+  description = "Access to the demo-${var.deployment_name}_lambdainvoke bucket"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "lambda:InvokeFunction",
+        ]
+        Effect   = "Allow"
+        Resource = "*"
+      },
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "lambdainvoke" {
+  role       = aws_iam_role.main_exec.name
+  policy_arn = aws_iam_policy.lambdainvoke.arn
 }
 
 
@@ -371,6 +411,24 @@ resource "aws_vpc_endpoint" "email" {
   vpc_endpoint_type = "Interface"
 }
 
+
+resource "aws_cloudwatch_event_rule" "scheduled_task_test-schedule" {
+  name                = "demo-${var.deployment_name}_testschedule"
+  schedule_expression = "rate(1 minute)"
+}
+resource "aws_cloudwatch_event_target" "scheduled_task_test-schedule" {
+  rule      = aws_cloudwatch_event_rule.scheduled_task_test-schedule.name
+  target_id = "lambda"
+  arn       = aws_lambda_function.main.arn
+  input     = "{\"scheduled\": \"test-schedule\"}"
+}
+resource "aws_lambda_permission" "scheduled_task_test-schedule" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.main.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.scheduled_task_test-schedule.arn
+}
 ####
 # App Declaration
 ####

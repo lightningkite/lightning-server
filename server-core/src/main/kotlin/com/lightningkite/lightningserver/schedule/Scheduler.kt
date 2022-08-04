@@ -7,7 +7,7 @@ import java.time.ZoneId
 import java.util.TimeZone
 
 object Scheduler {
-    val schedules: MutableCollection<ScheduledTask> = ArrayList()
+    val schedules: MutableMap<String, ScheduledTask> = HashMap()
 }
 
 data class ScheduledTask(val name: String, val schedule: Schedule, val handler: suspend () -> Unit)

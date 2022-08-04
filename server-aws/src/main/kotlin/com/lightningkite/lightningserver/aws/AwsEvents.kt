@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.aws
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
@@ -120,5 +121,14 @@ internal fun JsonObject.jankMeADataClass(name: String) {
     println("}")
 }
 
-//{version=1.0, resource=$default, path=/demo-test-gateway-stage, httpMethod=POST, headers={Content-Length=19, Content-Type=application/json, Host=kyob2thob4.execute-api.us-west-2.amazonaws.com, User-Agent=insomnia/2022.4.2, X-Amzn-Trace-Id=Root=1-62d9ad26-449f338c7cbc14df1091fa79, X-Forwarded-For=75.148.99.49, X-Forwarded-Port=443, X-Forwarded-Proto=https, accept=*/*}, multiValueHeaders={Content-Length=[19], Content-Type=[application/json], Host=[kyob2thob4.execute-api.us-west-2.amazonaws.com], User-Agent=[insomnia/2022.4.2], X-Amzn-Trace-Id=[Root=1-62d9ad26-449f338c7cbc14df1091fa79], X-Forwarded-For=[75.148.99.49], X-Forwarded-Port=[443], X-Forwarded-Proto=[https], accept=[*/*]}, queryStringParameters=null, multiValueQueryStringParameters=null,
-// requestContext={accountId=907811386443, apiId=kyob2thob4, domainName=kyob2thob4.execute-api.us-west-2.amazonaws.com, domainPrefix=kyob2thob4, extendedRequestId=Vof-AimwPHcEMbg=, httpMethod=POST, identity={sourceIp=75.148.99.49}, path=/demo-test-gateway-stage, protocol=HTTP/1.1, requestId=Vof-AimwPHcEMbg=, requestTime=21/Jul/2022:19:46:46 +0000, requestTimeEpoch=1658432806236, resourceId=$default, resourcePath=$default, stage=demo-test-gateway-stage}, pathParameters=null, stageVariables=null, body={"content": "true"}, isBase64Encoded=false}
+@Serializable
+data class EventHubEvent(
+    val version: String,
+    val id: String,
+    @SerialName("detail-type") val detailType: String,
+    val source: String,
+    val account: String,
+    val time: String,
+    val region: String,
+    val resources: List<String>,
+)
