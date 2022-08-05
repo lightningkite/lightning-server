@@ -39,6 +39,16 @@ public extension PartialKeyPathLike {
                 return left.compareToResult(right as! String)
             case let left as UUID:
                 return left.compareToResult(right as! UUID)
+            case let left as Date:
+                return left.compareToResult(right as! UUID)
+            case let left as LocalDate:
+                return left.compareToResult(right as! UUID)
+            case let left as LocalTime:
+                return left.compareToResult(right as! UUID)
+            case let left as LocalDateTime:
+                return left.compareToResult(right as! UUID)
+            case let left as ZonedDateTime:
+                return left.compareToResult(right as! UUID)
             default:
                 return ComparisonResult.orderedSame
             }
