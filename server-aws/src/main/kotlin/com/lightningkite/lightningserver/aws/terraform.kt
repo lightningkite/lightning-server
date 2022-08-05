@@ -69,15 +69,6 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
         provider "aws" {
           region = var.deployment_location
         }
-        
-        # locals {
-        #     subdomainPrefix = "${'$'}{var.deployment_name}.${'$'}{var.subdomain}" 
-        #     subdomain = "${'$'}{var.deployment_name}.${'$'}{var.subdomain}.${'$'}{var.basis_domain}"
-        # }
-        # 
-        # data "aws_route53_zone" "main" {
-        #   name = var.basis_domain
-        # }
 
         module "vpc" {
           source = "terraform-aws-modules/vpc/aws"
@@ -714,29 +705,6 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
 
           source_arn = "${'$'}{aws_apigatewayv2_api.http.execution_arn}/*/*"
         }
-        
-
-        #resource "aws_route53_record" "cert_api_validations" {
-        #  allow_overwrite = true
-        #  count           = length(aws_acm_certificate.cert_api.domain_validation_options)
-        #  zone_id = aws_route53_zone.api.zone_id
-        #  name    = element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_name, count.index)
-        #  type    = element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_type, count.index)
-        #  records = [element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_value, count.index)]
-        #  ttl     = 60
-        #}
-
-        #resource "aws_route53_record" "http" {
-        #  zone_id = aws_route53_zone.main.zone_id
-        #  name    = local.subdomain
-        #  type    = "A"
-        #  
-        #  alias {
-        #    name                   = aws_apigatewayv2_domain_name.api.domain_name_configuration[0].target_domain_name
-        #    zone_id                = aws_apigatewayv2_domain_name.api.domain_name_configuration[0].hosted_zone_id
-        #    evaluate_target_health = false
-        #  }
-        #}
         
         """.trimIndent())
 
