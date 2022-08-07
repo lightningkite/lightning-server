@@ -327,8 +327,8 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
             serializer<GeneralServerSettings>() -> {
                 appSettings.add("""${setting.key} = {
                     projectName = "$projectName"
-                    publicUrl = try(var.public_http_url, aws_apigatewayv2_stage.http.invoke_url)
-                    wsUrl = try(var.public_ws_url, aws_apigatewayv2_stage.ws.invoke_url)
+                    publicUrl = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
+                    wsUrl = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
                     debug = var.debug
                 }""".trimIndent())
             }
@@ -482,7 +482,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
                     }
                 """.trimIndent())
                 appSettings.add("""${setting.key} = {
-                    url = "memcached://${'$'}{aws_elasticache_cluster.${setting.key}.cluster_address}:11211"
+                    uri = "memcached-aws://${'$'}{aws_elasticache_cluster.${setting.key}.cluster_address}:11211"
                 }""".trimIndent())
             }
             serializer<JwtSigner>() -> {

@@ -287,6 +287,7 @@ abstract class AwsAdapter : RequestStreamHandler {
         cacheId: String,
         path: String
     ): APIGatewayV2HTTPResponse {
+        logger.debug("Connecting $cacheId")
         val match = wsMatcher.match(path)
         if (match == null) {
             logger.warn("match is null!"); return APIGatewayV2HTTPResponse(404)
@@ -321,7 +322,11 @@ abstract class AwsAdapter : RequestStreamHandler {
     }
 
     suspend fun handleWebsocketMessage(cacheId: String, content: String): APIGatewayV2HTTPResponse {
-        val path = cache().get<String>(cacheId) ?: return APIGatewayV2HTTPResponse(400)
+        logger.debug("Handling message $content to $cacheId")
+        val path = cache().get<String>(cacheId) ?: run {
+            logger.warn("cache has no id $cacheId")
+             return APIGatewayV2HTTPResponse(400)
+        }
         // Reset the cache so it endures longer
         cache().set(cacheId, path, Duration.ofHours(1))
         val match = wsMatcher.match(path)
@@ -342,7 +347,11 @@ abstract class AwsAdapter : RequestStreamHandler {
     }
 
     suspend fun handleWebsocketDisconnect(cacheId: String): APIGatewayV2HTTPResponse {
-        val path = cache().get<String>(cacheId) ?: return APIGatewayV2HTTPResponse(400)
+        logger.debug("Disconnecting $cacheId")
+        val path = cache().get<String>(cacheId) ?: run {
+            logger.warn("cache has no id $cacheId")
+             return APIGatewayV2HTTPResponse(400)
+        }
         // Reset the cache so it endures longer
         cache().set(cacheId, path, Duration.ofHours(1))
         val match = wsMatcher.match(path)

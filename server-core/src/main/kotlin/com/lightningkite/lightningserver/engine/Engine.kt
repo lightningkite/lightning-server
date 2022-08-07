@@ -19,9 +19,6 @@ interface Engine {
 
 class LocalEngine(val pubSub: PubSubInterface): Engine {
     val logger = LoggerFactory.getLogger(this::class.java)
-    init {
-        Tasks.startup()
-    }
     override suspend fun sendWebSocketMessage(id: String, content: String) {
         logger.debug("Sending $content to $id")
         pubSub.string("ws-$id").emit(content)

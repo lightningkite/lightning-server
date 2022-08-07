@@ -448,8 +448,8 @@ resource "aws_lambda_function" "main" {
       LIGHTNING_SERVER_SETTINGS = jsonencode({
         general = {
             projectName = "demo"
-            publicUrl = try(var.public_http_url, aws_apigatewayv2_stage.http.invoke_url)
-            wsUrl = try(var.public_ws_url, aws_apigatewayv2_stage.ws.invoke_url)
+            publicUrl = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
+            wsUrl = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
             debug = var.debug
         },
         database = {
@@ -457,7 +457,7 @@ resource "aws_lambda_function" "main" {
             databaseName = "demo-${var.deployment_name}_database"
         },
         cache = {
-            url = "memcached://${aws_elasticache_cluster.cache.cluster_address}:11211"
+            uri = "memcached-aws://${aws_elasticache_cluster.cache.cluster_address}:11211"
         },
         jwt = {
             expirationMilliseconds = var.jwt_expirationMilliseconds 

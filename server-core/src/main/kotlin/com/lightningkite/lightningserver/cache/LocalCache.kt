@@ -6,7 +6,10 @@ import java.util.concurrent.ConcurrentHashMap
 
 object LocalCache: CacheInterface {
     data class Entry(val value: Any?, val expires: Long? = null)
-    val entries = ConcurrentHashMap<String, Entry>()
+    val entries by lazy {
+        println("WARNING: Using local cache.  You should NEVER see this in production or serverless.")
+        ConcurrentHashMap<String, Entry>()
+    }
 
     @Suppress("UNCHECKED_CAST")
     override suspend fun <T> get(key: String, serializer: KSerializer<T>): T? = entries[key]?.takeIf { it.expires == null || it.expires > System.currentTimeMillis() }?.value as? T

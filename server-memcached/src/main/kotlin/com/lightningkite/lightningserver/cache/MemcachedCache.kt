@@ -5,18 +5,13 @@ import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.reactive.awaitFirst
-import kotlinx.coroutines.reactive.awaitFirstOrNull
-import kotlinx.coroutines.reactive.collect
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import net.rubyeye.xmemcached.*
-import net.rubyeye.xmemcached.utils.AddrUtil
+import net.rubyeye.xmemcached.aws.AWSElasticCacheClient
 import java.net.InetSocketAddress
 import java.time.Duration
-import java.util.concurrent.ConcurrentHashMap
+
 
 class MemcachedCache(val client: MemcachedClient): CacheInterface, HealthCheckable {
     companion object {
@@ -33,15 +28,23 @@ class MemcachedCache(val client: MemcachedClient): CacheInterface, HealthCheckab
                     .map { InetSocketAddress(it.substringBefore(':'), it.substringAfter(':', "").toIntOrNull() ?: 11211) }
                 MemcachedCache(XMemcachedClient(hosts))
             }
+            CacheSettings.register("memcached-aws") {
+                val configFullHost = it.uri.substringAfter("://")
+                val configPort = configFullHost.substringAfter(':', "").toIntOrNull() ?: 11211
+                val configHost = configFullHost.substringBefore(':')
+                val client = AWSElasticCacheClient(InetSocketAddress(configHost, configPort))
+                MemcachedCache(client)
+            }
         }
     }
 
     override suspend fun <T> get(key: String, serializer: KSerializer<T>): T? = withContext(Dispatchers.IO) {
-        client.get<String>(key)?.let { Serialization.json.decodeFromString(serializer, it) }
+        client.get<String>(key)?.let { Serialization.json.decodeFromString(serializer, it) }.also {
+        }
     }
 
     override suspend fun <T> set(key: String, value: T, serializer: KSerializer<T>, timeToLive: Duration?) = withContext(Dispatchers.IO) {
-        client.set(key, timeToLive?.toMillis()?.toInt() ?: Int.MAX_VALUE, Serialization.json.encodeToString(serializer, value))
+        val succeed = client.set(key, timeToLive?.toSeconds()?.toInt() ?: Int.MAX_VALUE, Serialization.json.encodeToString(serializer, value))
         Unit
     }
 
