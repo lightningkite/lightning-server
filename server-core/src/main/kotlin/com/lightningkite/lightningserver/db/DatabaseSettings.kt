@@ -76,6 +76,12 @@ class InMemoryDatabase(val premadeData: JsonObject? = null): Database {
         }
         made
     } as FieldCollection<T>
+
+    fun drop() {
+        collections.forEach{
+            (it.value as InMemoryFieldCollection).data.clear()
+        }
+    }
 }
 
 class InMemoryUnsafePersistenceDatabase(val folder: File): Database {
@@ -88,4 +94,11 @@ class InMemoryUnsafePersistenceDatabase(val folder: File): Database {
             = collections.getOrPut(name) {
         InMemoryUnsafePersistentFieldCollection(Serialization.json, Serialization.json.serializersModule.serializer(type) as KSerializer<T>, folder.resolve(name))
     } as FieldCollection<T>
+
+
+    fun drop() {
+        collections.forEach{
+            (it.value as InMemoryFieldCollection).data.clear()
+        }
+    }
 }
