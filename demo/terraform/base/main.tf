@@ -24,15 +24,6 @@ provider "aws" {
   region = var.deployment_location
 }
 
-# locals {
-#     subdomainPrefix = "${var.deployment_name}.${var.subdomain}" 
-#     subdomain = "${var.deployment_name}.${var.subdomain}.${var.basis_domain}"
-# }
-# 
-# data "aws_route53_zone" "main" {
-#   name = var.basis_domain
-# }
-
 module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
 
@@ -363,10 +354,6 @@ resource "aws_iam_role_policy_attachment" "files" {
 # email: EmailSettings
 ####
 
-resource "aws_ses_email_identity" "email" {
-  email = var.email_sender
-}
-
 resource "aws_iam_user" "email" {
   name = "demo-${var.deployment_name}-email-user"
 }
@@ -461,8 +448,8 @@ resource "aws_lambda_function" "main" {
       LIGHTNING_SERVER_SETTINGS = jsonencode({
         general = {
             projectName = "demo"
-            publicUrl = aws_apigatewayv2_stage.http.invoke_url
-            wsUrl = aws_apigatewayv2_stage.ws.invoke_url
+            publicUrl = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
+            wsUrl = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
             debug = var.debug
         },
         database = {
@@ -470,7 +457,7 @@ resource "aws_lambda_function" "main" {
             databaseName = "demo-${var.deployment_name}_database"
         },
         cache = {
-            url = "memcached://${aws_elasticache_cluster.cache.cluster_address}:11211"
+            uri = "memcached-aws://${aws_elasticache_cluster.cache.cluster_address}:11211"
         },
         jwt = {
             expirationMilliseconds = var.jwt_expirationMilliseconds 
@@ -504,6 +491,9 @@ resource "aws_cloudwatch_log_group" "main" {
 ####
 # ApiGateway for Http
 ####
+variable "public_http_url" {
+  default = null
+}
 resource "aws_apigatewayv2_api" "http" {
   name = "demo-${var.deployment_name}-http"
   protocol_type = "HTTP"
@@ -563,34 +553,15 @@ resource "aws_lambda_permission" "api_gateway_http" {
   source_arn = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
 }
 
-
-#resource "aws_route53_record" "cert_api_validations" {
-#  allow_overwrite = true
-#  count           = length(aws_acm_certificate.cert_api.domain_validation_options)
-#  zone_id = aws_route53_zone.api.zone_id
-#  name    = element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_name, count.index)
-#  type    = element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_type, count.index)
-#  records = [element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_value, count.index)]
-#  ttl     = 60
-#}
-
-#resource "aws_route53_record" "http" {
-#  zone_id = aws_route53_zone.main.zone_id
-#  name    = local.subdomain
-#  type    = "A"
-#  
-#  alias {
-#    name                   = aws_apigatewayv2_domain_name.api.domain_name_configuration[0].target_domain_name
-#    zone_id                = aws_apigatewayv2_domain_name.api.domain_name_configuration[0].hosted_zone_id
-#    evaluate_target_health = false
-#  }
-#}
-
             
 
 ####
 # ApiGateway for Websockets
 ####
+variable "public_ws_url" {
+  default = null
+}
+
 resource "aws_apigatewayv2_api" "ws" {
   name = "demo-${var.deployment_name}-gateway"
   protocol_type = "WEBSOCKET"

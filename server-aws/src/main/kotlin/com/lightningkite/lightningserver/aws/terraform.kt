@@ -32,6 +32,10 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
     val variables = StringBuilder()
     val main = StringBuilder()
     val outputs = StringBuilder()
+    val domain = StringBuilder()
+    val domainInputs = StringBuilder()
+    val noDomain = StringBuilder()
+    val noDomainInputs = StringBuilder()
     variables.appendLine("""
         variable "deployment_location" {
           default = "us-west-2"
@@ -276,14 +280,55 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
         }
 
     """.trimIndent())
+    domain.appendLine("""
+        variable "debug" {
+          default = true
+        }
+        variable "domain_name_zone" {
+        }
+        variable "domain_name" {
+        }
+        variable "deployment_name" {
+          default = "example"
+        }
+        variable "deployment_location" {
+          default = "us-west-2"
+        }
+        provider "aws" {
+          region = var.deployment_location
+        }
+
+        data "aws_route53_zone" "main" {
+          name = var.domain_name_zone
+        }
+        provider "aws" {
+          alias = "acm"
+          region = "us-east-1"
+        }
+    """.trimIndent())
+    noDomain.appendLine("""
+        variable "debug" {
+          default = true
+        }
+        variable "deployment_name" {
+          default = "example"
+        }
+        variable "deployment_location" {
+          default = "us-west-2"
+        }
+        provider "aws" {
+          region = var.deployment_location
+        }
+
+    """.trimIndent())
     dependencies.add("aws_s3_object.app_storage")
     for(setting in Settings.requirements) {
         when(setting.value.serializer) {
             serializer<GeneralServerSettings>() -> {
                 appSettings.add("""${setting.key} = {
                     projectName = "$projectName"
-                    publicUrl = aws_apigatewayv2_stage.http.invoke_url
-                    wsUrl = aws_apigatewayv2_stage.ws.invoke_url
+                    publicUrl = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
+                    wsUrl = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
                     debug = var.debug
                 }""".trimIndent())
             }
@@ -437,7 +482,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
                     }
                 """.trimIndent())
                 appSettings.add("""${setting.key} = {
-                    url = "memcached://${'$'}{aws_elasticache_cluster.${setting.key}.cluster_address}:11211"
+                    uri = "memcached-aws://${'$'}{aws_elasticache_cluster.${setting.key}.cluster_address}:11211"
                 }""".trimIndent())
             }
             serializer<JwtSigner>() -> {
@@ -476,10 +521,6 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
                     ####
                     # ${setting.key}: EmailSettings
                     ####
-                    
-                    resource "aws_ses_email_identity" "${setting.key}" {
-                      email = var.${setting.key}_sender
-                    }
                     
                     resource "aws_iam_user" "${setting.key}" {
                       name = "${namePrefix}-${setting.key}-user"
@@ -530,6 +571,29 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
                     url = "smtp://${'$'}{aws_iam_access_key.${setting.key}.id}:${'$'}{aws_iam_access_key.${setting.key}.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
                     fromEmail = var.${setting.key}_sender
                 }""".trimIndent())
+                noDomain.appendLine("""
+                    variable "${setting.key}_sender" {
+                    }
+                    resource "aws_ses_email_identity" "${setting.key}" {
+                      email = var.${setting.key}_sender
+                    }
+                """.trimIndent())
+                noDomainInputs.appendLine("""  ${setting.key}_sender  = var.${setting.key}_sender""")
+                domain.appendLine("""
+                    
+                    resource "aws_ses_domain_identity" "${setting.key}" {
+                      domain = var.domain_name
+                    }
+                    resource "aws_route53_record" "${setting.key}" {
+                      zone_id = data.aws_route53_zone.main.zone_id
+                      name    = "_amazonses.${'$'}{var.domain_name}"
+                      type    = "TXT"
+                      ttl     = "600"
+                      records = [aws_ses_domain_identity.${setting.key}.verification_token]
+                    }
+                    
+                """.trimIndent())
+                domainInputs.appendLine("""  ${setting.key}_sender  = "noreply@${'$'}{var.domain_name}"""")
             }
 //            serializer<NotificationSettings>() ->{}
             else -> {
@@ -641,12 +705,16 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
         }
     """.trimIndent())
 
-    if(Http.endpoints.isNotEmpty()) {
+    // HTTP
+    run {
         main.appendLine("""
         
         ####
         # ApiGateway for Http
         ####
+        variable "public_http_url" {
+          default = null
+        }
         resource "aws_apigatewayv2_api" "http" {
           name = "${namePrefix}-http"
           protocol_type = "HTTP"
@@ -712,16 +780,73 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
             output "http_url" {
               value = aws_apigatewayv2_stage.http.invoke_url
             }
+            output "http" {
+              value = {
+                id = aws_apigatewayv2_stage.http.id
+                api_id = aws_apigatewayv2_stage.http.api_id
+                invoke_url = aws_apigatewayv2_stage.http.invoke_url
+                arn = aws_apigatewayv2_stage.http.arn
+                name = aws_apigatewayv2_stage.http.name
+              }
+            }
+        """.trimIndent())
+        
+        domain.appendLine("""
+            resource "aws_acm_certificate" "http" {
+              domain_name   = var.domain_name
+              validation_method = "DNS"
+            }
+            resource "aws_route53_record" "http" {
+              zone_id = data.aws_route53_zone.main.zone_id
+              name = tolist(aws_acm_certificate.http.domain_validation_options)[0].resource_record_name
+              type = tolist(aws_acm_certificate.http.domain_validation_options)[0].resource_record_type
+              records = [tolist(aws_acm_certificate.http.domain_validation_options)[0].resource_record_value]
+              ttl = "300"
+            }
+            resource "aws_acm_certificate_validation" "http" {
+              certificate_arn = aws_acm_certificate.http.arn
+              validation_record_fqdns = [aws_route53_record.http.fqdn]
+            }
+            resource aws_apigatewayv2_domain_name http {
+              domain_name = var.domain_name
+              domain_name_configuration {
+                certificate_arn = aws_acm_certificate.http.arn
+                endpoint_type   = "REGIONAL"
+                security_policy = "TLS_1_2"
+              }
+              depends_on = [aws_acm_certificate_validation.http]
+            }
+            resource aws_apigatewayv2_api_mapping http {
+              api_id      = module.Base.http.api_id
+              domain_name = aws_apigatewayv2_domain_name.http.domain_name
+              stage       = module.Base.http.id
+            }
+            resource aws_route53_record httpAccess {
+              type    = "A"
+              name    = aws_apigatewayv2_domain_name.http.domain_name
+              zone_id = data.aws_route53_zone.main.id
+
+                alias {
+                  evaluate_target_health = false
+                  name                   = aws_apigatewayv2_domain_name.http.domain_name_configuration[0].target_domain_name
+                  zone_id                = aws_apigatewayv2_domain_name.http.domain_name_configuration[0].hosted_zone_id
+                }
+            }
         """.trimIndent())
     }
 
-    if(WebSockets.handlers.isNotEmpty()) {
+    // Websockets
+    run {
         main.appendLine("""
                     
         
         ####
         # ApiGateway for Websockets
         ####
+        variable "public_ws_url" {
+          default = null
+        }
+
         resource "aws_apigatewayv2_api" "ws" {
           name = "${namePrefix}-gateway"
           protocol_type = "WEBSOCKET"
@@ -823,12 +948,88 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
             output "ws_url" {
               value = aws_apigatewayv2_stage.ws.invoke_url
             }
+            output "ws" {
+              value = {
+                id = aws_apigatewayv2_stage.ws.id
+                api_id = aws_apigatewayv2_stage.ws.api_id
+                invoke_url = aws_apigatewayv2_stage.ws.invoke_url
+                arn = aws_apigatewayv2_stage.ws.arn
+                name = aws_apigatewayv2_stage.ws.name
+              }
+            }
+        """.trimIndent())
+        
+        domain.appendLine("""
+            resource "aws_acm_certificate" "ws" {
+              domain_name   = "ws.${'$'}{var.domain_name}"
+              validation_method = "DNS"
+            }
+            resource "aws_route53_record" "ws" {
+              zone_id = data.aws_route53_zone.main.zone_id
+              name = tolist(aws_acm_certificate.ws.domain_validation_options)[0].resource_record_name
+              type = tolist(aws_acm_certificate.ws.domain_validation_options)[0].resource_record_type
+              records = [tolist(aws_acm_certificate.ws.domain_validation_options)[0].resource_record_value]
+              ttl = "300"
+            }
+            resource "aws_acm_certificate_validation" "ws" {
+              certificate_arn = aws_acm_certificate.ws.arn
+              validation_record_fqdns = [aws_route53_record.ws.fqdn]
+            }
+            resource aws_apigatewayv2_domain_name ws {
+              domain_name = "ws.${'$'}{var.domain_name}"
+              domain_name_configuration {
+                certificate_arn = aws_acm_certificate.ws.arn
+                endpoint_type   = "REGIONAL"
+                security_policy = "TLS_1_2"
+              }
+              depends_on = [aws_acm_certificate_validation.ws]
+            }
+            resource aws_apigatewayv2_api_mapping ws {
+              api_id      = module.Base.ws.api_id
+              domain_name = aws_apigatewayv2_domain_name.ws.domain_name
+              stage       = module.Base.ws.id
+            }
+            resource aws_route53_record wsAccess {
+              type    = "A"
+              name    = aws_apigatewayv2_domain_name.ws.domain_name
+              zone_id = data.aws_route53_zone.main.id
+
+                alias {
+                  evaluate_target_health = false
+                  name                   = aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].target_domain_name
+                  zone_id                = aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].hosted_zone_id
+                }
+            }
         """.trimIndent())
     }
+
+    domain.appendLine("""
+        module "Base" {
+          source              = "../base"
+          deployment_location = var.deployment_location
+          deployment_name     = var.deployment_name
+          debug               = var.debug
+          public_http_url     = var.domain_name
+          public_ws_url       = "ws.${'$'}{var.domain_name}"
+          ${domainInputs}
+        }
+    """.trimIndent())
+    noDomain.appendLine("""
+        module "Base" {
+          source              = "../base"
+          deployment_location = var.deployment_location
+          deployment_name     = var.deployment_name
+          debug               = var.debug
+          ${noDomainInputs}
+        }
+    """.trimIndent())
 
     root.resolve("base/main.tf").apply { parentFile!!.mkdirs() }.writeText(main.toString())
     root.resolve("base/variables.tf").apply { parentFile!!.mkdirs() }.writeText(variables.toString())
     root.resolve("base/outputs.tf").apply { parentFile!!.mkdirs() }.writeText(outputs.toString())
+
+    root.resolve("nodomain/main.tf").apply { parentFile!!.mkdirs() }.writeText(noDomain.toString())
+    root.resolve("domain/main.tf").apply { parentFile!!.mkdirs() }.writeText(domain.toString())
 
     root.resolve("example/main.tf").takeUnless { it.exists() }?.apply { parentFile!!.mkdirs() }?.writeText("""
         module "Base" {
