@@ -114,8 +114,8 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
                             //    throw BadRequestException("Content type ${part.contentType} doesn't match any of the accepted types: ${isFile.allowedTypes.joinToString()}")
                             //}
                             val file = parsingFileSettings!!().root.resolveRandom(
-                                "uploaded/${part.filename}",
-                                type.extension ?: "bin"
+                                "uploaded/${part.filename.substringBeforeLast(".")}",
+                                type.extension ?: part.filename.substringAfterLast(".")
                             )
                             file.write(part.content)
                             var current: MutableMap<String, Any?> = overrideData
