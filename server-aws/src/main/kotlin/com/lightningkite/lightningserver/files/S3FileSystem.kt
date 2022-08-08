@@ -36,7 +36,7 @@ class S3FileSystem(
     companion object {
         init {
             FilesSettings.register("s3") {
-                val withoutScheme = it.storageUrl.substringAfter("s3://")
+                val withoutScheme = it.storageUrl.substringAfter("://")
                 val credentials = withoutScheme.substringBefore('@', "").split(':').filter { it.isNotBlank() }
                 val endpoint = withoutScheme.substringAfter('@').substringBefore('/')
                 val bucket = endpoint.substringBefore('.')

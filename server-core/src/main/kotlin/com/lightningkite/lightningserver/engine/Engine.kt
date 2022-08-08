@@ -14,14 +14,11 @@ interface Engine {
     suspend fun sendWebSocketMessage(id: String, content: String)
     suspend fun listenForWebSocketMessage(id: String): Flow<String> = throw UnsupportedOperationException()
     @Suppress("OPT_IN_USAGE")
-    fun launchTask(task: Task<Any?>, input: Any?)
+    suspend fun launchTask(task: Task<Any?>, input: Any?)
 }
 
 class LocalEngine(val pubSub: PubSubInterface): Engine {
     val logger = LoggerFactory.getLogger(this::class.java)
-    init {
-        Tasks.startup()
-    }
     override suspend fun sendWebSocketMessage(id: String, content: String) {
         logger.debug("Sending $content to $id")
         pubSub.string("ws-$id").emit(content)
@@ -32,7 +29,7 @@ class LocalEngine(val pubSub: PubSubInterface): Engine {
         return pubSub.string("ws-$id").map { println("Send intercept $id $it"); it }
     }
 
-    override fun launchTask(task: Task<Any?>, input: Any?) {
+    override suspend fun launchTask(task: Task<Any?>, input: Any?) {
         logger.debug("Launching ${task.name} with $input")
         GlobalScope.launch {
             logger.debug("Executing ${task.name} with $input")

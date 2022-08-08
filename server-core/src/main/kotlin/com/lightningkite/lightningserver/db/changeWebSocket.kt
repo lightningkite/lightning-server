@@ -19,8 +19,8 @@ import kotlinx.serialization.*
 
 @LightningServerDsl
 inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> ServerPath.restApiWebsocket(
-    noinline database: ()->Database,
-    noinline baseCollection: (Database)->AbstractSignalFieldCollection<T> = { database().collection<T>() as AbstractSignalFieldCollection<T> },
+    noinline database: () -> Database,
+    noinline baseCollection: (Database) -> AbstractSignalFieldCollection<T> = { database().collection<T>() as AbstractSignalFieldCollection<T> },
     noinline collection: suspend FieldCollection<T>.(USER) -> FieldCollection<T>
 ): ApiWebsocket<USER, Query<T>, ListChange<T>> = restApiWebsocket(
     AuthInfo(),
@@ -36,8 +36,8 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
     authInfo: AuthInfo<USER>,
     serializer: KSerializer<T>,
     userSerializer: KSerializer<USER>,
-    database: ()->Database,
-    baseCollection: (Database)->AbstractSignalFieldCollection<T>,
+    database: () -> Database,
+    baseCollection: (Database) -> AbstractSignalFieldCollection<T>,
     collection: suspend FieldCollection<T>.(USER) -> FieldCollection<T>
 ): ApiWebsocket<USER, Query<T>, ListChange<T>> {
     prepareModels()
@@ -84,7 +84,10 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             val asyncs = ArrayList<Deferred<Unit>>()
             subscriptionDb().find(condition { it.databaseId eq modelIdentifier }).collect {
                 asyncs += async {
-                    val p = collection(baseCollection(database()), Serialization.json.decodeFromString(userSerializer, it.user))
+                    val p = collection(
+                        baseCollection(database()),
+                        Serialization.json.decodeFromString(userSerializer, it.user)
+                    )
                     val c = Serialization.json.decodeFromString(Query.serializer(serializer), it.condition)
                     for (entry in changes.changes) {
                         send(it._id, ListChange(

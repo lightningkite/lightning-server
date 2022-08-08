@@ -17,41 +17,12 @@ terraform {
       version = "~> 2.2.0"
     }
   }
-  backend "s3" {
-    bucket = "demo"
-    key    = var.deployment_name
-    region = var.deployment_location
-  }
   required_version = "~> 1.0"
 }
 
 provider "aws" {
   region = var.deployment_location
 }
-
-variable "deployment_location" {
-  default = "us-west-2"
-}
-variable "deployment_name" {
-  default = "test"
-}
-variable "basis_domain" {
-}
-variable "subdomain" {
-  default = "api"
-}
-variable "debug" {
-  default = false
-}
-
-# locals {
-#     subdomainPrefix = "${var.deployment_name}.${var.subdomain}" 
-#     subdomain = "${var.deployment_name}.${var.subdomain}.${var.basis_domain}"
-# }
-# 
-# data "aws_route53_zone" "main" {
-#   name = var.basis_domain
-# }
 
 module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
@@ -63,14 +34,26 @@ module "vpc" {
   private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
   public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 
-  enable_nat_gateway = false
+  enable_nat_gateway = true
   enable_vpn_gateway = false
 }
 
 resource "aws_vpc_endpoint" "s3" {
-  vpc_id = "${module.vpc.vpc_id}"
+  vpc_id = module.vpc.vpc_id
   service_name = "com.amazonaws.${var.deployment_location}.s3"
   route_table_ids = module.vpc.public_route_table_ids
+}
+resource "aws_vpc_endpoint" "executeapi" {
+  vpc_id = module.vpc.vpc_id
+  service_name = "com.amazonaws.${var.deployment_location}.execute-api"
+  security_group_ids = [aws_security_group.executeapi.id]
+  vpc_endpoint_type = "Interface"
+}
+resource "aws_vpc_endpoint" "lambdainvoke" {
+  vpc_id = module.vpc.vpc_id
+  service_name = "com.amazonaws.${var.deployment_location}.lambda"
+  security_group_ids = [aws_security_group.lambdainvoke.id]
+  vpc_endpoint_type = "Interface"
 }
 
 resource "aws_api_gateway_account" "main" {
@@ -153,6 +136,30 @@ resource "aws_security_group" "access_outside" {
   }
 }
 
+resource "aws_security_group" "executeapi" {
+  name   = "demo-${var.deployment_name}-execute-api"
+  vpc_id = "${module.vpc.vpc_id}"
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [module.vpc.vpc_cidr_block]
+  }
+}
+
+resource "aws_security_group" "lambdainvoke" {
+  name   = "demo-${var.deployment_name}-lambda-invoke"
+  vpc_id = "${module.vpc.vpc_id}"
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [module.vpc.vpc_cidr_block]
+  }
+}
+
 resource "aws_s3_bucket" "lambda_bucket" {
   bucket_prefix = "demo-${var.deployment_name}-lambda-bucket"
   force_destroy = true
@@ -163,7 +170,7 @@ resource "aws_s3_bucket_acl" "lambda_bucket" {
 }
 
 locals {
-  lambda_source = "build/dist/lambda.zip"
+  lambda_source = "../../build/dist/lambda.zip"
 }
 resource "aws_s3_object" "app_storage" {
   bucket = aws_s3_bucket.lambda_bucket.id
@@ -200,14 +207,32 @@ resource "aws_iam_role_policy_attachment" "main_policy_vpc" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
+resource "aws_iam_policy" "lambdainvoke" {
+  name        = "demo-${var.deployment_name}-lambdainvoke"
+  path = "/demo/${var.deployment_name}/lambdainvoke/"
+  description = "Access to the demo-${var.deployment_name}_lambdainvoke bucket"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "lambda:InvokeFunction",
+        ]
+        Effect   = "Allow"
+        Resource = "*"
+      },
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "lambdainvoke" {
+  role       = aws_iam_role.main_exec.name
+  policy_arn = aws_iam_policy.lambdainvoke.arn
+}
+
 
 ####
 # database: DatabaseSettings
 ####
-
-variable "database_expiry" {
-    default = "P1D"
-}
 resource "random_password" "database" {
   length           = 32
   special          = true
@@ -249,13 +274,6 @@ resource "aws_docdb_cluster_instance" "database" {
 # cache: CacheSettings
 ####
 
-variable "cache_node_type" {
-  default = "cache.t2.micro"
-}
-variable "cache_node_count" {
-  default = 1
-}
-
 resource "aws_elasticache_cluster" "cache" {
   cluster_id           = "demo-${var.deployment_name}-cache"
   engine               = "memcached"
@@ -274,13 +292,6 @@ resource "aws_elasticache_subnet_group" "cache" {
 ####
 # jwt: JwtSigner
 ####
-
-variable "jwt_expirationMilliseconds" {
-  default = 31540000000
-}
-variable "jwt_emailExpirationMilliseconds" {
-  default = 1800000
-}
 resource "random_password" "jwt" {
   length           = 32
   special          = true
@@ -288,28 +299,8 @@ resource "random_password" "jwt" {
 }
 
 ####
-# oauth-google
-####
-
-variable "oauth-google" {
-  default = null
-}
-
-####
-# logging
-####
-
-variable "logging" {
-  default = {}
-}
-
-####
 # files: FilesSettings
 ####
-
-variable "files_expiry" {
-    default = "P1D"
-}
 
 resource "aws_s3_bucket" "files" {
   bucket_prefix = "demo-${var.deployment_name}-files"
@@ -360,22 +351,6 @@ resource "aws_iam_role_policy_attachment" "files" {
 }
 
 ####
-# oauth-github
-####
-
-variable "oauth-github" {
-  default = null
-}
-
-####
-# exceptions
-####
-
-variable "exceptions" {
-  default = {}
-}
-
-####
 # email: EmailSettings
 ####
 
@@ -404,19 +379,42 @@ resource "aws_iam_user_policy_attachment" "email" {
   user       = aws_iam_user.email.name
   policy_arn = aws_iam_policy.email.arn
 }
-variable "email_sender" {
+
+resource "aws_security_group" "email" {
+  name   = "demo-${var.deployment_name}-email"
+  vpc_id = module.vpc.vpc_id
+
+  ingress {
+    from_port   = 587
+    to_port     = 587
+    protocol    = "tcp"
+    cidr_blocks = [module.vpc.vpc_cidr_block]
+  }
 }
-resource "aws_ses_email_identity" "email" {
-  email = var.email_sender
+resource "aws_vpc_endpoint" "email" {
+  vpc_id = module.vpc.vpc_id
+  service_name = "com.amazonaws.${var.deployment_location}.email-smtp"
+  security_group_ids = [aws_security_group.email.id]
+  vpc_endpoint_type = "Interface"
 }
 
 
-####
-# oauth-apple
-####
-
-variable "oauth-apple" {
-  default = null
+resource "aws_cloudwatch_event_rule" "scheduled_task_test-schedule" {
+  name                = "demo-${var.deployment_name}_testschedule"
+  schedule_expression = "rate(1 minute)"
+}
+resource "aws_cloudwatch_event_target" "scheduled_task_test-schedule" {
+  rule      = aws_cloudwatch_event_rule.scheduled_task_test-schedule.name
+  target_id = "lambda"
+  arn       = aws_lambda_function.main.arn
+  input     = "{\"scheduled\": \"test-schedule\"}"
+}
+resource "aws_lambda_permission" "scheduled_task_test-schedule" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.main.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.scheduled_task_test-schedule.arn
 }
 ####
 # App Declaration
@@ -435,13 +433,13 @@ resource "aws_lambda_function" "main" {
   timeout = 30
   # memory_size = "1024"
 
-  source_code_hash = filesha256(local.lambda_source)
+  source_code_hash = filebase64sha256(local.lambda_source)
 
   role = aws_iam_role.main_exec.arn
   depends_on = [aws_s3_object.app_storage]
   
   vpc_config {
-    subnet_ids = module.vpc.public_subnets
+    subnet_ids = module.vpc.private_subnets
     security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
   }
   
@@ -450,8 +448,8 @@ resource "aws_lambda_function" "main" {
       LIGHTNING_SERVER_SETTINGS = jsonencode({
         general = {
             projectName = "demo"
-            publicUrl = aws_apigatewayv2_stage.http.invoke_url
-            wsUrl = aws_apigatewayv2_stage.ws.invoke_url
+            publicUrl = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
+            wsUrl = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
             debug = var.debug
         },
         database = {
@@ -459,7 +457,7 @@ resource "aws_lambda_function" "main" {
             databaseName = "demo-${var.deployment_name}_database"
         },
         cache = {
-            url = "memcached://${aws_elasticache_cluster.cache.cluster_address}:11211"
+            uri = "memcached-aws://${aws_elasticache_cluster.cache.cluster_address}:11211"
         },
         jwt = {
             expirationMilliseconds = var.jwt_expirationMilliseconds 
@@ -475,15 +473,8 @@ resource "aws_lambda_function" "main" {
         oauth-github = var.oauth-github,
         exceptions = var.exceptions,
         email = {
-            option = "Smtp" 
-            smtp = {
-                hostName = "email-smtp.us-west-2.amazonaws.com"
-                port = 587
-                username = aws_iam_access_key.email.id
-                password = aws_iam_access_key.email.ses_smtp_password_v4
-                useSSL = true
-                fromEmail = aws_ses_email_identity.email.email
-            }
+            url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
+            fromEmail = var.email_sender
         },
         oauth-apple = var.oauth-apple
       })
@@ -500,6 +491,9 @@ resource "aws_cloudwatch_log_group" "main" {
 ####
 # ApiGateway for Http
 ####
+variable "public_http_url" {
+  default = null
+}
 resource "aws_apigatewayv2_api" "http" {
   name = "demo-${var.deployment_name}-http"
   protocol_type = "HTTP"
@@ -559,34 +553,15 @@ resource "aws_lambda_permission" "api_gateway_http" {
   source_arn = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
 }
 
-
-#resource "aws_route53_record" "cert_api_validations" {
-#  allow_overwrite = true
-#  count           = length(aws_acm_certificate.cert_api.domain_validation_options)
-#  zone_id = aws_route53_zone.api.zone_id
-#  name    = element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_name, count.index)
-#  type    = element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_type, count.index)
-#  records = [element(aws_acm_certificate.cert_api.domain_validation_options.*.resource_record_value, count.index)]
-#  ttl     = 60
-#}
-
-#resource "aws_route53_record" "http" {
-#  zone_id = aws_route53_zone.main.zone_id
-#  name    = local.subdomain
-#  type    = "A"
-#  
-#  alias {
-#    name                   = aws_apigatewayv2_domain_name.api.domain_name_configuration[0].target_domain_name
-#    zone_id                = aws_apigatewayv2_domain_name.api.domain_name_configuration[0].hosted_zone_id
-#    evaluate_target_health = false
-#  }
-#}
-
             
 
 ####
 # ApiGateway for Websockets
 ####
+variable "public_ws_url" {
+  default = null
+}
+
 resource "aws_apigatewayv2_api" "ws" {
   name = "demo-${var.deployment_name}-gateway"
   protocol_type = "WEBSOCKET"
@@ -659,3 +634,26 @@ resource "aws_lambda_permission" "api_gateway_ws" {
 
   source_arn = "${aws_apigatewayv2_api.ws.execution_arn}/*/*"
 }
+
+resource "aws_iam_policy" "api_gateway_ws" {
+  name        = "demo-${var.deployment_name}-api_gateway_ws"
+  path = "/demo/${var.deployment_name}/api_gateway_ws/"
+  description = "Access to the demo-${var.deployment_name}_api_gateway_ws management"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "execute-api:ManageConnections"
+        ]
+        Effect   = "Allow"
+        Resource = "*"
+      },
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "api_gateway_ws" {
+  role       = aws_iam_role.main_exec.name
+  policy_arn = aws_iam_policy.api_gateway_ws.arn
+}
+

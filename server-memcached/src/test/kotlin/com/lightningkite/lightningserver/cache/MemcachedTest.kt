@@ -14,10 +14,11 @@ class MemcachedTest {
         }
         val redisServer = EmbeddedMemcached.start()
         try {
-            val pubSub = MemcachedCache(XMemcachedClient("127.0.0.1", 11211))
+            val pubSubA = MemcachedCache(XMemcachedClient("127.0.0.1", 11211))
+            val pubSubB = MemcachedCache(XMemcachedClient("127.0.0.1", 11211))
             runBlocking {
-                pubSub.set("test", 4)
-                assertEquals(4, pubSub.get<Int>("test"))
+                pubSubA.set("test", 4)
+                assertEquals(4, pubSubB.get<Int>("test"))
             }
         } finally {
             redisServer.destroy()

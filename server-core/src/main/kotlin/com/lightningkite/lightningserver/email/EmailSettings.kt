@@ -1,12 +1,20 @@
 package com.lightningkite.lightningserver.email
 
+import com.lightningkite.lightningdb.Database
+import com.lightningkite.lightningserver.db.DatabaseSettings
+import com.lightningkite.lightningserver.db.InMemoryDatabase
+import com.lightningkite.lightningserver.db.InMemoryUnsafePersistenceDatabase
+import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
+import com.lightningkite.lightningserver.settings.Pluggable
 import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.json.JsonObject
 import java.io.BufferedReader
 import java.io.DataOutputStream
+import java.io.File
 import java.io.InputStreamReader
 import java.util.*
 import javax.net.ssl.SSLSocketFactory
@@ -20,17 +28,43 @@ import javax.net.ssl.SSLSocketFactory
  */
 @Serializable
 data class EmailSettings(
+    val url: String = "old",
+    val fromEmail: String = "",
     val option: EmailClientOption = EmailClientOption.Console,
     val smtp: SmtpConfig? = null
-) : ()->EmailClient {
-
-    override fun invoke(): EmailClient = when (option) {
-        EmailClientOption.Console -> ConsoleEmailClient
-        EmailClientOption.Smtp -> SmtpEmailClient(
-            smtp
-                ?: throw IllegalArgumentException("Option SMTP was requested, but no additional information was present under the 'smtp' key.")
-        )
+) : () -> EmailClient {
+    companion object : Pluggable<EmailSettings, EmailClient>() {
+        init {
+            EmailSettings.register("console") { ConsoleEmailClient }
+            EmailSettings.register("smtp") {
+                val urlWithoutProtocol = it.url.substringAfter("://")
+                val urlAuth = urlWithoutProtocol.substringBefore('@')
+                val urlHost = urlWithoutProtocol.substringAfter('@')
+                val port = urlHost.substringAfter(':', "").toIntOrNull() ?: 22
+                SmtpEmailClient(
+                    it.smtp ?: SmtpConfig(
+                        hostName = urlHost.substringBefore(':'),
+                        port = port,
+                        username = urlAuth.substringBefore(':'),
+                        password = urlAuth.substringAfter(':'),
+                        useSSL = port != 25,
+                        fromEmail = it.fromEmail
+                    )
+                )
+            }
+            EmailSettings.register("old") {
+                when (it.option) {
+                    EmailClientOption.Console -> ConsoleEmailClient
+                    EmailClientOption.Smtp -> SmtpEmailClient(
+                        it.smtp
+                            ?: throw IllegalArgumentException("Option SMTP was requested, but no additional information was present under the 'smtp' key.")
+                    )
+                }
+            }
+        }
     }
+
+    override fun invoke(): EmailClient = EmailSettings.parse(url.substringBefore("://"), this)
 
     @Transient
     var sendEmailDuringTests: Boolean = false
