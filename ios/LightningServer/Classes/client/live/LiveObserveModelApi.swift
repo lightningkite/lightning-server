@@ -8,7 +8,7 @@ public final class LiveObserveModelApi<Model : HasId> : ObserveModelApi<Model> {
     public var openSocket: (Query<Model>) -> Observable<Array<Model>>
     public init(openSocket: @escaping (Query<Model>) -> Observable<Array<Model>>) {
         self.openSocket = openSocket
-        self.alreadyOpen = (HashMap() as Dictionary<Query<Model>, Observable<Array<Model>>>)
+        self.alreadyOpen = ([:] as Dictionary<Query<Model>, Observable<Array<Model>>>)
         super.init()
         //Necessary properties should be initialized now
     }

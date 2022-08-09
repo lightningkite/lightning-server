@@ -4,7 +4,7 @@ import KhrysalisRuntime
 import RxSwift
 import Foundation
 
-public final class MockTable<Model : HasId> {
+public final class MockTable<Model : HasId> where Model.ID == UUID {
     public init() {
         self.data = dictionaryOf()
         self.signals = PublishSubject()

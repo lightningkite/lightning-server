@@ -40,15 +40,15 @@ public extension PartialKeyPathLike {
             case let left as UUID:
                 return left.compareToResult(right as! UUID)
             case let left as Date:
-                return left.compareToResult(right as! UUID)
+                return left.compareToResult(right as! Date)
             case let left as LocalDate:
-                return left.compareToResult(right as! UUID)
+                return left.compareToResult(right as! LocalDate)
             case let left as LocalTime:
-                return left.compareToResult(right as! UUID)
+                return left.compareToResult(right as! LocalTime)
             case let left as LocalDateTime:
-                return left.compareToResult(right as! UUID)
+                return left.compareToResult(right as! LocalDateTime)
             case let left as ZonedDateTime:
-                return left.compareToResult(right as! UUID)
+                return left.compareToResult(right as! ZonedDateTime)
             default:
                 return ComparisonResult.orderedSame
             }
@@ -103,9 +103,12 @@ fileprivate struct ConditionCodingKeys: CodingKey, Hashable {
     static let IntBitsSet = ConditionCodingKeys(stringValue: "IntBitsSet")
     static let IntBitsAnyClear = ConditionCodingKeys(stringValue: "IntBitsAnyClear")
     static let IntBitsAnySet = ConditionCodingKeys(stringValue: "IntBitsAnySet")
-    static let AllElements = ConditionCodingKeys(stringValue: "AllElements")
-    static let AnyElements = ConditionCodingKeys(stringValue: "AnyElements")
-    static let SizesEquals = ConditionCodingKeys(stringValue: "SizesEquals")
+    static let ListAllElements = ConditionCodingKeys(stringValue: "ListAllElements")
+    static let ListAnyElements = ConditionCodingKeys(stringValue: "ListAnyElements")
+    static let ListSizesEquals = ConditionCodingKeys(stringValue: "ListSizesEquals")
+    static let SetAllElements = ConditionCodingKeys(stringValue: "SetAllElements")
+    static let SetAnyElements = ConditionCodingKeys(stringValue: "SetAnyElements")
+    static let SetSizesEquals = ConditionCodingKeys(stringValue: "SetSizesEquals")
     static let Exists = ConditionCodingKeys(stringValue: "Exists")
     static let OnKey = ConditionCodingKeys(stringValue: "OnKey")
     static let IfNotNull = ConditionCodingKeys(stringValue: "IfNotNull")
@@ -145,18 +148,32 @@ extension Condition: ComparableCondition where T: Comparable {
     static func conditionLessThanOrEqual(_ value: Any) -> Any { return ConditionLessThanOrEqual(value as! T) }
 }
 fileprivate protocol ArrayCondition {
-    static func any(structure: inout KeyedDecodingContainer<ConditionCodingKeys>) throws -> Any
-    static func all(structure: inout KeyedDecodingContainer<ConditionCodingKeys>) throws -> Any
-    static func size(_ value: Int) -> Any
+    static func listAny(structure: inout KeyedDecodingContainer<ConditionCodingKeys>) throws -> Any
+    static func listAll(structure: inout KeyedDecodingContainer<ConditionCodingKeys>) throws -> Any
+    static func listSize(_ value: Int) -> Any
+}
+fileprivate protocol SetCondition {
+    static func setAny(structure: inout KeyedDecodingContainer<ConditionCodingKeys>) throws -> Any
+    static func setAll(structure: inout KeyedDecodingContainer<ConditionCodingKeys>) throws -> Any
+    static func setSize(_ value: Int) -> Any
 }
 extension Condition: ArrayCondition where T: Collection, T.Element: Codable & Hashable {
-    fileprivate static func any(structure: inout KeyedDecodingContainer<ConditionCodingKeys>) throws -> Any {
-        return ConditionAnyElements(try structure.decode(Condition<T.Element>.self, forKey: .AnyElements))
+    fileprivate static func listAny(structure: inout KeyedDecodingContainer<ConditionCodingKeys>) throws -> Any {
+        return ConditionListAnyElements(try structure.decode(Condition<T.Element>.self, forKey: .ListAnyElements))
     }
-    fileprivate static func all(structure: inout KeyedDecodingContainer<ConditionCodingKeys>) throws -> Any {
-        return ConditionAllElements(try structure.decode(Condition<T.Element>.self, forKey: .AllElements))
+    fileprivate static func listAll(structure: inout KeyedDecodingContainer<ConditionCodingKeys>) throws -> Any {
+        return ConditionListAllElements(try structure.decode(Condition<T.Element>.self, forKey: .ListAllElements))
     }
-    fileprivate static func size(_ value: Int) -> Any { return ConditionSizesEquals<T>(count: value) }
+    fileprivate static func listSize(_ value: Int) -> Any { return ConditionListSizesEquals<T>(count: value) }
+}
+extension Condition: SetCondition where T: Collection, T.Element: Codable & Hashable {
+    fileprivate static func setAny(structure: inout KeyedDecodingContainer<ConditionCodingKeys>) throws -> Any {
+        return ConditionSetAnyElements(try structure.decode(Condition<T.Element>.self, forKey: .SetAnyElements))
+    }
+    fileprivate static func setAll(structure: inout KeyedDecodingContainer<ConditionCodingKeys>) throws -> Any {
+        return ConditionSetAllElements(try structure.decode(Condition<T.Element>.self, forKey: .SetAllElements))
+    }
+    fileprivate static func setSize(_ value: Int) -> Any { return ConditionSetSizesEquals<T>(count: value) }
 }
 protocol DictionaryProtocol {
     associatedtype Key
@@ -278,19 +295,34 @@ extension ConditionIntBitsAnySet: ConditionProtocol {
         try structure.encode(mask, forKey: .IntBitsAnySet)
     }
 }
-extension ConditionAllElements: ConditionProtocol {
+extension ConditionListAllElements: ConditionProtocol {
     fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ConditionCodingKeys>) throws {
-        try structure.encode(condition, forKey: .AllElements)
+        try structure.encode(condition, forKey: .ListAllElements)
     }
 }
-extension ConditionAnyElements: ConditionProtocol {
+extension ConditionListAnyElements: ConditionProtocol {
     fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ConditionCodingKeys>) throws {
-        try structure.encode(condition, forKey: .AnyElements)
+        try structure.encode(condition, forKey: .ListAnyElements)
     }
 }
-extension ConditionSizesEquals: ConditionProtocol {
+extension ConditionListSizesEquals: ConditionProtocol {
     fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ConditionCodingKeys>) throws {
-        try structure.encode(count, forKey: .SizesEquals)
+        try structure.encode(count, forKey: .ListSizesEquals)
+    }
+}
+extension ConditionSetAllElements: ConditionProtocol {
+    fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ConditionCodingKeys>) throws {
+        try structure.encode(condition, forKey: .SetAllElements)
+    }
+}
+extension ConditionSetAnyElements: ConditionProtocol {
+    fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ConditionCodingKeys>) throws {
+        try structure.encode(condition, forKey: .SetAnyElements)
+    }
+}
+extension ConditionSetSizesEquals: ConditionProtocol {
+    fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ConditionCodingKeys>) throws {
+        try structure.encode(count, forKey: .SetSizesEquals)
     }
 }
 extension ConditionExists: ConditionProtocol {
@@ -367,15 +399,24 @@ extension Condition: AltCodable {
                 return ConditionIntBitsAnyClear(mask: try structure.decode(Int.self, forKey: key)) as! Self
             case .IntBitsAnySet:
                 return ConditionIntBitsAnySet(mask: try structure.decode(Int.self, forKey: key)) as! Self
-            case .AllElements:
+            case .ListAllElements:
                 let selfType = (Self.self as! ArrayCondition.Type)
-                return try selfType.all(structure: &structure) as! Self
-            case .AnyElements:
+                return try selfType.listAll(structure: &structure) as! Self
+            case .ListAnyElements:
                 let selfType = (Self.self as! ArrayCondition.Type)
-                return try selfType.any(structure: &structure) as! Self
-            case .SizesEquals:
+                return try selfType.listAny(structure: &structure) as! Self
+            case .ListSizesEquals:
                 let selfType = (Self.self as! ArrayCondition.Type)
-                return selfType.size(try structure.decode(Int.self, forKey: key)) as! Self
+                return selfType.listSize(try structure.decode(Int.self, forKey: key)) as! Self
+        case .SetAllElements:
+            let selfType = (Self.self as! SetCondition.Type)
+            return try selfType.setAll(structure: &structure) as! Self
+        case .SetAnyElements:
+            let selfType = (Self.self as! SetCondition.Type)
+            return try selfType.setAny(structure: &structure) as! Self
+        case .SetSizesEquals:
+            let selfType = (Self.self as! SetCondition.Type)
+            return selfType.setSize(try structure.decode(Int.self, forKey: key)) as! Self
             case .Exists:
                 let selfType = (Self.self as! DictionaryCondition.Type)
                 return selfType.exists(try structure.decode(String.self, forKey: key)) as! Self
@@ -405,13 +446,21 @@ fileprivate struct ModificationCodingKeys: CodingKey, Hashable {
     static let Increment = ModificationCodingKeys(stringValue: "Increment")
     static let Multiply = ModificationCodingKeys(stringValue: "Multiply")
     static let AppendString = ModificationCodingKeys(stringValue: "AppendString")
-    static let AppendList = ModificationCodingKeys(stringValue: "AppendList")
-    static let AppendSet = ModificationCodingKeys(stringValue: "AppendSet")
-    static let Remove = ModificationCodingKeys(stringValue: "Remove")
-    static let RemoveInstances = ModificationCodingKeys(stringValue: "RemoveInstances")
-    static let DropFirst = ModificationCodingKeys(stringValue: "DropFirst")
-    static let DropLast = ModificationCodingKeys(stringValue: "DropLast")
-    static let PerElement = ModificationCodingKeys(stringValue: "PerElement")
+    
+    static let ListAppend = ModificationCodingKeys(stringValue: "ListAppend")
+    static let ListRemove = ModificationCodingKeys(stringValue: "ListRemove")
+    static let ListRemoveInstances = ModificationCodingKeys(stringValue: "ListRemoveInstances")
+    static let ListDropFirst = ModificationCodingKeys(stringValue: "ListDropFirst")
+    static let ListDropLast = ModificationCodingKeys(stringValue: "ListDropLast")
+    static let ListPerElement = ModificationCodingKeys(stringValue: "ListPerElement")
+    
+    static let SetAppend = ModificationCodingKeys(stringValue: "SetAppend")
+    static let SetRemove = ModificationCodingKeys(stringValue: "SetRemove")
+    static let SetRemoveInstances = ModificationCodingKeys(stringValue: "SetRemoveInstances")
+    static let SetDropFirst = ModificationCodingKeys(stringValue: "SetDropFirst")
+    static let SetDropLast = ModificationCodingKeys(stringValue: "SetDropLast")
+    static let SetPerElement = ModificationCodingKeys(stringValue: "SetPerElement")
+    
     static let Combine = ModificationCodingKeys(stringValue: "Combine")
     static let ModifyByKey = ModificationCodingKeys(stringValue: "ModifyByKey")
     static let RemoveKeys = ModificationCodingKeys(stringValue: "RemoveKeys")
@@ -455,26 +504,45 @@ extension Modification: NumberModification where T: Number {
     static func multiply(_ value: Any) -> Any { return ModificationMultiply<T>(by: value as! T) }
 }
 fileprivate protocol ArrayModification {
-    static func appendList(value: Any) -> Any
-    static func appendSet(value: Any) -> Any
-    static func removeInstances(value: Any) -> Any
-    static func dropFirst() -> Any
-    static func dropLast() -> Any
-    static func map(structure: inout KeyedDecodingContainer<ModificationCodingKeys>) throws -> Any
-    static func remove(structure: inout KeyedDecodingContainer<ModificationCodingKeys>) throws -> Any
+    static func listAppend(value: Any) -> Any
+    static func listRemoveInstances(value: Any) -> Any
+    static func listDropFirst() -> Any
+    static func listDropLast() -> Any
+    static func listMap(structure: inout KeyedDecodingContainer<ModificationCodingKeys>) throws -> Any
+    static func listRemove(structure: inout KeyedDecodingContainer<ModificationCodingKeys>) throws -> Any
+}
+fileprivate protocol SetModification {
+    static func setAppend(value: Any) -> Any
+    static func setRemoveInstances(value: Any) -> Any
+    static func setDropFirst() -> Any
+    static func setDropLast() -> Any
+    static func setMap(structure: inout KeyedDecodingContainer<ModificationCodingKeys>) throws -> Any
+    static func setRemove(structure: inout KeyedDecodingContainer<ModificationCodingKeys>) throws -> Any
 }
 extension Modification: ArrayModification where T: Collection, T.Element: Codable & Hashable {
-    fileprivate static func appendList(value: Any) -> Any { return ModificationAppendList<T.Element>(items: value as! Array<T.Element>) }
-    fileprivate static func appendSet(value: Any) -> Any { return ModificationAppendSet<T.Element>(items: value as! Array<T.Element>) }
-    fileprivate static func removeInstances(value: Any) -> Any { return ModificationRemoveInstances<T.Element>(items: value as! Array<T.Element>) }
-    static func dropFirst() -> Any { return ModificationDropFirst<T.Element>() }
-    static func dropLast() -> Any { return ModificationDropLast<T.Element>() }
-    fileprivate static func map(structure: inout KeyedDecodingContainer<ModificationCodingKeys>) throws -> Any {
-        return try structure.decodeCodable(ModificationPerElement<T.Element>.self, forKey: .PerElement)
+    fileprivate static func listAppend(value: Any) -> Any { return ModificationListAppend<T.Element>(items: value as! Array<T.Element>) }
+    fileprivate static func listRemoveInstances(value: Any) -> Any { return ModificationListRemoveInstances<T.Element>(items: value as! Array<T.Element>) }
+    static func listDropFirst() -> Any { return ModificationListDropFirst<T.Element>() }
+    static func listDropLast() -> Any { return ModificationListDropLast<T.Element>() }
+    fileprivate static func listMap(structure: inout KeyedDecodingContainer<ModificationCodingKeys>) throws -> Any {
+        return try structure.decodeCodable(ModificationListPerElement<T.Element>.self, forKey: .ListPerElement)
     }
-    fileprivate static func remove(structure: inout KeyedDecodingContainer<ModificationCodingKeys>) throws -> Any {
-        let condition = try structure.decode(Condition<T.Element>.self, forKey: .Remove)
-        return ModificationRemove(condition)
+    fileprivate static func listRemove(structure: inout KeyedDecodingContainer<ModificationCodingKeys>) throws -> Any {
+        let condition = try structure.decode(Condition<T.Element>.self, forKey: .ListRemove)
+        return ModificationListRemove(condition)
+    }
+}
+extension Modification: SetModification where T: Collection, T.Element: Codable & Hashable {
+    fileprivate static func setAppend(value: Any) -> Any { return ModificationSetAppend<T.Element>(items: value as! Set<T.Element>) }
+    fileprivate static func setRemoveInstances(value: Any) -> Any { return ModificationSetRemoveInstances<T.Element>(items: value as! Set<T.Element>) }
+    static func setDropFirst() -> Any { return ModificationSetDropFirst<T.Element>() }
+    static func setDropLast() -> Any { return ModificationSetDropLast<T.Element>() }
+    fileprivate static func setMap(structure: inout KeyedDecodingContainer<ModificationCodingKeys>) throws -> Any {
+        return try structure.decodeCodable(ModificationListPerElement<T.Element>.self, forKey: .SetPerElement)
+    }
+    fileprivate static func setRemove(structure: inout KeyedDecodingContainer<ModificationCodingKeys>) throws -> Any {
+        let condition = try structure.decode(Condition<T.Element>.self, forKey: .SetRemove)
+        return ModificationSetRemove(condition)
     }
 }
 fileprivate protocol DictionaryModification {
@@ -485,7 +553,7 @@ fileprivate protocol DictionaryModification {
 extension Modification: DictionaryModification where T: DictionaryProtocol, T.Value: Codable & Hashable {
     fileprivate static func combine(value: Any) -> Any { return ModificationCombine(value as! Dictionary<String, T.Value>) }
     fileprivate static func modifyByKey(structure: inout KeyedDecodingContainer<ModificationCodingKeys>) throws -> Any {
-        let parts = try structure.decode(Dictionary<String, Modification<T.Value>>.self, forKey: .Remove)
+        let parts = try structure.decode(Dictionary<String, Modification<T.Value>>.self, forKey: .RemoveKeys)
         return ModificationModifyByKey(parts)
     }
     fileprivate static func removeKeys(keys: Set<String>) -> Any {
@@ -536,39 +604,64 @@ extension ModificationAppendString: ModificationProtocol {
         try structure.encode(value, forKey: .AppendString)
     }
 }
-extension ModificationAppendList: ModificationProtocol {
+extension ModificationListAppend: ModificationProtocol {
     fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ModificationCodingKeys>) throws {
-        try structure.encode(items, forKey: .AppendList)
+        try structure.encode(items, forKey: .ListAppend)
     }
 }
-extension ModificationAppendSet: ModificationProtocol {
+extension ModificationListRemove: ModificationProtocol {
     fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ModificationCodingKeys>) throws {
-        try structure.encode(items, forKey: .AppendSet)
+        try structure.encode(condition, forKey: .ListRemove)
     }
 }
-extension ModificationRemove: ModificationProtocol {
+extension ModificationListRemoveInstances: ModificationProtocol {
     fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ModificationCodingKeys>) throws {
-        try structure.encode(condition, forKey: .Remove)
+        try structure.encode(items, forKey: .ListRemoveInstances)
     }
 }
-extension ModificationRemoveInstances: ModificationProtocol {
+extension ModificationListDropFirst: ModificationProtocol {
     fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ModificationCodingKeys>) throws {
-        try structure.encode(items, forKey: .RemoveInstances)
+        try structure.encode(true, forKey: .ListDropFirst)
     }
 }
-extension ModificationDropFirst: ModificationProtocol {
+extension ModificationListDropLast: ModificationProtocol {
     fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ModificationCodingKeys>) throws {
-        try structure.encode(true, forKey: .DropFirst)
+        try structure.encode(true, forKey: .ListDropLast)
     }
 }
-extension ModificationDropLast: ModificationProtocol {
+extension ModificationListPerElement: ModificationProtocol {
     fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ModificationCodingKeys>) throws {
-        try structure.encode(true, forKey: .DropLast)
+        try structure.encodeCodable(self, forKey: .ListPerElement)
     }
 }
-extension ModificationPerElement: ModificationProtocol {
+extension ModificationSetAppend: ModificationProtocol {
     fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ModificationCodingKeys>) throws {
-        try structure.encodeCodable(self, forKey: .PerElement)
+        try structure.encode(items, forKey: .SetAppend)
+    }
+}
+extension ModificationSetRemove: ModificationProtocol {
+    fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ModificationCodingKeys>) throws {
+        try structure.encode(condition, forKey: .SetRemove)
+    }
+}
+extension ModificationSetRemoveInstances: ModificationProtocol {
+    fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ModificationCodingKeys>) throws {
+        try structure.encode(items, forKey: .SetRemoveInstances)
+    }
+}
+extension ModificationSetDropFirst: ModificationProtocol {
+    fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ModificationCodingKeys>) throws {
+        try structure.encode(true, forKey: .SetDropFirst)
+    }
+}
+extension ModificationSetDropLast: ModificationProtocol {
+    fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ModificationCodingKeys>) throws {
+        try structure.encode(true, forKey: .SetDropLast)
+    }
+}
+extension ModificationSetPerElement: ModificationProtocol {
+    fileprivate func encodeSelfInStructure(structure: inout KeyedEncodingContainer<ModificationCodingKeys>) throws {
+        try structure.encodeCodable(self, forKey: .SetPerElement)
     }
 }
 extension ModificationCombine: ModificationProtocol {
@@ -627,29 +720,46 @@ extension Modification: AltCodable {
             return selfType.multiply(try structure.decode(T.self, forKey: key)) as! Self
         case .AppendString:
             return ModificationAppendString(try structure.decode(String.self, forKey: key)) as! Self
-        case .AppendList:
+        case .ListAppend:
             let selfType = (Self.self as! ArrayModification.Type)
-            return selfType.appendList(value: try structure.decode(T.self, forKey: key)) as! Self
-        case .AppendSet:
+            return selfType.listAppend(value: try structure.decode(T.self, forKey: key)) as! Self
+        case .ListRemove:
             let selfType = (Self.self as! ArrayModification.Type)
-            return selfType.appendList(value: try structure.decode(T.self, forKey: key)) as! Self
-        case .Remove:
+            return try selfType.listRemove(structure: &structure) as! Self
+        case .ListRemoveInstances:
             let selfType = (Self.self as! ArrayModification.Type)
-            return try selfType.remove(structure: &structure) as! Self
-        case .RemoveInstances:
-            let selfType = (Self.self as! ArrayModification.Type)
-            return selfType.removeInstances(value: try structure.decode(T.self, forKey: key)) as! Self
-        case .DropFirst:
+            return selfType.listRemoveInstances(value: try structure.decode(T.self, forKey: key)) as! Self
+        case .ListDropFirst:
             try structure.decode(Bool.self, forKey: key)
             let selfType = (Self.self as! ArrayModification.Type)
-            return selfType.dropFirst() as! Self
-        case .DropLast:
+            return selfType.listDropFirst() as! Self
+        case .ListDropLast:
             try structure.decode(Bool.self, forKey: key)
             let selfType = (Self.self as! ArrayModification.Type)
-            return selfType.dropLast() as! Self
-        case .PerElement:
+            return selfType.listDropLast() as! Self
+        case .ListPerElement:
             let selfType = (Self.self as! ArrayModification.Type)
-            return try selfType.map(structure: &structure) as! Self
+            return try selfType.listMap(structure: &structure) as! Self
+        case .SetAppend:
+            let selfType = (Self.self as! SetModification.Type)
+            return selfType.setAppend(value: try structure.decode(T.self, forKey: key)) as! Self
+        case .SetRemove:
+            let selfType = (Self.self as! SetModification.Type)
+            return try selfType.setRemove(structure: &structure) as! Self
+        case .SetRemoveInstances:
+            let selfType = (Self.self as! SetModification.Type)
+            return selfType.setRemoveInstances(value: try structure.decode(T.self, forKey: key)) as! Self
+        case .SetDropFirst:
+            try structure.decode(Bool.self, forKey: key)
+            let selfType = (Self.self as! SetModification.Type)
+            return selfType.setDropFirst() as! Self
+        case .SetDropLast:
+            try structure.decode(Bool.self, forKey: key)
+            let selfType = (Self.self as! SetModification.Type)
+            return selfType.setDropLast() as! Self
+        case .SetPerElement:
+            let selfType = (Self.self as! SetModification.Type)
+            return try selfType.setMap(structure: &structure) as! Self
         case .Combine:
             let selfType = (Self.self as! DictionaryModification.Type)
             return selfType.combine(value: try structure.decode(T.self, forKey: key)) as! Self

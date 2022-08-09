@@ -3,7 +3,7 @@
 import KhrysalisRuntime
 import Foundation
 
-public final class MockCompleteModelApi<Model : HasId> : CompleteModelApi<Model> {
+public final class MockCompleteModelApi<Model : HasId> : CompleteModelApi<Model> where Model.ID == UUID {
     public var table: MockTable<Model>
     public init(table: MockTable<Model>) {
         self.table = table
