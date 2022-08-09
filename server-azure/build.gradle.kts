@@ -12,21 +12,12 @@ plugins {
     `maven-publish`
 }
 
-repositories {
-    mavenLocal()
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap") }
-    mavenCentral()
-}
-
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
 dependencies {
     api(project(":server-core"))
     api("com.microsoft.azure.functions:azure-functions-java-library:2.0.1")
-    api("com.azure:azure-storage-blob:12.17.1")
+    api("com.azure:azure-storage-blob:12.18.0")
 
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
 

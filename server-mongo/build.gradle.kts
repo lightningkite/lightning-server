@@ -12,11 +12,6 @@ plugins {
     `maven-publish`
 }
 
-repositories {
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap") }
-}
-
 val kotlinVersion:String by project
 dependencies {
     api(project(":server-core"))

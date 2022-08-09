@@ -12,15 +12,6 @@ plugins {
     `maven-publish`
 }
 
-repositories {
-    mavenLocal()
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap") }
-    mavenCentral()
-}
-
 val ktorVersion = "2.0.3"
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
@@ -44,15 +35,15 @@ dependencies {
     api("io.ktor:ktor-client-cio:$ktorVersion")
 
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
-    api("org.jetbrains.kotlinx:kotlinx-html-jvm:0.7.5")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+    api("org.jetbrains.kotlinx:kotlinx-html-jvm:0.8.0")
 
     api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     api("io.ktor:ktor-serialization-kotlinx-cbor:$ktorVersion")
     api("de.brudaswen.kotlinx.serialization:kotlinx-serialization-csv:2.0.0")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:1.3.3")
     api("io.github.pdvrieze.xmlutil:serialization-jvm:0.84.2")
-    api("com.github.jershell:kbson:0.4.4")
+    api("com.github.jershell:kbson:0.4.5")
 
     implementation("org.bouncycastle:bcprov-jdk18on:1.71")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.71")
@@ -62,7 +53,7 @@ dependencies {
     implementation("org.bouncycastle:bcprov-jdk18on:1.71")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.71")
 
-    testImplementation("com.auth0:java-jwt:3.19.2")
+    testImplementation("com.auth0:java-jwt:4.0.0")
 
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
 

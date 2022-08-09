@@ -5,10 +5,10 @@ buildscript {
     val khrysalisVersion: String by extra
     repositories {
 //        mavenLocal()
-        mavenCentral()
 //        maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
         maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
         google()
+        mavenCentral()
     }
     dependencies {
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
@@ -21,9 +21,10 @@ allprojects {
     group = "com.lightningkite.lightningserver"
     repositories {
 //        mavenLocal()
-        mavenCentral()
-        maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
 //        maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
+        maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
+        mavenCentral()
+
     }
 }
 tasks.create("clean", Delete::class.java) {

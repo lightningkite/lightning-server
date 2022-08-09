@@ -12,24 +12,15 @@ plugins {
     `maven-publish`
 }
 
-repositories {
-    mavenLocal()
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap") }
-    mavenCentral()
-}
-
 val ktorVersion = "2.0.3"
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
 dependencies {
     api(project(":server-core"))
-    api("software.amazon.awssdk:s3:2.17.232")
-    api("software.amazon.awssdk:lambda:2.17.232")
-    api("software.amazon.awssdk:ses:2.17.232")
-    api("software.amazon.awssdk:apigatewaymanagementapi:2.17.238")
+    api("software.amazon.awssdk:s3:2.17.243")
+    api("software.amazon.awssdk:lambda:2.17.243")
+    api("software.amazon.awssdk:ses:2.17.243")
+    api("software.amazon.awssdk:apigatewaymanagementapi:2.17.243")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.6.4")
     api("com.amazonaws:aws-lambda-java-core:1.2.1")
     api("com.amazonaws:aws-lambda-java-events:3.11.0")

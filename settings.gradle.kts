@@ -1,6 +1,5 @@
 rootProject.name = "lightning-server"
 
-
 pluginManagement {
     val kotlinVersion: String by settings
     val kspVersion: String by settings
