@@ -156,5 +156,9 @@ open class InMemoryFieldCollection<Model : Any>(val data: MutableList<Model> = A
     override suspend fun deleteOneIgnoringOldImpl(condition: Condition<Model>): Boolean = deleteOne(condition) != null
 
     override suspend fun deleteManyIgnoringOldImpl(condition: Condition<Model>): Int = deleteMany(condition).size
+
+    fun drop(){
+        data.clear()
+    }
 }
 
