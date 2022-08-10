@@ -5,7 +5,7 @@ import com.lightningkite.lightningserver.auth.AuthInfo
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.serialization.serializerOrContextual
+
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.ApiWebsocket
@@ -24,8 +24,8 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> Se
     noinline collection: suspend FieldCollection<T>.(USER) -> FieldCollection<T>
 ): ApiWebsocket<USER, Query<T>, ListChange<T>> = restApiWebsocket(
     AuthInfo(),
-    serializerOrContextual(),
-    serializerOrContextual(),
+    Serialization.module.serializer(),
+    Serialization.module.serializer(),
     database,
     baseCollection,
     collection

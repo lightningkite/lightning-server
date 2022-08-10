@@ -32,7 +32,7 @@ fun <T> HttpRequest.queryParameters(serializer: KSerializer<T>): T {
 
 var parsingFileSettings: (() -> FileSystem)? = null
 
-suspend inline fun <reified T> HttpContent.parse(): T = parse(serializerOrContextual())
+suspend inline fun <reified T> HttpContent.parse(): T = parse(Serialization.module.serializer())
 suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
     try {
         @Suppress("UNCHECKED_CAST")
@@ -142,7 +142,7 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
 }
 
 suspend inline fun <reified T> T.toHttpContent(acceptedTypes: List<ContentType>): HttpContent? =
-    toHttpContent(acceptedTypes, serializerOrContextual())
+    toHttpContent(acceptedTypes, Serialization.module.serializer())
 
 suspend fun <T> T.toHttpContent(acceptedTypes: List<ContentType>, serializer: KSerializer<T>): HttpContent? {
     if (this == Unit) return null

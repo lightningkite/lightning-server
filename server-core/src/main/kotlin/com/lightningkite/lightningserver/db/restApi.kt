@@ -12,7 +12,7 @@ import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.serialization.serializerOrContextual
+
 import io.ktor.util.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
@@ -45,7 +45,7 @@ import kotlin.reflect.KProperty1
 inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> ServerPath.restApi(
     noinline database: ()->Database,
     noinline getCollection: suspend Database.(principal: USER) -> FieldCollection<T>
-) = restApi(AuthInfo(), serializerOrContextual(), serializerOrContextual(), database, getCollection)
+) = restApi(AuthInfo(), Serialization.module.serializer(), Serialization.module.serializer(), database, getCollection)
 
 /**
  * Creates a Restful API for the model provided.

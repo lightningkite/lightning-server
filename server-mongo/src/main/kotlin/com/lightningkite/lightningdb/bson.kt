@@ -78,22 +78,14 @@ fun Modification<*>.dump(update: UpdateWithOptions = UpdateWithOptions(), key: S
         is Modification.CoerceAtMost -> into["\$min", key] = value
         is Modification.Increment -> into["\$inc", key] = by
         is Modification.Multiply -> into["\$mul", key] = by
-        is Modification.ListAppend<*> -> into.sub("\$push").sub(key)["\$each"] = items
-        is Modification.SetAppend<*> -> into.sub("\$addToSet").sub(key)["\$each"] = items
         is Modification.AppendString -> TODO("Appending strings is not supported yet")
-        is Modification.SetDropFirst<*> -> into["\$pop", key] = -1
-        is Modification.SetDropLast<*> -> into["\$pop", key] = 1
-        is Modification.ListDropFirst<*> -> into["\$pop", key] = -1
-        is Modification.ListDropLast<*> -> into["\$pop", key] = 1
         is Modification.IfNotNull -> this.modification.dump(update, key)
         is Modification.OnField<*, *> -> modification.dump(update, if (key == null) this.key.name else "$key.${this.key.name}")
-        is Modification.SetPerElement<*> -> {
-            val condIdentifier = genName()
-            update.options = update.options.arrayFilters(
-                (update.options.arrayFilters ?: listOf()) + condition.dump(key = condIdentifier)
-            )
-            modification.dump(update, "$key.$[$condIdentifier]")
-        }
+        is Modification.ListAppend<*> -> into.sub("\$push").sub(key)["\$each"] = items
+        is Modification.ListRemove<*> -> into["\$pull", key] = condition.bson()
+        is Modification.ListRemoveInstances<*> -> into["\$pullAll", key] = items
+        is Modification.ListDropFirst<*> -> into["\$pop", key] = -1
+        is Modification.ListDropLast<*> -> into["\$pop", key] = 1
         is Modification.ListPerElement<*> -> {
             val condIdentifier = genName()
             update.options = update.options.arrayFilters(
@@ -101,10 +93,18 @@ fun Modification<*>.dump(update: UpdateWithOptions = UpdateWithOptions(), key: S
             )
             modification.dump(update, "$key.$[$condIdentifier]")
         }
+        is Modification.SetAppend<*> -> into.sub("\$addToSet").sub(key)["\$each"] = items
         is Modification.SetRemove<*> -> into["\$pull", key] = condition.bson()
         is Modification.SetRemoveInstances<*> -> into["\$pullAll", key] = items
-        is Modification.ListRemove<*> -> into["\$pull", key] = condition.bson()
-        is Modification.ListRemoveInstances<*> -> into["\$pullAll", key] = items
+        is Modification.SetDropFirst<*> -> into["\$pop", key] = -1
+        is Modification.SetDropLast<*> -> into["\$pop", key] = 1
+        is Modification.SetPerElement<*> -> {
+            val condIdentifier = genName()
+            update.options = update.options.arrayFilters(
+                (update.options.arrayFilters ?: listOf()) + condition.dump(key = condIdentifier)
+            )
+            modification.dump(update, "$key.$[$condIdentifier]")
+        }
         is Modification.Combine<*> -> map.forEach {
             into.sub("\$set")[if (key == null) it.key else "$key.${it.key}"] = it.value
         }

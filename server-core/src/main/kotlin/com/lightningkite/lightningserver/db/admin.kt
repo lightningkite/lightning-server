@@ -9,7 +9,7 @@ import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.parse
-import com.lightningkite.lightningserver.serialization.serializerOrContextual
+
 import kotlinx.coroutines.flow.toList
 import kotlinx.html.*
 import kotlinx.serialization.KSerializer
@@ -62,8 +62,8 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> Se
 ): Unit = adminPages(
     database = database,
     authInfo = AuthInfo(),
-    serializer = serializerOrContextual(),
-    idSerializer = serializerOrContextual(),
+    serializer = Serialization.module.serializer(),
+    idSerializer = Serialization.module.serializer(),
     defaultItem = defaultItem,
     getCollection = getCollection
 )
