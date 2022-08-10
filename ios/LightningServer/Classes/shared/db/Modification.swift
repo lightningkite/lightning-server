@@ -3,7 +3,7 @@
 import KhrysalisRuntime
 import Foundation
 
-open class Modification<T : Codable & Hashable> : KEquatable, KHashable {
+public class Modification<T : Codable & Hashable> : KEquatable, KHashable {
     public init() {
         //Necessary properties should be initialized now
     }
@@ -16,6 +16,16 @@ open class Modification<T : Codable & Hashable> : KEquatable, KHashable {
     public func then(other: Modification<T>) -> ModificationChain<T> {
         return ModificationChain(modifications: [self, other]);
     }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     
     
@@ -103,7 +113,7 @@ public final class ModificationIfNotNull<T : Codable & Hashable> : Modification<
     public func copy(_ modification: Modification<T>? = nil) -> ModificationIfNotNull<T> { return ModificationIfNotNull(modification ?? self.modification) }
     
     override public func invoke(on: T?) -> T? {
-        return on.flatMap { temp79 in ({ (it) -> T in self.modification.invoke(on: it) })(temp79) };
+        return on.flatMap { temp81 in ({ (it) -> T in self.modification.invoke(on: it) })(temp81) };
     }
     override public func invokeDefault() -> T? {
         return nil;
@@ -281,7 +291,7 @@ public final class ModificationAppendString : Modification<String>, CustomString
         return self.value;
     }
 }
-public final class ModificationAppendList<T : Codable & Hashable> : Modification<Array<T>>, CustomStringConvertible {
+public final class ModificationListAppend<T : Codable & Hashable> : Modification<Array<T>>, CustomStringConvertible {
     public var items: Array<T>
     public init(items: Array<T>) {
         self.items = items
@@ -294,11 +304,11 @@ public final class ModificationAppendList<T : Codable & Hashable> : Modification
         return hasher.finalize()
     }
     override public func equals(other: Any) -> Bool {
-        guard let other = other as? ModificationAppendList else { return false }
+        guard let other = other as? ModificationListAppend else { return false }
         return self.items == other.items
     }
-    public var description: String { return "ModificationAppendList(items=\(String(kotlin: self.items)))" }
-    public func copy(items: Array<T>? = nil) -> ModificationAppendList<T> { return ModificationAppendList(items: items ?? self.items) }
+    public var description: String { return "ModificationListAppend(items=\(String(kotlin: self.items)))" }
+    public func copy(items: Array<T>? = nil) -> ModificationListAppend<T> { return ModificationListAppend(items: items ?? self.items) }
     
     override public func invoke(on: Array<T>) -> Array<T> {
         return on + self.items;
@@ -307,33 +317,7 @@ public final class ModificationAppendList<T : Codable & Hashable> : Modification
         return self.items;
     }
 }
-public final class ModificationAppendSet<T : Codable & Hashable> : Modification<Array<T>>, CustomStringConvertible {
-    public var items: Array<T>
-    public init(items: Array<T>) {
-        self.items = items
-        super.init()
-        //Necessary properties should be initialized now
-    }
-    override public func hashCode() -> Int {
-        var hasher = Hasher()
-        hasher.combine(items)
-        return hasher.finalize()
-    }
-    override public func equals(other: Any) -> Bool {
-        guard let other = other as? ModificationAppendSet else { return false }
-        return self.items == other.items
-    }
-    public var description: String { return "ModificationAppendSet(items=\(String(kotlin: self.items)))" }
-    public func copy(items: Array<T>? = nil) -> ModificationAppendSet<T> { return ModificationAppendSet(items: items ?? self.items) }
-    
-    override public func invoke(on: Array<T>) -> Array<T> {
-        return Array(Set((on + self.items)));
-    }
-    override public func invokeDefault() -> Array<T> {
-        return self.items;
-    }
-}
-public final class ModificationRemove<T : Codable & Hashable> : Modification<Array<T>>, CustomStringConvertible {
+public final class ModificationListRemove<T : Codable & Hashable> : Modification<Array<T>>, CustomStringConvertible {
     public var condition: Condition<T>
     public init(_ condition: Condition<T>) {
         self.condition = condition
@@ -346,11 +330,11 @@ public final class ModificationRemove<T : Codable & Hashable> : Modification<Arr
         return hasher.finalize()
     }
     override public func equals(other: Any) -> Bool {
-        guard let other = other as? ModificationRemove else { return false }
+        guard let other = other as? ModificationListRemove else { return false }
         return self.condition == other.condition
     }
-    public var description: String { return "ModificationRemove(condition=\(String(kotlin: self.condition)))" }
-    public func copy(_ condition: Condition<T>? = nil) -> ModificationRemove<T> { return ModificationRemove(condition ?? self.condition) }
+    public var description: String { return "ModificationListRemove(condition=\(String(kotlin: self.condition)))" }
+    public func copy(_ condition: Condition<T>? = nil) -> ModificationListRemove<T> { return ModificationListRemove(condition ?? self.condition) }
     
     override public func invoke(on: Array<T>) -> Array<T> {
         return on.filter({ (it) -> Bool in (!self.condition.invoke(on: it)) });
@@ -359,7 +343,7 @@ public final class ModificationRemove<T : Codable & Hashable> : Modification<Arr
         return [];
     }
 }
-public final class ModificationRemoveInstances<T : Codable & Hashable> : Modification<Array<T>>, CustomStringConvertible {
+public final class ModificationListRemoveInstances<T : Codable & Hashable> : Modification<Array<T>>, CustomStringConvertible {
     public var items: Array<T>
     public init(items: Array<T>) {
         self.items = items
@@ -372,11 +356,11 @@ public final class ModificationRemoveInstances<T : Codable & Hashable> : Modific
         return hasher.finalize()
     }
     override public func equals(other: Any) -> Bool {
-        guard let other = other as? ModificationRemoveInstances else { return false }
+        guard let other = other as? ModificationListRemoveInstances else { return false }
         return self.items == other.items
     }
-    public var description: String { return "ModificationRemoveInstances(items=\(String(kotlin: self.items)))" }
-    public func copy(items: Array<T>? = nil) -> ModificationRemoveInstances<T> { return ModificationRemoveInstances(items: items ?? self.items) }
+    public var description: String { return "ModificationListRemoveInstances(items=\(String(kotlin: self.items)))" }
+    public func copy(items: Array<T>? = nil) -> ModificationListRemoveInstances<T> { return ModificationListRemoveInstances(items: items ?? self.items) }
     
     override public func invoke(on: Array<T>) -> Array<T> {
         return on.minus(elements: self.items);
@@ -385,7 +369,7 @@ public final class ModificationRemoveInstances<T : Codable & Hashable> : Modific
         return [];
     }
 }
-public final class ModificationDropFirst<T : Codable & Hashable> : Modification<Array<T>> {
+public final class ModificationListDropFirst<T : Codable & Hashable> : Modification<Array<T>> {
     override public init() {
         super.init()
         //Necessary properties should be initialized now
@@ -401,10 +385,10 @@ public final class ModificationDropFirst<T : Codable & Hashable> : Modification<
         return 1;
     }
     override public func equals(other: Any) -> Bool {
-        return (other as? ModificationDropFirst<T>) != nil;
+        return (other as? ModificationListDropFirst<T>) != nil;
     }
 }
-public final class ModificationDropLast<T : Codable & Hashable> : Modification<Array<T>> {
+public final class ModificationListDropLast<T : Codable & Hashable> : Modification<Array<T>> {
     override public init() {
         super.init()
         //Necessary properties should be initialized now
@@ -420,10 +404,10 @@ public final class ModificationDropLast<T : Codable & Hashable> : Modification<A
         return 1;
     }
     override public func equals(other: Any) -> Bool {
-        return (other as? ModificationDropLast<T>) != nil;
+        return (other as? ModificationListDropLast<T>) != nil;
     }
 }
-public final class ModificationPerElement<T : Codable & Hashable> : Modification<Array<T>>, CustomStringConvertible, Codable {
+public final class ModificationListPerElement<T : Codable & Hashable> : Modification<Array<T>>, CustomStringConvertible, Codable {
     public var condition: Condition<T>
     public var modification: Modification<T>
     public init(condition: Condition<T>, modification: Modification<T>) {
@@ -458,17 +442,181 @@ public final class ModificationPerElement<T : Codable & Hashable> : Modification
         return hasher.finalize()
     }
     override public func equals(other: Any) -> Bool {
-        guard let other = other as? ModificationPerElement else { return false }
+        guard let other = other as? ModificationListPerElement else { return false }
         return self.condition == other.condition && self.modification == other.modification
     }
-    public var description: String { return "ModificationPerElement(condition=\(String(kotlin: self.condition)), modification=\(String(kotlin: self.modification)))" }
-    public func copy(condition: Condition<T>? = nil, modification: Modification<T>? = nil) -> ModificationPerElement<T> { return ModificationPerElement(condition: condition ?? self.condition, modification: modification ?? self.modification) }
+    public var description: String { return "ModificationListPerElement(condition=\(String(kotlin: self.condition)), modification=\(String(kotlin: self.modification)))" }
+    public func copy(condition: Condition<T>? = nil, modification: Modification<T>? = nil) -> ModificationListPerElement<T> { return ModificationListPerElement(condition: condition ?? self.condition, modification: modification ?? self.modification) }
     
     override public func invoke(on: Array<T>) -> Array<T> {
         return on.map({ (it) -> T in self.condition.invoke(on: it) ? self.modification.invoke(on: it) : it });
     }
     override public func invokeDefault() -> Array<T> {
         return [];
+    }
+}
+public final class ModificationSetAppend<T : Codable & Hashable> : Modification<Set<T>>, CustomStringConvertible {
+    public var items: Set<T>
+    public init(items: Set<T>) {
+        self.items = items
+        super.init()
+        //Necessary properties should be initialized now
+    }
+    override public func hashCode() -> Int {
+        var hasher = Hasher()
+        hasher.combine(items)
+        return hasher.finalize()
+    }
+    override public func equals(other: Any) -> Bool {
+        guard let other = other as? ModificationSetAppend else { return false }
+        return self.items == other.items
+    }
+    public var description: String { return "ModificationSetAppend(items=\(String(kotlin: self.items)))" }
+    public func copy(items: Set<T>? = nil) -> ModificationSetAppend<T> { return ModificationSetAppend(items: items ?? self.items) }
+    
+    override public func invoke(on: Set<T>) -> Set<T> {
+        return (on.union(self.items));
+    }
+    override public func invokeDefault() -> Set<T> {
+        return self.items;
+    }
+}
+public final class ModificationSetRemove<T : Codable & Hashable> : Modification<Set<T>>, CustomStringConvertible {
+    public var condition: Condition<T>
+    public init(_ condition: Condition<T>) {
+        self.condition = condition
+        super.init()
+        //Necessary properties should be initialized now
+    }
+    override public func hashCode() -> Int {
+        var hasher = Hasher()
+        hasher.combine(condition)
+        return hasher.finalize()
+    }
+    override public func equals(other: Any) -> Bool {
+        guard let other = other as? ModificationSetRemove else { return false }
+        return self.condition == other.condition
+    }
+    public var description: String { return "ModificationSetRemove(condition=\(String(kotlin: self.condition)))" }
+    public func copy(_ condition: Condition<T>? = nil) -> ModificationSetRemove<T> { return ModificationSetRemove(condition ?? self.condition) }
+    
+    override public func invoke(on: Set<T>) -> Set<T> {
+        return Set(on.filter({ (it) -> Bool in (!self.condition.invoke(on: it)) }));
+    }
+    override public func invokeDefault() -> Set<T> {
+        return Set([]);
+    }
+}
+public final class ModificationSetRemoveInstances<T : Codable & Hashable> : Modification<Set<T>>, CustomStringConvertible {
+    public var items: Set<T>
+    public init(items: Set<T>) {
+        self.items = items
+        super.init()
+        //Necessary properties should be initialized now
+    }
+    override public func hashCode() -> Int {
+        var hasher = Hasher()
+        hasher.combine(items)
+        return hasher.finalize()
+    }
+    override public func equals(other: Any) -> Bool {
+        guard let other = other as? ModificationSetRemoveInstances else { return false }
+        return self.items == other.items
+    }
+    public var description: String { return "ModificationSetRemoveInstances(items=\(String(kotlin: self.items)))" }
+    public func copy(items: Set<T>? = nil) -> ModificationSetRemoveInstances<T> { return ModificationSetRemoveInstances(items: items ?? self.items) }
+    
+    override public func invoke(on: Set<T>) -> Set<T> {
+        return on.subtracting(self.items);
+    }
+    override public func invokeDefault() -> Set<T> {
+        return Set([]);
+    }
+}
+public final class ModificationSetDropFirst<T : Codable & Hashable> : Modification<Set<T>> {
+    override public init() {
+        super.init()
+        //Necessary properties should be initialized now
+    }
+    
+    override public func invoke(on: Set<T>) -> Set<T> {
+        return Set(on.dropFirst(1));
+    }
+    override public func invokeDefault() -> Set<T> {
+        return Set([]);
+    }
+    override public func hashCode() -> Int {
+        return 1;
+    }
+    override public func equals(other: Any) -> Bool {
+        return (other as? ModificationSetDropFirst<T>) != nil;
+    }
+}
+public final class ModificationSetDropLast<T : Codable & Hashable> : Modification<Set<T>> {
+    override public init() {
+        super.init()
+        //Necessary properties should be initialized now
+    }
+    
+    override public func invoke(on: Set<T>) -> Set<T> {
+        return Set(Array(Array(on).dropLast(1)));
+    }
+    override public func invokeDefault() -> Set<T> {
+        return Set([]);
+    }
+    override public func hashCode() -> Int {
+        return 1;
+    }
+    override public func equals(other: Any) -> Bool {
+        return (other as? ModificationSetDropLast<T>) != nil;
+    }
+}
+public final class ModificationSetPerElement<T : Codable & Hashable> : Modification<Set<T>>, CustomStringConvertible, Codable {
+    public var condition: Condition<T>
+    public var modification: Modification<T>
+    public init(condition: Condition<T>, modification: Modification<T>) {
+        self.condition = condition
+        self.modification = modification
+        super.init()
+        //Necessary properties should be initialized now
+    }
+    convenience required public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            condition: try values.decode(Condition<T>.self, forKey: .condition),
+            modification: try values.decode(Modification<T>.self, forKey: .modification)
+        )
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case condition = "condition"
+        case modification = "modification"
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.condition, forKey: .condition)
+        try container.encode(self.modification, forKey: .modification)
+    }
+    
+    override public func hashCode() -> Int {
+        var hasher = Hasher()
+        hasher.combine(condition)
+        hasher.combine(modification)
+        return hasher.finalize()
+    }
+    override public func equals(other: Any) -> Bool {
+        guard let other = other as? ModificationSetPerElement else { return false }
+        return self.condition == other.condition && self.modification == other.modification
+    }
+    public var description: String { return "ModificationSetPerElement(condition=\(String(kotlin: self.condition)), modification=\(String(kotlin: self.modification)))" }
+    public func copy(condition: Condition<T>? = nil, modification: Modification<T>? = nil) -> ModificationSetPerElement<T> { return ModificationSetPerElement(condition: condition ?? self.condition, modification: modification ?? self.modification) }
+    
+    override public func invoke(on: Set<T>) -> Set<T> {
+        return Set(on.map({ (it) -> T in self.condition.invoke(on: it) ? self.modification.invoke(on: it) : it }));
+    }
+    override public func invokeDefault() -> Set<T> {
+        return Set([]);
     }
 }
 public final class ModificationCombine<T : Codable & Hashable> : Modification<Dictionary<String, T>>, CustomStringConvertible {

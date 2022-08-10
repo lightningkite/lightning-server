@@ -2,7 +2,7 @@ import { Condition } from './Condition';
 import { Modification } from './Modification';
 export interface Query<T> {
     condition?: Condition<T>;
-    orderBy?: Array<keyof T>;
+    orderBy?: Array<keyof T | `-${keyof T & string}`>;
     skip?: number;
     limit?: number;
 }

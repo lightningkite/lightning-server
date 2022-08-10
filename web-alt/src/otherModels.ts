@@ -3,7 +3,7 @@ import { Modification } from './Modification'
 
 export interface Query<T> {
     condition?: Condition<T>// = Condition.Always<T>(),
-    orderBy?: Array<keyof T>
+    orderBy?: Array<keyof T | `-${keyof T & string}`>
     skip?: number // = 0,
     limit?: number // = 100,
 }

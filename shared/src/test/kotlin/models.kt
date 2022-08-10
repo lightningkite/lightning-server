@@ -91,6 +91,8 @@ data class LargeTestModel(
     var instant: Instant = Instant.ofEpochMilli(0L),
     var list: List<Int> = listOf(),
     var listEmbedded: List<ClassUsedForEmbedding> = listOf(),
+    var set: Set<Int> = setOf(),
+    var setEmbedded: Set<ClassUsedForEmbedding> = setOf(),
     var map: Map<String, Int> = mapOf(),
     var embedded: ClassUsedForEmbedding = ClassUsedForEmbedding(),
     var booleanNullable: Boolean? = null,

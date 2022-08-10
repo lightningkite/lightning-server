@@ -8,7 +8,7 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.parse
-import com.lightningkite.lightningserver.serialization.serializerOrContextual
+
 import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.websocket.VirtualSocket
@@ -82,14 +82,14 @@ inline fun <reified USER, reified INPUT, reified OUTPUT> ServerPath.typedWebsock
     noinline disconnect: suspend ApiWebsocket<USER, INPUT, OUTPUT>.(WebSockets.DisconnectEvent) -> Unit = {}
 ): ApiWebsocket<USER, INPUT, OUTPUT> = typedWebsocket(
     authInfo = AuthInfo(),
-    inputType = serializerOrContextual(),
-    outputType = serializerOrContextual(),
+    inputType = Serialization.module.serializer(),
+    outputType = Serialization.module.serializer(),
     summary = summary,
-            description = description,
-            errorCases = errorCases,
-            connect = connect,
-            message = message,
-            disconnect = disconnect,
+    description = description,
+    errorCases = errorCases,
+    connect = connect,
+    message = message,
+    disconnect = disconnect,
 )
 
 @LightningServerDsl

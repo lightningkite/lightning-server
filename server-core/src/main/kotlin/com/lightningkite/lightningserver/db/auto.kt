@@ -6,7 +6,7 @@ import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.auth.AuthInfo
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.serialization.serializerOrContextual
+
 
 /**
  * Shortcut to create each of the endpoints required for the Auto Admin

@@ -40,13 +40,18 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): KSerializer<Modification<
             if (inner == String.serializer()) register(Modification.AppendString.serializer())
             if (inner.descriptor.kind == StructureKind.LIST) {
                 inner.listElement()?.let { element ->
-                    register(Modification.AppendList.serializer(element))
-                    register(Modification.AppendSet.serializer(element))
-                    register(Modification.Remove.serializer(element))
-                    register(Modification.RemoveInstances.serializer(element))
-                    register(Modification.DropFirst.serializer(element))
-                    register(Modification.DropLast.serializer(element))
-                    register(Modification.PerElement.serializer(element))
+                    register(Modification.SetAppend.serializer(element))
+                    register(Modification.SetRemove.serializer(element))
+                    register(Modification.SetRemoveInstances.serializer(element))
+                    register(Modification.SetDropFirst.serializer(element))
+                    register(Modification.SetDropLast.serializer(element))
+                    register(Modification.SetPerElement.serializer(element))
+                    register(Modification.ListAppend.serializer(element))
+                    register(Modification.ListRemove.serializer(element))
+                    register(Modification.ListRemoveInstances.serializer(element))
+                    register(Modification.ListDropFirst.serializer(element))
+                    register(Modification.ListDropLast.serializer(element))
+                    register(Modification.ListPerElement.serializer(element))
                 }
             }
             if (inner.descriptor.kind == StructureKind.MAP) {
@@ -77,7 +82,16 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): KSerializer<Modification<
             }
             map
         },
-        annotations = Modification::class.annotations
+        annotations = Modification::class.annotations,
+        alternateReadNames = mapOf(
+            "AppendList" to "ListAppend",
+            "AppendSet" to "SetAppend",
+            "Remove" to "ListRemove",
+            "RemoveInstances" to "ListRemoveInstances",
+            "DropFirst" to "ListDropFirst",
+            "DropLast" to "ListDropLast",
+            "PerElement" to "ListPerElement",
+        )
     ) {
         when (it) {
             is Modification.Chain -> "Chain"
@@ -88,13 +102,18 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): KSerializer<Modification<
             is Modification.Increment -> "Increment"
             is Modification.Multiply -> "Multiply"
             is Modification.AppendString -> "AppendString"
-            is Modification.AppendList<*> -> "AppendList"
-            is Modification.AppendSet<*> -> "AppendSet"
-            is Modification.Remove<*> -> "Remove"
-            is Modification.RemoveInstances<*> -> "RemoveInstances"
-            is Modification.DropFirst<*> -> "DropFirst"
-            is Modification.DropLast<*> -> "DropLast"
-            is Modification.PerElement<*> -> "PerElement"
+            is Modification.ListAppend<*> -> "ListAppend"
+            is Modification.ListRemove<*> -> "ListRemove"
+            is Modification.ListRemoveInstances<*> -> "ListRemoveInstances"
+            is Modification.ListDropFirst<*> -> "ListDropFirst"
+            is Modification.ListDropLast<*> -> "ListDropLast"
+            is Modification.ListPerElement<*> -> "ListPerElement"
+            is Modification.SetAppend<*> -> "SetAppend"
+            is Modification.SetRemove<*> -> "SetRemove"
+            is Modification.SetRemoveInstances<*> -> "SetRemoveInstances"
+            is Modification.SetDropFirst<*> -> "SetDropFirst"
+            is Modification.SetDropLast<*> -> "SetDropLast"
+            is Modification.SetPerElement<*> -> "SetPerElement"
             is Modification.Combine<*> -> "Combine"
             is Modification.ModifyByKey<*> -> "ModifyByKey"
             is Modification.RemoveKeys<*> -> "RemoveKeys"
@@ -203,44 +222,65 @@ object ModificationAppendStringSerializer : KSerializer<Modification.AppendStrin
         encoder.encodeSerializableValue(to, value.value)
 }
 
-class ModificationAppendListSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.AppendList<T>> {
+class ModificationListAppendSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.ListAppend<T>> {
     val to by lazy { ListSerializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("AppendList") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.AppendList<T> =
-        Modification.AppendList(decoder.decodeSerializableValue(to))
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("ListAppend") { to.descriptor }
+    override fun deserialize(decoder: Decoder): Modification.ListAppend<T> =
+        Modification.ListAppend(decoder.decodeSerializableValue(to))
 
-    override fun serialize(encoder: Encoder, value: Modification.AppendList<T>) =
+    override fun serialize(encoder: Encoder, value: Modification.ListAppend<T>) =
         encoder.encodeSerializableValue(to, value.items)
 }
 
-class ModificationAppendSetSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.AppendSet<T>> {
-    val to by lazy { ListSerializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("AppendSet") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.AppendSet<T> =
-        Modification.AppendSet(decoder.decodeSerializableValue(to))
+class ModificationSetAppendSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.SetAppend<T>> {
+    val to by lazy { SetSerializer(inner) }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("SetAppend") { to.descriptor }
+    override fun deserialize(decoder: Decoder): Modification.SetAppend<T> =
+        Modification.SetAppend(decoder.decodeSerializableValue(to))
 
-    override fun serialize(encoder: Encoder, value: Modification.AppendSet<T>) =
+    override fun serialize(encoder: Encoder, value: Modification.SetAppend<T>) =
         encoder.encodeSerializableValue(to, value.items)
 }
 
-class ModificationRemoveSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.Remove<T>> {
+class ModificationListRemoveSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.ListRemove<T>> {
     val to by lazy { Condition.serializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Remove") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.Remove<T> =
-        Modification.Remove(decoder.decodeSerializableValue(to))
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("ListRemove") { to.descriptor }
+    override fun deserialize(decoder: Decoder): Modification.ListRemove<T> =
+        Modification.ListRemove(decoder.decodeSerializableValue(to))
 
-    override fun serialize(encoder: Encoder, value: Modification.Remove<T>) =
+    override fun serialize(encoder: Encoder, value: Modification.ListRemove<T>) =
         encoder.encodeSerializableValue(to, value.condition)
 }
 
-class ModificationRemoveInstancesSerializer<T>(val inner: KSerializer<T>) :
-    KSerializer<Modification.RemoveInstances<T>> {
-    val to by lazy { ListSerializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("RemoveInstances") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.RemoveInstances<T> =
-        Modification.RemoveInstances(decoder.decodeSerializableValue(to))
+class ModificationSetRemoveSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.SetRemove<T>> {
+    val to by lazy { Condition.serializer(inner) }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("SetRemove") { to.descriptor }
+    override fun deserialize(decoder: Decoder): Modification.SetRemove<T> =
+        Modification.SetRemove(decoder.decodeSerializableValue(to))
 
-    override fun serialize(encoder: Encoder, value: Modification.RemoveInstances<T>) =
+    override fun serialize(encoder: Encoder, value: Modification.SetRemove<T>) =
+        encoder.encodeSerializableValue(to, value.condition)
+}
+
+class ModificationListRemoveInstancesSerializer<T>(val inner: KSerializer<T>) :
+    KSerializer<Modification.ListRemoveInstances<T>> {
+    val to by lazy { ListSerializer(inner) }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("ListRemoveInstances") { to.descriptor }
+    override fun deserialize(decoder: Decoder): Modification.ListRemoveInstances<T> =
+        Modification.ListRemoveInstances(decoder.decodeSerializableValue(to))
+
+    override fun serialize(encoder: Encoder, value: Modification.ListRemoveInstances<T>) =
+        encoder.encodeSerializableValue(to, value.items)
+}
+
+class ModificationSetRemoveInstancesSerializer<T>(val inner: KSerializer<T>) :
+    KSerializer<Modification.SetRemoveInstances<T>> {
+    val to by lazy { SetSerializer(inner) }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("SetRemoveInstances") { to.descriptor }
+    override fun deserialize(decoder: Decoder): Modification.SetRemoveInstances<T> =
+        Modification.SetRemoveInstances(decoder.decodeSerializableValue(to))
+
+    override fun serialize(encoder: Encoder, value: Modification.SetRemoveInstances<T>) =
         encoder.encodeSerializableValue(to, value.items)
 }
 
@@ -274,23 +314,43 @@ class ModificationRemoveKeysSerializer<T>(val inner: KSerializer<T>) : KSerializ
         encoder.encodeSerializableValue(to, value.fields)
 }
 
-class ModificationDropFirstSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.DropFirst<T>> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("DropFirst", PrimitiveKind.BOOLEAN)
-    override fun deserialize(decoder: Decoder): Modification.DropFirst<T> {
+class ModificationListDropFirstSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.ListDropFirst<T>> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ListDropFirst", PrimitiveKind.BOOLEAN)
+    override fun deserialize(decoder: Decoder): Modification.ListDropFirst<T> {
         decoder.decodeBoolean()
-        return Modification.DropFirst()
+        return Modification.ListDropFirst()
     }
 
-    override fun serialize(encoder: Encoder, value: Modification.DropFirst<T>) = encoder.encodeBoolean(true)
+    override fun serialize(encoder: Encoder, value: Modification.ListDropFirst<T>) = encoder.encodeBoolean(true)
 }
 
-class ModificationDropLastSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.DropLast<T>> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("DropLast", PrimitiveKind.BOOLEAN)
-    override fun deserialize(decoder: Decoder): Modification.DropLast<T> {
+class ModificationSetDropFirstSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.SetDropFirst<T>> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("SetDropFirst", PrimitiveKind.BOOLEAN)
+    override fun deserialize(decoder: Decoder): Modification.SetDropFirst<T> {
         decoder.decodeBoolean()
-        return Modification.DropLast()
+        return Modification.SetDropFirst()
     }
 
-    override fun serialize(encoder: Encoder, value: Modification.DropLast<T>) = encoder.encodeBoolean(true)
+    override fun serialize(encoder: Encoder, value: Modification.SetDropFirst<T>) = encoder.encodeBoolean(true)
+}
+
+class ModificationListDropLastSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.ListDropLast<T>> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ListDropLast", PrimitiveKind.BOOLEAN)
+    override fun deserialize(decoder: Decoder): Modification.ListDropLast<T> {
+        decoder.decodeBoolean()
+        return Modification.ListDropLast()
+    }
+
+    override fun serialize(encoder: Encoder, value: Modification.ListDropLast<T>) = encoder.encodeBoolean(true)
+}
+
+class ModificationSetDropLastSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.SetDropLast<T>> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("SetDropLast", PrimitiveKind.BOOLEAN)
+    override fun deserialize(decoder: Decoder): Modification.SetDropLast<T> {
+        decoder.decodeBoolean()
+        return Modification.SetDropLast()
+    }
+
+    override fun serialize(encoder: Encoder, value: Modification.SetDropLast<T>) = encoder.encodeBoolean(true)
 }
 

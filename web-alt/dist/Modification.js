@@ -27,20 +27,30 @@ function evaluateModification(modification, model) {
             throw new Error("Multiply is not supported yet");
         case "AppendString":
             throw new Error("AppendString is not supported yet");
-        case "AppendList":
-            throw new Error("AppendList is not supported yet");
-        case "AppendSet":
-            throw new Error("AppendSet is not supported yet");
-        case "Remove":
-            throw new Error("Remove is not supported yet");
-        case "RemoveInstances":
-            throw new Error("RemoveInstances is not supported yet");
-        case "DropFirst":
-            throw new Error("DropFirst is not supported yet");
-        case "DropLast":
-            throw new Error("DropLast is not supported yet");
-        case "PerElement":
-            throw new Error("PerElement is not supported yet");
+        case "ListAppend":
+            throw new Error("ListAppend is not supported yet");
+        case "ListRemove":
+            throw new Error("ListRemove is not supported yet");
+        case "ListRemoveInstances":
+            throw new Error("ListRemoveInstances is not supported yet");
+        case "ListDropFirst":
+            throw new Error("ListDropFirst is not supported yet");
+        case "ListDropLast":
+            throw new Error("ListDropLast is not supported yet");
+        case "ListPerElement":
+            throw new Error("ListPerElement is not supported yet");
+        case "SetAppend":
+            throw new Error("SetAppend is not supported yet");
+        case "SetRemove":
+            throw new Error("SetRemove is not supported yet");
+        case "SetRemoveInstances":
+            throw new Error("SetRemoveInstances is not supported yet");
+        case "SetDropFirst":
+            throw new Error("SetDropFirst is not supported yet");
+        case "SetDropLast":
+            throw new Error("SetDropLast is not supported yet");
+        case "SetPerElement":
+            throw new Error("SetPerElement is not supported yet");
         case "Combine":
             throw new Error("Combine is not supported yet");
         case "ModifyByKey":

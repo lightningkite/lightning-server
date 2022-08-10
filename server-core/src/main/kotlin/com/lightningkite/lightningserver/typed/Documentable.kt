@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.websocket.WebSockets
+import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -60,6 +61,9 @@ internal fun KSerializer<*>.subAndChildSerializers(): Array<KSerializer<*>> = li
     ?: (this as? ConditionSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: (this as? ModificationSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: arrayOf()
-internal fun KSerializer<*>.uncontextualize(): KSerializer<*> = if (this.descriptor.kind == SerialKind.CONTEXTUAL)
-    Serialization.json.serializersModule.getContextual(descriptor.capturedKClass!!)!!
-else this
+internal fun KSerializer<*>.uncontextualize(): KSerializer<*> {
+    return if (this.descriptor.kind == SerialKind.CONTEXTUAL) {
+        Serialization.json.serializersModule.getContextual(descriptor.capturedKClass!!)!!
+    }
+    else this
+}

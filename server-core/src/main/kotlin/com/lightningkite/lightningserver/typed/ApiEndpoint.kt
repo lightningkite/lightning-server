@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.serializer
 
 data class ApiEndpoint<USER, INPUT : Any, OUTPUT>(
     val route: HttpEndpoint,
@@ -44,7 +45,7 @@ data class ApiEndpoint<USER, INPUT : Any, OUTPUT>(
 @kotlinx.serialization.Serializable
 data class IdHolder<ID>(val id: ID)
 inline fun <reified T: Comparable<T>> String.parseUrlPartOrBadRequest(): T = parseUrlPartOrBadRequest(
-    serializerOrContextual()
+    Serialization.module.serializer()
 )
 fun <T: Comparable<T>> String.parseUrlPartOrBadRequest(serializer: KSerializer<T>): T = try {
     Serialization.properties.decodeFromStringMap(IdHolder.serializer(serializer), mapOf("id" to this)).id
@@ -65,8 +66,8 @@ inline fun <reified USER, reified INPUT : Any, reified OUTPUT> HttpEndpoint.type
     noinline implementation: suspend (user: USER, input: INPUT, pathSegments: Map<String, String>) -> OUTPUT
 ): HttpEndpoint = typed(
     authInfo = AuthInfo(),
-    inputType = serializerOrContextual(),
-    outputType = serializerOrContextual(),
+    inputType = Serialization.module.serializer(),
+    outputType = Serialization.module.serializer(),
     summary = summary,
     description = description,
     errorCases = errorCases,
@@ -121,8 +122,8 @@ inline fun <reified USER, reified INPUT : Any, reified OUTPUT> HttpEndpoint.type
     noinline implementation: suspend (user: USER, input: INPUT) -> OUTPUT
 ): HttpEndpoint = typed(
     authInfo = AuthInfo(),
-    inputType = serializerOrContextual(),
-    outputType = serializerOrContextual(),
+    inputType = Serialization.module.serializer(),
+    outputType = Serialization.module.serializer(),
     summary = summary,
     description = description,
     errorCases = errorCases,
@@ -176,9 +177,9 @@ inline fun <reified USER, reified INPUT : Any, reified OUTPUT, reified ROUTE: Co
 ): HttpEndpoint {
     return typed(
         authInfo = AuthInfo(),
-        inputType = serializerOrContextual(),
-        outputType = serializerOrContextual(),
-        routeType = serializerOrContextual(),
+        inputType = Serialization.module.serializer(),
+        outputType = Serialization.module.serializer(),
+        routeType = Serialization.module.serializer(),
         summary = summary,
         description = description,
         errorCases = errorCases,
@@ -237,10 +238,10 @@ inline fun <reified USER, reified INPUT : Any, reified OUTPUT, reified ROUTE: Co
 ): HttpEndpoint {
     return typed(
         authInfo = AuthInfo(),
-        inputType = serializerOrContextual(),
-        outputType = serializerOrContextual(),
-        routeType = serializerOrContextual(),
-        route2Type = serializerOrContextual(),
+        inputType = Serialization.module.serializer(),
+        outputType = Serialization.module.serializer(),
+        routeType = Serialization.module.serializer(),
+        route2Type = Serialization.module.serializer(),
         summary = summary,
         description = description,
         errorCases = errorCases,

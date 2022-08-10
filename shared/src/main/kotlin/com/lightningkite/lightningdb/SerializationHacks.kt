@@ -2,6 +2,8 @@ package com.lightningkite.lightningdb
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.SetSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
@@ -15,13 +17,15 @@ import kotlin.reflect.KClass
 import kotlin.reflect.full.memberProperties
 
 fun KSerializer<*>.listElement(): KSerializer<*>? {
-    val theoreticalMethod = this::class.java.methods.find { it.name.contains("getElementSerializer") } ?: return null
-    return theoreticalMethod.invoke(this, this) as KSerializer<*>
+    val inner = this.nullElement() ?: this
+    val theoreticalMethod = inner::class.java.methods.find { it.name.contains("getElementSerializer") } ?: return null
+    return theoreticalMethod.invoke(inner, inner) as KSerializer<*>
 }
 
 fun KSerializer<*>.mapValueElement(): KSerializer<*>? {
-    val theoreticalMethod = this::class.java.methods.find { it.name.contains("getValueSerializer") } ?: return null
-    return theoreticalMethod.invoke(this) as KSerializer<*>
+    val inner = this.nullElement() ?: this
+    val theoreticalMethod = inner::class.java.methods.find { it.name.contains("getValueSerializer") } ?: return null
+    return theoreticalMethod.invoke(inner) as KSerializer<*>
 }
 
 fun KSerializer<*>.nullElement(): KSerializer<*>? {

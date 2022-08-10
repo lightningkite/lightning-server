@@ -3,7 +3,7 @@
 import { Condition } from './Condition'
 import { keySet } from './TProperty1Extensions'
 import { EqualOverrideSet, ReifiedType, TProperty1, cMax, cMin, reflectiveGet, setUpDataClass, tryCastClass, xIterableMinusMultiple } from '@lightningkite/khrysalis-runtime'
-import { filter, map, reduce, toArray } from 'iter-tools-es'
+import { execPipe, filter, map, reduce, toArray } from 'iter-tools-es'
 
 //! Declares com.lightningkite.lightningdb.Modification
 export class Modification<T extends any> {
@@ -18,6 +18,16 @@ export class Modification<T extends any> {
     public then(other: Modification<T>): Modification.Chain<T> {
         return new Modification.Chain<T>([this, other]);
     }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     
     
@@ -247,14 +257,14 @@ export namespace Modification {
     setUpDataClass(AppendString)
 }
 export namespace Modification {
-    //! Declares com.lightningkite.lightningdb.Modification.AppendList
-    export class AppendList<T extends any> extends Modification<Array<T>> {
+    //! Declares com.lightningkite.lightningdb.Modification.ListAppend
+    export class ListAppend<T extends any> extends Modification<Array<T>> {
         public constructor(public readonly items: Array<T>) {
             super();
         }
         public static properties = ["items"]
         public static propertyTypes(T: ReifiedType) { return {items: [Array, T]} }
-        copy: (values: Partial<AppendList<T>>) => this;
+        copy: (values: Partial<ListAppend<T>>) => this;
         equals: (other: any) => boolean;
         hashCode: () => number;
         
@@ -265,38 +275,17 @@ export namespace Modification {
             return this.items;
         }
     }
-    setUpDataClass(AppendList)
+    setUpDataClass(ListAppend)
 }
 export namespace Modification {
-    //! Declares com.lightningkite.lightningdb.Modification.AppendSet
-    export class AppendSet<T extends any> extends Modification<Array<T>> {
-        public constructor(public readonly items: Array<T>) {
-            super();
-        }
-        public static properties = ["items"]
-        public static propertyTypes(T: ReifiedType) { return {items: [Array, T]} }
-        copy: (values: Partial<AppendSet<T>>) => this;
-        equals: (other: any) => boolean;
-        hashCode: () => number;
-        
-        public invoke(on: Array<T>): Array<T> {
-            return toArray(new EqualOverrideSet((on.concat(this.items))));
-        }
-        public invokeDefault(): Array<T> {
-            return this.items;
-        }
-    }
-    setUpDataClass(AppendSet)
-}
-export namespace Modification {
-    //! Declares com.lightningkite.lightningdb.Modification.Remove
-    export class Remove<T extends any> extends Modification<Array<T>> {
+    //! Declares com.lightningkite.lightningdb.Modification.ListRemove
+    export class ListRemove<T extends any> extends Modification<Array<T>> {
         public constructor(public readonly condition: Condition<T>) {
             super();
         }
         public static properties = ["condition"]
         public static propertyTypes(T: ReifiedType) { return {condition: [Condition, T]} }
-        copy: (values: Partial<Remove<T>>) => this;
+        copy: (values: Partial<ListRemove<T>>) => this;
         equals: (other: any) => boolean;
         hashCode: () => number;
         
@@ -307,17 +296,17 @@ export namespace Modification {
             return [];
         }
     }
-    setUpDataClass(Remove)
+    setUpDataClass(ListRemove)
 }
 export namespace Modification {
-    //! Declares com.lightningkite.lightningdb.Modification.RemoveInstances
-    export class RemoveInstances<T extends any> extends Modification<Array<T>> {
+    //! Declares com.lightningkite.lightningdb.Modification.ListRemoveInstances
+    export class ListRemoveInstances<T extends any> extends Modification<Array<T>> {
         public constructor(public readonly items: Array<T>) {
             super();
         }
         public static properties = ["items"]
         public static propertyTypes(T: ReifiedType) { return {items: [Array, T]} }
-        copy: (values: Partial<RemoveInstances<T>>) => this;
+        copy: (values: Partial<ListRemoveInstances<T>>) => this;
         equals: (other: any) => boolean;
         hashCode: () => number;
         
@@ -328,11 +317,11 @@ export namespace Modification {
             return [];
         }
     }
-    setUpDataClass(RemoveInstances)
+    setUpDataClass(ListRemoveInstances)
 }
 export namespace Modification {
-    //! Declares com.lightningkite.lightningdb.Modification.DropFirst
-    export class DropFirst<T extends any> extends Modification<Array<T>> {
+    //! Declares com.lightningkite.lightningdb.Modification.ListDropFirst
+    export class ListDropFirst<T extends any> extends Modification<Array<T>> {
         public constructor() {
             super();
         }
@@ -347,13 +336,13 @@ export namespace Modification {
             return 1;
         }
         public equals(other: (any | null)): boolean {
-            return (tryCastClass<Modification.DropFirst<T>>(other, Modification.DropFirst)) !== null;
+            return (tryCastClass<Modification.ListDropFirst<T>>(other, Modification.ListDropFirst)) !== null;
         }
     }
 }
 export namespace Modification {
-    //! Declares com.lightningkite.lightningdb.Modification.DropLast
-    export class DropLast<T extends any> extends Modification<Array<T>> {
+    //! Declares com.lightningkite.lightningdb.Modification.ListDropLast
+    export class ListDropLast<T extends any> extends Modification<Array<T>> {
         public constructor() {
             super();
         }
@@ -368,19 +357,19 @@ export namespace Modification {
             return 1;
         }
         public equals(other: (any | null)): boolean {
-            return (tryCastClass<Modification.DropLast<T>>(other, Modification.DropLast)) !== null;
+            return (tryCastClass<Modification.ListDropLast<T>>(other, Modification.ListDropLast)) !== null;
         }
     }
 }
 export namespace Modification {
-    //! Declares com.lightningkite.lightningdb.Modification.PerElement
-    export class PerElement<T extends any> extends Modification<Array<T>> {
+    //! Declares com.lightningkite.lightningdb.Modification.ListPerElement
+    export class ListPerElement<T extends any> extends Modification<Array<T>> {
         public constructor(public readonly condition: Condition<T>, public readonly modification: Modification<T>) {
             super();
         }
         public static properties = ["condition", "modification"]
         public static propertyTypes(T: ReifiedType) { return {condition: [Condition, T], modification: [Modification, T]} }
-        copy: (values: Partial<PerElement<T>>) => this;
+        copy: (values: Partial<ListPerElement<T>>) => this;
         equals: (other: any) => boolean;
         hashCode: () => number;
         
@@ -391,7 +380,133 @@ export namespace Modification {
             return [];
         }
     }
-    setUpDataClass(PerElement)
+    setUpDataClass(ListPerElement)
+}
+export namespace Modification {
+    //! Declares com.lightningkite.lightningdb.Modification.SetAppend
+    export class SetAppend<T extends any> extends Modification<Set<T>> {
+        public constructor(public readonly items: Set<T>) {
+            super();
+        }
+        public static properties = ["items"]
+        public static propertyTypes(T: ReifiedType) { return {items: [Set, T]} }
+        copy: (values: Partial<SetAppend<T>>) => this;
+        equals: (other: any) => boolean;
+        hashCode: () => number;
+        
+        public invoke(on: Set<T>): Set<T> {
+            return (new EqualOverrideSet([...on, ...this.items]));
+        }
+        public invokeDefault(): Set<T> {
+            return this.items;
+        }
+    }
+    setUpDataClass(SetAppend)
+}
+export namespace Modification {
+    //! Declares com.lightningkite.lightningdb.Modification.SetRemove
+    export class SetRemove<T extends any> extends Modification<Set<T>> {
+        public constructor(public readonly condition: Condition<T>) {
+            super();
+        }
+        public static properties = ["condition"]
+        public static propertyTypes(T: ReifiedType) { return {condition: [Condition, T]} }
+        copy: (values: Partial<SetRemove<T>>) => this;
+        equals: (other: any) => boolean;
+        hashCode: () => number;
+        
+        public invoke(on: Set<T>): Set<T> {
+            return new EqualOverrideSet(execPipe(on, filter((it: T): boolean => ((!this.condition.invoke(it)))), toArray));
+        }
+        public invokeDefault(): Set<T> {
+            return new EqualOverrideSet([]);
+        }
+    }
+    setUpDataClass(SetRemove)
+}
+export namespace Modification {
+    //! Declares com.lightningkite.lightningdb.Modification.SetRemoveInstances
+    export class SetRemoveInstances<T extends any> extends Modification<Set<T>> {
+        public constructor(public readonly items: Set<T>) {
+            super();
+        }
+        public static properties = ["items"]
+        public static propertyTypes(T: ReifiedType) { return {items: [Set, T]} }
+        copy: (values: Partial<SetRemoveInstances<T>>) => this;
+        equals: (other: any) => boolean;
+        hashCode: () => number;
+        
+        public invoke(on: Set<T>): Set<T> {
+            return new EqualOverrideSet([...on].filter(x => !this.items.has(x)));
+        }
+        public invokeDefault(): Set<T> {
+            return new EqualOverrideSet([]);
+        }
+    }
+    setUpDataClass(SetRemoveInstances)
+}
+export namespace Modification {
+    //! Declares com.lightningkite.lightningdb.Modification.SetDropFirst
+    export class SetDropFirst<T extends any> extends Modification<Set<T>> {
+        public constructor() {
+            super();
+        }
+        
+        public invoke(on: Set<T>): Set<T> {
+            return new EqualOverrideSet(toArray(on).slice(1));
+        }
+        public invokeDefault(): Set<T> {
+            return new EqualOverrideSet([]);
+        }
+        public hashCode(): number {
+            return 1;
+        }
+        public equals(other: (any | null)): boolean {
+            return (tryCastClass<Modification.SetDropFirst<T>>(other, Modification.SetDropFirst)) !== null;
+        }
+    }
+}
+export namespace Modification {
+    //! Declares com.lightningkite.lightningdb.Modification.SetDropLast
+    export class SetDropLast<T extends any> extends Modification<Set<T>> {
+        public constructor() {
+            super();
+        }
+        
+        public invoke(on: Set<T>): Set<T> {
+            return new EqualOverrideSet(toArray(on).slice(0, -1));
+        }
+        public invokeDefault(): Set<T> {
+            return new EqualOverrideSet([]);
+        }
+        public hashCode(): number {
+            return 1;
+        }
+        public equals(other: (any | null)): boolean {
+            return (tryCastClass<Modification.SetDropLast<T>>(other, Modification.SetDropLast)) !== null;
+        }
+    }
+}
+export namespace Modification {
+    //! Declares com.lightningkite.lightningdb.Modification.SetPerElement
+    export class SetPerElement<T extends any> extends Modification<Set<T>> {
+        public constructor(public readonly condition: Condition<T>, public readonly modification: Modification<T>) {
+            super();
+        }
+        public static properties = ["condition", "modification"]
+        public static propertyTypes(T: ReifiedType) { return {condition: [Condition, T], modification: [Modification, T]} }
+        copy: (values: Partial<SetPerElement<T>>) => this;
+        equals: (other: any) => boolean;
+        hashCode: () => number;
+        
+        public invoke(on: Set<T>): Set<T> {
+            return new EqualOverrideSet(execPipe(on, map((it: T): T => (this.condition.invoke(it) ? this.modification.invoke(it) : it)), toArray));
+        }
+        public invokeDefault(): Set<T> {
+            return new EqualOverrideSet([]);
+        }
+    }
+    setUpDataClass(SetPerElement)
 }
 export namespace Modification {
     //! Declares com.lightningkite.lightningdb.Modification.Combine
@@ -428,9 +543,9 @@ export namespace Modification {
         
         public invoke(on: Map<string, T>): Map<string, T> {
             return new Map([...on, ...new Map(map(x => [x[0], ((it: [string, Modification<T>]): T => ((((): (T | null) => {
-                const temp25 = (on.get(it[0]) ?? null);
-                if(temp25 === null) { return null }
-                return ((e: T): T => (it[1].invoke(e)))(temp25)
+                const temp32 = (on.get(it[0]) ?? null);
+                if(temp32 === null) { return null }
+                return ((e: T): T => (it[1].invoke(e)))(temp32)
             })() ?? it[1].invokeDefault())))(x)], this.map.entries()))]);
         }
         public invokeDefault(): Map<string, T> {

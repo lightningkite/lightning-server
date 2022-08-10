@@ -202,8 +202,8 @@ exports.Modification = Modification;
     (0, khrysalis_runtime_1.setUpDataClass)(AppendString);
 })(Modification = exports.Modification || (exports.Modification = {}));
 (function (Modification) {
-    //! Declares com.lightningkite.lightningdb.Modification.AppendList
-    class AppendList extends Modification {
+    //! Declares com.lightningkite.lightningdb.Modification.ListAppend
+    class ListAppend extends Modification {
         constructor(items) {
             super();
             this.items = items;
@@ -216,32 +216,13 @@ exports.Modification = Modification;
             return this.items;
         }
     }
-    AppendList.properties = ["items"];
-    Modification.AppendList = AppendList;
-    (0, khrysalis_runtime_1.setUpDataClass)(AppendList);
+    ListAppend.properties = ["items"];
+    Modification.ListAppend = ListAppend;
+    (0, khrysalis_runtime_1.setUpDataClass)(ListAppend);
 })(Modification = exports.Modification || (exports.Modification = {}));
 (function (Modification) {
-    //! Declares com.lightningkite.lightningdb.Modification.AppendSet
-    class AppendSet extends Modification {
-        constructor(items) {
-            super();
-            this.items = items;
-        }
-        static propertyTypes(T) { return { items: [Array, T] }; }
-        invoke(on) {
-            return (0, iter_tools_es_1.toArray)(new khrysalis_runtime_1.EqualOverrideSet((on.concat(this.items))));
-        }
-        invokeDefault() {
-            return this.items;
-        }
-    }
-    AppendSet.properties = ["items"];
-    Modification.AppendSet = AppendSet;
-    (0, khrysalis_runtime_1.setUpDataClass)(AppendSet);
-})(Modification = exports.Modification || (exports.Modification = {}));
-(function (Modification) {
-    //! Declares com.lightningkite.lightningdb.Modification.Remove
-    class Remove extends Modification {
+    //! Declares com.lightningkite.lightningdb.Modification.ListRemove
+    class ListRemove extends Modification {
         constructor(condition) {
             super();
             this.condition = condition;
@@ -254,13 +235,13 @@ exports.Modification = Modification;
             return [];
         }
     }
-    Remove.properties = ["condition"];
-    Modification.Remove = Remove;
-    (0, khrysalis_runtime_1.setUpDataClass)(Remove);
+    ListRemove.properties = ["condition"];
+    Modification.ListRemove = ListRemove;
+    (0, khrysalis_runtime_1.setUpDataClass)(ListRemove);
 })(Modification = exports.Modification || (exports.Modification = {}));
 (function (Modification) {
-    //! Declares com.lightningkite.lightningdb.Modification.RemoveInstances
-    class RemoveInstances extends Modification {
+    //! Declares com.lightningkite.lightningdb.Modification.ListRemoveInstances
+    class ListRemoveInstances extends Modification {
         constructor(items) {
             super();
             this.items = items;
@@ -273,13 +254,13 @@ exports.Modification = Modification;
             return [];
         }
     }
-    RemoveInstances.properties = ["items"];
-    Modification.RemoveInstances = RemoveInstances;
-    (0, khrysalis_runtime_1.setUpDataClass)(RemoveInstances);
+    ListRemoveInstances.properties = ["items"];
+    Modification.ListRemoveInstances = ListRemoveInstances;
+    (0, khrysalis_runtime_1.setUpDataClass)(ListRemoveInstances);
 })(Modification = exports.Modification || (exports.Modification = {}));
 (function (Modification) {
-    //! Declares com.lightningkite.lightningdb.Modification.DropFirst
-    class DropFirst extends Modification {
+    //! Declares com.lightningkite.lightningdb.Modification.ListDropFirst
+    class ListDropFirst extends Modification {
         constructor() {
             super();
         }
@@ -293,14 +274,14 @@ exports.Modification = Modification;
             return 1;
         }
         equals(other) {
-            return ((0, khrysalis_runtime_1.tryCastClass)(other, Modification.DropFirst)) !== null;
+            return ((0, khrysalis_runtime_1.tryCastClass)(other, Modification.ListDropFirst)) !== null;
         }
     }
-    Modification.DropFirst = DropFirst;
+    Modification.ListDropFirst = ListDropFirst;
 })(Modification = exports.Modification || (exports.Modification = {}));
 (function (Modification) {
-    //! Declares com.lightningkite.lightningdb.Modification.DropLast
-    class DropLast extends Modification {
+    //! Declares com.lightningkite.lightningdb.Modification.ListDropLast
+    class ListDropLast extends Modification {
         constructor() {
             super();
         }
@@ -314,14 +295,14 @@ exports.Modification = Modification;
             return 1;
         }
         equals(other) {
-            return ((0, khrysalis_runtime_1.tryCastClass)(other, Modification.DropLast)) !== null;
+            return ((0, khrysalis_runtime_1.tryCastClass)(other, Modification.ListDropLast)) !== null;
         }
     }
-    Modification.DropLast = DropLast;
+    Modification.ListDropLast = ListDropLast;
 })(Modification = exports.Modification || (exports.Modification = {}));
 (function (Modification) {
-    //! Declares com.lightningkite.lightningdb.Modification.PerElement
-    class PerElement extends Modification {
+    //! Declares com.lightningkite.lightningdb.Modification.ListPerElement
+    class ListPerElement extends Modification {
         constructor(condition, modification) {
             super();
             this.condition = condition;
@@ -335,9 +316,128 @@ exports.Modification = Modification;
             return [];
         }
     }
-    PerElement.properties = ["condition", "modification"];
-    Modification.PerElement = PerElement;
-    (0, khrysalis_runtime_1.setUpDataClass)(PerElement);
+    ListPerElement.properties = ["condition", "modification"];
+    Modification.ListPerElement = ListPerElement;
+    (0, khrysalis_runtime_1.setUpDataClass)(ListPerElement);
+})(Modification = exports.Modification || (exports.Modification = {}));
+(function (Modification) {
+    //! Declares com.lightningkite.lightningdb.Modification.SetAppend
+    class SetAppend extends Modification {
+        constructor(items) {
+            super();
+            this.items = items;
+        }
+        static propertyTypes(T) { return { items: [Set, T] }; }
+        invoke(on) {
+            return (new khrysalis_runtime_1.EqualOverrideSet([...on, ...this.items]));
+        }
+        invokeDefault() {
+            return this.items;
+        }
+    }
+    SetAppend.properties = ["items"];
+    Modification.SetAppend = SetAppend;
+    (0, khrysalis_runtime_1.setUpDataClass)(SetAppend);
+})(Modification = exports.Modification || (exports.Modification = {}));
+(function (Modification) {
+    //! Declares com.lightningkite.lightningdb.Modification.SetRemove
+    class SetRemove extends Modification {
+        constructor(condition) {
+            super();
+            this.condition = condition;
+        }
+        static propertyTypes(T) { return { condition: [Condition_1.Condition, T] }; }
+        invoke(on) {
+            return new khrysalis_runtime_1.EqualOverrideSet((0, iter_tools_es_1.execPipe)(on, (0, iter_tools_es_1.filter)((it) => ((!this.condition.invoke(it)))), iter_tools_es_1.toArray));
+        }
+        invokeDefault() {
+            return new khrysalis_runtime_1.EqualOverrideSet([]);
+        }
+    }
+    SetRemove.properties = ["condition"];
+    Modification.SetRemove = SetRemove;
+    (0, khrysalis_runtime_1.setUpDataClass)(SetRemove);
+})(Modification = exports.Modification || (exports.Modification = {}));
+(function (Modification) {
+    //! Declares com.lightningkite.lightningdb.Modification.SetRemoveInstances
+    class SetRemoveInstances extends Modification {
+        constructor(items) {
+            super();
+            this.items = items;
+        }
+        static propertyTypes(T) { return { items: [Set, T] }; }
+        invoke(on) {
+            return new khrysalis_runtime_1.EqualOverrideSet([...on].filter(x => !this.items.has(x)));
+        }
+        invokeDefault() {
+            return new khrysalis_runtime_1.EqualOverrideSet([]);
+        }
+    }
+    SetRemoveInstances.properties = ["items"];
+    Modification.SetRemoveInstances = SetRemoveInstances;
+    (0, khrysalis_runtime_1.setUpDataClass)(SetRemoveInstances);
+})(Modification = exports.Modification || (exports.Modification = {}));
+(function (Modification) {
+    //! Declares com.lightningkite.lightningdb.Modification.SetDropFirst
+    class SetDropFirst extends Modification {
+        constructor() {
+            super();
+        }
+        invoke(on) {
+            return new khrysalis_runtime_1.EqualOverrideSet((0, iter_tools_es_1.toArray)(on).slice(1));
+        }
+        invokeDefault() {
+            return new khrysalis_runtime_1.EqualOverrideSet([]);
+        }
+        hashCode() {
+            return 1;
+        }
+        equals(other) {
+            return ((0, khrysalis_runtime_1.tryCastClass)(other, Modification.SetDropFirst)) !== null;
+        }
+    }
+    Modification.SetDropFirst = SetDropFirst;
+})(Modification = exports.Modification || (exports.Modification = {}));
+(function (Modification) {
+    //! Declares com.lightningkite.lightningdb.Modification.SetDropLast
+    class SetDropLast extends Modification {
+        constructor() {
+            super();
+        }
+        invoke(on) {
+            return new khrysalis_runtime_1.EqualOverrideSet((0, iter_tools_es_1.toArray)(on).slice(0, -1));
+        }
+        invokeDefault() {
+            return new khrysalis_runtime_1.EqualOverrideSet([]);
+        }
+        hashCode() {
+            return 1;
+        }
+        equals(other) {
+            return ((0, khrysalis_runtime_1.tryCastClass)(other, Modification.SetDropLast)) !== null;
+        }
+    }
+    Modification.SetDropLast = SetDropLast;
+})(Modification = exports.Modification || (exports.Modification = {}));
+(function (Modification) {
+    //! Declares com.lightningkite.lightningdb.Modification.SetPerElement
+    class SetPerElement extends Modification {
+        constructor(condition, modification) {
+            super();
+            this.condition = condition;
+            this.modification = modification;
+        }
+        static propertyTypes(T) { return { condition: [Condition_1.Condition, T], modification: [Modification, T] }; }
+        invoke(on) {
+            return new khrysalis_runtime_1.EqualOverrideSet((0, iter_tools_es_1.execPipe)(on, (0, iter_tools_es_1.map)((it) => (this.condition.invoke(it) ? this.modification.invoke(it) : it)), iter_tools_es_1.toArray));
+        }
+        invokeDefault() {
+            return new khrysalis_runtime_1.EqualOverrideSet([]);
+        }
+    }
+    SetPerElement.properties = ["condition", "modification"];
+    Modification.SetPerElement = SetPerElement;
+    (0, khrysalis_runtime_1.setUpDataClass)(SetPerElement);
 })(Modification = exports.Modification || (exports.Modification = {}));
 (function (Modification) {
     //! Declares com.lightningkite.lightningdb.Modification.Combine
@@ -371,11 +471,11 @@ exports.Modification = Modification;
                         var _a;
                         return (((_a = (() => {
                             var _a;
-                            const temp25 = ((_a = on.get(it[0])) !== null && _a !== void 0 ? _a : null);
-                            if (temp25 === null) {
+                            const temp32 = ((_a = on.get(it[0])) !== null && _a !== void 0 ? _a : null);
+                            if (temp32 === null) {
                                 return null;
                             }
-                            return ((e) => (it[1].invoke(e)))(temp25);
+                            return ((e) => (it[1].invoke(e)))(temp32);
                         })()) !== null && _a !== void 0 ? _a : it[1].invokeDefault()));
                     })(x)], this.map.entries()))]);
         }

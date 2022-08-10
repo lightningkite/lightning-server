@@ -28,17 +28,17 @@ public final class MockTable<Model : HasId> where Model.ID == UUID {
     }
     
     public func addItem(item: Model) -> Model {
-        var array49 = self.data
-        array49[item._id] = item
-        self.data = array49
+        var array51 = self.data
+        array51[item._id] = item
+        self.data = array51
         self.signals.onNext(SignalData(item: item, created: true, deleted: false))
         return item
     }
     
     public func replaceItem(item: Model) -> Model {
-        var array53 = self.data
-        array53[item._id] = item
-        self.data = array53
+        var array55 = self.data
+        array55[item._id] = item
+        self.data = array55
         self.signals.onNext(SignalData(item: item, created: false, deleted: false))
         return item
     }

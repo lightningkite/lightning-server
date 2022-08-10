@@ -100,53 +100,90 @@ open class Modification<T: IsCodableAndHashable> protected constructor()  {
         override fun invokeDefault(): String = value
     }
 
-    @Serializable(ModificationAppendListSerializer::class)
-    data class AppendList<T: IsCodableAndHashable>(val items: List<T>): Modification<List<T>>() {
+    @Serializable(ModificationListAppendSerializer::class)
+    data class ListAppend<T: IsCodableAndHashable>(val items: List<T>): Modification<List<T>>() {
         override fun invoke(on: List<T>): List<T> = on + items
         override fun invokeDefault(): List<T> = items
     }
 
-    @Serializable(ModificationAppendSetSerializer::class)
-    data class AppendSet<T: IsCodableAndHashable>(val items: List<T>): Modification<List<T>>() {
-        override fun invoke(on: List<T>): List<T> = (on + items).toSet().toList()
-        override fun invokeDefault(): List<T> = items
-    }
-
-    @Serializable(ModificationRemoveSerializer::class)
-    data class Remove<T: IsCodableAndHashable>(val condition: Condition<T>): Modification<List<T>>() {
+    @Serializable(ModificationListRemoveSerializer::class)
+    data class ListRemove<T: IsCodableAndHashable>(val condition: Condition<T>): Modification<List<T>>() {
         override fun invoke(on: List<T>): List<T> = on.filter { !condition(it) }
         override fun invokeDefault(): List<T> = listOf()
     }
 
-    @Serializable(ModificationRemoveInstancesSerializer::class)
-    data class RemoveInstances<T: IsCodableAndHashable>(val items: List<T>): Modification<List<T>>() {
+    @Serializable(ModificationListRemoveInstancesSerializer::class)
+    data class ListRemoveInstances<T: IsCodableAndHashable>(val items: List<T>): Modification<List<T>>() {
         override fun invoke(on: List<T>): List<T> = on - items
         override fun invokeDefault(): List<T> = listOf()
     }
 
-    @Serializable(ModificationDropFirstSerializer::class)
-    class DropFirst<T: IsCodableAndHashable>: Modification<List<T>>() {
+    @Serializable(ModificationListDropFirstSerializer::class)
+    class ListDropFirst<T: IsCodableAndHashable>: Modification<List<T>>() {
         override fun invoke(on: List<T>): List<T> = on.drop(1)
         override fun invokeDefault(): List<T> = listOf()
         override fun hashCode(): Int = 1
         @Suppress("UNCHECKED_CAST")
-        override fun equals(other: Any?): Boolean = (other as? Modification.DropFirst<T>) != null
+        override fun equals(other: Any?): Boolean = (other as? Modification.ListDropFirst<T>) != null
     }
 
-    @Serializable(ModificationDropLastSerializer::class)
-    class DropLast<T: IsCodableAndHashable>: Modification<List<T>>() {
+    @Serializable(ModificationListDropLastSerializer::class)
+    class ListDropLast<T: IsCodableAndHashable>: Modification<List<T>>() {
         override fun invoke(on: List<T>): List<T> = on.dropLast(1)
         override fun invokeDefault(): List<T> = listOf()
         override fun hashCode(): Int = 1
         @Suppress("UNCHECKED_CAST")
-        override fun equals(other: Any?): Boolean = (other as? Modification.DropLast<T>) != null
+        override fun equals(other: Any?): Boolean = (other as? Modification.ListDropLast<T>) != null
     }
 
     @Serializable()
-    @SerialName("PerElement")
-    data class PerElement<T: IsCodableAndHashable>(val condition: Condition<T>, val modification: Modification<T>): Modification<List<T>>() {
+    @SerialName("ListPerElement")
+    data class ListPerElement<T: IsCodableAndHashable>(val condition: Condition<T>, val modification: Modification<T>): Modification<List<T>>() {
         override fun invoke(on: List<T>): List<T> = on.map { if(condition(it)) modification(it) else it }
         override fun invokeDefault(): List<T> = listOf()
+    }
+
+    @Serializable(ModificationSetAppendSerializer::class)
+    data class SetAppend<T: IsCodableAndHashable>(val items: Set<T>): Modification<Set<T>>() {
+        override fun invoke(on: Set<T>): Set<T> = (on + items)
+        override fun invokeDefault(): Set<T> = items
+    }
+
+    @Serializable(ModificationSetRemoveSerializer::class)
+    data class SetRemove<T: IsCodableAndHashable>(val condition: Condition<T>): Modification<Set<T>>() {
+        override fun invoke(on: Set<T>): Set<T> = on.filter { !condition(it) }.toSet()
+        override fun invokeDefault(): Set<T> = setOf()
+    }
+
+    @Serializable(ModificationSetRemoveInstancesSerializer::class)
+    data class SetRemoveInstances<T: IsCodableAndHashable>(val items: Set<T>): Modification<Set<T>>() {
+        override fun invoke(on: Set<T>): Set<T> = on - items
+        override fun invokeDefault(): Set<T> = setOf()
+    }
+
+    @Serializable(ModificationSetDropFirstSerializer::class)
+    class SetDropFirst<T: IsCodableAndHashable>: Modification<Set<T>>() {
+        override fun invoke(on: Set<T>): Set<T> = on.drop(1).toSet()
+        override fun invokeDefault(): Set<T> = setOf()
+        override fun hashCode(): Int = 1
+        @Suppress("UNCHECKED_CAST")
+        override fun equals(other: Any?): Boolean = (other as? Modification.SetDropFirst<T>) != null
+    }
+
+    @Serializable(ModificationSetDropLastSerializer::class)
+    class SetDropLast<T: IsCodableAndHashable>: Modification<Set<T>>() {
+        override fun invoke(on: Set<T>): Set<T> = on.toList().dropLast(1).toSet()
+        override fun invokeDefault(): Set<T> = setOf()
+        override fun hashCode(): Int = 1
+        @Suppress("UNCHECKED_CAST")
+        override fun equals(other: Any?): Boolean = (other as? Modification.SetDropLast<T>) != null
+    }
+
+    @Serializable()
+    @SerialName("SetPerElement")
+    data class SetPerElement<T: IsCodableAndHashable>(val condition: Condition<T>, val modification: Modification<T>): Modification<Set<T>>() {
+        override fun invoke(on: Set<T>): Set<T> = on.map { if(condition(it)) modification(it) else it }.toSet()
+        override fun invokeDefault(): Set<T> = setOf()
     }
 
     @Serializable(ModificationCombineSerializer::class)

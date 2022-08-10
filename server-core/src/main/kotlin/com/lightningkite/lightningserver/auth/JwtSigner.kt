@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.serialization.serializerOrContextual
+
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.*
@@ -45,16 +45,18 @@ data class JwtSigner(
     val hasher = SecureHasher.HS256(secret.toByteArray())
 
     @Deprecated("Use the version with duration instead", ReplaceWith("token(subject, Duration.ofMillis(expireDuration))", "java.time.Duration"))
-    inline fun <reified T> token(subject: T, expireDuration: Long): String = token(serializerOrContextual(), subject, Duration.ofMillis(expireDuration))
+    inline fun <reified T> token(subject: T, expireDuration: Long): String =
+        token(Serialization.module.serializer(), subject, Duration.ofMillis(expireDuration))
     @Deprecated("Use the version with duration instead", ReplaceWith("token(serializer, subject, Duration.ofMillis(expireDuration))", "java.time.Duration"))
     fun <T> token(serializer: KSerializer<T>, subject: T, expireDuration: Long): String =
         token(serializer, subject, Duration.ofMillis(expireDuration))
 
-    inline fun <reified T> token(subject: T, expireDuration: Duration = expiration): String = token(serializerOrContextual(), subject, expireDuration)
+    inline fun <reified T> token(subject: T, expireDuration: Duration = expiration): String =
+        token(Serialization.module.serializer(), subject, expireDuration)
     fun <T> token(serializer: KSerializer<T>, subject: T, expireDuration: Duration = expiration): String =
         Serialization.json.encodeJwt(hasher, serializer, subject, expireDuration, issuer ?: generalSettings().publicUrl, audience ?: generalSettings().publicUrl)
 
-    inline fun <reified T> verify(token: String): T = verify(serializerOrContextual(), token)
+    inline fun <reified T> verify(token: String): T = verify(Serialization.module.serializer(), token)
     fun <T> verify(serializer: KSerializer<T>, token: String): T {
         return try {
             Serialization.json.decodeJwt(hasher, serializer, token, audience ?: generalSettings().publicUrl)

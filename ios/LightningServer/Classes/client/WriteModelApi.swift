@@ -4,7 +4,7 @@ import KhrysalisRuntime
 import RxSwift
 import Foundation
 
-open class WriteModelApi<Model : Codable & Hashable> {
+public class WriteModelApi<Model : Codable & Hashable> {
     public init() {
         //Necessary properties should be initialized now
     }

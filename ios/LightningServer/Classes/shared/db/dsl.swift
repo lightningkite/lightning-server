@@ -141,15 +141,27 @@ public extension PropChain where From : Codable & Hashable, To : Codable & Hasha
 }
 
 public func xPropChainAll<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Array<T>>, condition: @escaping (PropChain<T, T>) -> Condition<T>) -> Condition<K> {
-    return this.mapCondition(ConditionAllElements((condition)((startChain() as PropChain<T, T>))));
+    return this.mapCondition(ConditionListAllElements((condition)((startChain() as PropChain<T, T>))));
 }
 
 public func xPropChainAny<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Array<T>>, condition: @escaping (PropChain<T, T>) -> Condition<T>) -> Condition<K> {
-    return this.mapCondition(ConditionAnyElements((condition)((startChain() as PropChain<T, T>))));
+    return this.mapCondition(ConditionListAnyElements((condition)((startChain() as PropChain<T, T>))));
 }
 
 public func xPropChainSizesEquals<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Array<T>>, count: Int) -> Condition<K> {
-    return this.mapCondition(ConditionSizesEquals(count: count));
+    return this.mapCondition(ConditionListSizesEquals(count: count));
+}
+
+public func xPropChainAll<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Set<T>>, condition: @escaping (PropChain<T, T>) -> Condition<T>) -> Condition<K> {
+    return this.mapCondition(ConditionSetAllElements((condition)((startChain() as PropChain<T, T>))));
+}
+
+public func xPropChainAny<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Set<T>>, condition: @escaping (PropChain<T, T>) -> Condition<T>) -> Condition<K> {
+    return this.mapCondition(ConditionSetAnyElements((condition)((startChain() as PropChain<T, T>))));
+}
+
+public func xPropChainSizesEquals<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Set<T>>, count: Int) -> Condition<K> {
+    return this.mapCondition(ConditionSetSizesEquals(count: count));
 }
 
 public func xPropChainContainsKey<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Dictionary<String, T>>, key: String) -> Condition<K> {
@@ -214,44 +226,78 @@ public extension PropChain where From : Codable & Hashable, To == String {
 }
 
 public func xPropChainPlus<K : Codable & Hashable, T>(_ this: PropChain<K, Array<T>>, items: Array<T>) -> Modification<K> {
-    return this.mapModification(ModificationAppendList(items: items));
+    return this.mapModification(ModificationListAppend(items: items));
+}
+
+public func xPropChainPlus<K : Codable & Hashable, T>(_ this: PropChain<K, Set<T>>, items: Set<T>) -> Modification<K> {
+    return this.mapModification(ModificationSetAppend(items: items));
 }
 
 public func xPropChainPlus<K : Codable & Hashable, T>(_ this: PropChain<K, Array<T>>, item: T) -> Modification<K> {
-    return this.mapModification(ModificationAppendList(items: [item]));
+    return this.mapModification(ModificationListAppend(items: [item]));
+}
+
+public func xPropChainPlus<K : Codable & Hashable, T>(_ this: PropChain<K, Set<T>>, item: T) -> Modification<K> {
+    return this.mapModification(ModificationSetAppend(items: Set([item])));
 }
 
 public func xPropChainAddAll<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Array<T>>, items: Array<T>) -> Modification<K> {
-    return this.mapModification(ModificationAppendList(items: items));
+    return this.mapModification(ModificationListAppend(items: items));
 }
 
-public func xPropChainAddUnique<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Array<T>>, items: Array<T>) -> Modification<K> {
-    return this.mapModification(ModificationAppendSet(items: items));
+public func xPropChainAddAll<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Set<T>>, items: Set<T>) -> Modification<K> {
+    return this.mapModification(ModificationSetAppend(items: items));
 }
 
 public func xPropChainRemoveAll<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Array<T>>, condition: @escaping (PropChain<T, T>) -> Condition<T>) -> Modification<K> {
-    return this.mapModification(ModificationRemove((condition)((startChain() as PropChain<T, T>))));
+    return this.mapModification(ModificationListRemove((condition)((startChain() as PropChain<T, T>))));
+}
+
+public func xPropChainRemoveAll<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Set<T>>, condition: @escaping (PropChain<T, T>) -> Condition<T>) -> Modification<K> {
+    return this.mapModification(ModificationSetRemove((condition)((startChain() as PropChain<T, T>))));
 }
 
 public func xPropChainRemoveAll<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Array<T>>, items: Array<T>) -> Modification<K> {
-    return this.mapModification(ModificationRemoveInstances(items: items));
+    return this.mapModification(ModificationListRemoveInstances(items: items));
+}
+
+public func xPropChainRemoveAll<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Set<T>>, items: Set<T>) -> Modification<K> {
+    return this.mapModification(ModificationSetRemoveInstances(items: items));
 }
 
 public func xPropChainDropLast<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Array<T>>) -> Modification<K> {
-    return this.mapModification(ModificationDropLast());
+    return this.mapModification(ModificationListDropLast());
+}
+
+public func xPropChainDropLast<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Set<T>>) -> Modification<K> {
+    return this.mapModification(ModificationSetDropLast());
 }
 
 public func xPropChainDropFirst<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Array<T>>) -> Modification<K> {
-    return this.mapModification(ModificationDropFirst());
+    return this.mapModification(ModificationListDropFirst());
+}
+
+public func xPropChainDropFirst<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Set<T>>) -> Modification<K> {
+    return this.mapModification(ModificationSetDropFirst());
 }
 
 public func xPropChainMap<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Array<T>>, modification: @escaping (PropChain<T, T>) -> Modification<T>) -> Modification<K> {
-    return this.mapModification(ModificationPerElement(condition: ConditionAlways(), modification: (modification)((startChain() as PropChain<T, T>))));
+    return this.mapModification(ModificationListPerElement(condition: ConditionAlways(), modification: (modification)((startChain() as PropChain<T, T>))));
+}
+
+public func xPropChainMap<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Set<T>>, modification: @escaping (PropChain<T, T>) -> Modification<T>) -> Modification<K> {
+    return this.mapModification(ModificationSetPerElement(condition: ConditionAlways(), modification: (modification)((startChain() as PropChain<T, T>))));
 }
 
 public func xPropChainMapIf<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Array<T>>, condition: @escaping (PropChain<T, T>) -> Condition<T>, modification: @escaping (PropChain<T, T>) -> Modification<T>) -> Modification<K> {
     return this.mapModification(
-        ModificationPerElement(condition: (condition)((startChain() as PropChain<T, T>)), modification: (modification)((startChain() as PropChain<T, T>)))
+        ModificationListPerElement(condition: (condition)((startChain() as PropChain<T, T>)), modification: (modification)((startChain() as PropChain<T, T>)))
+    );
+}
+
+public func xPropChainMapIf<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Set<T>>, condition: @escaping (PropChain<T, T>) -> Condition<T>, modification: @escaping (PropChain<T, T>) -> Modification<T>) -> Modification<K> {
+    return this.mapModification(
+        ModificationSetPerElement(condition: (condition)((startChain() as PropChain<T, T>)), modification: (modification)((startChain() as PropChain<T, T>)))
     );
 }
 

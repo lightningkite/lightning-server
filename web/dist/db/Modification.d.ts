@@ -129,14 +129,14 @@ export declare namespace Modification {
     }
 }
 export declare namespace Modification {
-    class AppendList<T extends any> extends Modification<Array<T>> {
+    class ListAppend<T extends any> extends Modification<Array<T>> {
         readonly items: Array<T>;
         constructor(items: Array<T>);
         static properties: string[];
         static propertyTypes(T: ReifiedType): {
             items: (ArrayConstructor | ReifiedType<unknown>)[];
         };
-        copy: (values: Partial<AppendList<T>>) => this;
+        copy: (values: Partial<ListAppend<T>>) => this;
         equals: (other: any) => boolean;
         hashCode: () => number;
         invoke(on: Array<T>): Array<T>;
@@ -144,29 +144,14 @@ export declare namespace Modification {
     }
 }
 export declare namespace Modification {
-    class AppendSet<T extends any> extends Modification<Array<T>> {
-        readonly items: Array<T>;
-        constructor(items: Array<T>);
-        static properties: string[];
-        static propertyTypes(T: ReifiedType): {
-            items: (ArrayConstructor | ReifiedType<unknown>)[];
-        };
-        copy: (values: Partial<AppendSet<T>>) => this;
-        equals: (other: any) => boolean;
-        hashCode: () => number;
-        invoke(on: Array<T>): Array<T>;
-        invokeDefault(): Array<T>;
-    }
-}
-export declare namespace Modification {
-    class Remove<T extends any> extends Modification<Array<T>> {
+    class ListRemove<T extends any> extends Modification<Array<T>> {
         readonly condition: Condition<T>;
         constructor(condition: Condition<T>);
         static properties: string[];
         static propertyTypes(T: ReifiedType): {
             condition: (ReifiedType<unknown> | typeof Condition)[];
         };
-        copy: (values: Partial<Remove<T>>) => this;
+        copy: (values: Partial<ListRemove<T>>) => this;
         equals: (other: any) => boolean;
         hashCode: () => number;
         invoke(on: Array<T>): Array<T>;
@@ -174,14 +159,14 @@ export declare namespace Modification {
     }
 }
 export declare namespace Modification {
-    class RemoveInstances<T extends any> extends Modification<Array<T>> {
+    class ListRemoveInstances<T extends any> extends Modification<Array<T>> {
         readonly items: Array<T>;
         constructor(items: Array<T>);
         static properties: string[];
         static propertyTypes(T: ReifiedType): {
             items: (ArrayConstructor | ReifiedType<unknown>)[];
         };
-        copy: (values: Partial<RemoveInstances<T>>) => this;
+        copy: (values: Partial<ListRemoveInstances<T>>) => this;
         equals: (other: any) => boolean;
         hashCode: () => number;
         invoke(on: Array<T>): Array<T>;
@@ -189,7 +174,7 @@ export declare namespace Modification {
     }
 }
 export declare namespace Modification {
-    class DropFirst<T extends any> extends Modification<Array<T>> {
+    class ListDropFirst<T extends any> extends Modification<Array<T>> {
         constructor();
         invoke(on: Array<T>): Array<T>;
         invokeDefault(): Array<T>;
@@ -198,7 +183,7 @@ export declare namespace Modification {
     }
 }
 export declare namespace Modification {
-    class DropLast<T extends any> extends Modification<Array<T>> {
+    class ListDropLast<T extends any> extends Modification<Array<T>> {
         constructor();
         invoke(on: Array<T>): Array<T>;
         invokeDefault(): Array<T>;
@@ -207,7 +192,7 @@ export declare namespace Modification {
     }
 }
 export declare namespace Modification {
-    class PerElement<T extends any> extends Modification<Array<T>> {
+    class ListPerElement<T extends any> extends Modification<Array<T>> {
         readonly condition: Condition<T>;
         readonly modification: Modification<T>;
         constructor(condition: Condition<T>, modification: Modification<T>);
@@ -216,11 +201,91 @@ export declare namespace Modification {
             condition: (ReifiedType<unknown> | typeof Condition)[];
             modification: (ReifiedType<unknown> | typeof Modification)[];
         };
-        copy: (values: Partial<PerElement<T>>) => this;
+        copy: (values: Partial<ListPerElement<T>>) => this;
         equals: (other: any) => boolean;
         hashCode: () => number;
         invoke(on: Array<T>): Array<T>;
         invokeDefault(): Array<T>;
+    }
+}
+export declare namespace Modification {
+    class SetAppend<T extends any> extends Modification<Set<T>> {
+        readonly items: Set<T>;
+        constructor(items: Set<T>);
+        static properties: string[];
+        static propertyTypes(T: ReifiedType): {
+            items: (SetConstructor | ReifiedType<unknown>)[];
+        };
+        copy: (values: Partial<SetAppend<T>>) => this;
+        equals: (other: any) => boolean;
+        hashCode: () => number;
+        invoke(on: Set<T>): Set<T>;
+        invokeDefault(): Set<T>;
+    }
+}
+export declare namespace Modification {
+    class SetRemove<T extends any> extends Modification<Set<T>> {
+        readonly condition: Condition<T>;
+        constructor(condition: Condition<T>);
+        static properties: string[];
+        static propertyTypes(T: ReifiedType): {
+            condition: (ReifiedType<unknown> | typeof Condition)[];
+        };
+        copy: (values: Partial<SetRemove<T>>) => this;
+        equals: (other: any) => boolean;
+        hashCode: () => number;
+        invoke(on: Set<T>): Set<T>;
+        invokeDefault(): Set<T>;
+    }
+}
+export declare namespace Modification {
+    class SetRemoveInstances<T extends any> extends Modification<Set<T>> {
+        readonly items: Set<T>;
+        constructor(items: Set<T>);
+        static properties: string[];
+        static propertyTypes(T: ReifiedType): {
+            items: (SetConstructor | ReifiedType<unknown>)[];
+        };
+        copy: (values: Partial<SetRemoveInstances<T>>) => this;
+        equals: (other: any) => boolean;
+        hashCode: () => number;
+        invoke(on: Set<T>): Set<T>;
+        invokeDefault(): Set<T>;
+    }
+}
+export declare namespace Modification {
+    class SetDropFirst<T extends any> extends Modification<Set<T>> {
+        constructor();
+        invoke(on: Set<T>): Set<T>;
+        invokeDefault(): Set<T>;
+        hashCode(): number;
+        equals(other: (any | null)): boolean;
+    }
+}
+export declare namespace Modification {
+    class SetDropLast<T extends any> extends Modification<Set<T>> {
+        constructor();
+        invoke(on: Set<T>): Set<T>;
+        invokeDefault(): Set<T>;
+        hashCode(): number;
+        equals(other: (any | null)): boolean;
+    }
+}
+export declare namespace Modification {
+    class SetPerElement<T extends any> extends Modification<Set<T>> {
+        readonly condition: Condition<T>;
+        readonly modification: Modification<T>;
+        constructor(condition: Condition<T>, modification: Modification<T>);
+        static properties: string[];
+        static propertyTypes(T: ReifiedType): {
+            condition: (ReifiedType<unknown> | typeof Condition)[];
+            modification: (ReifiedType<unknown> | typeof Modification)[];
+        };
+        copy: (values: Partial<SetPerElement<T>>) => this;
+        equals: (other: any) => boolean;
+        hashCode: () => number;
+        invoke(on: Set<T>): Set<T>;
+        invokeDefault(): Set<T>;
     }
 }
 export declare namespace Modification {

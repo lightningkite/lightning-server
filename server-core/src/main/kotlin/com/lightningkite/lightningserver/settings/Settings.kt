@@ -2,8 +2,10 @@ package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.logging.loggingSettings
-import com.lightningkite.lightningserver.serialization.serializerOrContextual
+import com.lightningkite.lightningserver.serialization.Serialization
+
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.serializer
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.properties.ReadOnlyProperty
 import kotlin.reflect.KProperty
@@ -19,7 +21,7 @@ object Settings {
         if(missing.isNotEmpty()) {
             throw IllegalStateException("Settings for ${missing.joinToString()} are missing.")
         }
-        requirements.values.forEach { it() }
+//        requirements.values.forEach { it() }
     }
     private data class Box<T>(val item: T)
     private val values = ConcurrentHashMap<String, Box<*>>()
@@ -51,7 +53,7 @@ inline fun <reified Goal> setting(name: String, default: Goal): Settings.Require
     @Suppress("UNCHECKED_CAST")
     if(Settings.requirements.containsKey(name)) return Settings.requirements[name] as Settings.Requirement<Goal, Goal>
     if(Settings.sealed) throw Error("Settings have already been set; you cannot add more requirements now.  Attempted to add '$name'")
-    val req = Settings.Requirement(name, serializerOrContextual(), default) { it }
+    val req = Settings.Requirement(name, Serialization.module.serializer(), default) { it }
     Settings.requirements[name] = req
     return req
 }
@@ -60,7 +62,7 @@ inline fun <reified Serializable: ()->Goal, Goal> setting(name: String, default:
     @Suppress("UNCHECKED_CAST")
     if(Settings.requirements.containsKey(name)) return Settings.requirements[name] as Settings.Requirement<Serializable, Goal>
     if(Settings.sealed) throw Error("Settings have already been set; you cannot add more requirements now.  Attempted to add '$name'")
-    val req = Settings.Requirement(name, serializerOrContextual(), default) { it() }
+    val req = Settings.Requirement(name, Serialization.module.serializer(), default) { it() }
     Settings.requirements[name] = req
     return req
 }

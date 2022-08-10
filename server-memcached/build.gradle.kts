@@ -12,22 +12,12 @@ plugins {
     `maven-publish`
 }
 
-repositories {
-    mavenLocal()
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap") }
-    mavenCentral()
-}
-
-val ktorVersion = "2.0.2"
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
 dependencies {
     api(project(":server-core"))
     api("com.googlecode.xmemcached:xmemcached:2.4.7")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.4")
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
     ksp(project(":processor"))
     kspTest(project(":processor"))

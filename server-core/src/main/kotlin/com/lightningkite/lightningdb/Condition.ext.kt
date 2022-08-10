@@ -8,8 +8,10 @@ fun Condition<*>.referencesField(field: KProperty1<*, *>): Boolean = when (this)
     is Condition.And -> conditions.any { it.referencesField(field) }
     is Condition.Or -> conditions.any { it.referencesField(field) }
     is Condition.Not -> condition.referencesField(field)
-    is Condition.AllElements<*> -> condition.referencesField(field)
-    is Condition.AnyElements<*> -> condition.referencesField(field)
+    is Condition.SetAllElements<*> -> condition.referencesField(field)
+    is Condition.SetAnyElements<*> -> condition.referencesField(field)
+    is Condition.ListAllElements<*> -> condition.referencesField(field)
+    is Condition.ListAnyElements<*> -> condition.referencesField(field)
     is Condition.OnKey<*> -> condition.referencesField(field)
     is Condition.IfNotNull<*> -> condition.referencesField(field)
     else -> false
@@ -17,7 +19,8 @@ fun Condition<*>.referencesField(field: KProperty1<*, *>): Boolean = when (this)
 fun Modification<*>.referencesField(field: KProperty1<*, *>): Boolean = when (this) {
     is Modification.Chain -> modifications.any { it.referencesField(field) }
     is Modification.IfNotNull -> modification.referencesField(field)
-    is Modification.PerElement<*> -> condition.referencesField(field)
+    is Modification.SetPerElement<*> -> condition.referencesField(field)
+    is Modification.ListPerElement<*> -> condition.referencesField(field)
     is Modification.ModifyByKey<*> -> map.values.any {it.referencesField(field)}
     is Modification.OnField<*, *> -> this.key.name == field.name || modification.referencesField(field)
     else -> false
@@ -25,8 +28,10 @@ fun Modification<*>.referencesField(field: KProperty1<*, *>): Boolean = when (th
 
 fun Modification<*>.referencesFieldRead(field: KProperty1<*, *>): Boolean = when (this) {
     is Modification.Chain -> modifications.any { it.referencesFieldRead(field) }
-    is Modification.Remove<*> -> this.condition.referencesField(field)
-    is Modification.PerElement<*> -> condition.referencesField(field)
+    is Modification.SetRemove<*> -> this.condition.referencesField(field)
+    is Modification.SetPerElement<*> -> condition.referencesField(field)
+    is Modification.ListRemove<*> -> this.condition.referencesField(field)
+    is Modification.ListPerElement<*> -> condition.referencesField(field)
     is Modification.ModifyByKey<*> -> map.values.any { it.referencesFieldRead(field) }
     is Modification.OnField<*, *> -> modification.referencesFieldRead(field)
     else -> false
@@ -47,8 +52,15 @@ fun <T, V> Condition<T>.forFieldOrNull(field: KProperty1<T, V>): Condition<V>? {
     }
 }
 
+@JvmName("perElementList")
 fun <T> Condition<List<T>>.perElement(): Condition<T> = when (this) {
-    is Condition.AnyElements<T> -> this.condition
+    is Condition.ListAnyElements<T> -> this.condition
+    else -> Condition.Always()
+}
+
+@JvmName("perElementSet")
+fun <T> Condition<Set<T>>.perElement(): Condition<T> = when (this) {
+    is Condition.SetAnyElements<T> -> this.condition
     else -> Condition.Always()
 }
 

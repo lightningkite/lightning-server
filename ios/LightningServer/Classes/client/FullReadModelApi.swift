@@ -3,11 +3,11 @@
 import KhrysalisRuntime
 import Foundation
 
-open class FullReadModelApi<Model : Codable & Hashable> {
+public class FullReadModelApi<Model : Codable & Hashable> {
     public init() {
         //Necessary properties should be initialized now
     }
     
-    open var read: ReadModelApi<Model> { get { TODO() } }
-    open var observe: ObserveModelApi<Model> { get { TODO() } }
+    public var read: ReadModelApi<Model> { get { TODO() } }
+    public var observe: ObserveModelApi<Model> { get { TODO() } }
 }
