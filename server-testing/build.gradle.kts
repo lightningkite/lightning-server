@@ -12,21 +12,14 @@ plugins {
     `maven-publish`
 }
 
-val kotlinVersion:String by project
+val kotlinVersion: String by project
+val khrysalisVersion: String by project
 dependencies {
     api(project(":server-core"))
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.4")
-    implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.4.8")
-    implementation("com.github.jershell:kbson:0.4.5")
-    api("org.litote.kmongo:kmongo-coroutine-serialization:4.6.1")
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.3")
+    api("org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion")
 
+    ksp(project(":processor"))
     kspTest(project(":processor"))
-    testImplementation(project(":client"))
-    testImplementation(project(":server-testing"))
-    testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
 }
 
 ksp {
@@ -34,14 +27,22 @@ ksp {
 }
 
 kotlin {
+    sourceSets.main {
+        kotlin.srcDir("build/generated/ksp/main/kotlin")
+    }
     sourceSets.test {
         kotlin.srcDir("build/generated/ksp/test/kotlin")
     }
 }
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    kotlinOptions.freeCompilerArgs += "-opt-in=kotlinx.serialization.ExperimentalSerializationApi"
+    kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
+}
+
 
 standardPublishing {
-    name.set("Lightning-server-Mongo")
-    description.set("A MongoDB implementation of Lightning-server-Databases.")
+    name.set("Lightning-server-Server")
+    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
     github("lightningkite", "lightning-server")
 
     licenses {
@@ -61,4 +62,3 @@ standardPublishing {
         )
     }
 }
-

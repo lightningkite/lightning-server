@@ -1,19 +1,21 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningdb.test
 
-import com.lightningkite.lightningdb.application.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
+import com.lightningkite.lightningdb.*
 
-class AggregationsTest: MongoTest() {
+abstract class AggregationsTest() {
+
+    init { prepareModels() }
+    abstract val database: Database
+
     @Test
     fun test(): Unit = runBlocking {
-        com.lightningkite.lightningdb.application.prepareModels()
-        prepareModels()
 
-        val c = defaultMongo.collection<LargeTestModel>()
+        val c = database.collection<LargeTestModel>()
         c.insertMany(listOf(
             LargeTestModel(int = 32, byte = 0),
             LargeTestModel(int = 42, byte = 0),

@@ -1,5 +1,5 @@
 @file:UseContextualSerialization(UUID::class, Instant::class)
-package com.lightningkite.lightningdb.application
+package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningdb.HasId
@@ -8,11 +8,9 @@ import com.lightningkite.lightningdb.UUIDFor
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import org.litote.kmongo.coroutine.CoroutineClient
 import java.time.Instant
 import java.util.*
-
-lateinit var defaultMongo: MongoDatabase
+import com.lightningkite.lightningdb.*
 
 @DatabaseModel()
 @Serializable
@@ -25,8 +23,6 @@ data class User(
     companion object
 }
 
-val User.Companion.mongo get() = defaultMongo.collection<User>()
-
 @DatabaseModel()
 @Serializable
 data class Post(
@@ -38,9 +34,6 @@ data class Post(
     companion object
 }
 
-
-val Post.Companion.mongo get() = defaultMongo.collection<Post>()
-
 @DatabaseModel()
 @Serializable
 data class Employee(
@@ -49,9 +42,6 @@ data class Employee(
 ) : HasId<UUID> {
     companion object
 }
-
-val Employee.Companion.mongo get() = defaultMongo.collection<Employee>()
-
 
 @DatabaseModel
 @Serializable
@@ -63,11 +53,6 @@ data class EmbeddedObjectTest(
 ) : HasId<UUID> {
     companion object
 }
-
-val EmbeddedObjectTest.Companion.mongo get() = defaultMongo.collection<EmbeddedObjectTest>()
-    .postCreate { println("Created $it") }
-    .preDelete { println("Deleted $it") }
-    .postChange { old, new -> println("Changed $old to $new") }
 
 @Serializable
 data class ClassUsedForEmbedding(
@@ -90,8 +75,6 @@ data class EmbeddedNullable(
 ) : HasId<UUID> {
     companion object
 }
-
-val EmbeddedNullable.Companion.mongo get() = defaultMongo.collection<EmbeddedNullable>()
 
 @DatabaseModel
 @Serializable
@@ -130,7 +113,6 @@ data class LargeTestModel(
 ) : HasId<UUID> {
     companion object
 }
-val LargeTestModel.Companion.mongo get() = defaultMongo.collection<LargeTestModel>()
 
 @DatabaseModel
 @Serializable
@@ -138,4 +120,12 @@ data class EmbeddedMap(
     override val _id: UUID = UUID.randomUUID(),
     var map: Map<String, RecursiveEmbed>,
 ) : HasId<UUID>
-val EmbeddedMap.Companion.mongo get() = defaultMongo.collection<EmbeddedMap>()
+
+@DatabaseModel
+@Serializable
+data class MetaTestModel(
+    override val _id: UUID = UUID.randomUUID(),
+    val condition: Condition<LargeTestModel>,
+    val modification: Modification<LargeTestModel>
+) : HasId<UUID> {
+}

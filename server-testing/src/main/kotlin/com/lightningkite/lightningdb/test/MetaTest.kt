@@ -1,8 +1,7 @@
 @file:UseContextualSerialization(UUID::class)
+package com.lightningkite.lightningdb.test
 
-package com.lightningkite.lightningdb
-
-import com.lightningkite.lightningdb.application.*
+import com.lightningkite.lightningdb.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -10,23 +9,14 @@ import kotlinx.serialization.UseContextualSerialization
 import org.junit.Test
 import java.util.*
 import kotlin.test.assertContains
-import kotlin.test.assertEquals
 
-@DatabaseModel
-@Serializable
-data class MetaTestModel(
-    override val _id: UUID = UUID.randomUUID(),
-    val condition: Condition<LargeTestModel>,
-    val modification: Modification<LargeTestModel>
-) : HasId<UUID> {
-}
-
-class MetaTest : MongoTest() {
+abstract class MetaTest {
+    init { prepareModels() }
+    abstract val database: Database
 
     @Test
     fun test(): Unit = runBlocking {
-        val c = defaultMongo.collection<MetaTestModel>()
-        com.lightningkite.lightningdb.application.prepareModels()
+        val c = database.collection<MetaTestModel>()
         prepareModels()
         val toInsert = MetaTestModel(
             condition = condition { it.int gt 3 },
