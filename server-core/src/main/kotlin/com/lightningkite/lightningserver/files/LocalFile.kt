@@ -42,8 +42,8 @@ class LocalFile(val system: LocalFileSystem, val file: File): FileObject {
     }
 
     override suspend fun write(content: HttpContent) {
-        contentTypeFile.writeText(content.type.toString())
         file.parentFile.mkdirs()
+        contentTypeFile.writeText(content.type.toString())
         file.outputStream().use { o ->
             content.stream().use { i ->
                 i.copyTo(o)
