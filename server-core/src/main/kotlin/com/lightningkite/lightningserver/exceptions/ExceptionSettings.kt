@@ -24,9 +24,6 @@ data class ExceptionSettings(
 //        }
     }
 
-    override val healthCheckName: String
-        get() = "Error Monitoring"
-
     override suspend fun healthCheck(): HealthStatus {
         val report = try {
             report(Exception("Health Check: Can Report Exception"))

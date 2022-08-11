@@ -6,10 +6,14 @@ import org.junit.Test
 import kotlin.test.assertEquals
 
 abstract class CacheTest {
-    abstract val cache: CacheInterface
+    abstract val cache: CacheInterface?
 
     @Test
     fun test() {
+        val cache = cache ?: run {
+            println("Could not test because the cache is not supported on this system.")
+            return
+        }
         runBlocking {
             val key = "key"
             assertEquals(null, cache.get<Int>(key))

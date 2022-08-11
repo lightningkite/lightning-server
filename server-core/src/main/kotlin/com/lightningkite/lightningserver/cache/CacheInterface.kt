@@ -38,14 +38,15 @@ interface CacheInterface : HealthCheckable {
     override suspend fun healthCheck(): HealthStatus {
         return try {
             set("health-check-test-key", true)
-            HealthStatus(HealthStatus.Level.OK)
+            if(get<Boolean>("health-check-test-key") == true) {
+                HealthStatus(HealthStatus.Level.OK)
+            } else {
+                HealthStatus(HealthStatus.Level.ERROR, additionalMessage = "Could not retrieve set property")
+            }
         } catch (e: Exception) {
             HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
         }
     }
-
-    override val healthCheckName: String
-        get() = "Cache"
 }
 
 suspend inline fun <reified T : Any> CacheInterface.get(key: String): T? {

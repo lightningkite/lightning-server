@@ -22,7 +22,6 @@ import java.io.File
 data class NotificationSettings(
     val implementation: String = "console",
     val credentials: String? = null
-//) : HealthCheckable {
 ): ()->NotificationInterface {
 
     companion object: Pluggable<NotificationSettings, NotificationInterface>() {

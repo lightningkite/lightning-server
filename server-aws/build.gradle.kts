@@ -26,6 +26,7 @@ dependencies {
     api("com.amazonaws:aws-lambda-java-events:3.11.0")
     runtimeOnly("com.amazonaws:aws-lambda-java-log4j2:1.5.1")
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
+    testImplementation(project(":server-testing"))
 
     ksp(project(":processor"))
     kspTest(project(":processor"))

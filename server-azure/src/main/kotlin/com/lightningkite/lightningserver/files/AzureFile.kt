@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.files
 
 import com.azure.core.util.BinaryData
+import com.azure.storage.blob.models.BlobHttpHeaders
 import com.azure.storage.blob.models.ListBlobsOptions
 import com.azure.storage.blob.sas.BlobSasPermission
 import com.azure.storage.blob.sas.BlobServiceSasSignatureValues
@@ -55,6 +56,7 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
             } ?: run {
                 client.upload(BinaryData.fromStream(content.stream()), true)
             }
+            client.setHttpHeaders(BlobHttpHeaders().setContentType(content.type.toString()))
         }
     }
 

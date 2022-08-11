@@ -20,6 +20,7 @@ dependencies {
     api("com.azure:azure-storage-blob:12.18.0")
 
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
+    testImplementation(project(":server-testing"))
 
     ksp(project(":processor"))
     kspTest(project(":processor"))
