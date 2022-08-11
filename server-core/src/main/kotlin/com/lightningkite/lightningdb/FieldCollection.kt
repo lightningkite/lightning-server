@@ -6,7 +6,7 @@ import kotlin.reflect.KProperty1
 interface FieldCollection<Model: Any> {
     val wraps: FieldCollection<Model>? get() = null
     suspend fun fullCondition(condition: Condition<Model>): Condition<Model> = condition
-    suspend fun mask(model: Model): Model = model
+    suspend fun mask(): Mask<Model> = Mask()
 
     suspend fun find(
         condition: Condition<Model>,
@@ -123,4 +123,6 @@ interface FieldCollection<Model: Any> {
     suspend fun deleteManyIgnoringOld(
         condition: Condition<Model>
     ): Int
+
+    fun registerRawSignal(callback: suspend (CollectionChanges<Model>)->Unit)
 }

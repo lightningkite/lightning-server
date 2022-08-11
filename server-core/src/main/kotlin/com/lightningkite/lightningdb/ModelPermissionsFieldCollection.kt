@@ -8,6 +8,10 @@ open class ModelPermissionsFieldCollection<Model : Any>(
     override val wraps: FieldCollection<Model>,
     val permissions: ModelPermissions<Model>
 ) : FieldCollection<Model> {
+    override fun registerRawSignal(callback: suspend (CollectionChanges<Model>) -> Unit) {
+        wraps.registerRawSignal(callback)
+    }
+
     override suspend fun find(
         condition: Condition<Model>,
         orderBy: List<SortPart<Model>>,
@@ -38,7 +42,10 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         condition: Condition<Model>,
         groupBy: KProperty1<Model, Key>
     ): Map<Key, Int> {
-        return wraps.groupCount(condition and permissions.read and (permissions.readFields[groupBy]?.condition ?: Condition.Always()), groupBy)
+        return wraps.groupCount(
+            condition and permissions.read and (permissions.readFields[groupBy]?.condition ?: Condition.Always()),
+            groupBy
+        )
     }
 
     override suspend fun <N : Number> aggregate(
@@ -47,12 +54,17 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         property: KProperty1<Model, N>
     ): Double? = wraps.aggregate(aggregate, condition and permissions.read, property)
 
-    override suspend fun <N: Number?, Key> groupAggregate(
+    override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
         groupBy: KProperty1<Model, Key>,
         property: KProperty1<Model, N>
-    ): Map<Key, Double?> = wraps.groupAggregate(aggregate, condition and permissions.read and (permissions.readFields[groupBy]?.condition ?: Condition.Always()), groupBy, property)
+    ): Map<Key, Double?> = wraps.groupAggregate(
+        aggregate,
+        condition and permissions.read and (permissions.readFields[groupBy]?.condition ?: Condition.Always()),
+        groupBy,
+        property
+    )
 
     override suspend fun replaceOne(condition: Condition<Model>, model: Model): EntryChange<Model> {
         return wraps.replaceOne(
@@ -61,13 +73,19 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         ).map { permissions.mask(it) }
     }
 
-    override suspend fun upsertOne(condition: Condition<Model>, modification: Modification<Model>, model: Model): EntryChange<Model> {
-        if(!permissions.create(model)) throw SecurityException("You do not have permission to insert this instance.  You can only insert instances that adhere to the following condition: ${permissions.create}")
-        return wraps.upsertOne(condition and permissions.allowed(modification), modification, model).map { permissions.mask(it) }
+    override suspend fun upsertOne(
+        condition: Condition<Model>,
+        modification: Modification<Model>,
+        model: Model
+    ): EntryChange<Model> {
+        if (!permissions.create(model)) throw SecurityException("You do not have permission to insert this instance.  You can only insert instances that adhere to the following condition: ${permissions.create}")
+        return wraps.upsertOne(condition and permissions.allowed(modification), modification, model)
+            .map { permissions.mask(it) }
     }
 
     override suspend fun updateOne(condition: Condition<Model>, modification: Modification<Model>): EntryChange<Model> {
-        return wraps.updateOne(condition and permissions.allowed(modification), modification).map { permissions.mask(it) }
+        return wraps.updateOne(condition and permissions.allowed(modification), modification)
+            .map { permissions.mask(it) }
     }
 
     override suspend fun updateOneIgnoringResult(
@@ -101,7 +119,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         modification: Modification<Model>,
         model: Model
     ): Boolean {
-        if(!permissions.create(model)) throw SecurityException("You do not have permission to insert this instance.  You can only insert instances that adhere to the following condition: ${permissions.create}")
+        if (!permissions.create(model)) throw SecurityException("You do not have permission to insert this instance.  You can only insert instances that adhere to the following condition: ${permissions.create}")
         return wraps.upsertOneIgnoringResult(condition and permissions.allowed(modification), modification, model)
     }
 
@@ -109,7 +127,8 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         condition: Condition<Model>,
         modification: Modification<Model>
     ): CollectionChanges<Model> {
-        return wraps.updateMany(condition and permissions.allowed(modification), modification).map { permissions.mask(it) }
+        return wraps.updateMany(condition and permissions.allowed(modification), modification)
+            .map { permissions.mask(it) }
     }
 
     override suspend fun deleteOne(condition: Condition<Model>): Model? {
@@ -121,8 +140,14 @@ open class ModelPermissionsFieldCollection<Model : Any>(
     }
 
     override suspend fun fullCondition(condition: Condition<Model>): Condition<Model> = permissions.read and condition
-
-    override suspend fun mask(model: Model): Model = permissions.mask(model)
+    override suspend fun mask(): Mask<Model> = permissions.readFields.values
+        .filter { it.condition !is Condition.Always }
+        .let {
+            Mask(it.map {
+                Condition.Not(it.condition) to Modification.OnField(it.property, Modification.Assign(it.mask))
+            })
+        }
 }
 
-fun <Model: Any> FieldCollection<Model>.withPermissions(permissions: ModelPermissions<Model>): FieldCollection<Model> = ModelPermissionsFieldCollection(this, permissions)
+fun <Model : Any> FieldCollection<Model>.withPermissions(permissions: ModelPermissions<Model>): FieldCollection<Model> =
+    ModelPermissionsFieldCollection(this, permissions)

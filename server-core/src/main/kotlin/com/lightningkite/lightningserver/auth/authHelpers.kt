@@ -1,11 +1,9 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
-import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.serialization.Serialization
-
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
@@ -28,38 +26,9 @@ fun <T> HttpRequest.jwt(jwtSigner: JwtSigner, serializer: KSerializer<T>): T? =
         }
     }
 
-data class AuthInfo<USER>(
-    val checker: suspend (Any?)->USER,
-    val type: String? = null,
-    val required: Boolean = false,
-)
-inline fun <reified USER> AuthInfo() = if(USER::class == Unit::class) AuthInfo<USER>(checker = { Unit as USER }, type = null, required = false)
-else AuthInfo<USER>(
-    checker = { raw ->
-        try {
-            raw as USER
-        } catch (e: Exception) {
-            throw UnauthorizedException(
-                if (raw == null) "You need to be authorized to use this." else "You need to be a ${USER::class.simpleName} to use this.",
-                cause = e
-            )
-        }
-    },
-    type = typeOf<USER>().toString().substringBefore('<').substringAfterLast('.').removeSuffix("?"),
-    required = !typeOf<USER>().isMarkedNullable
-)
-typealias TypeCheckOrUnauthorized<USER> = HttpRequest.()->USER
-
-private var authorizationMethodImpl: suspend (HttpRequest) -> Any? = { null }
-var Http.authorizationMethod: suspend (HttpRequest) -> Any?
-    get() = authorizationMethodImpl
-    set(value) {
-        authorizationMethodImpl = value
-    }
-
-suspend fun HttpRequest.rawUser(): Any? = Http.authorizationMethod(this)
+suspend fun HttpRequest.rawUser(): Any? = Authorization.handler.http(this)
 suspend inline fun <reified USER> HttpRequest.user(): USER {
-    val raw = Http.authorizationMethod(this)
+    val raw = Authorization.handler.http(this)
     raw?.let { it as? USER }?.let { return it }
     try {
         return raw as USER
@@ -71,16 +40,9 @@ suspend inline fun <reified USER> HttpRequest.user(): USER {
     }
 }
 
-private var wsAuthorizationMethodImpl: suspend (WebSockets.ConnectEvent) -> Any? = { null }
-var WebSockets.authorizationMethod: suspend (WebSockets.ConnectEvent) -> Any?
-    get() = wsAuthorizationMethodImpl
-    set(value) {
-        wsAuthorizationMethodImpl = value
-    }
-
-suspend fun WebSockets.ConnectEvent.rawUser(): Any? = WebSockets.authorizationMethod(this)
+suspend fun WebSockets.ConnectEvent.rawUser(): Any? = Authorization.handler.ws(this)
 suspend inline fun <reified USER> WebSockets.ConnectEvent.user(): USER {
-    val raw = WebSockets.authorizationMethod(this)
+    val raw = Authorization.handler.ws(this)
     raw?.let { it as? USER }?.let { return it }
     try {
         return raw as USER

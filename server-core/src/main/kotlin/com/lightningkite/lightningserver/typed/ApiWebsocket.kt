@@ -144,7 +144,6 @@ suspend fun <USER, INPUT, OUTPUT> ApiWebsocket<USER, INPUT, OUTPUT>.test(
             coroutineScope {
                 val job = launch {
                     for(it in incoming) {
-                        println("Parsing $it")
                         channel.send(Serialization.json.decodeFromString(outputType, it))
                     }
                 }
