@@ -24,7 +24,10 @@ class ChangeSocketTest {
 
     @Test fun test() {
         val database = TestSettings.database
-        val ws = ServerPath("test").restApiWebsocket<Unit, TestThing, UUID>(database) { this }
+        val ws = ServerPath("test").restApiWebsocket<Unit, TestThing, UUID>(database, ModelInfo(
+            getCollection = { database().collection() },
+            forUser = { this }
+        ))
         runBlocking {
             ws.test {
                 this.send(Query())

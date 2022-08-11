@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.lightningdb.application.*
+import com.lightningkite.lightningdb.test.EmbeddedMap
+import com.lightningkite.lightningdb.test.RecursiveEmbed
 import com.mongodb.client.model.changestream.UpdateDescription
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -12,7 +13,7 @@ class UpdateDescriptionTest: MongoTest() {
     fun testUpdate() {
         val item1 = EmbeddedMap(map = mapOf("item1" to RecursiveEmbed()))
 
-        val collection = (EmbeddedMap.mongo as MongoFieldCollection<EmbeddedMap>).mongo
+        val collection = (defaultMongo.collection<EmbeddedMap>("UpdateDescriptionTest_testUpdate") as MongoFieldCollection<EmbeddedMap>).mongo
         val codec = collection.codecRegistry.get(collection.documentClass)
 
         var update = UpdateDescription(
@@ -42,7 +43,7 @@ class UpdateDescriptionTest: MongoTest() {
     fun testRemove() {
         val item1 = EmbeddedMap(map = mapOf("item1" to RecursiveEmbed(embedded = RecursiveEmbed()), "item2" to RecursiveEmbed()))
 
-        val collection = (EmbeddedMap.mongo as MongoFieldCollection<EmbeddedMap>).mongo
+        val collection = (defaultMongo.collection<EmbeddedMap>("UpdateDescriptionTest_testRemove") as MongoFieldCollection<EmbeddedMap>).mongo
         val codec = collection.codecRegistry.get(collection.documentClass)
 
         var update = UpdateDescription(

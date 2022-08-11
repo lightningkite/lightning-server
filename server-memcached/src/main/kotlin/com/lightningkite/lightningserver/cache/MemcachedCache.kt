@@ -81,7 +81,6 @@ class MemcachedCache(val client: MemcachedClient): CacheInterface, HealthCheckab
         Unit
     }
 
-    override val healthCheckName: String get() = "Cache"
     override suspend fun healthCheck(): HealthStatus = withContext(Dispatchers.IO) {
         try {
             val allEntries = client.stats.values.flatMap { it.entries }.associate { it.key to it.value }

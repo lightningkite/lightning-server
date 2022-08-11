@@ -2,10 +2,14 @@ package com.lightningkite.lightningdb
 
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ConcurrentSkipListSet
+import kotlin.reflect.KProperty1
 
 abstract class AbstractSignalFieldCollection<Model: Any>: FieldCollection<Model> {
 
     val signals = ConcurrentLinkedQueue<suspend (CollectionChanges<Model>)->Unit>()
+    override fun registerRawSignal(callback: suspend (CollectionChanges<Model>) -> Unit) {
+        signals.add(callback)
+    }
 
     private suspend fun signal(change: CollectionChanges<Model>) {
         signals.forEach { it(change) }

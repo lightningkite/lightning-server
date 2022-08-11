@@ -19,9 +19,6 @@ interface PubSubInterface: HealthCheckable {
             HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
         }
     }
-
-    override val healthCheckName: String
-        get() = "PubSub"
 }
 inline operator fun <reified T: Any> PubSubInterface.get(key: String): PubSubChannel<T> {
     return get(key, Serialization.json.serializersModule.serializer<T>())

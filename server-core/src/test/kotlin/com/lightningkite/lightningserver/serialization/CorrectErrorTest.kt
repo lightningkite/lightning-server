@@ -24,14 +24,14 @@ class CorrectErrorTest {
             implementation = { user: Unit, input: TestModel -> input }
         )
         runBlocking {
-            t.test(
+            t.route.test(
                 body = HttpContent.Text("""{"number": 2}""", ContentType.Application.Json),
                 headers = HttpHeaders(HttpHeader.Accept to ContentType.Application.Json.toString())
             ).let {
                 assertEquals(HttpStatus.OK, it.status)
                 assertEquals(TestModel(number = 2), it.body?.parse())
             }
-            t.test(
+            t.route.test(
                 body = HttpContent.Text("""{"number": "asdf"}""", ContentType.Application.Json),
                 headers = HttpHeaders(HttpHeader.Accept to ContentType.Application.Json.toString())
             ).let {

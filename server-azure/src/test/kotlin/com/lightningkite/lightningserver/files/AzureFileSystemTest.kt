@@ -16,34 +16,20 @@ import org.junit.Test
 import java.io.File
 import java.time.Duration
 import kotlin.test.assertContains
+import com.lightningkite.lightningserver.files.FileSystemTests
 
-class AzureFileSystemTest {
-    @Test
-    fun test() {
-        TestSettings
-        runBlocking {
-            val credentials = File("local/test-credentials.txt")
-            if(!credentials.exists()) {
-                println("No credentials to test with at ${credentials.absolutePath}")
-                return@runBlocking
-            }
-            AzureFileSystem
-            val system = FilesSettings(credentials.readText(), signedUrlExpiration = Duration.ofDays(1))()
-            val testFile = system.root.resolve("test.txt")
-            val message = "Hello world!"
-            testFile.write(HttpContent.Text(message, ContentType.Text.Plain))
-            assertEquals(message, testFile.read().reader().readText())
-            assertNotNull(testFile.info())
-            assertContains(testFile.parent!!.list()!!.also { println(it) }, testFile)
-            assert(testFile.signedUrl.startsWith(testFile.url))
-            println("testFile.signedUrl: ${testFile.signedUrl}")
-            assert(client.get(testFile.signedUrl).status.isSuccess())
-            assert(client.put(testFile.uploadUrl(Duration.ofHours(1))) {
-                header("x-ms-blob-type", "BlockBlob")
-                setBody(TextContent(message, io.ktor.http.ContentType.Text.Plain))
-            }.status.isSuccess())
-            println(Serialization.json.encodeToString(ServerFile(testFile.url)))
-            assertTrue(Serialization.json.encodeToString(ServerFile(testFile.url)).contains("?"))
+class AzureFileSystemTest: FileSystemTests() {
+    override val system: FileSystem? by lazy {
+        val credentials = File("local/test-credentials.txt")
+        if(!credentials.exists()) {
+            println("No credentials to test with at ${credentials.absolutePath}")
+            return@lazy null
         }
+        AzureFileSystem
+        FilesSettings(credentials.readText(), signedUrlExpiration = Duration.ofDays(1))()
+    }
+
+    override fun uploadHeaders(builder: HttpRequestBuilder) {
+        builder.header("x-ms-blob-type", "BlockBlob")
     }
 }

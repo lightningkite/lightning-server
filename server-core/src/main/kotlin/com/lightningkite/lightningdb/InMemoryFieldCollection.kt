@@ -46,14 +46,14 @@ open class InMemoryFieldCollection<Model : Any>(val data: MutableList<Model> = A
         aggregate: Aggregate,
         condition: Condition<Model>,
         property: KProperty1<Model, N>
-    ): Double? = data.asSequence().map { property.get(it).toDouble() }.aggregate(aggregate)
+    ): Double? = data.asSequence().filter { condition(it) }.map { property.get(it).toDouble() }.aggregate(aggregate)
 
     override suspend fun <N: Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
         groupBy: KProperty1<Model, Key>,
         property: KProperty1<Model, N>,
-    ): Map<Key, Double?> = data.asSequence().mapNotNull { groupBy.get(it) to (property.get(it)?.toDouble() ?: return@mapNotNull null) }.aggregate(aggregate)
+    ): Map<Key, Double?> = data.asSequence().filter { condition(it) }.mapNotNull { groupBy.get(it) to (property.get(it)?.toDouble() ?: return@mapNotNull null) }.aggregate(aggregate)
 
     override suspend fun insertImpl(models: List<Model>): List<Model> = lock.withLock {
         data.addAll(models)

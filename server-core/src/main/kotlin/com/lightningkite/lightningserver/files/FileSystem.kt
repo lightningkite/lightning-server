@@ -1,6 +1,9 @@
 package com.lightningkite.lightningserver.files
 
-interface FileSystem {
+import com.lightningkite.lightningserver.serverhealth.HealthCheckable
+import com.lightningkite.lightningserver.serverhealth.HealthStatus
+
+interface FileSystem: HealthCheckable {
     val root: FileObject
     companion object {
         fun register(system: FileSystem) {
@@ -11,6 +14,15 @@ interface FileSystem {
         fun resolve(url: String): FileObject? {
             val sys = registered.find { url.startsWith(it.root.url) } ?: return null
             return sys.root.resolve(url.removePrefix(sys.root.url))
+        }
+    }
+
+    override suspend fun healthCheck(): HealthStatus {
+        try {
+            root.list()
+            return HealthStatus(HealthStatus.Level.OK)
+        } catch(e: Exception) {
+            return HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
         }
     }
 }

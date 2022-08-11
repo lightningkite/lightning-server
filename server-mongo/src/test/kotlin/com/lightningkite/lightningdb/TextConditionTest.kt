@@ -1,6 +1,6 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.lightningdb.application.*
+import com.lightningkite.lightningdb.test.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
