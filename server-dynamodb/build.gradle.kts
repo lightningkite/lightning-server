@@ -14,6 +14,7 @@ plugins {
 
 repositories {
     mavenLocal()
+    maven(url = "https://s3-us-west-2.amazonaws.com/dynamodb-local/release")
     maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
     maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
     maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
@@ -28,7 +29,9 @@ dependencies {
 //    api(platform("software.amazon.awssdk:s3:2.17.232"))
     api("software.amazon.awssdk:dynamodb:2.17.238")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.2")
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
+    testImplementation(project(":server-testing"))
     ksp(project(":processor"))
     kspTest(project(":processor"))
 }
