@@ -26,6 +26,22 @@ fun <T> HttpRequest.jwt(jwtSigner: JwtSigner, serializer: KSerializer<T>): T? =
         }
     }
 
+inline fun <reified T> WebSockets.ConnectEvent.jwt(jwtSigner: JwtSigner): T? = jwt(jwtSigner, Serialization.module.serializer())
+fun <T> WebSockets.ConnectEvent.jwt(jwtSigner: JwtSigner, serializer: KSerializer<T>): T? =
+    (headers[HttpHeader.Authorization]?.removePrefix("Bearer ") ?: headers.cookies[HttpHeader.Authorization]?.removePrefix("Bearer ") ?: queryParameter("jwt"))?.let {
+        try {
+            jwtSigner.verify(serializer, it)
+        } catch(e: UnauthorizedException) {
+            throw UnauthorizedException(
+                body = e.body,
+                headers = {
+                    setCookie(HttpHeader.Authorization, "deleted", maxAge = 0)
+                },
+                cause = e.cause
+            )
+        }
+    }
+
 suspend fun HttpRequest.rawUser(): Any? = Authorization.handler.http(this)
 suspend inline fun <reified USER> HttpRequest.user(): USER {
     val raw = Authorization.handler.http(this)

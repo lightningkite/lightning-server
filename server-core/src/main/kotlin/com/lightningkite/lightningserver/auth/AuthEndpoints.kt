@@ -49,7 +49,7 @@ open class AuthEndpoints<USER : Any, ID>(
             }
 
             override suspend fun ws(request: WebSockets.ConnectEvent): USER? {
-                return request.queryParameter("jwt")?.let { jwtSigner().verify<ID>(idSerializer, it) }?.let { userById(it) }
+                return request.jwt<ID>(jwtSigner(), idSerializer)?.let { userById(it) }
             }
 
             override fun userToIdString(user: USER): String = Serialization.json.encodeToString(idSerializer, userId(user))
