@@ -1,10 +1,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.khrysalis.IsCodableAndHashable
-import com.lightningkite.lightningdb.Condition
-import com.lightningkite.lightningdb.fieldSerializer
-import com.lightningkite.lightningdb.mapValueElement
-import com.lightningkite.lightningdb.nullElement
+import com.lightningkite.lightningdb.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
@@ -29,6 +26,18 @@ data class DynamoCondition<T>(
                 }
             } else writeKey ?: writeFilter
         }
+    val builder: DynamoQueryBuilder by lazy { DynamoQueryBuilder() }
+    val builderKey: DynamoQueryBuilder.Part? by lazy { writeKey?.let { builder.Part().also { p -> it(p) } } }
+    val builderFilter: DynamoQueryBuilder.Part? by lazy { writeFilter?.let { builder.Part().also { p -> it(p) } } }
+    val builderCombined: DynamoQueryBuilder.Part? by lazy { writeCombined?.let { builder.Part().also { p -> it(p) } } }
+}
+data class DynamoModification<T>(
+    val local: Modification<T>? = null,
+    val set: List<DynamoQueryBuilder.Part.() -> Unit> = listOf(),
+    val remove: List<DynamoQueryBuilder.Part.() -> Unit> = listOf(),
+    val add: List<DynamoQueryBuilder.Part.() -> Unit> = listOf(),
+    val delete: List<DynamoQueryBuilder.Part.() -> Unit> = listOf(),
+) {
 }
 
 fun <T> Condition<T>.dynamo(serializer: KSerializer<T>): DynamoCondition<T> {
@@ -262,6 +271,104 @@ fun <T> Condition<T>.dynamo(serializer: KSerializer<T>): DynamoCondition<T> {
         }
 
         else -> DynamoCondition(local = this)
+    }
+}
+
+fun <T> Modification<T>.dynamo(serializer: KSerializer<T>): DynamoModification<T> {
+    return when(this) {
+        is Modification.Chain -> {
+            val subs = this.modifications.mapNotNull { it.dynamo() }
+            DynamoModification(
+                local = subs.mapNotNull { it.local }.let {
+                    when(it.size) {
+                        0 -> null
+                        1 -> it[0]
+                        else -> Modification.Chain(it)
+                    }
+                },
+                set = subs.flatMap { it.set },
+                remove = subs.flatMap { it.remove },
+                add = subs.flatMap { it.add },
+                delete = subs.flatMap { it.delete },
+            )
+        }
+        is Modification.Assign -> DynamoModification<T>(set = listOf {
+            key(field)
+            filter.append(" = ")
+            value(this@dynamo.value, serializer)
+        })
+//        is Modification.CoerceAtLeast -> into["\$max", key] = value
+//        is Modification.CoerceAtMost -> into["\$min", key] = value
+        is Modification.Increment -> DynamoModification<T>(set = listOf {
+            key(field)
+            filter.append(" = ")
+            key(field)
+            filter.append(" + ")
+            value(this@dynamo.by, serializer)
+        })
+//        is Modification.Multiply -> into["\$mul", key] = by
+        is Modification.AppendString -> DynamoModification<T>(set = listOf {
+            key(field)
+            filter.append(" = ")
+            key(field)
+            filter.append(" + ")
+            value(this@dynamo.value, String.serializer())
+        })
+        is Modification.IfNotNull<*> -> {
+            @Suppress("UNCHECKED_CAST")
+            val inner = (modification as Modification<T>).dynamo(serializer.nullElement()!! as KSerializer<T>)
+            inner
+        }
+        is Modification.OnField<*, *> -> {
+            @Suppress("UNCHECKED_CAST")
+            val inner =
+                (condition as Modification<IsCodableAndHashable>).dynamo(serializer.fieldSerializer(key as KProperty1<T, IsCodableAndHashable>)!!)
+            DynamoModification(
+                local = (this as Modification<T>).takeIf { inner.local != null },
+                writeFilter = inner.writeCombined?.let {
+                    {
+                        val oldField = field
+                        if (field.isEmpty()) field = key.name
+                        else field += ".${key.name}"
+                        it(this)
+                        field = oldField
+                    }
+                }
+            )
+        }
+        is Modification.ListAppend<*> -> into.sub("\$push").sub(key)["\$each"] = items
+        is Modification.ListRemove<*> -> into["\$pull", key] = condition.bson()
+        is Modification.ListRemoveInstances<*> -> into["\$pullAll", key] = items
+        is Modification.ListDropFirst<*> -> into["\$pop", key] = -1
+        is Modification.ListDropLast<*> -> into["\$pop", key] = 1
+        is Modification.ListPerElement<*> -> {
+            val condIdentifier = genName()
+            update.options = update.options.arrayFilters(
+                (update.options.arrayFilters ?: listOf()) + condition.dump(key = condIdentifier)
+            )
+            modification.dump(update, "$key.$[$condIdentifier]")
+        }
+        is Modification.SetAppend<*> -> into.sub("\$addToSet").sub(key)["\$each"] = items
+        is Modification.SetRemove<*> -> into["\$pull", key] = condition.bson()
+        is Modification.SetRemoveInstances<*> -> into["\$pullAll", key] = items
+        is Modification.SetDropFirst<*> -> into["\$pop", key] = -1
+        is Modification.SetDropLast<*> -> into["\$pop", key] = 1
+        is Modification.SetPerElement<*> -> {
+            val condIdentifier = genName()
+            update.options = update.options.arrayFilters(
+                (update.options.arrayFilters ?: listOf()) + condition.dump(key = condIdentifier)
+            )
+            modification.dump(update, "$key.$[$condIdentifier]")
+        }
+        is Modification.Combine<*> -> map.forEach {
+            into.sub("\$set")[if (key == null) it.key else "$key.${it.key}"] = it.value
+        }
+        is Modification.ModifyByKey<*> -> map.forEach {
+            it.value.dump(update, if (key == null) it.key else "$key.${it.key}")
+        }
+        is Modification.RemoveKeys<*> -> this.fields.forEach {
+            into.sub("\$unset")[if (key == null) it else "$key.${it}"] = ""
+        }
     }
 }
 

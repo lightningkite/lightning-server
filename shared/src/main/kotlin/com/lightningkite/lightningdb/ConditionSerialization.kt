@@ -25,6 +25,11 @@ fun <K, V> KSerializer<K>.fieldSerializer(property: KProperty1<K, V>): KSerializ
     return (this as? GeneratedSerializer<*>)?.childSerializers()?.get(index) as? KSerializer<V>
 }
 
+fun <K> KSerializer<K>.fieldSerializer(fieldName: String): KSerializer<*>? {
+    val index = this.descriptor.elementNames.indexOf(fieldName)
+    return (this as? GeneratedSerializer<*>)?.childSerializers()?.get(index)
+}
+
 private val serializers = HashMap<KSerializer<*>, KSerializer<*>>()
 
 @Suppress("UNCHECKED_CAST")

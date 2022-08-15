@@ -25,7 +25,7 @@ interface FieldCollection<Model: Any> {
         groupBy: KProperty1<Model, Key>
     ): Map<Key, Int>
 
-    suspend fun <N: Number> aggregate(
+    suspend fun <N: Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model> = Condition.Always(),
         property: KProperty1<Model, N>

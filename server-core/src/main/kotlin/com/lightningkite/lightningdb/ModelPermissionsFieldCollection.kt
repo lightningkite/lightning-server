@@ -48,7 +48,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         )
     }
 
-    override suspend fun <N : Number> aggregate(
+    override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
         property: KProperty1<Model, N>
