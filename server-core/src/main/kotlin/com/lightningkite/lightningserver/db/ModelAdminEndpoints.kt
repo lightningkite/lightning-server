@@ -35,7 +35,7 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>> (
                 form(method = FormMethod.post) {
                     id = "data-form"
                     insideHtmlForm(
-                        title = name,
+                        title = this@ModelAdminEndpoints.name,
                         jsEditorName = "editor",
                         serializer = info.serialization.serializer,
                         defaultValue = item,
@@ -87,7 +87,7 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>> (
                 form(method = FormMethod.post) {
                     id = "data-form"
                     insideHtmlForm<T>(
-                        title = name,
+                        title = this@ModelAdminEndpoints.name,
                         jsEditorName = "editor",
                         serializer = info.serialization.serializer,
                         defaultValue = item,
