@@ -72,7 +72,7 @@ fun main() {
 
 In `Server`, we define two `ServerPaths`: a `get` and a `post`. The get simply returns the current value of `counter`.
 The `post` has a bit more functionality. First, we get the body of the `HttpRequest` and make sure that it is not null
-before parsing it into an integer with `parse&lt;Int&gt;()`. We then set the value of `counter` to whatever that parsed
+before parsing it into an integer with `parse()`. We then set the value of `counter` to whatever that parsed
 value was. After that, we return the value of `counter`.
 
 Something else you might want to know is that LightningServer automatically handles many things for you in `parse()`.
@@ -81,24 +81,25 @@ the Server will automatically respond with an HTTP 400 (Bad Request) status code
 
 ### Paths
 
-LightningServer allows us to specify our `ServerPath's` paths simply by inputting a path parameter into `path`:
+LightningServer allows us to specify our `ServerPath's` paths simply by inputting a path parameter into `path`. Create
+this `ServerPath` in the `Server` object:
 
 <pre><code>val notRoot = path("this-is-a-path").get.handler { HttpResponse.plainText("This is a separate endpoint.") }</code></pre>
 
-If you run the server and make an HTTP `get` request to `localhost:8080/this-is-a-path`, the server will respond
-with the text `This is a seperate endpoint.`
+If you run the server and make an HTTP `get` request to `localhost:8080/this-is-a-path`, the server will respond with
+the text `This is a seperate endpoint.`
 
 ### Typed paths
 
-Let's say that we have this endpoint:
+Let's say that we have this `ServerPath`:
 
-<pre><code>path.get.handler {
+<pre><code>val rootGet = path.get.handler {
     HttpResponse.plainText("Hello World!")
 }</code></pre>
 
-Aside from this, there is another way to write an endpoint that performs the same task:
+Aside from this, there is another way to write a `ServerPath` that performs the same task:
 
-<pre><code>path.get.typed(
+<pre><code>val rootGet = path.get.typed(
     summary = "Root get",
     errorCases = listOf(),
     implementation = { _user: Unit, _: Unit ->
@@ -106,8 +107,8 @@ Aside from this, there is another way to write an endpoint that performs the sam
     }
 )</code></pre>
 
-This way may seem unnecessarily verbose, and for the purposes of this endpoint it is. But `typed` endpoints have a lot
-more functionality than `handler` endpoints, and we will be using them in later examples.
+This way may seem unnecessarily verbose, and for the purposes of this path it is. But `typed` paths have a lot
+more functionality than `handler` paths, and we will be using them in later examples.
 
 ## LightningServer settings
 
