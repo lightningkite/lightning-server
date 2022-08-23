@@ -18,7 +18,7 @@ data class Task<INPUT>(
         Tasks.tasks[name] = this
     }
     @Suppress("UNCHECKED_CAST")
-    operator suspend fun invoke(input: INPUT) = engine.launchTask(this as Task<Any?>, input)
+    suspend operator fun invoke(input: INPUT) = engine.launchTask(this as Task<Any?>, input)
 }
 
 object Tasks {
