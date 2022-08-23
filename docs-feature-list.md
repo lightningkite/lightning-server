@@ -7,7 +7,6 @@ already experienced with the library.
 
 - `prepareModels()`
 - `runServer()`
-- `routing()`
 - `path()`
 
 ### PubSubInterface
@@ -53,20 +52,20 @@ HTTP response.
 
 ## ServerPath
 
-- `ServerPath::get`
-- `ServerPath::post`
-- `ServerPath::put`
-- `ServerPath::patch`
-- `ServerPath::delete`
-- `ServerPath::head`
+- `ServerPath::get : HttpEndpoint`
+- `ServerPath::post : HttpEndpoint`
+- `ServerPath::put : HttpEndpoint`
+- `ServerPath::patch : HttpEndpoint`
+- `ServerPath::delete : HttpEndpoint`
+- `ServerPath::head : HttpEndpoint`
 - `ServerPath::autoCollection()` - generates a restful api for a [FieldCollection](#fieldcollection)
 - `ServerPath::authEndpoints()`
 - `ServerPath::apiHelp()` - generates documentation for every typed [HttpEndpoint](#httpendpoint)
 
 ## HttpEndpoint
 
-- `HttpEndpoint::handler()`
-- `HttpEndpoint::typed()`
+- `HttpEndpoint::handler() : HttpEndpoint`
+- `HttpEndpoint::typed(): ApiEndpoint`
 
 ## Database
 
