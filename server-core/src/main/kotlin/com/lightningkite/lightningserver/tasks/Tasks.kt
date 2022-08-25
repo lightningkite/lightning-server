@@ -1,39 +1,23 @@
 package com.lightningkite.lightningserver.tasks
 
-import com.lightningkite.lightningserver.engine.engine
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.builtins.serializer
-import kotlin.coroutines.CoroutineContext
-import kotlin.reflect.KFunction
-
-data class Task<INPUT>(
-    val name: String,
-    val serializer: KSerializer<INPUT>,
-    val implementation: suspend CoroutineScope.(INPUT) -> Unit
-) {
-    init {
-        Tasks.tasks[name] = this
-    }
-    @Suppress("UNCHECKED_CAST")
-    operator suspend fun invoke(input: INPUT) = engine.launchTask(this as Task<Any?>, input)
-}
+import com.lightningkite.lightningdb.*
+import kotlinx.serialization.Serializable
 
 object Tasks {
     val tasks = HashMap<String, Task<*>>()
-    private val startupActions = HashSet<()->Unit>()
-    fun startup(action: ()->Unit) {
-        if(isStarted) action()
-        else startupActions.add(action)
+    private val startupActions = HashSet<StartupAction>()
+    fun startup(priority: Double = 0.0, action: suspend ()->Unit): StartupAction {
+        if(isStarted) throw IllegalStateException()
+        val result = StartupAction(priority, action)
+        startupActions.add(result)
+        return result
     }
     var isStarted = false
         private set
-    fun startup() {
+    suspend fun startup() {
         if(isStarted) return
         isStarted = true
-        startupActions.forEach { it() }
+        startupActions.sortedByDescending { it.priority }.forEach { it.action() }
         startupActions.clear()
     }
 }

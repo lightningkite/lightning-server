@@ -353,7 +353,7 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
         }
         Tasks.tasks  // No registration necessary
         engine = LocalEngine(pubSub)
-        Tasks.startup()
+        runBlocking { Tasks.startup() }
     } catch (t: Throwable) {
         t.printStackTrace()
     }

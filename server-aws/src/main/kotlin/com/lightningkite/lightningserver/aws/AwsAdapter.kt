@@ -143,7 +143,7 @@ abstract class AwsAdapter : RequestStreamHandler {
                     }.await()
                 }
             }
-            Tasks.startup()
+            runBlocking { Tasks.startup() }
             Unit
         }
     }

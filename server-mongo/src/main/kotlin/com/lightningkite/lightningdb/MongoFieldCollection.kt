@@ -7,8 +7,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.StructureKind
+import kotlinx.serialization.descriptors.*
 import org.bson.BsonDocument
 import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
@@ -21,7 +20,7 @@ import kotlin.reflect.KProperty1
  */
 class MongoFieldCollection<Model : Any>(
     val serializer: KSerializer<Model>,
-    val mongo: CoroutineCollection<Model>
+    val mongo: CoroutineCollection<Model>,
 ) : AbstractSignalFieldCollection<Model>() {
 
     override suspend fun find(
@@ -29,7 +28,7 @@ class MongoFieldCollection<Model : Any>(
         orderBy: List<SortPart<Model>>,
         skip: Int,
         limit: Int,
-        maxQueryMs: Long
+        maxQueryMs: Long,
     ): Flow<Model> {
         return mongo.find(condition.bson())
             .let {
@@ -64,7 +63,7 @@ class MongoFieldCollection<Model : Any>(
 
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
-        groupBy: KProperty1<Model, Key>
+        groupBy: KProperty1<Model, Key>,
     ): Map<Key, Int> {
         return mongo.aggregate<BsonDocument>(
             match(condition.bson()),
@@ -89,7 +88,7 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun <N : Number> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        property: KProperty1<Model, N>
+        property: KProperty1<Model, N>,
     ): Double? {
         return mongo.aggregate<BsonDocument>(match(condition.bson()), group(null, aggregate.asValueBson(property.name)))
             .toList()
@@ -104,7 +103,7 @@ class MongoFieldCollection<Model : Any>(
         aggregate: Aggregate,
         condition: Condition<Model>,
         groupBy: KProperty1<Model, Key>,
-        property: KProperty1<Model, N>
+        property: KProperty1<Model, N>,
     ): Map<Key, Double?> {
         return mongo.aggregate<BsonDocument>(
             match(condition.bson()),
@@ -120,8 +119,9 @@ class MongoFieldCollection<Model : Any>(
     }
 
     override suspend fun insertImpl(
-        models: List<Model>
+        models: List<Model>,
     ): List<Model> {
+        if (models.isEmpty()) return models
         mongo.insertMany(models)
         return models
     }
@@ -132,7 +132,7 @@ class MongoFieldCollection<Model : Any>(
 
     override suspend fun replaceOneIgnoringResultImpl(
         condition: Condition<Model>,
-        model: Model
+        model: Model,
     ): Boolean {
         return mongo.replaceOne(condition.bson(), model).matchedCount != 0L
     }
@@ -140,7 +140,7 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun upsertOneImpl(
         condition: Condition<Model>,
         modification: Modification<Model>,
-        model: Model
+        model: Model,
     ): EntryChange<Model> {
         val m = modification.bson()
         return mongo.findOneAndUpdate(
@@ -157,12 +157,16 @@ class MongoFieldCollection<Model : Any>(
         )?.let { EntryChange(it, modification(it)) } ?: run { mongo.insertOne(model); EntryChange(null, model) }
     }
 
-    override suspend fun upsertOneIgnoringResultImpl(condition: Condition<Model>, modification: Modification<Model>, model: Model): Boolean {
-        if(modification is Modification.Assign && modification.value == model) {
+    override suspend fun upsertOneIgnoringResultImpl(
+        condition: Condition<Model>,
+        modification: Modification<Model>,
+        model: Model,
+    ): Boolean {
+        if (modification is Modification.Assign && modification.value == model) {
             return mongo.replaceOne(condition.bson(), model, ReplaceOptions().upsert(true)).matchedCount != 0L
         } else {
             val m = modification.bson()
-            if(mongo.updateOne(condition.bson(), m.document, m.options).matchedCount != 0L)
+            if (mongo.updateOne(condition.bson(), m.document, m.options).matchedCount != 0L)
                 return true
             else {
                 mongo.insertOne(model)
@@ -173,7 +177,7 @@ class MongoFieldCollection<Model : Any>(
 
     override suspend fun updateOneImpl(
         condition: Condition<Model>,
-        modification: Modification<Model>
+        modification: Modification<Model>,
     ): EntryChange<Model> {
         val m = modification.bson()
         val before = mongo.findOneAndUpdate(
@@ -194,7 +198,7 @@ class MongoFieldCollection<Model : Any>(
 
     override suspend fun updateOneIgnoringResultImpl(
         condition: Condition<Model>,
-        modification: Modification<Model>
+        modification: Modification<Model>,
     ): Boolean {
         val m = modification.bson()
         return mongo.updateOne(condition.bson(), m.document, m.options).matchedCount != 0L
@@ -202,7 +206,7 @@ class MongoFieldCollection<Model : Any>(
 
     override suspend fun updateManyImpl(
         condition: Condition<Model>,
-        modification: Modification<Model>
+        modification: Modification<Model>,
     ): CollectionChanges<Model> {
         val m = modification.bson()
         val changes = ArrayList<EntryChange<Model>>()
@@ -237,7 +241,7 @@ class MongoFieldCollection<Model : Any>(
     }
 
     override suspend fun deleteOneIgnoringOldImpl(
-        condition: Condition<Model>
+        condition: Condition<Model>,
     ): Boolean {
         return mongo.deleteOne(condition.bson()).deletedCount > 0
     }
@@ -255,7 +259,7 @@ class MongoFieldCollection<Model : Any>(
     }
 
     override suspend fun deleteManyIgnoringOldImpl(
-        condition: Condition<Model>
+        condition: Condition<Model>,
     ): Int {
         return mongo.deleteMany(condition.bson()).deletedCount.toInt()
     }
@@ -265,14 +269,20 @@ class MongoFieldCollection<Model : Any>(
         val requireCompletion = ArrayList<Job>()
         val seen = HashSet<SerialDescriptor>()
         fun handleDescriptor(descriptor: SerialDescriptor) {
-            if(!seen.add(descriptor)) return
+            if (!seen.add(descriptor)) return
             descriptor.annotations.forEach {
                 when (it) {
                     is UniqueSet -> {
                         requireCompletion += scope.launch {
-                            mongo.ensureIndex(Sorts.ascending(it.fields.toList()), IndexOptions().unique(true))
+                            mongo.ensureIndex(
+                                Sorts.ascending(it.fields.toList()),
+                                IndexOptions().unique(true).partialFilterExpression(
+                                    documentOf(*it.fields.map { it to documentOf("\$type" to descriptor.getElementDescriptor(descriptor.getElementIndex(it)).bsonType().value) }.toTypedArray())
+                                )
+                            )
                         }
                     }
+
                     is IndexSet -> {
                         scope.launch {
                             mongo.ensureIndex(
@@ -281,19 +291,27 @@ class MongoFieldCollection<Model : Any>(
                             )
                         }
                     }
+
                     is TextIndex -> {
                         requireCompletion += scope.launch {
-                            mongo.ensureIndex(documentOf(*it.fields.map { it to "text" }.toTypedArray()), IndexOptions().name("${mongo.namespace.fullName}TextIndex"))
+                            mongo.ensureIndex(
+                                documentOf(*it.fields.map { it to "text" }.toTypedArray()),
+                                IndexOptions().name("${mongo.namespace.fullName}TextIndex")
+                            )
                         }
                     }
+
                     is NamedUniqueSet -> {
                         requireCompletion += scope.launch {
                             mongo.ensureIndex(
                                 Sorts.ascending(it.fields.toList()),
-                                IndexOptions().unique(true).name(it.indexName)
+                                IndexOptions().unique(true).name(it.indexName).partialFilterExpression(
+                                    documentOf(*it.fields.map { it to documentOf("\$type" to descriptor.getElementDescriptor(descriptor.getElementIndex(it)).bsonType().value) }.toTypedArray())
+                                )
                             )
                         }
                     }
+
                     is NamedIndexSet -> {
                         scope.launch {
                             mongo.ensureIndex(
@@ -302,6 +320,7 @@ class MongoFieldCollection<Model : Any>(
                             )
                         }
                     }
+
                     is NamedTextIndex -> {
                         requireCompletion += scope.launch {
                             mongo.ensureIndex(documentOf(*it.fields.map { it to "text" }.toTypedArray()))
@@ -323,6 +342,7 @@ class MongoFieldCollection<Model : Any>(
                                 )
                             }
                         }
+
                         is Index -> {
                             scope.launch {
                                 mongo.ensureIndex(
@@ -331,19 +351,26 @@ class MongoFieldCollection<Model : Any>(
                                 )
                             }
                         }
+
                         is NamedUnique -> {
                             requireCompletion += scope.launch {
                                 mongo.ensureIndex(
                                     Sorts.ascending(descriptor.getElementName(index)),
                                     IndexOptions().unique(true).name(it.indexName.takeUnless { it.isBlank() })
+                                        .partialFilterExpression(
+                                            documentOf(descriptor.getElementName(index) to documentOf("\$type" to descriptor.getElementDescriptor(index).bsonType().value))
+                                        )
                                 )
                             }
                         }
+
                         is Unique -> {
                             requireCompletion += scope.launch {
                                 mongo.ensureIndex(
                                     Sorts.ascending(descriptor.getElementName(index)),
-                                    IndexOptions().unique(true)
+                                    IndexOptions().unique(true).partialFilterExpression(
+                                        documentOf(descriptor.getElementName(index) to documentOf("\$type" to descriptor.getElementDescriptor(index).bsonType().value))
+                                    )
                                 )
                             }
                         }

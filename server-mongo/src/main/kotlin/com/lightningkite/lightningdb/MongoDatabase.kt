@@ -23,18 +23,12 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
-class MongoDatabase(val database: CoroutineDatabase, var ensureIndexesReady: Boolean = false) : Database {
+class MongoDatabase(val database: CoroutineDatabase) : Database {
     init {
         registerRequiredSerializers()
     }
 
     constructor(client: MongoClient, databaseName: String) : this(client.getDatabase(databaseName).coroutine) {}
-    constructor(
-        client: MongoClient,
-        databaseName: String,
-        ensureIndexesReady: Boolean = false
-    ) : this(client.getDatabase(databaseName).coroutine, ensureIndexesReady) {
-    }
 
     companion object {
         val bson by lazy { KBson(serializersModule = kmongoSerializationModule, configuration = configuration) }
@@ -72,16 +66,14 @@ class MongoDatabase(val database: CoroutineDatabase, var ensureIndexesReady: Boo
                         .getCollection(name, (type.classifier as KClass<*>).java as Class<T>)
                         .coroutine
                 ).also {
-                    if (ensureIndexesReady) {
-                        runBlocking {
-                            @Suppress("OPT_IN_USAGE")
-                            it.handleIndexes(GlobalScope)
-                        }
+                    runBlocking {
+                        @Suppress("OPT_IN_USAGE")
+                        it.handleIndexes(GlobalScope)
                     }
                 }
             }
         } as Lazy<MongoFieldCollection<T>>).value
 }
 
-fun MongoClient.database(name: String, ensureIndexesReady: Boolean = false): MongoDatabase =
-    MongoDatabase(this, name, ensureIndexesReady)
+fun MongoClient.database(name: String): MongoDatabase =
+    MongoDatabase(this, name)

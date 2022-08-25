@@ -1,15 +1,13 @@
 package com.lightningkite.lightningdb
 
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import kotlin.reflect.KProperty1
 
 data class ModelPermissions<Model>(
     val create: Condition<Model>,
     val read: Condition<Model>,
-    val readFields: Map<KProperty1<Model, *>, Read<Model, *>> = mapOf(),
+    val readMask: Mask<Model> = Mask(listOf()),
     val update: Condition<Model>,
-    val updateFields: Map<KProperty1<Model, *>, Update<Model, *>> = mapOf(),
+    val updateRestrictions: UpdateRestrictions<Model> = UpdateRestrictions(listOf()),
     val delete: Condition<Model>,
     val maxQueryTimeMs: Long = 1_000L
 ) {
@@ -17,41 +15,29 @@ data class ModelPermissions<Model>(
         val property: KProperty1<Model, Field>,
         val condition: Condition<Model>,
         val mask: Field
-    ) {
-        @Suppress("UNCHECKED_CAST")
-        fun mask(model: Model): Model {
-            return if(condition(model)) model
-            else property.setCopy(model, mask)
-        }
-    }
+    )
     data class Update<Model, Field>(
         val property: KProperty1<Model, Field>,
         val condition: Condition<Model>
     )
+    constructor(
+        create: Condition<Model>,
+        read: Condition<Model>,
+        readFields: Map<KProperty1<Model, *>, Read<Model, *>> = mapOf(),
+        update: Condition<Model>,
+        updateFields: Map<KProperty1<Model, *>, Update<Model, *>> = mapOf(),
+        delete: Condition<Model>,
+        maxQueryTimeMs: Long = 1_000L
+    ):this(
+        create = create,
+        read = read,
+        readMask = Mask(readFields.values.map { it.condition to Modification.OnField(it.property, Modification.Assign(it.mask)) }),
+        update = update,
+        updateRestrictions = UpdateRestrictions(updateFields.values.map { Modification.OnField(it.property, Modification.Assign(null)) to it.condition }),
+        delete = delete,
+        maxQueryTimeMs = maxQueryTimeMs,
+    )
 
-    fun allowed(modification: Modification<*>): Condition<Model> {
-        return when(modification) {
-            is Modification.Assign<*> -> Condition.And(updateFields.values.map { it.condition })
-            is Modification.Chain<*> -> Condition.And(modification.modifications.map { allowed(it) })
-            is Modification.IfNotNull<*> -> allowed(modification.modification)
-            is Modification.OnField<*, *> -> allowedInner(modification)
-            else -> Condition.Always()
-        }
-    }
-    private fun allowedInner(modification: Modification<*>): Condition<Model> {
-        return when(modification) {
-            is Modification.OnField<*, *> -> updateFields[modification.key]?.condition ?: Condition.Always()
-            is Modification.Chain<*> -> Condition.And(modification.modifications.map { allowedInner(it) })
-            is Modification.IfNotNull<*> -> allowed(modification.modification)
-            else -> Condition.Always()
-        }
-    }
-
-    fun mask(model: Model): Model {
-        var current = model
-        for(f in readFields.values) {
-            current = f.mask(current)
-        }
-        return current
-    }
+    fun allowed(modification: Modification<Model>): Condition<Model> = updateRestrictions(modification)
+    fun mask(model: Model): Model = readMask(model)
 }

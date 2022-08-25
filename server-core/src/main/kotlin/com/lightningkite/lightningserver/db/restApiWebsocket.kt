@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.serialization.Serialization
 
 import com.lightningkite.lightningserver.tasks.Tasks
+import com.lightningkite.lightningserver.tasks.startup
 import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.ApiWebsocket
 import com.lightningkite.lightningserver.typed.typedWebsocket
@@ -95,7 +96,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             }
             asyncs.awaitAll()
         }
-        Tasks.startup {
+        startup {
             info.collection().registerRawSignal { changes -> sendWsChanges(changes) }
         }
     }
