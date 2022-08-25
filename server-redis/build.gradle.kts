@@ -14,11 +14,12 @@ plugins {
 
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
+val coroutines:String by project
 dependencies {
     api(project(":server-core"))
     api("io.lettuce:lettuce-core:6.2.0.RELEASE")
     api("org.signal:embedded-redis:0.8.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.4")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutines")
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
     ksp(project(":processor"))
     kspTest(project(":processor"))

@@ -12,7 +12,7 @@ plugins {
     `maven-publish`
 }
 
-val ktorVersion = "2.0.3"
+val ktorVersion: String by project
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
 dependencies {

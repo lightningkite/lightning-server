@@ -1,24 +1,144 @@
+@file:UseContextualSerialization(UUID::class)
+
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.core.*
 import com.lightningkite.lightningserver.email.EmailClient
+import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
-
 import com.lightningkite.lightningserver.settings.generalSettings
+import com.lightningkite.lightningserver.sms.SMSClient
 import com.lightningkite.lightningserver.typed.typed
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.coroutines.flow.singleOrNull
-import kotlinx.serialization.KSerializer
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.serializer
-import java.net.URLDecoder
+import java.util.*
+
+
+@Serializable
+data class SMSAuthSubmission(
+    val userKey: String,
+    val clientKey: UUID,
+)
+
+@Serializable
+data class SMSCredentials<ID>(
+    val userId: ID,
+    val userKey: String,
+    val clientKey: UUID,
+)
+
+private const val availableNumbers = "1234567890"
+val smsTemplate:suspend (code: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." }
+
+open class SMSAuthEndpoints<USER, ID>(
+    path: ServerPath,
+    private val idSerializer: KSerializer<ID>,
+    private val jwtSigner: () -> JwtSigner,
+    private val sms: () -> SMSClient,
+    private val userByPhone: (suspend (phone: String) -> USER?),
+    private val userId: (user:USER) -> ID,
+    private val storeCredentials: (suspend (SMSCredentials<ID>) -> Unit),
+    private val validateCredentials: (suspend (SMSAuthSubmission) -> ID?),
+    private val template: (suspend (code: String) -> String) = smsTemplate
+) : ServerPathGroup(path) {
+
+    init {
+        path.docName = "SMSAuth"
+    }
+
+    val loginSMS = path("login-sms").post.typed(
+        summary = "SMS SSO",
+        description = "Sends a login token to the given phone number",
+        errorCases = listOf(),
+        successCode = HttpStatus.OK,
+        implementation = { _: Unit, phone: String ->
+            val user = userByPhone(phone) ?: return@typed UUID.randomUUID()
+            val userId = userId(user)
+            val clientCode = UUID.randomUUID()
+            val userCode = (1..7)
+                .map { availableNumbers.random() }
+                .joinToString("")
+
+            storeCredentials(SMSCredentials(userId, userCode, clientCode))
+
+            sms().send(phone, template(userCode))
+
+            clientCode
+        }
+    )
+
+    val submitSMS = post("submit-login-sms").typed(
+        summary = "Submit SMS SSO",
+        description = "Submit the code sent through SMS to finalize login.",
+        errorCases = listOf(),
+        implementation = { user: Unit, input: SMSAuthSubmission ->
+            val id = validateCredentials(input)
+
+            if (id != null)
+                jwtSigner().token(
+                    idSerializer,
+                    id,
+                    jwtSigner().emailExpiration
+                )
+            else throw BadRequestException()
+        }
+    )
+}
+
+inline fun <reified USER, reified ID : Comparable<ID>> ServerPath.smsAuthEndpoints(
+    noinline database: () -> Database,
+    noinline jwtSigner: () -> JwtSigner,
+    noinline sms: () -> SMSClient,
+    noinline storeCredentials: (suspend (SMSCredentials<ID>) -> Unit),
+    noinline validateCredentials: (suspend (SMSAuthSubmission) -> ID?),
+    noinline template: (suspend (code: String) -> String) = smsTemplate,
+) where USER : HasPhoneNumber, USER : HasId<ID> = SMSAuthEndpoints(
+    path = this,
+    idSerializer = Serialization.module.serializer(),
+    jwtSigner = jwtSigner,
+    sms = sms,
+    userId = {
+        @Suppress("UNCHECKED_CAST")
+        (it as HasId<ID>)._id
+    },
+    userByPhone = {
+        database()
+            .collection<USER>()
+            .find(Condition.OnField(HasPhoneNumberFields.phoneNumber<USER>(), Condition.Equal(it)))
+            .singleOrNull()
+    },
+    storeCredentials = storeCredentials,
+    validateCredentials = validateCredentials,
+    template = template,
+)
+
+inline fun <reified USER, reified ID : Comparable<ID>> ServerPath.smsAuthEndpoints(
+    noinline jwtSigner: () -> JwtSigner,
+    noinline sms: () -> SMSClient,
+    noinline userByPhone: (phone: String) -> USER?,
+    noinline userId: (user: USER) -> ID,
+    noinline storeCredentials: (SMSCredentials<ID>) -> Unit,
+    noinline validateCredentials: (SMSAuthSubmission) -> ID?,
+    noinline template: (suspend (code: String) -> String) = smsTemplate,
+) where USER : HasPhoneNumber, USER : HasId<ID> = SMSAuthEndpoints(
+    path = this,
+    idSerializer = Serialization.module.serializer(),
+    jwtSigner = jwtSigner,
+    sms = sms,
+    userId = userId,
+    userByPhone = userByPhone,
+    storeCredentials = storeCredentials,
+    validateCredentials = validateCredentials,
+    template = template,
+)
+
 
 open class AuthEndpoints<USER : Any, ID>(
     path: ServerPath,
@@ -43,7 +163,7 @@ open class AuthEndpoints<USER : Any, ID>(
     private val template: (suspend (email: String, link: String) -> String) = HtmlDefaults.defaultLoginEmailTemplate
 ) : ServerPathGroup(path) {
     init {
-        Authorization.handler = object: Authorization.Handler<USER> {
+        Authorization.handler = object : Authorization.Handler<USER> {
             override suspend fun http(request: HttpRequest): USER? {
                 return request.jwt<ID>(jwtSigner(), idSerializer)?.let { userById(it) }
             }
@@ -52,8 +172,11 @@ open class AuthEndpoints<USER : Any, ID>(
                 return request.jwt<ID>(jwtSigner(), idSerializer)?.let { userById(it) }
             }
 
-            override fun userToIdString(user: USER): String = Serialization.json.encodeToString(idSerializer, userId(user))
-            override suspend fun idStringToUser(id: String): USER = userById(Serialization.json.decodeFromString(idSerializer, id))
+            override fun userToIdString(user: USER): String =
+                Serialization.json.encodeToString(idSerializer, userId(user))
+
+            override suspend fun idStringToUser(id: String): USER =
+                userById(Serialization.json.decodeFromString(idSerializer, id))
         }
         path.docName = "Auth"
     }
@@ -103,9 +226,17 @@ open class AuthEndpoints<USER : Any, ID>(
         errorCases = listOf(),
         implementation = { user: USER, _: Unit -> user }
     )
-    val oauthGoogle = OauthGoogleEndpoints(path = path("oauth/google"), jwtSigner = jwtSigner, landing = landingRoute) { userByEmail(it).let(userId).toString() }
-    val oauthGithub = OauthGitHubEndpoints(path = path("oauth/github"), jwtSigner = jwtSigner, landing = landingRoute) { userByEmail(it).let(userId).toString() }
-    val oauthApple = OauthAppleEndpoints(path = path("oauth/apple"), jwtSigner = jwtSigner, landing = landingRoute) { userByEmail(it).let(userId).toString() }
+    val oauthGoogle = OauthGoogleEndpoints(path = path("oauth/google"), jwtSigner = jwtSigner, landing = landingRoute) {
+        userByEmail(it).let(userId).toString()
+    }
+    val oauthGithub = OauthGitHubEndpoints(path = path("oauth/github"), jwtSigner = jwtSigner, landing = landingRoute) {
+        userByEmail(it).let(userId).toString()
+    }
+    val oauthApple = OauthAppleEndpoints(
+        path = path("oauth/apple"),
+        jwtSigner = jwtSigner,
+        landing = landingRoute
+    ) { userByEmail(it).let(userId).toString() }
 }
 
 /**
