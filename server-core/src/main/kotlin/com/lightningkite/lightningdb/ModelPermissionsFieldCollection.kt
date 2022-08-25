@@ -32,11 +32,8 @@ open class ModelPermissionsFieldCollection<Model : Any>(
     }
 
     override suspend fun insert(models: List<Model>): List<Model> {
-        return models
-            .filter { permissions.create(it) }
-            .takeIf { it.isNotEmpty() }
-            ?.let{ wraps.insertMany(it).map { permissions.mask(it) } }
-            ?: listOf()
+        val passingModels = models.filter { permissions.create(it) }
+        return wraps.insertMany(passingModels).map { permissions.mask(it) }
     }
 
     override suspend fun count(condition: Condition<Model>): Int = wraps.count(condition and permissions.read)

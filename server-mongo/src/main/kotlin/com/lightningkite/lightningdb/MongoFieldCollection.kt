@@ -1,18 +1,21 @@
 package com.lightningkite.lightningdb
 
 import com.mongodb.client.model.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
 import org.bson.BsonDocument
-import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
 import org.litote.kmongo.coroutine.aggregate
+import org.litote.kmongo.group
+import org.litote.kmongo.match
 import java.util.concurrent.TimeUnit
 import kotlin.reflect.KProperty1
 
@@ -122,7 +125,9 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun insertImpl(
         models: List<Model>
     ): List<Model> {
-        mongo.insertMany(models)
+        models
+            .takeIf { it.isNotEmpty() }
+            ?.also { mongo.insertMany(it) }
         return models
     }
 
@@ -157,12 +162,16 @@ class MongoFieldCollection<Model : Any>(
         )?.let { EntryChange(it, modification(it)) } ?: run { mongo.insertOne(model); EntryChange(null, model) }
     }
 
-    override suspend fun upsertOneIgnoringResultImpl(condition: Condition<Model>, modification: Modification<Model>, model: Model): Boolean {
-        if(modification is Modification.Assign && modification.value == model) {
+    override suspend fun upsertOneIgnoringResultImpl(
+        condition: Condition<Model>,
+        modification: Modification<Model>,
+        model: Model
+    ): Boolean {
+        if (modification is Modification.Assign && modification.value == model) {
             return mongo.replaceOne(condition.bson(), model, ReplaceOptions().upsert(true)).matchedCount != 0L
         } else {
             val m = modification.bson()
-            if(mongo.updateOne(condition.bson(), m.document, m.options).matchedCount != 0L)
+            if (mongo.updateOne(condition.bson(), m.document, m.options).matchedCount != 0L)
                 return true
             else {
                 mongo.insertOne(model)
@@ -265,7 +274,7 @@ class MongoFieldCollection<Model : Any>(
         val requireCompletion = ArrayList<Job>()
         val seen = HashSet<SerialDescriptor>()
         fun handleDescriptor(descriptor: SerialDescriptor) {
-            if(!seen.add(descriptor)) return
+            if (!seen.add(descriptor)) return
             descriptor.annotations.forEach {
                 when (it) {
                     is UniqueSet -> {
@@ -273,6 +282,7 @@ class MongoFieldCollection<Model : Any>(
                             mongo.ensureIndex(Sorts.ascending(it.fields.toList()), IndexOptions().unique(true))
                         }
                     }
+
                     is IndexSet -> {
                         scope.launch {
                             mongo.ensureIndex(
@@ -281,11 +291,16 @@ class MongoFieldCollection<Model : Any>(
                             )
                         }
                     }
+
                     is TextIndex -> {
                         requireCompletion += scope.launch {
-                            mongo.ensureIndex(documentOf(*it.fields.map { it to "text" }.toTypedArray()), IndexOptions().name("${mongo.namespace.fullName}TextIndex"))
+                            mongo.ensureIndex(
+                                documentOf(*it.fields.map { it to "text" }.toTypedArray()),
+                                IndexOptions().name("${mongo.namespace.fullName}TextIndex")
+                            )
                         }
                     }
+
                     is NamedUniqueSet -> {
                         requireCompletion += scope.launch {
                             mongo.ensureIndex(
@@ -294,6 +309,7 @@ class MongoFieldCollection<Model : Any>(
                             )
                         }
                     }
+
                     is NamedIndexSet -> {
                         scope.launch {
                             mongo.ensureIndex(
@@ -302,6 +318,7 @@ class MongoFieldCollection<Model : Any>(
                             )
                         }
                     }
+
                     is NamedTextIndex -> {
                         requireCompletion += scope.launch {
                             mongo.ensureIndex(documentOf(*it.fields.map { it to "text" }.toTypedArray()))
@@ -323,6 +340,7 @@ class MongoFieldCollection<Model : Any>(
                                 )
                             }
                         }
+
                         is Index -> {
                             scope.launch {
                                 mongo.ensureIndex(
@@ -331,6 +349,7 @@ class MongoFieldCollection<Model : Any>(
                                 )
                             }
                         }
+
                         is NamedUnique -> {
                             requireCompletion += scope.launch {
                                 mongo.ensureIndex(
@@ -339,6 +358,7 @@ class MongoFieldCollection<Model : Any>(
                                 )
                             }
                         }
+
                         is Unique -> {
                             requireCompletion += scope.launch {
                                 mongo.ensureIndex(
