@@ -23,9 +23,25 @@ data class ModelPermissions<Model>(
     constructor(
         create: Condition<Model>,
         read: Condition<Model>,
+        readFields: Map<KProperty1<Model, *>, Read<Model, *>>,
+        update: Condition<Model>,
+        delete: Condition<Model>,
+        maxQueryTimeMs: Long = 1_000L
+    ):this(
+        create = create,
+        read = read,
+        readMask = Mask(readFields.values.map { it.condition to Modification.OnField(it.property, Modification.Assign(it.mask)) }),
+        update = update,
+        updateRestrictions = UpdateRestrictions(listOf()),
+        delete = delete,
+        maxQueryTimeMs = maxQueryTimeMs,
+    )
+    constructor(
+        create: Condition<Model>,
+        read: Condition<Model>,
         readFields: Map<KProperty1<Model, *>, Read<Model, *>> = mapOf(),
         update: Condition<Model>,
-        updateFields: Map<KProperty1<Model, *>, Update<Model, *>> = mapOf(),
+        updateFields: Map<KProperty1<Model, *>, Update<Model, *>>,
         delete: Condition<Model>,
         maxQueryTimeMs: Long = 1_000L
     ):this(

@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathMatcher
+import com.lightningkite.lightningserver.cors.addCors
 import com.lightningkite.lightningserver.engine.Engine
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
@@ -411,7 +412,7 @@ abstract class AwsAdapter : RequestStreamHandler {
             } catch (e: Exception) {
                 HttpResponse.plainText(e.message ?: "?", HttpStatus.InternalServerError)
             }
-        }
+        }.addCors(request)
         val outHeaders = HashMap<String, String>()
         result.headers.entries.forEach { outHeaders.put(it.first, it.second) }
         val b = result.body
