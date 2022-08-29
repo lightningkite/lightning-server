@@ -111,7 +111,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
         }
         
         resource "aws_iam_role" "cloudwatch" {
-          name = "api_gateway_cloudwatch_global"
+          name = "api_gateway_cloudwatch_global_${'$'}{var.deployment_location}"
         
           assume_role_policy = <<EOF
         {

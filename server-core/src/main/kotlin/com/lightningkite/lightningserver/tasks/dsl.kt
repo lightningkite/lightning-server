@@ -30,11 +30,15 @@ data class ActionHasOccurred(override val _id: String, val started: Instant? = n
 fun startupOnce(name: String, database: ()-> Database, maxDuration: Long = 60_000, priority: Double = 0.0, action: suspend ()->Unit): StartupAction {
     return startup(priority) {
         val a = database().collection<ActionHasOccurred>()
-        a.updateOne(
+        val existing = a.get(name)
+        val lock = a.updateOne(
             condition { it._id eq name and (it.started eq null or (it.started.notNull lt Instant.now().minusSeconds(maxDuration))) },
             modification { it.started assign Instant.now() }
         )
-        if(a.get(name) != null) return@startup
+        if (lock.new == null && existing != null) return@startup
+        if(lock.new == null) {
+            a.insertOne(ActionHasOccurred(_id = name, started = Instant.now()))
+        }
         try {
             action()
             a.updateOneById(
