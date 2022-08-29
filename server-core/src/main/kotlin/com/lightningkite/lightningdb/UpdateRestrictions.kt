@@ -9,6 +9,7 @@ data class UpdateRestrictions<T>(
      */
     val fields: List<Triple<Modification<T>, Condition<T>, Condition<T>>> = listOf()
 ) {
+
     operator fun invoke(on: Modification<T>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
         for(pair in fields) {

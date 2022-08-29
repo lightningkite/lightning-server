@@ -49,7 +49,7 @@ data class ModelPermissions<Model>(
         read = read,
         readMask = Mask(readFields.values.map { it.condition to Modification.OnField(it.property, Modification.Assign(it.mask)) }),
         update = update,
-        updateRestrictions = UpdateRestrictions(updateFields.values.map { Modification.OnField(it.property, Modification.Assign(null)) to it.condition }),
+        updateRestrictions = UpdateRestrictions(updateFields.values.map { Triple(Modification.OnField(it.property, Modification.Assign(null)), it.condition, Condition.Always()) }),
         delete = delete,
         maxQueryTimeMs = maxQueryTimeMs,
     )
