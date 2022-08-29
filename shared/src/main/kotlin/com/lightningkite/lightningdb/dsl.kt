@@ -1,17 +1,23 @@
 @file:SharedCode
+
 package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.*
+import java.lang.IllegalStateException
 import kotlin.reflect.KProperty1
 
-fun <T: IsCodableAndHashable> startChain(): PropChain<T, T> = PropChain({it}, {it})
-class PropChain<From: IsCodableAndHashable, To: IsCodableAndHashable>(
-    val mapCondition: (Condition<To>)->Condition<From>,
-    val mapModification: (Modification<To>)-> Modification<From>
+fun <T : IsCodableAndHashable> startChain(): PropChain<T, T> = PropChain({ it }, { it }, { it }, { _, it -> it })
+class PropChain<From : IsCodableAndHashable, To : IsCodableAndHashable>(
+    val mapCondition: (Condition<To>) -> Condition<From>,
+    val mapModification: (Modification<To>) -> Modification<From>,
+    val getProp: (From) -> To,
+    val setProp: (From, To) -> From,
 ) {
     operator fun <V : IsCodableAndHashable> get(prop: KProperty1<To, V>): PropChain<From, V> = PropChain(
         mapCondition = { mapCondition(Condition.OnField(prop, it)) },
-        mapModification = { mapModification(Modification.OnField(prop, it)) }
+        mapModification = { mapModification(Modification.OnField(prop, it)) },
+        getProp = { prop.get(getProp(it)) },
+        setProp = { from, to -> setProp(from, prop.setCopy(getProp(from), to)) }
     )
 
 //    override fun hashCode(): Int = mapCondition(Condition.Always()).hashCode()
@@ -22,18 +28,33 @@ class PropChain<From: IsCodableAndHashable, To: IsCodableAndHashable>(
 //    override fun equals(other: Any?): Boolean = other is PropChain<*, *> && mapCondition(Condition.Always()) == (other as PropChain<Any?, Any?>).mapCondition(Condition.Always())
 }
 
-inline fun <T: IsCodableAndHashable> condition(setup: (PropChain<T, T>) -> Condition<T>): Condition<T> = startChain<T>().let(setup)
-inline fun <T: IsCodableAndHashable> modification(setup: (PropChain<T, T>) -> Modification<T>): Modification<T> = startChain<T>().let(setup)
+inline fun <T : IsCodableAndHashable> condition(setup: (PropChain<T, T>) -> Condition<T>): Condition<T> =
+    startChain<T>().let(setup)
 
-val <K: IsCodableAndHashable> PropChain<K, K>.always: Condition<K> get() = Condition.Always<K>()
-val <K: IsCodableAndHashable> PropChain<K, K>.never: Condition<K> get() = Condition.Never<K>()
+inline fun <T : IsCodableAndHashable> modification(setup: (PropChain<T, T>) -> Modification<T>): Modification<T> =
+    startChain<T>().let(setup)
 
-infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.eq(value: T) = mapCondition(Condition.Equal(value))
-infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.neq(value: T) = mapCondition(Condition.NotEqual(value))
-infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.ne(value: T) = mapCondition(Condition.NotEqual(value))
-infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.inside(values: List<T>) = mapCondition(Condition.Inside(values))
-infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.nin(values: List<T>) = mapCondition(Condition.NotInside(values))
-infix fun <K: IsCodableAndHashable, T: IsCodableAndHashable> PropChain<K, T>.notIn(values: List<T>) = mapCondition(Condition.NotInside(values))
+val <K : IsCodableAndHashable> PropChain<K, K>.always: Condition<K> get() = Condition.Always<K>()
+val <K : IsCodableAndHashable> PropChain<K, K>.never: Condition<K> get() = Condition.Never<K>()
+
+infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.eq(value: T) =
+    mapCondition(Condition.Equal(value))
+
+infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.neq(value: T) =
+    mapCondition(Condition.NotEqual(value))
+
+infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.ne(value: T) =
+    mapCondition(Condition.NotEqual(value))
+
+infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.inside(values: List<T>) =
+    mapCondition(Condition.Inside(values))
+
+infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.nin(values: List<T>) =
+    mapCondition(Condition.NotInside(values))
+
+infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.notIn(values: List<T>) =
+    mapCondition(Condition.NotInside(values))
+
 infix fun <K : IsCodableAndHashable, T : ComparableCodableAndHashable<T>> PropChain<K, T>.gt(value: T) =
     mapCondition(Condition.GreaterThan(value))
 
@@ -59,7 +80,10 @@ infix fun <K : IsCodableAndHashable> PropChain<K, String>.contains(value: String
 fun <K : IsCodableAndHashable> PropChain<K, String>.contains(value: String, ignoreCase: Boolean) =
     mapCondition(Condition.StringContains(value, ignoreCase = ignoreCase))
 
-fun <K : IsCodableAndHashable, V: IsCodableAndHashable> PropChain<K, V>.fullTextSearch(value: String, ignoreCase: Boolean) =
+fun <K : IsCodableAndHashable, V : IsCodableAndHashable> PropChain<K, V>.fullTextSearch(
+    value: String,
+    ignoreCase: Boolean,
+) =
     mapCondition(Condition.FullTextSearch<V>(value, ignoreCase = ignoreCase))
 
 @JsName("xPropChainListAll")
@@ -98,13 +122,57 @@ infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Map<
 val <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T?>.notNull
     get() = PropChain<K, T>(
         mapCondition = { mapCondition(Condition.IfNotNull(it)) },
-        mapModification = { mapModification(Modification.IfNotNull(it)) }
+        mapModification = { mapModification(Modification.IfNotNull(it)) },
+        getProp = { getProp(it)!! },
+        setProp = { it, value -> setProp(it, value) }
     )
 
 operator fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Map<String, T>>.get(key: String) =
     PropChain<K, T>(
         mapCondition = { mapCondition(Condition.OnKey(key, it)) },
-        mapModification = { mapModification(Modification.ModifyByKey(mapOf(key to it))) }
+        mapModification = { mapModification(Modification.ModifyByKey(mapOf(key to it))) },
+        getProp = { getProp(it).getValue(key) },
+        setProp = { from, to -> setProp(from, getProp(from).plus(key to to)) }
+    )
+
+@JsName("xPropChainListAll")
+@get:JvmName("listAll")
+inline val <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, List<T>>.all get() =
+    PropChain<K, T>(
+        mapCondition = { mapCondition(Condition.ListAllElements(it)) },
+        mapModification = { mapModification(Modification.ListPerElement(Condition.Always(), it)) },
+        getProp = { getProp(it).first() },
+        setProp = { from, to -> setProp(from, getProp(from).plus(to)) }
+    )
+
+@JsName("xPropChainSetAll")
+@get:JvmName("setAll")
+inline val <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.all get() =
+    PropChain<K, T>(
+        mapCondition = { mapCondition(Condition.SetAllElements(it)) },
+        mapModification = { mapModification(Modification.SetPerElement(Condition.Always(), it)) },
+        getProp = { getProp(it).first() },
+        setProp = { from, to -> setProp(from, getProp(from).plus(to)) }
+    )
+
+@JsName("xPropChainListAny")
+@get:JvmName("listAny")
+inline val <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, List<T>>.any get() =
+    PropChain<K, T>(
+        mapCondition = { mapCondition(Condition.ListAnyElements(it)) },
+        mapModification = { mapModification(Modification.ListPerElement(Condition.Always(), it)) },
+        getProp = { getProp(it).first() },
+        setProp = { from, to -> setProp(from, getProp(from).plus(to)) }
+    )
+
+@JsName("xPropChainSetAny")
+@get:JvmName("setAny")
+inline val <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.any get() =
+    PropChain<K, T>(
+        mapCondition = { mapCondition(Condition.SetAnyElements(it)) },
+        mapModification = { mapModification(Modification.SetPerElement(Condition.Always(), it)) },
+        getProp = { getProp(it).first() },
+        setProp = { from, to -> setProp(from, getProp(from).plus(to)) }
     )
 
 inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.condition(make: (PropChain<T, T>) -> Condition<T>): Condition<K> =
@@ -211,7 +279,7 @@ inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<
 @JvmName("listMapIf")
 inline fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, List<T>>.mapIf(
     condition: (PropChain<T, T>) -> Condition<T>,
-    modification: (PropChain<T, T>) -> Modification<T>
+    modification: (PropChain<T, T>) -> Modification<T>,
 ) = mapModification(
     Modification.ListPerElement(
         condition = startChain<T>().let(condition),
@@ -223,7 +291,7 @@ inline fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Lis
 @JvmName("setMapIf")
 inline fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.mapIf(
     condition: (PropChain<T, T>) -> Condition<T>,
-    modification: (PropChain<T, T>) -> Modification<T>
+    modification: (PropChain<T, T>) -> Modification<T>,
 ) = mapModification(
     Modification.SetPerElement(
         condition = startChain<T>().let(condition),

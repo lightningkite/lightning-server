@@ -1,10 +1,33 @@
 package com.lightningkite.lightningdb
 
+import com.github.jershell.kbson.BigDecimalSerializer
+import com.github.jershell.kbson.ByteArraySerializer
+import com.github.jershell.kbson.DateSerializer
+import com.github.jershell.kbson.ObjectIdSerializer
 import com.lightningkite.lightningdb.*
 import com.mongodb.client.model.UpdateOptions
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.descriptors.*
 import org.bson.BsonDocument
+import org.bson.BsonTimestamp
+import org.bson.BsonType
 import org.bson.Document
+import org.bson.types.Binary
+import org.bson.types.ObjectId
+import org.litote.kmongo.Id
+import org.litote.kmongo.id.StringId
+import org.litote.kmongo.id.WrappedObjectId
+import org.litote.kmongo.serialization.*
+import org.litote.kmongo.serialization.InstantSerializer
+import org.litote.kmongo.serialization.LocalDateSerializer
+import org.litote.kmongo.serialization.LocalTimeSerializer
+import org.litote.kmongo.serialization.OffsetDateTimeSerializer
+import org.litote.kmongo.serialization.ZonedDateTimeSerializer
+import java.math.BigDecimal
+import java.time.*
+import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.regex.Pattern
 
 fun documentOf(): Document {
     return Document()
@@ -137,3 +160,45 @@ data class UpdateWithOptions(
 
 fun Condition<*>.bson() = Document().also { simplify().dump(it, null) }
 fun Modification<*>.bson(): UpdateWithOptions = UpdateWithOptions().also { dump(it, null) }
+
+@OptIn(ExperimentalSerializationApi::class)
+fun SerialDescriptor.bsonType(): BsonType = when(kind) {
+    SerialKind.ENUM -> BsonType.STRING
+    SerialKind.CONTEXTUAL -> when(this.capturedKClass){
+        ObjectId::class -> BsonType.OBJECT_ID
+        BigDecimal::class -> BsonType.DECIMAL128
+        ByteArray::class -> BsonType.BINARY
+        Date::class -> BsonType.DATE_TIME
+        Calendar::class -> BsonType.DATE_TIME
+        GregorianCalendar::class -> BsonType.DATE_TIME
+        Instant::class -> BsonType.DATE_TIME
+        ZonedDateTime::class -> BsonType.DATE_TIME
+        OffsetDateTime::class -> BsonType.DATE_TIME
+        LocalDate::class -> BsonType.DATE_TIME
+        LocalDateTime::class -> BsonType.DATE_TIME
+        LocalTime::class -> BsonType.DATE_TIME
+        OffsetTime::class -> BsonType.DATE_TIME
+        BsonTimestamp::class -> BsonType.DATE_TIME
+        Locale::class -> BsonType.STRING
+        Binary::class -> BsonType.BINARY
+        Pattern::class -> BsonType.DOCUMENT
+        Regex::class -> BsonType.DOCUMENT
+        UUID::class -> BsonType.BINARY
+        else -> MongoDatabase.bson.serializersModule.getContextualDescriptor(this)!!.bsonType()
+    }
+    PrimitiveKind.BOOLEAN -> BsonType.BOOLEAN
+    PrimitiveKind.BYTE -> BsonType.INT32
+    PrimitiveKind.CHAR -> BsonType.SYMBOL
+    PrimitiveKind.SHORT -> BsonType.INT32
+    PrimitiveKind.INT -> BsonType.INT32
+    PrimitiveKind.LONG -> BsonType.INT64
+    PrimitiveKind.FLOAT -> BsonType.DOUBLE
+    PrimitiveKind.DOUBLE -> BsonType.DOUBLE
+    PrimitiveKind.STRING -> BsonType.STRING
+    StructureKind.CLASS -> BsonType.DOCUMENT
+    StructureKind.LIST -> BsonType.ARRAY
+    StructureKind.MAP -> BsonType.DOCUMENT
+    StructureKind.OBJECT -> BsonType.STRING
+    PolymorphicKind.SEALED -> TODO()
+    PolymorphicKind.OPEN -> TODO()
+}

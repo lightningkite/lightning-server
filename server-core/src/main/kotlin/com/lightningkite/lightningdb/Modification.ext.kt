@@ -27,3 +27,24 @@ fun <T> Modification<T>.vet(onModification: (Modification<T>) -> Unit) {
         else -> onModification(this)
     }
 }
+
+@Suppress("UNCHECKED_CAST")
+fun <V> Modification<*>.vet(fieldChain: List<KProperty1<*, *>>, onModification: (Modification<V>) -> Unit) {
+    val field: KProperty1<*, *> = fieldChain.firstOrNull() ?: run {
+        onModification(this as Modification<V>)
+        return
+    }
+    when (this) {
+        is Modification.Assign -> {
+            var value = this.value
+            for(key in fieldChain) {
+                value = (key as KProperty1<Any?, Any?>).get(value)
+            }
+            onModification(Modification.Assign(value as V))
+        }
+        is Modification.Chain -> modifications.forEach { it.vet(fieldChain, onModification) }
+        is Modification.OnField<*, *> -> if (this.key == field) this.modification.vet(fieldChain.drop(1), onModification)
+        is Modification.IfNotNull -> this.modification.vet(fieldChain, onModification)
+        else -> { }
+    }
+}

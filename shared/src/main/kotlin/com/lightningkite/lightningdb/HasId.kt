@@ -25,3 +25,14 @@ interface HasEmail {
 object HasEmailFields {
     fun <T: HasEmail> email() = HasEmail::email as KProperty1<T, String>
 }
+
+
+@SwiftProtocolExtends("Codable", "Hashable")
+interface HasPhoneNumber {
+    val phoneNumber: String
+}
+
+@Suppress("UNCHECKED_CAST")
+object HasPhoneNumberFields {
+    fun <T: HasPhoneNumber> phoneNumber() = HasPhoneNumber::phoneNumber as KProperty1<T, String>
+}

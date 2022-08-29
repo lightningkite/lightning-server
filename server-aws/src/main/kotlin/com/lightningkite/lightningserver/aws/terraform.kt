@@ -41,7 +41,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
           default = "us-west-2"
         }
         variable "deployment_name" {
-          default = "test"
+          default = "no-deployment-name"
         }
         variable "debug" {
           default = false
@@ -111,7 +111,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
         }
         
         resource "aws_iam_role" "cloudwatch" {
-          name = "api_gateway_cloudwatch_global"
+          name = "api_gateway_cloudwatch_global_${'$'}{var.deployment_location}"
         
           assume_role_policy = <<EOF
         {
@@ -325,11 +325,29 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
     for(setting in Settings.requirements) {
         when(setting.value.serializer) {
             serializer<GeneralServerSettings>() -> {
+                variables.appendLine("""
+                    variable "cors" {
+                        default = null
+                    }
+                """.trimIndent())
+                noDomain.appendLine("""
+                    variable "cors" {
+                        default = null
+                    }
+                """.trimIndent())
+                domain.appendLine("""
+                    variable "cors" {
+                        default = null
+                    }
+                """.trimIndent())
+                noDomainInputs.appendLine("""  cors  = var.cors""")
+                domainInputs.appendLine("""  cors  = var.cors""")
                 appSettings.add("""${setting.key} = {
                     projectName = "$projectName"
                     publicUrl = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
                     wsUrl = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
                     debug = var.debug
+                    cors = var.cors
                 }""".trimIndent())
             }
             serializer<FilesSettings>() -> {

@@ -353,7 +353,7 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
         }
         Tasks.tasks  // No registration necessary
         engine = LocalEngine(pubSub)
-        Tasks.startup()
+        runBlocking { Tasks.startup() }
     } catch (t: Throwable) {
         t.printStackTrace()
     }
@@ -367,7 +367,7 @@ fun runServer(pubSub: PubSubInterface, cache: CacheInterface) = embeddedServer(
     port = generalSettings().port,
     host = generalSettings().host,
     module = { lightningServer(pubSub, cache) },
-    watchPaths = listOf("classes")
+    watchPaths = listOf()
 ).start(wait = true)
 
 private fun ContentType.adapt(): HttpContentType =
