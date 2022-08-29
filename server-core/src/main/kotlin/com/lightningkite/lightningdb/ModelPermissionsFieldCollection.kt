@@ -21,7 +21,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
     ): Flow<Model> {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
         return wraps.find(
-            condition = condition and permissions.read and sortImposedConditions,
+            condition = condition and permissions.read and sortImposedConditions and permissions.readMask(condition),
             orderBy = orderBy,
             skip = skip,
             limit = limit,
@@ -41,7 +41,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         groupBy: KProperty1<Model, Key>
     ): Map<Key, Int> {
         return wraps.groupCount(
-            condition and permissions.read and permissions.readMask(groupBy),
+            condition and permissions.read and permissions.readMask(groupBy) and permissions.readMask(condition),
             groupBy
         )
     }
@@ -50,7 +50,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         aggregate: Aggregate,
         condition: Condition<Model>,
         property: KProperty1<Model, N>
-    ): Double? = wraps.aggregate(aggregate, condition and permissions.read, property)
+    ): Double? = wraps.aggregate(aggregate, condition and permissions.read and permissions.readMask(condition), property)
 
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
@@ -59,7 +59,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         property: KProperty1<Model, N>
     ): Map<Key, Double?> = wraps.groupAggregate(
         aggregate,
-        condition and permissions.read and permissions.readMask(groupBy),
+        condition and permissions.read and permissions.readMask(groupBy) and permissions.readMask(condition),
         groupBy,
         property
     )
@@ -137,7 +137,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         return wraps.deleteMany(condition and permissions.delete).map { permissions.mask(it) }
     }
 
-    override suspend fun fullCondition(condition: Condition<Model>): Condition<Model> = permissions.read and condition
+    override suspend fun fullCondition(condition: Condition<Model>): Condition<Model> = permissions.read and condition and permissions.readMask(condition)
     override suspend fun mask(): Mask<Model> = permissions.readMask
 }
 

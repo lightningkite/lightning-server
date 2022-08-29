@@ -23,6 +23,20 @@ class MaskTest {
     }
 
     @Test
+    fun complexModification() {
+        val mask = updateRestrictions<LargeTestModel> {
+            it.embedded.value2.restrict<Int>(
+                requires = it.always,
+                valueMust = { it gt 4 }
+            )
+        }
+
+        assertTrue(mask(modification { it.embedded.value2 assign 5 }) is Condition.Always)
+        assertTrue(mask(modification { it.embedded.value2 assign 4 }) is Condition.Never)
+        assertTrue(mask(modification { it.embedded.value2 plus 4 }) is Condition.Never)
+    }
+
+    @Test
     fun modificationList() {
         val matchingMod = modification<LargeTestModel> { it.listEmbedded.map { it.value1 assign "" } }
         val matchingBMod = modification<LargeTestModel> {
@@ -55,5 +69,19 @@ class MaskTest {
         assertTrue(mask.permitSort(listOf(notMatchingSortA)) is Condition.Always)
         assertTrue(mask.permitSort(listOf(notMatchingSortV)) is Condition.Always)
         assertEquals(2, mask(LargeTestModel(int = 4)).int)
+    }
+
+    @Test
+    fun condition() {
+        val matchingMod = modification<LargeTestModel> { it.int assign 2 }
+        val matchingSort = condition<LargeTestModel> { it.int eq 2 }
+        val notMatchingSortA = condition<LargeTestModel> { it.byte eq 2 }
+        val notMatchingSortV = condition<LargeTestModel> { it.string eq "" }
+
+        val mask = mask { always(it.int.maskedTo(2)) }
+
+        assertTrue(mask(matchingSort) is Condition.Never)
+        assertTrue(mask(notMatchingSortA) is Condition.Always)
+        assertTrue(mask(notMatchingSortV) is Condition.Always)
     }
 }

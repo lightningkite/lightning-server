@@ -17,17 +17,10 @@ data class Mask<T>(
         }
         return value
     }
-    private fun path(modification: Modification<*>): List<KProperty1<*, *>> {
-        return when(modification) {
-            is Modification.OnField<*, *> -> listOf(modification.key) + path(modification.modification)
-            else -> listOf()
-        }
-    }
     fun permitSort(on: List<SortPart<T>>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
         for(pair in pairs) {
-            val path = path(pair.second)
-            if(on.any { it.field.property == path.firstOrNull() }) totalConditions.add(pair.first)
+            if(on.any { pair.second.matchesPath(it.field.property) }) totalConditions.add(pair.first)
         }
         return when(totalConditions.size) {
             0 -> Condition.Always()
@@ -38,8 +31,18 @@ data class Mask<T>(
     operator fun invoke(on: KProperty1<T, *>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
         for(pair in pairs) {
-            val path = path(pair.second)
-            if(on == path.firstOrNull()) totalConditions.add(pair.first)
+            if(pair.second.matchesPath(on)) totalConditions.add(pair.first)
+        }
+        return when(totalConditions.size) {
+            0 -> Condition.Always()
+            1 -> totalConditions[0]
+            else -> Condition.And(totalConditions)
+        }
+    }
+    operator fun invoke(condition: Condition<T>): Condition<T> {
+        val totalConditions = ArrayList<Condition<T>>()
+        for(pair in pairs) {
+            if(condition.matchesPath(pair.second)) totalConditions.add(pair.first)
         }
         return when(totalConditions.size) {
             0 -> Condition.Always()

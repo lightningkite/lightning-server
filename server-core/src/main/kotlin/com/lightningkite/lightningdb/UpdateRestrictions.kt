@@ -1,41 +1,22 @@
 package com.lightningkite.lightningdb
 
 import kotlinx.serialization.Serializable
-import kotlin.reflect.KProperty1
 
 @Serializable
 data class UpdateRestrictions<T>(
     /**
      * If the modification matches paths, then the condition is applied to the update
      */
-    val pairs: List<Pair<Modification<T>, Condition<T>>> = listOf()
+    val fields: List<Triple<Modification<T>, Condition<T>, Condition<T>>> = listOf()
 ) {
-    private fun path(modification: Modification<*>): List<KProperty1<*, *>> {
-        return when(modification) {
-            is Modification.OnField<*, *> -> listOf(modification.key) + path(modification.modification)
-            is Modification.SetPerElement<*> -> path(modification.modification)
-            is Modification.ListPerElement<*> -> path(modification.modification)
-            else -> listOf()
-        }
-    }
-    private fun matches(modification: Modification<*>, list: List<KProperty1<*, *>>): Boolean {
-        if(list.isEmpty()) return true
-        return when(modification) {
-            is Modification.OnField<*, *> -> {
-                list.firstOrNull() == modification.key && matches(modification.modification, list.drop(1))
-            }
-            is Modification.SetPerElement<*> -> matches(modification.modification, list)
-            is Modification.ListPerElement<*> -> matches(modification.modification, list)
-            is Modification.Chain -> modification.modifications.any { matches(it, list) }
-            else -> false
-        }
-    }
     operator fun invoke(on: Modification<T>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
-        for(pair in pairs) {
-            val path = path(pair.first)
-            if(matches(on, path)) {
+        for(pair in fields) {
+            if(on.matchesPath(pair.first)) {
                 totalConditions.add(pair.second)
+            }
+            if(pair.third !is Condition.Always) {
+                if(!pair.third.invoke(on)) return Condition.Never()
             }
         }
         return when(totalConditions.size) {
@@ -46,26 +27,42 @@ data class UpdateRestrictions<T>(
     }
 
     class Builder<T>(
-        val pairs: ArrayList<Pair<Modification<T>, Condition<T>>> = ArrayList()
+        val fields: ArrayList<Triple<Modification<T>, Condition<T>, Condition<T>>> = ArrayList()
     ) {
         val it = startChain<T>()
         fun PropChain<T, *>.cannotBeModified() {
-            pairs.add(
+            fields.add(Triple(
                 this.let {
                     @Suppress("UNCHECKED_CAST")
                     it as PropChain<T, Any?>
-                }.assign(null) to Condition.Never()
-            )
+                }.assign(null), Condition.Never(), Condition.Always()
+            ))
         }
         infix fun PropChain<T, *>.requires(condition: Condition<T>) {
-            pairs.add(
+            fields.add(Triple(
                 this.let {
                     @Suppress("UNCHECKED_CAST")
                     it as PropChain<T, Any?>
-                }.assign(null) to condition
-            )
+                }.assign(null), condition, Condition.Always()
+            ))
         }
-        fun build() = UpdateRestrictions(pairs)
+        fun <V> PropChain<T, V>.restrict(requires: Condition<T>, valueMust: (PropChain<V, V>)->Condition<V>) {
+            fields.add(Triple(
+                this.let {
+                    @Suppress("UNCHECKED_CAST")
+                    it as PropChain<T, Any?>
+                }.assign(null), requires, this.condition(valueMust)
+            ))
+        }
+        fun <V> PropChain<T, V>.mustBe(valueMust: (PropChain<V, V>)->Condition<V>) {
+            fields.add(Triple(
+                this.let {
+                    @Suppress("UNCHECKED_CAST")
+                    it as PropChain<T, Any?>
+                }.assign(null), Condition.Always(), this.condition(valueMust)
+            ))
+        }
+        fun build() = UpdateRestrictions(fields)
     }
 }
 
