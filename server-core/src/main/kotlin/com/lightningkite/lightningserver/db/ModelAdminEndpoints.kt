@@ -4,6 +4,7 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.rawUser
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
+import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.handler
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -16,7 +17,8 @@ import kotlinx.html.*
 
 open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>> (
     path: ServerPath,
-    val info: ModelInfoWithDefault<USER, T, ID>
+    val info: ModelInfoWithDefault<USER, T, ID>,
+    val fileUploadPath: UploadEarlyEndpoint? = UploadEarlyEndpoint.default
 ): ServerPathGroup(path) {
     companion object {
         val known: MutableCollection<ModelAdminEndpoints<*, *, *>> = ArrayList()
