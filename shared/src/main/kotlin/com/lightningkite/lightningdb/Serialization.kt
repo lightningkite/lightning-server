@@ -14,7 +14,7 @@ import java.util.*
 
 object UUIDSerializer: KSerializer<UUID> {
     override fun deserialize(decoder: Decoder): UUID = UUID.fromString(decoder.decodeString())
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("UUID", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.util.UUID", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: UUID) = encoder.encodeString(value.toString())
 }
 
@@ -28,31 +28,31 @@ object InstantSerializer: KSerializer<Instant> {
         }
     }
 
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Instant", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.time.Instant", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: Instant) = encoder.encodeString(value.toString())
 }
 
 object ZonedDateTimeSerializer: KSerializer<ZonedDateTime> {
     override fun deserialize(decoder: Decoder): ZonedDateTime = ZonedDateTime.parse(decoder.decodeString())
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ZonedDateTime", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.time.ZonedDateTime", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: ZonedDateTime) = encoder.encodeString(value.toString())
 }
 
 object LocalDateSerializer: KSerializer<LocalDate> {
     override fun deserialize(decoder: Decoder): LocalDate = LocalDate.parse(decoder.decodeString().trim('z', 'Z'))
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("LocalDate", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.time.LocalDate", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: LocalDate) = encoder.encodeString(value.toString())
 }
 
 object LocalTimeSerializer: KSerializer<LocalTime> {
     override fun deserialize(decoder: Decoder): LocalTime = LocalTime.parse(decoder.decodeString().trim('z', 'Z'))
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("LocalTime", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.time.LocalTime", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: LocalTime) = encoder.encodeString(value.toString())
 }
 
 object OffsetDateTimeSerializer: KSerializer<OffsetDateTime> {
     override fun deserialize(decoder: Decoder): OffsetDateTime = OffsetDateTime.parse(decoder.decodeString())
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("OffsetDateTime", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.time.OffsetDateTime", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: OffsetDateTime) = encoder.encodeString(value.toString())
 }
 
@@ -61,7 +61,7 @@ object DurationSerializer: KSerializer<Duration> {
         val raw = decoder.decodeString()
         return raw.toLongOrNull()?.let { Duration.ofMillis(it) } ?: Duration.parse(raw)
     }
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Duration", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.time.Duration", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: Duration) = encoder.encodeString(value.toString())
 }
 
