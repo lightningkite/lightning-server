@@ -62,6 +62,7 @@ data class Mask<T>(
             pairs.add(Condition.Never<T>() to modification)
         }
         fun build() = Mask(pairs)
+        fun include(mask: Mask<T>) { pairs.addAll(mask.pairs) }
     }
 }
 

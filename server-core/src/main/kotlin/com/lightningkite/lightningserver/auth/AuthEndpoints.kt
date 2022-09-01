@@ -22,13 +22,13 @@ import java.util.*
 
 
 @Serializable
-data class SMSAuthSubmission(
+data class SSOAuthSubmission(
     val userKey: String,
     val clientKey: UUID,
 )
 
 @Serializable
-data class SMSCredentials<ID>(
+data class SSOCredentials<ID>(
     val userId: ID,
     val userKey: String,
     val clientKey: UUID,
@@ -44,8 +44,8 @@ open class SMSAuthEndpoints<USER, ID>(
     private val sms: () -> SMSClient,
     private val userByPhone: (suspend (phone: String) -> USER?),
     private val userId: (user:USER) -> ID,
-    private val storeCredentials: (suspend (SMSCredentials<ID>) -> Unit),
-    private val validateCredentials: (suspend (SMSAuthSubmission) -> ID?),
+    private val storeCredentials: (suspend (SSOCredentials<ID>) -> Unit),
+    private val validateCredentials: (suspend (SSOAuthSubmission) -> ID?),
     private val template: (suspend (code: String) -> String) = smsTemplate
 ) : ServerPathGroup(path) {
 
@@ -54,8 +54,8 @@ open class SMSAuthEndpoints<USER, ID>(
     }
 
     val loginSMS = path("login-sms").post.typed(
-        summary = "SMS SSO",
-        description = "Sends a login token to the given phone number",
+        summary = "Request SMS SSO",
+        description = "Sends a SSO password to the given Phone Number",
         errorCases = listOf(),
         successCode = HttpStatus.OK,
         implementation = { _: Unit, phone: String ->
@@ -66,7 +66,7 @@ open class SMSAuthEndpoints<USER, ID>(
                 .map { availableNumbers.random() }
                 .joinToString("")
 
-            storeCredentials(SMSCredentials(userId, userCode, clientCode))
+            storeCredentials(SSOCredentials(userId, userCode, clientCode))
 
             sms().send(phone, template(userCode))
 
@@ -74,11 +74,11 @@ open class SMSAuthEndpoints<USER, ID>(
         }
     )
 
-    val submitSMS = post("submit-login-sms").typed(
+    val submitLoginSSO = post("submit-sso").typed(
         summary = "Submit SMS SSO",
-        description = "Submit the code sent through SMS to finalize login.",
+        description = "Submit the SSO sent to the user to finalize login.",
         errorCases = listOf(),
-        implementation = { user: Unit, input: SMSAuthSubmission ->
+        implementation = { user: Unit, input: SSOAuthSubmission ->
             val id = validateCredentials(input)
 
             if (id != null)
@@ -96,8 +96,8 @@ inline fun <reified USER, reified ID : Comparable<ID>> ServerPath.smsAuthEndpoin
     noinline database: () -> Database,
     noinline jwtSigner: () -> JwtSigner,
     noinline sms: () -> SMSClient,
-    noinline storeCredentials: (suspend (SMSCredentials<ID>) -> Unit),
-    noinline validateCredentials: (suspend (SMSAuthSubmission) -> ID?),
+    noinline storeCredentials: (suspend (SSOCredentials<ID>) -> Unit),
+    noinline validateCredentials: (suspend (SSOAuthSubmission) -> ID?),
     noinline template: (suspend (code: String) -> String) = smsTemplate,
 ) where USER : HasPhoneNumber, USER : HasId<ID> = SMSAuthEndpoints(
     path = this,
@@ -124,8 +124,8 @@ inline fun <reified USER, reified ID : Comparable<ID>> ServerPath.smsAuthEndpoin
     noinline sms: () -> SMSClient,
     noinline userByPhone: (phone: String) -> USER?,
     noinline userId: (user: USER) -> ID,
-    noinline storeCredentials: (SMSCredentials<ID>) -> Unit,
-    noinline validateCredentials: (SMSAuthSubmission) -> ID?,
+    noinline storeCredentials: (SSOCredentials<ID>) -> Unit,
+    noinline validateCredentials: (SSOAuthSubmission) -> ID?,
     noinline template: (suspend (code: String) -> String) = smsTemplate,
 ) where USER : HasPhoneNumber, USER : HasId<ID> = SMSAuthEndpoints(
     path = this,

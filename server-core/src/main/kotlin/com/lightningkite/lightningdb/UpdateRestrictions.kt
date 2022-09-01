@@ -64,6 +64,7 @@ data class UpdateRestrictions<T>(
             ))
         }
         fun build() = UpdateRestrictions(fields)
+        fun include(mask: UpdateRestrictions<T>) { fields.addAll(mask.fields) }
     }
 }
 
