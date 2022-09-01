@@ -6,6 +6,9 @@ import com.lightningkite.lightningserver.SetOnce
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.get
+import com.lightningkite.lightningserver.http.handler
 import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.pubsub.PubSubSettings
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -42,7 +45,7 @@ class KtorKtTest {
             },
             message = { println("message $it") },
             disconnect = { println("disconnect $it") },
-        )
+        ).get.handler { HttpResponse.plainText("no")}
         testApplication {
             environment { watchPaths = listOf() }
             application {

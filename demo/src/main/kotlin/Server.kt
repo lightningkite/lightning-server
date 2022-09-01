@@ -54,9 +54,12 @@ object Server : ServerPathGroup(ServerPath.root) {
     val authHtml = AuthEndpointsHtml(auth)
     val testModel = TestModelEndpoints(path("test-model"))
 
-    val root = path.get.handler { HttpResponse.plainText("Hello ${it.rawUser()}") }
+    val root = path.get.handler {
+        println("haha get rooted loser")
+        HttpResponse.plainText("Hello ${it.rawUser()}")
+    }
 
-    val socket = path.websocket(
+    val socket = path("socket").websocket(
         connect = { println("Connected $it") },
         message = { println("Message $it") },
         disconnect = { println("Disconnect $it") }

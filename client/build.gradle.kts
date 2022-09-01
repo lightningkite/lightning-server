@@ -10,7 +10,7 @@ plugins {
 }
 
 val kotlinVersion: String by project
-val rxPlusVersion = "1.0.4"
+val rxPlusVersion: String by project
 val khrysalisVersion: String by project
 dependencies {
     api(project(":shared"))

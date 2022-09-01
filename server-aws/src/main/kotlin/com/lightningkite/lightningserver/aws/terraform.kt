@@ -666,7 +666,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
                       input     = "{\"scheduled\": \"${it.name}\"}"
                     }
                     resource "aws_lambda_permission" "scheduled_task_${it.name}" {
-                      statement_id  = "AllowExecutionFromCloudWatch"
+                      statement_id  = "scheduled_task_${it.name}"
                       action        = "lambda:InvokeFunction"
                       function_name = aws_lambda_function.main.function_name
                       principal     = "events.amazonaws.com"
