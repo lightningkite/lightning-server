@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -74,4 +75,18 @@ val ClientModule = SerializersModule {
     contextual(OffsetDateTime::class, OffsetDateTimeSerializer)
     contextual(ServerFile::class, ServerFileSerialization)
     contextual(Duration::class, DurationSerializer)
+    contextual(Optional::class) { list ->
+        @Suppress("UNCHECKED_CAST")
+        OptionalSerializer(list[0] as KSerializer<Any>)
+    }
+}
+@Suppress("OPT_IN_USAGE")
+class OptionalSerializer<T: Any>(val inner: KSerializer<T>): KSerializer<Optional<T>> {
+    val nullable = inner.nullable
+    override val descriptor: SerialDescriptor
+        get() = SerialDescriptor("Optional<${inner.descriptor.serialName}>", nullable.descriptor)
+    override fun deserialize(decoder: Decoder): Optional<T> = Optional.ofNullable(nullable.deserialize(decoder))
+    override fun serialize(encoder: Encoder, value: Optional<T>) {
+        nullable.serialize(encoder, if(value.isPresent) value.get() else null)
+    }
 }
