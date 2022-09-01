@@ -1,41 +1,13 @@
 # LightningServer feature list
 
-LightningServer is chock-full of useful features. This list is designed to be used as a quick reference for those
-already experienced with the library.
+LightningServer is chock-full of useful features. This list is designed to be used as a reference for those already
+familiar with the library.
 
 ## General
 
-- `prepareModels()`
 - `runServer()`
-
-### PubSubInterface
-
 - `LocalPubSub`
-
-### CacheInterface
-
 - `LocalCache`
-
-### Annotations
-
-- `@file:UseContextualSerialization()` - enables contextual serialization for the file
-- `@Serializable` - makes a data class serializable
-- `@DatabaseModel` - makes a data class a database model
-
-### Model Interfaces
-
-- `HasId` - provides a data class with an id
-- `HasEmail` - provides a data class with an email address
-
-### Exceptions
-
-Throwing these exceptions in the body of an [HttpEndpoint](#httpendpoint) will automatically return the corresponding
-HTTP response.
-
-- `BadRequestException()` - 400
-- `UnauthorizedException()` - 401
-- `ForbiddenException()` - 403
-- `NotFoundException()` - 404
 
 ### Settings
 
@@ -48,6 +20,28 @@ HTTP response.
 - `EmailSettings`
 - `generalSettings`
 - `parsingFileSettings`
+
+### Models
+
+- `prepareModels()`
+- `HasId` - provides a data class with an id
+- `HasEmail` - provides a data class with an email address
+- 
+### Annotations
+
+- `@file:UseContextualSerialization()` - enables contextual serialization for the file
+- `@Serializable` - makes a data class serializable
+- `@DatabaseModel` - makes a data class a database model
+
+### Exceptions
+
+Throwing these exceptions in the body of an [HttpEndpoint](#httpendpoint) will automatically return the corresponding
+HTTP response.
+
+- `BadRequestException()` - 400
+- `UnauthorizedException()` - 401
+- `ForbiddenException()` - 403
+- `NotFoundException()` - 404
 
 ## ServerPath
 
@@ -111,7 +105,7 @@ HTTP response.
 - `FieldCollection::preCreate()` - executes code before an element is added to the `FieldCollection`
 - `FieldCollection::postCreate()` - executes code after an element is added to the `FieldCollection`
 
-# Condition
+## Condition
 
 - `condition(): Condition` - creates a `Condition`
 - `Condition::Always()` - returns true
@@ -119,13 +113,13 @@ HTTP response.
 - `and` - returns true if both of the given `Conditions` are true
 - `or` - returns true if either of the given `Conditions` are true
 - `not` - returns true if the given `Condition` is not true
-- `eq` - **(equal)** returns true if the given values are equivalent
-- `neq` - **(not equal)** returns true if the given values are not equivalent
+- `eq` - returns true if the given values are equivalent
+- `neq` - returns true if the given values are not equivalent
 - `ne` - equivalent to `neq`
-- `gt` - **(greater than)** returns true if the given number is greater than another number
-- `lt` - **(less than)** returns true if the given number is less than another number
-- `gte` - **(greater than or equal)** returns true if the given number is greater than or equal to another number
-- `lte` - **(less than or equal)** returns true if the given number is less than or equal to another number
+- `gt` - returns true if the given number is greater than another number
+- `lt` - returns true if the given number is less than another number
+- `gte` - returns true if the given number is greater than or equal to another number
+- `lte` - returns true if the given number is less than or equal to another number
 - `inside` - returns true if the given value is inside a given list
 - `notIn` - returns true if the given value is not inside a given list
 - `nin` - equivalent to `notIn`
@@ -139,7 +133,7 @@ HTTP response.
 - `sizesEquals` - returns true if the given integer is equal to the size of a given list
 - `containsKey` - returns true if the given key is inside a given map
 
-# Modification
+## Modification
 
 - `modification(): Modification` - creates a `Modification`
 - `then` - strings multiple `Modifications` together
@@ -157,7 +151,7 @@ HTTP response.
 - `dropFirst()` - removes the first element from a given list
 - `dropLast()` - removes the last element from a given list
 
-# Documentable
+## Documentable
 
 - `Documentable::kotlinSdk()` - generates an SDK for the server in a .zip file
 - `Documentable::kotlinSdkLocal()` - generates an SDK for the server in a local file
