@@ -29,8 +29,8 @@ object WebSockets {
     }
     data class MessageEvent(val id: String, val content: String)
     data class DisconnectEvent(val id: String)
-    suspend fun send(id: String, content: String): Unit {
-        engine.sendWebSocketMessage(id, content)
+    suspend fun send(id: String, content: String): Boolean {
+        return engine.sendWebSocketMessage(id, content)
     }
 
     interface Handler {

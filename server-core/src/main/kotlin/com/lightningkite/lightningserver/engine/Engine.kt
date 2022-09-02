@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 
 interface Engine {
-    suspend fun sendWebSocketMessage(id: String, content: String)
+    suspend fun sendWebSocketMessage(id: String, content: String): Boolean
     suspend fun listenForWebSocketMessage(id: String): Flow<String> = throw UnsupportedOperationException()
     @Suppress("OPT_IN_USAGE")
     suspend fun launchTask(task: Task<Any?>, input: Any?)
@@ -19,9 +19,10 @@ interface Engine {
 
 class LocalEngine(val pubSub: PubSubInterface): Engine {
     val logger = LoggerFactory.getLogger(this::class.java)
-    override suspend fun sendWebSocketMessage(id: String, content: String) {
+    override suspend fun sendWebSocketMessage(id: String, content: String): Boolean {
         logger.debug("Sending $content to $id")
         pubSub.string("ws-$id").emit(content)
+        return true
     }
 
     override suspend fun listenForWebSocketMessage(id: String): Flow<String> {

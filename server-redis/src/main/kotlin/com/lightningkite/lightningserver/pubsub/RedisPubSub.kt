@@ -35,7 +35,7 @@ class RedisPubSub(val client: RedisClient): PubSubInterface {
                 RedisPubSub(RedisClient.create("redis://127.0.0.1:6378"))
             }
             PubSubSettings.register("redis") {
-                RedisPubSub(RedisClient.create(it.uri))
+                RedisPubSub(RedisClient.create(it.url))
             }
         }
     }

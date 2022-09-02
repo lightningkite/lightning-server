@@ -500,7 +500,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
                     }
                 """.trimIndent())
                 appSettings.add("""${setting.key} = {
-                    uri = "memcached-aws://${'$'}{aws_elasticache_cluster.${setting.key}.cluster_address}:11211"
+                    url = "memcached-aws://${'$'}{aws_elasticache_cluster.${setting.key}.cluster_address}:11211"
                 }""".trimIndent())
             }
             serializer<JwtSigner>() -> {
@@ -620,6 +620,18 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
                       default = ${setting.value.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.default) }}
                     }
                 """.trimIndent())
+                domain.appendLine("""
+                    variable "${setting.key}" {
+                      default = ${setting.value.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.default) }}
+                    }
+                """.trimIndent())
+                noDomain.appendLine("""
+                    variable "${setting.key}" {
+                      default = ${setting.value.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.default) }}
+                    }
+                """.trimIndent())
+                domainInputs.appendLine("""  ${setting.key}  = var.${setting.key}""")
+                noDomainInputs.appendLine("""  ${setting.key}  = var.${setting.key}""")
                 appSettings.add("""${setting.key} = var.${setting.key}""".trimIndent())
             }
         }

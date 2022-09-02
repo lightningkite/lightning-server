@@ -15,6 +15,7 @@ import com.lightningkite.lightningserver.files.S3FileSystem
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.handler
+import com.lightningkite.lightningserver.meta.metaEndpoints
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.parsingFileSettings
 import com.lightningkite.lightningserver.settings.setting
@@ -82,7 +83,6 @@ object Server : ServerPathGroup(ServerPath.root) {
         HttpResponse.plainText("OK")
     }
 
-    val docs = path("docs").apiHelp()
     val testPrimitive = path("test-primitive").get.typed(
         summary = "Get Test Primitive",
         errorCases = listOf(),
@@ -93,5 +93,7 @@ object Server : ServerPathGroup(ServerPath.root) {
     val testSchedule = schedule("test-schedule", Duration.ofMinutes(1)) {
         println("Hello schedule!")
     }
+
+    val meta = path("meta").metaEndpoints<Unit> { true }
 }
 

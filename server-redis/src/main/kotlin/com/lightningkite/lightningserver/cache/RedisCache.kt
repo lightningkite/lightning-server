@@ -34,7 +34,7 @@ class RedisCache(val client: RedisClient) : CacheInterface {
                 RedisCache(RedisClient.create("redis://127.0.0.1:6378"))
             }
             CacheSettings.register("redis") {
-                RedisCache(RedisClient.create(it.uri + (it.connectionString ?: "")))
+                RedisCache(RedisClient.create(it.url + (it.connectionString ?: "")))
             }
         }
     }

@@ -24,12 +24,12 @@ class MemcachedCache(val client: MemcachedClient): CacheInterface, HealthCheckab
                 MemcachedCache(XMemcachedClient("127.0.0.1", 11211))
             }
             CacheSettings.register("memcached") {
-                val hosts = it.uri.substringAfter("://").split(' ', ',').filter { it.isNotBlank() }
+                val hosts = it.url.substringAfter("://").split(' ', ',').filter { it.isNotBlank() }
                     .map { InetSocketAddress(it.substringBefore(':'), it.substringAfter(':', "").toIntOrNull() ?: 11211) }
                 MemcachedCache(XMemcachedClient(hosts))
             }
             CacheSettings.register("memcached-aws") {
-                val configFullHost = it.uri.substringAfter("://")
+                val configFullHost = it.url.substringAfter("://")
                 val configPort = configFullHost.substringAfter(':', "").toIntOrNull() ?: 11211
                 val configHost = configFullHost.substringBefore(':')
                 val client = AWSElasticCacheClient(InetSocketAddress(configHost, configPort))

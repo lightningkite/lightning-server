@@ -71,6 +71,16 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
         Afterwards.TrailingSlash -> "/"
         Afterwards.ChainedWildcard -> "/{...}"
     }
+    fun toString(parts: Map<String, String> = mapOf(), wildcard: String = ""): String = "/" + segments.joinToString("/") {
+        when(it) {
+            is Segment.Constant -> it.value
+            is Segment.Wildcard -> parts[it.name] ?: ""
+        }
+    } + when(after) {
+        Afterwards.None -> ""
+        Afterwards.TrailingSlash -> "/"
+        Afterwards.ChainedWildcard -> "/$wildcard"
+    }
 
     data class Match(
         val path: ServerPath,
