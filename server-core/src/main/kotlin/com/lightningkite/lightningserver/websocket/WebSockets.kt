@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.websocket
 
+import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.engine.LocalEngine
 import com.lightningkite.lightningserver.engine.engine
@@ -51,7 +52,7 @@ suspend fun ServerPath.test(
     sourceIp: String = "0.0.0.0",
     test: suspend VirtualSocket.()->Unit
 ) {
-    engine = LocalEngine(LocalPubSub)
+    engine = LocalEngine(LocalPubSub, LocalCache)
     Tasks.startup()
     val id = "TEST-${UUID.randomUUID()}"
     val req = WebSockets.ConnectEvent(

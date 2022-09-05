@@ -14,15 +14,19 @@ import com.lightningkite.lightningserver.typed.insideHtmlForm
 import com.lightningkite.lightningserver.typed.parseUrlPartOrBadRequest
 import kotlinx.coroutines.flow.toList
 import kotlinx.html.*
+import kotlinx.serialization.properties.decodeFromStringMap
+import java.net.URLEncoder
+import java.nio.charset.Charset
 
-open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>> (
+open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     path: ServerPath,
     val info: ModelInfoWithDefault<USER, T, ID>,
-    val fileUploadPath: UploadEarlyEndpoint? = UploadEarlyEndpoint.default
-): ServerPathGroup(path) {
+    val uploadEarlyEndpoint: UploadEarlyEndpoint? = UploadEarlyEndpoint.default,
+) : ServerPathGroup(path) {
     companion object {
         val known: MutableCollection<ModelAdminEndpoints<*, *, *>> = ArrayList()
     }
+
     init {
         known.add(this)
     }
@@ -38,10 +42,11 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>> (
                     id = "data-form"
                     insideHtmlForm(
                         title = this@ModelAdminEndpoints.name,
-                        jsEditorName = "editor",
+                        jsEditorName = "modelEditor",
                         serializer = info.serialization.serializer,
                         defaultValue = item,
-                        collapsed = false
+                        collapsed = false,
+                        uploadEarlyEndpoint = uploadEarlyEndpoint,
                     )
                     button {
                         +"Save"
@@ -90,10 +95,11 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>> (
                     id = "data-form"
                     insideHtmlForm<T>(
                         title = this@ModelAdminEndpoints.name,
-                        jsEditorName = "editor",
+                        jsEditorName = "modelEditor",
                         serializer = info.serialization.serializer,
                         defaultValue = item,
-                        collapsed = false
+                        collapsed = false,
+                        uploadEarlyEndpoint = uploadEarlyEndpoint,
                     )
                     button {
                         +"Save"
@@ -109,14 +115,8 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>> (
     }
     val list = get("/").handler {
         val secured = info.collection(info.serialization.authInfo.checker(it.rawUser()))
-        val items = secured.query(
-            Query(
-                condition = Condition.Always(),
-                orderBy = listOf(),
-                skip = it.queryParameter("skip")?.toIntOrNull() ?: 0,
-                limit = it.queryParameter("limit")?.toIntOrNull() ?: 25,
-            )
-        ).toList()
+        val query = Serialization.properties.decodeFromStringMap<Query<T>>(Query.serializer(info.serialization.serializer), it.queryParameters.associate { it })
+        val items = secured.query(query).toList()
         val propItems = items.map { Serialization.properties.encodeToStringMap(info.serialization.serializer, it) }
         val keys = propItems.flatMap { it.keys }.distinct()
         HttpResponse.html {
@@ -144,6 +144,44 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>> (
                                 }
                             }
                         }
+                    }
+                }
+                div {
+                    if (query.skip != 0) {
+                        a(
+                            href = "?${
+                                it.queryParameters.associate { it.first.lowercase() to it.second }.toMutableMap()
+                                    .apply {
+                                        this["skip"] = (query.skip - query.limit).toString()
+                                        this["limit"] = (query.limit).toString()
+                                    }.entries.joinToString("&") {
+                                        "${it.key}=${
+                                            URLEncoder.encode(
+                                                it.value,
+                                                Charsets.UTF_8
+                                            )
+                                        }"
+                                    }
+                            }"
+                        ) { +"Previous Page " }
+                    }
+                    if(items.size == query.limit) {
+                        a(
+                            href = "?${
+                                it.queryParameters.associate { it.first.lowercase() to it.second }.toMutableMap()
+                                    .apply {
+                                        this["skip"] = (query.skip + query.limit).toString()
+                                        this["limit"] = (query.limit).toString()
+                                    }.entries.joinToString("&") {
+                                    "${it.key}=${
+                                        URLEncoder.encode(
+                                            it.value,
+                                            Charsets.UTF_8
+                                        )
+                                    }"
+                                }
+                            }"
+                        ) { +"Next Page " }
                     }
                 }
             }

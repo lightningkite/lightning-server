@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.cache.modify
 import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathMatcher
 import com.lightningkite.lightningserver.cors.addCors
 import com.lightningkite.lightningserver.engine.Engine
@@ -24,6 +25,7 @@ import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.pubsub.get
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.settings.CorsSettings
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Task
@@ -396,10 +398,38 @@ abstract class AwsAdapter : RequestStreamHandler {
         val queryParams =
             (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v } }
 
-        val match = httpMatcher.match(path, method) ?: return APIGatewayV2HTTPResponse(
-            statusCode = 404,
-            body = "No matching path for '${path}' found"
-        )
+        val match = httpMatcher.match(path, method) ?: run {
+            if(method == HttpMethod.OPTIONS) {
+                val origin = headers[HttpHeader.Origin] ?: return APIGatewayV2HTTPResponse(
+                    statusCode = 404,
+                    body = "No matching path for '${path}' found"
+                )
+                val cors = generalSettings().cors ?: CorsSettings()
+                val matches = cors.allowedDomains.any {
+                    it == "*" || it == origin || origin.endsWith(it.removePrefix("*"))
+                }
+                if(matches) {
+                    return APIGatewayV2HTTPResponse(
+                        statusCode = HttpStatus.NoContent.code,
+                        headers = mapOf(
+                            HttpHeader.AccessControlAllowOrigin to (headers[HttpHeader.Origin] ?: "*"),
+                            HttpHeader.AccessControlAllowMethods to (headers[HttpHeader.AccessControlRequestMethod]
+                                ?: "GET"),
+                            HttpHeader.AccessControlAllowHeaders to (cors.allowedHeaders.joinToString(", ")),
+                            HttpHeader.AccessControlAllowCredentials to "true",
+                        )
+                    )
+                } else {
+                    return APIGatewayV2HTTPResponse(
+                        statusCode = 404,
+                        body = "No matching path for '${path}' found"
+                    )
+                }
+            } else return APIGatewayV2HTTPResponse(
+                statusCode = 404,
+                body = "No matching path for '${path}' found"
+            )
+        }
         val request = HttpRequest(
             endpoint = match.endpoint,
             parts = match.parts,
@@ -407,9 +437,9 @@ abstract class AwsAdapter : RequestStreamHandler {
             queryParameters = queryParams,
             headers = headers,
             body = body,
-            domain = "input.requestContext.domainName",
+            domain = event.requestContext.domainName,
             protocol = "https",
-            sourceIp = "input.requestContext.http.sourceIp"
+            sourceIp = event.requestContext.identity.sourceIp
         )
         val result = try {
             Http.endpoints[match.endpoint]!!.invoke(request)

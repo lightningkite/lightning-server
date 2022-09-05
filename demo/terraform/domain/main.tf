@@ -22,6 +22,15 @@ provider "aws" {
   alias = "acm"
   region = "us-east-1"
 }
+variable "cors" {
+    default = null
+}
+variable "logging" {
+  default = {}
+}
+variable "exceptions" {
+  default = {}
+}
 
 resource "aws_ses_domain_identity" "email" {
   domain = var.domain_name
@@ -114,13 +123,16 @@ resource aws_route53_record wsAccess {
       zone_id                = aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].hosted_zone_id
     }
 }
-module "Base" {
-  source              = "../base"
-  deployment_location = var.deployment_location
-  deployment_name     = var.deployment_name
-  debug               = var.debug
-  public_http_url     = var.domain_name
-  public_ws_url       = "ws.${var.domain_name}"
-    email_sender  = "noreply@${var.domain_name}"
+      module "Base" {
+        source              = "../base"
+        deployment_location = var.deployment_location
+        deployment_name     = var.deployment_name
+        debug               = var.debug
+        public_http_url     = "https://${var.domain_name}"
+        public_ws_url       = "wss://ws.${var.domain_name}"
+          cors  = var.cors
+logging  = var.logging
+exceptions  = var.exceptions
+email_sender  = "noreply@${var.domain_name}"
 
-}
+      }

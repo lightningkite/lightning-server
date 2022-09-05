@@ -8,6 +8,7 @@ value class HttpMethod(private val asString: String) {
         val PUT = HttpMethod("PUT")
         val PATCH = HttpMethod("PATCH")
         val DELETE = HttpMethod("DELETE")
+        val OPTIONS = HttpMethod("OPTIONS")
         val HEAD = HttpMethod("HEAD")
     }
 

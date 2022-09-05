@@ -61,7 +61,7 @@ resource "aws_api_gateway_account" "main" {
 }
 
 resource "aws_iam_role" "cloudwatch" {
-  name = "api_gateway_cloudwatch_global"
+  name = "api_gateway_cloudwatch_global_${var.deployment_location}"
 
   assume_role_policy = <<EOF
 {
@@ -399,6 +399,23 @@ resource "aws_vpc_endpoint" "email" {
 }
 
 
+resource "aws_cloudwatch_event_rule" "scheduled_task_test-schedule2" {
+  name                = "demo-${var.deployment_name}_testschedule2"
+  schedule_expression = "rate(1 minute)"
+}
+resource "aws_cloudwatch_event_target" "scheduled_task_test-schedule2" {
+  rule      = aws_cloudwatch_event_rule.scheduled_task_test-schedule2.name
+  target_id = "lambda"
+  arn       = aws_lambda_function.main.arn
+  input     = "{\"scheduled\": \"test-schedule2\"}"
+}
+resource "aws_lambda_permission" "scheduled_task_test-schedule2" {
+  statement_id  = "scheduled_task_test-schedule2"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.main.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.scheduled_task_test-schedule2.arn
+}
 resource "aws_cloudwatch_event_rule" "scheduled_task_test-schedule" {
   name                = "demo-${var.deployment_name}_testschedule"
   schedule_expression = "rate(1 minute)"
@@ -410,11 +427,28 @@ resource "aws_cloudwatch_event_target" "scheduled_task_test-schedule" {
   input     = "{\"scheduled\": \"test-schedule\"}"
 }
 resource "aws_lambda_permission" "scheduled_task_test-schedule" {
-  statement_id  = "AllowExecutionFromCloudWatch"
+  statement_id  = "scheduled_task_test-schedule"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.main.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.scheduled_task_test-schedule.arn
+}
+resource "aws_cloudwatch_event_rule" "scheduled_task_cleanupUploads" {
+  name                = "demo-${var.deployment_name}_cleanupUploads"
+  schedule_expression = "rate(15 minutes)"
+}
+resource "aws_cloudwatch_event_target" "scheduled_task_cleanupUploads" {
+  rule      = aws_cloudwatch_event_rule.scheduled_task_cleanupUploads.name
+  target_id = "lambda"
+  arn       = aws_lambda_function.main.arn
+  input     = "{\"scheduled\": \"cleanupUploads\"}"
+}
+resource "aws_lambda_permission" "scheduled_task_cleanupUploads" {
+  statement_id  = "scheduled_task_cleanupUploads"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.main.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.scheduled_task_cleanupUploads.arn
 }
 ####
 # App Declaration
@@ -451,32 +485,30 @@ resource "aws_lambda_function" "main" {
             publicUrl = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
             wsUrl = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
             debug = var.debug
+            cors = var.cors
         },
         database = {
             url = "mongodb://master:${random_password.database.result}@${aws_docdb_cluster_instance.database[0].endpoint}/?retryWrites=false"
             databaseName = "demo-${var.deployment_name}_database"
         },
         cache = {
-            uri = "memcached-aws://${aws_elasticache_cluster.cache.cluster_address}:11211"
+            url = "memcached-aws://${aws_elasticache_cluster.cache.cluster_address}:11211"
         },
         jwt = {
             expirationMilliseconds = var.jwt_expirationMilliseconds 
             emailExpirationMilliseconds = var.jwt_emailExpirationMilliseconds 
             secret = random_password.jwt.result
         },
-        oauth-google = var.oauth-google,
         logging = var.logging,
         files = {
             storageUrl = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
             signedUrlExpiration = var.files_expiry
         },
-        oauth-github = var.oauth-github,
         exceptions = var.exceptions,
         email = {
             url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
             fromEmail = var.email_sender
-        },
-        oauth-apple = var.oauth-apple
+        }
       })
     }
   }

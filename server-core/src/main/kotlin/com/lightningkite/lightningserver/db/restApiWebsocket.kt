@@ -1,9 +1,12 @@
+@file:UseContextualSerialization(Instant::class)
+
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.Authorization
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.Serialization
 
 import com.lightningkite.lightningserver.tasks.Tasks
@@ -16,11 +19,13 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.*
+import java.time.Duration
+import java.time.Instant
 
 @LightningServerDsl
 fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
     database: () -> Database,
-    info: ModelInfo<USER, T, ID>
+    info: ModelInfo<USER, T, ID>,
 ): ApiWebsocket<USER, Query<T>, ListChange<T>> {
     prepareModels()
     val modelName = info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
@@ -48,7 +53,8 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
                     mask = Serialization.json.encodeToString(
                         Mask.serializer(info.serialization.serializer),
                         collection.mask()
-                    )
+                    ),
+                    establishedAt = Instant.now()
                 )
             )
         },
@@ -80,17 +86,22 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             val asyncs = ArrayList<Deferred<Unit>>()
             subscriptionDb().find(condition { it.databaseId eq modelIdentifier }).collect {
                 asyncs += async {
-                    val m = Serialization.json.decodeFromString(Mask.serializer(info.serialization.serializer), it.mask)
+                    val m =
+                        Serialization.json.decodeFromString(Mask.serializer(info.serialization.serializer), it.mask)
                     val c = Serialization.json.decodeFromString(
                         Query.serializer(info.serialization.serializer),
                         it.condition
                     )
                     for (entry in changes.changes) {
-                        send(it._id, ListChange(
-                            old = entry.old?.takeIf { c.condition(it) }?.let { m(it) },
-                            new = entry.new?.takeIf { c.condition(it) }?.let { m(it) },
-                        )
-                        )
+                        if (!send(it._id, ListChange(
+                                old = entry.old?.takeIf { c.condition(it) }?.let { m(it) },
+                                new = entry.new?.takeIf { c.condition(it) }?.let { m(it) },
+                            )
+                            )
+                        ) {
+                            subscriptionDb().deleteOneById(it._id)
+                            break
+                        }
                     }
                 }
             }
@@ -111,4 +122,5 @@ data class __WebSocketDatabaseChangeSubscription(
     val user: String?, //USER
     val condition: String, //Condition<T>
     val mask: String, //Mask<T>
+    val establishedAt: Instant,
 ) : HasId<String>

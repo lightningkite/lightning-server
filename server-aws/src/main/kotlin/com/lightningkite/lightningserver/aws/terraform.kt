@@ -1039,8 +1039,8 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
           deployment_location = var.deployment_location
           deployment_name     = var.deployment_name
           debug               = var.debug
-          public_http_url     = var.domain_name
-          public_ws_url       = "ws.${'$'}{var.domain_name}"
+          public_http_url     = "https://${'$'}{var.domain_name}"
+          public_ws_url       = "wss://ws.${'$'}{var.domain_name}"
           ${domainInputs}
         }
     """.trimIndent())
