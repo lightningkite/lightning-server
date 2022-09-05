@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.html.*
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.InternalSerializationApi
@@ -17,8 +18,11 @@ import kotlinx.serialization.internal.GeneratedSerializer
 import kotlinx.serialization.serializer
 import kotlin.reflect.KType
 
+@Deprecated("Use apiDocs instead", ReplaceWith("this.apiDocs(packageName)", "com.lightningkite.lightningserver.typed.apiDocs"))
 @LightningServerDsl
-fun ServerPath.apiHelp(packageName: String = "com.mypackage"): HttpEndpoint {
+fun ServerPath.apiHelp(packageName: String = "com.mypackage"): HttpEndpoint = apiDocs(packageName)
+@LightningServerDsl
+fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
     get("sdk.ts").handler {
         HttpResponse(
             HttpContent.Text(
@@ -38,7 +42,7 @@ fun ServerPath.apiHelp(packageName: String = "com.mypackage"): HttpEndpoint {
     return this.copy(after = ServerPath.Afterwards.TrailingSlash).get.handler { request ->
         val rootRoute = this
         HttpResponse(body = HttpContent.Html {
-            head { title("Index") }
+            head { title("${generalSettings().projectName} - Generated Documentation") }
             body {
                 h1 { +"API Docs" }
                 div {

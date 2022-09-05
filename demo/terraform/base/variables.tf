@@ -2,10 +2,13 @@ variable "deployment_location" {
   default = "us-west-2"
 }
 variable "deployment_name" {
-  default = "test"
+  default = "no-deployment-name"
 }
 variable "debug" {
   default = false
+}
+variable "cors" {
+    default = null
 }
 variable "database_expiry" {
     default = "P1D"
@@ -22,23 +25,14 @@ variable "jwt_expirationMilliseconds" {
 variable "jwt_emailExpirationMilliseconds" {
   default = 1800000
 }
-variable "oauth-google" {
-  default = null
-}
 variable "logging" {
   default = {}
 }
 variable "files_expiry" {
     default = "P1D"
 }
-variable "oauth-github" {
-  default = null
-}
 variable "exceptions" {
   default = {}
 }
 variable "email_sender" {
-}
-variable "oauth-apple" {
-  default = null
 }

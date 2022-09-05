@@ -12,9 +12,12 @@ plugins {
     `maven-publish`
 }
 
-val ktorVersion = "2.0.3"
+val ktorVersion: String by project
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
+val logBack: String by project
+val coroutines: String by project
+val kotlinXSerialization: String by project
 dependencies {
     api(project(":shared"))
 
@@ -26,7 +29,7 @@ dependencies {
 //    implementation("com.fasterxml.jackson.core:jackson-databind:2.13.3")
     // End Security
 
-    implementation("ch.qos.logback:logback-classic:1.2.11")
+    implementation("ch.qos.logback:logback-classic:$logBack")
 
     api("com.lightningkite:kotliner-cli:1.0.3")
     implementation("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
@@ -35,23 +38,20 @@ dependencies {
     api("io.ktor:ktor-client-cio:$ktorVersion")
 
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines")
     api("org.jetbrains.kotlinx:kotlinx-html-jvm:0.8.0")
 
     api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     api("io.ktor:ktor-serialization-kotlinx-cbor:$ktorVersion")
     api("de.brudaswen.kotlinx.serialization:kotlinx-serialization-csv:2.0.0")
-    api("org.jetbrains.kotlinx:kotlinx-serialization-properties:1.3.3")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
     api("io.github.pdvrieze.xmlutil:serialization-jvm:0.84.2")
     api("com.github.jershell:kbson:0.4.5")
 
-    implementation("org.bouncycastle:bcprov-jdk18on:1.71")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.71")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.71.1")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.71.1")
 
     api("org.apache.commons:commons-email:1.5")
-
-    implementation("org.bouncycastle:bcprov-jdk18on:1.71")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.71")
 
     testImplementation("com.auth0:java-jwt:4.0.0")
 

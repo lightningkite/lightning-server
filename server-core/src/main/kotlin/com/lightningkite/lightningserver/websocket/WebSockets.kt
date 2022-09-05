@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.websocket
 
+import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.engine.LocalEngine
 import com.lightningkite.lightningserver.engine.engine
@@ -29,8 +30,8 @@ object WebSockets {
     }
     data class MessageEvent(val id: String, val content: String)
     data class DisconnectEvent(val id: String)
-    suspend fun send(id: String, content: String): Unit {
-        engine.sendWebSocketMessage(id, content)
+    suspend fun send(id: String, content: String): Boolean {
+        return engine.sendWebSocketMessage(id, content)
     }
 
     interface Handler {
@@ -51,7 +52,7 @@ suspend fun ServerPath.test(
     sourceIp: String = "0.0.0.0",
     test: suspend VirtualSocket.()->Unit
 ) {
-    engine = LocalEngine(LocalPubSub)
+    engine = LocalEngine(LocalPubSub, LocalCache)
     Tasks.startup()
     val id = "TEST-${UUID.randomUUID()}"
     val req = WebSockets.ConnectEvent(

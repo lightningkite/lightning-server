@@ -3,6 +3,13 @@ package com.lightningkite.lightningserver.db
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.get
+import com.lightningkite.lightningserver.http.handler
+import kotlinx.html.a
+import kotlinx.html.body
+import kotlinx.html.div
+import kotlinx.html.head
 
 
 @LightningServerDsl
@@ -22,7 +29,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> Se
     noinline defaultItem: (USER) -> T,
     noinline getCollection: suspend Database.(principal: USER) -> FieldCollection<T>
 ) = ModelAdminEndpoints(this, ModelInfoWithDefault(
-    getCollection = { throw NotImplementedError() },
+    getCollection = { database().collection() },
     forUser = { getCollection(database(), it) },
     defaultItem = defaultItem
 ))
@@ -32,6 +39,6 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> Se
     noinline database: ()->Database,
     noinline getCollection: suspend Database.(principal: USER) -> FieldCollection<T>
 ) = ModelRestEndpoints<USER, T, ID>(this, ModelInfo(
-    getCollection = { throw NotImplementedError() },
+    getCollection = { database().collection() },
     forUser = { getCollection(database(), it) }
 ))

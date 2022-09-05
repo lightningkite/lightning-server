@@ -64,4 +64,5 @@ private fun getRandomString(length: Int, allowedChars: String): String = (1..len
     .joinToString("")
 
 fun FileObject.resolveRandom(prefix: String = "", extension: String) = resolve(prefix + getRandomString(20, allowedChars) + ".$extension")
+
 suspend fun FileObject.exists() = info() != null

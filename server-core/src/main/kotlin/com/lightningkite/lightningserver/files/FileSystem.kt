@@ -13,7 +13,7 @@ interface FileSystem: HealthCheckable {
         private val registered = ArrayList<FileSystem>()
         fun resolve(url: String): FileObject? {
             val sys = registered.find { url.startsWith(it.root.url) } ?: return null
-            return sys.root.resolve(url.removePrefix(sys.root.url))
+            return sys.root.resolve(url.removePrefix(sys.root.url).substringBefore('?'))
         }
     }
 

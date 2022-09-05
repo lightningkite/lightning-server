@@ -16,7 +16,7 @@ import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.json.*
 
 
-private val multipartJsonKey = "__json"
+private const val multipartJsonKey = "__json"
 
 inline fun <reified T> HttpRequest.queryParameters(): T =
     queryParameters(Serialization.properties.serializersModule.serializer())
@@ -29,8 +29,6 @@ fun <T> HttpRequest.queryParameters(serializer: KSerializer<T>): T {
         queryParameters.groupBy { it.first }.mapValues { it.value.joinToString(",") }
     )
 }
-
-var parsingFileSettings: (() -> FileSystem)? = null
 
 suspend inline fun <reified T> HttpContent.parse(): T = parse(Serialization.module.serializer())
 suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
@@ -113,7 +111,7 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
                             //) {
                             //    throw BadRequestException("Content type ${part.contentType} doesn't match any of the accepted types: ${isFile.allowedTypes.joinToString()}")
                             //}
-                            val file = parsingFileSettings!!().root.resolveRandom(
+                            val file = ExternalServerFileSerializer.fileSystem().root.resolveRandom(
                                 "uploaded/${part.filename.substringBeforeLast(".")}",
                                 type.extension ?: part.filename.substringAfterLast(".")
                             )

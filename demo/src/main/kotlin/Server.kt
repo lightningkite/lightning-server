@@ -12,12 +12,14 @@ import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.email.SesClient
 import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.files.S3FileSystem
+import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.handler
+import com.lightningkite.lightningserver.meta.metaEndpoints
 import com.lightningkite.lightningserver.schedule.schedule
-import com.lightningkite.lightningserver.serialization.parsingFileSettings
 import com.lightningkite.lightningserver.settings.setting
+import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.apiHelp
 import com.lightningkite.lightningserver.typed.typed
@@ -40,7 +42,6 @@ object Server : ServerPathGroup(ServerPath.root) {
         MongoDatabase
         MemcachedCache
         S3FileSystem
-        parsingFileSettings = files
         prepareModels()
     }
 
@@ -51,12 +52,15 @@ object Server : ServerPathGroup(ServerPath.root) {
         email = email,
         onNewUser = { User(email = it) }
     )
+    val uploadEarly = UploadEarlyEndpoint(path("upload"), files, database, jwtSigner)
     val authHtml = AuthEndpointsHtml(auth)
     val testModel = TestModelEndpoints(path("test-model"))
 
-    val root = path.get.handler { HttpResponse.plainText("Hello ${it.rawUser()}") }
+    val root = path.get.handler {
+        HttpResponse.plainText("Hello ${it.rawUser()}")
+    }
 
-    val socket = path.websocket(
+    val socket = path("socket").websocket(
         connect = { println("Connected $it") },
         message = { println("Message $it") },
         disconnect = { println("Disconnect $it") }
@@ -79,7 +83,6 @@ object Server : ServerPathGroup(ServerPath.root) {
         HttpResponse.plainText("OK")
     }
 
-    val docs = path("docs").apiHelp()
     val testPrimitive = path("test-primitive").get.typed(
         summary = "Get Test Primitive",
         errorCases = listOf(),
@@ -90,5 +93,10 @@ object Server : ServerPathGroup(ServerPath.root) {
     val testSchedule = schedule("test-schedule", Duration.ofMinutes(1)) {
         println("Hello schedule!")
     }
+    val testSchedule2 = schedule("test-schedule2", Duration.ofMinutes(1)) {
+        println("Hello schedule 2!")
+    }
+
+    val meta = path("meta").metaEndpoints<Unit> { true }
 }
 

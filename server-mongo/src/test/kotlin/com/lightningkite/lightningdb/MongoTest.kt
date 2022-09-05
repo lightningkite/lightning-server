@@ -13,7 +13,7 @@ abstract class MongoTest {
         @BeforeClass @JvmStatic
         fun start() {
             mongoClient = testMongo()
-            db = mongoClient!!.database("default", ensureIndexesReady = true)
+            db = mongoClient!!.database("default")
             com.lightningkite.lightningdb.test.prepareModels()
         }
 

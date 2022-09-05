@@ -19,11 +19,11 @@ import java.util.*
 fun main(vararg args: String) {
     Server
     loadSettings(File("settings.json"))
-    runServer(LocalPubSub, LocalCache)
+//    runServer(LocalPubSub, LocalCache)
 
 //    println(Documentable.kotlinApi("test"))
 
-//    terraformAws("com.lightningkite.lightningserver.demo.AwsHandler", "demo", File("demo/terraform"))
+    terraformAws("com.lightningkite.lightningserver.demo.AwsHandler", "demo", File("demo/terraform"))
 
 //    println(buildString { terraformAzure("demo", this) })
 }

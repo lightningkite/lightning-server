@@ -41,7 +41,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
           default = "us-west-2"
         }
         variable "deployment_name" {
-          default = "test"
+          default = "no-deployment-name"
         }
         variable "debug" {
           default = false
@@ -111,7 +111,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
         }
         
         resource "aws_iam_role" "cloudwatch" {
-          name = "api_gateway_cloudwatch_global"
+          name = "api_gateway_cloudwatch_global_${'$'}{var.deployment_location}"
         
           assume_role_policy = <<EOF
         {
@@ -325,11 +325,29 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
     for(setting in Settings.requirements) {
         when(setting.value.serializer) {
             serializer<GeneralServerSettings>() -> {
+                variables.appendLine("""
+                    variable "cors" {
+                        default = null
+                    }
+                """.trimIndent())
+                noDomain.appendLine("""
+                    variable "cors" {
+                        default = null
+                    }
+                """.trimIndent())
+                domain.appendLine("""
+                    variable "cors" {
+                        default = null
+                    }
+                """.trimIndent())
+                noDomainInputs.appendLine("""  cors  = var.cors""")
+                domainInputs.appendLine("""  cors  = var.cors""")
                 appSettings.add("""${setting.key} = {
                     projectName = "$projectName"
                     publicUrl = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
                     wsUrl = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
                     debug = var.debug
+                    cors = var.cors
                 }""".trimIndent())
             }
             serializer<FilesSettings>() -> {
@@ -482,7 +500,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
                     }
                 """.trimIndent())
                 appSettings.add("""${setting.key} = {
-                    uri = "memcached-aws://${'$'}{aws_elasticache_cluster.${setting.key}.cluster_address}:11211"
+                    url = "memcached-aws://${'$'}{aws_elasticache_cluster.${setting.key}.cluster_address}:11211"
                 }""".trimIndent())
             }
             serializer<JwtSigner>() -> {
@@ -602,6 +620,18 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
                       default = ${setting.value.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.default) }}
                     }
                 """.trimIndent())
+                domain.appendLine("""
+                    variable "${setting.key}" {
+                      default = ${setting.value.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.default) }}
+                    }
+                """.trimIndent())
+                noDomain.appendLine("""
+                    variable "${setting.key}" {
+                      default = ${setting.value.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.default) }}
+                    }
+                """.trimIndent())
+                domainInputs.appendLine("""  ${setting.key}  = var.${setting.key}""")
+                noDomainInputs.appendLine("""  ${setting.key}  = var.${setting.key}""")
                 appSettings.add("""${setting.key} = var.${setting.key}""".trimIndent())
             }
         }
@@ -648,7 +678,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
                       input     = "{\"scheduled\": \"${it.name}\"}"
                     }
                     resource "aws_lambda_permission" "scheduled_task_${it.name}" {
-                      statement_id  = "AllowExecutionFromCloudWatch"
+                      statement_id  = "scheduled_task_${it.name}"
                       action        = "lambda:InvokeFunction"
                       function_name = aws_lambda_function.main.function_name
                       principal     = "events.amazonaws.com"
@@ -1009,8 +1039,8 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
           deployment_location = var.deployment_location
           deployment_name     = var.deployment_name
           debug               = var.debug
-          public_http_url     = var.domain_name
-          public_ws_url       = "ws.${'$'}{var.domain_name}"
+          public_http_url     = "https://${'$'}{var.domain_name}"
+          public_ws_url       = "wss://ws.${'$'}{var.domain_name}"
           ${domainInputs}
         }
     """.trimIndent())

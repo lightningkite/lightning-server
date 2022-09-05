@@ -86,45 +86,6 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
 //                    .reportException(it)
 //            }
 //        }
-        Http.endpoints.forEach { entry ->
-            routing {
-                val routeString = entry.key.path.toString().replace("{...}", "{tailcard...}")
-                route(routeString, HttpMethod.parse(entry.key.method.toString())) {
-                    handle {
-                        val request = call.adapt(entry.key)
-                        val result = try {
-                            entry.value(request)
-                        } catch (e: Exception) {
-                            Http.exception(request, e)
-                        }
-                        for (header in result.headers.entries) {
-                            call.response.header(header.first, header.second)
-                        }
-                        call.response.status(HttpStatusCode.fromValue(result.status.code))
-                        when (val b = result.body) {
-                            null -> call.respondText("")
-                            is HttpContent.Binary -> call.respondBytes(
-                                b.bytes,
-                                ContentType.parse(b.type.toString())
-                            )
-
-                            is HttpContent.Text -> call.respondText(b.string, ContentType.parse(b.type.toString()))
-                            is HttpContent.OutStream -> call.respondOutputStream(ContentType.parse(b.type.toString())) {
-                                b.write(
-                                    this
-                                )
-                            }
-
-                            is HttpContent.Stream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
-                                b.getStream().copyTo(this)
-                            }
-
-                            is HttpContent.Multipart -> TODO()
-                        }
-                    }
-                }
-            }
-        }
         WebSockets.handlers.forEach { entry ->
             routing {
                 route(entry.key.toString()) {
@@ -176,19 +137,13 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                 call.request.queryParameters["path"]?.let { path ->
                     val entry = wsMatcher.match(path) ?: throw NotFoundException()
                     val handler = WebSockets.handlers[entry.path] ?: throw NotFoundException()
-                    val parts = HashMap<String, String>()
-                    var wildcard: String? = null
-                    call.parameters.forEach { s, strings ->
-                        if (strings.size > 1) wildcard = strings.joinToString("/")
-                        parts[s] = strings.single()
-                    }
                     val id = UUID.randomUUID().toString()
                     try {
                         handler.connect(
                             WebSockets.ConnectEvent(
                                 path = entry.path,
-                                parts = parts,
-                                wildcard = wildcard,
+                                parts = entry.parts,
+                                wildcard = entry.wildcard,
                                 queryParameters = call.request.queryParameters.flattenEntries(),
                                 id = id,
                                 headers = call.request.headers.adapt(),
@@ -320,6 +275,45 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                 }
             }
         }
+        Http.endpoints.forEach { entry ->
+            routing {
+                val routeString = entry.key.path.toString().replace("{...}", "{tailcard...}")
+                route(routeString, HttpMethod.parse(entry.key.method.toString())) {
+                    handle {
+                        val request = call.adapt(entry.key)
+                        val result = try {
+                            entry.value(request)
+                        } catch (e: Exception) {
+                            Http.exception(request, e)
+                        }
+                        for (header in result.headers.entries) {
+                            call.response.header(header.first, header.second)
+                        }
+                        call.response.status(HttpStatusCode.fromValue(result.status.code))
+                        when (val b = result.body) {
+                            null -> call.respondText("")
+                            is HttpContent.Binary -> call.respondBytes(
+                                b.bytes,
+                                ContentType.parse(b.type.toString())
+                            )
+
+                            is HttpContent.Text -> call.respondText(b.string, ContentType.parse(b.type.toString()))
+                            is HttpContent.OutStream -> call.respondOutputStream(ContentType.parse(b.type.toString())) {
+                                b.write(
+                                    this
+                                )
+                            }
+
+                            is HttpContent.Stream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
+                                b.getStream().copyTo(this)
+                            }
+
+                            is HttpContent.Multipart -> TODO()
+                        }
+                    }
+                }
+            }
+        }
         Scheduler.schedules.values.forEach {
             @Suppress("OPT_IN_USAGE")
             GlobalScope.launch {
@@ -352,8 +346,8 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
             }
         }
         Tasks.tasks  // No registration necessary
-        engine = LocalEngine(pubSub)
-        Tasks.startup()
+        engine = LocalEngine(pubSub, cache)
+        runBlocking { Tasks.startup() }
     } catch (t: Throwable) {
         t.printStackTrace()
     }
@@ -367,7 +361,7 @@ fun runServer(pubSub: PubSubInterface, cache: CacheInterface) = embeddedServer(
     port = generalSettings().port,
     host = generalSettings().host,
     module = { lightningServer(pubSub, cache) },
-    watchPaths = listOf("classes")
+    watchPaths = listOf()
 ).start(wait = true)
 
 private fun ContentType.adapt(): HttpContentType =

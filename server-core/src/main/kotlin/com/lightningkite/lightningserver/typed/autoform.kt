@@ -4,6 +4,8 @@ import com.lightningkite.lightningserver.jsonschema.encodeToSchema
 import com.lightningkite.lightningserver.jsonschema.internal.createJsonSchema
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningdb.ServerFile
+import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
+import com.lightningkite.lightningserver.routes.fullUrl
 
 import io.ktor.util.*
 import kotlinx.html.*
@@ -51,17 +53,66 @@ inline fun <reified T> FORM.insideHtmlForm(
     jsEditorName: String,
     defaultValue: T? = null,
     collapsed: Boolean = false,
-): Unit = insideHtmlForm(title, jsEditorName, Serialization.module.serializer(), defaultValue, collapsed)
+    uploadEarlyEndpoint: UploadEarlyEndpoint? = UploadEarlyEndpoint.default,
+): Unit =
+    insideHtmlForm(title, jsEditorName, Serialization.module.serializer(), defaultValue, collapsed, uploadEarlyEndpoint)
+
 fun <T> FORM.insideHtmlForm(
     title: String,
     jsEditorName: String,
     serializer: KSerializer<T>,
     defaultValue: T? = null,
     collapsed: Boolean = false,
+    uploadEarlyEndpoint: UploadEarlyEndpoint? = UploadEarlyEndpoint.default,
 ): Unit {
     this.encType = FormEncType.multipartFormData
     input(InputType.hidden, name = "__json") {
         id = "$jsEditorName-input"
+    }
+    script {
+        unsafe {
+            //language=JavaScript
+            raw(
+                """
+                const fileEditorSet = new Map([${
+                    serializer.descriptor.fileFieldNames().joinToString {
+                        "[\"$title${it.joinToString { "[$it]" }}\", \"$title.${it.joinToString(separator = ".")}\"]"
+                    }
+                }]);
+                const obs = new MutationObserver((mutations) => {
+                    window.setTimeout(()=>{
+                      for(const mut of mutations) {
+                        for(const added of mut.addedNodes) {
+                          if(!(added instanceof HTMLElement)) continue;
+                          for(const [name, path] of fileEditorSet) {
+                            const part = added.querySelector(`label[for="${'$'}{name}"]`);
+                            if(!part) continue;
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.onchange = async (ev) => {
+                              const urlsResponse = await fetch("${uploadEarlyEndpoint?.endpoint?.path?.fullUrl()}");
+                              const urls = await urlsResponse.json();
+                              const uploadResult = await fetch(urls.uploadUrl, {
+                                method: "PUT",
+                                body: input.files[0],
+                                headers: {
+                                  'x-ms-blob-type': 'BlockBlob'
+                                }
+                              });
+                              if(uploadResult.ok) {
+                                window.${jsEditorName}.getEditor(path).setValue(urls.futureCallToken);
+                              }
+                            };
+                            part.after(input);
+                          }
+                        }
+                      }
+                    }, 10);
+                }).observe(document.getElementById('${this@insideHtmlForm.id}'), { childList: true });
+                window.${jsEditorName}_mutObs = obs;
+                """.trimIndent()
+            )
+        }
     }
     jsForm(
         title = title,
@@ -72,40 +123,20 @@ fun <T> FORM.insideHtmlForm(
     )
     script {
         unsafe {
+            //language=JavaScript
             raw(
                 """
                 $jsEditorName.on('change', function () {
-                    document.querySelector('#$jsEditorName-input').value = JSON.stringify(editor.getValue())
-                })
+                    document.querySelector('#$jsEditorName-input').value = JSON.stringify(${jsEditorName}.getValue())
+                });
                 """.trimIndent()
             )
         }
     }
-    div {
-        classes = setOf("je-object__container")
-        div {
-            attributes.set("data-theme", "html")
-            classes = setOf("je-indented-panel")
-            serializer.descriptor.fileFieldNames().forEach {
-                div {
-                    classes = setOf("row")
-                    label {
-                        classes = setOf("je-form-input-label")
-                        +"Upload "
-                        +it.replace(".", " ")
-                        input(InputType.file) {
-                            classes = setOf("row")
-                            this.name = it
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
-internal fun SerialDescriptor.fileFieldNames(visited: MutableSet<SerialDescriptor> = mutableSetOf()): List<String> {
-    if(!visited.add(this)) return listOf()
+internal fun SerialDescriptor.fileFieldNames(visited: MutableSet<SerialDescriptor> = mutableSetOf()): List<List<String>> {
+    if (!visited.add(this)) return listOf()
     return (0 until elementsCount)
         .flatMap {
             val name = getElementName(it)
@@ -113,11 +144,12 @@ internal fun SerialDescriptor.fileFieldNames(visited: MutableSet<SerialDescripto
             if (descriptor.kind == SerialKind.CONTEXTUAL) {
                 descriptor = Serialization.module.getContextualDescriptor(descriptor)!!
             }
-            descriptor.fileFieldNames(visited).map { "$name.$it" } + if (descriptor == Serialization.module.getContextual(
+            descriptor.fileFieldNames(visited)
+                .map { listOf(name) + it } + if (descriptor == Serialization.module.getContextual(
                     ServerFile::class
                 )?.descriptor
             ) listOf(
-                name
+                listOf(name)
             ) else listOf()
         }
 }
@@ -148,6 +180,7 @@ fun <T> FlowContent.jsForm(
                     schema: ${Serialization.json.encodeToSchema(serializer)},
                     max_depth: 5
                 });
+                window.${jsEditorName} = $jsEditorName
                 ${
                 if (defaultValue != null) "${jsEditorName}.on('ready', () => ${jsEditorName}.setValue(${
                     Json(

@@ -129,7 +129,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     appendLine()
 
     appendLine("export class LiveApi implements Api {")
-    appendLine("    public constructor(public httpUrl: String, public socketUrl: String = httpUrl, public extraHeaders: Record<string, string> = {}) {}")
+    appendLine("    public constructor(public httpUrl: string, public socketUrl: string = httpUrl, public extraHeaders: Record<string, string> = {}) {}")
     for (group in groups) {
         appendLine("    readonly ${group.groupToPartName()} = {")
         appendLine("        httpUrl: this.httpUrl,")

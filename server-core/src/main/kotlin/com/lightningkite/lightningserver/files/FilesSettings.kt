@@ -20,7 +20,6 @@ import java.util.concurrent.ConcurrentHashMap
  * a variety of sources. For now this is set up to handle a local file system, a s3 bucket, or an azure blob container.
  *
  * @param storageUrl Defines where the file system is. This follows ApacheVFS standards.
- * @param key Used only by Azure right now. Used to authenticate with Azure.
  * @param userContentPath A path you wish all file paths to be prefixed with.
  * @param signedUrlExpirationSeconds When dealing with secured filesystems that require url signing this will determine how long pre-signed URLs will be valid for.
  */
@@ -28,7 +27,6 @@ import java.util.concurrent.ConcurrentHashMap
 @Serializable
 data class FilesSettings(
     val storageUrl: String = "file://${File("./local/files/").absolutePath}",
-    val key: String? = null,
     val signedUrlExpiration: Duration? = null,
     val jwtSigner: JwtSigner = JwtSigner()
 ) : () -> FileSystem {
