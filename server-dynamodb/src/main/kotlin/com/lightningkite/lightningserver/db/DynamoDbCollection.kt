@@ -104,13 +104,13 @@ class DynamoDbCollection<T : Any>(
     }
 
     override suspend fun updateOneImpl(condition: Condition<T>, modification: Modification<T>): EntryChange<T> {
+        val m = modification.dynamo(serializer)
         return perKey(condition, limit = 1) { c, key ->
             val result = client.updateItem {
                 it.tableName(tableName)
                 it.returnValues(ReturnValue.ALL_OLD)
-                it.apply(c)
+                it.apply(c, m)
                 it.key(key)
-                it.updateExpression()
             }.await()
             val o = serializer.fromDynamoMap(result.attributes())
             EntryChange(
@@ -121,10 +121,11 @@ class DynamoDbCollection<T : Any>(
     }
 
     override suspend fun updateOneIgnoringResultImpl(condition: Condition<T>, modification: Modification<T>): Boolean {
+        val m = modification.dynamo(serializer)
         return perKey(condition, limit = 1) { c, key ->
             client.updateItem {
                 it.tableName(tableName)
-                it.apply(c)
+                it.apply(c, m)
                 it.key(key)
             }.await()
             true
@@ -132,12 +133,13 @@ class DynamoDbCollection<T : Any>(
     }
 
     override suspend fun updateManyImpl(condition: Condition<T>, modification: Modification<T>): CollectionChanges<T> {
+        val m = modification.dynamo(serializer)
         val changes = ArrayList<EntryChange<T>>()
         perKey(condition) { c, key ->
             val result = client.updateItem {
                 it.tableName(tableName)
                 it.returnValues(ReturnValue.ALL_OLD)
-                it.apply(c)
+                it.apply(c, m)
                 it.key(key)
             }.await()
             val o = serializer.fromDynamoMap(result.attributes())
@@ -151,10 +153,11 @@ class DynamoDbCollection<T : Any>(
 
     override suspend fun updateManyIgnoringResultImpl(condition: Condition<T>, modification: Modification<T>): Int {
         var changed = 0
+        val m = modification.dynamo(serializer)
         perKey(condition) { c, key ->
             val result = client.updateItem {
                 it.tableName(tableName)
-                it.apply(c)
+                it.apply(c, m)
                 it.key(key)
             }.await()
             changed++

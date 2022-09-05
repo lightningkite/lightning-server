@@ -19,8 +19,9 @@ fun <T> ScanRequest.Builder.apply(part: DynamoCondition<T>) {
     part.builder.nameMap.takeUnless { it.isEmpty() }?.let { m -> expressionAttributeNames(m) }
     part.builder.valueMap.takeUnless { it.isEmpty() }?.let { m -> expressionAttributeValues(m) }
 }
-fun <T> UpdateItemRequest.Builder.apply(part: DynamoCondition<T>) {
+fun <T> UpdateItemRequest.Builder.apply(part: DynamoCondition<T>, mod: DynamoModification<T>) {
     part.builderFilter?.filter?.toString()?.let { f -> conditionExpression(f) }
+    mod.build(part.builder)?.let { updateExpression(it.filter.toString()) }
     part.builder.nameMap.takeUnless { it.isEmpty() }?.let { m -> expressionAttributeNames(m) }
     part.builder.valueMap.takeUnless { it.isEmpty() }?.let { m -> expressionAttributeValues(m) }
 }

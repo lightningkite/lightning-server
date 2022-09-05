@@ -6,6 +6,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
+import java.lang.IllegalArgumentException
 import kotlin.reflect.KProperty1
 
 data class DynamoCondition<T>(
@@ -16,7 +17,7 @@ data class DynamoCondition<T>(
 ) {
     val writeCombined: (DynamoQueryBuilder.Part.() -> Unit)?
         get() {
-            return if(writeKey != null && writeFilter != null) {
+            return if (writeKey != null && writeFilter != null) {
                 {
                     filter.append('(')
                     writeKey.invoke(this)
@@ -31,6 +32,7 @@ data class DynamoCondition<T>(
     val builderFilter: DynamoQueryBuilder.Part? by lazy { writeFilter?.let { builder.Part().also { p -> it(p) } } }
     val builderCombined: DynamoQueryBuilder.Part? by lazy { writeCombined?.let { builder.Part().also { p -> it(p) } } }
 }
+
 data class DynamoModification<T>(
     val local: Modification<T>? = null,
     val set: List<DynamoQueryBuilder.Part.() -> Unit> = listOf(),
@@ -38,6 +40,47 @@ data class DynamoModification<T>(
     val add: List<DynamoQueryBuilder.Part.() -> Unit> = listOf(),
     val delete: List<DynamoQueryBuilder.Part.() -> Unit> = listOf(),
 ) {
+    fun build(builder: DynamoQueryBuilder): DynamoQueryBuilder.Part? {
+        if (set.isEmpty() && remove.isEmpty() && add.isEmpty() && delete.isEmpty()) return null
+        return builder.Part().also {
+            set.takeUnless { it.isEmpty() }?.let { ops ->
+                it.filter.append("SET ")
+                var first = true
+                ops.forEach { p ->
+                    if (first) first = false
+                    else it.filter.append(", ")
+                    p(it)
+                }
+            }
+            remove.takeUnless { it.isEmpty() }?.let { ops ->
+                it.filter.append("REMOVE ")
+                var first = true
+                ops.forEach { p ->
+                    if (first) first = false
+                    else it.filter.append(", ")
+                    p(it)
+                }
+            }
+            add.takeUnless { it.isEmpty() }?.let { ops ->
+                it.filter.append("ADD ")
+                var first = true
+                ops.forEach { p ->
+                    if (first) first = false
+                    else it.filter.append(", ")
+                    p(it)
+                }
+            }
+            delete.takeUnless { it.isEmpty() }?.let { ops ->
+                it.filter.append("DELETE ")
+                var first = true
+                ops.forEach { p ->
+                    if (first) first = false
+                    else it.filter.append(", ")
+                    p(it)
+                }
+            }
+        }
+    }
 }
 
 fun <T> Condition<T>.dynamo(serializer: KSerializer<T>): DynamoCondition<T> {
@@ -219,7 +262,7 @@ fun <T> Condition<T>.dynamo(serializer: KSerializer<T>): DynamoCondition<T> {
             val inner =
                 (condition as Condition<IsCodableAndHashable>).dynamo(serializer.fieldSerializer(key as KProperty1<T, IsCodableAndHashable>)!!)
             val indexed = key.name == "_id"
-            if(indexed) {
+            if (indexed) {
                 DynamoCondition(
                     local = (this as Condition<T>).takeIf { inner.local != null },
                     never = inner.never,
@@ -275,12 +318,12 @@ fun <T> Condition<T>.dynamo(serializer: KSerializer<T>): DynamoCondition<T> {
 }
 
 fun <T> Modification<T>.dynamo(serializer: KSerializer<T>): DynamoModification<T> {
-    return when(this) {
+    return when (this) {
         is Modification.Chain -> {
-            val subs = this.modifications.mapNotNull { it.dynamo() }
+            val subs = this.modifications.mapNotNull { it.dynamo(serializer) }
             DynamoModification(
                 local = subs.mapNotNull { it.local }.let {
-                    when(it.size) {
+                    when (it.size) {
                         0 -> null
                         1 -> it[0]
                         else -> Modification.Chain(it)
@@ -292,13 +335,13 @@ fun <T> Modification<T>.dynamo(serializer: KSerializer<T>): DynamoModification<T
                 delete = subs.flatMap { it.delete },
             )
         }
+
         is Modification.Assign -> DynamoModification<T>(set = listOf {
             key(field)
             filter.append(" = ")
             value(this@dynamo.value, serializer)
         })
-//        is Modification.CoerceAtLeast -> into["\$max", key] = value
-//        is Modification.CoerceAtMost -> into["\$min", key] = value
+
         is Modification.Increment -> DynamoModification<T>(set = listOf {
             key(field)
             filter.append(" = ")
@@ -306,7 +349,7 @@ fun <T> Modification<T>.dynamo(serializer: KSerializer<T>): DynamoModification<T
             filter.append(" + ")
             value(this@dynamo.by, serializer)
         })
-//        is Modification.Multiply -> into["\$mul", key] = by
+
         is Modification.AppendString -> DynamoModification<T>(set = listOf {
             key(field)
             filter.append(" = ")
@@ -314,18 +357,47 @@ fun <T> Modification<T>.dynamo(serializer: KSerializer<T>): DynamoModification<T
             filter.append(" + ")
             value(this@dynamo.value, String.serializer())
         })
+
         is Modification.IfNotNull<*> -> {
             @Suppress("UNCHECKED_CAST")
             val inner = (modification as Modification<T>).dynamo(serializer.nullElement()!! as KSerializer<T>)
             inner
         }
+
         is Modification.OnField<*, *> -> {
             @Suppress("UNCHECKED_CAST")
             val inner =
-                (condition as Modification<IsCodableAndHashable>).dynamo(serializer.fieldSerializer(key as KProperty1<T, IsCodableAndHashable>)!!)
+                (modification as Modification<IsCodableAndHashable>).dynamo(serializer.fieldSerializer(key as KProperty1<T, IsCodableAndHashable>)!!)
             DynamoModification(
                 local = (this as Modification<T>).takeIf { inner.local != null },
-                writeFilter = inner.writeCombined?.let {
+                set = inner.set.map {
+                    {
+                        val oldField = field
+                        if (field.isEmpty()) field = key.name
+                        else field += ".${key.name}"
+                        it(this)
+                        field = oldField
+                    }
+                },
+                remove = inner.remove.map {
+                    {
+                        val oldField = field
+                        if (field.isEmpty()) field = key.name
+                        else field += ".${key.name}"
+                        it(this)
+                        field = oldField
+                    }
+                },
+                add = inner.add.map {
+                    {
+                        val oldField = field
+                        if (field.isEmpty()) field = key.name
+                        else field += ".${key.name}"
+                        it(this)
+                        field = oldField
+                    }
+                },
+                delete = inner.delete.map {
                     {
                         val oldField = field
                         if (field.isEmpty()) field = key.name
@@ -336,39 +408,32 @@ fun <T> Modification<T>.dynamo(serializer: KSerializer<T>): DynamoModification<T
                 }
             )
         }
-        is Modification.ListAppend<*> -> into.sub("\$push").sub(key)["\$each"] = items
-        is Modification.ListRemove<*> -> into["\$pull", key] = condition.bson()
-        is Modification.ListRemoveInstances<*> -> into["\$pullAll", key] = items
-        is Modification.ListDropFirst<*> -> into["\$pop", key] = -1
-        is Modification.ListDropLast<*> -> into["\$pop", key] = 1
-        is Modification.ListPerElement<*> -> {
-            val condIdentifier = genName()
-            update.options = update.options.arrayFilters(
-                (update.options.arrayFilters ?: listOf()) + condition.dump(key = condIdentifier)
-            )
-            modification.dump(update, "$key.$[$condIdentifier]")
-        }
-        is Modification.SetAppend<*> -> into.sub("\$addToSet").sub(key)["\$each"] = items
-        is Modification.SetRemove<*> -> into["\$pull", key] = condition.bson()
-        is Modification.SetRemoveInstances<*> -> into["\$pullAll", key] = items
-        is Modification.SetDropFirst<*> -> into["\$pop", key] = -1
-        is Modification.SetDropLast<*> -> into["\$pop", key] = 1
-        is Modification.SetPerElement<*> -> {
-            val condIdentifier = genName()
-            update.options = update.options.arrayFilters(
-                (update.options.arrayFilters ?: listOf()) + condition.dump(key = condIdentifier)
-            )
-            modification.dump(update, "$key.$[$condIdentifier]")
-        }
-        is Modification.Combine<*> -> map.forEach {
-            into.sub("\$set")[if (key == null) it.key else "$key.${it.key}"] = it.value
-        }
-        is Modification.ModifyByKey<*> -> map.forEach {
-            it.value.dump(update, if (key == null) it.key else "$key.${it.key}")
-        }
-        is Modification.RemoveKeys<*> -> this.fields.forEach {
-            into.sub("\$unset")[if (key == null) it else "$key.${it}"] = ""
-        }
+
+        is Modification.ListAppend<*> -> DynamoModification<T>(set = listOf {
+            key(field)
+            filter.append(" = list_append(")
+            key(field)
+            filter.append(", ")
+            value(this@dynamo.items, serializer as KSerializer<List<Any?>>)
+            filter.append(")")
+        })
+
+        is Modification.ListDropFirst<*> -> DynamoModification<T>(remove = listOf {
+            key(field)
+            filter.append("[0]")
+        })
+
+        is Modification.SetAppend<*> -> DynamoModification<T>(add = listOf {
+            key(field)
+            value(this@dynamo.items, serializer as KSerializer<Set<Any?>>)
+        })
+
+        is Modification.SetRemoveInstances<*> -> DynamoModification<T>(delete = listOf {
+            key(field)
+            value(this@dynamo.items, serializer as KSerializer<Set<Any?>>)
+        })
+
+        else -> DynamoModification(local = this)
     }
 }
 

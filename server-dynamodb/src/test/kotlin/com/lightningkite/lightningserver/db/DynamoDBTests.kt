@@ -1,10 +1,7 @@
 @file:UseContextualSerialization(UUID::class)
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.DatabaseModel
-import com.lightningkite.lightningdb.condition
-import com.lightningkite.lightningdb.eq
-import com.lightningkite.lightningdb.gt
+import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.future.await
@@ -24,6 +21,7 @@ import java.util.UUID
 class DynamoDBTests() {
     @Test
     fun test() {
+        prepareModels()
         runBlocking {
             val dynamo = embeddedDynamo()
             println("Defining table")
@@ -47,6 +45,10 @@ class DynamoDBTests() {
             ))
             println(collection.find(condition { it.value gt 3 }).toList())
             println(collection.find(condition { it._id eq special._id }).toList())
+            collection.updateMany(condition { it._id eq special._id }, modification { it.value assign 2 })
+            println(collection.find(condition { it._id eq special._id }).toList())
+            collection.updateMany(condition { it._id eq special._id }, modification { it.value plus 1 })
+            println(collection.find(condition { it._id eq special._id }).toList())
         }
     }
 }
@@ -54,5 +56,5 @@ class DynamoDBTests() {
 @DatabaseModel
 @Serializable data class TestData(
     val _id: UUID = UUID.randomUUID(),
-    val value: Int = 42
+    @Index val value: Int = 42
 )
