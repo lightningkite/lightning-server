@@ -4,7 +4,6 @@ import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpContent
-import com.lightningkite.lightningserver.serialization.parsingFileSettings
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -14,6 +13,7 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import org.slf4j.LoggerFactory
+import java.net.URLDecoder
 import java.util.Base64
 
 /**
@@ -21,6 +21,11 @@ import java.util.Base64
  * If security is required it will serialize as a pre-signed URL. It will also check deserializing of url to confirm it is valid.
  */
 object ExternalServerFileSerializer: KSerializer<ServerFile> {
+
+    var fileValidators: List<(url:String, param: Map<String, String>) -> Boolean> = listOf()
+    lateinit var fileSystem: () -> FileSystem
+    var uploadPath:String = "uploaded"
+
     @OptIn(ExperimentalSerializationApi::class)
     override val descriptor: SerialDescriptor = object: SerialDescriptor {
         override val kind: SerialKind = PrimitiveKind.STRING
@@ -52,8 +57,8 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
             val type = ContentType(raw.removePrefix("data:").substringBefore(';'))
             val base64 = raw.substringAfter("base64,")
             val data = Base64.getDecoder().decode(base64)
-            val file = parsingFileSettings!!().root.resolveRandom(
-                "uploaded/file",
+            val file = fileSystem().root.resolve(uploadPath).resolveRandom(
+                "file",
                 type.extension ?: "bin"
             )
             runBlocking {
@@ -62,7 +67,16 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
             return ServerFile(file.url)
         } else {
             val file = FileSystem.resolve(raw.substringBefore('?')) ?: throw BadRequestException("The given url ($raw) does not start with any files root.  Known roots: ${FileSystem.urlRoots}")
-            if(file.checkSignature(raw.substringAfter('?')))
+            val paramString = raw.substringAfter('?')
+            val paramMap = paramString.split('&').associate {
+                URLDecoder.decode(it.substringBefore('='), Charsets.UTF_8) to URLDecoder.decode(
+                    it.substringAfter(
+                        '=',
+                        ""
+                    ), Charsets.UTF_8
+                )
+            }
+            if(fileValidators.any { it(file.url, paramMap) } || file.checkSignature(paramString))
                 return ServerFile(file.url)
             else
                 throw BadRequestException("URL does not appear to be signed properly")
