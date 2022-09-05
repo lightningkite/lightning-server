@@ -83,12 +83,12 @@ data class DynamoModification<T>(
     }
 }
 
-fun <T> Condition<T>.dynamo(serializer: KSerializer<T>): DynamoCondition<T> {
+fun <T> Condition<T>.dynamo(serializer: KSerializer<T>, sortKey: String): DynamoCondition<T> {
     return when (this) {
         is Condition.Never -> DynamoCondition(never = true)
         is Condition.Always -> DynamoCondition()
         is Condition.And -> {
-            val subs = conditions.map { it.dynamo(serializer) }
+            val subs = conditions.map { it.dynamo(serializer, sortKey) }
             if (subs.any { it.never }) return DynamoCondition(never = true)
             DynamoCondition(
                 writeKey = subs.mapNotNull { it.writeKey }.takeUnless { it.isEmpty() }?.let {
@@ -126,7 +126,7 @@ fun <T> Condition<T>.dynamo(serializer: KSerializer<T>): DynamoCondition<T> {
         }
 
         is Condition.Or -> {
-            val subs = conditions.map { it.dynamo(serializer) }.filter { !it.never }
+            val subs = conditions.map { it.dynamo(serializer, sortKey) }.filter { !it.never }
             if (subs.isEmpty()) return DynamoCondition(never = true)
             if (subs.any { it.local != null }) return DynamoCondition(local = this)
             DynamoCondition(
@@ -146,7 +146,7 @@ fun <T> Condition<T>.dynamo(serializer: KSerializer<T>): DynamoCondition<T> {
         }
 
         is Condition.Not -> {
-            val inner = condition.dynamo(serializer)
+            val inner = condition.dynamo(serializer, sortKey)
             DynamoCondition(
                 writeFilter = inner.writeCombined?.let {
                     return@let {
@@ -171,13 +171,16 @@ fun <T> Condition<T>.dynamo(serializer: KSerializer<T>): DynamoCondition<T> {
             value(value, serializer)
         })
 
-        is Condition.Inside -> DynamoCondition(writeKey = {
+        is Condition.Inside -> DynamoCondition(writeFilter = {
             key(field)
-            filter.append(" IN ")
-            value(values, ListSerializer(serializer))
+            filter.append(" IN (")
+            for(value in values) {
+                value(value, serializer)
+            }
+            filter.append(")")
         })
 
-        is Condition.NotInside -> Condition.Not(Condition.Inside(values)).dynamo(serializer)
+        is Condition.NotInside -> Condition.Not(Condition.Inside(values)).dynamo(serializer, sortKey)
         is Condition.GreaterThan -> DynamoCondition(writeKey = {
             key(field)
             filter.append(" > ")
@@ -232,7 +235,7 @@ fun <T> Condition<T>.dynamo(serializer: KSerializer<T>): DynamoCondition<T> {
 
         is Condition.OnKey<*> -> {
             @Suppress("UNCHECKED_CAST")
-            val inner = (condition as Condition<Any?>).dynamo(serializer.mapValueElement()!! as KSerializer<Any?>)
+            val inner = (condition as Condition<Any?>).dynamo(serializer.mapValueElement()!! as KSerializer<Any?>, key)
             DynamoCondition(
                 local = (this as Condition<T>).takeIf { inner.local != null },
                 never = inner.never,
@@ -260,8 +263,8 @@ fun <T> Condition<T>.dynamo(serializer: KSerializer<T>): DynamoCondition<T> {
         is Condition.OnField<*, *> -> {
             @Suppress("UNCHECKED_CAST")
             val inner =
-                (condition as Condition<IsCodableAndHashable>).dynamo(serializer.fieldSerializer(key as KProperty1<T, IsCodableAndHashable>)!!)
-            val indexed = key.name == "_id"
+                (condition as Condition<IsCodableAndHashable>).dynamo(serializer.fieldSerializer(key as KProperty1<T, IsCodableAndHashable>)!!, sortKey)
+            val indexed = key.name == sortKey
             if (indexed) {
                 DynamoCondition(
                     local = (this as Condition<T>).takeIf { inner.local != null },
@@ -304,7 +307,7 @@ fun <T> Condition<T>.dynamo(serializer: KSerializer<T>): DynamoCondition<T> {
 
         is Condition.IfNotNull<*> -> {
             @Suppress("UNCHECKED_CAST")
-            val inner = (condition as Condition<T>).dynamo(serializer.nullElement()!! as KSerializer<T>)
+            val inner = (condition as Condition<T>).dynamo(serializer.nullElement()!! as KSerializer<T>, sortKey)
             DynamoCondition<T>(
                 local = (this as Condition<T>).takeIf { inner.local != null },
                 never = inner.never,
@@ -320,7 +323,7 @@ fun <T> Condition<T>.dynamo(serializer: KSerializer<T>): DynamoCondition<T> {
 fun <T> Modification<T>.dynamo(serializer: KSerializer<T>): DynamoModification<T> {
     return when (this) {
         is Modification.Chain -> {
-            val subs = this.modifications.mapNotNull { it.dynamo(serializer) }
+            val subs = this.modifications.map { it.dynamo(serializer) }
             DynamoModification(
                 local = subs.mapNotNull { it.local }.let {
                     when (it.size) {

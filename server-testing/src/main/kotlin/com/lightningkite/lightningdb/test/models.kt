@@ -78,7 +78,6 @@ data class EmbeddedNullable(
 
 @DatabaseModel
 @Serializable
-@TextIndex(fields = ["string"])
 data class LargeTestModel(
     override val _id: UUID = UUID.randomUUID(),
     var boolean: Boolean = false,

@@ -2,6 +2,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningdb.Condition
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.future.await
@@ -23,17 +24,9 @@ class DynamoDBTests() {
     fun test() {
         prepareModels()
         runBlocking {
-            val dynamo = embeddedDynamo()
+            val database = DynamoDatabase(embeddedDynamo())
             println("Defining table")
-            val tableName = "test"
-            dynamo.createOrUpdateIdTable(tableName)
-
-            val collection = DynamoDbCollection(
-                client = dynamo,
-                serializer = TestData.serializer(),
-                tableName = tableName
-            )
-
+            val collection = database.collection<TestData>()
             val special = TestData(value = 0)
             collection.insert(listOf(
                 special,
@@ -49,6 +42,7 @@ class DynamoDBTests() {
             println(collection.find(condition { it._id eq special._id }).toList())
             collection.updateMany(condition { it._id eq special._id }, modification { it.value plus 1 })
             println(collection.find(condition { it._id eq special._id }).toList())
+            println(collection.find(Condition.Always(), orderBy = listOf(SortPart(TestData::value))).toList())
         }
     }
 }
