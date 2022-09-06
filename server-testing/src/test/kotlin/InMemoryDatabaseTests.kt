@@ -24,6 +24,7 @@ import com.lightningkite.lightningserver.settings.setting
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import org.junit.Test
@@ -111,9 +112,9 @@ class SecurityTest() {
                 LargeTestModel(intNullable = 3),
                 LargeTestModel(intNullable = 4),
             ))
-            secured.find(Condition.Always()).collect {
-                println(it)
-            }
+            val results = secured.find(Condition.Always()).toList()
+            assertEquals(4, results.size)
+            for(r in results) assertEquals(null, r.intNullable)
         }
     }
 }
