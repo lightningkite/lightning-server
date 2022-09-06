@@ -77,4 +77,4 @@ standardPublishing {
         )
     }
 }
-tasks.getByName("equivalentsJarMain").published = true
+tasks.getByName("equivalentsJar").published = true
