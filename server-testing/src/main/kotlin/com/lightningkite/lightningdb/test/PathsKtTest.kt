@@ -47,11 +47,13 @@ class PathsKtTest {
             assertTrue((startChain<LargeTestModel>().int eq 3).matchesPath(modification))
             assertTrue((startChain<LargeTestModel>().int gt 3).matchesPath(modification))
             assertFalse((startChain<LargeTestModel>().short eq 3).matchesPath(modification))
+            assertFalse((startChain<LargeTestModel>().always).matchesPath(modification))
         }
         (startChain<LargeTestModel>().intNullable assign 2).let { modification ->
             assertTrue((startChain<LargeTestModel>().intNullable eq 3).matchesPath(modification))
             assertTrue((startChain<LargeTestModel>().intNullable.notNull gt 3).matchesPath(modification))
             assertFalse((startChain<LargeTestModel>().short eq 3).matchesPath(modification))
+            assertFalse((startChain<LargeTestModel>().always).matchesPath(modification))
         }
     }
 

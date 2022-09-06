@@ -76,6 +76,8 @@ fun <T> Modification<T>.matchesPath(modification: Modification<T>): Boolean {
 }
 fun <T> Condition<T>.matchesPath(modification: Modification<T>): Boolean {
     return when(this) {
+        is Condition.Always -> false
+        is Condition.Never -> false
         is Condition.OnField<*, *> -> {
             val field = modification as? Modification.OnField<*, *> ?: return false
             @Suppress("UNCHECKED_CAST")

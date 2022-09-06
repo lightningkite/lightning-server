@@ -1,7 +1,6 @@
 package com.lightningkite.lightningdb.test
 
-import com.lightningkite.lightningdb.Database
-import com.lightningkite.lightningdb.ServerFile
+import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.auth.OauthProviderCredentials
 import com.lightningkite.lightningserver.cache.CacheInterface
@@ -25,8 +24,10 @@ import com.lightningkite.lightningserver.settings.setting
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
+import org.junit.Test
 import java.io.File
 import java.time.Duration
 import kotlin.test.assertEquals
@@ -85,6 +86,35 @@ class LocalFilesTest: FileSystemTests() {
             )
             println(response)
             assertEquals(HttpStatus.NoContent, response.status)
+        }
+    }
+}
+
+class SecurityTest() {
+    init { TestSettings }
+    @Test
+    fun test() {
+        prepareModels()
+        runBlocking {
+            val unsecured = TestSettings.database().collection<LargeTestModel>("SecurityTest_test")
+            val secured = unsecured.withPermissions(ModelPermissions(
+                create = Condition.Always(),
+                read = Condition.Always(),
+                readMask = mask {
+                    always(it.intNullable.maskedTo(null))
+                },
+                update = Condition.Always(),
+                delete = Condition.Always(),
+            ))
+            unsecured.insert(listOf(
+                LargeTestModel(intNullable = 1),
+                LargeTestModel(intNullable = 2),
+                LargeTestModel(intNullable = 3),
+                LargeTestModel(intNullable = 4),
+            ))
+            val results = secured.find(Condition.Always()).toList()
+            assertEquals(4, results.size)
+            for(r in results) assertEquals(null, r.intNullable)
         }
     }
 }
