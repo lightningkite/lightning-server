@@ -19,13 +19,13 @@ interface CacheInterface : HealthCheckable {
         modification: (T?) -> T?
     ): Boolean {
         repeat(maxTries) {
-            val current = LocalCache.get(key, serializer)
+            val current = get(key, serializer)
             val new = modification(current)
-            if (current == LocalCache.get(key, serializer)) {
+            if (current == get(key, serializer)) {
                 if (new != null)
-                    LocalCache.set(key, new, serializer)
+                    set(key, new, serializer)
                 else
-                    LocalCache.remove(key)
+                    remove(key)
                 return true
             }
         }
