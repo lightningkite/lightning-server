@@ -1,50 +1,62 @@
+@file:UseContextualSerialization(UUID::class)
 package com.lightningkite.lightningdb
 
 import com.lightningkite.lightningdb.test.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseContextualSerialization
 import org.junit.Test
+import java.util.*
 import kotlin.test.assertContains
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+
+@Serializable
+@DatabaseModel
+@TextIndex(["string"])
+data class ModelWithTextIndex(
+    override val _id: UUID = UUID.randomUUID(),
+    val string: String
+): HasId<UUID>
 
 class TextConditionTest: MongoTest() {
 
     @Test
     fun testTextSearch() = runBlocking {
-        val collection = defaultMongo.collection<LargeTestModel>() as MongoFieldCollection<LargeTestModel>
-        val value1 = LargeTestModel(string = "One Two Three")
-        val value2 = LargeTestModel(string = "Five Six Seven")
+        val collection = defaultMongo.collection<ModelWithTextIndex>() as MongoFieldCollection<ModelWithTextIndex>
+        val value1 = ModelWithTextIndex(string = "One Two Three")
+        val value2 = ModelWithTextIndex(string = "Five Six Seven")
         collection.insertOne(value1)
         collection.insertOne(value2)
 
         var query = "One"
-        var condition = startChain<LargeTestModel>().fullTextSearch(query, false)
+        var condition = startChain<ModelWithTextIndex>().fullTextSearch(query, false)
         var results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "one"
-        condition = startChain<LargeTestModel>().fullTextSearch(query, false)
+        condition = startChain<ModelWithTextIndex>().fullTextSearch(query, false)
         results = collection.find(condition).toList()
         assertFalse(results.contains(value1))
 
         query = "one"
-        condition = startChain<LargeTestModel>().fullTextSearch(query, true)
+        condition = startChain<ModelWithTextIndex>().fullTextSearch(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "four two"
-        condition = startChain<LargeTestModel>().fullTextSearch(query, true)
+        condition = startChain<ModelWithTextIndex>().fullTextSearch(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "four five"
-        condition = startChain<LargeTestModel>().fullTextSearch(query, true)
+        condition = startChain<ModelWithTextIndex>().fullTextSearch(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value2)
 
         query = "three five"
-        condition = startChain<LargeTestModel>().fullTextSearch(query, true)
+        condition = startChain<ModelWithTextIndex>().fullTextSearch(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
         assertContains(results, value2)
@@ -52,49 +64,49 @@ class TextConditionTest: MongoTest() {
 
     @Test
     fun testContains() = runBlocking {
-        val collection = defaultMongo.collection<LargeTestModel>("TextConditionSearchTest") as MongoFieldCollection<LargeTestModel>
-        val value1 = LargeTestModel(string = "One Two Three")
-        val value2 = LargeTestModel(string = "Five Six Seven")
+        val collection = defaultMongo.collection<ModelWithTextIndex>("TextConditionSearchTest") as MongoFieldCollection<ModelWithTextIndex>
+        val value1 = ModelWithTextIndex(string = "One Two Three")
+        val value2 = ModelWithTextIndex(string = "Five Six Seven")
         collection.insertOne(value1)
         collection.insertOne(value2)
 
         var query = "One"
-        var condition = startChain<LargeTestModel>().string.contains(query, false)
+        var condition = startChain<ModelWithTextIndex>().string.contains(query, false)
         var results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "one"
-        condition = startChain<LargeTestModel>().string.contains(query, false)
+        condition = startChain<ModelWithTextIndex>().string.contains(query, false)
         results = collection.find(condition).toList()
         assertFalse(results.contains(value1))
 
         query = "one"
-        condition = startChain<LargeTestModel>().string.contains(query, true)
+        condition = startChain<ModelWithTextIndex>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "four two"
-        condition = startChain<LargeTestModel>().string.contains(query, true)
+        condition = startChain<ModelWithTextIndex>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertTrue(results.isEmpty())
 
         query = "six seven"
-        condition = startChain<LargeTestModel>().string.contains(query, true)
+        condition = startChain<ModelWithTextIndex>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value2)
 
         query = "seven six"
-        condition = startChain<LargeTestModel>().string.contains(query, true)
+        condition = startChain<ModelWithTextIndex>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertTrue(results.isEmpty())
 
         query = "four five"
-        condition = startChain<LargeTestModel>().string.contains(query, true)
+        condition = startChain<ModelWithTextIndex>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertTrue(results.isEmpty())
 
         query = "three five"
-        condition = startChain<LargeTestModel>().string.contains(query, true)
+        condition = startChain<ModelWithTextIndex>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertTrue(results.isEmpty())
     }
