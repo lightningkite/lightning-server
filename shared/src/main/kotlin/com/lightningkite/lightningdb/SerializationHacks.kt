@@ -22,6 +22,11 @@ fun KSerializer<*>.listElement(): KSerializer<*>? {
     return theoreticalMethod.invoke(inner, inner) as KSerializer<*>
 }
 
+fun KSerializer<*>.mapKeyElement(): KSerializer<*>? {
+    val inner = this.nullElement() ?: this
+    val theoreticalMethod = inner::class.java.methods.find { it.name.contains("getKeySerializer") } ?: return null
+    return theoreticalMethod.invoke(inner) as KSerializer<*>
+}
 fun KSerializer<*>.mapValueElement(): KSerializer<*>? {
     val inner = this.nullElement() ?: this
     val theoreticalMethod = inner::class.java.methods.find { it.name.contains("getValueSerializer") } ?: return null
