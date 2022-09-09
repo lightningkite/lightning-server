@@ -25,7 +25,7 @@ import kotlin.reflect.KTypeProjection
  */
 @Serializable
 data class DatabaseSettings(
-    val url: String = "ram-unsafe-persist://${File("./local/mongo").absolutePath}",
+    val url: String = "ram-unsafe-persist://${File("./local/database").absolutePath}",
     val databaseName: String = "default"
 ): ()->Database {
 
