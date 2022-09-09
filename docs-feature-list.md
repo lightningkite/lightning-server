@@ -123,7 +123,7 @@ HTTP response.
 - `inside` - returns true if the given value is inside a given list
 - `notIn` - returns true if the given value is not inside a given list
 - `nin` - equivalent to `notIn`
-- `contains` - returns true if the given value is inside a given list
+- `contains` - returns true if the given string is a substring of a string
 - `allClear` - returns true if all the given bits in a bitmask that correspond to given set (1) bits are clear (0)
 - `allSet` - returns true if all the given bits in a bitmask that correspond to given set (1) bits are set (1)
 - `anyClear` - returns true if any of the given bits in a bitmask that correspond to given set (1) bits are clear (0)
@@ -131,7 +131,7 @@ HTTP response.
 - `all` - returns true if the given `Condition` is true for all elements in a given list
 - `any` - returns true if the given `Condition` is true for any element in a given list
 - `sizesEquals` - returns true if the given integer is equal to the size of a given list
-- `containsKey` - returns true if the given key is inside a given map
+- `containsKey` - returns true if the given map contains the given key
 
 ## Modification
 
