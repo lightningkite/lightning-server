@@ -12,13 +12,14 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils.statementsRequiredToActualizeScheme
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.sql.Connection.TRANSACTION_READ_COMMITTED
+import java.sql.Connection.TRANSACTION_SERIALIZABLE
 import kotlin.reflect.KProperty1
 
 class PostgresCollection<T : Any>(
     val db: Database,
     val name: String,
     val serializer: KSerializer<T>,
-) : FieldCollection<T> {
+) : AbstractSignalFieldCollection<T>() {
     companion object {
         var format = DbMapLikeFormat(Serialization.module)
     }
@@ -118,7 +119,7 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun insert(models: List<T>): List<T> {
+    override suspend fun insertImpl(models: List<T>): List<T> {
         prepare.await()
         t {
             table.batchInsert(models) {
@@ -128,27 +129,40 @@ class PostgresCollection<T : Any>(
         return models
     }
 
-    override suspend fun replaceOne(condition: Condition<T>, model: T): EntryChange<T> {
-        TODO("Not yet implemented")
+    override suspend fun replaceOneImpl(condition: Condition<T>, model: T): EntryChange<T> {
+        return updateOneImpl(condition, Modification.Assign(model))
     }
 
-    override suspend fun replaceOneIgnoringResult(condition: Condition<T>, model: T): Boolean {
-        TODO("Not yet implemented")
+    override suspend fun replaceOneIgnoringResultImpl(condition: Condition<T>, model: T): Boolean {
+        return updateOneIgnoringResultImpl(condition, Modification.Assign(model))
     }
 
-    override suspend fun upsertOne(condition: Condition<T>, modification: Modification<T>, model: T): EntryChange<T> {
-        TODO("Not yet implemented")
+    override suspend fun upsertOneImpl(condition: Condition<T>, modification: Modification<T>, model: T): EntryChange<T> {
+        return newSuspendedTransaction(db = db, transactionIsolation = TRANSACTION_SERIALIZABLE) {
+            val existing = findOne(condition)
+            if(existing == null) {
+                EntryChange(null, insertImpl(listOf(model)).first())
+            } else
+                updateOneImpl(condition, modification)
+        }
     }
 
-    override suspend fun upsertOneIgnoringResult(
+    override suspend fun upsertOneIgnoringResultImpl(
         condition: Condition<T>,
         modification: Modification<T>,
         model: T,
     ): Boolean {
-        TODO()
+        return newSuspendedTransaction(db = db, transactionIsolation = TRANSACTION_SERIALIZABLE) {
+            val existing = findOne(condition)
+            if(existing == null) {
+                insertImpl(listOf(model))
+                false
+            } else
+                updateOneIgnoringResultImpl(condition, modification)
+        }
     }
 
-    override suspend fun updateOne(condition: Condition<T>, modification: Modification<T>): EntryChange<T> {
+    override suspend fun updateOneImpl(condition: Condition<T>, modification: Modification<T>): EntryChange<T> {
         return t {
             val old = table.updateReturningOld(
                 where = { condition(condition, serializer, table).asOp() },
@@ -163,7 +177,7 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun updateOneIgnoringResult(condition: Condition<T>, modification: Modification<T>): Boolean {
+    override suspend fun updateOneIgnoringResultImpl(condition: Condition<T>, modification: Modification<T>): Boolean {
         return t {
             table.update(
                 where = { condition(condition, serializer, table).asOp() },
@@ -175,7 +189,7 @@ class PostgresCollection<T : Any>(
         } > 0
     }
 
-    override suspend fun updateMany(condition: Condition<T>, modification: Modification<T>): CollectionChanges<T> {
+    override suspend fun updateManyImpl(condition: Condition<T>, modification: Modification<T>): CollectionChanges<T> {
         return t {
             val old = table.updateReturningOld(
                 where = { condition(condition, serializer, table).asOp() },
@@ -190,7 +204,7 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun updateManyIgnoringResult(condition: Condition<T>, modification: Modification<T>): Int {
+    override suspend fun updateManyIgnoringResultImpl(condition: Condition<T>, modification: Modification<T>): Int {
         return t {
             table.update(
                 where = { condition(condition, serializer, table).asOp() },
@@ -202,24 +216,38 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun deleteOne(condition: Condition<T>): T? {
-        TODO("Not yet implemented")
+    override suspend fun deleteOneImpl(condition: Condition<T>): T? {
+        return t {
+            table.deleteReturningWhere(
+                limit = 1,
+                where = { condition(condition, serializer, table).asOp() }
+            ).firstOrNull()?.let { format.decode(serializer, it) }
+        }
     }
 
-    override suspend fun deleteOneIgnoringOld(condition: Condition<T>): Boolean {
-        TODO("Not yet implemented")
+    override suspend fun deleteOneIgnoringOldImpl(condition: Condition<T>): Boolean {
+        return t {
+            table.deleteWhere(
+                limit = 1,
+                op = { condition(condition, serializer, table).asOp() }
+            ) > 0
+        }
     }
 
-    override suspend fun deleteMany(condition: Condition<T>): List<T> {
-        TODO("Not yet implemented")
+    override suspend fun deleteManyImpl(condition: Condition<T>): List<T> {
+        return t {
+            table.deleteReturningWhere(
+                where = { condition(condition, serializer, table).asOp() }
+            ).map { format.decode(serializer, it) }
+        }
     }
 
-    override suspend fun deleteManyIgnoringOld(condition: Condition<T>): Int {
-        TODO("Not yet implemented")
-    }
-
-    override fun registerRawSignal(callback: suspend (CollectionChanges<T>) -> Unit) {
-        TODO("Not yet implemented")
+    override suspend fun deleteManyIgnoringOldImpl(condition: Condition<T>): Int {
+        return t {
+            table.deleteWhere(
+                op = { condition(condition, serializer, table).asOp() }
+            )
+        }
     }
 
 }
