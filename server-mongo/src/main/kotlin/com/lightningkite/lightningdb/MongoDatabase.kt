@@ -65,12 +65,7 @@ class MongoDatabase(val database: CoroutineDatabase) : Database {
                         .database
                         .getCollection(name, (type.classifier as KClass<*>).java as Class<T>)
                         .coroutine
-                ).also {
-                    runBlocking {
-                        @Suppress("OPT_IN_USAGE")
-                        it.handleIndexes(GlobalScope)
-                    }
-                }
+                )
             }
         } as Lazy<MongoFieldCollection<T>>).value
 }

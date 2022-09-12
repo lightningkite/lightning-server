@@ -1,11 +1,9 @@
 package com.lightningkite.lightningdb
 
 import com.mongodb.client.model.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -33,6 +31,7 @@ class MongoFieldCollection<Model : Any>(
         limit: Int,
         maxQueryMs: Long,
     ): Flow<Model> {
+        prepare.await()
         return mongo.find(condition.bson())
             .let {
                 if (skip != 0) it.skip(skip)
@@ -61,6 +60,7 @@ class MongoFieldCollection<Model : Any>(
     data class KeyHolder<Key>(val _id: Key)
 
     override suspend fun count(condition: Condition<Model>): Int {
+        prepare.await()
         return mongo.countDocuments(condition.bson()).toInt()
     }
 
@@ -68,6 +68,7 @@ class MongoFieldCollection<Model : Any>(
         condition: Condition<Model>,
         groupBy: KProperty1<Model, Key>,
     ): Map<Key, Int> {
+        prepare.await()
         return mongo.aggregate<BsonDocument>(
             match(condition.bson()),
             group("\$" + groupBy.name, Accumulators.sum("count", 1))
@@ -93,6 +94,7 @@ class MongoFieldCollection<Model : Any>(
         condition: Condition<Model>,
         property: KProperty1<Model, N>,
     ): Double? {
+        prepare.await()
         return mongo.aggregate<BsonDocument>(match(condition.bson()), group(null, aggregate.asValueBson(property.name)))
             .toList()
             .map {
@@ -108,6 +110,7 @@ class MongoFieldCollection<Model : Any>(
         groupBy: KProperty1<Model, Key>,
         property: KProperty1<Model, N>,
     ): Map<Key, Double?> {
+        prepare.await()
         return mongo.aggregate<BsonDocument>(
             match(condition.bson()),
             group("\$" + groupBy.name, aggregate.asValueBson(property.name))
@@ -124,12 +127,14 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun insertImpl(
         models: List<Model>,
     ): List<Model> {
+        prepare.await()
         if (models.isEmpty()) return models
         mongo.insertMany(models)
         return models
     }
 
     override suspend fun replaceOneImpl(condition: Condition<Model>, model: Model): EntryChange<Model> {
+        prepare.await()
         return updateOne(condition, Modification.Assign(model))
     }
 
@@ -137,6 +142,7 @@ class MongoFieldCollection<Model : Any>(
         condition: Condition<Model>,
         model: Model,
     ): Boolean {
+        prepare.await()
         return mongo.replaceOne(condition.bson(), model).matchedCount != 0L
     }
 
@@ -145,6 +151,7 @@ class MongoFieldCollection<Model : Any>(
         modification: Modification<Model>,
         model: Model,
     ): EntryChange<Model> {
+        prepare.await()
         val m = modification.bson()
         return mongo.findOneAndUpdate(
             condition.bson(),
@@ -165,6 +172,7 @@ class MongoFieldCollection<Model : Any>(
         modification: Modification<Model>,
         model: Model,
     ): Boolean {
+        prepare.await()
         if (modification is Modification.Assign && modification.value == model) {
             return mongo.replaceOne(condition.bson(), model, ReplaceOptions().upsert(true)).matchedCount != 0L
         } else {
@@ -182,6 +190,7 @@ class MongoFieldCollection<Model : Any>(
         condition: Condition<Model>,
         modification: Modification<Model>,
     ): EntryChange<Model> {
+        prepare.await()
         val m = modification.bson()
         val before = mongo.findOneAndUpdate(
             condition.bson(),
@@ -203,6 +212,7 @@ class MongoFieldCollection<Model : Any>(
         condition: Condition<Model>,
         modification: Modification<Model>,
     ): Boolean {
+        prepare.await()
         val m = modification.bson()
         return mongo.updateOne(condition.bson(), m.document, m.options).matchedCount != 0L
     }
@@ -211,6 +221,7 @@ class MongoFieldCollection<Model : Any>(
         condition: Condition<Model>,
         modification: Modification<Model>,
     ): CollectionChanges<Model> {
+        prepare.await()
         val m = modification.bson()
         val changes = ArrayList<EntryChange<Model>>()
         mongo.withDocumentClass<BsonDocument>().find(condition.bson()).toFlow().collectChunked(1000) { list ->
@@ -227,6 +238,7 @@ class MongoFieldCollection<Model : Any>(
         condition: Condition<Model>,
         modification: Modification<Model>,
     ): Int {
+        prepare.await()
         val m = modification.bson()
         return mongo.updateMany(
             condition.bson(),
@@ -236,6 +248,7 @@ class MongoFieldCollection<Model : Any>(
     }
 
     override suspend fun deleteOneImpl(condition: Condition<Model>): Model? {
+        prepare.await()
         return mongo.withDocumentClass<BsonDocument>().find(condition.bson()).toFlow().firstOrNull()?.let {
             val id = it["_id"]
             mongo.deleteOne(Filters.eq("_id", id))
@@ -246,10 +259,12 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun deleteOneIgnoringOldImpl(
         condition: Condition<Model>,
     ): Boolean {
+        prepare.await()
         return mongo.deleteOne(condition.bson()).deletedCount > 0
     }
 
     override suspend fun deleteManyImpl(condition: Condition<Model>): List<Model> {
+        prepare.await()
         val remove = ArrayList<Model>()
         mongo.withDocumentClass<BsonDocument>().find(condition.bson()).toFlow().collectChunked(1000) { list ->
             mongo.deleteMany(Filters.`in`("_id", list.map { it["_id"] }))
@@ -264,11 +279,13 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun deleteManyIgnoringOldImpl(
         condition: Condition<Model>,
     ): Int {
+        prepare.await()
         return mongo.deleteMany(condition.bson()).deletedCount.toInt()
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
-    suspend fun handleIndexes(scope: CoroutineScope) {
+
+    @OptIn(DelicateCoroutinesApi::class, ExperimentalSerializationApi::class)
+    val prepare = GlobalScope.async(Dispatchers.Unconfined, start = CoroutineStart.LAZY) {
         val requireCompletion = ArrayList<Job>()
         val seen = HashSet<SerialDescriptor>()
         fun handleDescriptor(descriptor: SerialDescriptor) {
@@ -276,7 +293,7 @@ class MongoFieldCollection<Model : Any>(
             descriptor.annotations.forEach {
                 when (it) {
                     is UniqueSet -> {
-                        requireCompletion += scope.launch {
+                        requireCompletion += launch {
                             mongo.ensureIndex(
                                 Sorts.ascending(it.fields.toList()),
                                 IndexOptions().unique(true).partialFilterExpression(
@@ -287,7 +304,7 @@ class MongoFieldCollection<Model : Any>(
                     }
 
                     is IndexSet -> {
-                        scope.launch {
+                        launch {
                             mongo.ensureIndex(
                                 Sorts.ascending(it.fields.toList()),
                                 IndexOptions().unique(false).background(true)
@@ -296,7 +313,7 @@ class MongoFieldCollection<Model : Any>(
                     }
 
                     is TextIndex -> {
-                        requireCompletion += scope.launch {
+                        requireCompletion += launch {
                             mongo.ensureIndex(
                                 documentOf(*it.fields.map { it to "text" }.toTypedArray()),
                                 IndexOptions().name("${mongo.namespace.fullName}TextIndex")
@@ -305,7 +322,7 @@ class MongoFieldCollection<Model : Any>(
                     }
 
                     is NamedUniqueSet -> {
-                        requireCompletion += scope.launch {
+                        requireCompletion += launch {
                             mongo.ensureIndex(
                                 Sorts.ascending(it.fields.toList()),
                                 IndexOptions().unique(true).name(it.indexName).partialFilterExpression(
@@ -316,7 +333,7 @@ class MongoFieldCollection<Model : Any>(
                     }
 
                     is NamedIndexSet -> {
-                        scope.launch {
+                        launch {
                             mongo.ensureIndex(
                                 Sorts.ascending(it.fields.toList()),
                                 IndexOptions().unique(false).name(it.indexName).background(true)
@@ -325,7 +342,7 @@ class MongoFieldCollection<Model : Any>(
                     }
 
                     is NamedTextIndex -> {
-                        requireCompletion += scope.launch {
+                        requireCompletion += launch {
                             mongo.ensureIndex(documentOf(*it.fields.map { it to "text" }.toTypedArray()))
                         }
                     }
@@ -337,7 +354,7 @@ class MongoFieldCollection<Model : Any>(
                 descriptor.getElementAnnotations(index).forEach {
                     when (it) {
                         is NamedIndex -> {
-                            scope.launch {
+                            launch {
                                 mongo.ensureIndex(
                                     Sorts.ascending(descriptor.getElementName(index)),
                                     IndexOptions().unique(false).name(it.indexName.takeUnless { it.isBlank() })
@@ -347,7 +364,7 @@ class MongoFieldCollection<Model : Any>(
                         }
 
                         is Index -> {
-                            scope.launch {
+                            launch {
                                 mongo.ensureIndex(
                                     Sorts.ascending(descriptor.getElementName(index)),
                                     IndexOptions().unique(false).background(true)
@@ -356,7 +373,7 @@ class MongoFieldCollection<Model : Any>(
                         }
 
                         is NamedUnique -> {
-                            requireCompletion += scope.launch {
+                            requireCompletion += launch {
                                 mongo.ensureIndex(
                                     Sorts.ascending(descriptor.getElementName(index)),
                                     IndexOptions().unique(true).name(it.indexName.takeUnless { it.isBlank() })
@@ -368,7 +385,7 @@ class MongoFieldCollection<Model : Any>(
                         }
 
                         is Unique -> {
-                            requireCompletion += scope.launch {
+                            requireCompletion += launch {
                                 mongo.ensureIndex(
                                     Sorts.ascending(descriptor.getElementName(index)),
                                     IndexOptions().unique(true).partialFilterExpression(

@@ -5,7 +5,6 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
-import kotlinx.serialization.encoding.AbstractDecoder
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.encoding.CompositeEncoder
 import kotlinx.serialization.encoding.Decoder
@@ -15,37 +14,50 @@ import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 import org.jetbrains.exposed.sql.Column
 import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.UUIDColumnType
-import org.jetbrains.exposed.sql.VarCharColumnType
 import org.jetbrains.exposed.sql.javatime.*
 import org.jetbrains.exposed.sql.statements.UpdateBuilder
-import java.sql.Struct
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
 class DbMapLikeFormat(val serializersModule: SerializersModule = Serialization.module) {
-    fun <T> encode(serializer: KSerializer<T>, value: T, it: UpdateBuilder<*>) {
+    fun <T> encode(serializer: KSerializer<T>, value: T, it: UpdateBuilder<*>, path: List<String> = listOf("")) {
         val columns = it.targets.flatMap { it.columns }.map { it as Column<Any?> }.associateBy { it.name }
         DbLikeMapEncoder(
             serializersModule,
-            { k, v -> it[columns[k] ?: throw IllegalStateException("Could not find key $k in columns")] = v },
+            { k, v ->
+                it[columns[k] ?: throw IllegalStateException("Could not find key $k in columns")] = v
+            },
             {}
-        ).encodeSerializableValue(serializer, value)
+        ).also { it.startWith(path) }.encodeSerializableValue(serializer, value)
     }
-    fun <T> encode(serializer: KSerializer<T>, value: T, out: MutableMap<String, Any?> = LinkedHashMap<String, Any?>()): Map<String, Any?> {
+
+    fun <T> encode(
+        serializer: KSerializer<T>,
+        value: T,
+        out: MutableMap<String, Any?> = LinkedHashMap<String, Any?>(),
+        path: List<String> = listOf(""),
+    ): Map<String, Any?> {
         DbLikeMapEncoder(
             serializersModule,
             out
-        ).encodeSerializableValue(serializer, value)
+        ).also { it.startWith(path) }.encodeSerializableValue(serializer, value)
         return out
     }
-    fun <T> decode(serializer: KSerializer<T>, map: Map<String, Any?>): T {
-        return DbLikeMapDecoder(serializersModule, map, serializer.descriptor).decodeSerializableValue(serializer)
+
+    fun <T> decode(serializer: KSerializer<T>, map: Map<String, Any?>, path: List<String> = listOf("")): T {
+        return DbLikeMapDecoder(serializersModule, map, serializer.descriptor).also { it.startWith(path) }
+            .decodeSerializableValue(serializer)
     }
-    fun <T> decode(serializer: KSerializer<T>, map: ResultRow): T {
+
+    fun <T> decode(serializer: KSerializer<T>, map: ResultRow, path: List<String> = listOf("")): T {
         val columns = map.fieldIndex.keys.mapNotNull { it as? Column<Any?> }.associateBy { it.name }
-        return DbLikeMapDecoder(serializersModule, keys = columns.keys, getter = { k -> map[columns[k]!!] }, descriptor = serializer.descriptor).decodeSerializableValue(serializer)
+        return DbLikeMapDecoder(
+            serializersModule,
+            keys = columns.keys,
+            getter = { k -> map[columns[k]!!] },
+            descriptor = serializer.descriptor
+        ).also { it.startWith(path) }.decodeSerializableValue(serializer)
     }
 }
 
@@ -68,6 +80,10 @@ public abstract class UnderscoreNamedValueEncoder : TaggedEncoder<String>() {
     protected open fun elementName(descriptor: SerialDescriptor, index: Int): String = descriptor.getElementName(index)
     protected open fun composeName(parentName: String, childName: String): String =
         if (parentName.isEmpty()) childName else if (childName.isEmpty()) parentName else "${parentName}__$childName"
+
+    fun startWith(path: List<String>) {
+        if (path.isNotEmpty()) pushTag(path.fold("", ::composeName))
+    }
 }
 
 @InternalSerializationApi
@@ -89,6 +105,10 @@ public abstract class UnderscoreNamedValueDecoder : TaggedDecoder<String>() {
     protected open fun elementName(desc: SerialDescriptor, index: Int): String = desc.getElementName(index)
     protected open fun composeName(parentName: String, childName: String): String =
         if (parentName.isEmpty()) childName else if (childName.isEmpty()) parentName else "${parentName}__$childName"
+
+    fun startWith(path: List<String>) {
+        if (path.isNotEmpty()) pushTag(path.fold("", ::composeName))
+    }
 }
 
 @OptIn(InternalSerializationApi::class)
@@ -150,7 +170,10 @@ class DbLikeMapDecoder(
                         DbLikeMapDecoder(
                             serializersModule = serializersModule,
                             keys = keys,
-                            getter = { (getter(it) as? List<Any?> ?: throw IllegalStateException("Could not find $it as an array"))[index] },
+                            getter = {
+                                (getter(it) as? List<Any?>
+                                    ?: throw IllegalStateException("Could not find $it as an array"))[index]
+                            },
                             descriptor = descriptor
                         ).also { copyTagsTo(it) }
                     },
@@ -158,7 +181,10 @@ class DbLikeMapDecoder(
                         DbLikeMapDecoder(
                             serializersModule = serializersModule,
                             keys = keys,
-                            getter = { (getter(it) as? List<Any?> ?: throw IllegalStateException("Could not find $it as an array"))[index] },
+                            getter = {
+                                (getter(it) as? List<Any?>
+                                    ?: throw IllegalStateException("Could not find $it as an array"))[index]
+                            },
                             descriptor = descriptor
                         ).also { copyTagsTo(it); it.pushTag(it.composeName(it.currentTag, "value")) }
                     },
@@ -285,7 +311,11 @@ class ListDecodeMapper(val decodeInstance: (index: Int) -> Decoder, val count: I
 }
 
 @OptIn(InternalSerializationApi::class)
-class MapDecodeMapper(val decodeKey: (index: Int) -> Decoder, val decodeValue: (index: Int) -> Decoder, val count: Int) : CompositeDecoder {
+class MapDecodeMapper(
+    val decodeKey: (index: Int) -> Decoder,
+    val decodeValue: (index: Int) -> Decoder,
+    val count: Int,
+) : CompositeDecoder {
     var index = 0
     override fun decodeElementIndex(descriptor: SerialDescriptor): Int {
         if (index >= count) return CompositeDecoder.DECODE_DONE
@@ -293,7 +323,7 @@ class MapDecodeMapper(val decodeKey: (index: Int) -> Decoder, val decodeValue: (
     }
 
     fun getDecoder(): Decoder {
-        return if(index % 2 == 0) decodeKey(index++ / 2) else decodeValue(index++ / 2)
+        return if (index % 2 == 0) decodeKey(index++ / 2) else decodeValue(index++ / 2)
     }
 
     override val serializersModule: SerializersModule
@@ -421,6 +451,7 @@ class DbLikeMapEncoder(
                     writer(tag, null)
                     writer(composeName(tag, "value"), null)
                 }
+
                 else -> encodeNull()
             }
         } else {
@@ -435,11 +466,12 @@ class DbLikeMapEncoder(
             is StructureKind.CLASS -> this
             is StructureKind.LIST -> {
                 val t = currentTag
-                val lists = descriptor.getElementDescriptor(0).columnType().map { it.first.joinToString("__") }.associateWith {
-                    val l = ArrayList<Any?>()
-                    writer(composeName(t, it), l)
-                    l
-                }
+                val lists =
+                    descriptor.getElementDescriptor(0).columnType().map { it.key.joinToString("__") }.associateWith {
+                        val l = ArrayList<Any?>()
+                        writer(composeName(t, it), l)
+                        l
+                    }
                 DbLikeMapEncoder(
                     serializersModule = serializersModule,
                     writer = { k, v ->
@@ -451,16 +483,18 @@ class DbLikeMapEncoder(
 
             is StructureKind.MAP -> {
                 val t = currentTag
-                val keyLists = descriptor.getElementDescriptor(0).columnType().map { it.first.joinToString("__") }.associateWith {
-                    val l = ArrayList<Any?>()
-                    writer(composeName(t, it), l)
-                    l
-                }
-                val valueLists = descriptor.getElementDescriptor(1).columnType().map { it.first.joinToString("__") }.associateWith {
-                    val l = ArrayList<Any?>()
-                    writer(composeName(composeName(t, it), "value"), l)
-                    l
-                }
+                val keyLists =
+                    descriptor.getElementDescriptor(0).columnType().map { it.key.joinToString("__") }.associateWith {
+                        val l = ArrayList<Any?>()
+                        writer(composeName(t, it), l)
+                        l
+                    }
+                val valueLists =
+                    descriptor.getElementDescriptor(1).columnType().map { it.key.joinToString("__") }.associateWith {
+                        val l = ArrayList<Any?>()
+                        writer(composeName(composeName(t, it), "value"), l)
+                        l
+                    }
                 var isKey = true
                 DbLikeMapEncoder(
                     serializersModule = serializersModule,
