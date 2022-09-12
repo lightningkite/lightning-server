@@ -42,6 +42,8 @@ class SerialDescriptorTable(name: String, val descriptor: SerialDescriptor) : Ta
             }
     }
 
+    override val primaryKey: PrimaryKey? = columns.find { it.name =="_id" }?.let { PrimaryKey(it) }
+
     val col = columns.associateBy { it.name }
 
     init {

@@ -46,12 +46,7 @@ class PostgresCollection<T : Any>(
         prepare.await()
         val items = t {
             table
-                .select {
-                    when (val c = condition(condition, serializer, table)) {
-                        is Op -> c
-                        else -> c.eq(LiteralOp(BooleanColumnType(), true))
-                    }
-                }
+                .select { condition(condition, serializer, table).asOp() }
                 .orderBy(*orderBy.map { table.col[it.field.property.name]!! to if (it.ascending) SortOrder.ASC else SortOrder.DESC }
                     .toTypedArray())
                 .limit(limit, skip.toLong())
@@ -64,12 +59,9 @@ class PostgresCollection<T : Any>(
     override suspend fun count(condition: Condition<T>): Int {
         prepare.await()
         return t {
-            table.select {
-                when (val c = condition(condition, serializer, table)) {
-                    is Op -> c
-                    else -> c.eq(LiteralOp(BooleanColumnType(), true))
-                }
-            }.count().toInt()
+            table
+                .select { condition(condition, serializer, table).asOp() }
+                .count().toInt()
         }
     }
 
@@ -78,12 +70,9 @@ class PostgresCollection<T : Any>(
         return t {
             val groupCol = table.col[groupBy.name] as Column<Key>
             val count = Count(stringLiteral("*"))
-            table.slice(groupCol, count).select {
-                when (val c = condition(condition, serializer, table)) {
-                    is Op -> c
-                    else -> c.eq(LiteralOp(BooleanColumnType(), true))
-                }
-            }.groupBy(table.col[groupBy.name]!!).associate { it[groupCol] to it[count].toInt() }
+            table.slice(groupCol, count)
+                .select { condition(condition, serializer, table).asOp() }
+                .groupBy(table.col[groupBy.name]!!).associate { it[groupCol] to it[count].toInt() }
         }
     }
 
@@ -101,12 +90,9 @@ class PostgresCollection<T : Any>(
                 Aggregate.StandardDeviationSample -> StdDevSamp(valueCol, 8)
                 Aggregate.StandardDeviationPopulation -> StdDevPop(valueCol, 8)
             }
-            table.slice(agg).select {
-                when (val c = condition(condition, serializer, table)) {
-                    is Op -> c
-                    else -> c.eq(LiteralOp(BooleanColumnType(), true))
-                }
-            }.firstOrNull()?.get(agg)?.toDouble()
+            table.slice(agg)
+                .select { condition(condition, serializer, table).asOp() }
+                .firstOrNull()?.get(agg)?.toDouble()
         }
     }
 
@@ -126,12 +112,9 @@ class PostgresCollection<T : Any>(
                 Aggregate.StandardDeviationSample -> StdDevSamp(valueCol, 8)
                 Aggregate.StandardDeviationPopulation -> StdDevPop(valueCol, 8)
             }
-            table.slice(groupCol, agg).select {
-                when (val c = condition(condition, serializer, table)) {
-                    is Op -> c
-                    else -> c.eq(LiteralOp(BooleanColumnType(), true))
-                }
-            }.groupBy(table.col[groupBy.name]!!).associate { it[groupCol] to it[agg]?.toDouble() }
+            table.slice(groupCol, agg)
+                .select { condition(condition, serializer, table).asOp() }
+                .groupBy(table.col[groupBy.name]!!).associate { it[groupCol] to it[agg]?.toDouble() }
         }
     }
 
@@ -162,23 +145,61 @@ class PostgresCollection<T : Any>(
         modification: Modification<T>,
         model: T,
     ): Boolean {
-        TODO("Not yet implemented")
+        TODO()
     }
 
     override suspend fun updateOne(condition: Condition<T>, modification: Modification<T>): EntryChange<T> {
-        TODO("Not yet implemented")
+        return t {
+            val old = table.updateReturningOld(
+                where = { condition(condition, serializer, table).asOp() },
+                limit = 1,
+                body = {
+                    it.modification(modification, serializer, table)
+                }
+            )
+            old.map { format.decode(serializer, it) }.firstOrNull()?.let {
+                EntryChange(it, modification(it))
+            } ?: EntryChange()
+        }
     }
 
     override suspend fun updateOneIgnoringResult(condition: Condition<T>, modification: Modification<T>): Boolean {
-        TODO("Not yet implemented")
+        return t {
+            table.update(
+                where = { condition(condition, serializer, table).asOp() },
+                limit = null,
+                body = {
+                    it.modification(modification, serializer, table)
+                }
+            )
+        } > 0
     }
 
     override suspend fun updateMany(condition: Condition<T>, modification: Modification<T>): CollectionChanges<T> {
-        TODO("Not yet implemented")
+        return t {
+            val old = table.updateReturningOld(
+                where = { condition(condition, serializer, table).asOp() },
+                limit = null,
+                body = {
+                    it.modification(modification, serializer, table)
+                }
+            )
+            CollectionChanges(old.map { format.decode(serializer, it) }.map {
+                EntryChange(it, modification(it))
+            })
+        }
     }
 
     override suspend fun updateManyIgnoringResult(condition: Condition<T>, modification: Modification<T>): Int {
-        TODO("Not yet implemented")
+        return t {
+            table.update(
+                where = { condition(condition, serializer, table).asOp() },
+                limit = null,
+                body = {
+                    it.modification(modification, serializer, table)
+                }
+            )
+        }
     }
 
     override suspend fun deleteOne(condition: Condition<T>): T? {

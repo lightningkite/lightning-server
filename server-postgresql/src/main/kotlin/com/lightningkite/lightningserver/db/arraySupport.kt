@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.db
 import com.lightningkite.lightningdb.listElement
 import kotlinx.serialization.KSerializer
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.statements.jdbc.JdbcConnectionImpl
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 
@@ -64,8 +65,6 @@ class ArrayColumnType(val type: ColumnType) : ColumnType() {
             else -> throw IllegalStateException("Not sure how to translate $value (${value::class.qualifiedName}) into a db array!")
         }
     }
-    fun arrayLengthOp(value: Expression<List<*>>) = CustomFunction<Int>("array_length", IntegerColumnType(), value, intLiteral(1))
-    fun index(array: Expression<List<*>>, value: Expression<*>) = CustomFunction<Int>("array_position", IntegerColumnType(), array, value)
 }
 
 //class ArrayOp<T>(val expr1: Expression<List<T>>, val keyword: String = "ANY") : Op<T>() {
@@ -84,6 +83,35 @@ class ArrayColumnType(val type: ColumnType) : ColumnType() {
 //        queryBuilder.append(")")
 //    }
 //}
+
+fun <T> ArrayLengthOp(array: Expression<List<T>>) = CustomFunction<Int>("array_length", IntegerColumnType(), array, intLiteral(1))
+fun <T> ArrayIndexOfOp(array: Expression<List<T>>, value: Expression<T>) = CustomFunction<Int>("array_position", IntegerColumnType(), array, value)
+
+class SliceOp<T>(
+    val source: Expression<List<T>>,
+    val from: Expression<Int> = LiteralOp(IntegerColumnType(), 1),
+    val to: Expression<Int> = ArrayLengthOp(source),
+): Op<List<T>>() {
+    override fun toQueryBuilder(queryBuilder: QueryBuilder) {
+        queryBuilder.append(source)
+        queryBuilder.append('[')
+        queryBuilder.append(from)
+        queryBuilder.append(':')
+        queryBuilder.append(to)
+        queryBuilder.append(']')
+    }
+}
+
+class ConcatOp<T>(vararg val sources: Expression<T>): Op<T>() {
+    override fun toQueryBuilder(queryBuilder: QueryBuilder) {
+        var first = true
+        for(entry in sources) {
+            if(first) first = false
+            else queryBuilder.append(" || ")
+            queryBuilder.append(entry)
+        }
+    }
+}
 
 class GetOp<T>(val source: Expression<List<T>>, val index: Expression<Int>): Op<T>() {
     override fun toQueryBuilder(queryBuilder: QueryBuilder) {
@@ -110,23 +138,26 @@ class AnyIsTrueOp(val source: Expression<List<Boolean>>): Op<Boolean>() {
     }
 }
 
-internal class MapOp<A, B>(val sources: FieldSet2<List<A>>, val mapper: (FieldSet2<A>)->Expression<B>): Op<List<B>>() {
+internal class MapOp<A, B>(
+    val sources: FieldSet2<List<A>>,
+    val mapper: (FieldSet2<A>) -> Expression<B>,
+    val filter: (FieldSet2<A>) -> Expression<Boolean> = { Op.TRUE },
+): Op<List<B>>() {
     override fun toQueryBuilder(queryBuilder: QueryBuilder) {
-        queryBuilder.append("(SELECT ")
-        queryBuilder.append(mapper(
-            FieldSet2<A>(
-                sources.serializer.listElement()!! as KSerializer<A>,
-                fields = sources.fields.mapValues {
-                    object: ExpressionWithColumnType<Any?>() {
-                        override val columnType: IColumnType
-                            get() = (it.value.columnType as ArrayColumnType).type
-                        override fun toQueryBuilder(queryBuilder: QueryBuilder) {
-                            queryBuilder.append(it.key.takeUnless { it.isEmpty() } ?: "it")
-                        }
+        val fs = FieldSet2<A>(
+            sources.serializer.listElement()!! as KSerializer<A>,
+            fields = sources.fields.mapValues {
+                object: ExpressionWithColumnType<Any?>() {
+                    override val columnType: IColumnType
+                        get() = (it.value.columnType as ArrayColumnType).type
+                    override fun toQueryBuilder(queryBuilder: QueryBuilder) {
+                        queryBuilder.append(it.key.takeUnless { it.isEmpty() } ?: "it")
                     }
                 }
-            )
-        ))
+            }
+        )
+        queryBuilder.append("ARRAY(SELECT ")
+        queryBuilder.append(mapper(fs))
         queryBuilder.append(" FROM unnest(")
         var first = true
         for(f in sources.fields) {
@@ -141,7 +172,9 @@ internal class MapOp<A, B>(val sources: FieldSet2<List<A>>, val mapper: (FieldSe
             else queryBuilder.append(", ")
             queryBuilder.append(s.key.takeUnless { it.isEmpty() } ?: "it")
         }
-        queryBuilder.append("))")
+        queryBuilder.append(") WHERE ")
+        queryBuilder.append(filter(fs))
+        queryBuilder.append(")")
     }
 }
 
@@ -158,5 +191,12 @@ class InsensitiveLikeEscapeOp(expr1: Expression<*>, expr2: Expression<*>, like: 
                 +stringParam(escapeChar.toString())
             }
         }
+    }
+}
+
+fun Expression<Boolean>.asOp(): Op<Boolean> {
+    return when (this) {
+        is Op -> this
+        else -> this.eq(LiteralOp(BooleanColumnType(), true))
     }
 }

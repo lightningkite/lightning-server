@@ -1,9 +1,6 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.Condition
-import com.lightningkite.lightningdb.condition
-import com.lightningkite.lightningdb.eq
-import com.lightningkite.lightningdb.insertOne
+import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningdb.test.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import io.zonky.test.db.postgres.junit.EmbeddedPostgresRules
@@ -13,8 +10,12 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.*
+import org.postgresql.util.PGobject
+import java.sql.ResultSet
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZonedDateTime
@@ -28,6 +29,7 @@ class BasicTest() {
     val pg = EmbeddedPostgresRules.singleInstance()
 
     @Test fun schema2() {
+        prepareLargeTestModelFields()
         val db = Database.connect(pg.embeddedPostgres.postgresDatabase)
         val collection = PostgresCollection(db, "LargeTestModel", LargeTestModel.serializer())
         runBlocking {
@@ -36,7 +38,79 @@ class BasicTest() {
             collection.insertOne(t)
             assertEquals(t, collection.find(Condition.Always()).firstOrNull())
             assertEquals(t, collection.find(condition { it.byte eq 0 }).firstOrNull())
+            assertEquals(t.byte, collection.updateOne(Condition.Always(), modification { it.byte + 1 }).old?.byte)
+            assertEquals(t.byte.plus(1).toByte(), collection.updateOne(Condition.Always(), modification { it.byte + 1 }).old?.byte)
+            assertEquals(t.byte.plus(2).toByte(), collection.updateOne(Condition.Always(), modification { it.byte + 1 }).old?.byte)
+            assertEquals(t.byte.plus(3).toByte(), collection.updateOne(Condition.Always(), modification { it.byte + 1 }).old?.byte)
         }
+    }
+
+    @Test fun schema3() {
+        val db = Database.connect(pg.embeddedPostgres.postgresDatabase)
+        runBlocking {
+            newSuspendedTransaction(db = db) {
+                exec("""
+                    CREATE TYPE inventory_item AS (
+                       name text,
+                       supplier_id integer,
+                       price numeric
+                    )
+                """.trimIndent())
+                exec("""
+                    CREATE TABLE on_hand (
+                       item inventory_item,
+                       count integer
+                    )
+                """.trimIndent())
+                exec("""
+                    INSERT INTO on_hand VALUES (ROW('fuzzy dice', 42, 1.99), 1000)
+                """.trimIndent())
+                TestTable.selectAll().forEach {
+                    println(it)
+                    println(it[TestTable.item])
+                }
+            }
+        }
+    }
+    class InventoryItemType(): ColumnType() {
+        override fun sqlType(): String = "inventory_item"
+        override fun nonNullValueToString(value: Any): String {
+            println("Value: $value, type: ${value::class.qualifiedName}")
+            (value as? PGobject)?.let { println(it.type); println(it.value) }
+            return super.nonNullValueToString(value)
+        }
+
+        override fun notNullValueToDB(value: Any): Any {
+            println("Value: $value, type: ${value::class.qualifiedName}")
+            (value as? PGobject)?.let { println(it.type); println(it.value) }
+            return super.notNullValueToDB(value)
+        }
+
+        override fun readObject(rs: ResultSet, index: Int): Any? {
+            return super.readObject(rs, index)
+        }
+
+        override fun valueFromDB(value: Any): Any {
+            println("Value: $value, type: ${value::class.qualifiedName}")
+            (value as? PGobject)?.let { println(it.type); println(it.value) }
+            return super.valueFromDB(value)
+        }
+
+        override fun valueToDB(value: Any?): Any? {
+            println("Value: $value, type: ${value?.let { it::class.qualifiedName}}")
+            (value as? PGobject)?.let { println(it.type); println(it.value) }
+            return super.valueToDB(value)
+        }
+
+        override fun valueToString(value: Any?): String {
+            println("Value: $value, type: ${value?.let { it::class.qualifiedName}}")
+            (value as? PGobject)?.let { println(it.type); println(it.value) }
+            return super.valueToString(value)
+        }
+    }
+    object TestTable: Table("on_hand") {
+        val item = registerColumn<Any?>("item", InventoryItemType())
+        val count = integer("count")
     }
 }
 
@@ -120,13 +194,6 @@ class PostgresModificationTests : ModificationTests() {
 }
 
 class PostgresSortTest : SortTest() {
-    companion object {
-        @ClassRule @JvmField val postgres = EmbeddedPostgresRules.singleInstance()
-    }
-    override val database: com.lightningkite.lightningdb.Database by lazy { PostgresDatabase(Database.connect(postgres.embeddedPostgres.postgresDatabase)) }
-}
-
-class PostgresMetaTest : MetaTest() {
     companion object {
         @ClassRule @JvmField val postgres = EmbeddedPostgresRules.singleInstance()
     }
