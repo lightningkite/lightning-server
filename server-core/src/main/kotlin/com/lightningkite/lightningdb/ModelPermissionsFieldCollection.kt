@@ -20,10 +20,6 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         maxQueryMs: Long
     ): Flow<Model> {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
-        println(condition)
-        println(permissions.read)
-        println(sortImposedConditions)
-        println(permissions.readMask(condition))
         return wraps.find(
             condition = condition and permissions.read and sortImposedConditions and permissions.readMask(condition),
             orderBy = orderBy,

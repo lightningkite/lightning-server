@@ -34,11 +34,9 @@ fun <USER> ServerPath.healthCheck(
             if (!allowed(user)) throw ForbiddenException()
             val now = Instant.now()
             ServerHealth(
-                features = Settings.current().entries.mapNotNull {
+                features = Settings.requirements.mapValues { it.value() }.entries.mapNotNull {
                     val checkable =
-                        it.value as? HealthCheckable
-                            ?: (it.value as? ()->Any?)?.invoke() as? HealthCheckable
-                            ?: return@mapNotNull null
+                        it.value as? HealthCheckable ?: return@mapNotNull null
                     it.key to checkable
                 }
                     .associate {

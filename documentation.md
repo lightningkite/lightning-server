@@ -40,7 +40,7 @@ Additionally, you'll need to call it in main:
 
 If you make an HTTP get request to `localhost::8080`, you'll get the response `"Hello World!"`, as specified in the
 server code. How does it work? The `Server` object inherits from `ServerPathGroup`, which is passed `ServerPath.root`.
-This sets up our object so that any `ServerPath` added to it (or `HttpEndpoint` with a `ServerPath` tied to it) gets
+This sets up your object so that any `ServerPath` added to it (or `HttpEndpoint` with a `ServerPath` tied to it) gets
 added to the server's root path, allowing it to handle requests.
 
 Inside the object, `path.get.handler {}` is called. This lambda simply creates an HTTP get endpoint and expects
@@ -54,9 +54,9 @@ This example uses an HTTP `get` handler, but LightningServer provides handlers f
 
 ### ServerPathGroups
 
-LightningServer provides an abstract class called `ServerPathGroup`, which we inherited from for our `Server` object.
+LightningServer provides an abstract class called `ServerPathGroup`, which you inherited from for your `Server` object.
 This class simply appends all of its `ServerPaths` and `HttpEndpoints` to whatever path was passed to it. Looking back
-at the server, we have it like so:
+at the server, you have it like so:
 
 <pre><code>object Server : ServerPathGroup(ServerPath.root) {
     // body...
@@ -142,8 +142,8 @@ If you run the code now, you should get an error that reads `Settings were incor
 The reason for this error (and the one [previously](#running-a-server)) is that LightningServer keeps the settings file
 up to date with the settings declared in code every time `loadSettings()` is called. If they do not
 match, `loadSettings()` will generate a file with suggested settings. In many cases, you may need to modify these
-settings slightly, although in others it may be fine to use them as is. For our server, the suggested settings are what
-we need, so we can just copy the contents of the generated `settings.suggested.json` file into `settings.json`. After
+settings slightly, although in others it may be fine to use them as is. For your server, the suggested settings are what
+you need, so you can just copy the contents of the generated `settings.suggested.json` file into `settings.json`. After
 you've done that, you can safely delete the suggested settings file. Running the server again should work without any
 errors.
 
@@ -193,7 +193,7 @@ Another thing to take note of is the `summary` field, which isn't being used cur
 The last example was fairly simple. You might want your server to be able to send and receive more complicated
 information like your own data types. Create a new file called `models.kt`. This file will contain all of your data
 classes. Additionally, create a new `User` model consisting of a `String` first and last name that the server will use
-instead of the `Int` setup from before. Because this data needs to be serialized in our endpoints, you have to add
+instead of the `Int` setup from before. Because this data needs to be serialized in your endpoints, you have to add
 the `@Serializable` annotation to the class, or LightningServer will not be able to serialize it from JSON.
 
 <pre><code>@Serializable
@@ -331,93 +331,23 @@ insert a `User` into the collection.
 
 ### Conditions
 
-The previous example uses a `Condition`. When you want to write conditional statements on data in a FieldCollection,
-this is what you will use. There are multiple ways to define a `Condition`. First, look at the one from the previous
-example:
+The previous example uses a `Condition`.  `Conditions` are used when you want to operate on information in the database
+and there are many functions that require a `Condition` as a parameter in LightingServer. It's important to note that
+`Conditions` are not functions that return booleans, nor are they equivalent to if statements. `Condition` is a class.
+Here is one way to define a `Condition`:
 
-<pre><code>Condition.Always&lt;User&gt;()</code></pre>
+<pre><code>Condition.Always()</code></pre>
 
-This creates a `Condition` for the `User` model that calls `Always()`, a shorthand for setting the `Condition` to always
-be `true`. Take a look at how this is used:
+This creates a `Condition` that calls `Always()`, a shorthand for setting the `Condition` to always be `true`.
+Conversely, you can also set the `Condition` to never be true (or rather to always be false) with `Never()`:
 
-<pre><code> override suspend fun collection(principal: User?): FieldCollection&lt;User&gt; {
-    val everybody = Condition.Always&lt;User&gt;()
-    return collection.withPermissions(
-        ModelPermissions(
-            create = everybody,
-            read = everybody,
-            update = everybody,
-            delete = everybody
-        )
-    )
-}</code></pre>
+<pre><code>Condition.Never()</code></pre>
 
-Here, the `User` model permissions are defined. The `create`, `read`, `update`, and `delete` fields are set to the
-`Condition`. When someone tries one of those operations, the `Condition` it is given will be checked to decide whether
-they have access to that operation. Since the `Condition` is set to `true` via `Always()`, anyone who tries any of those
-operations will be granted access. But what if you changed the permissions to this?:
+You can also create a `Condition` using the function `condition()`, which has an internal syntax using infix operators:
 
-<pre><code> override suspend fun collection(principal: User?): FieldCollection&lt;User&gt; {
-    val nobody = Condition.Never&lt;User&gt;()
-    return collection.withPermissions(
-        ModelPermissions(
-            create = nobody,
-            read = nobody,
-            update = nobody,
-            delete = nobody
-        )
-    )
-}</code></pre>
+<pre><code>condition { it: User -> it.firstname eq "Test First Name" }</code></pre>
 
-As you might expect, `Never()` sets the `Condition` to never be `true`, or rather to always be `false`. Run the server
-and test the `get` and `post` endpoints again. This code means that anyone who tries any operation will be denied
-access. Not very useful if you want anyone to access your data! Instead, you'll probably want a slightly more advanced
-`Condition`. For example, you may only want certain `Users` (admins) to be able to make requests. To do this, you'll
-need to add a flag to the `User` model for whether they are an admin, and you'll need to make use of the `principal`
-parameter, which contains the given `User` attempting to make the request. Using these bits of information together, we
-can write a new `Condition`:
-
-<pre><code>data class User(
-    override val _id: UUID = UUID.randomUUID()
-    val firstname: String,
-    val lastname: String,
-    val isAdmin: Boolean
-) : HasId&lt;UUID&gt;</code></pre>
-
-<pre><code>override suspend fun collection(principal: User?): FieldCollection&lt;User&gt; {
-    val admins = if (principal?.isAdmin == true) Condition.Always&lt;User&gt;() else Condition.Never&lt;User&gt;()
-    return collection.withPermissions(
-        ModelPermissions(
-            create = admins,
-            read = admins,
-            update = admins,
-            delete = admins
-        )
-    )
-}</code></pre>
-
-This all works just fine. Only `Users` with the `isAdmin` flag set to true will be able to access these operations. But
-what about a user trying to access operations for their own `User`? Rather, what if a `User` wanted to be able to
-read and write their own fields, such as their `firstname` and `lastname`? To do this, you'll have to have multiple
-`Conditions`, and this example will also show you another way to create one:
-
-<pre><code>override suspend fun collection(principal: User?): FieldCollection&lt;User&gt; {
-    val admins = if (principal?.isAdmin == true) Condition.Always&lt;User&gt;() else Condition.Never&lt;User&gt;()
-    return collection.withPermissions(
-        ModelPermissions(
-            create = admins,
-            read = if (principal != null) condition { it._id eq principal._id } else admins,
-            update = admins,
-            delete = admins
-        )
-    )
-}</code></pre>
-
-Now, `Users` can read their own data.
-
-Here is another way to write a condition:
-
-<pre><code>condition { it.firstname eq "Test First Name" }</code></pre>
+Given a `User`, this `Condition` would return true if the `firstname` on it equals the string `"Test First Name"`.
 
 Like with normal if statements, you can test for multiple `Conditions` at once using the infix operators `and` and
 `or`, which work as you would expect. Note that you need to wrap individual conditions in parentheses:
@@ -432,9 +362,8 @@ Like with normal if statements, you can test for multiple `Conditions` at once u
     (it.lastname eq "Test Last Name")
 }</code></pre>
 
-`Conditions` are only used in certain contexts, mainly as a parameter for functions on a `FieldCollection` or other
-related items, such as `ModelPermissions()` from before. Here is an example of how you could use this to get a list
-of `Users` from the collection that are all admins using the function `find()`:
+Here is an example of how you could use this to get a list of `Users` from the collection that are all admins using the
+function `find()`, which needs a `Condition`:
 
 <pre><code>val users = collection.find(condition = condition {
     it.isAdmin eq true
@@ -462,9 +391,8 @@ to wrap individual modifications with parentheses:
     (it.lastname assign "New Last Name")
 }</pre>
 
-Like `Conditions`, `Modifications` are only used in certain contexts. They are generally used as parameters to functions
-on a `FieldCollection`. For example, here is how you could use a `Modification` to modify the name of an existing `User`
-with a given id using the function `updateOneById()`:
+Here is an example of how you could use a `Modification` to modify the name of an existing `User` with a given id using
+the function `updateOneById()`:
 
 <pre><code>val userId = /* obtain user id */
 collection.updateOneById(id = userId, modification = modification {
@@ -472,6 +400,182 @@ collection.updateOneById(id = userId, modification = modification {
 })</code></pre>
 
 You can find a full list of the operations you can perform inside a `Modification` in `docs-feature-list.md`.
+
+## Authentication and authorization
+
+To start using authentication and authorization in your server, you first need to set up JWT tokens, as that is what
+LightningServer uses to authenticate calls. To start using JWT tokens, you first need to declare the `JwtSigner`
+setting in your `Server` object:
+
+<pre><code>object Server : ServerPathGroup(ServerPath.root) {
+    val database = setting("database", DatabaseSettings())
+    val userSigner = setting("userJwt", JwtSigner())
+
+    // ...
+}</code></pre>
+
+Now that you have the `JwtSigner`, you also need to create a path for `AuthEndpoints`. `AuthEndpoints` is a
+`ServerPathGroup` within LightningServer that provides the basic endpoints you'll need for authentication in your
+server. You can add it to your server like any other path:
+
+<pre><code>object Server : ServerPathGroup(ServerPath.root) {
+    //...
+
+    val index = path.get.handler {
+        HttpResponse.plainText("Hello, ${it.user&lt;User?&gt;()?.firstname}!")
+    }
+
+    val auth = AuthEndpoints(
+        path = path("auth"),
+        userSerializer = Serialization.module.serializer(),
+        idSerializer = Serialization.module.serializer(),
+        authInfo = AuthInfo&lt;User&gt;(),
+        jwtSigner = userSigner,
+        email = email,
+        userId = { it._id },
+        userById = {
+            database().collection&lt;User&gt;().get(it)!!
+        },
+        userByEmail = {
+            database().collection&lt;User&gt;().find(Condition.OnField(HasEmailFields.email&lt;User&gt;(), Condition.Equal(it)))
+                .singleOrNull() ?: User(email = it).let { database().collection&lt;User&gt;().insertOne(it) }
+            ?: throw NotFoundException()
+        },
+        landing = "/",
+        emailSubject = { "${generalSettings().projectName} Log In" },
+        template = HtmlDefaults.defaultLoginEmailTemplate
+    ).authEndpointExtensionHtml()
+
+    val users = UserEndpoints(path("users"))
+}</code></pre>
+
+### Model permissions
+
+Going back to `UserEndpoints.kt`, lets implement permissions for the `User` object. Currently, you have them like this:
+
+<pre><code> override suspend fun collection(principal: User?): FieldCollection&lt;User&gt; {
+    val everybody = Condition.Always&lt;User&gt;()
+    return collection.withPermissions(
+        ModelPermissions(
+            create = everybody,
+            read = everybody,
+            update = everybody,
+            delete = everybody
+        )
+    )
+}</code></pre>
+
+Here, the `User` model permissions are defined. The `create`, `read`, `update`, and `delete` fields are set to
+`everybody`. When someone tries one of those operations, the `Condition` it is given will be checked to decide whether
+they have access to that operation. Since the `Condition` is set to `true` via `Always()`, anyone who tries any of those
+operations will be granted access. You probably don't want that to be the case. Rather, you may want certain access
+rights to be granted to certain `Users` (admins). To implement this kind of system, you'll need to add a flag to
+the `User` model for whether they are an admin, and you'll need to make use of the `principal` parameter, which contains
+the given `User` attempting to make the request. Using these bits of information together, you can write a
+new `Condition`:
+
+<pre><code>data class User(
+    override val _id: UUID = UUID.randomUUID()
+    val firstname: String,
+    val lastname: String,
+    val isAdmin: Boolean
+) : HasId&lt;UUID&gt;</code></pre>
+
+<pre><code>override suspend fun collection(principal: User?): FieldCollection&lt;User&gt; {
+    val admins = if (principal?.isAdmin == true) Condition.Always&lt;User&gt;() else Condition.Never&lt;User&gt;()
+    return collection.withPermissions(
+        ModelPermissions(
+            create = admins,
+            read = admins,
+            update = admins,
+            delete = admins
+        )
+    )
+}</code></pre>
+
+This all works just fine. Only `Users` with the `isAdmin` flag set to true will be able to access the operations. But
+what about a user trying to access operations for their own `User`? Rather, what if a `User` wanted to be able to
+read and write their own fields, such as their `firstname` and `lastname`? To do this, you'll have to have multiple
+`Conditions`, and this example will also show you another way to create one:
+
+<pre><code>override suspend fun collection(principal: User?): FieldCollection&lt;User&gt; {
+    val admins = if (principal?.isAdmin == true) Condition.Always&lt;User&gt;() else Condition.Never&lt;User&gt;()
+    return collection.withPermissions(
+        ModelPermissions(
+            create = admins,
+            read = if (principal != null) condition { it._id eq principal._id } else admins,
+            update = if (principal != null) condition { it._id eq principal._id } else admins,
+            delete = admins
+        )
+    )
+}</code></pre>
+
+Now, `Users` can read and write their own data. This presents an interesting problem, however. You want `Users` to be
+able to edit their `firstname` and `lastname` fields, but you definitely wouldn't want them to be able to change the
+`_id` or `isAdmin` fields. It follows that you need a way to allow `Users` to edit only some of the fields on their
+`User` model. You can do this by using `updateRestrictions()`:
+
+<pre><code>override suspend fun collection(principal: User?): FieldCollection&lt;User&gt; {
+    val admins = if (principal?.isAdmin == true) Condition.Always&lt;User&gt;() else Condition.Never&lt;User&gt;()
+    return collection.withPermissions(
+        ModelPermissions(
+            create = admins,
+            read = if (principal != null) condition { it._id eq principal._id } else admins,
+            update = if (principal != null) condition { it._id eq principal._id } else admins,
+            updateRestrictions = updateRestrictions {
+                it._id.cannotBeModified(),
+                it.isAdmin.cannotBeModified()
+            },
+            delete = admins
+        )
+    )
+}</code></pre>
+
+This prevents the `_id` and `isAdmin` field from being changed. Instead of `cannotBeModified()`, you can also use other
+functions, such as `requires()`, which could be used, for example, to allow only admins to change the `isAdmin` field on
+a `User`:
+
+<pre><code>override suspend fun collection(principal: User?): FieldCollection&lt;User&gt; {
+    val admins = if (principal?.isAdmin == true) Condition.Always&lt;User&gt;() else Condition.Never&lt;User&gt;()
+    return collection.withPermissions(
+        ModelPermissions(
+            create = admins,
+            read = if (principal != null) condition { it._id eq principal._id } else admins,
+            update = if (principal != null) condition { it._id eq principal._id } else admins,
+            updateRestrictions = updateRestrictions {
+                it._id.cannotBeModified(),
+                it.isAdmin.requires(admins)
+            },
+            delete = admins
+        )
+    )
+}</code></pre>
+
+You can also apply similar granular restrictions to reading the fields as well. This is done using `readMask`:
+
+<pre><code>override suspend fun collection(principal: User?): FieldCollection&lt;User&gt; {
+    val admins = if (principal?.isAdmin == true) Condition.Always&lt;User&gt;() else Condition.Never&lt;User&gt;()
+    return collection.withPermissions(
+        ModelPermissions(
+            create = admins,
+            read = if (principal != null) condition { it._id eq principal._id } else admins,
+            readMask = mask {
+                it._id.maskedTo(null).unless(admins),
+                it.isAdmin.maskedTo(null).unless(admins)
+            },
+            update = if (principal != null) condition { it._id eq principal._id } else admins,
+            updateRestrictions = updateRestrictions {
+                it._id.cannotBeModified(),
+                it.isAdmin.requires(admins)
+            },
+            delete = admins
+        )
+    )
+}</code></pre>
+
+This code sets the model up so that only admins can read and write the `_id` and `isAdmin` properties on a given `User`
+model. If a `User` with the `isAdmin` field set to false tries a read on another `User`, they will only obtain the
+`firstname` and `lastname` fields, as the others will be masked to `null`.
 
 ## Documenting your server's endpoints
 

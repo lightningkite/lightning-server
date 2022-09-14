@@ -21,11 +21,11 @@ object Settings {
         if(missing.isNotEmpty()) {
             throw IllegalStateException("Settings for ${missing.joinToString()} are missing.")
         }
-        requirements.values.forEach { it() }
+//        requirements.values.forEach { it() }
     }
     private data class Box<T>(val item: T)
     private val values = ConcurrentHashMap<String, Box<*>>()
-    fun current(): Map<String, Any?> = values.mapValues { it.value.item }
+    internal fun current(): Map<String, Any?> = values.mapValues { it.value.item }
     val requirements = HashMap<String, Requirement<*, *>>()
     init {
         generalSettings

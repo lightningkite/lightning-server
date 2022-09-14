@@ -28,6 +28,7 @@ data class ActionHasOccurred(override val _id: String, val started: Instant? = n
 
 @LightningServerDsl
 fun startupOnce(name: String, database: ()-> Database, maxDuration: Long = 60_000, priority: Double = 0.0, action: suspend ()->Unit): StartupAction {
+    prepareModels()
     return startup(priority) {
         val a = database().collection<ActionHasOccurred>()
         val existing = a.get(name)
