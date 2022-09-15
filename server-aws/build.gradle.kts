@@ -17,10 +17,13 @@ val khrysalisVersion: String by project
 val coroutines: String by project
 val awsVersion = "2.17.261"
 dependencies {
+    api(project(":server-postgresql"))
+    api(project(":server-dynamodb"))
     api(project(":server-core"))
     api("software.amazon.awssdk:s3:$awsVersion")
     api("software.amazon.awssdk:lambda:$awsVersion")
     api("software.amazon.awssdk:ses:$awsVersion")
+    api("software.amazon.awssdk:rds:$awsVersion")
     api("software.amazon.awssdk:apigatewaymanagementapi:$awsVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:$coroutines")
     api("com.amazonaws:aws-lambda-java-core:1.2.1")

@@ -15,6 +15,7 @@ module "domain" {
   domain_name         = "example.demo.ivieleague.com"
   domain_name_zone    = "ivieleague.com"
   debug               = true
+  secure_over_cheap   = false
   cors = {
     allowedDomains = ["*"]
     allowedHeaders = ["*"]

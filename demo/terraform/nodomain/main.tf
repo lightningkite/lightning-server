@@ -4,6 +4,7 @@ module "Base" {
   deployment_location = var.deployment_location
   deployment_name = var.deployment_name
   debug = var.debug
+  secure_over_cheap = var.secure_over_cheap
   # general
   cors = var.cors
   # database

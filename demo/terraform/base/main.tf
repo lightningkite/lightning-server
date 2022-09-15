@@ -5,7 +5,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 4.0.0"
+      version = "~> 4.30"
     }
     random = {
       source  = "hashicorp/random"
@@ -33,9 +33,11 @@ module "vpc" {
   private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
   public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 
-  enable_nat_gateway = true
+  enable_nat_gateway = var.secure_over_cheap
   single_nat_gateway = true
   enable_vpn_gateway = false
+  enable_dns_hostnames = !var.secure_over_cheap
+  enable_dns_support   = !var.secure_over_cheap
 }
 
 resource "aws_vpc_endpoint" "s3" {
@@ -113,14 +115,14 @@ resource "aws_security_group" "internal" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks)
+    cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.secure_over_cheap ? [] : ["0.0.0.0/0"])
   }
 
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks)
+    cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.secure_over_cheap ? [] : ["0.0.0.0/0"])
   }
 }
 
@@ -169,30 +171,35 @@ resource "random_password" "database" {
   override_special = "-_"
 }
 resource "aws_db_subnet_group" "database" {
-  name       = "demo-${var.deployment_name}-database"
-  subnet_ids = module.vpc.private_subnets
+  name       = "demo-${var.deployment_name}-database2"
+  subnet_ids = var.secure_over_cheap ? module.vpc.private_subnets : module.vpc.public_subnets 
 }
 resource "aws_rds_cluster" "database" {
   cluster_identifier = "demo-${var.deployment_name}-database"
   engine             = "aurora-postgresql"
-  engine_mode        = "serverless"
-  engine_version     = "10.18"
+  engine_mode        = "provisioned"
+  engine_version     = "13.6"
   database_name      = "demo${var.deployment_name}database"
   master_username = "master"
   master_password = random_password.database.result
   skip_final_snapshot = var.debug
   final_snapshot_identifier = "demo-${var.deployment_name}-database"
-  enable_http_endpoint = true
   vpc_security_group_ids = [aws_security_group.internal.id]
   db_subnet_group_name    = "${aws_db_subnet_group.database.name}"
 
-  scaling_configuration {
-    auto_pause = var.database_auto_pause
+  serverlessv2_scaling_configuration {
     min_capacity = var.database_min_capacity
     max_capacity = var.database_max_capacity
-    seconds_until_auto_pause = 300
-    timeout_action = "ForceApplyCapacityChange"
   }
+}
+
+resource "aws_rds_cluster_instance" "database" {
+  publicly_accessible = !var.secure_over_cheap
+  cluster_identifier = aws_rds_cluster.database.id
+  instance_class     = "db.serverless"
+  engine             = aws_rds_cluster.database.engine
+  engine_version     = aws_rds_cluster.database.engine_version
+  db_subnet_group_name    = "${aws_db_subnet_group.database.name}"
 }
 
 ##########
@@ -587,9 +594,12 @@ resource "aws_iam_role_policy_attachment" "api_gateway_ws" {
 
           role = aws_iam_role.main_exec.arn
           
-          vpc_config {
+          dynamic "vpc_config" {
+            for_each = var.secure_over_cheap ? [1] : []
+            content {
             subnet_ids = module.vpc.private_subnets
             security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
+            }
           }
           
           environment {
@@ -602,24 +612,24 @@ resource "aws_iam_role_policy_attachment" "api_gateway_ws" {
     debug = var.debug
     cors = var.cors
 },
-                database = {
+database = {
     url = "postgresql://master:${random_password.database.result}@${aws_rds_cluster.database.endpoint}/demo${var.deployment_name}database"
 },
-                cache = {
+cache = {
     url = "dynamodb://${var.deployment_location}/demo-${var.deployment_name}_${var.deployment_name}"
 },
-                jwt = {
+jwt = {
     expirationMilliseconds = var.jwt_expirationMilliseconds 
     emailExpirationMilliseconds = var.jwt_emailExpirationMilliseconds 
     secret = random_password.jwt.result
 },
-                logging = var.logging,
-                files = {
+logging = var.logging,
+files = {
     storageUrl = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
     signedUrlExpiration = var.files_expiry
 },
-                exceptions = var.exceptions,
-                email = {
+exceptions = var.exceptions,
+email = {
     url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
     fromEmail = var.email_sender
 }

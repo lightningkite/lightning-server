@@ -10,7 +10,11 @@ variable "deployment_name" {
 }
 variable "debug" {
     type = bool
-    default = "false"
+    default = false
+}
+variable "secure_over_cheap" {
+    type = bool
+    default = false
 }
 
 ##########
@@ -26,15 +30,15 @@ variable "cors" {
 ##########
 variable "database_min_capacity" {
     type = number
-    default = "2"
+    default = 0.5
 }
 variable "database_max_capacity" {
     type = number
-    default = "4"
+    default = 2
 }
 variable "database_auto_pause" {
     type = bool
-    default = "true"
+    default = true
 }
 
 ##########
@@ -42,11 +46,11 @@ variable "database_auto_pause" {
 ##########
 variable "jwt_expirationMilliseconds" {
     type = number
-    default = "31540000000"
+    default = 31540000000
 }
 variable "jwt_emailExpirationMilliseconds" {
     type = number
-    default = "1800000"
+    default = 1800000
 }
 
 ##########

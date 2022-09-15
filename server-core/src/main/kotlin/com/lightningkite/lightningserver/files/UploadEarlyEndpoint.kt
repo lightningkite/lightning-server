@@ -66,7 +66,7 @@ class UploadEarlyEndpoint(
             )
         }
     )
-    val cleanupSchedule = schedule("cleanupUploads", Duration.ofMinutes(15)) {
+    val cleanupSchedule = schedule("cleanupUploads", Duration.ofDays(1)) {
         database().collection<UploadForNextRequest>().deleteMany(condition { it.expires lt Instant.now() }).forEach {
             try {
                 it.file.fileObject.delete()

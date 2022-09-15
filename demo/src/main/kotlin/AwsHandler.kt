@@ -9,7 +9,6 @@ class AwsHandler: AwsAdapter() {
     companion object {
         init {
             Server
-            cache
             Serialization.json.decodeFromString<Settings>(System.getenv("LIGHTNING_SERVER_SETTINGS")!!)
         }
     }

@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathMatcher
 import com.lightningkite.lightningserver.cors.addCors
+import com.lightningkite.lightningserver.db.DynamoDbCache
 import com.lightningkite.lightningserver.engine.Engine
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
@@ -50,6 +51,7 @@ import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.apigatewaymanagementapi.ApiGatewayManagementApiAsyncClient
 import software.amazon.awssdk.services.apigatewaymanagementapi.model.GoneException
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.lambda.LambdaAsyncClient
 import software.amazon.awssdk.services.lambda.model.InvocationType
 import java.io.InputStream
@@ -69,7 +71,8 @@ abstract class AwsAdapter : RequestStreamHandler {
         val logger: Logger = LoggerFactory.getLogger(AwsAdapter::class.java)
         val httpMatcher by lazy { HttpEndpointMatcher(Http.endpoints.keys.asSequence()) }
         val wsMatcher by lazy { ServerPathMatcher(WebSockets.handlers.keys.asSequence()) }
-        val cache by lazy { setting("cache", CacheSettings()) }
+        private val wsCache by lazy { DynamoDbCache(DynamoDbAsyncClient.create(), "${generalSettings().projectName.filter { it.isLetter() }}WsCache") }
+        fun cache() = wsCache
         val configureEngine by lazy {
             engine = object : Engine {
                 val region = Region.of(System.getenv("AWS_REGION"))

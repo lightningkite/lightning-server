@@ -16,10 +16,6 @@ class PostgresDatabase(val db: Database) : com.lightningkite.lightningdb.Databas
                 val user = auth.substringBefore(':').takeUnless { it.isEmpty() }
                 val password = auth.substringAfter(':').takeUnless { it.isEmpty() }
                 val destination = withoutScheme.substringAfter('@')
-                println("Connection info:")
-                println("url: jdbc:postgresql://$destination")
-                println("user: $user")
-                println("password: $password")
                 if(user != null && password != null)
                     PostgresDatabase(Database.connect("jdbc:postgresql://$destination", "org.postgresql.Driver", user, password))
                 else

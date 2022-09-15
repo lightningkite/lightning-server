@@ -5,8 +5,10 @@ import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.MemcachedCache
 import com.lightningkite.lightningserver.cache.get
+import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
+import com.lightningkite.lightningserver.db.AuroraDatabase
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.db.DynamoDbCache
 import com.lightningkite.lightningserver.db.PostgresDatabase
@@ -26,6 +28,8 @@ import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.apiHelp
 import com.lightningkite.lightningserver.typed.typed
 import com.lightningkite.lightningserver.websocket.websocket
+import io.ktor.client.*
+import io.ktor.client.request.*
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.util.*
@@ -41,6 +45,7 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     init {
         SesClient
+        AuroraDatabase
         PostgresDatabase
         DynamoDbCache
         MongoDatabase
@@ -48,6 +53,8 @@ object Server : ServerPathGroup(ServerPath.root) {
         S3FileSystem
         prepareModels()
     }
+
+    val pausing = AuroraDatabase.shutdownSchedule(Duration.ofMinutes(5))
 
     val auth = AuthEndpoints(
         path = path("auth"),
@@ -99,6 +106,12 @@ object Server : ServerPathGroup(ServerPath.root) {
     }
     val testSchedule2 = schedule("test-schedule2", Duration.ofMinutes(1)) {
         println("Hello schedule 2!")
+    }
+
+    val hasInternet = path("has-internet").get.handler {
+        println("Checking for internet...")
+        val response = client.get("https://lightningkite.com")
+        HttpResponse.plainText("Got status ${response.status}")
     }
 
     val meta = path("meta").metaEndpoints<Unit> { true }

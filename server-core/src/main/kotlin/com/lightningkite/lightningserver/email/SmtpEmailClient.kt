@@ -74,8 +74,10 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
         email.subject = subject
 //        email.addHeader("X-SES-LIST-MANAGEMENT-OPTIONS", "contactListName; topic=topicName")
         email.addTo(*to.toTypedArray())
+        println("Ready to send...")
         withContext(Dispatchers.IO) {
             email.send()
         }
+        println("Email sent")
     }
 }

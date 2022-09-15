@@ -69,8 +69,8 @@ private data class TerraformSection(
         )
 
         fun inputString(name: String, default: String?) = TerraformInput(name, "string", default?.let { "\"$it\"" })
-        fun inputBoolean(name: String, default: Boolean?) = TerraformInput(name, "bool", default?.let { "\"$it\"" })
-        fun inputNumber(name: String, default: Number?) = TerraformInput(name, "number", default?.let { "\"$it\"" })
+        fun inputBoolean(name: String, default: Boolean?) = TerraformInput(name, "bool", default?.toString())
+        fun inputNumber(name: String, default: Number?) = TerraformInput(name, "number", default?.toString())
     }
 }
 
@@ -90,8 +90,8 @@ private data class TerraformSituationOverride(
 private data class TerraformProjectInfo(val projectName: String) {
     fun input(name: String, type: String, default: String?) = TerraformInput(name, type, default)
     fun inputString(name: String, default: String?) = TerraformInput(name, "string", default?.let { "\"$it\"" })
-    fun inputBoolean(name: String, default: Boolean?) = TerraformInput(name, "bool", default?.let { "\"$it\"" })
-    fun inputNumber(name: String, default: Number?) = TerraformInput(name, "number", default?.let { "\"$it\"" })
+    fun inputBoolean(name: String, default: Boolean?) = TerraformInput(name, "bool", default?.toString())
+    fun inputNumber(name: String, default: Number?) = TerraformInput(name, "number", default?.toString())
     val namePrefix: String = "${projectName}-\${var.deployment_name}"
     val namePrefixSafe: String = "${projectName.filter { it.isLetterOrDigit() }}\${var.deployment_name}"
     val namePrefixPath: String = "${projectName}/\${var.deployment_name}"
@@ -251,7 +251,7 @@ private fun handlers() {
     )
     TerraformSection.handler<DatabaseSettings>(
         name = "AuroraDB Serverless V1",
-        priority = 2,
+        priority = 1,
         inputs = { key ->
             listOf(inputNumber("${key}_min_capacity", 2), inputNumber("${key}_max_capacity", 4), inputBoolean("${key}_auto_pause", true))
         },
@@ -300,9 +300,13 @@ private fun handlers() {
     )
     TerraformSection.handler<DatabaseSettings>(
         name = "AuroraDB Serverless V2",
-        priority = 1,
+        priority = 2,
         inputs = { key ->
-            listOf(inputNumber("${key}_min_capacity", 0.5), inputNumber("${key}_max_capacity", 2))
+            listOf(
+                inputNumber("${key}_min_capacity", 0.5),
+                inputNumber("${key}_max_capacity", 2),
+                inputBoolean("${key}_auto_pause", true)
+            )
         },
         resources = { key ->
             """
@@ -310,6 +314,10 @@ private fun handlers() {
                   length           = 32
                   special          = true
                   override_special = "-_"
+                }
+                resource "aws_db_subnet_group" "${key}" {
+                  name       = "$namePrefix-${key}"
+                  subnet_ids = var.secure_over_cheap ? module.vpc.private_subnets : module.vpc.public_subnets 
                 }
                 resource "aws_rds_cluster" "$key" {
                   cluster_identifier = "$namePrefix-${key}"
@@ -331,6 +339,7 @@ private fun handlers() {
                 }
 
                 resource "aws_rds_cluster_instance" "$key" {
+                  publicly_accessible = !var.secure_over_cheap
                   cluster_identifier = aws_rds_cluster.$key.id
                   instance_class     = "db.serverless"
                   engine             = aws_rds_cluster.$key.engine
@@ -340,6 +349,7 @@ private fun handlers() {
             """.trimIndent()
         },
         settingOutput = { key ->
+                    //url = "${'$'}{var.${key}_auto_pause ? "auroradb-autopause" : "postgresql"}://master:${'$'}{random_password.${key}.result}@${'$'}{aws_rds_cluster.database.endpoint}/$namePrefixSafe${key}"
             """
                 {
                     url = "postgresql://master:${'$'}{random_password.${key}.result}@${'$'}{aws_rds_cluster.database.endpoint}/$namePrefixSafe${key}"
@@ -543,13 +553,14 @@ private fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(projectI
             TerraformSection.inputString("deployment_location", "us-west-2"),
             TerraformSection.inputString("deployment_name", null),
             TerraformSection.inputBoolean("debug", false),
+            TerraformSection.inputBoolean("secure_over_cheap", false),
         ),
         resources = """
         terraform {
           required_providers {
             aws = {
               source  = "hashicorp/aws"
-              version = "~> 4.0.0"
+              version = "~> 4.30"
             }
             random = {
               source  = "hashicorp/random"
@@ -577,8 +588,11 @@ private fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(projectI
           private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
           public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
         
-          enable_nat_gateway = true
+          enable_nat_gateway = var.secure_over_cheap
+          single_nat_gateway = true
           enable_vpn_gateway = false
+          enable_dns_hostnames = !var.secure_over_cheap
+          enable_dns_support   = !var.secure_over_cheap
         }
         
         resource "aws_vpc_endpoint" "s3" {
@@ -656,14 +670,14 @@ private fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(projectI
             from_port   = 0
             to_port     = 0
             protocol    = "-1"
-            cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks)
+            cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.secure_over_cheap ? [] : ["0.0.0.0/0"])
           }
         
           egress {
             from_port   = 0
             to_port     = 0
             protocol    = "-1"
-            cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks)
+            cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.secure_over_cheap ? [] : ["0.0.0.0/0"])
           }
         }
 
@@ -877,15 +891,18 @@ private fun awsMainAppHandler(projectInfo: TerraformProjectInfo, handlerFqn: Str
 
           role = aws_iam_role.main_exec.arn
           
-          vpc_config {
+          dynamic "vpc_config" {
+            for_each = var.secure_over_cheap ? [1] : []
+            content {
             subnet_ids = module.vpc.private_subnets
             security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
+            }
           }
           
           environment {
             variables = {
               LIGHTNING_SERVER_SETTINGS = jsonencode({
-                ${otherSections.mapNotNull { it.toLightningServer }.joinToString(",\n                ")}
+                ${otherSections.mapNotNull { it.toLightningServer }.joinToString(",\n")}
               })
             }
           }
@@ -1184,7 +1201,6 @@ private fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
 )
 
 fun terraformAws(handlerFqn: String, projectName: String = "project", root: File) {
-    AwsAdapter.cache
     handlers()
     val handlerFile = root.resolve("handlers.properties")
     val handlerNames: Properties = handlerFile
