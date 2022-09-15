@@ -37,6 +37,7 @@ private fun JsonElement.toDynamoDb(): AttributeValue {
     return when (this) {
         JsonNull -> AttributeValue.fromNul(true)
         is JsonPrimitive -> if (isString) AttributeValue.fromS(this.content)
+        else if(content == "true" || content == "false") AttributeValue.fromBool(this.content.toBoolean())
         else AttributeValue.fromN(this.content)
 
         is JsonArray -> AttributeValue.fromL(this.map { it.toDynamoDb() })

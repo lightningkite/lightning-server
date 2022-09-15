@@ -1,15 +1,45 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningserver.cache.CacheInterface
+import com.lightningkite.lightningserver.cache.CacheSettings
 import kotlinx.coroutines.*
 import kotlinx.coroutines.future.await
 import kotlinx.serialization.KSerializer
+import software.amazon.awssdk.auth.credentials.AwsCredentials
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
+import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.*
 import java.time.Duration
 import java.time.Instant
 
 class DynamoDbCache(val client: DynamoDbAsyncClient, val tableName: String = "cache"): CacheInterface {
+    companion object {
+        init {
+            CacheSettings.register("dynamodb") {
+                //dynamodb://[access:secret@]us-west-2/tableName
+                val withoutScheme = it.url.substringAfter("://")
+                val credentials = withoutScheme.substringBefore('@', "").split(':').filter { it.isNotBlank() }
+                val endpoint = withoutScheme.substringAfter('@')
+                val region = endpoint.substringBefore('/')
+                val name = endpoint.substringAfter('/')
+                val client = DynamoDbAsyncClient.builder()
+                    .credentialsProvider(
+                        if (credentials.isNotEmpty()) {
+                            StaticCredentialsProvider.create(object : AwsCredentials {
+                                override fun accessKeyId(): String = credentials[0]
+                                override fun secretAccessKey(): String = credentials[1]
+                            })
+                        } else DefaultCredentialsProvider.create()
+                    )
+                    .region(Region.of(region))
+                    .build()
+                DynamoDbCache(client, name)
+            }
+        }
+    }
+
     @OptIn(DelicateCoroutinesApi::class)
     private fun ready() =  GlobalScope.async(Dispatchers.Unconfined, start = CoroutineStart.LAZY) {
         try {

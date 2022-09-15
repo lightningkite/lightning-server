@@ -23,6 +23,8 @@ dependencies {
     api(project(":server-mongo"))
     api(project(":server-memcached"))
     api(project(":server-redis"))
+    api(project(":server-dynamodb"))
+    api(project(":server-postgresql"))
 }
 
 ksp {

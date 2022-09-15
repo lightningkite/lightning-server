@@ -1,6 +1,12 @@
 ##########
 # main
 ##########
+variable "domain_name_zone" {
+    type = string
+}
+variable "domain_name" {
+    type = string
+}
 variable "deployment_location" {
     type = string
     default = "us-west-2"
@@ -71,12 +77,5 @@ variable "files_expiry" {
 variable "exceptions" {
     type = any
     default = {}
-}
-
-##########
-# email
-##########
-variable "email_sender" {
-    type = string
 }
 

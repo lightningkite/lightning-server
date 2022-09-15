@@ -8,7 +8,6 @@ import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.http.HttpEndpoint
-import com.lightningkite.lightningserver.notifications.NotificationSettings
 import com.lightningkite.lightningserver.schedule.Schedule
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -20,38 +19,532 @@ import kotlinx.serialization.serializer
 import java.io.File
 import java.time.LocalDate
 import java.time.ZonedDateTime
+import java.util.Properties
 
-fun terraformAws(handler: String, projectName: String = "project", root: File) {
-    AwsAdapter.cache
-    val namePrefix = "${projectName}-\${var.deployment_name}"
-    val namePrefixSafe = "${projectName.filter { it.isLetterOrDigit() }}\${var.deployment_name}"
-    val namePrefixPath = "${projectName}/\${var.deployment_name}"
-    val dependencies = ArrayList<String>()
-    val appSettings = ArrayList<String>()
-//    root.resolve("base/main.tf").apply { parentFile!!.mkdirs() }
-    val variables = StringBuilder()
-    val main = StringBuilder()
-    val outputs = StringBuilder()
-    val domain = StringBuilder()
-    val domainInputs = StringBuilder()
-    val noDomain = StringBuilder()
-    val noDomainInputs = StringBuilder()
-    variables.appendLine("""
-        variable "deployment_location" {
-          default = "us-west-2"
+private data class TerraformSection(
+    val name: String,
+    val inputs: List<TerraformInput> = listOf(),
+    val resources: String? = null,
+    val toLightningServer: String? = null,
+    val outputs: List<TerraformOutput> = listOf(),
+    val domainOverride: TerraformSituationOverride = TerraformSituationOverride(),
+    val noDomainOverride: TerraformSituationOverride = TerraformSituationOverride(),
+) {
+    companion object {
+        val handlers =
+            HashMap<KSerializer<*>, HashMap<String, TerraformHandler>>()
+
+        inline fun <reified T : Any> handler(
+            name: String = "Standard",
+            priority: Int = 0,
+            noinline inputs: TerraformProjectInfo.(settingKey: String) -> List<TerraformInput> = { listOf() },
+            noinline resources: TerraformProjectInfo.(settingKey: String) -> String? = { null },
+            noinline settingOutput: TerraformProjectInfo.(settingKey: String) -> String,
+            noinline domainOverride: (TerraformProjectInfo.(settingKey: String) -> TerraformSituationOverride)? = null,
+            noinline noDomainOverride: (TerraformProjectInfo.(settingKey: String) -> TerraformSituationOverride)? = null,
+        ) {
+            handlers.getOrPut(serializer<T>()) { HashMap() }.put(name, TerraformHandler(name, priority) { it ->
+                TerraformSection(
+                    name = it,
+                    inputs = inputs(this, it),
+                    resources = resources(this, it),
+                    toLightningServer = it + " = " + settingOutput(this, it),
+                    outputs = listOf(),
+                    domainOverride = domainOverride?.invoke(this, it) ?: TerraformSituationOverride(),
+                    noDomainOverride = noDomainOverride?.invoke(this, it) ?: TerraformSituationOverride()
+                )
+            })
         }
-        variable "deployment_name" {
-          default = "no-deployment-name"
+
+        fun <T> default(projectInfo: TerraformProjectInfo, setting: Settings.Requirement<T, *>) = TerraformSection(
+            name = setting.name,
+            inputs = listOf(
+                projectInfo.input(
+                    setting.name,
+                    "any",
+                    setting.default?.let { Serialization.json.encodeToString(setting.serializer, it) })
+            ),
+            resources = null,
+            toLightningServer = "${setting.name} = var.${setting.name}"
+        )
+
+        fun inputString(name: String, default: String?) = TerraformInput(name, "string", default?.let { "\"$it\"" })
+        fun inputBoolean(name: String, default: Boolean?) = TerraformInput(name, "bool", default?.let { "\"$it\"" })
+        fun inputNumber(name: String, default: Number?) = TerraformInput(name, "number", default?.let { "\"$it\"" })
+    }
+}
+
+private data class TerraformHandler(
+    val name: String,
+    val priority: Int = 0,
+    val makeSection: TerraformProjectInfo.(settingKey: String) -> TerraformSection
+)
+
+private data class TerraformSituationOverride(
+    val inputs: List<TerraformInput> = listOf(),
+    val resources: String? = null,
+    val passOn: Map<String, String> = mapOf(),
+    val outputs: List<TerraformOutput> = listOf()
+)
+
+private data class TerraformProjectInfo(val projectName: String) {
+    fun input(name: String, type: String, default: String?) = TerraformInput(name, type, default)
+    fun inputString(name: String, default: String?) = TerraformInput(name, "string", default?.let { "\"$it\"" })
+    fun inputBoolean(name: String, default: Boolean?) = TerraformInput(name, "bool", default?.let { "\"$it\"" })
+    fun inputNumber(name: String, default: Number?) = TerraformInput(name, "number", default?.let { "\"$it\"" })
+    val namePrefix: String = "${projectName}-\${var.deployment_name}"
+    val namePrefixSafe: String = "${projectName.filter { it.isLetterOrDigit() }}\${var.deployment_name}"
+    val namePrefixPath: String = "${projectName}/\${var.deployment_name}"
+}
+
+private data class TerraformInput(val name: String, val type: String, val default: String?)
+private data class TerraformOutput(val name: String, val value: String)
+
+private fun handlers() {
+    TerraformSection.handler<GeneralServerSettings>(
+        inputs = {
+            listOf(
+                input(
+                    "cors",
+                    "object({ allowedDomains = list(string), allowedHeaders = list(string) })",
+                    "null"
+                )
+            )
+        },
+        settingOutput = {
+            """
+            {
+                projectName = "$projectName"
+                publicUrl = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
+                wsUrl = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
+                debug = var.debug
+                cors = var.cors
+            }
+        """.trimIndent()
         }
-        variable "debug" {
-          default = false
+    )
+    TerraformSection.handler<FilesSettings>(
+        name = "S3",
+        inputs = { key ->
+            listOf(
+                inputString("${key}_expiry", "P1D")
+            )
+        },
+        resources = { key ->
+            """
+                ####
+                # ${key}: FilesSettings
+                ####
+    
+                resource "aws_s3_bucket" "${key}" {
+                  bucket_prefix = "${namePrefix}-${key}"
+                  force_destroy = var.debug
+                }
+                resource "aws_s3_bucket_cors_configuration" "${key}" {
+                  bucket = aws_s3_bucket.${key}.bucket
+                
+                  cors_rule {
+                    allowed_headers = ["*"]
+                    allowed_methods = ["PUT", "POST"]
+                    allowed_origins = ["*"]
+                    expose_headers  = ["ETag"]
+                    max_age_seconds = 3000
+                  }
+                
+                  cors_rule {
+                    allowed_methods = ["GET"]
+                    allowed_origins = ["*"]
+                  }
+                }
+                resource "aws_s3_bucket_acl" "${key}" {
+                  bucket = aws_s3_bucket.${key}.id
+                  acl    = "private"
+                }
+                resource "aws_iam_policy" "${key}" {
+                  name        = "${namePrefix}-${key}"
+                  path = "/${namePrefixPath}/${key}/"
+                  description = "Access to the ${namePrefix}_${key} bucket"
+                  policy = jsonencode({
+                    Version = "2012-10-17"
+                    Statement = [
+                      {
+                        Action = [
+                          "s3:*",
+                        ]
+                        Effect   = "Allow"
+                        Resource = [
+                            "${'$'}{aws_s3_bucket.${key}.arn}",
+                            "${'$'}{aws_s3_bucket.${key}.arn}/*",
+                        ]
+                      },
+                    ]
+                  })
+                }
+                resource "aws_iam_role_policy_attachment" "${key}" {
+                  role       = aws_iam_role.main_exec.name
+                  policy_arn = aws_iam_policy.${key}.arn
+                }
+            """.trimIndent()
+        },
+        settingOutput = { key ->
+            """
+                {
+                    storageUrl = "s3://${'$'}{aws_s3_bucket.${key}.id}.s3-${'$'}{aws_s3_bucket.${key}.region}.amazonaws.com"
+                    signedUrlExpiration = var.${key}_expiry
+                }
+            """.trimIndent()
         }
-    """.trimIndent())
-    main.appendLine("""
-        ####
-        # General configuration for an AWS Api http project
-        ####
-        
+    )
+    TerraformSection.handler<DatabaseSettings>(
+        name = "DocumentDB",
+        inputs = { key ->
+            listOf(inputString("${key}_instance_class", "db.t4g.medium"))
+        },
+        resources = { key ->
+            """
+                resource "random_password" "${key}" {
+                  length           = 32
+                  special          = true
+                  override_special = "-_"
+                }
+                resource "aws_docdb_subnet_group" "${key}" {
+                  name       = "$namePrefix-${key}"
+                  subnet_ids = module.vpc.private_subnets
+                }
+                resource "aws_docdb_cluster_parameter_group" "${key}" {
+                  family = "docdb4.0"
+                  name = "$namePrefix-${key}-parameter-group"
+                  parameter {
+                    name  = "tls"
+                    value = "disabled"
+                  }
+                }
+                resource "aws_docdb_cluster" "${key}" {
+                  cluster_identifier = "${namePrefix}-${key}"
+                  engine = "docdb"
+                  master_username = "master"
+                  master_password = random_password.${key}.result
+                  backup_retention_period = 5
+                  preferred_backup_window = "07:00-09:00"
+                  skip_final_snapshot = true
+
+                  db_cluster_parameter_group_name = "${'$'}{aws_docdb_cluster_parameter_group.${key}.name}"
+                  vpc_security_group_ids = [aws_security_group.internal.id]
+                  db_subnet_group_name    = "${'$'}{aws_docdb_subnet_group.${key}.name}"
+                }
+                resource "aws_docdb_cluster_instance" "${key}" {
+                  count              = 1
+                  identifier         = "$namePrefix-${key}-${'$'}{count.index}"
+                  cluster_identifier = "${'$'}{aws_docdb_cluster.${key}.id}"
+                  instance_class     = "db.t4g.medium"
+                }
+            """.trimIndent()
+        },
+        settingOutput = { key ->
+            """
+                {
+                    url = "mongodb://master:${'$'}{random_password.${key}.result}@${'$'}{aws_docdb_cluster_instance.${key}[0].endpoint}/?retryWrites=false"
+                    databaseName = "${namePrefix}_${key}"
+                }
+            """.trimIndent()
+        }
+    )
+    TerraformSection.handler<DatabaseSettings>(
+        name = "AuroraDB Serverless V1",
+        priority = 2,
+        inputs = { key ->
+            listOf(inputNumber("${key}_min_capacity", 2), inputNumber("${key}_max_capacity", 4), inputBoolean("${key}_auto_pause", true))
+        },
+        resources = { key ->
+            """
+                resource "random_password" "${key}" {
+                  length           = 32
+                  special          = true
+                  override_special = "-_"
+                }
+                resource "aws_db_subnet_group" "${key}" {
+                  name       = "$namePrefix-${key}"
+                  subnet_ids = module.vpc.private_subnets
+                }
+                resource "aws_rds_cluster" "$key" {
+                  cluster_identifier = "$namePrefix-${key}"
+                  engine             = "aurora-postgresql"
+                  engine_mode        = "serverless"
+                  engine_version     = "10.18"
+                  database_name      = "$namePrefixSafe${key}"
+                  master_username = "master"
+                  master_password = random_password.${key}.result
+                  skip_final_snapshot = var.debug
+                  final_snapshot_identifier = "$namePrefix-${key}"
+                  enable_http_endpoint = true
+                  vpc_security_group_ids = [aws_security_group.internal.id]
+                  db_subnet_group_name    = "${'$'}{aws_db_subnet_group.${key}.name}"
+
+                  scaling_configuration {
+                    auto_pause = var.${key}_auto_pause
+                    min_capacity = var.${key}_min_capacity
+                    max_capacity = var.${key}_max_capacity
+                    seconds_until_auto_pause = 300
+                    timeout_action = "ForceApplyCapacityChange"
+                  }
+                }
+            """.trimIndent()
+        },
+        settingOutput = { key ->
+            """
+                {
+                    url = "postgresql://master:${'$'}{random_password.${key}.result}@${'$'}{aws_rds_cluster.database.endpoint}/$namePrefixSafe${key}"
+                }
+            """.trimIndent()
+        }
+    )
+    TerraformSection.handler<DatabaseSettings>(
+        name = "AuroraDB Serverless V2",
+        priority = 1,
+        inputs = { key ->
+            listOf(inputNumber("${key}_min_capacity", 0.5), inputNumber("${key}_max_capacity", 2))
+        },
+        resources = { key ->
+            """
+                resource "random_password" "${key}" {
+                  length           = 32
+                  special          = true
+                  override_special = "-_"
+                }
+                resource "aws_rds_cluster" "$key" {
+                  cluster_identifier = "$namePrefix-${key}"
+                  engine             = "aurora-postgresql"
+                  engine_mode        = "provisioned"
+                  engine_version     = "13.6"
+                  database_name      = "$namePrefixSafe${key}"
+                  master_username = "master"
+                  master_password = random_password.${key}.result
+                  skip_final_snapshot = var.debug
+                  final_snapshot_identifier = "$namePrefix-${key}"
+                  vpc_security_group_ids = [aws_security_group.internal.id]
+                  db_subnet_group_name    = "${'$'}{aws_db_subnet_group.${key}.name}"
+
+                  serverlessv2_scaling_configuration {
+                    min_capacity = var.${key}_min_capacity
+                    max_capacity = var.${key}_max_capacity
+                  }
+                }
+
+                resource "aws_rds_cluster_instance" "$key" {
+                  cluster_identifier = aws_rds_cluster.$key.id
+                  instance_class     = "db.serverless"
+                  engine             = aws_rds_cluster.$key.engine
+                  engine_version     = aws_rds_cluster.$key.engine_version
+                  db_subnet_group_name    = "${'$'}{aws_db_subnet_group.${key}.name}"
+                }
+            """.trimIndent()
+        },
+        settingOutput = { key ->
+            """
+                {
+                    url = "postgresql://master:${'$'}{random_password.${key}.result}@${'$'}{aws_rds_cluster.database.endpoint}/$namePrefixSafe${key}"
+                }
+            """.trimIndent()
+        }
+    )
+    TerraformSection.handler<CacheSettings>(
+        name = "ElastiCache",
+        inputs = { key ->
+            listOf(
+                inputString("${key}_node_type", "cache.t2.micro"),
+                inputNumber("${key}_node_count", 1)
+            )
+        },
+        resources = { key ->
+            """
+                resource "aws_elasticache_cluster" "${key}" {
+                  cluster_id           = "${namePrefix}-${key}"
+                  engine               = "memcached"
+                  node_type            = var.${key}_node_type
+                  num_cache_nodes      = var.${key}_node_count
+                  parameter_group_name = "default.memcached1.6"
+                  port                 = 11211
+                  security_group_ids   = [aws_security_group.internal.id]
+                  subnet_group_name    = aws_elasticache_subnet_group.${key}.name
+                }
+                resource "aws_elasticache_subnet_group" "${key}" {
+                  name       = "$namePrefix-${key}"
+                  subnet_ids = module.vpc.private_subnets
+                }
+            """.trimIndent()
+        },
+        settingOutput = { key ->
+            """
+                {
+                    url = "memcached-aws://${'$'}{aws_elasticache_cluster.${key}.cluster_address}:11211"
+                }
+            """.trimIndent()
+        }
+    )
+    TerraformSection.handler<CacheSettings>(
+        name = "DynamoDB",
+        priority = 1,
+        resources = { key ->
+            """
+                resource "aws_iam_policy" "${key}" {
+                  name        = "${namePrefix}-${key}"
+                  path = "/${namePrefixPath}/${key}/"
+                  description = "Access to the ${namePrefix}_${key} tables in DynamoDB"
+                  policy = jsonencode({
+                    Version = "2012-10-17"
+                    Statement = [
+                      {
+                        Action = [
+                          "dynamodb:*",
+                        ]
+                        Effect   = "Allow"
+                        Resource = ["*"]
+                      },
+                    ]
+                  })
+                }
+                resource "aws_iam_role_policy_attachment" "${key}" {
+                  role       = aws_iam_role.main_exec.name
+                  policy_arn = aws_iam_policy.${key}.arn
+                }
+            """.trimIndent()
+        },
+        settingOutput = { key ->
+            """
+                {
+                    url = "dynamodb://${'$'}{var.deployment_location}/${namePrefix}_${'$'}{var.deployment_name}"
+                }
+            """.trimIndent()
+        }
+    )
+    TerraformSection.handler<JwtSigner>(
+        inputs = { key ->
+            listOf(
+                inputNumber("${key}_expirationMilliseconds", 31540000000),
+                inputNumber("${key}_emailExpirationMilliseconds", 1800000),
+            )
+        },
+        resources = { key ->
+            """
+                resource "random_password" "${key}" {
+                  length           = 32
+                  special          = true
+                  override_special = "!#${'$'}%&*()-_=+[]{}<>:?"
+                }
+            """.trimIndent()
+        },
+        settingOutput = { key ->
+            """
+                {
+                    expirationMilliseconds = var.${key}_expirationMilliseconds 
+                    emailExpirationMilliseconds = var.${key}_emailExpirationMilliseconds 
+                    secret = random_password.${key}.result
+                }
+            """.trimIndent()
+        }
+    )
+    TerraformSection.handler<EmailSettings>(
+        name = "SMTP through SES",
+        inputs = { key ->
+            listOf(
+                inputString("${key}_sender", null)
+            )
+        },
+        resources = { key ->
+            """
+                resource "aws_iam_user" "${key}" {
+                  name = "${namePrefix}-${key}-user"
+                }
+
+                resource "aws_iam_access_key" "${key}" {
+                  user = aws_iam_user.${key}.name
+                }
+
+                data "aws_iam_policy_document" "${key}" {
+                  statement {
+                    actions   = ["ses:SendRawEmail"]
+                    resources = ["*"]
+                  }
+                }
+
+                resource "aws_iam_policy" "${key}" {
+                  name = "${namePrefix}-${key}-policy"
+                  description = "Allows sending of e-mails via Simple Email Service"
+                  policy      = data.aws_iam_policy_document.${key}.json
+                }
+
+                resource "aws_iam_user_policy_attachment" "${key}" {
+                  user       = aws_iam_user.${key}.name
+                  policy_arn = aws_iam_policy.${key}.arn
+                }
+                
+                resource "aws_security_group" "${key}" {
+                  name   = "${namePrefix}-${'$'}{var.deployment_name}-${key}"
+                  vpc_id = module.vpc.vpc_id
+                
+                  ingress {
+                    from_port   = 587
+                    to_port     = 587
+                    protocol    = "tcp"
+                    cidr_blocks = [module.vpc.vpc_cidr_block]
+                  }
+                }
+                resource "aws_vpc_endpoint" "${key}" {
+                  vpc_id = module.vpc.vpc_id
+                  service_name = "com.amazonaws.${'$'}{var.deployment_location}.email-smtp"
+                  security_group_ids = [aws_security_group.${key}.id]
+                  vpc_endpoint_type = "Interface"
+                }
+            """.trimIndent()
+        },
+        settingOutput = { key ->
+            """
+                {
+                    url = "smtp://${'$'}{aws_iam_access_key.${key}.id}:${'$'}{aws_iam_access_key.${key}.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
+                    fromEmail = var.${key}_sender
+                }
+            """.trimIndent()
+        },
+        noDomainOverride = { key ->
+            TerraformSituationOverride(
+                inputs = listOf(),
+                resources = """
+                    resource "aws_ses_email_identity" "${key}" {
+                      email = var.${key}_sender
+                    }
+                """.trimIndent()
+            )
+        },
+        domainOverride = { key ->
+            TerraformSituationOverride(
+                inputs = listOf(),
+                resources = """
+                    resource "aws_ses_domain_identity" "${key}" {
+                      domain = var.domain_name
+                    }
+                    resource "aws_route53_record" "${key}" {
+                      zone_id = data.aws_route53_zone.main.zone_id
+                      name    = "_amazonses.${'$'}{var.domain_name}"
+                      type    = "TXT"
+                      ttl     = "600"
+                      records = [aws_ses_domain_identity.${key}.verification_token]
+                    }
+                """.trimIndent(),
+                passOn = mapOf("${key}_sender" to "\"noreply@${'$'}{var.domain_name}\"")
+            )
+        },
+    )
+}
+
+private fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(projectInfo) {
+    TerraformSection(
+        name = "main",
+        inputs = listOf(
+            TerraformSection.inputString("deployment_location", "us-west-2"),
+            TerraformSection.inputString("deployment_name", null),
+            TerraformSection.inputBoolean("debug", false),
+        ),
+        resources = """
         terraform {
           required_providers {
             aws = {
@@ -73,7 +566,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
         provider "aws" {
           region = var.deployment_location
         }
-
+        
         module "vpc" {
           source = "terraform-aws-modules/vpc/aws"
         
@@ -209,30 +702,108 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
             cidr_blocks = [module.vpc.vpc_cidr_block]
           }
         }
+        """.trimIndent(),
+        domainOverride = TerraformSituationOverride(
+            inputs = listOf(
+                TerraformSection.inputString("domain_name_zone", null),
+                TerraformSection.inputString("domain_name", null),
+            ),
+            resources = """
+                provider "aws" {
+                  region = var.deployment_location
+                }
         
+                data "aws_route53_zone" "main" {
+                  name = var.domain_name_zone
+                }
+                provider "aws" {
+                  alias = "acm"
+                  region = "us-east-1"
+                }
+            """.trimIndent()
+        ),
+        noDomainOverride = TerraformSituationOverride(
+            inputs = listOf(),
+            resources = """
+                provider "aws" {
+                  region = var.deployment_location
+                }
+            """.trimIndent()
+        )
+    )
+}
+
+private fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(projectInfo) {
+    Scheduler.schedules.values.map {
+        when (val s = it.schedule) {
+            is Schedule.Daily -> {
+                val utcTime = ZonedDateTime.of(LocalDate.now(), s.time, s.zone)
+                TerraformSection(
+                    name = "Schedule ${it.name}",
+                    resources = """
+                    resource "aws_cloudwatch_event_rule" "scheduled_task_${it.name}" {
+                      name                = "${namePrefix}_${it.name.filter { it.isLetterOrDigit() || it == '_' }}"
+                      schedule_expression = "cron(${utcTime.minute} ${utcTime.hour} * * ? *)"
+                    }
+                    resource "aws_cloudwatch_event_target" "scheduled_task_${it.name}" {
+                      rule      = aws_cloudwatch_event_rule.scheduled_task_${it.name}.name
+                      target_id = "lambda"
+                      arn       = aws_lambda_function.main.arn
+                      input     = "{\"scheduled\": \"${it.name}\"}"
+                    }
+                    resource "aws_lambda_permission" "scheduled_task_${it.name}" {
+                      statement_id  = "AllowExecutionFromCloudWatch"
+                      action        = "lambda:InvokeFunction"
+                      function_name = aws_lambda_function.main.function_name
+                      principal     = "events.amazonaws.com"
+                      source_arn    = aws_cloudwatch_event_rule.scheduled_task_${it.name}.arn
+                    }
+                """.trimIndent()
+                )
+            }
+
+            is Schedule.Frequency -> {
+                TerraformSection(
+                    name = "Schedule ${it.name}",
+                    resources = """
+                    resource "aws_cloudwatch_event_rule" "scheduled_task_${it.name}" {
+                      name                = "${namePrefix}_${it.name.filter { it.isLetterOrDigit() || it == '_' }}"
+                      schedule_expression = "rate(${s.gap.toMinutes()} minute${if (s.gap.toMinutes() > 1) "s" else ""})"
+                    }
+                    resource "aws_cloudwatch_event_target" "scheduled_task_${it.name}" {
+                      rule      = aws_cloudwatch_event_rule.scheduled_task_${it.name}.name
+                      target_id = "lambda"
+                      arn       = aws_lambda_function.main.arn
+                      input     = "{\"scheduled\": \"${it.name}\"}"
+                    }
+                    resource "aws_lambda_permission" "scheduled_task_${it.name}" {
+                      statement_id  = "scheduled_task_${it.name}"
+                      action        = "lambda:InvokeFunction"
+                      function_name = aws_lambda_function.main.function_name
+                      principal     = "events.amazonaws.com"
+                      source_arn    = aws_cloudwatch_event_rule.scheduled_task_${it.name}.arn
+                    }
+                """.trimIndent()
+                )
+            }
+        }
+    }
+}
+
+private fun awsMainAppHandler(projectInfo: TerraformProjectInfo, handlerFqn: String, otherSections: List<TerraformSection>) = TerraformSection(
+    name = "Main",
+    resources = """
         resource "aws_s3_bucket" "lambda_bucket" {
-          bucket_prefix = "${namePrefix}-lambda-bucket"
+          bucket_prefix = "${projectInfo.namePrefix}-lambda-bucket"
           force_destroy = true
         }
         resource "aws_s3_bucket_acl" "lambda_bucket" {
           bucket = aws_s3_bucket.lambda_bucket.id
           acl    = "private"
         }
-        
-        locals {
-          lambda_source = "../../build/dist/lambda.zip"
-        }
-        resource "aws_s3_object" "app_storage" {
-          bucket = aws_s3_bucket.lambda_bucket.id
-
-          key    = "lambda-functions.zip"
-          source = local.lambda_source
-
-          source_hash = filemd5(local.lambda_source)
-        }
 
         resource "aws_iam_role" "main_exec" {
-          name = "${namePrefix}-main-exec"
+          name = "${projectInfo.namePrefix}-main-exec"
 
           assume_role_policy = jsonencode({
             Version = "2012-10-17"
@@ -258,9 +829,9 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
         }
         
         resource "aws_iam_policy" "lambdainvoke" {
-          name        = "${namePrefix}-lambdainvoke"
-          path = "/${namePrefixPath}/lambdainvoke/"
-          description = "Access to the ${namePrefix}_lambdainvoke bucket"
+          name        = "${projectInfo.namePrefix}-lambdainvoke"
+          path = "/${projectInfo.namePrefixPath}/lambdainvoke/"
+          description = "Access to the ${projectInfo.namePrefix}_lambdainvoke bucket"
           policy = jsonencode({
             Version = "2012-10-17"
             Statement = [
@@ -278,432 +849,25 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
           role       = aws_iam_role.main_exec.name
           policy_arn = aws_iam_policy.lambdainvoke.arn
         }
+        locals {
+          lambda_source = "../../build/dist/lambda.zip"
+        }
+        resource "aws_s3_object" "app_storage" {
+          bucket = aws_s3_bucket.lambda_bucket.id
 
-    """.trimIndent())
-    domain.appendLine("""
-        variable "debug" {
-          default = true
-        }
-        variable "domain_name_zone" {
-        }
-        variable "domain_name" {
-        }
-        variable "deployment_name" {
-          default = "example"
-        }
-        variable "deployment_location" {
-          default = "us-west-2"
-        }
-        provider "aws" {
-          region = var.deployment_location
-        }
+          key    = "lambda-functions.zip"
+          source = local.lambda_source
 
-        data "aws_route53_zone" "main" {
-          name = var.domain_name_zone
+          source_hash = filemd5(local.lambda_source)
         }
-        provider "aws" {
-          alias = "acm"
-          region = "us-east-1"
-        }
-    """.trimIndent())
-    noDomain.appendLine("""
-        variable "debug" {
-          default = true
-        }
-        variable "deployment_name" {
-          default = "example"
-        }
-        variable "deployment_location" {
-          default = "us-west-2"
-        }
-        provider "aws" {
-          region = var.deployment_location
-        }
-
-    """.trimIndent())
-    dependencies.add("aws_s3_object.app_storage")
-    for(setting in Settings.requirements) {
-        when(setting.value.serializer) {
-            serializer<GeneralServerSettings>() -> {
-                variables.appendLine("""
-                    variable "cors" {
-                        default = null
-                    }
-                """.trimIndent())
-                noDomain.appendLine("""
-                    variable "cors" {
-                        default = null
-                    }
-                """.trimIndent())
-                domain.appendLine("""
-                    variable "cors" {
-                        default = null
-                    }
-                """.trimIndent())
-                noDomainInputs.appendLine("""  cors  = var.cors""")
-                domainInputs.appendLine("""  cors  = var.cors""")
-                appSettings.add("""${setting.key} = {
-                    projectName = "$projectName"
-                    publicUrl = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
-                    wsUrl = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
-                    debug = var.debug
-                    cors = var.cors
-                }""".trimIndent())
-            }
-            serializer<FilesSettings>() -> {
-                variables.appendLine("""
-                    variable "${setting.key}_expiry" {
-                        default = "P1D"
-                    }
-                """.trimIndent())
-                main.appendLine("""
-                    
-                    ####
-                    # ${setting.key}: FilesSettings
-                    ####
-        
-                    resource "aws_s3_bucket" "${setting.key}" {
-                      bucket_prefix = "${namePrefix}-${setting.key}"
-                    }
-                    resource "aws_s3_bucket_cors_configuration" "${setting.key}" {
-                      bucket = aws_s3_bucket.${setting.key}.bucket
-                    
-                      cors_rule {
-                        allowed_headers = ["*"]
-                        allowed_methods = ["PUT", "POST"]
-                        allowed_origins = ["*"]
-                        expose_headers  = ["ETag"]
-                        max_age_seconds = 3000
-                      }
-                    
-                      cors_rule {
-                        allowed_methods = ["GET"]
-                        allowed_origins = ["*"]
-                      }
-                    }
-                    resource "aws_s3_bucket_acl" "${setting.key}" {
-                      bucket = aws_s3_bucket.${setting.key}.id
-                      acl    = "private"
-                    }
-                    resource "aws_iam_policy" "${setting.key}" {
-                      name        = "${namePrefix}-${setting.key}"
-                      path = "/${namePrefixPath}/${setting.key}/"
-                      description = "Access to the ${namePrefix}_${setting.key} bucket"
-                      policy = jsonencode({
-                        Version = "2012-10-17"
-                        Statement = [
-                          {
-                            Action = [
-                              "s3:*",
-                            ]
-                            Effect   = "Allow"
-                            Resource = [
-                                "${'$'}{aws_s3_bucket.${setting.key}.arn}",
-                                "${'$'}{aws_s3_bucket.${setting.key}.arn}/*",
-                            ]
-                          },
-                        ]
-                      })
-                    }
-                    resource "aws_iam_role_policy_attachment" "${setting.key}" {
-                      role       = aws_iam_role.main_exec.name
-                      policy_arn = aws_iam_policy.${setting.key}.arn
-                    }
-                """.trimIndent())
-                appSettings.add("""${setting.key} = {
-                    storageUrl = "s3://${'$'}{aws_s3_bucket.${setting.key}.id}.s3-${'$'}{aws_s3_bucket.${setting.key}.region}.amazonaws.com"
-                    signedUrlExpiration = var.${setting.key}_expiry
-                }""".trimIndent())
-            }
-            serializer<DatabaseSettings>() -> {
-                variables.appendLine("""
-                    variable "${setting.key}_expiry" {
-                        default = "P1D"
-                    }
-                """.trimIndent())
-                main.appendLine("""
-                    
-                    ####
-                    # ${setting.key}: DatabaseSettings
-                    ####
-                    resource "random_password" "${setting.key}" {
-                      length           = 32
-                      special          = true
-                      override_special = "-_"
-                    }
-                    resource "aws_docdb_subnet_group" "${setting.key}" {
-                      name       = "$namePrefix-${setting.key}"
-                      subnet_ids = module.vpc.private_subnets
-                    }
-                    resource "aws_docdb_cluster_parameter_group" "${setting.key}" {
-                      family = "docdb4.0"
-                      name = "$namePrefix-${setting.key}-parameter-group"
-                      parameter {
-                        name  = "tls"
-                        value = "disabled"
-                      }
-                    }
-                    resource "aws_docdb_cluster" "${setting.key}" {
-                      cluster_identifier = "${namePrefix}-${setting.key}"
-                      engine = "docdb"
-                      master_username = "master"
-                      master_password = random_password.${setting.key}.result
-                      backup_retention_period = 5
-                      preferred_backup_window = "07:00-09:00"
-                      skip_final_snapshot = true
-
-                      db_cluster_parameter_group_name = "${'$'}{aws_docdb_cluster_parameter_group.${setting.key}.name}"
-                      vpc_security_group_ids = [aws_security_group.internal.id]
-                      db_subnet_group_name    = "${'$'}{aws_docdb_subnet_group.${setting.key}.name}"
-                    }
-                    resource "aws_docdb_cluster_instance" "${setting.key}" {
-                      count              = 1
-                      identifier         = "$namePrefix-${setting.key}-${'$'}{count.index}"
-                      cluster_identifier = "${'$'}{aws_docdb_cluster.${setting.key}.id}"
-                      instance_class     = "db.t4g.medium"
-                    }
-                """.trimIndent())
-                //TODO: use config endpoint
-                appSettings.add("""${setting.key} = {
-                    url = "mongodb://master:${'$'}{random_password.${setting.key}.result}@${'$'}{aws_docdb_cluster_instance.${setting.key}[0].endpoint}/?retryWrites=false"
-                    databaseName = "${namePrefix}_${setting.key}"
-                }""".trimIndent())
-            }
-            serializer<CacheSettings>() -> {
-                variables.appendLine("""
-                    variable "${setting.key}_node_type" {
-                      default = "cache.t2.micro"
-                    }
-                    variable "${setting.key}_node_count" {
-                      default = 1
-                    }
-                """.trimIndent())
-                main.appendLine("""
-
-                    ####
-                    # ${setting.key}: CacheSettings
-                    ####
-
-                    resource "aws_elasticache_cluster" "${setting.key}" {
-                      cluster_id           = "${namePrefix}-${setting.key}"
-                      engine               = "memcached"
-                      node_type            = var.${setting.key}_node_type
-                      num_cache_nodes      = var.${setting.key}_node_count
-                      parameter_group_name = "default.memcached1.6"
-                      port                 = 11211
-                      security_group_ids   = [aws_security_group.internal.id]
-                      subnet_group_name    = aws_elasticache_subnet_group.${setting.key}.name
-                    }
-                    resource "aws_elasticache_subnet_group" "${setting.key}" {
-                      name       = "$namePrefix-${setting.key}"
-                      subnet_ids = module.vpc.private_subnets
-                    }
-                """.trimIndent())
-                appSettings.add("""${setting.key} = {
-                    url = "memcached-aws://${'$'}{aws_elasticache_cluster.${setting.key}.cluster_address}:11211"
-                }""".trimIndent())
-            }
-            serializer<JwtSigner>() -> {
-                variables.appendLine("""
-                    variable "${setting.key}_expirationMilliseconds" {
-                      default = 31540000000
-                    }
-                    variable "${setting.key}_emailExpirationMilliseconds" {
-                      default = 1800000
-                    }
-                """.trimIndent())
-                main.appendLine("""
-                    
-                    ####
-                    # ${setting.key}: JwtSigner
-                    ####
-                    resource "random_password" "${setting.key}" {
-                      length           = 32
-                      special          = true
-                      override_special = "!#${'$'}%&*()-_=+[]{}<>:?"
-                    }
-                """.trimIndent())
-                appSettings.add("""${setting.key} = {
-                    expirationMilliseconds = var.${setting.key}_expirationMilliseconds 
-                    emailExpirationMilliseconds = var.${setting.key}_emailExpirationMilliseconds 
-                    secret = random_password.${setting.key}.result
-                }""".trimIndent())
-            }
-            serializer<EmailSettings>() -> {
-                variables.appendLine("""
-                    variable "${setting.key}_sender" {
-                    }
-                """.trimIndent())
-                main.appendLine("""
-                    
-                    ####
-                    # ${setting.key}: EmailSettings
-                    ####
-                    
-                    resource "aws_iam_user" "${setting.key}" {
-                      name = "${namePrefix}-${setting.key}-user"
-                    }
-
-                    resource "aws_iam_access_key" "${setting.key}" {
-                      user = aws_iam_user.${setting.key}.name
-                    }
-
-                    data "aws_iam_policy_document" "${setting.key}" {
-                      statement {
-                        actions   = ["ses:SendRawEmail"]
-                        resources = ["*"]
-                      }
-                    }
-
-                    resource "aws_iam_policy" "${setting.key}" {
-                      name = "${namePrefix}-${setting.key}-policy"
-                      description = "Allows sending of e-mails via Simple Email Service"
-                      policy      = data.aws_iam_policy_document.${setting.key}.json
-                    }
-
-                    resource "aws_iam_user_policy_attachment" "${setting.key}" {
-                      user       = aws_iam_user.${setting.key}.name
-                      policy_arn = aws_iam_policy.${setting.key}.arn
-                    }
-                    
-                    resource "aws_security_group" "${setting.key}" {
-                      name   = "demo-${'$'}{var.deployment_name}-${setting.key}"
-                      vpc_id = module.vpc.vpc_id
-                    
-                      ingress {
-                        from_port   = 587
-                        to_port     = 587
-                        protocol    = "tcp"
-                        cidr_blocks = [module.vpc.vpc_cidr_block]
-                      }
-                    }
-                    resource "aws_vpc_endpoint" "${setting.key}" {
-                      vpc_id = module.vpc.vpc_id
-                      service_name = "com.amazonaws.${'$'}{var.deployment_location}.email-smtp"
-                      security_group_ids = [aws_security_group.${setting.key}.id]
-                      vpc_endpoint_type = "Interface"
-                    }
-                    
-                """.trimIndent())
-                appSettings.add("""${setting.key} = {
-                    url = "smtp://${'$'}{aws_iam_access_key.${setting.key}.id}:${'$'}{aws_iam_access_key.${setting.key}.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
-                    fromEmail = var.${setting.key}_sender
-                }""".trimIndent())
-                noDomain.appendLine("""
-                    variable "${setting.key}_sender" {
-                    }
-                    resource "aws_ses_email_identity" "${setting.key}" {
-                      email = var.${setting.key}_sender
-                    }
-                """.trimIndent())
-                noDomainInputs.appendLine("""  ${setting.key}_sender  = var.${setting.key}_sender""")
-                domain.appendLine("""
-                    
-                    resource "aws_ses_domain_identity" "${setting.key}" {
-                      domain = var.domain_name
-                    }
-                    resource "aws_route53_record" "${setting.key}" {
-                      zone_id = data.aws_route53_zone.main.zone_id
-                      name    = "_amazonses.${'$'}{var.domain_name}"
-                      type    = "TXT"
-                      ttl     = "600"
-                      records = [aws_ses_domain_identity.${setting.key}.verification_token]
-                    }
-                    
-                """.trimIndent())
-                domainInputs.appendLine("""  ${setting.key}_sender  = "noreply@${'$'}{var.domain_name}"""")
-            }
-//            serializer<NotificationSettings>() ->{}
-            else -> {
-                variables.appendLine("""
-                    variable "${setting.key}" {
-                      default = ${setting.value.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.default) }}
-                    }
-                """.trimIndent())
-                domain.appendLine("""
-                    variable "${setting.key}" {
-                      default = ${setting.value.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.default) }}
-                    }
-                """.trimIndent())
-                noDomain.appendLine("""
-                    variable "${setting.key}" {
-                      default = ${setting.value.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.default) }}
-                    }
-                """.trimIndent())
-                domainInputs.appendLine("""  ${setting.key}  = var.${setting.key}""")
-                noDomainInputs.appendLine("""  ${setting.key}  = var.${setting.key}""")
-                appSettings.add("""${setting.key} = var.${setting.key}""".trimIndent())
-            }
-        }
-    }
-
-    if(Scheduler.schedules.isNotEmpty()) {
-        main.appendLine("""
-        """.trimIndent())
-    }
-    Scheduler.schedules.values.forEach {
-        when(val s = it.schedule) {
-            is Schedule.Daily -> {
-                val utcTime = ZonedDateTime.of(LocalDate.now(), s.time, s.zone)
-                main.appendLine("""
-                    resource "aws_cloudwatch_event_rule" "scheduled_task_${it.name}" {
-                      name                = "${namePrefix}_${it.name.filter { it.isLetterOrDigit() || it == '_' }}"
-                      schedule_expression = "cron(${utcTime.minute} ${utcTime.hour} * * ? *)"
-                    }
-                    resource "aws_cloudwatch_event_target" "scheduled_task_${it.name}" {
-                      rule      = aws_cloudwatch_event_rule.scheduled_task_${it.name}.name
-                      target_id = "lambda"
-                      arn       = aws_lambda_function.main.arn
-                      input     = "{\"scheduled\": \"${it.name}\"}"
-                    }
-                    resource "aws_lambda_permission" "scheduled_task_${it.name}" {
-                      statement_id  = "AllowExecutionFromCloudWatch"
-                      action        = "lambda:InvokeFunction"
-                      function_name = aws_lambda_function.main.function_name
-                      principal     = "events.amazonaws.com"
-                      source_arn    = aws_cloudwatch_event_rule.scheduled_task_${it.name}.arn
-                    }
-                """.trimIndent())
-            }
-            is Schedule.Frequency -> {
-                main.appendLine("""
-                    resource "aws_cloudwatch_event_rule" "scheduled_task_${it.name}" {
-                      name                = "${namePrefix}_${it.name.filter { it.isLetterOrDigit() || it == '_' }}"
-                      schedule_expression = "rate(${s.gap.toMinutes()} minute${if(s.gap.toMinutes() > 1) "s" else ""})"
-                    }
-                    resource "aws_cloudwatch_event_target" "scheduled_task_${it.name}" {
-                      rule      = aws_cloudwatch_event_rule.scheduled_task_${it.name}.name
-                      target_id = "lambda"
-                      arn       = aws_lambda_function.main.arn
-                      input     = "{\"scheduled\": \"${it.name}\"}"
-                    }
-                    resource "aws_lambda_permission" "scheduled_task_${it.name}" {
-                      statement_id  = "scheduled_task_${it.name}"
-                      action        = "lambda:InvokeFunction"
-                      function_name = aws_lambda_function.main.function_name
-                      principal     = "events.amazonaws.com"
-                      source_arn    = aws_cloudwatch_event_rule.scheduled_task_${it.name}.arn
-                    }
-                """.trimIndent())
-            }
-        }
-    }
-
-    // Now we create the outputs.
-
-    main.appendLine("""
-        ####
-        # App Declaration
-        ####
-        
         resource "aws_lambda_function" "main" {
-          function_name = "${namePrefix}-main"
+          function_name = "${projectInfo.namePrefix}-main"
 
           s3_bucket = aws_s3_bucket.lambda_bucket.id
           s3_key    = aws_s3_object.app_storage.key
 
           runtime = "java11"
-          handler = "$handler"
+          handler = "$handlerFqn"
           
           memory_size = "2048"
           timeout = 30
@@ -712,7 +876,6 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
           source_code_hash = filebase64sha256(local.lambda_source)
 
           role = aws_iam_role.main_exec.arn
-          depends_on = [${dependencies.joinToString()}]
           
           vpc_config {
             subnet_ids = module.vpc.private_subnets
@@ -722,38 +885,37 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
           environment {
             variables = {
               LIGHTNING_SERVER_SETTINGS = jsonencode({
-                ${appSettings.joinToString(",\n                ")}
+                ${otherSections.mapNotNull { it.toLightningServer }.joinToString(",\n                ")}
               })
             }
           }
+          
+          depends_on = [aws_s3_object.app_storage]
         }
 
         resource "aws_cloudwatch_log_group" "main" {
-          name = "${namePrefix}-main-log"
-
+          name = "${projectInfo.namePrefix}-main-log"
           retention_in_days = 30
         }
-    """.trimIndent())
+    """.trimIndent()
+)
 
-    // HTTP
-    run {
-        main.appendLine("""
+private fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
+    name = "HTTP",
+    resources = """
         
-        ####
-        # ApiGateway for Http
-        ####
         variable "public_http_url" {
           default = null
         }
         resource "aws_apigatewayv2_api" "http" {
-          name = "${namePrefix}-http"
+          name = "${projectInfo.namePrefix}-http"
           protocol_type = "HTTP"
         }
 
         resource "aws_apigatewayv2_stage" "http" {
           api_id = aws_apigatewayv2_api.http.id
 
-          name = "${namePrefix}-gateway-stage"
+          name = "${projectInfo.namePrefix}-gateway-stage"
           auto_deploy = true
 
           access_log_settings {
@@ -784,7 +946,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
         }
 
         resource "aws_cloudwatch_log_group" "http_api" {
-          name = "${namePrefix}-http-gateway-log"
+          name = "${projectInfo.namePrefix}-http-gateway-log"
 
           retention_in_days = 30
         }
@@ -803,25 +965,21 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
 
           source_arn = "${'$'}{aws_apigatewayv2_api.http.execution_arn}/*/*"
         }
-        
-        """.trimIndent())
-
-        outputs.appendLine("""
-            output "http_url" {
-              value = aws_apigatewayv2_stage.http.invoke_url
-            }
-            output "http" {
-              value = {
+    """.trimIndent(),
+    outputs = listOf(
+        TerraformOutput("http_url", "aws_apigatewayv2_stage.http.invoke_url"),
+        TerraformOutput("http", """
+            {
                 id = aws_apigatewayv2_stage.http.id
                 api_id = aws_apigatewayv2_stage.http.api_id
                 invoke_url = aws_apigatewayv2_stage.http.invoke_url
                 arn = aws_apigatewayv2_stage.http.arn
                 name = aws_apigatewayv2_stage.http.name
-              }
             }
-        """.trimIndent())
-        
-        domain.appendLine("""
+        """.trimIndent()),
+    ),
+    domainOverride = TerraformSituationOverride(
+        resources = """
             resource "aws_acm_certificate" "http" {
               domain_name   = var.domain_name
               validation_method = "DNS"
@@ -855,30 +1013,25 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
               type    = "A"
               name    = aws_apigatewayv2_domain_name.http.domain_name
               zone_id = data.aws_route53_zone.main.id
-
                 alias {
                   evaluate_target_health = false
                   name                   = aws_apigatewayv2_domain_name.http.domain_name_configuration[0].target_domain_name
                   zone_id                = aws_apigatewayv2_domain_name.http.domain_name_configuration[0].hosted_zone_id
                 }
             }
-        """.trimIndent())
-    }
-
-    // Websockets
-    run {
-        main.appendLine("""
-                    
-        
-        ####
-        # ApiGateway for Websockets
-        ####
+        """.trimIndent(),
+        passOn = mapOf("public_http_url" to "\"https://${'$'}{var.domain_name}\"")
+    )
+)
+private fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
+    name = "WebSockets",
+    resources = """
         variable "public_ws_url" {
           default = null
         }
 
         resource "aws_apigatewayv2_api" "ws" {
-          name = "${namePrefix}-gateway"
+          name = "${projectInfo.namePrefix}-gateway"
           protocol_type = "WEBSOCKET"
           route_selection_expression = "constant"
         }
@@ -886,7 +1039,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
         resource "aws_apigatewayv2_stage" "ws" {
           api_id = aws_apigatewayv2_api.ws.id
 
-          name = "${namePrefix}-gateway-stage"
+          name = "${projectInfo.namePrefix}-gateway-stage"
           auto_deploy = true
 
           access_log_settings {
@@ -917,7 +1070,7 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
         }
 
         resource "aws_cloudwatch_log_group" "ws_api" {
-          name = "${namePrefix}-ws-gateway-log"
+          name = "${projectInfo.namePrefix}-ws-gateway-log"
 
           retention_in_days = 30
         }
@@ -951,9 +1104,9 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
         }
         
         resource "aws_iam_policy" "api_gateway_ws" {
-          name        = "${namePrefix}-api_gateway_ws"
-          path = "/${namePrefixPath}/api_gateway_ws/"
-          description = "Access to the ${namePrefix}_api_gateway_ws management"
+          name        = "${projectInfo.namePrefix}-api_gateway_ws"
+          path = "/${projectInfo.namePrefixPath}/api_gateway_ws/"
+          description = "Access to the ${projectInfo.namePrefix}_api_gateway_ws management"
           policy = jsonencode({
             Version = "2012-10-17"
             Statement = [
@@ -971,25 +1124,21 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
           role       = aws_iam_role.main_exec.name
           policy_arn = aws_iam_policy.api_gateway_ws.arn
         }
-        
-        """.trimIndent())
-
-        outputs.appendLine("""
-            output "ws_url" {
-              value = aws_apigatewayv2_stage.ws.invoke_url
-            }
-            output "ws" {
-              value = {
+    """.trimIndent(),
+    outputs = listOf(
+        TerraformOutput("ws_url", "aws_apigatewayv2_stage.ws.invoke_url"),
+        TerraformOutput("ws", """
+            {
                 id = aws_apigatewayv2_stage.ws.id
                 api_id = aws_apigatewayv2_stage.ws.api_id
                 invoke_url = aws_apigatewayv2_stage.ws.invoke_url
                 arn = aws_apigatewayv2_stage.ws.arn
                 name = aws_apigatewayv2_stage.ws.name
-              }
             }
-        """.trimIndent())
-        
-        domain.appendLine("""
+        """.trimIndent()),
+    ),
+    domainOverride = TerraformSituationOverride(
+        resources = """
             resource "aws_acm_certificate" "ws" {
               domain_name   = "ws.${'$'}{var.domain_name}"
               validation_method = "DNS"
@@ -1023,67 +1172,155 @@ fun terraformAws(handler: String, projectName: String = "project", root: File) {
               type    = "A"
               name    = aws_apigatewayv2_domain_name.ws.domain_name
               zone_id = data.aws_route53_zone.main.id
-
                 alias {
                   evaluate_target_health = false
                   name                   = aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].target_domain_name
                   zone_id                = aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].hosted_zone_id
                 }
             }
-        """.trimIndent())
+        """.trimIndent(),
+        passOn = mapOf("public_ws_url" to "\"wss://ws.${'$'}{var.domain_name}\"")
+    )
+)
+
+fun terraformAws(handlerFqn: String, projectName: String = "project", root: File) {
+    AwsAdapter.cache
+    handlers()
+    val handlerFile = root.resolve("handlers.properties")
+    val handlerNames: Properties = handlerFile
+        .takeIf { it.exists() }
+        ?.let { Properties().apply { it.inputStream().use { s -> load(s) } } }
+        ?: Properties()
+    val info = TerraformProjectInfo(projectName)
+    val sections = listOf(
+        listOf(defaultAwsHandler(info)),
+        Settings.requirements.values.map {
+            val handler = TerraformSection.handlers[it.serializer]?.let { handlers ->
+                handlerNames.getProperty(it.name)?.let { handlers[it] } ?: handlers.values.maxBy { it.priority }.also { h -> handlerNames[it.name] = h.name }
+            }
+            handler?.makeSection?.invoke(info, it.name) ?: TerraformSection.default(info, it)
+        },
+        listOfNotNull(
+            if(Http.endpoints.isNotEmpty()) httpAwsHandler(info) else null,
+            if(WebSockets.handlers.isNotEmpty()) wsAwsHandler(info) else null,
+        )
+    ).flatten()
+    val allSections = sections + awsMainAppHandler(info, handlerFqn, sections)
+
+    handlerFile.outputStream().use { handlerNames.store(it, "") }
+
+    root.resolve("base/main.tf").apply { parentFile!!.mkdirs() }.printWriter().use {
+        for(section in allSections) {
+            if(section.resources == null) continue
+            it.appendLine("##########")
+            it.appendLine("# ${section.name}")
+            it.appendLine("##########")
+            it.appendLine(section.resources)
+            it.appendLine()
+        }
+    }
+    root.resolve("base/variables.tf").apply { parentFile!!.mkdirs() }.printWriter().use {
+        for(section in allSections) {
+            if(section.inputs.isEmpty()) continue
+            it.appendLine("##########")
+            it.appendLine("# ${section.name}")
+            it.appendLine("##########")
+            for(input in section.inputs) {
+                it.appendLine("variable \"${input.name}\" {")
+                it.appendLine("    type = ${input.type}")
+                input.default?.let { d ->
+                    it.appendLine("    default = $d")
+                }
+                it.appendLine("}")
+            }
+            it.appendLine()
+        }
+    }
+    root.resolve("base/outputs.tf").apply { parentFile!!.mkdirs() }.printWriter().use {
+        for(section in allSections) {
+            if(section.outputs.isEmpty()) continue
+            it.appendLine("##########")
+            it.appendLine("# ${section.name}")
+            it.appendLine("##########")
+            for(output in section.outputs) {
+                it.appendLine("output \"${output.name}\" {")
+                it.appendLine("    value = ${output.value}")
+                it.appendLine("}")
+            }
+            it.appendLine()
+        }
     }
 
-    domain.appendLine("""
-        module "Base" {
-          source              = "../base"
-          deployment_location = var.deployment_location
-          deployment_name     = var.deployment_name
-          debug               = var.debug
-          public_http_url     = "https://${'$'}{var.domain_name}"
-          public_ws_url       = "wss://ws.${'$'}{var.domain_name}"
-          ${domainInputs}
+    fun situationOutput(name: String, getter: (TerraformSection)->TerraformSituationOverride) {
+        root.resolve("$name/main.tf").apply { parentFile!!.mkdirs() }.printWriter().use {
+            it.appendLine("""
+                module "Base" {
+                  source              = "../base"
+            """.trimIndent())
+            for(section in allSections) {
+                val o = section.let(getter)
+                if(o.passOn.isEmpty() && section.inputs.filter { it.name !in o.passOn.keys }.isEmpty()) continue
+                it.appendLine("  # ${section.name}")
+                for(entry in o.passOn) {
+                    it.appendLine("  ${entry.key} = ${entry.value}")
+                }
+                for(input in section.inputs.filter { it.name !in o.passOn.keys }) {
+                    it.appendLine("  ${input.name} = var.${input.name}")
+                }
+            }
+            it.appendLine("}".trimIndent())
+            for(section in allSections) {
+                val o = section.let(getter)
+                if(o.resources == null) continue
+                it.appendLine("##########")
+                it.appendLine("# ${section.name}")
+                it.appendLine("##########")
+                it.appendLine(o.resources)
+                it.appendLine()
+            }
         }
-    """.trimIndent())
-    noDomain.appendLine("""
-        module "Base" {
-          source              = "../base"
-          deployment_location = var.deployment_location
-          deployment_name     = var.deployment_name
-          debug               = var.debug
-          ${noDomainInputs}
+        root.resolve("$name/variables.tf").apply { parentFile!!.mkdirs() }.printWriter().use {
+            for(section in allSections) {
+                val o = section.let(getter)
+                val inputs = o.inputs + section.inputs.filter { it.name !in o.passOn.keys }
+                if(inputs.isEmpty()) continue
+                it.appendLine("##########")
+                it.appendLine("# ${section.name}")
+                it.appendLine("##########")
+                for(input in inputs) {
+                    it.appendLine("variable \"${input.name}\" {")
+                    it.appendLine("    type = ${input.type}")
+                    input.default?.let { d ->
+                        it.appendLine("    default = $d")
+                    }
+                    it.appendLine("}")
+                }
+                it.appendLine()
+            }
         }
-    """.trimIndent())
+        root.resolve("$name/outputs.tf").apply { parentFile!!.mkdirs() }.printWriter().use {
+            for(section in allSections) {
+                val o = section.let(getter)
+                val outputs = section.outputs + o.outputs
+                if(outputs.isEmpty()) continue
+                it.appendLine("##########")
+                it.appendLine("# ${section.name}")
+                it.appendLine("##########")
+                for(output in section.outputs) {
+                    it.appendLine("output \"${output.name}\" {")
+                    it.appendLine("    value = module.Base.${output.name}")
+                    it.appendLine("}")
+                }
+                for(output in o.outputs) {
+                    it.appendLine("output \"${output.name}\" {")
+                    it.appendLine("    value = ${output.value}")
+                    it.appendLine("}")
+                }
+                it.appendLine()
+            }
+        }
+    }
 
-    root.resolve("base/main.tf").apply { parentFile!!.mkdirs() }.writeText(main.toString())
-    root.resolve("base/variables.tf").apply { parentFile!!.mkdirs() }.writeText(variables.toString())
-    root.resolve("base/outputs.tf").apply { parentFile!!.mkdirs() }.writeText(outputs.toString())
-
-    root.resolve("nodomain/main.tf").apply { parentFile!!.mkdirs() }.writeText(noDomain.toString())
-    root.resolve("domain/main.tf").apply { parentFile!!.mkdirs() }.writeText(domain.toString())
-
-    root.resolve("example/main.tf").takeUnless { it.exists() }?.apply { parentFile!!.mkdirs() }?.writeText("""
-        module "Base" {
-          source      = "../base"
-          deployment_location = "us-west-2"
-          deployment_name = "example"
-          debug = true
-          email_sender = "example@example.com"
-        }
-        terraform {
-          backend "s3" {
-            bucket = "${projectName.filter { it.isLetterOrDigit() }}"
-            key    = "example"
-            region = "us-west-2"
-          }
-        }
-    """.trimIndent())
+    situationOutput("domain") { it.domainOverride }
+    situationOutput("nodomain") { it.noDomainOverride }
 }
-
-private val HttpEndpoint.terraformName: String get() =
-    path.terraformName
-    .plus('_')
-    .plus(method.toString())
-
-private val ServerPath.terraformName: String get() = toString()
-    .replace('/', '_')
-    .filter { it.isLetterOrDigit() || it == '_' }

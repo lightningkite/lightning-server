@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.cache
 
+import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert
 import org.junit.Test
@@ -31,6 +32,17 @@ abstract class CacheTest {
             cache.setIfNotExists(key, 2)
             cache.setIfNotExists(key, 3)
             assertEquals(2, cache.get<Int>(key))
+        }
+    }
+
+    @Test
+    fun healthCheck() {
+        val cache = cache ?: run {
+            println("Could not test because the cache is not supported on this system.")
+            return
+        }
+        runBlocking {
+            assertEquals(HealthStatus.Level.OK, cache.healthCheck().level)
         }
     }
 }

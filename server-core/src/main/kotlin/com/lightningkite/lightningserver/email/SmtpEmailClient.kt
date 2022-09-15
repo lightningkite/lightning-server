@@ -72,6 +72,7 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
         email.isSSLOnConnect = smtpConfig.useSSL
         email.setFrom(smtpConfig.fromEmail)
         email.subject = subject
+//        email.addHeader("X-SES-LIST-MANAGEMENT-OPTIONS", "contactListName; topic=topicName")
         email.addTo(*to.toTypedArray())
         withContext(Dispatchers.IO) {
             email.send()

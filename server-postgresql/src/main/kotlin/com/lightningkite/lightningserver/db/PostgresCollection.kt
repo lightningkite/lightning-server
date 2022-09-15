@@ -77,7 +77,7 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun <N : Number> aggregate(
+    override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<T>,
         property: KProperty1<T, N>,

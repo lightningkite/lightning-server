@@ -8,6 +8,8 @@ import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.DatabaseSettings
+import com.lightningkite.lightningserver.db.DynamoDbCache
+import com.lightningkite.lightningserver.db.PostgresDatabase
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.email.SesClient
 import com.lightningkite.lightningserver.files.FilesSettings
@@ -39,6 +41,8 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     init {
         SesClient
+        PostgresDatabase
+        DynamoDbCache
         MongoDatabase
         MemcachedCache
         S3FileSystem

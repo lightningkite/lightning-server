@@ -28,6 +28,7 @@ dependencies {
     api("org.jetbrains.exposed:exposed-core:0.39.2")
     api("org.jetbrains.exposed:exposed-java-time:0.39.2")
     api("org.jetbrains.exposed:exposed-jdbc:0.39.2")
+    api("org.postgresql:postgresql:42.3.5")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.6.2")
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
     testImplementation(project(":server-testing"))

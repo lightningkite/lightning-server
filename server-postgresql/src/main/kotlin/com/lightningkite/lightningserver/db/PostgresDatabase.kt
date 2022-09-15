@@ -9,8 +9,21 @@ import kotlin.reflect.KType
 class PostgresDatabase(val db: Database) : com.lightningkite.lightningdb.Database {
     companion object {
         init {
-            DatabaseSettings.register("postgres") {
-                PostgresDatabase(Database.connect(it.url))
+            // postgresql://master:YYKgRGvj0Bu9ivWuQvEV1KVymEeT6YOD@demo-example-database.cluster-ca9aa9iabzgd.us-west-2.rds.amazonaws.com/demoexampledatabase
+            DatabaseSettings.register("postgresql") {
+                val withoutScheme = it.url.substringAfter("://")
+                val auth = withoutScheme.substringBefore('@', "")
+                val user = auth.substringBefore(':').takeUnless { it.isEmpty() }
+                val password = auth.substringAfter(':').takeUnless { it.isEmpty() }
+                val destination = withoutScheme.substringAfter('@')
+                println("Connection info:")
+                println("url: jdbc:postgresql://$destination")
+                println("user: $user")
+                println("password: $password")
+                if(user != null && password != null)
+                    PostgresDatabase(Database.connect("jdbc:postgresql://$destination", "org.postgresql.Driver", user, password))
+                else
+                    PostgresDatabase(Database.connect("jdbc:postgresql://$destination", "org.postgresql.Driver"))
             }
         }
     }

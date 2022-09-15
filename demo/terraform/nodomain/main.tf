@@ -1,38 +1,38 @@
-variable "debug" {
-  default = true
+module "Base" {
+  source              = "../base"
+  # main
+  deployment_location = var.deployment_location
+  deployment_name = var.deployment_name
+  debug = var.debug
+  # general
+  cors = var.cors
+  # database
+  database_min_capacity = var.database_min_capacity
+  database_max_capacity = var.database_max_capacity
+  database_auto_pause = var.database_auto_pause
+  # jwt
+  jwt_expirationMilliseconds = var.jwt_expirationMilliseconds
+  jwt_emailExpirationMilliseconds = var.jwt_emailExpirationMilliseconds
+  # logging
+  logging = var.logging
+  # files
+  files_expiry = var.files_expiry
+  # exceptions
+  exceptions = var.exceptions
+  # email
+  email_sender = var.email_sender
 }
-variable "deployment_name" {
-  default = "example"
-}
-variable "deployment_location" {
-  default = "us-west-2"
-}
+##########
+# main
+##########
 provider "aws" {
   region = var.deployment_location
 }
 
-variable "cors" {
-    default = null
-}
-variable "logging" {
-  default = {}
-}
-variable "exceptions" {
-  default = {}
-}
-variable "email_sender" {
-}
+##########
+# email
+##########
 resource "aws_ses_email_identity" "email" {
   email = var.email_sender
 }
-      module "Base" {
-        source              = "../base"
-        deployment_location = var.deployment_location
-        deployment_name     = var.deployment_name
-        debug               = var.debug
-          cors  = var.cors
-logging  = var.logging
-exceptions  = var.exceptions
-email_sender  = var.email_sender
 
-      }

@@ -1,7 +1,6 @@
-####
-# General configuration for an AWS Api http project
-####
-
+##########
+# main
+##########
 terraform {
   required_providers {
     aws = {
@@ -61,7 +60,7 @@ resource "aws_api_gateway_account" "main" {
 }
 
 resource "aws_iam_role" "cloudwatch" {
-  name = "api_gateway_cloudwatch_global_${var.deployment_location}"
+  name = "demo${var.deployment_name}"
 
   assume_role_policy = <<EOF
 {
@@ -80,7 +79,7 @@ resource "aws_iam_role" "cloudwatch" {
 EOF
 }
 resource "aws_iam_role_policy" "cloudwatch" {
-  name = "default"
+  name = "demo${var.deployment_name}_policy"
   role = aws_iam_role.cloudwatch.id
 
   policy = <<EOF
@@ -160,150 +159,85 @@ resource "aws_security_group" "lambdainvoke" {
   }
 }
 
-resource "aws_s3_bucket" "lambda_bucket" {
-  bucket_prefix = "demo-${var.deployment_name}-lambda-bucket"
-  force_destroy = true
-}
-resource "aws_s3_bucket_acl" "lambda_bucket" {
-  bucket = aws_s3_bucket.lambda_bucket.id
-  acl    = "private"
-}
-
-locals {
-  lambda_source = "../../build/dist/lambda.zip"
-}
-resource "aws_s3_object" "app_storage" {
-  bucket = aws_s3_bucket.lambda_bucket.id
-
-  key    = "lambda-functions.zip"
-  source = local.lambda_source
-
-  source_hash = filemd5(local.lambda_source)
-}
-
-resource "aws_iam_role" "main_exec" {
-  name = "demo-${var.deployment_name}-main-exec"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Sid    = ""
-      Principal = {
-        Service = "lambda.amazonaws.com"
-      }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "main_policy_exec" {
-  role       = aws_iam_role.main_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-resource "aws_iam_role_policy_attachment" "main_policy_vpc" {
-  role       = aws_iam_role.main_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-}
-
-resource "aws_iam_policy" "lambdainvoke" {
-  name        = "demo-${var.deployment_name}-lambdainvoke"
-  path = "/demo/${var.deployment_name}/lambdainvoke/"
-  description = "Access to the demo-${var.deployment_name}_lambdainvoke bucket"
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "lambda:InvokeFunction",
-        ]
-        Effect   = "Allow"
-        Resource = "*"
-      },
-    ]
-  })
-}
-resource "aws_iam_role_policy_attachment" "lambdainvoke" {
-  role       = aws_iam_role.main_exec.name
-  policy_arn = aws_iam_policy.lambdainvoke.arn
-}
-
-
-####
-# database: DatabaseSettings
-####
+##########
+# database
+##########
 resource "random_password" "database" {
   length           = 32
   special          = true
   override_special = "-_"
 }
-resource "aws_docdb_subnet_group" "database" {
+resource "aws_db_subnet_group" "database" {
   name       = "demo-${var.deployment_name}-database"
   subnet_ids = module.vpc.private_subnets
 }
-resource "aws_docdb_cluster_parameter_group" "database" {
-  family = "docdb4.0"
-  name = "demo-${var.deployment_name}-database-parameter-group"
-  parameter {
-    name  = "tls"
-    value = "disabled"
-  }
-}
-resource "aws_docdb_cluster" "database" {
+resource "aws_rds_cluster" "database" {
   cluster_identifier = "demo-${var.deployment_name}-database"
-  engine = "docdb"
+  engine             = "aurora-postgresql"
+  engine_mode        = "serverless"
+  engine_version     = "10.18"
+  database_name      = "demo${var.deployment_name}database"
   master_username = "master"
   master_password = random_password.database.result
-  backup_retention_period = 5
-  preferred_backup_window = "07:00-09:00"
-  skip_final_snapshot = true
-
-  db_cluster_parameter_group_name = "${aws_docdb_cluster_parameter_group.database.name}"
+  skip_final_snapshot = var.debug
+  final_snapshot_identifier = "demo-${var.deployment_name}-database"
+  enable_http_endpoint = true
   vpc_security_group_ids = [aws_security_group.internal.id]
-  db_subnet_group_name    = "${aws_docdb_subnet_group.database.name}"
-}
-resource "aws_docdb_cluster_instance" "database" {
-  count              = 1
-  identifier         = "demo-${var.deployment_name}-database-${count.index}"
-  cluster_identifier = "${aws_docdb_cluster.database.id}"
-  instance_class     = "db.t4g.medium"
+  db_subnet_group_name    = "${aws_db_subnet_group.database.name}"
+
+  scaling_configuration {
+    auto_pause = var.database_auto_pause
+    min_capacity = var.database_min_capacity
+    max_capacity = var.database_max_capacity
+    seconds_until_auto_pause = 300
+    timeout_action = "ForceApplyCapacityChange"
+  }
 }
 
-####
-# cache: CacheSettings
-####
-
-resource "aws_elasticache_cluster" "cache" {
-  cluster_id           = "demo-${var.deployment_name}-cache"
-  engine               = "memcached"
-  node_type            = var.cache_node_type
-  num_cache_nodes      = var.cache_node_count
-  parameter_group_name = "default.memcached1.6"
-  port                 = 11211
-  security_group_ids   = [aws_security_group.internal.id]
-  subnet_group_name    = aws_elasticache_subnet_group.cache.name
+##########
+# cache
+##########
+resource "aws_iam_policy" "cache" {
+  name        = "demo-${var.deployment_name}-cache"
+  path = "/demo/${var.deployment_name}/cache/"
+  description = "Access to the demo-${var.deployment_name}_cache tables in DynamoDB"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "dynamodb:*",
+        ]
+        Effect   = "Allow"
+        Resource = ["*"]
+      },
+    ]
+  })
 }
-resource "aws_elasticache_subnet_group" "cache" {
-  name       = "demo-${var.deployment_name}-cache"
-  subnet_ids = module.vpc.private_subnets
+resource "aws_iam_role_policy_attachment" "cache" {
+  role       = aws_iam_role.main_exec.name
+  policy_arn = aws_iam_policy.cache.arn
 }
 
-####
-# jwt: JwtSigner
-####
+##########
+# jwt
+##########
 resource "random_password" "jwt" {
   length           = 32
   special          = true
   override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
+##########
+# files
+##########
 ####
 # files: FilesSettings
 ####
 
 resource "aws_s3_bucket" "files" {
   bucket_prefix = "demo-${var.deployment_name}-files"
+  force_destroy = var.debug
 }
 resource "aws_s3_bucket_cors_configuration" "files" {
   bucket = aws_s3_bucket.files.bucket
@@ -350,10 +284,9 @@ resource "aws_iam_role_policy_attachment" "files" {
   policy_arn = aws_iam_policy.files.arn
 }
 
-####
-# email: EmailSettings
-####
-
+##########
+# email
+##########
 resource "aws_iam_user" "email" {
   name = "demo-${var.deployment_name}-email-user"
 }
@@ -381,7 +314,7 @@ resource "aws_iam_user_policy_attachment" "email" {
 }
 
 resource "aws_security_group" "email" {
-  name   = "demo-${var.deployment_name}-email"
+  name   = "demo-${var.deployment_name}-${var.deployment_name}-email"
   vpc_id = module.vpc.vpc_id
 
   ingress {
@@ -398,131 +331,10 @@ resource "aws_vpc_endpoint" "email" {
   vpc_endpoint_type = "Interface"
 }
 
+##########
+# HTTP
+##########
 
-resource "aws_cloudwatch_event_rule" "scheduled_task_test-schedule2" {
-  name                = "demo-${var.deployment_name}_testschedule2"
-  schedule_expression = "rate(1 minute)"
-}
-resource "aws_cloudwatch_event_target" "scheduled_task_test-schedule2" {
-  rule      = aws_cloudwatch_event_rule.scheduled_task_test-schedule2.name
-  target_id = "lambda"
-  arn       = aws_lambda_function.main.arn
-  input     = "{\"scheduled\": \"test-schedule2\"}"
-}
-resource "aws_lambda_permission" "scheduled_task_test-schedule2" {
-  statement_id  = "scheduled_task_test-schedule2"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.main.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.scheduled_task_test-schedule2.arn
-}
-resource "aws_cloudwatch_event_rule" "scheduled_task_test-schedule" {
-  name                = "demo-${var.deployment_name}_testschedule"
-  schedule_expression = "rate(1 minute)"
-}
-resource "aws_cloudwatch_event_target" "scheduled_task_test-schedule" {
-  rule      = aws_cloudwatch_event_rule.scheduled_task_test-schedule.name
-  target_id = "lambda"
-  arn       = aws_lambda_function.main.arn
-  input     = "{\"scheduled\": \"test-schedule\"}"
-}
-resource "aws_lambda_permission" "scheduled_task_test-schedule" {
-  statement_id  = "scheduled_task_test-schedule"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.main.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.scheduled_task_test-schedule.arn
-}
-resource "aws_cloudwatch_event_rule" "scheduled_task_cleanupUploads" {
-  name                = "demo-${var.deployment_name}_cleanupUploads"
-  schedule_expression = "rate(15 minutes)"
-}
-resource "aws_cloudwatch_event_target" "scheduled_task_cleanupUploads" {
-  rule      = aws_cloudwatch_event_rule.scheduled_task_cleanupUploads.name
-  target_id = "lambda"
-  arn       = aws_lambda_function.main.arn
-  input     = "{\"scheduled\": \"cleanupUploads\"}"
-}
-resource "aws_lambda_permission" "scheduled_task_cleanupUploads" {
-  statement_id  = "scheduled_task_cleanupUploads"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.main.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.scheduled_task_cleanupUploads.arn
-}
-####
-# App Declaration
-####
-
-resource "aws_lambda_function" "main" {
-  function_name = "demo-${var.deployment_name}-main"
-
-  s3_bucket = aws_s3_bucket.lambda_bucket.id
-  s3_key    = aws_s3_object.app_storage.key
-
-  runtime = "java11"
-  handler = "com.lightningkite.lightningserver.demo.AwsHandler"
-  
-  memory_size = "2048"
-  timeout = 30
-  # memory_size = "1024"
-
-  source_code_hash = filebase64sha256(local.lambda_source)
-
-  role = aws_iam_role.main_exec.arn
-  depends_on = [aws_s3_object.app_storage]
-  
-  vpc_config {
-    subnet_ids = module.vpc.private_subnets
-    security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
-  }
-  
-  environment {
-    variables = {
-      LIGHTNING_SERVER_SETTINGS = jsonencode({
-        general = {
-            projectName = "demo"
-            publicUrl = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
-            wsUrl = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
-            debug = var.debug
-            cors = var.cors
-        },
-        database = {
-            url = "mongodb://master:${random_password.database.result}@${aws_docdb_cluster_instance.database[0].endpoint}/?retryWrites=false"
-            databaseName = "demo-${var.deployment_name}_database"
-        },
-        cache = {
-            url = "memcached-aws://${aws_elasticache_cluster.cache.cluster_address}:11211"
-        },
-        jwt = {
-            expirationMilliseconds = var.jwt_expirationMilliseconds 
-            emailExpirationMilliseconds = var.jwt_emailExpirationMilliseconds 
-            secret = random_password.jwt.result
-        },
-        logging = var.logging,
-        files = {
-            storageUrl = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
-            signedUrlExpiration = var.files_expiry
-        },
-        exceptions = var.exceptions,
-        email = {
-            url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
-            fromEmail = var.email_sender
-        }
-      })
-    }
-  }
-}
-
-resource "aws_cloudwatch_log_group" "main" {
-  name = "demo-${var.deployment_name}-main-log"
-
-  retention_in_days = 30
-}
-
-####
-# ApiGateway for Http
-####
 variable "public_http_url" {
   default = null
 }
@@ -585,11 +397,9 @@ resource "aws_lambda_permission" "api_gateway_http" {
   source_arn = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
 }
 
-            
-
-####
-# ApiGateway for Websockets
-####
+##########
+# WebSockets
+##########
 variable "public_ws_url" {
   default = null
 }
@@ -688,4 +498,139 @@ resource "aws_iam_role_policy_attachment" "api_gateway_ws" {
   role       = aws_iam_role.main_exec.name
   policy_arn = aws_iam_policy.api_gateway_ws.arn
 }
+
+##########
+# Main
+##########
+        resource "aws_s3_bucket" "lambda_bucket" {
+          bucket_prefix = "demo-${var.deployment_name}-lambda-bucket"
+          force_destroy = true
+        }
+        resource "aws_s3_bucket_acl" "lambda_bucket" {
+          bucket = aws_s3_bucket.lambda_bucket.id
+          acl    = "private"
+        }
+
+        resource "aws_iam_role" "main_exec" {
+          name = "demo-${var.deployment_name}-main-exec"
+
+          assume_role_policy = jsonencode({
+            Version = "2012-10-17"
+            Statement = [{
+              Action = "sts:AssumeRole"
+              Effect = "Allow"
+              Sid    = ""
+              Principal = {
+                Service = "lambda.amazonaws.com"
+              }
+              }
+            ]
+          })
+        }
+
+        resource "aws_iam_role_policy_attachment" "main_policy_exec" {
+          role       = aws_iam_role.main_exec.name
+          policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        }
+        resource "aws_iam_role_policy_attachment" "main_policy_vpc" {
+          role       = aws_iam_role.main_exec.name
+          policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+        }
+        
+        resource "aws_iam_policy" "lambdainvoke" {
+          name        = "demo-${var.deployment_name}-lambdainvoke"
+          path = "/demo/${var.deployment_name}/lambdainvoke/"
+          description = "Access to the demo-${var.deployment_name}_lambdainvoke bucket"
+          policy = jsonencode({
+            Version = "2012-10-17"
+            Statement = [
+              {
+                Action = [
+                  "lambda:InvokeFunction",
+                ]
+                Effect   = "Allow"
+                Resource = "*"
+              },
+            ]
+          })
+        }
+        resource "aws_iam_role_policy_attachment" "lambdainvoke" {
+          role       = aws_iam_role.main_exec.name
+          policy_arn = aws_iam_policy.lambdainvoke.arn
+        }
+        locals {
+          lambda_source = "../../build/dist/lambda.zip"
+        }
+        resource "aws_s3_object" "app_storage" {
+          bucket = aws_s3_bucket.lambda_bucket.id
+
+          key    = "lambda-functions.zip"
+          source = local.lambda_source
+
+          source_hash = filemd5(local.lambda_source)
+        }
+        resource "aws_lambda_function" "main" {
+          function_name = "demo-${var.deployment_name}-main"
+
+          s3_bucket = aws_s3_bucket.lambda_bucket.id
+          s3_key    = aws_s3_object.app_storage.key
+
+          runtime = "java11"
+          handler = "com.lightningkite.lightningserver.demo.AwsHandler"
+          
+          memory_size = "2048"
+          timeout = 30
+          # memory_size = "1024"
+
+          source_code_hash = filebase64sha256(local.lambda_source)
+
+          role = aws_iam_role.main_exec.arn
+          
+          vpc_config {
+            subnet_ids = module.vpc.private_subnets
+            security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
+          }
+          
+          environment {
+            variables = {
+              LIGHTNING_SERVER_SETTINGS = jsonencode({
+                general = {
+    projectName = "demo"
+    publicUrl = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
+    wsUrl = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
+    debug = var.debug
+    cors = var.cors
+},
+                database = {
+    url = "postgresql://master:${random_password.database.result}@${aws_rds_cluster.database.endpoint}/demo${var.deployment_name}database"
+},
+                cache = {
+    url = "dynamodb://${var.deployment_location}/demo-${var.deployment_name}_${var.deployment_name}"
+},
+                jwt = {
+    expirationMilliseconds = var.jwt_expirationMilliseconds 
+    emailExpirationMilliseconds = var.jwt_emailExpirationMilliseconds 
+    secret = random_password.jwt.result
+},
+                logging = var.logging,
+                files = {
+    storageUrl = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
+    signedUrlExpiration = var.files_expiry
+},
+                exceptions = var.exceptions,
+                email = {
+    url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
+    fromEmail = var.email_sender
+}
+              })
+            }
+          }
+          
+          depends_on = [aws_s3_object.app_storage]
+        }
+
+        resource "aws_cloudwatch_log_group" "main" {
+          name = "demo-${var.deployment_name}-main-log"
+          retention_in_days = 30
+        }
 
