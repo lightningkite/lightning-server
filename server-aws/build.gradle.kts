@@ -17,7 +17,6 @@ val khrysalisVersion: String by project
 val coroutines: String by project
 val awsVersion = "2.17.261"
 dependencies {
-    api(project(":server-postgresql"))
     api(project(":server-dynamodb"))
     api(project(":server-core"))
     api("software.amazon.awssdk:s3:$awsVersion")

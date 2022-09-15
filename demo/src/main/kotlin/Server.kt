@@ -8,7 +8,6 @@ import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.db.AuroraDatabase
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.db.DynamoDbCache
 import com.lightningkite.lightningserver.db.PostgresDatabase
@@ -45,7 +44,6 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     init {
         SesClient
-        AuroraDatabase
         PostgresDatabase
         DynamoDbCache
         MongoDatabase
@@ -53,8 +51,6 @@ object Server : ServerPathGroup(ServerPath.root) {
         S3FileSystem
         prepareModels()
     }
-
-    val pausing = AuroraDatabase.shutdownSchedule(Duration.ofMinutes(5))
 
     val auth = AuthEndpoints(
         path = path("auth"),
