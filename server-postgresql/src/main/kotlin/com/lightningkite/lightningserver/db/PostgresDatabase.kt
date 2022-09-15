@@ -9,7 +9,7 @@ import kotlin.reflect.KType
 class PostgresDatabase(val db: Database) : com.lightningkite.lightningdb.Database {
     companion object {
         init {
-            // postgresql://master:YYKgRGvj0Bu9ivWuQvEV1KVymEeT6YOD@demo-example-database.cluster-ca9aa9iabzgd.us-west-2.rds.amazonaws.com/demoexampledatabase
+            // postgresql://user:password@endpoint/database
             DatabaseSettings.register("postgresql") {
                 val withoutScheme = it.url.substringAfter("://")
                 val auth = withoutScheme.substringBefore('@', "")
