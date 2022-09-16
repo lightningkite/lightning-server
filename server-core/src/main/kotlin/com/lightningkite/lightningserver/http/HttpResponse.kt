@@ -45,6 +45,15 @@ data class HttpResponse(
             status = status,
             headers = headers
         )
+        fun html(
+            status: HttpStatus = HttpStatus.OK,
+            headers: HttpHeaders.Builder.()->Unit = {},
+            content: String
+        ) = HttpResponse(
+            body = HttpContent.Text(content, ContentType.Text.Plain),
+            status = status,
+            headers = headers
+        )
         fun plainText(
             text: String,
             status: HttpStatus = HttpStatus.OK,

@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
+@Deprecated("This doesn't work yet.")
 class DynamoDatabase(val dynamo: DynamoDbAsyncClient): Database {
     private val collections = ConcurrentHashMap<String, Lazy<DynamoDbCollection<*>>>()
 
