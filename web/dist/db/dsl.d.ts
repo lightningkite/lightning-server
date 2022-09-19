@@ -5,7 +5,9 @@ export declare function startChain<T extends any>(): PropChain<T, T>;
 export declare class PropChain<From extends any, To extends any> {
     readonly mapCondition: ((a: Condition<To>) => Condition<From>);
     readonly mapModification: ((a: Modification<To>) => Modification<From>);
-    constructor(mapCondition: ((a: Condition<To>) => Condition<From>), mapModification: ((a: Modification<To>) => Modification<From>));
+    readonly getProp: ((a: From) => To);
+    readonly setProp: ((a: From, b: To) => From);
+    constructor(mapCondition: ((a: Condition<To>) => Condition<From>), mapModification: ((a: Modification<To>) => Modification<From>), getProp: ((a: From) => To), setProp: ((a: From, b: To) => From));
     get<V extends any>(prop: TProperty1<To, V>): PropChain<From, V>;
     toString(): string;
 }
@@ -39,6 +41,10 @@ export declare function xPropChainSetSizedEqual<K extends any, T extends any>(th
 export declare function xPropChainContainsKey<K extends any, T extends any>(this_: PropChain<K, Map<string, T>>, key: string): Condition<K>;
 export declare function xPropChainNotNullGet<K extends any, T extends any>(this_: PropChain<K, (T | null)>): PropChain<K, T>;
 export declare function xPropChainGet<K extends any, T extends any>(this_: PropChain<K, Map<string, T>>, key: string): PropChain<K, T>;
+export declare function xPropChainListAllGet<K extends any, T extends any>(this_: PropChain<K, Array<T>>): PropChain<K, T>;
+export declare function xPropChainSetAllGet<K extends any, T extends any>(this_: PropChain<K, Set<T>>): PropChain<K, T>;
+export declare function xPropChainListAnyGet<K extends any, T extends any>(this_: PropChain<K, Array<T>>): PropChain<K, T>;
+export declare function xPropChainSetAnyGet<K extends any, T extends any>(this_: PropChain<K, Set<T>>): PropChain<K, T>;
 export declare function xPropChainCondition<K extends any, T extends any>(this_: PropChain<K, T>, make: ((a: PropChain<T, T>) => Condition<T>)): Condition<K>;
 export declare function xPropChainModification<K extends any, T extends any>(this_: PropChain<K, T>, make: ((a: PropChain<T, T>) => Modification<T>)): Modification<K>;
 export declare function xPropChainAssign<K extends any, T extends any>(this_: PropChain<K, T>, value: T): Modification<K>;

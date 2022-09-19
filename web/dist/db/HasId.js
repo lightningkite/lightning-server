@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.HasEmailFields = exports.HasIdFields = void 0;
+exports.HasPhoneNumberFields = exports.HasEmailFields = exports.HasIdFields = void 0;
 //! Declares com.lightningkite.lightningdb.HasIdFields
 class HasIdFields {
     constructor() {
@@ -21,4 +21,14 @@ class HasEmailFields {
 }
 exports.HasEmailFields = HasEmailFields;
 HasEmailFields.INSTANCE = new HasEmailFields();
+//! Declares com.lightningkite.lightningdb.HasPhoneNumberFields
+class HasPhoneNumberFields {
+    constructor() {
+    }
+    phoneNumber() {
+        return "phoneNumber";
+    }
+}
+exports.HasPhoneNumberFields = HasPhoneNumberFields;
+HasPhoneNumberFields.INSTANCE = new HasPhoneNumberFields();
 //# sourceMappingURL=HasId.js.map

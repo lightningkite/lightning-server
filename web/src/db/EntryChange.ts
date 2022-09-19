@@ -20,11 +20,11 @@ setUpDataClass(EntryChange)
 export function xEntryChangeMap<T extends any, B extends any>(this_: EntryChange<T>, mapper: ((a: T) => B)): EntryChange<B> {
     return new EntryChange<B>(((): (B | null) => {
                 const temp0 = this_.old;
-                if(temp0 === null) { return null }
+                if (temp0 === null) { return null }
                 return (mapper)(temp0)
         })(), ((): (B | null) => {
             const temp1 = this_._new;
-            if(temp1 === null) { return null }
+            if (temp1 === null) { return null }
             return (mapper)(temp1)
     })());
 }

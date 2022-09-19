@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.cache
 
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

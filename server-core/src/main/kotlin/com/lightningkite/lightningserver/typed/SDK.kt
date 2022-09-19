@@ -144,7 +144,11 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                 appendLine("        url = \"\$httpUrl${entry.route.path.escaped}\",")
                 appendLine("        method = HttpClient.${entry.route.method},")
                 entry.authInfo.type?.let {
-                    appendLine("        headers = mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
+                    if(entry.authInfo.required) {
+                        appendLine("        headers = mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
+                    } else {
+                        appendLine("        headers = if(${it.userTypeTokenName()} != null) mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\") else mapOf(),")
+                    }
                 }
                 entry.inputType.takeUnless { it == Unit.serializer() }?.let {
                     appendLine("        body = input.toJsonRequestBody()")
@@ -171,7 +175,11 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                     appendLine("            url = \"\$httpUrl${entry.route.path.escaped}\",")
                     appendLine("            method = HttpClient.${entry.route.method},")
                     entry.authInfo.type?.let {
-                        appendLine("            headers = mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
+                        if(entry.authInfo.required) {
+                            appendLine("            headers = mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
+                        } else {
+                            appendLine("            headers = if(${it.userTypeTokenName()} != null) mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\") else mapOf(),")
+                        }
                     }
                     entry.inputType.takeUnless { it == Unit.serializer() }?.let {
                         appendLine("            body = input.toJsonRequestBody()")
@@ -290,7 +298,10 @@ private data class Arg(val name: String, val type: KSerializer<*>? = null, val s
 private fun arguments(documentable: Documentable, skipAuth: Boolean = false): List<Arg> = when (documentable) {
     is ApiEndpoint<*, *, *> -> listOfNotNull(
         documentable.authInfo.type?.takeUnless { skipAuth }?.let {
-            Arg(name = it.userTypeTokenName(), stringType = "String")
+            if(documentable.authInfo.required)
+                Arg(name = it.userTypeTokenName(), stringType = "String")
+            else
+                Arg(name = it.userTypeTokenName(), stringType = "String?", default = "null")
         }?.let(::listOf),
         documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {
@@ -302,7 +313,10 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false): Li
     ).flatten()
     is ApiWebsocket<*, *, *> -> listOfNotNull(
         documentable.authInfo.type?.takeUnless { skipAuth }?.let {
-            Arg(name = it.userTypeTokenName(), stringType = "String")
+            if(documentable.authInfo.required)
+                Arg(name = it.userTypeTokenName(), stringType = "String")
+            else
+                Arg(name = it.userTypeTokenName(), stringType = "String?", default = "null")
         }?.let(::listOf),
         documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {

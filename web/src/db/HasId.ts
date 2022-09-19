@@ -39,3 +39,23 @@ export class HasEmailFields {
         return "email" as TProperty1<T, string>;
     }
 }
+
+
+//! Declares com.lightningkite.lightningdb.HasPhoneNumber
+export interface HasPhoneNumber {
+    
+    readonly phoneNumber: string;
+    
+}
+
+
+//! Declares com.lightningkite.lightningdb.HasPhoneNumberFields
+export class HasPhoneNumberFields {
+    private constructor() {
+    }
+    public static INSTANCE = new HasPhoneNumberFields();
+    
+    phoneNumber<T extends HasPhoneNumber>(): TProperty1<T, string> {
+        return "phoneNumber" as TProperty1<T, string>;
+    }
+}

@@ -33,11 +33,11 @@ module "vpc" {
   private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
   public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 
-  enable_nat_gateway = var.secure_over_cheap
+  enable_nat_gateway = var.lambda_in_vpc
   single_nat_gateway = true
   enable_vpn_gateway = false
-  enable_dns_hostnames = !var.secure_over_cheap
-  enable_dns_support   = !var.secure_over_cheap
+  enable_dns_hostnames = !var.lambda_in_vpc
+  enable_dns_support   = !var.lambda_in_vpc
 }
 
 resource "aws_vpc_endpoint" "s3" {
@@ -115,14 +115,14 @@ resource "aws_security_group" "internal" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.secure_over_cheap ? [] : ["0.0.0.0/0"])
+    cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.lambda_in_vpc ? [] : ["0.0.0.0/0"])
   }
 
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.secure_over_cheap ? [] : ["0.0.0.0/0"])
+    cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.lambda_in_vpc ? [] : ["0.0.0.0/0"])
   }
 }
 
@@ -172,7 +172,7 @@ resource "random_password" "database" {
 }
 resource "aws_db_subnet_group" "database" {
   name       = "demo-${var.deployment_name}-database2"
-  subnet_ids = var.secure_over_cheap ? module.vpc.private_subnets : module.vpc.public_subnets 
+  subnet_ids = var.lambda_in_vpc ? module.vpc.private_subnets : module.vpc.public_subnets
 }
 resource "aws_rds_cluster" "database" {
   cluster_identifier = "demo-${var.deployment_name}-database"
@@ -194,7 +194,7 @@ resource "aws_rds_cluster" "database" {
 }
 
 resource "aws_rds_cluster_instance" "database" {
-  publicly_accessible = !var.secure_over_cheap
+  publicly_accessible = !var.lambda_in_vpc
   cluster_identifier = aws_rds_cluster.database.id
   instance_class     = "db.serverless"
   engine             = aws_rds_cluster.database.engine
@@ -595,7 +595,7 @@ resource "aws_iam_role_policy_attachment" "api_gateway_ws" {
           role = aws_iam_role.main_exec.arn
           
           dynamic "vpc_config" {
-            for_each = var.secure_over_cheap ? [1] : []
+            for_each = var.lambda_in_vpc ? [1] : []
             content {
             subnet_ids = module.vpc.private_subnets
             security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]

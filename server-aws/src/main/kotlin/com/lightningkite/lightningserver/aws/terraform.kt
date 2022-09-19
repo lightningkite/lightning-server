@@ -317,7 +317,7 @@ private fun handlers() {
                 }
                 resource "aws_db_subnet_group" "${key}" {
                   name       = "$namePrefix-${key}"
-                  subnet_ids = var.secure_over_cheap ? module.vpc.private_subnets : module.vpc.public_subnets 
+                  subnet_ids = var.lambda_in_vpc ? module.vpc.private_subnets : module.vpc.public_subnets 
                 }
                 resource "aws_rds_cluster" "$key" {
                   cluster_identifier = "$namePrefix-${key}"
@@ -339,7 +339,7 @@ private fun handlers() {
                 }
 
                 resource "aws_rds_cluster_instance" "$key" {
-                  publicly_accessible = !var.secure_over_cheap
+                  publicly_accessible = !var.lambda_in_vpc
                   cluster_identifier = aws_rds_cluster.$key.id
                   instance_class     = "db.serverless"
                   engine             = aws_rds_cluster.$key.engine
@@ -394,31 +394,7 @@ private fun handlers() {
     TerraformSection.handler<CacheSettings>(
         name = "DynamoDB",
         priority = 1,
-        resources = { key ->
-            """
-                resource "aws_iam_policy" "${key}" {
-                  name        = "${namePrefix}-${key}"
-                  path = "/${namePrefixPath}/${key}/"
-                  description = "Access to the ${namePrefix}_${key} tables in DynamoDB"
-                  policy = jsonencode({
-                    Version = "2012-10-17"
-                    Statement = [
-                      {
-                        Action = [
-                          "dynamodb:*",
-                        ]
-                        Effect   = "Allow"
-                        Resource = ["*"]
-                      },
-                    ]
-                  })
-                }
-                resource "aws_iam_role_policy_attachment" "${key}" {
-                  role       = aws_iam_role.main_exec.name
-                  policy_arn = aws_iam_policy.${key}.arn
-                }
-            """.trimIndent()
-        },
+        resources = { null },
         settingOutput = { key ->
             """
                 {
@@ -553,7 +529,7 @@ private fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(projectI
             TerraformSection.inputString("deployment_location", "us-west-2"),
             TerraformSection.inputString("deployment_name", null),
             TerraformSection.inputBoolean("debug", false),
-            TerraformSection.inputBoolean("secure_over_cheap", false),
+            TerraformSection.inputBoolean("lambda_in_vpc", true),
         ),
         resources = """
         terraform {
@@ -588,11 +564,11 @@ private fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(projectI
           private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
           public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
         
-          enable_nat_gateway = var.secure_over_cheap
+          enable_nat_gateway = var.lambda_in_vpc
           single_nat_gateway = true
           enable_vpn_gateway = false
-          enable_dns_hostnames = !var.secure_over_cheap
-          enable_dns_support   = !var.secure_over_cheap
+          enable_dns_hostnames = !var.lambda_in_vpc
+          enable_dns_support   = true
         }
         
         resource "aws_vpc_endpoint" "s3" {
@@ -670,14 +646,14 @@ private fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(projectI
             from_port   = 0
             to_port     = 0
             protocol    = "-1"
-            cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.secure_over_cheap ? [] : ["0.0.0.0/0"])
+            cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.lambda_in_vpc ? [] : ["0.0.0.0/0"])
           }
         
           egress {
             from_port   = 0
             to_port     = 0
             protocol    = "-1"
-            cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.secure_over_cheap ? [] : ["0.0.0.0/0"])
+            cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.lambda_in_vpc ? [] : ["0.0.0.0/0"])
           }
         }
 
@@ -833,6 +809,10 @@ private fun awsMainAppHandler(projectInfo: TerraformProjectInfo, handlerFqn: Str
           })
         }
 
+        resource "aws_iam_role_policy_attachment" "dynamo" {
+          role       = aws_iam_role.main_exec.name
+          policy_arn = aws_iam_policy.dynamo.arn
+        }
         resource "aws_iam_role_policy_attachment" "main_policy_exec" {
           role       = aws_iam_role.main_exec.name
           policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -842,6 +822,23 @@ private fun awsMainAppHandler(projectInfo: TerraformProjectInfo, handlerFqn: Str
           policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
         }
         
+        resource "aws_iam_policy" "dynamo" {
+          name        = "${projectInfo.namePrefix}-dynamo"
+          path = "/${projectInfo.namePrefixPath}/dynamo/"
+          description = "Access to the ${projectInfo.namePrefix}_dynamo tables in DynamoDB"
+          policy = jsonencode({
+            Version = "2012-10-17"
+            Statement = [
+              {
+                Action = [
+                  "dynamodb:*",
+                ]
+                Effect   = "Allow"
+                Resource = ["*"]
+              },
+            ]
+          })
+        }
         resource "aws_iam_policy" "lambdainvoke" {
           name        = "${projectInfo.namePrefix}-lambdainvoke"
           path = "/${projectInfo.namePrefixPath}/lambdainvoke/"
@@ -892,7 +889,7 @@ private fun awsMainAppHandler(projectInfo: TerraformProjectInfo, handlerFqn: Str
           role = aws_iam_role.main_exec.arn
           
           dynamic "vpc_config" {
-            for_each = var.secure_over_cheap ? [1] : []
+            for_each = var.lambda_in_vpc ? [1] : []
             content {
             subnet_ids = module.vpc.private_subnets
             security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
@@ -1217,9 +1214,12 @@ fun terraformAws(handlerFqn: String, projectName: String = "project", root: File
             handler?.makeSection?.invoke(info, it.name) ?: TerraformSection.default(info, it)
         },
         listOfNotNull(
-            if(Http.endpoints.isNotEmpty()) httpAwsHandler(info) else null,
-            if(WebSockets.handlers.isNotEmpty()) wsAwsHandler(info) else null,
-        )
+//            if(Http.endpoints.isNotEmpty()) httpAwsHandler(info) else null,
+            httpAwsHandler(info),
+//            if(WebSockets.handlers.isNotEmpty()) wsAwsHandler(info) else null,
+            wsAwsHandler(info),
+        ),
+        scheduleAwsHandlers(info)
     ).flatten()
     val allSections = sections + awsMainAppHandler(info, handlerFqn, sections)
 

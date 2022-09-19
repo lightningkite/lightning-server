@@ -131,7 +131,7 @@ operator fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, M
     PropChain<K, T>(
         mapCondition = { mapCondition(Condition.OnKey(key, it)) },
         mapModification = { mapModification(Modification.ModifyByKey(mapOf(key to it))) },
-        getProp = { getProp(it).getValue(key) },
+        getProp = { getProp(it)[key]!! },
         setProp = { from, to -> setProp(from, getProp(from).plus(key to to)) }
     )
 
@@ -268,12 +268,12 @@ fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.dr
 @JsName("xPropChainListMap")
 @JvmName("listMap")
 inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, List<T>>.map(modification: (PropChain<T, T>) -> Modification<T>) =
-    mapModification(Modification.ListPerElement(condition = Condition.Always(), startChain<T>().let(modification)))
+    mapModification(Modification.ListPerElement(condition = Condition.Always<T>(), startChain<T>().let(modification)))
 
 @JsName("xPropChainSetMap")
 @JvmName("setMap")
 inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.map(modification: (PropChain<T, T>) -> Modification<T>) =
-    mapModification(Modification.SetPerElement(condition = Condition.Always(), startChain<T>().let(modification)))
+    mapModification(Modification.SetPerElement(condition = Condition.Always<T>(), startChain<T>().let(modification)))
 
 @JsName("xPropChainListMapIf")
 @JvmName("listMapIf")

@@ -4,6 +4,7 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.rawUser
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
+import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.handler

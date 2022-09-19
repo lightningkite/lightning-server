@@ -4,19 +4,23 @@ import KhrysalisRuntime
 import Foundation
 
 public func startChain<T : Codable & Hashable>() -> PropChain<T, T> {
-    return PropChain(mapCondition: { (it) -> Condition<T> in it }, mapModification: { (it) -> Modification<T> in it });
+    return PropChain(mapCondition: { (it) -> Condition<T> in it }, mapModification: { (it) -> Modification<T> in it }, getProp: { (it) -> T in it }, setProp: { (_, it) -> T in it });
 }
 public final class PropChain<From : Codable & Hashable, To : Codable & Hashable> : KStringable {
     public var mapCondition: (Condition<To>) -> Condition<From>
     public var mapModification: (Modification<To>) -> Modification<From>
-    public init(mapCondition: @escaping (Condition<To>) -> Condition<From>, mapModification: @escaping (Modification<To>) -> Modification<From>) {
+    public var getProp: (From) -> To
+    public var setProp: (From, To) -> From
+    public init(mapCondition: @escaping (Condition<To>) -> Condition<From>, mapModification: @escaping (Modification<To>) -> Modification<From>, getProp: @escaping (From) -> To, setProp: @escaping (From, To) -> From) {
         self.mapCondition = mapCondition
         self.mapModification = mapModification
+        self.getProp = getProp
+        self.setProp = setProp
         //Necessary properties should be initialized now
     }
     
     public func get<V : Codable & Hashable>(prop: PropertyIterableProperty<To, V>) -> PropChain<From, V> {
-        return PropChain<From, V>(mapCondition: { (it) -> Condition<From> in self.mapCondition(ConditionOnField(key: prop, condition: it)) }, mapModification: { (it) -> Modification<From> in self.mapModification(ModificationOnField(key: prop, modification: it)) });
+        return PropChain<From, V>(mapCondition: { (it) -> Condition<From> in self.mapCondition(ConditionOnField(key: prop, condition: it)) }, mapModification: { (it) -> Modification<From> in self.mapModification(ModificationOnField(key: prop, modification: it)) }, getProp: { (it) -> V in prop.get(self.getProp(it)) }, setProp: { (from, to) -> From in self.setProp(from, prop.set(self.getProp(from), to)) });
     }
     
     //    override fun hashCode(): Int = mapCondition(Condition.Always()).hashCode()
@@ -32,6 +36,7 @@ public final class PropChain<From : Codable & Hashable, To : Codable & Hashable>
 public func condition<T : Codable & Hashable>(setup: @escaping (PropChain<T, T>) -> Condition<T>) -> Condition<T> {
     return (setup)((startChain() as PropChain<T, T>));
 }
+
 public func modification<T : Codable & Hashable>(setup: @escaping (PropChain<T, T>) -> Modification<T>) -> Modification<T> {
     return (setup)((startChain() as PropChain<T, T>));
 }
@@ -52,31 +57,37 @@ public extension PropChain where From : Codable & Hashable, To : Codable & Hasha
         return self.mapCondition(ConditionEqual(value));
     }
 }
+
 public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
     func neq(_ value: To) -> Condition<From> {
         return self.mapCondition(ConditionNotEqual(value));
     }
 }
+
 public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
     func ne(_ value: To) -> Condition<From> {
         return self.mapCondition(ConditionNotEqual(value));
     }
 }
+
 public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
     func inside(values: Array<To>) -> Condition<From> {
         return self.mapCondition(ConditionInside(values: values));
     }
 }
+
 public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
     func nin(values: Array<To>) -> Condition<From> {
         return self.mapCondition(ConditionNotInside(values: values));
     }
 }
+
 public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
     func notIn(values: Array<To>) -> Condition<From> {
         return self.mapCondition(ConditionNotInside(values: values));
     }
 }
+
 public extension PropChain where From : Codable & Hashable, To : Codable & Hashable & Comparable {
     func gt(_ value: To) -> Condition<From> {
         return self.mapCondition(ConditionGreaterThan(value));
@@ -169,13 +180,33 @@ public func xPropChainContainsKey<K : Codable & Hashable, T : Codable & Hashable
 }
 
 public func getPropChainNotNull<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, T?>) -> PropChain<K, T> {
-    return (PropChain(mapCondition: { (it) -> Condition<K> in this.mapCondition(ConditionIfNotNull(it)) } as (Condition<T>) -> Condition<K>, mapModification: { (it) -> Modification<K> in this.mapModification(ModificationIfNotNull(it)) } as (Modification<T>) -> Modification<K>) as PropChain<K, T>);
+    return (PropChain(mapCondition: { (it) -> Condition<K> in this.mapCondition(ConditionIfNotNull(it)) } as (Condition<T>) -> Condition<K>, mapModification: { (it) -> Modification<K> in this.mapModification(ModificationIfNotNull(it)) } as (Modification<T>) -> Modification<K>, getProp: { (it) -> T in this.getProp(it)! } as (K) -> T, setProp: { (it, value) -> K in this.setProp(it, value) } as (K, T) -> K) as PropChain<K, T>);
 }
 
 
 public func xPropChainGet<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Dictionary<String, T>>, key: String) -> PropChain<K, T> {
-    return (PropChain<K, T>(mapCondition: { (it) -> Condition<K> in this.mapCondition(ConditionOnKey(key: key, condition: it)) } as (Condition<T>) -> Condition<K>, mapModification: { (it) -> Modification<K> in this.mapModification(ModificationModifyByKey(dictionaryOf(Pair(key, it)))) } as (Modification<T>) -> Modification<K>) as PropChain<K, T>);
+    return (PropChain<K, T>(mapCondition: { (it) -> Condition<K> in this.mapCondition(ConditionOnKey(key: key, condition: it)) } as (Condition<T>) -> Condition<K>, mapModification: { (it) -> Modification<K> in this.mapModification(ModificationModifyByKey(dictionaryOf(Pair(key, it)))) } as (Modification<T>) -> Modification<K>, getProp: { (it) -> T in this.getProp(it).getValue(key: key) } as (K) -> T, setProp: { (from, to) -> K in this.setProp(from, (this.getProp(from) + dictionaryOf(Pair(key, to)))) } as (K, T) -> K) as PropChain<K, T>);
 }
+
+public func getPropChainAll<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Array<T>>) -> PropChain<K, T> {
+    return (PropChain(mapCondition: { (it) -> Condition<K> in this.mapCondition(ConditionListAllElements(it)) } as (Condition<T>) -> Condition<K>, mapModification: { (it) -> Modification<K> in this.mapModification(ModificationListPerElement(condition: ConditionAlways(), modification: it)) } as (Modification<T>) -> Modification<K>, getProp: { (it) -> T in this.getProp(it).first! } as (K) -> T, setProp: { (from, to) -> K in this.setProp(from, (this.getProp(from) + [to])) } as (K, T) -> K) as PropChain<K, T>);
+}
+
+
+public func getPropChainAll<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Set<T>>) -> PropChain<K, T> {
+    return (PropChain(mapCondition: { (it) -> Condition<K> in this.mapCondition(ConditionSetAllElements(it)) } as (Condition<T>) -> Condition<K>, mapModification: { (it) -> Modification<K> in this.mapModification(ModificationSetPerElement(condition: ConditionAlways(), modification: it)) } as (Modification<T>) -> Modification<K>, getProp: { (it) -> T in this.getProp(it).first() } as (K) -> T, setProp: { (from, to) -> K in this.setProp(from, (this.getProp(from) + [to])) } as (K, T) -> K) as PropChain<K, T>);
+}
+
+
+public func getPropChainAny<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Array<T>>) -> PropChain<K, T> {
+    return (PropChain(mapCondition: { (it) -> Condition<K> in this.mapCondition(ConditionListAnyElements(it)) } as (Condition<T>) -> Condition<K>, mapModification: { (it) -> Modification<K> in this.mapModification(ModificationListPerElement(condition: ConditionAlways(), modification: it)) } as (Modification<T>) -> Modification<K>, getProp: { (it) -> T in this.getProp(it).first! } as (K) -> T, setProp: { (from, to) -> K in this.setProp(from, (this.getProp(from) + [to])) } as (K, T) -> K) as PropChain<K, T>);
+}
+
+
+public func getPropChainAny<K : Codable & Hashable, T : Codable & Hashable>(_ this: PropChain<K, Set<T>>) -> PropChain<K, T> {
+    return (PropChain(mapCondition: { (it) -> Condition<K> in this.mapCondition(ConditionSetAnyElements(it)) } as (Condition<T>) -> Condition<K>, mapModification: { (it) -> Modification<K> in this.mapModification(ModificationSetPerElement(condition: ConditionAlways(), modification: it)) } as (Modification<T>) -> Modification<K>, getProp: { (it) -> T in this.getProp(it).first() } as (K) -> T, setProp: { (from, to) -> K in this.setProp(from, (this.getProp(from) + [to])) } as (K, T) -> K) as PropChain<K, T>);
+}
+
 
 public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
     func condition(make: @escaping (PropChain<To, To>) -> Condition<To>) -> Condition<From> {

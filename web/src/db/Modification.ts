@@ -103,9 +103,8 @@ export namespace Modification {
         
         public invoke(on: (T | null)): (T | null) {
             return ((): (T | null) => {
-                const temp6 = on;
-                if(temp6 === null) { return null }
-                return ((it: T): T => (this.modification.invoke(it)))(temp6)
+                if (on === null) { return null }
+                return ((it: T): T => (this.modification.invoke(it)))(on)
             })();
         }
         public invokeDefault(): (T | null) {
@@ -543,9 +542,9 @@ export namespace Modification {
         
         public invoke(on: Map<string, T>): Map<string, T> {
             return new Map([...on, ...new Map(map(x => [x[0], ((it: [string, Modification<T>]): T => ((((): (T | null) => {
-                const temp32 = (on.get(it[0]) ?? null);
-                if(temp32 === null) { return null }
-                return ((e: T): T => (it[1].invoke(e)))(temp32)
+                const temp31 = (on.get(it[0]) ?? null);
+                if (temp31 === null) { return null }
+                return ((e: T): T => (it[1].invoke(e)))(temp31)
             })() ?? it[1].invokeDefault())))(x)], this.map.entries()))]);
         }
         public invokeDefault(): Map<string, T> {

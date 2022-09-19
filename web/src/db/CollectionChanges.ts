@@ -45,7 +45,7 @@ export function xListApply<T extends HasId<ID>, ID extends Comparable<ID>>(this_
 export function xCollectionChangesMap<T extends any, B extends any>(this_: CollectionChanges<T>, mapper: ((a: T) => B)): CollectionChanges<B> {
     return new CollectionChanges<B>(this_.changes.map((it: EntryChange<T>): EntryChange<B> => (xEntryChangeMap<T, B>(it, mapper))), ((): (Array<B> | null) => {
         const temp5 = this_.replace;
-        if(temp5 === null) { return null }
+        if (temp5 === null) { return null }
         return temp5.map(mapper)
     })());
 }

@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.pubsub
 
-import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus

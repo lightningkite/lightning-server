@@ -50,11 +50,10 @@ exports.Modification = Modification;
         static propertyTypes(T) { return { modification: [Modification, T] }; }
         invoke(on) {
             return (() => {
-                const temp6 = on;
-                if (temp6 === null) {
+                if (on === null) {
                     return null;
                 }
-                return ((it) => (this.modification.invoke(it)))(temp6);
+                return ((it) => (this.modification.invoke(it)))(on);
             })();
         }
         invokeDefault() {
@@ -471,11 +470,11 @@ exports.Modification = Modification;
                         var _a;
                         return (((_a = (() => {
                             var _a;
-                            const temp32 = ((_a = on.get(it[0])) !== null && _a !== void 0 ? _a : null);
-                            if (temp32 === null) {
+                            const temp31 = ((_a = on.get(it[0])) !== null && _a !== void 0 ? _a : null);
+                            if (temp31 === null) {
                                 return null;
                             }
-                            return ((e) => (it[1].invoke(e)))(temp32);
+                            return ((e) => (it[1].invoke(e)))(temp31);
                         })()) !== null && _a !== void 0 ? _a : it[1].invokeDefault()));
                     })(x)], this.map.entries()))]);
         }

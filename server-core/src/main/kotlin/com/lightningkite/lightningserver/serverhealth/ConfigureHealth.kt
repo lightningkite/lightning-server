@@ -7,8 +7,9 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.typed.ApiEndpoint0
 import com.lightningkite.lightningserver.typed.typed
-import kotlinx.serialization.UseContextualSerialization
 import kotlinx.serialization.builtins.serializer
+import java.lang.management.ManagementFactory
+import java.net.NetworkInterface
 import java.time.Instant
 
 /**
@@ -33,21 +34,41 @@ fun <USER> ServerPath.healthCheck(
         implementation = { user: USER, _: Unit ->
             if (!allowed(user)) throw ForbiddenException()
             val now = Instant.now()
-            ServerHealth(
+            serverHealth(
                 features = Settings.requirements.mapValues { it.value() }.entries.mapNotNull {
                     val checkable =
                         it.value as? HealthCheckable ?: return@mapNotNull null
                     it.key to checkable
                 }
                     .associate {
-                        ServerHealth.healthCache[it.second]?.takeIf {
+                        healthCache[it.second]?.takeIf {
                             now.toEpochMilli() - it.checkedAt.toEpochMilli() < 60_000 && it.level <= HealthStatus.Level.WARNING
                         }?.let { s -> return@associate it.first to s }
                         val result = it.second.healthCheck()
-                        ServerHealth.healthCache[it.second] = result
+                        healthCache[it.second] = result
                         it.first to result
                     }
             )
         }
     )
 }
+
+private fun serverHealth(
+features: Map<String, HealthStatus>,
+): ServerHealth = ServerHealth(
+serverId = System.getenv("AWS_LAMBDA_LOG_STREAM_NAME")?.takeUnless { it.isEmpty() } ?: NetworkInterface.getNetworkInterfaces().toList().sortedBy { it.name } .firstOrNull()?.hardwareAddress?.sumOf { it.hashCode() }?.toString(16) ?: "?",
+version = System.getenv("AWS_LAMBDA_FUNCTION_VERSION")?.takeUnless { it.isEmpty() } ?: "Unknown",
+memory = memory(),
+features = features,
+loadAverageCpu = ManagementFactory.getOperatingSystemMXBean().systemLoadAverage,
+)
+private val healthCache = HashMap<HealthCheckable, HealthStatus>()
+
+private fun memory(): ServerHealth.Memory = ServerHealth.Memory(
+maxMem = Runtime.getRuntime().maxMemory(),
+totalMemory = Runtime.getRuntime().totalMemory(),
+freeMemory = Runtime.getRuntime().freeMemory(),
+systemAllocated = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory(),
+memUsagePercent = ((((Runtime.getRuntime().totalMemory() - Runtime.getRuntime()
+.freeMemory()).toFloat() / Runtime.getRuntime().maxMemory().toFloat() * 100f) * 100).toInt()) / 100f,
+)

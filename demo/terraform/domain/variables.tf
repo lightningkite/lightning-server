@@ -18,7 +18,7 @@ variable "debug" {
     type = bool
     default = false
 }
-variable "secure_over_cheap" {
+variable "lambda_in_vpc" {
     type = bool
     default = false
 }

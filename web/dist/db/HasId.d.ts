@@ -15,3 +15,11 @@ export declare class HasEmailFields {
     static INSTANCE: HasEmailFields;
     email<T extends HasEmail>(): TProperty1<T, string>;
 }
+export interface HasPhoneNumber {
+    readonly phoneNumber: string;
+}
+export declare class HasPhoneNumberFields {
+    private constructor();
+    static INSTANCE: HasPhoneNumberFields;
+    phoneNumber<T extends HasPhoneNumber>(): TProperty1<T, string>;
+}

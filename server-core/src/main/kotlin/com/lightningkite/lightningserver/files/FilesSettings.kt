@@ -2,18 +2,12 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.auth.JwtSigner
-import com.lightningkite.lightningserver.core.ContentType
-import com.lightningkite.lightningserver.core.routing
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.serverhealth.HealthCheckable
-import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import com.lightningkite.lightningserver.settings.Pluggable
-import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import java.io.File
 import java.time.Duration
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * FileSettings defines where server files and user content is stored. This used ApacheVFS which allows the filesystem to be

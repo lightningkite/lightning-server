@@ -1,9 +1,6 @@
 package com.lightningkite.lightningserver.pubsub
 
-import com.lightningkite.lightningserver.serverhealth.HealthCheckable
-import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import com.lightningkite.lightningserver.settings.Pluggable
-import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 

@@ -248,9 +248,9 @@ public final class ModificationMultiply<T : Number> : Modification<T>, CustomStr
     override public func invokeDefault() -> T {
         return run { () -> T in
             if self.by is Int8 {
-                return Int8(0) as! T
+                return Int8(truncatingIfNeeded: 0) as! T
             } else if self.by is Int16 {
-                return Int16(0) as! T
+                return Int16(truncatingIfNeeded: 0) as! T
             } else if self.by is Int {
                 return 0 as! T
             } else if self.by is Int {
@@ -475,7 +475,7 @@ public final class ModificationSetAppend<T : Codable & Hashable> : Modification<
     public func copy(items: Set<T>? = nil) -> ModificationSetAppend<T> { return ModificationSetAppend(items: items ?? self.items) }
     
     override public func invoke(on: Set<T>) -> Set<T> {
-        return (on.union(self.items));
+        return (on + self.items);
     }
     override public func invokeDefault() -> Set<T> {
         return self.items;
@@ -527,7 +527,7 @@ public final class ModificationSetRemoveInstances<T : Codable & Hashable> : Modi
     public func copy(items: Set<T>? = nil) -> ModificationSetRemoveInstances<T> { return ModificationSetRemoveInstances(items: items ?? self.items) }
     
     override public func invoke(on: Set<T>) -> Set<T> {
-        return on.subtracting(self.items);
+        return on.subtracting([self.items]);
     }
     override public func invokeDefault() -> Set<T> {
         return Set([]);

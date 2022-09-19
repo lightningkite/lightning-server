@@ -1,4 +1,10 @@
 LightningServer
+com.lightningkite.lightningserver.files.prepareUploadForNextRequestFields
+com.lightningkite.lightningserver.files._id
+com.lightningkite.lightningserver.files.file
+com.lightningkite.lightningserver.files.expires
+com.lightningkite.lightningserver.files
+com.lightningkite.lightningserver.files.prepareModels
 com.lightningkite.lightningdb.Aggregate
 com.lightningkite.lightningdb.aggregator
 com.lightningkite.lightningdb.Aggregator
@@ -75,6 +81,8 @@ com.lightningkite.lightningdb.HasId
 com.lightningkite.lightningdb.HasIdFields
 com.lightningkite.lightningdb.HasEmail
 com.lightningkite.lightningdb.HasEmailFields
+com.lightningkite.lightningdb.HasPhoneNumber
+com.lightningkite.lightningdb.HasPhoneNumberFields
 
 com.lightningkite.lightningdb.KProperty1_setCopyImplementation
 com.lightningkite.lightningdb.setCopyImplementation
@@ -121,7 +129,9 @@ com.lightningkite.lightningdb.LocalTimeSerializer
 com.lightningkite.lightningdb.OffsetDateTimeSerializer
 com.lightningkite.lightningdb.DurationSerializer
 com.lightningkite.lightningdb.ClientModule
+com.lightningkite.lightningdb.OptionalSerializer
 com.lightningkite.lightningdb.listElement
+com.lightningkite.lightningdb.mapKeyElement
 com.lightningkite.lightningdb.mapValueElement
 com.lightningkite.lightningdb.nullElement
 com.lightningkite.lightningdb.defer
@@ -171,3 +181,8 @@ com.lightningkite.lightningdb.dropFirst
 com.lightningkite.lightningdb.mapIf
 com.lightningkite.lightningdb.modifyByKey
 com.lightningkite.lightningdb.removeKeys
+com.lightningkite.lightningserver.files.UploadForNextRequest
+com.lightningkite.lightningserver.files.UploadInformation
+com.lightningkite.lightningserver.serverhealth.HealthStatus
+com.lightningkite.lightningserver.serverhealth.ServerHealth
+com.lightningkite.lightningserver.serverhealth

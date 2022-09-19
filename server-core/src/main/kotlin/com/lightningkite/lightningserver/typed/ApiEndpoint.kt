@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.serialization.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.serializer
+import java.net.URLDecoder
 
 interface ApiEndpoint<USER, INPUT : Any, OUTPUT>: Documentable, (suspend (HttpRequest)->HttpResponse) {
     val route: HttpEndpoint
@@ -141,12 +142,12 @@ inline fun <reified T: Comparable<T>> String.parseUrlPartOrBadRequest(): T = par
     Serialization.module.serializer()
 )
 fun <T: Comparable<T>> String.parseUrlPartOrBadRequest(serializer: KSerializer<T>): T = try {
-    Serialization.properties.decodeFromStringMap(IdHolder.serializer(serializer), mapOf("id" to this)).id
+    Serialization.properties.decodeFromStringMap(IdHolder.serializer(serializer), mapOf("id" to URLDecoder.decode(this, Charsets.UTF_8))).id
 } catch(e: Exception) {
     throw BadRequestException("ID ${this} could not be parsed as a ${serializer.descriptor.serialName}.")
 }
 private fun String.parseUrlPartOrBadRequestUntyped(serializer: KSerializer<*>): Any? = try {
-    Serialization.properties.decodeFromStringMap(IdHolder.serializer(serializer), mapOf("id" to this)).id
+    Serialization.properties.decodeFromStringMap(IdHolder.serializer(serializer), mapOf("id" to URLDecoder.decode(this, Charsets.UTF_8))).id
 } catch(e: Exception) {
     throw BadRequestException("ID ${this} could not be parsed as a ${serializer.descriptor.serialName}.")
 }

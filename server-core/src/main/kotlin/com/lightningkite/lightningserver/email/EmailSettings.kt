@@ -1,23 +1,8 @@
 package com.lightningkite.lightningserver.email
 
-import com.lightningkite.lightningdb.Database
-import com.lightningkite.lightningserver.db.DatabaseSettings
-import com.lightningkite.lightningserver.db.InMemoryDatabase
-import com.lightningkite.lightningserver.db.InMemoryUnsafePersistenceDatabase
-import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.serverhealth.HealthCheckable
-import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import com.lightningkite.lightningserver.settings.Pluggable
-import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.json.JsonObject
-import java.io.BufferedReader
-import java.io.DataOutputStream
-import java.io.File
-import java.io.InputStreamReader
-import java.util.*
-import javax.net.ssl.SSLSocketFactory
 
 /**
  * EmailSettings defines where to send emails, and any credentials that may be required to do so.

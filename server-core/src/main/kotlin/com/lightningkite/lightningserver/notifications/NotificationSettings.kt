@@ -1,12 +1,7 @@
 package com.lightningkite.lightningserver.notifications
 
-import com.lightningkite.lightningserver.serverhealth.HealthCheckable
-import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import com.lightningkite.lightningserver.settings.Pluggable
-import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
-import java.io.File
 
 
 /**
