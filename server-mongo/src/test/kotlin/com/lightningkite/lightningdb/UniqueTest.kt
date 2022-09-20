@@ -4,6 +4,7 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.lightningdb.test.EmbeddedMap
 import com.lightningkite.lightningdb.test.RecursiveEmbed
+import com.mongodb.MongoBulkWriteException
 import com.mongodb.MongoWriteException
 import com.mongodb.client.model.changestream.UpdateDescription
 import kotlinx.coroutines.runBlocking
@@ -21,7 +22,7 @@ class UniqueTest : MongoTest() {
     fun test() {
         runBlocking {
             val collection =
-                (defaultMongo.collection<IndexingTestModel>("UniqueTest_test") as MongoFieldCollection<IndexingTestModel>).mongo
+                (defaultMongo.collection<IndexingTestModel>("UniqueTest_test") as MongoFieldCollection<IndexingTestModel>)
             collection.insertOne(IndexingTestModel(email = "test@test.com", account = "asdf"))
             collection.insertOne(IndexingTestModel(email = "test@test.com", account = "fdsa"))
             collection.insertOne(IndexingTestModel(email = "test@test.com", account = null))
@@ -29,9 +30,11 @@ class UniqueTest : MongoTest() {
             collection.insertOne(IndexingTestModel(email = null, account = "asdf"))
             collection.insertOne(IndexingTestModel(email = null, account = "asdf"))
             try {
-                collection.insertOne(IndexingTestModel(email = "test@test.com", account = "asdf"))
+                println(collection.insertOne(IndexingTestModel(email = "test@test.com", account = "asdf")))
                 fail()
             } catch(w: MongoWriteException) {
+                /*expected*/
+            } catch(w: MongoBulkWriteException) {
                 /*expected*/
             }
         }
