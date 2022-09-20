@@ -15,8 +15,10 @@ import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.openssl.PEMParser
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
 import java.io.StringReader
+import java.security.KeyFactory
 import java.security.Signature
 import java.security.interfaces.ECPrivateKey
+import java.security.spec.PKCS8EncodedKeySpec
 import java.time.Duration
 import java.time.Instant
 import java.util.Base64
@@ -25,6 +27,7 @@ import javax.crypto.spec.SecretKeySpec
 
 @Serializable
 data class JwtHeader(val typ: String = "JWT", val alg: String = "HS256")
+
 @Serializable
 data class JwtClaims(
     val iss: String? = null,
@@ -34,17 +37,17 @@ data class JwtClaims(
     val nbf: Long? = null,
     val iat: Long = System.currentTimeMillis() / 1000L,
     val jti: String? = null,
-    val userId: String? = null
+    val userId: String? = null,
 )
 
 interface SecureHasher {
     val name: String
-    fun sign(bytes: ByteArray):ByteArray
+    fun sign(bytes: ByteArray): ByteArray
     fun verify(bytes: ByteArray, signature: ByteArray): Boolean {
         return signature.contentEquals(sign(bytes))
     }
 
-    class HS256(val secret: ByteArray): SecureHasher {
+    class HS256(val secret: ByteArray) : SecureHasher {
         override val name: String = "HS256"
         override fun sign(bytes: ByteArray): ByteArray {
             return Mac.getInstance("HmacSHA256").apply {
@@ -52,21 +55,13 @@ interface SecureHasher {
             }.doFinal(bytes)
         }
     }
-    class ECDSA256(val privateKey: String): SecureHasher {
+
+    class ECDSA256(privateKey: String) : SecureHasher {
         override val name: String = "ECDSA256"
-        val pk = run {
-            val pk = JcaPEMKeyConverter().getPrivateKey(
-                PEMParser(
-                StringReader(
-                    """
-                            -----BEGIN PRIVATE KEY-----
-                            ${privateKey.replace(" ", "")}
-                            -----END PRIVATE KEY-----
-                        """.trimIndent()
-                )
-            ).use { it.readObject() as PrivateKeyInfo })
-            pk as ECPrivateKey
-        }
+        val pk = KeyFactory.getInstance("EC").generatePrivate(
+            PKCS8EncodedKeySpec(Base64.getDecoder().decode(privateKey.filter { !it.isWhitespace() }))
+        )
+
         override fun sign(bytes: ByteArray): ByteArray {
             return Signature.getInstance("SHA1withECDSA").apply {
                 initSign(pk)
@@ -90,43 +85,53 @@ fun <T> Json.encodeJwt(
     expire: Duration,
     issuer: String = generalSettings().publicUrl,
     audience: String? = generalSettings().publicUrl,
-    issuedAt: Instant = Instant.now()
+    issuedAt: Instant = Instant.now(),
 ): String = buildString {
     val withDefaults = Json(this@encodeJwt) { encodeDefaults = true; explicitNulls = false }
     append(Base64.getUrlEncoder().encodeToString(withDefaults.encodeToString(JwtHeader()).toByteArray()))
     append('.')
-    append(Base64.getUrlEncoder().encodeToString(withDefaults.encodeToString(JwtClaims(
-        iss = issuer,
-        aud = audience,
-        iat = issuedAt.toEpochMilli() / 1000,
-        sub = if (serializer.isPrimitive())
-            (encodeToJsonElement(serializer, subject) as JsonPrimitive).content
-        else
-            encodeToString(serializer, subject),
-        exp = issuedAt.toEpochMilli() / 1000 + expire.seconds
-    )).toByteArray()))
+    append(
+        Base64.getUrlEncoder().encodeToString(
+            withDefaults.encodeToString(
+                JwtClaims(
+                    iss = issuer,
+                    aud = audience,
+                    iat = issuedAt.toEpochMilli() / 1000,
+                    sub = if (serializer.isPrimitive())
+                        (encodeToJsonElement(serializer, subject) as JsonPrimitive).content
+                    else
+                        encodeToString(serializer, subject),
+                    exp = issuedAt.toEpochMilli() / 1000 + expire.seconds
+                )
+            ).toByteArray()
+        )
+    )
     val soFar = this.toString()
     append('.')
     append(Base64.getUrlEncoder().encodeToString(hasher.sign(soFar.toByteArray())))
 }
 
-class JwtException(message: String): Exception(message)
+class JwtException(message: String) : Exception(message)
 
 fun <T> Json.decodeJwt(
     hasher: SecureHasher,
     serializer: KSerializer<T>,
     token: String,
-    requireAudience: String? = generalSettings().publicUrl
+    requireAudience: String? = generalSettings().publicUrl,
 ): T {
     val parts = token.split('.')
-    if(parts.size != 3) throw JwtException("JWT does not have three parts.  This JWT is either missing pieces, corrupt, or not a JWT.")
+    if (parts.size != 3) throw JwtException("JWT does not have three parts.  This JWT is either missing pieces, corrupt, or not a JWT.")
     val signature = Base64.getUrlDecoder().decode(parts[2])
-    if(!hasher.verify(token.substringBeforeLast('.').toByteArray(), signature)) throw JwtException("JWT Signature is incorrect.")
+    if (!hasher.verify(
+            token.substringBeforeLast('.').toByteArray(),
+            signature
+        )
+    ) throw JwtException("JWT Signature is incorrect.")
     val header: JwtHeader = decodeFromString(Base64.getUrlDecoder().decode(parts[0]).toString(Charsets.UTF_8))
     val claims: JwtClaims = decodeFromString(Base64.getUrlDecoder().decode(parts[1]).toString(Charsets.UTF_8))
     val textSubject = claims.sub ?: claims.userId ?: throw JwtException("JWT does not have a subject.")
-    if(System.currentTimeMillis() / 1000L > claims.exp) throw JwtException("JWT has expired.")
-    requireAudience?.let { if(claims.aud != it) throw JwtException("JWT has expired.") }
+    if (System.currentTimeMillis() / 1000L > claims.exp) throw JwtException("JWT has expired.")
+    requireAudience?.let { if (claims.aud != it) throw JwtException("JWT has expired.") }
     return if (serializer.isPrimitive())
         decodeFromJsonElement(
             serializer,
@@ -143,6 +148,7 @@ private fun KSerializer<*>.isPrimitive(): Boolean {
             is PrimitiveKind -> return true
             SerialKind.CONTEXTUAL -> current =
                 Serialization.json.serializersModule.getContextualDescriptor(current)!!
+
             else -> return false
         }
     }

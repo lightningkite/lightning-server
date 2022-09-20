@@ -7,10 +7,10 @@ import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.serialization.Serialization
 import io.ktor.util.*
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.boolean
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.*
 import java.time.Duration
+import java.time.Instant
 import java.util.*
 
 /**
@@ -23,15 +23,15 @@ class OauthAppleEndpoints(
     path: ServerPath,
     jwtSigner: () -> JwtSigner,
     landing: HttpEndpoint,
-    emailToId: suspend (String) -> String
+    emailToId: suspend (String) -> String,
 ) : OauthEndpoints(
     path = path,
+    codeName = "apple",
     jwtSigner = jwtSigner,
     landing = landing,
     emailToId = emailToId,
 ) {
     override val niceName = "Apple"
-    override val codeName = "apple"
     override val authUrl = "https://appleid.apple.com/auth/authorize"
     override val getTokenUrl = "https://appleid.apple.com/auth/token"
     override val scope = "email"
@@ -48,15 +48,72 @@ class OauthAppleEndpoints(
 
     override fun secretTransform(secret: String): String {
         val settings = settings() ?: throw NotFoundException("Oauth is not configured for Apple.")
-        val teamId = settings.secret.substringBefore("|")
-        val keyString = settings.secret.substringAfter("|")
-        return Serialization.json.encodeJwt(
-            hasher = SecureHasher.ECDSA256(keyString),
-            serializer = String.serializer(),
-            subject = settings.id,
-            expire = Duration.ofDays(1),
-            issuer = teamId,
-            audience = "https://appleid.apple.com"
-        )
+        val parts = settings.secret.split('|')
+        val teamId = parts[0]
+        val keyId = parts[1]
+        val keyString = parts[2]
+        return buildString {
+            val withDefaults = Json { encodeDefaults = true; explicitNulls = false }
+            append(Base64.getUrlEncoder().encodeToString(withDefaults.encodeToString(buildJsonObject {
+                put("alg", "ES256")
+                put("typ", "JWT")
+                put("kid", keyId)
+            }).toByteArray()))
+            append('.')
+            val issuedAt = Instant.now()
+            append(
+                Base64.getUrlEncoder().encodeToString(
+                    withDefaults.encodeToString(
+                        buildJsonObject {
+                            put("iss", teamId)
+                            put("iat", issuedAt.toEpochMilli().div(1000))
+                            put("exp", issuedAt.plus(Duration.ofDays(1)).toEpochMilli().div(1000))
+                            put("aud", "https://appleid.apple.com")
+                            put("sub", settings.id)
+                        }
+                    ).toByteArray()
+                )
+            )
+            val soFar = this.toString()
+            append('.')
+            append(Base64.getUrlEncoder().encodeToString(SecureHasher.ECDSA256(keyString).sign(soFar.toByteArray())))
+        }
+    }
+
+    companion object {
+        fun generateJwt(id: String, secret: String): String {
+            val parts = secret.split('|')
+            val teamId = parts[0]
+            val keyId = parts[1]
+            val keyString = parts[2]
+            return buildString {
+                val withDefaults = Json { encodeDefaults = true; explicitNulls = false }
+                append(Base64.getUrlEncoder().encodeToString(withDefaults.encodeToString(buildJsonObject {
+                    put("alg", "ES256")
+                    put("typ", "JWT")
+                    put("kid", keyId)
+                }).toByteArray()))
+                append('.')
+                val issuedAt = Instant.now()
+                append(
+                    Base64.getUrlEncoder().encodeToString(
+                        withDefaults.encodeToString(
+                            buildJsonObject {
+                                put("iss", teamId)
+                                put("iat", issuedAt.toEpochMilli().div(1000))
+                                put("exp", issuedAt.plus(Duration.ofDays(1)).toEpochMilli().div(1000))
+                                put("aud", "https://appleid.apple.com")
+                                put("sub", id)
+                            }
+                        ).toByteArray()
+                    )
+                )
+                val soFar = this.toString()
+                append('.')
+                append(
+                    Base64.getUrlEncoder().encodeToString(SecureHasher.ECDSA256(keyString).sign(soFar.toByteArray()))
+                )
+            }
+        }
     }
 }

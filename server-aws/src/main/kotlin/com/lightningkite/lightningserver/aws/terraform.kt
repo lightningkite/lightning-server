@@ -62,7 +62,7 @@ private data class TerraformSection(
                 projectInfo.input(
                     setting.name,
                     "any",
-                    setting.default?.let { Serialization.json.encodeToString(setting.serializer, it) })
+                    setting.default.let { Serialization.json.encodeToString(setting.serializer, it) })
             ),
             resources = null,
             toLightningServer = "${setting.name} = var.${setting.name}"
