@@ -14,7 +14,7 @@ variable "debug" {
 }
 variable "lambda_in_vpc" {
     type = bool
-    default = false
+    default = true
 }
 
 ##########
@@ -28,17 +28,8 @@ variable "cors" {
 ##########
 # database
 ##########
-variable "database_min_capacity" {
-    type = number
-    default = 0.5
-}
-variable "database_max_capacity" {
-    type = number
-    default = 2
-}
-variable "database_auto_pause" {
-    type = bool
-    default = true
+variable "database_org_id" {
+    type = string
 }
 
 ##########
@@ -51,6 +42,14 @@ variable "jwt_expirationMilliseconds" {
 variable "jwt_emailExpirationMilliseconds" {
     type = number
     default = 1800000
+}
+
+##########
+# oauth_github
+##########
+variable "oauth_github" {
+    type = any
+    default = null
 }
 
 ##########
@@ -82,5 +81,21 @@ variable "exceptions" {
 ##########
 variable "email_sender" {
     type = string
+}
+
+##########
+# oauth_google
+##########
+variable "oauth_google" {
+    type = any
+    default = null
+}
+
+##########
+# oauth_apple
+##########
+variable "oauth_apple" {
+    type = any
+    default = null
 }
 

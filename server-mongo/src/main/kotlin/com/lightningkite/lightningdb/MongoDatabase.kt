@@ -42,6 +42,14 @@ class MongoDatabase(val database: CoroutineDatabase) : Database {
                         .build()
                 ).database(it.databaseName)
             }
+            DatabaseSettings.register("mongodb+srv") {
+                KMongo.createClient(
+                    MongoClientSettings.builder()
+                        .applyConnectionString(ConnectionString(it.url))
+                        .uuidRepresentation(UuidRepresentation.STANDARD)
+                        .build()
+                ).database(it.databaseName)
+            }
             DatabaseSettings.register("mongodb-test") {
                 testMongo().database(it.databaseName)
             }

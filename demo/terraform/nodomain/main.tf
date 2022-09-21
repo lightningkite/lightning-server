@@ -1,3 +1,25 @@
+terraform {
+  required_providers {
+    aws = {
+      source = "hashicorp/aws"
+      version = "~> 4.30"
+    }
+    random = {
+      source = "hashicorp/random"
+      version = "~> 3.1.0"
+    }
+    archive = {
+      source = "hashicorp/archive"
+      version = "~> 2.2.0"
+    }
+    mongodbatlas = {
+      source = "mongodb/mongodbatlas"
+      version = "~> 1.4"
+    }
+  }
+  required_version = "~> 1.0"
+}
+
 module "Base" {
   source              = "../base"
   # main
@@ -8,12 +30,12 @@ module "Base" {
   # general
   cors = var.cors
   # database
-  database_min_capacity = var.database_min_capacity
-  database_max_capacity = var.database_max_capacity
-  database_auto_pause = var.database_auto_pause
+  database_org_id = var.database_org_id
   # jwt
   jwt_expirationMilliseconds = var.jwt_expirationMilliseconds
   jwt_emailExpirationMilliseconds = var.jwt_emailExpirationMilliseconds
+  # oauth_github
+  oauth_github = var.oauth_github
   # logging
   logging = var.logging
   # files
@@ -22,13 +44,15 @@ module "Base" {
   exceptions = var.exceptions
   # email
   email_sender = var.email_sender
+  # oauth_google
+  oauth_google = var.oauth_google
+  # oauth_apple
+  oauth_apple = var.oauth_apple
 }
 ##########
 # main
 ##########
-provider "aws" {
-  region = var.deployment_location
-}
+
 
 ##########
 # email

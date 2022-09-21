@@ -21,8 +21,21 @@ import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.util.Properties
 
+private data class TerraformProvider(
+    val name: String,
+    val source: String,
+    val version: String
+) {
+    companion object {
+        val aws = TerraformProvider("aws", "hashicorp/aws", "~> 4.30")
+        val random = TerraformProvider("random", "hashicorp/random", "~> 3.1.0")
+        val archive = TerraformProvider("archive", "hashicorp/archive", "~> 2.2.0")
+        val mongodbatlas = TerraformProvider("mongodbatlas", "mongodb/mongodbatlas", "~> 1.4")
+    }
+}
 private data class TerraformSection(
     val name: String,
+    val providers: List<TerraformProvider> = listOf(TerraformProvider.aws, TerraformProvider.random, TerraformProvider.archive),
     val inputs: List<TerraformInput> = listOf(),
     val resources: String? = null,
     val toLightningServer: String? = null,
@@ -37,6 +50,7 @@ private data class TerraformSection(
         inline fun <reified T : Any> handler(
             name: String = "Standard",
             priority: Int = 0,
+            providers: List<TerraformProvider> = listOf(TerraformProvider.aws, TerraformProvider.random, TerraformProvider.archive),
             noinline inputs: TerraformProjectInfo.(settingKey: String) -> List<TerraformInput> = { listOf() },
             noinline resources: TerraformProjectInfo.(settingKey: String) -> String? = { null },
             noinline settingOutput: TerraformProjectInfo.(settingKey: String) -> String,
@@ -46,6 +60,7 @@ private data class TerraformSection(
             handlers.getOrPut(serializer<T>()) { HashMap() }.put(name, TerraformHandler(name, priority) { it ->
                 TerraformSection(
                     name = it,
+                    providers = providers,
                     inputs = inputs(this, it),
                     resources = resources(this, it),
                     toLightningServer = it + " = " + settingOutput(this, it),
@@ -357,6 +372,124 @@ private fun handlers() {
             """.trimIndent()
         }
     )
+    TerraformSection.handler<DatabaseSettings>(
+        name = "MongoDB Serverless Project",
+        priority = 0,
+        providers = listOf(TerraformProvider.mongodbatlas),
+        inputs = { key ->
+            listOf(
+                inputString("${key}_project_id", null)
+            )
+        },
+        resources = { key ->
+            """
+                resource "random_password" "${key}" {
+                  length           = 32
+                  special          = true
+                  override_special = "-_"
+                }
+                resource "mongodbatlas_serverless_instance" "$key" {
+                  project_id   = var.${key}_project_id
+                  name         = "$namePrefixSafe$key"
+
+                  provider_settings_backing_provider_name = "AWS"
+                  provider_settings_provider_name = "SERVERLESS"
+                  provider_settings_region_name = replace(upper(var.deployment_location), "-", "_")
+                }
+                resource "mongodbatlas_database_user" "test" {
+                  username           = "$namePrefixSafe$key-main"
+                  password           = random_password.$key.result
+                  project_id         = var.${key}_project_id
+                  auth_database_name = "admin"
+
+                  roles {
+                    role_name     = "readWrite"
+                    database_name = "default"
+                  }
+
+                  roles {
+                    role_name     = "readAnyDatabase"
+                    database_name = "admin"
+                  }
+
+                }
+            """.trimIndent()
+        },
+        settingOutput = { key ->
+            """
+                {
+                  url = "mongodb+srv://$namePrefixSafe$key-main:${'$'}{random_password.${key}.result}@${'$'}{replace(mongodbatlas_serverless_instance.$key.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
+                }
+            """.trimIndent()
+        }
+    )
+    TerraformSection.handler<DatabaseSettings>(
+        name = "MongoDB Serverless",
+        priority = 0,
+        providers = listOf(TerraformProvider.mongodbatlas),
+        inputs = { key ->
+            listOf(
+                inputString("${key}_org_id", null),
+//                inputString("${key}_team_id", null)
+            )
+        },
+        resources = { key ->
+            """
+                resource "mongodbatlas_project" "$key" {
+                  name   = "$namePrefixSafe$key"
+                  org_id = var.${key}_org_id
+                  
+                  is_collect_database_specifics_statistics_enabled = true
+                  is_data_explorer_enabled                         = true
+                  is_performance_advisor_enabled                   = true
+                  is_realtime_performance_panel_enabled            = true
+                  is_schema_advisor_enabled                        = true
+                }
+                resource "mongodbatlas_project_ip_access_list" "$key" {
+                  project_id   = mongodbatlas_project.$key.id
+                  cidr_block = "0.0.0.0/0"
+                  comment    = "Anywhere"
+                }
+                resource "random_password" "${key}" {
+                  length           = 32
+                  special          = true
+                  override_special = "-_"
+                }
+                resource "mongodbatlas_serverless_instance" "$key" {
+                  project_id   = mongodbatlas_project.$key.id
+                  name         = "$namePrefixSafe$key"
+
+                  provider_settings_backing_provider_name = "AWS"
+                  provider_settings_provider_name = "SERVERLESS"
+                  provider_settings_region_name = replace(upper(var.deployment_location), "-", "_")
+                }
+                resource "mongodbatlas_database_user" "$key" {
+                  username           = "$namePrefixSafe$key-main"
+                  password           = random_password.$key.result
+                  project_id         = mongodbatlas_project.$key.id
+                  auth_database_name = "admin"
+
+                  roles {
+                    role_name     = "readWrite"
+                    database_name = "default"
+                  }
+
+                  roles {
+                    role_name     = "readAnyDatabase"
+                    database_name = "admin"
+                  }
+
+                }
+            """.trimIndent()
+        },
+        settingOutput = { key ->
+            """
+                {
+                  url = "mongodb+srv://$namePrefixSafe$key-main:${'$'}{random_password.${key}.result}@${'$'}{replace(mongodbatlas_serverless_instance.$key.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
+                }
+            """.trimIndent()
+        }
+    )
     TerraformSection.handler<CacheSettings>(
         name = "ElastiCache",
         inputs = { key ->
@@ -532,28 +665,6 @@ private fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(projectI
             TerraformSection.inputBoolean("lambda_in_vpc", true),
         ),
         resources = """
-        terraform {
-          required_providers {
-            aws = {
-              source  = "hashicorp/aws"
-              version = "~> 4.30"
-            }
-            random = {
-              source  = "hashicorp/random"
-              version = "~> 3.1.0"
-            }
-            archive = {
-              source  = "hashicorp/archive"
-              version = "~> 2.2.0"
-            }
-          }
-          required_version = "~> 1.0"
-        }
-        
-        provider "aws" {
-          region = var.deployment_location
-        }
-        
         module "vpc" {
           source = "terraform-aws-modules/vpc/aws"
         
@@ -699,25 +810,14 @@ private fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(projectI
                 TerraformSection.inputString("domain_name", null),
             ),
             resources = """
-                provider "aws" {
-                  region = var.deployment_location
-                }
-        
                 data "aws_route53_zone" "main" {
                   name = var.domain_name_zone
-                }
-                provider "aws" {
-                  alias = "acm"
-                  region = "us-east-1"
                 }
             """.trimIndent()
         ),
         noDomainOverride = TerraformSituationOverride(
             inputs = listOf(),
             resources = """
-                provider "aws" {
-                  region = var.deployment_location
-                }
             """.trimIndent()
         )
     )
@@ -1226,6 +1326,18 @@ fun terraformAws(handlerFqn: String, projectName: String = "project", root: File
     handlerFile.outputStream().use { handlerNames.store(it, "") }
 
     root.resolve("base/main.tf").apply { parentFile!!.mkdirs() }.printWriter().use {
+        it.appendLine("terraform {")
+        it.appendLine("  required_providers {")
+        for(provider in allSections.flatMap { it.providers }.distinct()) {
+            it.appendLine("    ${provider.name} = {")
+            it.appendLine("      source = \"${provider.source}\"")
+            it.appendLine("      version = \"${provider.version}\"")
+            it.appendLine("    }")
+        }
+        it.appendLine("  }")
+        it.appendLine("  required_version = \"~> 1.0\"")
+        it.appendLine("}")
+        it.appendLine()
         for(section in allSections) {
             if(section.resources == null) continue
             it.appendLine("##########")
@@ -1269,6 +1381,18 @@ fun terraformAws(handlerFqn: String, projectName: String = "project", root: File
 
     fun situationOutput(name: String, getter: (TerraformSection)->TerraformSituationOverride) {
         root.resolve("$name/main.tf").apply { parentFile!!.mkdirs() }.printWriter().use {
+            it.appendLine("terraform {")
+            it.appendLine("  required_providers {")
+            for(provider in allSections.flatMap { it.providers }.distinct()) {
+                it.appendLine("    ${provider.name} = {")
+                it.appendLine("      source = \"${provider.source}\"")
+                it.appendLine("      version = \"${provider.version}\"")
+                it.appendLine("    }")
+            }
+            it.appendLine("  }")
+            it.appendLine("  required_version = \"~> 1.0\"")
+            it.appendLine("}")
+            it.appendLine()
             it.appendLine("""
                 module "Base" {
                   source              = "../base"

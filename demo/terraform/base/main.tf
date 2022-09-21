@@ -1,28 +1,28 @@
-##########
-# main
-##########
 terraform {
   required_providers {
     aws = {
-      source  = "hashicorp/aws"
+      source = "hashicorp/aws"
       version = "~> 4.30"
     }
     random = {
-      source  = "hashicorp/random"
+      source = "hashicorp/random"
       version = "~> 3.1.0"
     }
     archive = {
-      source  = "hashicorp/archive"
+      source = "hashicorp/archive"
       version = "~> 2.2.0"
+    }
+    mongodbatlas = {
+      source = "mongodb/mongodbatlas"
+      version = "~> 1.4"
     }
   }
   required_version = "~> 1.0"
 }
 
-provider "aws" {
-  region = var.deployment_location
-}
-
+##########
+# main
+##########
 module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
 
@@ -37,7 +37,7 @@ module "vpc" {
   single_nat_gateway = true
   enable_vpn_gateway = false
   enable_dns_hostnames = !var.lambda_in_vpc
-  enable_dns_support   = !var.lambda_in_vpc
+  enable_dns_support   = true
 }
 
 resource "aws_vpc_endpoint" "s3" {
@@ -165,66 +165,50 @@ resource "aws_security_group" "lambdainvoke" {
 ##########
 # database
 ##########
+resource "mongodbatlas_project" "database" {
+  name   = "demo${var.deployment_name}database"
+  org_id = var.database_org_id
+  
+  is_collect_database_specifics_statistics_enabled = true
+  is_data_explorer_enabled                         = true
+  is_performance_advisor_enabled                   = true
+  is_realtime_performance_panel_enabled            = true
+  is_schema_advisor_enabled                        = true
+}
+resource "mongodbatlas_project_ip_access_list" "database" {
+  project_id   = mongodbatlas_project.database.id
+  cidr_block = "0.0.0.0/0"
+  comment    = "Anywhere"
+}
 resource "random_password" "database" {
   length           = 32
   special          = true
   override_special = "-_"
 }
-resource "aws_db_subnet_group" "database" {
-  name       = "demo-${var.deployment_name}-database2"
-  subnet_ids = var.lambda_in_vpc ? module.vpc.private_subnets : module.vpc.public_subnets
-}
-resource "aws_rds_cluster" "database" {
-  cluster_identifier = "demo-${var.deployment_name}-database"
-  engine             = "aurora-postgresql"
-  engine_mode        = "provisioned"
-  engine_version     = "13.6"
-  database_name      = "demo${var.deployment_name}database"
-  master_username = "master"
-  master_password = random_password.database.result
-  skip_final_snapshot = var.debug
-  final_snapshot_identifier = "demo-${var.deployment_name}-database"
-  vpc_security_group_ids = [aws_security_group.internal.id]
-  db_subnet_group_name    = "${aws_db_subnet_group.database.name}"
+resource "mongodbatlas_serverless_instance" "database" {
+  project_id   = mongodbatlas_project.database.id
+  name         = "demo${var.deployment_name}database"
 
-  serverlessv2_scaling_configuration {
-    min_capacity = var.database_min_capacity
-    max_capacity = var.database_max_capacity
+  provider_settings_backing_provider_name = "AWS"
+  provider_settings_provider_name = "SERVERLESS"
+  provider_settings_region_name = replace(upper(var.deployment_location), "-", "_")
+}
+resource "mongodbatlas_database_user" "database" {
+  username           = "demo${var.deployment_name}database-main"
+  password           = random_password.database.result
+  project_id         = mongodbatlas_project.database.id
+  auth_database_name = "admin"
+
+  roles {
+    role_name     = "readWrite"
+    database_name = "default"
   }
-}
 
-resource "aws_rds_cluster_instance" "database" {
-  publicly_accessible = !var.lambda_in_vpc
-  cluster_identifier = aws_rds_cluster.database.id
-  instance_class     = "db.serverless"
-  engine             = aws_rds_cluster.database.engine
-  engine_version     = aws_rds_cluster.database.engine_version
-  db_subnet_group_name    = "${aws_db_subnet_group.database.name}"
-}
+  roles {
+    role_name     = "readAnyDatabase"
+    database_name = "admin"
+  }
 
-##########
-# cache
-##########
-resource "aws_iam_policy" "cache" {
-  name        = "demo-${var.deployment_name}-cache"
-  path = "/demo/${var.deployment_name}/cache/"
-  description = "Access to the demo-${var.deployment_name}_cache tables in DynamoDB"
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "dynamodb:*",
-        ]
-        Effect   = "Allow"
-        Resource = ["*"]
-      },
-    ]
-  })
-}
-resource "aws_iam_role_policy_attachment" "cache" {
-  role       = aws_iam_role.main_exec.name
-  policy_arn = aws_iam_policy.cache.arn
 }
 
 ##########
@@ -508,6 +492,69 @@ resource "aws_iam_role_policy_attachment" "api_gateway_ws" {
 }
 
 ##########
+# Schedule test-schedule2
+##########
+resource "aws_cloudwatch_event_rule" "scheduled_task_test-schedule2" {
+  name                = "demo-${var.deployment_name}_testschedule2"
+  schedule_expression = "rate(1 minute)"
+}
+resource "aws_cloudwatch_event_target" "scheduled_task_test-schedule2" {
+  rule      = aws_cloudwatch_event_rule.scheduled_task_test-schedule2.name
+  target_id = "lambda"
+  arn       = aws_lambda_function.main.arn
+  input     = "{\"scheduled\": \"test-schedule2\"}"
+}
+resource "aws_lambda_permission" "scheduled_task_test-schedule2" {
+  statement_id  = "scheduled_task_test-schedule2"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.main.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.scheduled_task_test-schedule2.arn
+}
+
+##########
+# Schedule test-schedule
+##########
+resource "aws_cloudwatch_event_rule" "scheduled_task_test-schedule" {
+  name                = "demo-${var.deployment_name}_testschedule"
+  schedule_expression = "rate(1 minute)"
+}
+resource "aws_cloudwatch_event_target" "scheduled_task_test-schedule" {
+  rule      = aws_cloudwatch_event_rule.scheduled_task_test-schedule.name
+  target_id = "lambda"
+  arn       = aws_lambda_function.main.arn
+  input     = "{\"scheduled\": \"test-schedule\"}"
+}
+resource "aws_lambda_permission" "scheduled_task_test-schedule" {
+  statement_id  = "scheduled_task_test-schedule"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.main.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.scheduled_task_test-schedule.arn
+}
+
+##########
+# Schedule cleanupUploads
+##########
+resource "aws_cloudwatch_event_rule" "scheduled_task_cleanupUploads" {
+  name                = "demo-${var.deployment_name}_cleanupUploads"
+  schedule_expression = "rate(1440 minutes)"
+}
+resource "aws_cloudwatch_event_target" "scheduled_task_cleanupUploads" {
+  rule      = aws_cloudwatch_event_rule.scheduled_task_cleanupUploads.name
+  target_id = "lambda"
+  arn       = aws_lambda_function.main.arn
+  input     = "{\"scheduled\": \"cleanupUploads\"}"
+}
+resource "aws_lambda_permission" "scheduled_task_cleanupUploads" {
+  statement_id  = "scheduled_task_cleanupUploads"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.main.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.scheduled_task_cleanupUploads.arn
+}
+
+##########
 # Main
 ##########
         resource "aws_s3_bucket" "lambda_bucket" {
@@ -536,6 +583,10 @@ resource "aws_iam_role_policy_attachment" "api_gateway_ws" {
           })
         }
 
+        resource "aws_iam_role_policy_attachment" "dynamo" {
+          role       = aws_iam_role.main_exec.name
+          policy_arn = aws_iam_policy.dynamo.arn
+        }
         resource "aws_iam_role_policy_attachment" "main_policy_exec" {
           role       = aws_iam_role.main_exec.name
           policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -545,6 +596,23 @@ resource "aws_iam_role_policy_attachment" "api_gateway_ws" {
           policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
         }
         
+        resource "aws_iam_policy" "dynamo" {
+          name        = "demo-${var.deployment_name}-dynamo"
+          path = "/demo/${var.deployment_name}/dynamo/"
+          description = "Access to the demo-${var.deployment_name}_dynamo tables in DynamoDB"
+          policy = jsonencode({
+            Version = "2012-10-17"
+            Statement = [
+              {
+                Action = [
+                  "dynamodb:*",
+                ]
+                Effect   = "Allow"
+                Resource = ["*"]
+              },
+            ]
+          })
+        }
         resource "aws_iam_policy" "lambdainvoke" {
           name        = "demo-${var.deployment_name}-lambdainvoke"
           path = "/demo/${var.deployment_name}/lambdainvoke/"
@@ -613,7 +681,7 @@ resource "aws_iam_role_policy_attachment" "api_gateway_ws" {
     cors = var.cors
 },
 database = {
-    url = "postgresql://master:${random_password.database.result}@${aws_rds_cluster.database.endpoint}/demo${var.deployment_name}database"
+  url = "mongodb+srv://demo${var.deployment_name}database-main:${random_password.database.result}@${replace(mongodbatlas_serverless_instance.database.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
 },
 cache = {
     url = "dynamodb://${var.deployment_location}/demo-${var.deployment_name}_${var.deployment_name}"
@@ -623,6 +691,7 @@ jwt = {
     emailExpirationMilliseconds = var.jwt_emailExpirationMilliseconds 
     secret = random_password.jwt.result
 },
+oauth_github = var.oauth_github,
 logging = var.logging,
 files = {
     storageUrl = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
@@ -632,7 +701,9 @@ exceptions = var.exceptions,
 email = {
     url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
     fromEmail = var.email_sender
-}
+},
+oauth_google = var.oauth_google,
+oauth_apple = var.oauth_apple
               })
             }
           }

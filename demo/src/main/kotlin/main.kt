@@ -18,7 +18,7 @@ import java.util.*
 
 fun main(vararg args: String) {
     Server
-    loadSettings(File("settings.json"))
+//    loadSettings(File("settings.json"))
 //    runServer(LocalPubSub, LocalCache)
 
 //    println(Documentable.kotlinApi("test"))
