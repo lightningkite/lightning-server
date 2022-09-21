@@ -25,12 +25,12 @@ class OauthGitHubEndpoints(
     emailToId: suspend (String) -> String
 ) : OauthEndpoints(
     path = path,
+    codeName = "github",
     jwtSigner = jwtSigner,
     landing = landing,
     emailToId = emailToId,
 ) {
     override val niceName = "GitHub"
-    override val codeName = "github"
     override val authUrl = "https://github.com/login/oauth/authorize"
     override val getTokenUrl = "https://github.com/login/oauth/access_token"
     override val scope = "user:email"

@@ -24,12 +24,12 @@ class OauthGoogleEndpoints(
     emailToId: suspend (String) -> String
 ) : OauthEndpoints(
     path = path,
+    codeName = "google",
     jwtSigner = jwtSigner,
     landing = landing,
     emailToId = emailToId,
 ) {
     override val niceName = "Google"
-    override val codeName = "google"
     override val authUrl = "https://accounts.google.com/o/oauth2/v2/auth"
     override val getTokenUrl = "https://oauth2.googleapis.com/token"
     override val scope = "https%3A//www.googleapis.com/auth/userinfo.email"
