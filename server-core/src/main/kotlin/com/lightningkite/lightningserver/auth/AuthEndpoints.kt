@@ -440,3 +440,5 @@ inline fun <reified USER : Any, reified ID> AuthEndpoints(
     emailSubject = emailSubject,
     template = template
 )
+
+

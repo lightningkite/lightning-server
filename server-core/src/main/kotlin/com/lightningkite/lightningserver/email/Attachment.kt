@@ -10,17 +10,20 @@ import java.net.URL
 sealed interface Attachment {
     val description: String
     val name: String
+    val inline: Boolean
 
     data class Local(
         val file: File,
         override val description: String,
         override val name: String,
+        override val inline: Boolean = false
     ) : Attachment
 
     data class Remote(
         val url: URL,
         override val description: String,
         override val name: String,
+        override val inline: Boolean = false
     ) : Attachment
 }
 

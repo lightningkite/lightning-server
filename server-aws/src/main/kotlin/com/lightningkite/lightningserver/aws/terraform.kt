@@ -1309,7 +1309,9 @@ fun terraformAws(handlerFqn: String, projectName: String = "project", root: File
         listOf(defaultAwsHandler(info)),
         Settings.requirements.values.map {
             val handler = TerraformSection.handlers[it.serializer]?.let { handlers ->
-                handlerNames.getProperty(it.name)?.let { handlers[it] } ?: handlers.values.maxBy { it.priority }.also { h -> handlerNames[it.name] = h.name }
+                val handlerName = handlerNames.getProperty(it.name)
+                if(handlerName == "Direct") return@let null
+                handlers[handlerName] ?: handlers.values.maxBy { it.priority }.also { h -> handlerNames[it.name] = h.name }
             }
             handler?.makeSection?.invoke(info, it.name) ?: TerraformSection.default(info, it)
         },

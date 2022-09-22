@@ -28,7 +28,7 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
                 multiPart.setMsg(message)
                 attachments.forEach {
                     val attachment = EmailAttachment()
-                    attachment.disposition = EmailAttachment.ATTACHMENT
+                    attachment.disposition = if(it.inline) EmailAttachment.INLINE else EmailAttachment.ATTACHMENT
                     attachment.description = it.description
                     attachment.name = it.name
                     when (it) {
@@ -48,7 +48,7 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
             email.setHtmlMsg(htmlMessage)
             attachments.forEach {
                 val attachment = EmailAttachment()
-                attachment.disposition = EmailAttachment.ATTACHMENT
+                attachment.disposition = if(it.inline) EmailAttachment.INLINE else EmailAttachment.ATTACHMENT
                 attachment.description = it.description
                 attachment.name = it.name
                 when (it) {

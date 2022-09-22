@@ -21,6 +21,15 @@ data class EmailSettings(
     companion object : Pluggable<EmailSettings, EmailClient>() {
         init {
             EmailSettings.register("console") { ConsoleEmailClient }
+            EmailSettings.register("mailgun") {
+                val urlWithoutProtocol = it.url.substringAfter("://")
+                val key = urlWithoutProtocol.substringBefore('@')
+                val domain = urlWithoutProtocol.substringAfter('@')
+                MailgunEmailClient(
+                    key,
+                    domain
+                )
+            }
             EmailSettings.register("smtp") {
                 val urlWithoutProtocol = it.url.substringAfter("://")
                 val urlAuth = urlWithoutProtocol.substringBefore('@')
