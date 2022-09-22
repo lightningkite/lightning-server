@@ -21,6 +21,8 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.handler
 import com.lightningkite.lightningserver.meta.metaEndpoints
 import com.lightningkite.lightningserver.schedule.schedule
+import com.lightningkite.lightningserver.serialization.FileRedirectHandler
+import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.tasks.task
@@ -50,6 +52,10 @@ object Server : ServerPathGroup(ServerPath.root) {
         MemcachedCache
         S3FileSystem
         prepareModels()
+        Tasks.startup {
+            println("Files started, got ${files().root.url}")
+        }
+        Serialization.handler(FileRedirectHandler)
     }
 
     val auth = AuthEndpoints(

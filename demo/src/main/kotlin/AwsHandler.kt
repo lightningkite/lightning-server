@@ -9,7 +9,7 @@ class AwsHandler: AwsAdapter() {
     companion object {
         init {
             Server
-            Serialization.json.decodeFromString<Settings>(System.getenv("LIGHTNING_SERVER_SETTINGS")!!)
+            Serialization.Internal.json.decodeFromString<Settings>(System.getenv("LIGHTNING_SERVER_SETTINGS")!!)
         }
     }
     init {

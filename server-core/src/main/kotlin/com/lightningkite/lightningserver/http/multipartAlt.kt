@@ -439,10 +439,10 @@ suspend fun InputStream.toMultipartContent(type: com.lightningkite.lightningserv
 }
 
 private fun io.ktor.http.ContentType.adapt(): ContentType =
-    ContentType(type = contentType, subtype = contentSubtype)
+    ContentType(type = contentType, subtype = contentSubtype, parameters = this.parameters.associate { it.name to it.value })
 
 private fun ContentType.adapt(): io.ktor.http.ContentType =
-    ContentType(contentType = type, contentSubtype = subtype)
+    ContentType(contentType = type, contentSubtype = subtype, parameters = parameters.map { HeaderValueParam(it.key, it.value) })
 
 internal fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
 

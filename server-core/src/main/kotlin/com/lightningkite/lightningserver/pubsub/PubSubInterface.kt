@@ -20,7 +20,7 @@ interface PubSubInterface: HealthCheckable {
     }
 }
 inline operator fun <reified T: Any> PubSubInterface.get(key: String): PubSubChannel<T> {
-    return get(key, Serialization.json.serializersModule.serializer<T>())
+    return get(key, Serialization.Internal.json.serializersModule.serializer<T>())
 }
 
 interface PubSubChannel<T>: Flow<T>, FlowCollector<T> {}

@@ -41,9 +41,10 @@ class DynamoDbCache(val client: DynamoDbAsyncClient, val tableName: String = "ca
     }
 
     @OptIn(DelicateCoroutinesApi::class)
-    private fun ready() =  GlobalScope.async(Dispatchers.Unconfined, start = CoroutineStart.LAZY) {
+    private fun ready() = GlobalScope.async(Dispatchers.Unconfined, start = CoroutineStart.LAZY) {
         try {
             val described = client.describeTable { it.tableName(tableName) }.await()
+            Unit
         } catch (e: Exception) {
             client.createTable {
                 it.tableName(tableName)
@@ -59,7 +60,8 @@ class DynamoDbCache(val client: DynamoDbAsyncClient, val tableName: String = "ca
                     it.enabled(true)
                     it.attributeName("expires")
                 }
-            }
+            }.await()
+            Unit
         }
     }
     private var ready = ready()

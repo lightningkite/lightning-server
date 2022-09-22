@@ -1,39 +1,45 @@
 ### GET request with a header
-GET http://localhost:8080/test-model/rest
+GET http://localhost:8941/test-model/rest
 Accept: application/json
 
 ### GET request with a header
-GET http://localhost:8080/test-model/rest
+GET http://localhost:8941/test-model/rest
 Accept: text/csv
 
 ### Login
-POST http://localhost:8080/auth/login-email
+POST http://localhost:8941/auth/login-email
 Accept: application/json
 Content-Type: application/json
 
 "joseph@lightningkite.com"
 
 ### Login ALt
-POST http://localhost:8080/auth/login-email
+POST http://localhost:8941/auth/login-email
 Accept: application/json
 Content-Type: application/json
 
 "josephivie@gmail.com"
 
 
+### List
+GET http://0.0.0.0:8941/test-model/rest
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2ppdmllLmxpZ2h0bmluZ2tpdGUuY29tIiwic3ViIjoiODNlNTBmMmUtMDgyMi00MGJkLWIzZDEtMjEyNTgyMTgzNzVjIiwiYXVkIjoiaHR0cHM6Ly9qaXZpZS5saWdodG5pbmdraXRlLmNvbSIsImV4cCI6MTY5NTQwNDU2MywiaWF0IjoxNjYzODY4NTYzfQ==.pKIqcX1H6VVzBT-zzRMlp-BMnmvPy9jMAHvJgEe5oB4=
+Accept: text/uri-list; subtype=text/csv
+
+
 ### Get count
-GET http://0.0.0.0:8080/test-model/rest/count?number.LessThan=2000
+GET http://0.0.0.0:8941/test-model/rest/count?number.LessThan=2000
 Accept: application/json
 
 ### Get count2
-POST http://0.0.0.0:8080/test-model/rest/count
+POST http://0.0.0.0:8941/test-model/rest/count
 Accept: application/json
 Content-Type: application/json
 
 { "number": { "LessThan": 2000 }}
 
 ### Get group count
-POST http://0.0.0.0:8080/test-model/rest/group-count
+POST http://0.0.0.0:8941/test-model/rest/group-count
 Accept: application/json
 Content-Type: application/json
 
@@ -43,14 +49,14 @@ Content-Type: application/json
 }
 
 ### Get aggregate
-POST http://0.0.0.0:8080/test-model/rest/aggregate
+POST http://0.0.0.0:8941/test-model/rest/aggregate
 Accept: application/json
 Content-Type: application/json
 
 { "property": "number", "aggregate": "Average" }
 
 ### Get group aggregate
-POST http://0.0.0.0:8080/test-model/rest/group-aggregate
+POST http://0.0.0.0:8941/test-model/rest/group-aggregate
 Accept: application/json
 Content-Type: application/json
 

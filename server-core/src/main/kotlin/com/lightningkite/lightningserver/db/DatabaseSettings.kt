@@ -32,7 +32,7 @@ data class DatabaseSettings(
     companion object: Pluggable<DatabaseSettings, Database>() {
         init {
             register("ram") { InMemoryDatabase() }
-            register("ram-preload") { InMemoryDatabase(Serialization.json.parseToJsonElement(File(it.url.substringAfter("://")).readText()) as? JsonObject) }
+            register("ram-preload") { InMemoryDatabase(Serialization.Internal.json.parseToJsonElement(File(it.url.substringAfter("://")).readText()) as? JsonObject) }
             register("ram-unsafe-persist") { InMemoryUnsafePersistenceDatabase(File(it.url.substringAfter("://"))) }
         }
     }
@@ -69,7 +69,7 @@ class InMemoryDatabase(val premadeData: JsonObject? = null): Database {
             = collections.getOrPut(name) {
         val made = InMemoryFieldCollection<T>()
         premadeData?.get(name)?.let {
-            val data = Serialization.json.decodeFromJsonElement(ListSerializer(Serialization.json.serializersModule.serializer(type) as KSerializer<T>), it)
+            val data = Serialization.Internal.json.decodeFromJsonElement(ListSerializer(Serialization.Internal.json.serializersModule.serializer(type) as KSerializer<T>), it)
             made.data.addAll(data)
         }
         made
@@ -90,7 +90,7 @@ class InMemoryUnsafePersistenceDatabase(val folder: File): Database {
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any> collection(type: KType, name: String): FieldCollection<T>
             = collections.getOrPut(name) {
-        InMemoryUnsafePersistentFieldCollection(Serialization.json, Serialization.json.serializersModule.serializer(type) as KSerializer<T>, folder.resolve(name))
+        InMemoryUnsafePersistentFieldCollection(Serialization.Internal.json, Serialization.Internal.json.serializersModule.serializer(type) as KSerializer<T>, folder.resolve(name))
     } as FieldCollection<T>
 
 

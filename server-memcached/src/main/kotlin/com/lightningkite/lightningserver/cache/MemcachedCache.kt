@@ -38,12 +38,12 @@ class MemcachedCache(val client: MemcachedClient): CacheInterface, HealthCheckab
     }
 
     override suspend fun <T> get(key: String, serializer: KSerializer<T>): T? = withContext(Dispatchers.IO) {
-        client.get<String>(key)?.let { Serialization.json.decodeFromString(serializer, it) }.also {
+        client.get<String>(key)?.let { Serialization.Internal.json.decodeFromString(serializer, it) }.also {
         }
     }
 
     override suspend fun <T> set(key: String, value: T, serializer: KSerializer<T>, timeToLive: Duration?) = withContext(Dispatchers.IO) {
-        val succeed = client.set(key, timeToLive?.toSeconds()?.toInt() ?: Int.MAX_VALUE, Serialization.json.encodeToString(serializer, value))
+        val succeed = client.set(key, timeToLive?.toSeconds()?.toInt() ?: Int.MAX_VALUE, Serialization.Internal.json.encodeToString(serializer, value))
         Unit
     }
 
@@ -52,16 +52,16 @@ class MemcachedCache(val client: MemcachedClient): CacheInterface, HealthCheckab
         value: T,
         serializer: KSerializer<T>
     ): Boolean = withContext(Dispatchers.IO) {
-        client.add(key, Int.MAX_VALUE, Serialization.json.encodeToString(serializer, value))
+        client.add(key, Int.MAX_VALUE, Serialization.Internal.json.encodeToString(serializer, value))
     }
 
     override suspend fun <T> modify(key: String, serializer: KSerializer<T>, maxTries: Int, modification: (T?) -> T?): Boolean = withContext(Dispatchers.IO) {
         client.cas(key, Int.MAX_VALUE, object: CASOperation<String> {
             override fun getMaxTries(): Int = maxTries
             override fun getNewValue(currentCAS: Long, currentValue: String?): String? {
-                return currentValue?.let { Serialization.json.decodeFromString(serializer, it) }
+                return currentValue?.let { Serialization.Internal.json.decodeFromString(serializer, it) }
                     .let(modification)
-                    ?.let { Serialization.json.encodeToString(serializer, it) }
+                    ?.let { Serialization.Internal.json.encodeToString(serializer, it) }
             }
         })
     }

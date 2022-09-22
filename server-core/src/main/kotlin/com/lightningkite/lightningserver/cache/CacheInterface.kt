@@ -49,15 +49,15 @@ interface CacheInterface : HealthCheckable {
 }
 
 suspend inline fun <reified T : Any> CacheInterface.get(key: String): T? {
-    return get(key, Serialization.json.serializersModule.serializer<T>())
+    return get(key, Serialization.Internal.json.serializersModule.serializer<T>())
 }
 
 suspend inline fun <reified T : Any> CacheInterface.set(key: String, value: T, timeToLive: Duration? = null) {
-    return set(key, value, Serialization.json.serializersModule.serializer<T>(), timeToLive)
+    return set(key, value, Serialization.Internal.json.serializersModule.serializer<T>(), timeToLive)
 }
 
 suspend inline fun <reified T : Any> CacheInterface.setIfNotExists(key: String, value: T): Boolean {
-    return setIfNotExists(key, value, Serialization.json.serializersModule.serializer<T>())
+    return setIfNotExists(key, value, Serialization.Internal.json.serializersModule.serializer<T>())
 }
 
 
@@ -65,4 +65,4 @@ suspend inline fun <reified T : Any> CacheInterface.modify(
     key: String,
     maxTries: Int = 1,
     noinline modification: (T?) -> T?
-): Boolean = modify(key, Serialization.json.serializersModule.serializer<T>(), maxTries, modification)
+): Boolean = modify(key, Serialization.Internal.json.serializersModule.serializer<T>(), maxTries, modification)

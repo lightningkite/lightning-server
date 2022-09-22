@@ -48,6 +48,7 @@ import com.lightningkite.lightningserver.core.ContentType as HttpContentType
 fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) {
     val logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.ktor.lightningServer")
     try {
+        runBlocking { Tasks.startup() }
         install(io.ktor.server.websocket.WebSockets)
         generalSettings().cors?.let {
             install(CORS) {

@@ -41,13 +41,13 @@ class RedisCache(val client: RedisClient) : CacheInterface {
 
     val connection = client.connect().reactive()
     override suspend fun <T> get(key: String, serializer: KSerializer<T>): T? {
-        return connection.get(key).awaitFirstOrNull()?.let { Serialization.json.decodeFromString(serializer, it) }
+        return connection.get(key).awaitFirstOrNull()?.let { Serialization.Internal.json.decodeFromString(serializer, it) }
     }
 
     override suspend fun <T> set(key: String, value: T, serializer: KSerializer<T>, timeToLive: Duration?) {
         connection.set(
             key,
-            Serialization.json.encodeToString(serializer, value),
+            Serialization.Internal.json.encodeToString(serializer, value),
             SetArgs().let { timeToLive?.toMillis()?.let { t -> it.ex(t) } ?: it }).collect {}
     }
 
@@ -56,7 +56,7 @@ class RedisCache(val client: RedisClient) : CacheInterface {
         value: T,
         serializer: KSerializer<T>
     ): Boolean {
-        return connection.setnx(key, Serialization.json.encodeToString(serializer, value)).awaitFirst()
+        return connection.setnx(key, Serialization.Internal.json.encodeToString(serializer, value)).awaitFirst()
     }
 
 //    val cas = connection.scriptLoad(

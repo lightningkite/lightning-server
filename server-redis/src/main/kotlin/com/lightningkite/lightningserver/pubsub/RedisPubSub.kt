@@ -60,11 +60,11 @@ class RedisPubSub(val client: RedisClient): PubSubInterface {
     override fun <T> get(key: String, serializer: KSerializer<T>): PubSubChannel<T> {
         return object: PubSubChannel<T> {
             override suspend fun collect(collector: FlowCollector<T>) {
-                key(key).map { Serialization.json.decodeFromString(serializer, it) }.collect { collector.emit(it) }
+                key(key).map { Serialization.Internal.json.decodeFromString(serializer, it) }.collect { collector.emit(it) }
             }
 
             override suspend fun emit(value: T) {
-                publishConnection.publish(key, Serialization.json.encodeToString(serializer, value)).awaitFirst()
+                publishConnection.publish(key, Serialization.Internal.json.encodeToString(serializer, value)).awaitFirst()
             }
         }
     }

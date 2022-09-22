@@ -18,7 +18,7 @@ fun <T> SdkPublisher<Map<String, AttributeValue>>.parse(serializer: KSerializer<
 }
 
 fun <T> KSerializer<T>.toDynamo(value: T): AttributeValue {
-    val jsonElement = Serialization.json.encodeToJsonElement(this, value)
+    val jsonElement = Serialization.Internal.json.encodeToJsonElement(this, value)
     return when (jsonElement) {
         is JsonObject -> AttributeValue.fromM(jsonElement.mapValues { it.value.toDynamoDb() })
         else -> jsonElement.toDynamoDb()
@@ -27,7 +27,7 @@ fun <T> KSerializer<T>.toDynamo(value: T): AttributeValue {
 
 fun <T> KSerializer<T>.fromDynamo(value: AttributeValue): T {
     val element = value.toJson()
-    return Serialization.json.decodeFromJsonElement(this, element)
+    return Serialization.Internal.json.decodeFromJsonElement(this, element)
 }
 
 fun <T> KSerializer<T>.toDynamoMap(value: T): Map<String, AttributeValue> = toDynamo(value).m()
