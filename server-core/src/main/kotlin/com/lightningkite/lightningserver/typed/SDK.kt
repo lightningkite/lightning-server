@@ -273,9 +273,9 @@ private fun CodeEmitter.functionHeader(documentable: Documentable, skipAuth: Boo
         }
         is ApiWebsocket<*, *, *> -> {
             append("Observable<WebSocketIsh<")
-            append(documentable.inputType.kotlinTypeString(this))
-            append(", ")
             append(documentable.outputType.kotlinTypeString(this))
+            append(", ")
+            append(documentable.inputType.kotlinTypeString(this))
             append(">>")
         }
         else -> TODO()
