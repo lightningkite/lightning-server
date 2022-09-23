@@ -270,6 +270,10 @@ abstract class AwsAdapter : RequestStreamHandler {
             else -> if (body == null || body.length == 0L)
                 return APIGatewayV2HTTPResponse(200)
             else if (isMultiplex()) {
+                if(event.body.isBlank()) {
+                    WebSockets.send(event.requestContext.connectionId, "")
+                    return APIGatewayV2HTTPResponse(200)
+                }
                 val message = Serialization.json.decodeFromString<MultiplexMessage>(event.body)
                 val cacheId = event.requestContext.connectionId + "/" + message.channel
                 when {

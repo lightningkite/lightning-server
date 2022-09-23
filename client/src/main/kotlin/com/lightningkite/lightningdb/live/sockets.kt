@@ -21,19 +21,19 @@ private val sharedSocketCache = HashMap<String, Observable<WebSocketInterface>>(
 fun sharedSocket(url: String): Observable<WebSocketInterface> {
     return sharedSocketCache.getOrPut(url) {
         val shortUrl = url.substringBefore('?')
-//        println("Creating socket to $url")
+        println("Creating socket to $url")
         (_overrideWebSocketProvider?.invoke(url) ?: HttpClient.webSocket(url))
             .switchMap {
-//                println("Connection to $shortUrl established, starting pings")
+                println("Connection to $shortUrl established, starting pings")
                 // Only have this observable until it fails
 
                 val pingMessages: Observable<WebSocketInterface> = Observable.interval(5000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!).map { _ ->
-//                    println("Sending ping to $url")
-                    it.write.onNext(WebSocketFrame(text = ""))
+                    println("Sending ping to $url")
+                    it.write.onNext(WebSocketFrame(text = " "))
                 }.switchMap { Observable.never() }
 
                 val timeoutAfterSeconds: Observable<WebSocketInterface> = it.read
-//                    .doOnNext { println("Got message from $shortUrl: ${it}") }
+                    .doOnNext { println("Got message from $shortUrl: ${it}") }
                     .timeout(10_000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!)
                     .switchMap { Observable.never() }
 
@@ -46,7 +46,7 @@ fun sharedSocket(url: String): Observable<WebSocketInterface> {
             .doOnError { println("Socket to $shortUrl FAILED with $it") }
             .retryWhen @SwiftReturnType("Observable<Error>") { it.delay(1000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!) }
             .doOnDispose {
-//                println("Disconnecting socket to $shortUrl")
+                println("Disconnecting socket to $shortUrl")
                 sharedSocketCache.remove(url)
             }
             .replay(1)
@@ -61,9 +61,8 @@ class WebSocketIsh<IN: IsCodableAndHashable, OUT: IsCodableAndHashable>(val mess
 inline fun <reified IN: IsCodableAndHashableNotNull, reified OUT: IsCodableAndHashable> multiplexedSocket(
     url: String,
     path: String,
-    queryParams: Map<String, List<String>> = mapOf(),
-    noinline onSetup: (WebSocketIsh<IN, OUT>) -> Unit = {}
-): Observable<WebSocketIsh<IN, OUT>> = multiplexedSocket(url, path, queryParams, serializer<IN>(), serializer<OUT>(), onSetup)
+    queryParams: Map<String, List<String>> = mapOf()
+): Observable<WebSocketIsh<IN, OUT>> = multiplexedSocket(url, path, queryParams, serializer<IN>(), serializer<OUT>())
 
 @JsName("multiplexedSocket")
 fun <IN: IsCodableAndHashableNotNull, OUT: IsCodableAndHashable> multiplexedSocket(
@@ -71,8 +70,7 @@ fun <IN: IsCodableAndHashableNotNull, OUT: IsCodableAndHashable> multiplexedSock
     path: String,
     queryParams: Map<String, List<String>> = mapOf(),
     inType: KSerializer<IN>,
-    outType: KSerializer<OUT>,
-    onSetup: (WebSocketIsh<IN, OUT>) -> Unit = {}
+    outType: KSerializer<OUT>
 ): Observable<WebSocketIsh<IN, OUT>> {
     val shortUrl = url.substringBefore('?')
     val channel = UUID.randomUUID().toString()
@@ -106,7 +104,6 @@ fun <IN: IsCodableAndHashableNotNull, OUT: IsCodableAndHashable> multiplexedSock
                 messages = part.messages.mapNotNull { it.fromJsonString(inType) },
                 send = { m -> part.send(m.toJsonString(outType)) }
             )
-            onSetup(typedPart)
             typedPart
         }
         .doOnDispose {

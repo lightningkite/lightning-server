@@ -192,8 +192,13 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                     val jobs = HashMap<String, Job>()
                     try {
                         for (incoming in this.incoming) {
+                            val messageText = (incoming as Frame.Text).readText()
+                            if(messageText.isBlank()) {
+                                send("")
+                                continue
+                            }
                             val message =
-                                Serialization.json.decodeFromString<MultiplexMessage>((incoming as Frame.Text).readText())
+                                Serialization.json.decodeFromString<MultiplexMessage>(messageText)
                             val cacheId = "ws/$id/${message.channel}"
                             when {
                                 message.start -> {
