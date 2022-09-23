@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.lightningserver.SetOnce
+import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
@@ -18,6 +19,7 @@ class CorrectErrorTest {
         val number: Int = 0
     )
     @Test fun testBadRequest() {
+        TestSettings
         val t = ServerPath("test").post.typed(
             summary = "Test endpoint",
             errorCases = listOf(),

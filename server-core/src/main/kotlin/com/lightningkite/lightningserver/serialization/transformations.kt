@@ -20,18 +20,27 @@ inline fun <reified T> HttpRequest.queryParameters(): T =
     queryParameters(Serialization.properties.serializersModule.serializer())
 
 fun <T> HttpRequest.queryParameters(serializer: KSerializer<T>): T {
-    @Suppress("UNCHECKED_CAST")
-    if (serializer == Unit.serializer()) return Unit as T
-    return Serialization.properties.decodeFromStringMap<T>(
-        serializer,
-        queryParameters.groupBy { it.first }.mapValues { it.value.joinToString(",") }
-    )
+    try {
+        @Suppress("UNCHECKED_CAST")
+        if (serializer == Unit.serializer()) return Unit as T
+        return Serialization.properties.decodeFromStringMap<T>(
+            serializer,
+            queryParameters.groupBy { it.first }.mapValues { it.value.joinToString(",") }
+        )
+    } catch (e: SerializationException) {
+        throw BadRequestException(e.message, cause = e.cause)
+    }
 }
 
 suspend inline fun <reified T> HttpContent.parse(): T = parse(Serialization.module.serializer())
 suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
-    val parser = Serialization.parsers[this.type] ?: throw BadRequestException("Content type $type not accepted; available types are ${Serialization.parsers.keys.joinToString()}")
-    return parser(this, serializer)
+    try {
+        val parser = Serialization.parsers[this.type]
+            ?: throw BadRequestException("Content type $type not accepted; available types are ${Serialization.parsers.keys.joinToString()}")
+        return parser(this, serializer)
+    } catch (e: SerializationException) {
+        throw BadRequestException(e.message, cause = e.cause)
+    }
 }
 
 suspend inline fun <reified T> T.toHttpContent(acceptedTypes: List<ContentType>): HttpContent? =

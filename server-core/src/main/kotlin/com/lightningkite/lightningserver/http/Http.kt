@@ -29,7 +29,8 @@ suspend fun HttpEndpoint.test(
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "0.0.0.0"
 ): HttpResponse {
-    Tasks.startup()
+    Tasks.onSettingsReady()
+    Tasks.onEngineReady()
     val req = HttpRequest(
         endpoint = this,
         parts = parts,

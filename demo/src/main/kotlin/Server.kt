@@ -52,7 +52,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         MemcachedCache
         S3FileSystem
         prepareModels()
-        Tasks.startup {
+        Tasks.onSettingsReady {
             println("Files started, got ${files().root.url}")
         }
         Serialization.handler(FileRedirectHandler)

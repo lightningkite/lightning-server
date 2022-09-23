@@ -43,7 +43,7 @@ object LocalCache: CacheInterface {
             is Double -> (current + value)
             else -> value
         }
-        entries[key] = Entry(value, entry?.expires)
+        entries[key] = Entry(new, entry?.expires)
     }
 
     override suspend fun clear() {

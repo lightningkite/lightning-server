@@ -52,8 +52,9 @@ suspend fun ServerPath.test(
     sourceIp: String = "0.0.0.0",
     test: suspend VirtualSocket.()->Unit
 ) {
+    Tasks.onSettingsReady()
     engine = LocalEngine(LocalPubSub, LocalCache)
-    Tasks.startup()
+    Tasks.onEngineReady()
     val id = "TEST-${UUID.randomUUID()}"
     val req = WebSockets.ConnectEvent(
         path = this,

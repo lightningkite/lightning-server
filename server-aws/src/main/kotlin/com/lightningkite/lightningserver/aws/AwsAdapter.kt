@@ -155,12 +155,13 @@ abstract class AwsAdapter : RequestStreamHandler {
                     }.await()
                 }
             }
-            runBlocking { Tasks.startup() }
+            runBlocking { Tasks.onEngineReady() }
             Unit
         }
     }
 
     init {
+        runBlocking { Tasks.onSettingsReady() }
         configureEngine
     }
 

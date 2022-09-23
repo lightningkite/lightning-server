@@ -18,7 +18,10 @@ inline fun <reified INPUT> task(name: String, noinline implementation: suspend C
 fun <INPUT> task(name: String, serializer: KSerializer<INPUT>, implementation: suspend CoroutineScope.(INPUT)->Unit) = Task(name, serializer, implementation)
 
 @LightningServerDsl
-fun startup(priority: Double = 0.0, action: suspend ()->Unit) = Tasks.startup(priority, action)
+fun startup(priority: Double = 0.0, action: suspend ()->Unit) = Tasks.onEngineReady(priority, action)
+
+@LightningServerDsl
+fun defineAfterSettings(priority: Double = 0.0, action: suspend ()->Unit) = Tasks.onSettingsReady(priority, action)
 
 
 
