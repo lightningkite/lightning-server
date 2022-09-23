@@ -160,7 +160,17 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                 }
             }
             is ApiWebsocket<*, *, *> -> {
-                appendLine(" = multiplexedSocket(url = \"\$httpUrl/multiplex\", path = \"${entry.path}\")")
+                appendLine(" = multiplexedSocket(")
+                appendLine("        url = \"\$socketUrl?path=multiplex\", ")
+                appendLine("        path = \"${entry.path}\", ")
+                entry.authInfo.type?.let {
+                    if(entry.authInfo.required) {
+                        appendLine("        queryParams = mapOf(\"jwt\" to listOf(${it.userTypeTokenName()}))")
+                    } else {
+                        appendLine("        queryParams = if(${it.userTypeTokenName()} != null) mapOf(\"jwt\" to listOf(${it.userTypeTokenName()})) else mapOf()")
+                    }
+                }
+                appendLine("    )")
             }
         }
     }
@@ -191,7 +201,17 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                     }
                 }
                 is ApiWebsocket<*, *, *> -> {
-                    appendLine(" = multiplexedSocket(url = \"\$httpUrl/multiplex\", path = \"${entry.path}\")")
+                    appendLine(" = multiplexedSocket(")
+                    appendLine("            url = \"\$socketUrl?path=multiplex\", ")
+                    appendLine("            path = \"${entry.path}\", ")
+                    entry.authInfo.type?.let {
+                        if(entry.authInfo.required) {
+                            appendLine("            queryParams = mapOf(\"jwt\" to listOf(${it.userTypeTokenName()}))")
+                        } else {
+                            appendLine("            queryParams = if(${it.userTypeTokenName()} != null) mapOf(\"jwt\" to listOf(${it.userTypeTokenName()})) else mapOf()")
+                        }
+                    }
+                    appendLine("        )")
                 }
             }
         }

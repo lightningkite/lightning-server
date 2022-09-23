@@ -8,6 +8,7 @@ import kotlinx.serialization.Serializable
 data class MultiplexMessage(
     val channel: String,
     val path: String? = null,
+    val queryParams: Map<String, List<String>>? = null,
     val start: Boolean = false,
     val end: Boolean = false,
     val data: String? = null,

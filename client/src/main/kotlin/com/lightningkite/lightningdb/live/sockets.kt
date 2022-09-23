@@ -61,13 +61,15 @@ class WebSocketIsh<IN: IsCodableAndHashable, OUT: IsCodableAndHashable>(val mess
 inline fun <reified IN: IsCodableAndHashableNotNull, reified OUT: IsCodableAndHashable> multiplexedSocket(
     url: String,
     path: String,
+    queryParams: Map<String, List<String>> = mapOf(),
     noinline onSetup: (WebSocketIsh<IN, OUT>) -> Unit = {}
-): Observable<WebSocketIsh<IN, OUT>> = multiplexedSocket(url, path, serializer<IN>(), serializer<OUT>(), onSetup)
+): Observable<WebSocketIsh<IN, OUT>> = multiplexedSocket(url, path, queryParams, serializer<IN>(), serializer<OUT>(), onSetup)
 
 @JsName("multiplexedSocket")
 fun <IN: IsCodableAndHashableNotNull, OUT: IsCodableAndHashable> multiplexedSocket(
     url: String,
     path: String,
+    queryParams: Map<String, List<String>> = mapOf(),
     inType: KSerializer<IN>,
     outType: KSerializer<OUT>,
     onSetup: (WebSocketIsh<IN, OUT>) -> Unit = {}
@@ -84,6 +86,7 @@ fun <IN: IsCodableAndHashableNotNull, OUT: IsCodableAndHashable> multiplexedSock
                     text = MultiplexMessage(
                         channel = channel,
                         path = path,
+                        queryParams = queryParams,
                         start = true
                     ).toJsonString()
                 )

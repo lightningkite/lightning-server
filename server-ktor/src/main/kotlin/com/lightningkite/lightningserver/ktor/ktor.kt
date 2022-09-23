@@ -218,6 +218,7 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                                                 path = match.path,
                                                 parts = match.parts,
                                                 wildcard = match.wildcard,
+                                                queryParameters = message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf(),
                                                 id = cacheId
                                             )
                                         )

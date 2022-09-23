@@ -69,13 +69,13 @@ abstract class AwsAdapter : RequestStreamHandler {
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(AwsAdapter::class.java)
+        val region by lazy { Region.of(System.getenv("AWS_REGION")) }
         val httpMatcher by lazy { HttpEndpointMatcher(Http.endpoints.keys.asSequence()) }
         val wsMatcher by lazy { ServerPathMatcher(WebSockets.handlers.keys.asSequence()) }
-        private val wsCache by lazy { DynamoDbCache(DynamoDbAsyncClient.create(), "${generalSettings().projectName.filter { it.isLetter() }}WsCache") }
+        private val wsCache by lazy { DynamoDbCache(DynamoDbAsyncClient.builder().region(region).build(), "${generalSettings().projectName.filter { it.isLetter() }}WsCache") }
         fun cache() = wsCache
         val configureEngine by lazy {
             engine = object : Engine {
-                val region = Region.of(System.getenv("AWS_REGION"))
                 val apiGatewayManagement = ApiGatewayManagementApiAsyncClient.builder()
                     .region(region)
                     .endpointOverride(URI.create("https://" + generalSettings().wsUrl.removePrefix("wss://")))
@@ -250,10 +250,10 @@ abstract class AwsAdapter : RequestStreamHandler {
         return when (event.requestContext.routeKey) {
             "\$connect" -> {
                 val path = headers["x-path"] ?: queryParams.find { it.first == "path" }?.second ?: ""
-                val isMultiplex = path.isEmpty()
+                val isMultiplex = path.isEmpty() || path.trim('/') == "multiplex"
                 cache().set("${event.requestContext.connectionId}-isMultiplex", isMultiplex)
                 if (isMultiplex) APIGatewayV2HTTPResponse(200)
-                else handleWebsocketConnect(event, event.requestContext.connectionId, path)
+                else handleWebsocketConnect(event, event.requestContext.connectionId, path, event.multiValueQueryStringParameters ?: mapOf())
             }
 
             "\$disconnect" -> {
@@ -272,10 +272,12 @@ abstract class AwsAdapter : RequestStreamHandler {
                 val message = Serialization.json.decodeFromString<MultiplexMessage>(event.body)
                 val cacheId = event.requestContext.connectionId + "/" + message.channel
                 when {
-                    message.start -> handleWebsocketConnect(event, cacheId, message.path!!).also {
-                        if (it.statusCode == 200) {
-                            cache().modify<Set<String>>(event.requestContext.connectionId, 40) {
-                                it?.plus(message.channel) ?: setOf(message.channel)
+                    message.start -> {
+                        handleWebsocketConnect(event, cacheId, message.path!!, message.queryParams ?: mapOf()).also {
+                            if (it.statusCode == 200) {
+                                cache().modify<Set<String>>(event.requestContext.connectionId, 40) {
+                                    it?.plus(message.channel) ?: setOf(message.channel)
+                                }
                             }
                         }
                     }
@@ -287,7 +289,7 @@ abstract class AwsAdapter : RequestStreamHandler {
                         handleWebsocketDisconnect(cacheId)
                     }
 
-                    message.data != null -> handleWebsocketMessage(event.requestContext.connectionId, message.data!!)
+                    message.data != null -> handleWebsocketMessage(cacheId, message.data!!)
                     else -> APIGatewayV2HTTPResponse(200)
                 }
             } else
@@ -298,7 +300,8 @@ abstract class AwsAdapter : RequestStreamHandler {
     suspend fun handleWebsocketConnect(
         event: APIGatewayV2WebsocketRequest,
         cacheId: String,
-        path: String
+        path: String,
+        queryParams: Map<String, List<String>>
     ): APIGatewayV2HTTPResponse {
         logger.debug("Connecting $cacheId")
         val match = wsMatcher.match(path)
@@ -315,8 +318,7 @@ abstract class AwsAdapter : RequestStreamHandler {
             parts = match.parts,
             wildcard = match.wildcard,
             id = cacheId,
-            queryParameters = event.multiValueQueryStringParameters?.flatMap { it.value.map { v -> it.key to v } }
-                ?: listOf(),
+            queryParameters = queryParams.flatMap { it.value.map { v -> it.key to v } },
             headers = HttpHeaders(
                 event.multiValueHeaders?.flatMap { it.value.map { v -> it.key to v } } ?: listOf()
             ),
