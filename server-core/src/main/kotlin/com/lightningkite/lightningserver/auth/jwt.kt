@@ -88,10 +88,10 @@ fun <T> Json.encodeJwt(
     issuedAt: Instant = Instant.now(),
 ): String = buildString {
     val withDefaults = Json(this@encodeJwt) { encodeDefaults = true; explicitNulls = false }
-    append(Base64.getUrlEncoder().encodeToString(withDefaults.encodeToString(JwtHeader()).toByteArray()))
+    append(Base64.getUrlEncoder().withoutPadding().encodeToString(withDefaults.encodeToString(JwtHeader()).toByteArray()))
     append('.')
     append(
-        Base64.getUrlEncoder().encodeToString(
+        Base64.getUrlEncoder().withoutPadding().encodeToString(
             withDefaults.encodeToString(
                 JwtClaims(
                     iss = issuer,
@@ -108,7 +108,7 @@ fun <T> Json.encodeJwt(
     )
     val soFar = this.toString()
     append('.')
-    append(Base64.getUrlEncoder().encodeToString(hasher.sign(soFar.toByteArray())))
+    append(Base64.getUrlEncoder().withoutPadding().encodeToString(hasher.sign(soFar.toByteArray())))
 }
 
 class JwtException(message: String) : Exception(message)

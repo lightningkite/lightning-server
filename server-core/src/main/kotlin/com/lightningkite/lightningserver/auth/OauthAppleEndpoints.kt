@@ -48,36 +48,7 @@ class OauthAppleEndpoints(
 
     override fun secretTransform(secret: String): String {
         val settings = settings() ?: throw NotFoundException("Oauth is not configured for Apple.")
-        val parts = settings.secret.split('|')
-        val teamId = parts[0]
-        val keyId = parts[1]
-        val keyString = parts[2]
-        return buildString {
-            val withDefaults = Json { encodeDefaults = true; explicitNulls = false }
-            append(Base64.getUrlEncoder().encodeToString(withDefaults.encodeToString(buildJsonObject {
-                put("alg", "ES256")
-                put("typ", "JWT")
-                put("kid", keyId)
-            }).toByteArray()))
-            append('.')
-            val issuedAt = Instant.now()
-            append(
-                Base64.getUrlEncoder().encodeToString(
-                    withDefaults.encodeToString(
-                        buildJsonObject {
-                            put("iss", teamId)
-                            put("iat", issuedAt.toEpochMilli().div(1000))
-                            put("exp", issuedAt.plus(Duration.ofDays(1)).toEpochMilli().div(1000))
-                            put("aud", "https://appleid.apple.com")
-                            put("sub", settings.id)
-                        }
-                    ).toByteArray()
-                )
-            )
-            val soFar = this.toString()
-            append('.')
-            append(Base64.getUrlEncoder().encodeToString(SecureHasher.ECDSA256(keyString).sign(soFar.toByteArray())))
-        }
+        return generateJwt(settings.id, settings.secret)
     }
 
     companion object {
@@ -88,20 +59,20 @@ class OauthAppleEndpoints(
             val keyString = parts[2]
             return buildString {
                 val withDefaults = Json { encodeDefaults = true; explicitNulls = false }
-                append(Base64.getUrlEncoder().encodeToString(withDefaults.encodeToString(buildJsonObject {
-                    put("alg", "ES256")
-                    put("typ", "JWT")
+                append(Base64.getUrlEncoder().withoutPadding().encodeToString(withDefaults.encodeToString(buildJsonObject {
+//                    put("typ", "JWT")
                     put("kid", keyId)
+                    put("alg", "ES256")
                 }).toByteArray()))
                 append('.')
                 val issuedAt = Instant.now()
                 append(
-                    Base64.getUrlEncoder().encodeToString(
+                    Base64.getUrlEncoder().withoutPadding().encodeToString(
                         withDefaults.encodeToString(
                             buildJsonObject {
                                 put("iss", teamId)
                                 put("iat", issuedAt.toEpochMilli().div(1000))
-                                put("exp", issuedAt.plus(Duration.ofDays(1)).toEpochMilli().div(1000))
+                                put("exp", issuedAt.plus(Duration.ofDays(5)).toEpochMilli().div(1000))
                                 put("aud", "https://appleid.apple.com")
                                 put("sub", id)
                             }
@@ -111,7 +82,7 @@ class OauthAppleEndpoints(
                 val soFar = this.toString()
                 append('.')
                 append(
-                    Base64.getUrlEncoder().encodeToString(SecureHasher.ECDSA256(keyString).sign(soFar.toByteArray()))
+                    Base64.getUrlEncoder().withoutPadding().encodeToString(SecureHasher.ECDSA256(keyString).sign(soFar.toByteArray()))
                 )
             }
         }

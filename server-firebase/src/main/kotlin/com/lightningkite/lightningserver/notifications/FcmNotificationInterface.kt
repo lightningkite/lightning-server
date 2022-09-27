@@ -17,12 +17,15 @@ import java.io.File
 object FcmNotificationInterface : NotificationInterface {
     init {
         NotificationSettings.register("fcm") {
-            assert(it.credentials != null) { "FCM was selected for notification implementation, but no credential file was provided." }
-            val file = File(it.credentials!!)
-            assert(file.exists()) { "FCM credentials file not found at '$file'" }
+            var creds = it.credentials?.trim() ?: throw IllegalStateException("FCM was selected for notification implementation, but no credential file was provided.")
+            if(!creds.startsWith('{')) {
+                val file = File(creds)
+                assert(file.exists()) { "FCM credentials file not found at '$file'" }
+                creds = file.readText()
+            }
             FirebaseApp.initializeApp(
                 FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(file.inputStream()))
+                    .setCredentials(GoogleCredentials.fromStream(creds.byteInputStream()))
                     .build()
             )
             FcmNotificationInterface
