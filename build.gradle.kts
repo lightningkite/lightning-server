@@ -12,7 +12,7 @@ buildscript {
     }
     dependencies {
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
-        classpath("org.jetbrains.dokka:dokka-gradle-plugin:1.6.21")
+        classpath("org.jetbrains.dokka:dokka-gradle-plugin:1.7.10")
         classpath("com.lightningkite:deploy-helpers:0.0.5")
         classpath("com.lightningkite.khrysalis:plugin:$khrysalisVersion")
     }

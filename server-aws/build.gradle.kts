@@ -15,7 +15,7 @@ plugins {
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
 val coroutines: String by project
-val awsVersion = "2.17.261"
+val awsVersion = "2.17.276"
 dependencies {
     api(project(":server-dynamodb"))
     api(project(":server-core"))
