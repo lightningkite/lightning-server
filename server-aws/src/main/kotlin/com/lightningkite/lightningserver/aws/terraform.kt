@@ -123,13 +123,17 @@ private fun handlers() {
                     "cors",
                     "object({ allowedDomains = list(string), allowedHeaders = list(string) })",
                     "null"
+                ),
+                inputString(
+                    "display_name",
+                    projectName
                 )
             )
         },
         settingOutput = {
             """
             {
-                projectName = "$projectName"
+                projectName = var.display_name
                 publicUrl = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
                 wsUrl = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
                 debug = var.debug

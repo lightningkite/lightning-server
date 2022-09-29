@@ -64,6 +64,7 @@ import java.util.*
 abstract class AwsAdapter : RequestStreamHandler {
     @Serializable
     data class TaskInvoke(val taskName: String, val input: String)
+
     @Serializable
     data class Scheduled(val scheduled: String)
 
@@ -72,7 +73,13 @@ abstract class AwsAdapter : RequestStreamHandler {
         val region by lazy { Region.of(System.getenv("AWS_REGION")) }
         val httpMatcher by lazy { HttpEndpointMatcher(Http.endpoints.keys.asSequence()) }
         val wsMatcher by lazy { ServerPathMatcher(WebSockets.handlers.keys.asSequence()) }
-        private val wsCache by lazy { DynamoDbCache(DynamoDbAsyncClient.builder().region(region).build(), "${generalSettings().projectName.filter { it.isLetter() }}WsCache") }
+        private val wsCache by lazy {
+            DynamoDbCache(
+                DynamoDbAsyncClient.builder().region(region).build(),
+                "${generalSettings().projectName.filter { it.isLetter() }}WsCache"
+            )
+        }
+
         fun cache() = wsCache
         val configureEngine by lazy {
             engine = object : Engine {
@@ -131,7 +138,7 @@ abstract class AwsAdapter : RequestStreamHandler {
                             }
                         }
                         return true
-                    } catch(e: GoneException) {
+                    } catch (e: GoneException) {
                         return false
                     }
                 }
@@ -194,10 +201,14 @@ abstract class AwsAdapter : RequestStreamHandler {
 
                     asJson.containsKey("scheduled") -> {
                         val parsed: Scheduled = Serialization.json.decodeFromJsonElement(asJson)
-                        val schedule = Scheduler.schedules[parsed.scheduled] ?: return@runBlocking APIGatewayV2HTTPResponse(statusCode = 404, body = "No schedule '${parsed.scheduled}' found")
+                        val schedule =
+                            Scheduler.schedules[parsed.scheduled] ?: return@runBlocking APIGatewayV2HTTPResponse(
+                                statusCode = 404,
+                                body = "No schedule '${parsed.scheduled}' found"
+                            )
                         try {
                             schedule.handler()
-                        } catch(e: Exception) {
+                        } catch (e: Exception) {
                             e.report(schedule)
                             APIGatewayV2HTTPResponse(statusCode = 500)
                         }
@@ -211,6 +222,7 @@ abstract class AwsAdapter : RequestStreamHandler {
             } catch (e: Exception) {
                 println("Input $asJson had trouble")
                 e.printStackTrace()
+                e.report(asJson)
             }
         }
     }
@@ -254,7 +266,12 @@ abstract class AwsAdapter : RequestStreamHandler {
                 val isMultiplex = path.isEmpty() || path.trim('/') == "multiplex"
                 cache().set("${event.requestContext.connectionId}-isMultiplex", isMultiplex)
                 if (isMultiplex) APIGatewayV2HTTPResponse(200)
-                else handleWebsocketConnect(event, event.requestContext.connectionId, path, event.multiValueQueryStringParameters ?: mapOf())
+                else handleWebsocketConnect(
+                    event,
+                    event.requestContext.connectionId,
+                    path,
+                    event.multiValueQueryStringParameters ?: mapOf()
+                )
             }
 
             "\$disconnect" -> {
@@ -270,7 +287,7 @@ abstract class AwsAdapter : RequestStreamHandler {
             else -> if (body == null || body.length == 0L)
                 return APIGatewayV2HTTPResponse(200)
             else if (isMultiplex()) {
-                if(event.body.isBlank()) {
+                if (event.body.isBlank()) {
                     WebSockets.send(event.requestContext.connectionId, "")
                     return APIGatewayV2HTTPResponse(200)
                 }
@@ -278,7 +295,12 @@ abstract class AwsAdapter : RequestStreamHandler {
                 val cacheId = event.requestContext.connectionId + "/" + message.channel
                 when {
                     message.start -> {
-                        handleWebsocketConnect(event, cacheId, message.path!!, message.queryParams ?: mapOf()).also {
+                        handleWebsocketConnect(
+                            event,
+                            cacheId,
+                            message.path!!,
+                            message.queryParams ?: mapOf()
+                        ).also {
                             if (it.statusCode == 200) {
                                 cache().modify<Set<String>>(event.requestContext.connectionId, 40) {
                                     it?.plus(message.channel) ?: setOf(message.channel)
@@ -306,7 +328,7 @@ abstract class AwsAdapter : RequestStreamHandler {
         event: APIGatewayV2WebsocketRequest,
         cacheId: String,
         path: String,
-        queryParams: Map<String, List<String>>
+        queryParams: Map<String, List<String>>,
     ): APIGatewayV2HTTPResponse {
         logger.debug("Connecting $cacheId")
         val match = wsMatcher.match(path)
@@ -344,7 +366,7 @@ abstract class AwsAdapter : RequestStreamHandler {
         logger.debug("Handling message $content to $cacheId")
         val path = cache().get<String>(cacheId) ?: run {
             logger.warn("cache has no id $cacheId")
-             return APIGatewayV2HTTPResponse(400)
+            return APIGatewayV2HTTPResponse(400)
         }
         // Reset the cache so it endures longer
         cache().set(cacheId, path, Duration.ofHours(1))
@@ -370,7 +392,7 @@ abstract class AwsAdapter : RequestStreamHandler {
         logger.debug("Disconnecting $cacheId")
         val path = cache().get<String>(cacheId) ?: run {
             logger.warn("cache has no id $cacheId")
-             return APIGatewayV2HTTPResponse(400)
+            return APIGatewayV2HTTPResponse(400)
         }
         // Reset the cache so it endures longer
         cache().set(cacheId, path, Duration.ofHours(1))
@@ -409,7 +431,7 @@ abstract class AwsAdapter : RequestStreamHandler {
             (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v } }
 
         val match = httpMatcher.match(path, method) ?: run {
-            if(method == HttpMethod.OPTIONS) {
+            if (method == HttpMethod.OPTIONS) {
                 val origin = headers[HttpHeader.Origin] ?: return APIGatewayV2HTTPResponse(
                     statusCode = 404,
                     body = "No matching path for '${path}' found"
@@ -418,7 +440,7 @@ abstract class AwsAdapter : RequestStreamHandler {
                 val matches = cors.allowedDomains.any {
                     it == "*" || it == origin || origin.endsWith(it.removePrefix("*"))
                 }
-                if(matches) {
+                if (matches) {
                     return APIGatewayV2HTTPResponse(
                         statusCode = HttpStatus.NoContent.code,
                         headers = mapOf(

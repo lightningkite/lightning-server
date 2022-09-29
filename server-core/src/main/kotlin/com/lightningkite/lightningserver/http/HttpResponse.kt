@@ -50,7 +50,7 @@ data class HttpResponse(
             headers: HttpHeaders.Builder.()->Unit = {},
             content: String
         ) = HttpResponse(
-            body = HttpContent.Text(content, ContentType.Text.Plain),
+            body = HttpContent.Text(content, ContentType.Text.Html),
             status = status,
             headers = headers
         )

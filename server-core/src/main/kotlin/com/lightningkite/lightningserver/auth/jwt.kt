@@ -11,10 +11,17 @@ import kotlinx.serialization.descriptors.getContextualDescriptor
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import org.bouncycastle.asn1.ASN1InputStream
+import org.bouncycastle.asn1.ASN1Integer
+import org.bouncycastle.asn1.ASN1OutputStream
+import org.bouncycastle.asn1.ASN1Sequence
+import org.bouncycastle.asn1.DERSequence
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.openssl.PEMParser
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
+import java.io.ByteArrayOutputStream
 import java.io.StringReader
+import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.Signature
 import java.security.interfaces.ECPrivateKey
@@ -62,17 +69,44 @@ interface SecureHasher {
             PKCS8EncodedKeySpec(Base64.getDecoder().decode(privateKey.filter { !it.isWhitespace() }))
         )
 
+//        override fun sign(bytes: ByteArray): ByteArray {
+//            return Signature.getInstance("NONEwithECDSA").apply {
+//                initSign(pk)
+//                update(bytes)
+//            }.sign()
+//        }
+//
+//        override fun verify(bytes: ByteArray, signature: ByteArray): Boolean {
+//            return Signature.getInstance("NONEwithECDSA").apply {
+//                update(bytes)
+//            }.verify(signature)
+//        }
         override fun sign(bytes: ByteArray): ByteArray {
-            return Signature.getInstance("SHA1withECDSA").apply {
+            return Signature.getInstance("SHA256withECDSA").apply {
                 initSign(pk)
                 update(bytes)
-            }.sign()
+            }.sign().let {
+                val seq = ASN1InputStream(it).use {
+                    (it.readObject() as ASN1Sequence).toArray()
+                }
+                (seq[0] as ASN1Integer).positiveValue.toByteArray() + (seq[1] as ASN1Integer).positiveValue.toByteArray()
+            }
         }
 
         override fun verify(bytes: ByteArray, signature: ByteArray): Boolean {
-            return Signature.getInstance("SHA1withECDSA").apply {
+            return Signature.getInstance("SHA256withECDSA").apply {
                 initSign(pk)
-                update(bytes)
+                val b = ByteArrayOutputStream()
+                val o = ASN1OutputStream.create(b)
+                try {
+                    o.writeObject(DERSequence(arrayOf(
+                        ASN1Integer(BigInteger(1, bytes.copyOfRange(0, 32))),
+                        ASN1Integer(BigInteger(1, bytes.copyOfRange(32, 64))),
+                    )))
+                } finally {
+                    o.close()
+                }
+                update(b.toByteArray())
             }.verify(signature)
         }
     }
