@@ -39,9 +39,6 @@ class MongoDatabase(val database: CoroutineDatabase) : Database {
                     MongoClientSettings.builder()
                         .applyConnectionString(ConnectionString(it.url))
                         .uuidRepresentation(UuidRepresentation.STANDARD)
-                        .applyToSocketSettings {
-                            it.connectTimeout()
-                        }
                         .build()
                 ).database(it.databaseName)
             }
