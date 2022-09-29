@@ -29,9 +29,9 @@ abstract class OauthEndpoints(
     @Serializable
     data class OauthResponse(
         val access_token: String,
-        val scope: String,
+        val scope: String = "",
         val token_type: String = "Bearer",
-        val id_token: String? = null
+        val id_token: String? = null,
     )
 
     protected abstract val niceName: String

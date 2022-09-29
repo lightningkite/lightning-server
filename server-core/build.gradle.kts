@@ -45,7 +45,7 @@ dependencies {
     api("io.ktor:ktor-serialization-kotlinx-cbor:$ktorVersion")
     api("de.brudaswen.kotlinx.serialization:kotlinx-serialization-csv:2.0.0")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
-    api("io.github.pdvrieze.xmlutil:serialization-jvm:0.84.2")
+    api("io.github.pdvrieze.xmlutil:serialization-jvm:0.84.3")
     api("com.github.jershell:kbson:0.4.5")
 
     implementation("org.bouncycastle:bcprov-jdk18on:1.71.1")

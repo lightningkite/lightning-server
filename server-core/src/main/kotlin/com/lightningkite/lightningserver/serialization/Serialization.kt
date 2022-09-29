@@ -18,7 +18,9 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.overwriteWith
 import kotlinx.serialization.modules.serializersModuleOf
 import kotlinx.serialization.properties.Properties
-import nl.adaptivity.xmlutil.serialization.XML
+import nl.adaptivity.xmlutil.XMLConstants
+import nl.adaptivity.xmlutil.XmlDeclMode
+import nl.adaptivity.xmlutil.serialization.*
 
 /**
  * A place to hold all the support Serialization types.
@@ -51,6 +53,11 @@ abstract class Serialization {
     }
     var xml: XML by SetOnce {
         XML(module) {
+            this.unknownChildHandler = UnknownChildHandler { input, inputKind, descriptor, name, candidates ->
+                emptyList()
+            }
+            this.xmlDeclMode = XmlDeclMode.Auto
+            this.repairNamespaces = true
         }
     }
     var cbor: Cbor by SetOnce {
