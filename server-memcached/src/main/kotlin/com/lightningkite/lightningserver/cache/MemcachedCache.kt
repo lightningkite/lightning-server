@@ -12,7 +12,7 @@ import java.net.InetSocketAddress
 import java.time.Duration
 
 
-class MemcachedCache(val client: MemcachedClient): CacheInterface, HealthCheckable {
+class MemcachedCache(val client: MemcachedClient) : CacheInterface, HealthCheckable {
     companion object {
         init {
             CacheSettings.register("memcached-test") {
@@ -24,7 +24,12 @@ class MemcachedCache(val client: MemcachedClient): CacheInterface, HealthCheckab
             }
             CacheSettings.register("memcached") {
                 val hosts = it.url.substringAfter("://").split(' ', ',').filter { it.isNotBlank() }
-                    .map { InetSocketAddress(it.substringBefore(':'), it.substringAfter(':', "").toIntOrNull() ?: 11211) }
+                    .map {
+                        InetSocketAddress(
+                            it.substringBefore(':'),
+                            it.substringAfter(':', "").toIntOrNull() ?: 11211
+                        )
+                    }
                 MemcachedCache(XMemcachedClient(hosts))
             }
             CacheSettings.register("memcached-aws") {
@@ -42,21 +47,37 @@ class MemcachedCache(val client: MemcachedClient): CacheInterface, HealthCheckab
         }
     }
 
-    override suspend fun <T> set(key: String, value: T, serializer: KSerializer<T>, timeToLive: Duration?) = withContext(Dispatchers.IO) {
-        val succeed = client.set(key, timeToLive?.toSeconds()?.toInt() ?: Int.MAX_VALUE, Serialization.Internal.json.encodeToString(serializer, value))
-        Unit
-    }
+    override suspend fun <T> set(key: String, value: T, serializer: KSerializer<T>, timeToLive: Duration?) =
+        withContext(Dispatchers.IO) {
+            val succeed = client.set(
+                key,
+                timeToLive?.toSeconds()?.toInt() ?: Int.MAX_VALUE,
+                Serialization.Internal.json.encodeToString(serializer, value)
+            )
+            Unit
+        }
 
     override suspend fun <T> setIfNotExists(
         key: String,
         value: T,
-        serializer: KSerializer<T>
+        serializer: KSerializer<T>,
+        timeToLive: Duration?,
     ): Boolean = withContext(Dispatchers.IO) {
-        client.add(key, Int.MAX_VALUE, Serialization.Internal.json.encodeToString(serializer, value))
+        client.add(
+            key,
+            timeToLive?.toSeconds()?.toInt() ?: Int.MAX_VALUE,
+            Serialization.Internal.json.encodeToString(serializer, value)
+        )
     }
 
-    override suspend fun <T> modify(key: String, serializer: KSerializer<T>, maxTries: Int, modification: (T?) -> T?): Boolean = withContext(Dispatchers.IO) {
-        client.cas(key, Int.MAX_VALUE, object: CASOperation<String> {
+    override suspend fun <T> modify(
+        key: String,
+        serializer: KSerializer<T>,
+        maxTries: Int,
+        timeToLive: Duration?,
+        modification: (T?) -> T?,
+    ): Boolean = withContext(Dispatchers.IO) {
+        client.cas(key, timeToLive?.toSeconds()?.toInt() ?: Int.MAX_VALUE, object : CASOperation<String> {
             override fun getMaxTries(): Int = maxTries
             override fun getNewValue(currentCAS: Long, currentValue: String?): String? {
                 return currentValue?.let { Serialization.Internal.json.decodeFromString(serializer, it) }
@@ -66,8 +87,11 @@ class MemcachedCache(val client: MemcachedClient): CacheInterface, HealthCheckab
         })
     }
 
-    override suspend fun add(key: String, value: Int) = withContext(Dispatchers.IO) {
+    override suspend fun add(key: String, value: Int, timeToLive: Duration?) = withContext(Dispatchers.IO) {
         client.incr(key, value.toLong())
+        timeToLive?.let {
+            //TODO
+        }
         Unit
     }
 
@@ -86,13 +110,21 @@ class MemcachedCache(val client: MemcachedClient): CacheInterface, HealthCheckab
             val used = allEntries["bytes"]?.toLong() ?: 0L
             val available = allEntries["limit_maxbytes"]?.toLong() ?: (1024L * 1024L * 1024L)
             val ratio = used.toDouble() / available.toDouble()
-            return@withContext when(ratio) {
-                in 0.75..0.85 -> HealthStatus(HealthStatus.Level.WARNING, additionalMessage = "${ratio.times(100).toInt()}%")
-                in 0.85..0.9999999 -> HealthStatus(HealthStatus.Level.URGENT, additionalMessage = "${ratio.times(100).toInt()}%")
+            return@withContext when (ratio) {
+                in 0.75..0.85 -> HealthStatus(
+                    HealthStatus.Level.WARNING,
+                    additionalMessage = "${ratio.times(100).toInt()}%"
+                )
+
+                in 0.85..0.9999999 -> HealthStatus(
+                    HealthStatus.Level.URGENT,
+                    additionalMessage = "${ratio.times(100).toInt()}%"
+                )
+
                 1.0 -> HealthStatus(HealthStatus.Level.ERROR, additionalMessage = "Memory is full!")
                 else -> HealthStatus(HealthStatus.Level.OK, additionalMessage = "${ratio.times(100).toInt()}%")
             }
-        } catch(e: Exception) {
+        } catch (e: Exception) {
             return@withContext HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
         }
     }

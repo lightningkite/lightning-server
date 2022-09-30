@@ -76,7 +76,7 @@ abstract class AwsAdapter : RequestStreamHandler {
         private val wsCache by lazy {
             DynamoDbCache(
                 DynamoDbAsyncClient.builder().region(region).build(),
-                "${generalSettings().projectName.filter { it.isLetter() }}WsCache"
+                generalSettings().wsUrl.substringAfter("://").filter { it.isLetterOrDigit() || it == '_' || it == '.' || it == '-' }
             )
         }
 
@@ -264,7 +264,7 @@ abstract class AwsAdapter : RequestStreamHandler {
             "\$connect" -> {
                 val path = headers["x-path"] ?: queryParams.find { it.first == "path" }?.second ?: ""
                 val isMultiplex = path.isEmpty() || path.trim('/') == "multiplex"
-                cache().set("${event.requestContext.connectionId}-isMultiplex", isMultiplex)
+                cache().set("${event.requestContext.connectionId}-isMultiplex", isMultiplex, Duration.ofHours(8))
                 if (isMultiplex) APIGatewayV2HTTPResponse(200)
                 else handleWebsocketConnect(
                     event,
@@ -275,11 +275,13 @@ abstract class AwsAdapter : RequestStreamHandler {
             }
 
             "\$disconnect" -> {
+                val isMultiplex = isMultiplex()
                 cache().remove("${event.requestContext.connectionId}-isMultiplex")
-                if (isMultiplex()) {
+                if (isMultiplex) {
                     cache().get<Set<String>>(event.requestContext.connectionId)?.forEach {
                         handleWebsocketDisconnect(event.requestContext.connectionId + "/" + it)
                     }
+                    cache().remove(event.requestContext.connectionId)
                     APIGatewayV2HTTPResponse(200)
                 } else handleWebsocketDisconnect(event.requestContext.connectionId)
             }
@@ -302,7 +304,7 @@ abstract class AwsAdapter : RequestStreamHandler {
                             message.queryParams ?: mapOf()
                         ).also {
                             if (it.statusCode == 200) {
-                                cache().modify<Set<String>>(event.requestContext.connectionId, 40) {
+                                cache().modify<Set<String>>(event.requestContext.connectionId, 40, timeToLive = Duration.ofHours(8)) {
                                     it?.plus(message.channel) ?: setOf(message.channel)
                                 }
                             }
@@ -310,7 +312,7 @@ abstract class AwsAdapter : RequestStreamHandler {
                     }
 
                     message.end -> {
-                        cache().modify<Set<String>>(event.requestContext.connectionId, 40) {
+                        cache().modify<Set<String>>(event.requestContext.connectionId, 40, timeToLive = Duration.ofHours(8)) {
                             it?.minus(message.channel) ?: setOf(message.channel)
                         }
                         handleWebsocketDisconnect(cacheId)

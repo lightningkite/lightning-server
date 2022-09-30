@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.cache
 
 import com.lightningkite.lightningserver.serialization.Serialization
+import io.lettuce.core.GetExArgs
 import io.lettuce.core.RedisClient
 import io.lettuce.core.ScriptOutputType
 import io.lettuce.core.SetArgs
@@ -54,9 +55,12 @@ class RedisCache(val client: RedisClient) : CacheInterface {
     override suspend fun <T> setIfNotExists(
         key: String,
         value: T,
-        serializer: KSerializer<T>
+        serializer: KSerializer<T>,
+        timeToLive: Duration?
     ): Boolean {
-        return connection.setnx(key, Serialization.Internal.json.encodeToString(serializer, value)).awaitFirst()
+        val result = connection.setnx(key, Serialization.Internal.json.encodeToString(serializer, value)).awaitFirst()
+        if(result) timeToLive?.let { connection.getex(key, GetExArgs().ex(it)) }
+        return result
     }
 
 //    val cas = connection.scriptLoad(
@@ -89,8 +93,9 @@ class RedisCache(val client: RedisClient) : CacheInterface {
 //        return false
 //    }
 
-    override suspend fun add(key: String, value: Int) {
+    override suspend fun add(key: String, value: Int, timeToLive: Duration?) {
         connection.incrby(key, value.toLong()).collect { }
+        timeToLive?.let { connection.getex(key, GetExArgs().ex(it)) }
     }
 
     override suspend fun clear() {

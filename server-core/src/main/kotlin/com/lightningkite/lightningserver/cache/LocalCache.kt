@@ -22,16 +22,17 @@ object LocalCache: CacheInterface {
     override suspend fun <T> setIfNotExists(
         key: String,
         value: T,
-        serializer: KSerializer<T>
+        serializer: KSerializer<T>,
+        timeToLive: Duration?
     ): Boolean {
         if(entries[key] == null) {
-            entries[key] = Entry(value, null)
+            entries[key] = Entry(value, timeToLive?.toMillis()?.let { System.currentTimeMillis() + it })
             return true
         }
         return false
     }
 
-    override suspend fun add(key: String, value: Int) {
+    override suspend fun add(key: String, value: Int, timeToLive: Duration?) {
         val entry = entries[key]?.takeIf { it.expires == null || it.expires > System.currentTimeMillis() }
         val current = entry?.value
         val new = when(current) {
@@ -43,7 +44,7 @@ object LocalCache: CacheInterface {
             is Double -> (current + value)
             else -> value
         }
-        entries[key] = Entry(new, entry?.expires)
+        entries[key] = Entry(new, timeToLive?.toMillis()?.let { System.currentTimeMillis() + it })
     }
 
     override suspend fun clear() {
