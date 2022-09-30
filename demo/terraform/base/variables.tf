@@ -16,6 +16,10 @@ variable "lambda_in_vpc" {
     type = bool
     default = true
 }
+variable "ip_prefix" {
+    type = string
+    default = "10.0"
+}
 
 ##########
 # general
@@ -23,6 +27,10 @@ variable "lambda_in_vpc" {
 variable "cors" {
     type = object({ allowedDomains = list(string), allowedHeaders = list(string) })
     default = null
+}
+variable "display_name" {
+    type = string
+    default = "demo"
 }
 
 ##########

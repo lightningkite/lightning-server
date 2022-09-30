@@ -27,8 +27,10 @@ module "Base" {
   deployment_name = var.deployment_name
   debug = var.debug
   lambda_in_vpc = var.lambda_in_vpc
+  ip_prefix = var.ip_prefix
   # general
   cors = var.cors
+  display_name = var.display_name
   # database
   database_org_id = var.database_org_id
   # jwt

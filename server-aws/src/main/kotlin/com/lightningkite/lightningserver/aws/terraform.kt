@@ -38,7 +38,7 @@ private data class TerraformSection(
     val providers: List<TerraformProvider> = listOf(TerraformProvider.aws, TerraformProvider.random, TerraformProvider.archive),
     val inputs: List<TerraformInput> = listOf(),
     val resources: String? = null,
-    val toLightningServer: String? = null,
+    val toLightningServer: Map<String, String>? = null,
     val outputs: List<TerraformOutput> = listOf(),
     val domainOverride: TerraformSituationOverride = TerraformSituationOverride(),
     val noDomainOverride: TerraformSituationOverride = TerraformSituationOverride(),
@@ -63,7 +63,7 @@ private data class TerraformSection(
                     providers = providers,
                     inputs = inputs(this, it),
                     resources = resources(this, it),
-                    toLightningServer = it + " = " + settingOutput(this, it),
+                    toLightningServer = mapOf(it to settingOutput(this, it)),
                     outputs = listOf(),
                     domainOverride = domainOverride?.invoke(this, it) ?: TerraformSituationOverride(),
                     noDomainOverride = noDomainOverride?.invoke(this, it) ?: TerraformSituationOverride()
@@ -80,7 +80,7 @@ private data class TerraformSection(
                     setting.default.let { Serialization.Internal.json.encodeToString(setting.serializer, it) })
             ),
             resources = null,
-            toLightningServer = "${setting.name} = var.${setting.name}"
+            toLightningServer = mapOf(setting.name to "var.${setting.name}")
         )
 
         fun inputString(name: String, default: String?) = TerraformInput(name, "string", default?.let { "\"$it\"" })
@@ -667,17 +667,18 @@ private fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(projectI
             TerraformSection.inputString("deployment_name", null),
             TerraformSection.inputBoolean("debug", false),
             TerraformSection.inputBoolean("lambda_in_vpc", true),
+            TerraformSection.inputString("ip_prefix", "10.0"),
         ),
         resources = """
         module "vpc" {
           source = "terraform-aws-modules/vpc/aws"
         
           name = "$namePrefix"
-          cidr = "10.0.0.0/16"
+          cidr = "${'$'}{var.ip_prefix}.0.0/16"
         
           azs             = ["${'$'}{var.deployment_location}a", "${'$'}{var.deployment_location}b", "${'$'}{var.deployment_location}c"]
-          private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-          public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+          private_subnets = ["${'$'}{var.ip_prefix}.1.0/24", "${'$'}{var.ip_prefix}.2.0/24", "${'$'}{var.ip_prefix}.3.0/24"]
+          public_subnets  = ["${'$'}{var.ip_prefix}.101.0/24", "${'$'}{var.ip_prefix}.102.0/24", "${'$'}{var.ip_prefix}.103.0/24"]
         
           enable_nat_gateway = var.lambda_in_vpc
           single_nat_gateway = true
@@ -1002,9 +1003,7 @@ private fun awsMainAppHandler(projectInfo: TerraformProjectInfo, handlerFqn: Str
           
           environment {
             variables = {
-              LIGHTNING_SERVER_SETTINGS = jsonencode({
-                ${otherSections.mapNotNull { it.toLightningServer }.joinToString(",\n")}
-              })
+              ${otherSections.mapNotNull { it.toLightningServer }.flatMap { it.entries }.map { "LIGHTNING_SERVER_SETTINGS_${it.key} = jsonencode(${it.value})" }.joinToString("\n              ")}
             }
           }
           

@@ -1,19 +1,19 @@
 terraform {
   required_providers {
     aws = {
-      source = "hashicorp/aws"
+      source  = "hashicorp/aws"
       version = "~> 4.30"
     }
     random = {
-      source = "hashicorp/random"
+      source  = "hashicorp/random"
       version = "~> 3.1.0"
     }
     archive = {
-      source = "hashicorp/archive"
+      source  = "hashicorp/archive"
       version = "~> 2.2.0"
     }
     mongodbatlas = {
-      source = "mongodb/mongodbatlas"
+      source  = "mongodb/mongodbatlas"
       version = "~> 1.4"
     }
   }
@@ -27,35 +27,35 @@ module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
 
   name = "demo-${var.deployment_name}"
-  cidr = "10.0.0.0/16"
+  cidr = "${var.ip_prefix}.0.0/16"
 
   azs             = ["${var.deployment_location}a", "${var.deployment_location}b", "${var.deployment_location}c"]
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+  private_subnets = ["${var.ip_prefix}.1.0/24", "${var.ip_prefix}.2.0/24", "${var.ip_prefix}.3.0/24"]
+  public_subnets  = ["${var.ip_prefix}.101.0/24", "${var.ip_prefix}.102.0/24", "${var.ip_prefix}.103.0/24"]
 
-  enable_nat_gateway = var.lambda_in_vpc
-  single_nat_gateway = true
-  enable_vpn_gateway = false
+  enable_nat_gateway   = var.lambda_in_vpc
+  single_nat_gateway   = true
+  enable_vpn_gateway   = false
   enable_dns_hostnames = !var.lambda_in_vpc
   enable_dns_support   = true
 }
 
 resource "aws_vpc_endpoint" "s3" {
-  vpc_id = module.vpc.vpc_id
-  service_name = "com.amazonaws.${var.deployment_location}.s3"
+  vpc_id          = module.vpc.vpc_id
+  service_name    = "com.amazonaws.${var.deployment_location}.s3"
   route_table_ids = module.vpc.public_route_table_ids
 }
 resource "aws_vpc_endpoint" "executeapi" {
-  vpc_id = module.vpc.vpc_id
-  service_name = "com.amazonaws.${var.deployment_location}.execute-api"
+  vpc_id             = module.vpc.vpc_id
+  service_name       = "com.amazonaws.${var.deployment_location}.execute-api"
   security_group_ids = [aws_security_group.executeapi.id]
-  vpc_endpoint_type = "Interface"
+  vpc_endpoint_type  = "Interface"
 }
 resource "aws_vpc_endpoint" "lambdainvoke" {
-  vpc_id = module.vpc.vpc_id
-  service_name = "com.amazonaws.${var.deployment_location}.lambda"
+  vpc_id             = module.vpc.vpc_id
+  service_name       = "com.amazonaws.${var.deployment_location}.lambda"
   security_group_ids = [aws_security_group.lambdainvoke.id]
-  vpc_endpoint_type = "Interface"
+  vpc_endpoint_type  = "Interface"
 }
 
 resource "aws_api_gateway_account" "main" {
@@ -115,14 +115,18 @@ resource "aws_security_group" "internal" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.lambda_in_vpc ? [] : ["0.0.0.0/0"])
+    cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.lambda_in_vpc ? [] : [
+      "0.0.0.0/0"
+    ])
   }
 
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.lambda_in_vpc ? [] : ["0.0.0.0/0"])
+    cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, var.lambda_in_vpc ? [] : [
+      "0.0.0.0/0"
+    ])
   }
 }
 
@@ -134,7 +138,7 @@ resource "aws_security_group" "access_outside" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks     = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
@@ -168,7 +172,7 @@ resource "aws_security_group" "lambdainvoke" {
 resource "mongodbatlas_project" "database" {
   name   = "demo${var.deployment_name}database"
   org_id = var.database_org_id
-  
+
   is_collect_database_specifics_statistics_enabled = true
   is_data_explorer_enabled                         = true
   is_performance_advisor_enabled                   = true
@@ -176,7 +180,7 @@ resource "mongodbatlas_project" "database" {
   is_schema_advisor_enabled                        = true
 }
 resource "mongodbatlas_project_ip_access_list" "database" {
-  project_id   = mongodbatlas_project.database.id
+  project_id = mongodbatlas_project.database.id
   cidr_block = "0.0.0.0/0"
   comment    = "Anywhere"
 }
@@ -186,12 +190,12 @@ resource "random_password" "database" {
   override_special = "-_"
 }
 resource "mongodbatlas_serverless_instance" "database" {
-  project_id   = mongodbatlas_project.database.id
-  name         = "demo${var.deployment_name}database"
+  project_id = mongodbatlas_project.database.id
+  name       = "demo${var.deployment_name}database"
 
   provider_settings_backing_provider_name = "AWS"
-  provider_settings_provider_name = "SERVERLESS"
-  provider_settings_region_name = replace(upper(var.deployment_location), "-", "_")
+  provider_settings_provider_name         = "SERVERLESS"
+  provider_settings_region_name           = replace(upper(var.deployment_location), "-", "_")
 }
 resource "mongodbatlas_database_user" "database" {
   username           = "demo${var.deployment_name}database-main"
@@ -253,10 +257,10 @@ resource "aws_s3_bucket_acl" "files" {
 }
 resource "aws_iam_policy" "files" {
   name        = "demo-${var.deployment_name}-files"
-  path = "/demo/${var.deployment_name}/files/"
+  path        = "/demo/${var.deployment_name}/files/"
   description = "Access to the demo-${var.deployment_name}_files bucket"
-  policy = jsonencode({
-    Version = "2012-10-17"
+  policy      = jsonencode({
+    Version   = "2012-10-17"
     Statement = [
       {
         Action = [
@@ -264,8 +268,8 @@ resource "aws_iam_policy" "files" {
         ]
         Effect   = "Allow"
         Resource = [
-            "${aws_s3_bucket.files.arn}",
-            "${aws_s3_bucket.files.arn}/*",
+          "${aws_s3_bucket.files.arn}",
+          "${aws_s3_bucket.files.arn}/*",
         ]
       },
     ]
@@ -295,7 +299,7 @@ data "aws_iam_policy_document" "email" {
 }
 
 resource "aws_iam_policy" "email" {
-  name = "demo-${var.deployment_name}-email-policy"
+  name        = "demo-${var.deployment_name}-email-policy"
   description = "Allows sending of e-mails via Simple Email Service"
   policy      = data.aws_iam_policy_document.email.json
 }
@@ -317,10 +321,10 @@ resource "aws_security_group" "email" {
   }
 }
 resource "aws_vpc_endpoint" "email" {
-  vpc_id = module.vpc.vpc_id
-  service_name = "com.amazonaws.${var.deployment_location}.email-smtp"
+  vpc_id             = module.vpc.vpc_id
+  service_name       = "com.amazonaws.${var.deployment_location}.email-smtp"
   security_group_ids = [aws_security_group.email.id]
-  vpc_endpoint_type = "Interface"
+  vpc_endpoint_type  = "Interface"
 }
 
 ##########
@@ -331,14 +335,14 @@ variable "public_http_url" {
   default = null
 }
 resource "aws_apigatewayv2_api" "http" {
-  name = "demo-${var.deployment_name}-http"
+  name          = "demo-${var.deployment_name}-http"
   protocol_type = "HTTP"
 }
 
 resource "aws_apigatewayv2_stage" "http" {
   api_id = aws_apigatewayv2_api.http.id
 
-  name = "demo-${var.deployment_name}-gateway-stage"
+  name        = "demo-${var.deployment_name}-gateway-stage"
   auto_deploy = true
 
   access_log_settings {
@@ -355,7 +359,7 @@ resource "aws_apigatewayv2_stage" "http" {
       status                  = "$context.status"
       responseLength          = "$context.responseLength"
       integrationErrorMessage = "$context.integrationErrorMessage"
-      }
+    }
     )
   }
 }
@@ -375,9 +379,9 @@ resource "aws_cloudwatch_log_group" "http_api" {
 }
 
 resource "aws_apigatewayv2_route" "http" {
-    api_id = aws_apigatewayv2_api.http.id
-    route_key = "$default"
-    target    = "integrations/${aws_apigatewayv2_integration.http.id}"
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "$default"
+  target    = "integrations/${aws_apigatewayv2_integration.http.id}"
 }
 
 resource "aws_lambda_permission" "api_gateway_http" {
@@ -397,15 +401,15 @@ variable "public_ws_url" {
 }
 
 resource "aws_apigatewayv2_api" "ws" {
-  name = "demo-${var.deployment_name}-gateway"
-  protocol_type = "WEBSOCKET"
+  name                       = "demo-${var.deployment_name}-gateway"
+  protocol_type              = "WEBSOCKET"
   route_selection_expression = "constant"
 }
 
 resource "aws_apigatewayv2_stage" "ws" {
   api_id = aws_apigatewayv2_api.ws.id
 
-  name = "demo-${var.deployment_name}-gateway-stage"
+  name        = "demo-${var.deployment_name}-gateway-stage"
   auto_deploy = true
 
   access_log_settings {
@@ -422,7 +426,7 @@ resource "aws_apigatewayv2_stage" "ws" {
       status                  = "$context.status"
       responseLength          = "$context.responseLength"
       integrationErrorMessage = "$context.integrationErrorMessage"
-      }
+    }
     )
   }
 }
@@ -442,22 +446,22 @@ resource "aws_cloudwatch_log_group" "ws_api" {
 }
 
 resource "aws_apigatewayv2_route" "ws_connect" {
-    api_id = aws_apigatewayv2_api.ws.id
+  api_id = aws_apigatewayv2_api.ws.id
 
-    route_key = "$connect"
-    target    = "integrations/${aws_apigatewayv2_integration.ws.id}"
+  route_key = "$connect"
+  target    = "integrations/${aws_apigatewayv2_integration.ws.id}"
 }
 resource "aws_apigatewayv2_route" "ws_default" {
-    api_id = aws_apigatewayv2_api.ws.id
+  api_id = aws_apigatewayv2_api.ws.id
 
-    route_key = "$default"
-    target    = "integrations/${aws_apigatewayv2_integration.ws.id}"
+  route_key = "$default"
+  target    = "integrations/${aws_apigatewayv2_integration.ws.id}"
 }
 resource "aws_apigatewayv2_route" "ws_disconnect" {
-    api_id = aws_apigatewayv2_api.ws.id
+  api_id = aws_apigatewayv2_api.ws.id
 
-    route_key = "$disconnect"
-    target    = "integrations/${aws_apigatewayv2_integration.ws.id}"
+  route_key = "$disconnect"
+  target    = "integrations/${aws_apigatewayv2_integration.ws.id}"
 }
 
 resource "aws_lambda_permission" "api_gateway_ws" {
@@ -471,10 +475,10 @@ resource "aws_lambda_permission" "api_gateway_ws" {
 
 resource "aws_iam_policy" "api_gateway_ws" {
   name        = "demo-${var.deployment_name}-api_gateway_ws"
-  path = "/demo/${var.deployment_name}/api_gateway_ws/"
+  path        = "/demo/${var.deployment_name}/api_gateway_ws/"
   description = "Access to the demo-${var.deployment_name}_api_gateway_ws management"
-  policy = jsonencode({
-    Version = "2012-10-17"
+  policy      = jsonencode({
+    Version   = "2012-10-17"
     Statement = [
       {
         Action = [
@@ -489,6 +493,27 @@ resource "aws_iam_policy" "api_gateway_ws" {
 resource "aws_iam_role_policy_attachment" "api_gateway_ws" {
   role       = aws_iam_role.main_exec.name
   policy_arn = aws_iam_policy.api_gateway_ws.arn
+}
+
+##########
+# Schedule cleanRedirectToFiles
+##########
+resource "aws_cloudwatch_event_rule" "scheduled_task_cleanRedirectToFiles" {
+  name                = "demo-${var.deployment_name}_cleanRedirectToFiles"
+  schedule_expression = "rate(1440 minutes)"
+}
+resource "aws_cloudwatch_event_target" "scheduled_task_cleanRedirectToFiles" {
+  rule      = aws_cloudwatch_event_rule.scheduled_task_cleanRedirectToFiles.name
+  target_id = "lambda"
+  arn       = aws_lambda_function.main.arn
+  input     = "{\"scheduled\": \"cleanRedirectToFiles\"}"
+}
+resource "aws_lambda_permission" "scheduled_task_cleanRedirectToFiles" {
+  statement_id  = "scheduled_task_cleanRedirectToFiles"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.main.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.scheduled_task_cleanRedirectToFiles.arn
 }
 
 ##########
@@ -557,162 +582,161 @@ resource "aws_lambda_permission" "scheduled_task_cleanupUploads" {
 ##########
 # Main
 ##########
-        resource "aws_s3_bucket" "lambda_bucket" {
-          bucket_prefix = "demo-${var.deployment_name}-lambda-bucket"
-          force_destroy = true
-        }
-        resource "aws_s3_bucket_acl" "lambda_bucket" {
-          bucket = aws_s3_bucket.lambda_bucket.id
-          acl    = "private"
-        }
+resource "aws_s3_bucket" "lambda_bucket" {
+  bucket_prefix = "demo-${var.deployment_name}-lambda-bucket"
+  force_destroy = true
+}
+resource "aws_s3_bucket_acl" "lambda_bucket" {
+  bucket = aws_s3_bucket.lambda_bucket.id
+  acl    = "private"
+}
 
-        resource "aws_iam_role" "main_exec" {
-          name = "demo-${var.deployment_name}-main-exec"
+resource "aws_iam_role" "main_exec" {
+  name = "demo-${var.deployment_name}-main-exec"
 
-          assume_role_policy = jsonencode({
-            Version = "2012-10-17"
-            Statement = [{
-              Action = "sts:AssumeRole"
-              Effect = "Allow"
-              Sid    = ""
-              Principal = {
-                Service = "lambda.amazonaws.com"
-              }
-              }
-            ]
-          })
+  assume_role_policy = jsonencode({
+    Version   = "2012-10-17"
+    Statement = [
+      {
+        Action    = "sts:AssumeRole"
+        Effect    = "Allow"
+        Sid       = ""
+        Principal = {
+          Service = "lambda.amazonaws.com"
         }
+      }
+    ]
+  })
+}
 
-        resource "aws_iam_role_policy_attachment" "dynamo" {
-          role       = aws_iam_role.main_exec.name
-          policy_arn = aws_iam_policy.dynamo.arn
-        }
-        resource "aws_iam_role_policy_attachment" "main_policy_exec" {
-          role       = aws_iam_role.main_exec.name
-          policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-        }
-        resource "aws_iam_role_policy_attachment" "main_policy_vpc" {
-          role       = aws_iam_role.main_exec.name
-          policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-        }
-        
-        resource "aws_iam_policy" "dynamo" {
-          name        = "demo-${var.deployment_name}-dynamo"
-          path = "/demo/${var.deployment_name}/dynamo/"
-          description = "Access to the demo-${var.deployment_name}_dynamo tables in DynamoDB"
-          policy = jsonencode({
-            Version = "2012-10-17"
-            Statement = [
-              {
-                Action = [
-                  "dynamodb:*",
-                ]
-                Effect   = "Allow"
-                Resource = ["*"]
-              },
-            ]
-          })
-        }
-        resource "aws_iam_policy" "lambdainvoke" {
-          name        = "demo-${var.deployment_name}-lambdainvoke"
-          path = "/demo/${var.deployment_name}/lambdainvoke/"
-          description = "Access to the demo-${var.deployment_name}_lambdainvoke bucket"
-          policy = jsonencode({
-            Version = "2012-10-17"
-            Statement = [
-              {
-                Action = [
-                  "lambda:InvokeFunction",
-                ]
-                Effect   = "Allow"
-                Resource = "*"
-              },
-            ]
-          })
-        }
-        resource "aws_iam_role_policy_attachment" "lambdainvoke" {
-          role       = aws_iam_role.main_exec.name
-          policy_arn = aws_iam_policy.lambdainvoke.arn
-        }
-        locals {
-          lambda_source = "../../build/dist/lambda.zip"
-        }
-        resource "aws_s3_object" "app_storage" {
-          bucket = aws_s3_bucket.lambda_bucket.id
+resource "aws_iam_role_policy_attachment" "dynamo" {
+  role       = aws_iam_role.main_exec.name
+  policy_arn = aws_iam_policy.dynamo.arn
+}
+resource "aws_iam_role_policy_attachment" "main_policy_exec" {
+  role       = aws_iam_role.main_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+resource "aws_iam_role_policy_attachment" "main_policy_vpc" {
+  role       = aws_iam_role.main_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
 
-          key    = "lambda-functions.zip"
-          source = local.lambda_source
+resource "aws_iam_policy" "dynamo" {
+  name        = "demo-${var.deployment_name}-dynamo"
+  path        = "/demo/${var.deployment_name}/dynamo/"
+  description = "Access to the demo-${var.deployment_name}_dynamo tables in DynamoDB"
+  policy      = jsonencode({
+    Version   = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "dynamodb:*",
+        ]
+        Effect   = "Allow"
+        Resource = ["*"]
+      },
+    ]
+  })
+}
+resource "aws_iam_policy" "lambdainvoke" {
+  name        = "demo-${var.deployment_name}-lambdainvoke"
+  path        = "/demo/${var.deployment_name}/lambdainvoke/"
+  description = "Access to the demo-${var.deployment_name}_lambdainvoke bucket"
+  policy      = jsonencode({
+    Version   = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "lambda:InvokeFunction",
+        ]
+        Effect   = "Allow"
+        Resource = "*"
+      },
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "lambdainvoke" {
+  role       = aws_iam_role.main_exec.name
+  policy_arn = aws_iam_policy.lambdainvoke.arn
+}
+locals {
+  lambda_source = "../../build/dist/lambda.zip"
+}
+resource "aws_s3_object" "app_storage" {
+  bucket = aws_s3_bucket.lambda_bucket.id
 
-          source_hash = filemd5(local.lambda_source)
-        }
-        resource "aws_lambda_function" "main" {
-          function_name = "demo-${var.deployment_name}-main"
+  key    = "lambda-functions.zip"
+  source = local.lambda_source
 
-          s3_bucket = aws_s3_bucket.lambda_bucket.id
-          s3_key    = aws_s3_object.app_storage.key
+  source_hash = filemd5(local.lambda_source)
+}
+resource "aws_lambda_function" "main" {
+  function_name = "demo-${var.deployment_name}-main"
 
-          runtime = "java11"
-          handler = "com.lightningkite.lightningserver.demo.AwsHandler"
-          
-          memory_size = "2048"
-          timeout = 30
-          # memory_size = "1024"
+  s3_bucket = aws_s3_bucket.lambda_bucket.id
+  s3_key    = aws_s3_object.app_storage.key
 
-          source_code_hash = filebase64sha256(local.lambda_source)
+  runtime = "java11"
+  handler = "com.lightningkite.lightningserver.demo.AwsHandler"
 
-          role = aws_iam_role.main_exec.arn
-          
-          dynamic "vpc_config" {
-            for_each = var.lambda_in_vpc ? [1] : []
-            content {
-            subnet_ids = module.vpc.private_subnets
-            security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
-            }
-          }
-          
-          environment {
-            variables = {
-              LIGHTNING_SERVER_SETTINGS = jsonencode({
-                general = {
-    projectName = "demo"
-    publicUrl = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
-    wsUrl = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
-    debug = var.debug
-    cors = var.cors
-},
-database = {
-  url = "mongodb+srv://demo${var.deployment_name}database-main:${random_password.database.result}@${replace(mongodbatlas_serverless_instance.database.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
-},
-cache = {
-    url = "dynamodb://${var.deployment_location}/demo-${var.deployment_name}_${var.deployment_name}"
-},
-jwt = {
-    expirationMilliseconds = var.jwt_expirationMilliseconds 
-    emailExpirationMilliseconds = var.jwt_emailExpirationMilliseconds 
-    secret = random_password.jwt.result
-},
-oauth_github = var.oauth_github,
-logging = var.logging,
-files = {
-    storageUrl = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
-    signedUrlExpiration = var.files_expiry
-},
-exceptions = var.exceptions,
-email = {
-    url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
-    fromEmail = var.email_sender
-},
-oauth_google = var.oauth_google,
-oauth_apple = var.oauth_apple
-              })
-            }
-          }
-          
-          depends_on = [aws_s3_object.app_storage]
-        }
+  memory_size = "2048"
+  timeout     = 30
+  # memory_size = "1024"
 
-        resource "aws_cloudwatch_log_group" "main" {
-          name = "demo-${var.deployment_name}-main-log"
-          retention_in_days = 30
-        }
+  source_code_hash = filebase64sha256(local.lambda_source)
+
+  role = aws_iam_role.main_exec.arn
+
+  dynamic "vpc_config" {
+    for_each = var.lambda_in_vpc ? [1] : []
+    content {
+      subnet_ids         = module.vpc.private_subnets
+      security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
+    }
+  }
+
+  environment {
+    variables = {
+      LIGHTNING_SERVER_SETTINGS_general = jsonencode({
+        projectName = var.display_name
+        publicUrl   = var.public_http_url == null ? aws_apigatewayv2_stage.http.invoke_url : var.public_http_url
+        wsUrl       = var.public_ws_url == null ? aws_apigatewayv2_stage.ws.invoke_url : var.public_ws_url
+        debug       = var.debug
+        cors        = var.cors
+      })
+      LIGHTNING_SERVER_SETTINGS_database = jsonencode({
+        url = "mongodb+srv://demo${var.deployment_name}database-main:${random_password.database.result}@${replace(mongodbatlas_serverless_instance.database.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
+      })
+      LIGHTNING_SERVER_SETTINGS_cache = jsonencode({
+        url = "dynamodb://${var.deployment_location}/demo-${var.deployment_name}_${var.deployment_name}"
+      })
+      LIGHTNING_SERVER_SETTINGS_jwt = jsonencode({
+        expirationMilliseconds      = var.jwt_expirationMilliseconds
+        emailExpirationMilliseconds = var.jwt_emailExpirationMilliseconds
+        secret                      = random_password.jwt.result
+      })
+      LIGHTNING_SERVER_SETTINGS_oauth_github = jsonencode(var.oauth_github)
+      LIGHTNING_SERVER_SETTINGS_logging      = jsonencode(var.logging)
+      LIGHTNING_SERVER_SETTINGS_files        = jsonencode({
+        storageUrl          = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
+        signedUrlExpiration = var.files_expiry
+      })
+      LIGHTNING_SERVER_SETTINGS_exceptions = jsonencode(var.exceptions)
+      LIGHTNING_SERVER_SETTINGS_email      = jsonencode({
+        url       = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587"
+        fromEmail = var.email_sender
+      })
+      LIGHTNING_SERVER_SETTINGS_oauth_google = jsonencode(var.oauth_google)
+      LIGHTNING_SERVER_SETTINGS_oauth_apple  = jsonencode(var.oauth_apple)
+    }
+  }
+
+  depends_on = [aws_s3_object.app_storage]
+}
+
+resource "aws_cloudwatch_log_group" "main" {
+  name              = "demo-${var.deployment_name}-main-log"
+  retention_in_days = 30
+}
 

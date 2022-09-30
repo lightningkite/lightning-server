@@ -28,12 +28,18 @@ terraform {
 }
 provider "aws" {
   region = "us-west-2"
+  access_key = local.awsKey
+  secret_key = local.awsPrivateKey
 }
 provider "aws" {
   alias = "acm"
   region = "us-east-1"
+  access_key = local.awsKey
+  secret_key = local.awsPrivateKey
 }
 provider "mongodbatlas" {
+  public_key = local.mongodbKey
+  private_key = local.mongodbPrivateKey
 }
 module "domain" {
   source              = "../domain"
@@ -48,4 +54,6 @@ module "domain" {
     allowedDomains = ["*"]
     allowedHeaders = ["*"]
   }
+  oauth_google = local.oauth_google
+  oauth_apple = local.oauth_apple
 }
