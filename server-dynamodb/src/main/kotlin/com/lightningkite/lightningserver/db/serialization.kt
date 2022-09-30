@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.json.*
 import software.amazon.awssdk.core.async.SdkPublisher
@@ -26,8 +27,12 @@ fun <T> KSerializer<T>.toDynamo(value: T): AttributeValue {
 }
 
 fun <T> KSerializer<T>.fromDynamo(value: AttributeValue): T {
-    val element = value.toJson()
-    return Serialization.Internal.json.decodeFromJsonElement(this, element)
+    try {
+        val element = value.toJson()
+        return Serialization.Internal.json.decodeFromJsonElement(this, element)
+    } catch(e: Exception) {
+        throw SerializationException("Could not parse $value as ${this.descriptor.serialName}", e)
+    }
 }
 
 fun <T> KSerializer<T>.toDynamoMap(value: T): Map<String, AttributeValue> = toDynamo(value).m()

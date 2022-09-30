@@ -475,7 +475,7 @@ public final class ModificationSetAppend<T : Codable & Hashable> : Modification<
     public func copy(items: Set<T>? = nil) -> ModificationSetAppend<T> { return ModificationSetAppend(items: items ?? self.items) }
     
     override public func invoke(on: Set<T>) -> Set<T> {
-        return on.union(self.items);
+        return (on.union(self.items));
     }
     override public func invokeDefault() -> Set<T> {
         return self.items;
@@ -504,7 +504,7 @@ public final class ModificationSetRemove<T : Codable & Hashable> : Modification<
         return Set(on.filter({ (it) -> Bool in (!self.condition.invoke(on: it)) }));
     }
     override public func invokeDefault() -> Set<T> {
-        return Set([]);
+        return ([] as Set<T>);
     }
 }
 public final class ModificationSetRemoveInstances<T : Codable & Hashable> : Modification<Set<T>>, CustomStringConvertible {
@@ -527,10 +527,10 @@ public final class ModificationSetRemoveInstances<T : Codable & Hashable> : Modi
     public func copy(items: Set<T>? = nil) -> ModificationSetRemoveInstances<T> { return ModificationSetRemoveInstances(items: items ?? self.items) }
     
     override public func invoke(on: Set<T>) -> Set<T> {
-        return on.subtracting(self.items);
+        return on.subtracting([self.items]);
     }
     override public func invokeDefault() -> Set<T> {
-        return Set([]);
+        return ([] as Set<T>);
     }
 }
 public final class ModificationSetDropFirst<T : Codable & Hashable> : Modification<Set<T>> {
@@ -543,7 +543,7 @@ public final class ModificationSetDropFirst<T : Codable & Hashable> : Modificati
         return Set(on.dropFirst(1));
     }
     override public func invokeDefault() -> Set<T> {
-        return Set([]);
+        return ([] as Set<T>);
     }
     override public func hashCode() -> Int {
         return 1;
@@ -562,7 +562,7 @@ public final class ModificationSetDropLast<T : Codable & Hashable> : Modificatio
         return Set(Array(Array(on).dropLast(1)));
     }
     override public func invokeDefault() -> Set<T> {
-        return Set([]);
+        return ([] as Set<T>);
     }
     override public func hashCode() -> Int {
         return 1;
@@ -616,7 +616,7 @@ public final class ModificationSetPerElement<T : Codable & Hashable> : Modificat
         return Set(on.map({ (it) -> T in self.condition.invoke(on: it) ? self.modification.invoke(on: it) : it }));
     }
     override public func invokeDefault() -> Set<T> {
-        return Set([]);
+        return ([] as Set<T>);
     }
 }
 public final class ModificationCombine<T : Codable & Hashable> : Modification<Dictionary<String, T>>, CustomStringConvertible {
