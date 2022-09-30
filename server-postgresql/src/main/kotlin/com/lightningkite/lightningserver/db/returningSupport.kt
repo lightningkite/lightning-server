@@ -53,7 +53,7 @@ abstract class ReturningStatement(type: StatementType, targets: List<Table>) :
 class DeleteReturningStatement(
     private val table: Table,
     private val where: Op<Boolean>? = null,
-    private val limit: Int? = 0,
+    private val limit: Int? = null,
     private val returning: ColumnSet? = null,
 ) : ReturningStatement(StatementType.DELETE, listOf(table)) {
     override val set: FieldSet = returning ?: table
@@ -87,7 +87,7 @@ class DeleteReturningStatement(
         fun where(
             table: Table,
             op: Op<Boolean>,
-            limit: Int? = 0,
+            limit: Int? = null,
             returning: ColumnSet? = null,
         ): DeleteReturningStatement = DeleteReturningStatement(
             table,
@@ -101,7 +101,7 @@ class DeleteReturningStatement(
 }
 
 fun Table.deleteReturningWhere(
-    limit: Int? = 0,
+    limit: Int? = null,
     returning: ColumnSet? = null,
     where: SqlExpressionBuilder.() -> Op<Boolean>,
 ): DeleteReturningStatement =
