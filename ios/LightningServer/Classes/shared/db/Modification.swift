@@ -527,7 +527,7 @@ public final class ModificationSetRemoveInstances<T : Codable & Hashable> : Modi
     public func copy(items: Set<T>? = nil) -> ModificationSetRemoveInstances<T> { return ModificationSetRemoveInstances(items: items ?? self.items) }
     
     override public func invoke(on: Set<T>) -> Set<T> {
-        return on.subtracting([self.items]);
+        return on.subtracting(self.items);
     }
     override public func invokeDefault() -> Set<T> {
         return ([] as Set<T>);
