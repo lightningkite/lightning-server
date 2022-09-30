@@ -62,6 +62,6 @@ data class ModelPermissions<Model>(
         maxQueryTimeMs = maxQueryTimeMs,
     )
 
-    fun allowed(modification: Modification<Model>): Condition<Model> = updateRestrictions(modification)
+    fun allowed(modification: Modification<Model>): Condition<Model> = updateRestrictions(modification) and update
     fun mask(model: Model): Model = readMask(model)
 }
