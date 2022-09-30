@@ -6,20 +6,20 @@ import com.lightningkite.lightningserver.settings.Settings
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.decodeFromStream
+import software.amazon.awssdk.services.s3.S3Client
 
 class AwsHandler : AwsAdapter() {
     companion object {
         init {
             Server
-            System.getenv("LIGHTNING_SERVER_SETTINGS")?.let {
-                Serialization.Internal.json.decodeFromString<Settings>(it)
-            } ?: run {
-                val compiled = JsonObject(Settings.requirements.entries.associate {
-                    it.key to Serialization.Internal.json.decodeFromString(
-                        System.getenv("LIGHTNING_SERVER_SETTINGS_${it.key}")
-                    )
-                })
-                Serialization.Internal.json.decodeFromJsonElement<Settings>(compiled)
+            S3Client.create().getObject {
+                it.bucket(System.getenv("LIGHTNING_SERVER_SETTINGS_BUCKET")!!)
+                it.key(System.getenv("LIGHTNING_SERVER_SETTINGS_FILE")!!)
+            }.use {
+                it.reader().readText().let {
+                    Serialization.Internal.json.decodeFromString<Settings>(it)
+                }
             }
         }
     }

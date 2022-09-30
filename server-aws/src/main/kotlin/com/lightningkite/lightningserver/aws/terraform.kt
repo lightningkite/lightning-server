@@ -31,11 +31,12 @@ private data class TerraformProvider(
         val random = TerraformProvider("random", "hashicorp/random", "~> 3.1.0")
         val archive = TerraformProvider("archive", "hashicorp/archive", "~> 2.2.0")
         val mongodbatlas = TerraformProvider("mongodbatlas", "mongodb/mongodbatlas", "~> 1.4")
+        val local = TerraformProvider("local", "hashicorp/local", "~> 2.2")
     }
 }
 private data class TerraformSection(
     val name: String,
-    val providers: List<TerraformProvider> = listOf(TerraformProvider.aws, TerraformProvider.random, TerraformProvider.archive),
+    val providers: List<TerraformProvider> = listOf(TerraformProvider.aws, TerraformProvider.local, TerraformProvider.random, TerraformProvider.archive),
     val inputs: List<TerraformInput> = listOf(),
     val resources: String? = null,
     val toLightningServer: Map<String, String>? = null,
@@ -896,6 +897,30 @@ private fun awsMainAppHandler(projectInfo: TerraformProjectInfo, handlerFqn: Str
           bucket = aws_s3_bucket.lambda_bucket.id
           acl    = "private"
         }
+        resource "aws_iam_policy" "lambda_bucket" {
+          name        = "${projectInfo.namePrefix}-lambda_bucket"
+          path = "/${projectInfo.namePrefixPath}/lambda_bucket/"
+          description = "Access to the ${projectInfo.namePrefix}_lambda_bucket bucket"
+          policy = jsonencode({
+            Version = "2012-10-17"
+            Statement = [
+              {
+                Action = [
+                  "s3:GetObject",
+                ]
+                Effect   = "Allow"
+                Resource = [
+                    "${'$'}{aws_s3_bucket.lambda_bucket.arn}",
+                    "${'$'}{aws_s3_bucket.lambda_bucket.arn}/*",
+                ]
+              },
+            ]
+          })
+        }
+        resource "aws_iam_role_policy_attachment" "lambda_bucket" {
+          role       = aws_iam_role.main_exec.name
+          policy_arn = aws_iam_policy.lambda_bucket.arn
+        }
 
         resource "aws_iam_role" "main_exec" {
           name = "${projectInfo.namePrefix}-main-exec"
@@ -976,6 +1001,14 @@ private fun awsMainAppHandler(projectInfo: TerraformProjectInfo, handlerFqn: Str
 
           source_hash = filemd5(local.lambda_source)
         }
+        resource "aws_s3_object" "app_settings" {
+          bucket = aws_s3_bucket.lambda_bucket.id
+
+          key    = "settings.json"
+          content = jsonencode({
+            ${otherSections.mapNotNull { it.toLightningServer }.flatMap { it.entries }.map { "${it.key} = ${it.value}" }.map { it.replace("\n", "\n            ") }.joinToString("\n            ")}
+          })
+        }
         resource "aws_lambda_function" "main" {
           function_name = "${projectInfo.namePrefix}-main"
 
@@ -996,14 +1029,15 @@ private fun awsMainAppHandler(projectInfo: TerraformProjectInfo, handlerFqn: Str
           dynamic "vpc_config" {
             for_each = var.lambda_in_vpc ? [1] : []
             content {
-            subnet_ids = module.vpc.private_subnets
-            security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
+              subnet_ids = module.vpc.private_subnets
+              security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
             }
           }
           
           environment {
             variables = {
-              ${otherSections.mapNotNull { it.toLightningServer }.flatMap { it.entries }.map { "LIGHTNING_SERVER_SETTINGS_${it.key} = jsonencode(${it.value})" }.joinToString("\n              ")}
+              LIGHTNING_SERVER_SETTINGS_BUCKET = aws_s3_object.app_settings.bucket
+              LIGHTNING_SERVER_SETTINGS_FILE = aws_s3_object.app_settings.key
             }
           }
           
