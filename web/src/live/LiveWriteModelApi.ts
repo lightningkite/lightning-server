@@ -44,7 +44,9 @@ export class LiveWriteModelApi<Model extends HasId<string>> extends WriteModelAp
     }
     
     public patchBulk(modification: MassModification<Model>): Observable<number> {
-        return HttpClient.INSTANCE.call(`${this.url}/bulk`, HttpClient.INSTANCE.PATCH, this.authHeaders, HttpBody.json(modification), undefined).pipe(mergeMap((it: Response): Observable<string> => (from(it.text())))).pipe(map((it: string): number => (parseInt(it))));
+        return HttpClient.INSTANCE.call(`${this.url}/bulk`, HttpClient.INSTANCE.PATCH, this.authHeaders, HttpBody.json(modification), undefined)
+            .pipe(mergeMap((it: Response): Observable<string> => (from(it.text()))))
+            .pipe(map((it: string): number => (parseInt(it))));
     }
     
     public _delete(id: UUIDFor<Model>): Observable<void> {

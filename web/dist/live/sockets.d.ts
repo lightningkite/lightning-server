@@ -15,5 +15,5 @@ export declare class WebSocketIsh<IN extends any, OUT extends any> {
     readonly send: ((a: OUT) => void);
     constructor(messages: Observable<IN>, send: ((a: OUT) => void));
 }
-export declare function multiplexedSocketReified<IN extends any, OUT extends any>(IN: Array<any>, OUT: Array<any>, url: string, path: string, onSetup?: ((a: WebSocketIsh<IN, OUT>) => void)): Observable<WebSocketIsh<IN, OUT>>;
-export declare function multiplexedSocket<IN extends any, OUT extends any>(url: string, path: string, inType: ReifiedType, outType: ReifiedType, onSetup?: ((a: WebSocketIsh<IN, OUT>) => void)): Observable<WebSocketIsh<IN, OUT>>;
+export declare function multiplexedSocketReified<IN extends any, OUT extends any>(IN: Array<any>, OUT: Array<any>, url: string, path: string, queryParams?: Map<string, Array<string>>): Observable<WebSocketIsh<IN, OUT>>;
+export declare function multiplexedSocket<IN extends any, OUT extends any>(url: string, path: string, queryParams: Map<string, string[]> | undefined, inType: ReifiedType, outType: ReifiedType): Observable<WebSocketIsh<IN, OUT>>;

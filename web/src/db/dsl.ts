@@ -173,7 +173,7 @@ export function xPropChainGet<K extends any, T extends any>(this_: PropChain<K, 
 }
 
 //! Declares com.lightningkite.lightningdb.all>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.all.K, kotlin.collections.Listcom.lightningkite.lightningdb.all.T
-export function xPropChainListAllGet<K extends any, T extends any>(this_: PropChain<K, Array<T>>): PropChain<K, T> { return new PropChain<K, T>((it: Condition<T>): Condition<K> => (this_.mapCondition(new Condition.ListAllElements<T>(it))), (it: Modification<T>): Modification<K> => (this_.mapModification(new Modification.ListPerElement<T>(new Condition.Always<T>(), it))), (it: K): T => (this_.getProp(it)[0]), (from: K, to: T): K => (this_.setProp(from, this_.getProp(from).concat([to])))); }
+export function xPropChainListAllGet<K extends any, T extends any>(this_: PropChain<K, Array<T>>): PropChain<K, T> { return new PropChain<K, T>((it: Condition<T>): Condition<K> => (this_.mapCondition(new Condition.ListAllElements<T>(it))), (it: Modification<T>): Modification<K> => (this_.mapModification(new Modification.ListPerElement<T>(new Condition.Always<T>(), it))), (it: K): T => (first(this_.getProp(it))!), (from: K, to: T): K => (this_.setProp(from, this_.getProp(from).concat([to])))); }
 
 
 //! Declares com.lightningkite.lightningdb.all>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.all.K, kotlin.collections.Setcom.lightningkite.lightningdb.all.T
@@ -181,7 +181,7 @@ export function xPropChainSetAllGet<K extends any, T extends any>(this_: PropCha
 
 
 //! Declares com.lightningkite.lightningdb.any>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.any.K, kotlin.collections.Listcom.lightningkite.lightningdb.any.T
-export function xPropChainListAnyGet<K extends any, T extends any>(this_: PropChain<K, Array<T>>): PropChain<K, T> { return new PropChain<K, T>((it: Condition<T>): Condition<K> => (this_.mapCondition(new Condition.ListAnyElements<T>(it))), (it: Modification<T>): Modification<K> => (this_.mapModification(new Modification.ListPerElement<T>(new Condition.Always<T>(), it))), (it: K): T => (this_.getProp(it)[0]), (from: K, to: T): K => (this_.setProp(from, this_.getProp(from).concat([to])))); }
+export function xPropChainListAnyGet<K extends any, T extends any>(this_: PropChain<K, Array<T>>): PropChain<K, T> { return new PropChain<K, T>((it: Condition<T>): Condition<K> => (this_.mapCondition(new Condition.ListAnyElements<T>(it))), (it: Modification<T>): Modification<K> => (this_.mapModification(new Modification.ListPerElement<T>(new Condition.Always<T>(), it))), (it: K): T => (first(this_.getProp(it))!), (from: K, to: T): K => (this_.setProp(from, this_.getProp(from).concat([to])))); }
 
 
 //! Declares com.lightningkite.lightningdb.any>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.any.K, kotlin.collections.Setcom.lightningkite.lightningdb.any.T

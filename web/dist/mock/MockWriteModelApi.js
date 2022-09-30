@@ -42,14 +42,19 @@ class MockWriteModelApi extends WriteModelApi_1.WriteModelApi {
     }
     patchBulk(modification) {
         return (0, rxjs_1.of)(this.table
-            .asList().filter((it) => (modification.condition.invoke(it))).map((it) => (this.table.replaceItem(modification.modification.invoke(it))))).pipe((0, operators_1.map)((it) => (it.length)));
+            .asList()
+            .filter((it) => (modification.condition.invoke(it)))
+            .map((it) => (this.table.replaceItem(modification.modification.invoke(it)))))
+            .pipe((0, operators_1.map)((it) => (it.length)));
     }
     _delete(id) {
         return (0, rxjs_1.of)(this.table.deleteItemById(id));
     }
     deleteBulk(condition) {
         return (0, rxjs_1.of)(this.table
-            .asList().filter((it) => (condition.invoke(it))).forEach((it) => {
+            .asList()
+            .filter((it) => (condition.invoke(it)))
+            .forEach((it) => {
             this.table.deleteItem(it);
         }));
     }

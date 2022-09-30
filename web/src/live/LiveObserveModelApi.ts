@@ -8,7 +8,7 @@ import { xListComparatorGet } from '../db/SortPart'
 import { WebSocketIsh, multiplexedSocketReified } from './sockets'
 import { Comparable, Comparator, EqualOverrideMap, compareBy, listRemoveAll, runOrNull, safeEq, xMutableMapGetOrPut } from '@lightningkite/khrysalis-runtime'
 import { NEVER, Observable } from 'rxjs'
-import { catchError, finalize, map, publishReplay, refCount, switchMap } from 'rxjs/operators'
+import { catchError, map, publishReplay, refCount, switchMap, tap } from 'rxjs/operators'
 
 //! Declares com.lightningkite.lightningdb.live.LiveObserveModelApi
 export class LiveObserveModelApi<Model extends HasId<string>> extends ObserveModelApi<Model> {
@@ -24,9 +24,12 @@ export class LiveObserveModelApi<Model extends HasId<string>> extends ObserveMod
     
     public observe(query: Query<Model>): Observable<Array<Model>> {
         //multiplexedSocket<ListChange<Model>, Query<Model>>("$multiplexUrl?jwt=$token", path)
-        return xMutableMapGetOrPut<Query<Model>, Observable<Array<Model>>>(this.alreadyOpen, query, (): Observable<Array<Model>> => (this.openSocket(query).pipe(finalize((): void => {
-            this.alreadyOpen.delete(query);
-        })).pipe(publishReplay(1)).pipe(refCount())));
+        return xMutableMapGetOrPut<Query<Model>, Observable<Array<Model>>>(this.alreadyOpen, query, (): Observable<Array<Model>> => (this.openSocket(query)
+                .pipe(tap({ unsubscribe: (): void => {
+                this.alreadyOpen.delete(query);
+            } }))
+                .pipe(publishReplay(1))
+            .pipe(refCount())));
     }
 }
 export namespace LiveObserveModelApi {
@@ -37,9 +40,10 @@ export namespace LiveObserveModelApi {
         public static INSTANCE = new Companion();
         
         public create<Model extends HasId<string>>(Model: Array<any>, multiplexUrl: string, token: string, headers: Map<string, string>, path: string): LiveObserveModelApi<Model> {
-            return new LiveObserveModelApi<Model>((query: Query<Model>): Observable<Array<Model>> => (xObservableToListObservable<Model>(multiplexedSocketReified<ListChange<Model>, Query<Model>>([ListChange, Model], [Query, Model], `${multiplexUrl}?jwt=${token}`, path, undefined).pipe(switchMap((it: WebSocketIsh<ListChange<Model>, Query<Model>>): Observable<ListChange<Model>> => {
-                it.send(query);
-                return it.messages.pipe(catchError((it: any): Observable<ListChange<Model>> => (NEVER)));
+            return new LiveObserveModelApi<Model>((query: Query<Model>): Observable<Array<Model>> => (xObservableToListObservable<Model>(multiplexedSocketReified<ListChange<Model>, Query<Model>>([ListChange, Model], [Query, Model], multiplexUrl, path, new Map([["jwt", [token]]]))
+                    .pipe(switchMap((it: WebSocketIsh<ListChange<Model>, Query<Model>>): Observable<ListChange<Model>> => {
+                    it.send(query);
+                    return it.messages.pipe(catchError((it: any): Observable<ListChange<Model>> => (NEVER)));
             })), xListComparatorGet(query.orderBy) ?? compareBy<Model>((it: Model): (Comparable<(any | null)> | null) => (it._id)))));
         }
     }
@@ -49,20 +53,20 @@ export namespace LiveObserveModelApi {
 export function xObservableToListObservable<T extends HasId<string>>(this_: Observable<ListChange<T>>, ordering: Comparator<T>): Observable<Array<T>> {
     const localList = ([] as Array<T>);
     return this_.pipe(map((it: ListChange<T>): Array<T> => {
-        const it_11 = it.wholeList;
-        if (it_11 !== null) {
-            localList.length = 0; localList.push(...it_11.slice().sort(ordering));
+        const it_12 = it.wholeList;
+        if (it_12 !== null) {
+            localList.length = 0; localList.push(...it_12.slice().sort(ordering));
         }
-        const it_13 = it._new;
-        if (it_13 !== null) {
-            listRemoveAll(localList, (o: T): boolean => (safeEq(it_13._id, o._id)));
-            let index = localList.findIndex((inList: T): boolean => (ordering(it_13, inList) < 0));
+        const it_14 = it._new;
+        if (it_14 !== null) {
+            listRemoveAll(localList, (o: T): boolean => (safeEq(it_14._id, o._id)));
+            let index = localList.findIndex((inList: T): boolean => (ordering(it_14, inList) < 0));
             if (index === (-1)) { index = localList.length }
-            localList.splice(index, 0, it_13);
+            localList.splice(index, 0, it_14);
         } else {
-            const it_20 = it.old;
-            if (it_20 !== null) {
-                listRemoveAll(localList, (o: T): boolean => (safeEq(it_20._id, o._id)));
+            const it_21 = it.old;
+            if (it_21 !== null) {
+                listRemoveAll(localList, (o: T): boolean => (safeEq(it_21._id, o._id)));
             }
         }
         return localList;

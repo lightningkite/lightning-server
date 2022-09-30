@@ -8,7 +8,7 @@ public final class LiveObserveModelApi<Model : HasId> : ObserveModelApi<Model> {
     public var openSocket: (Query<Model>) -> Observable<Array<Model>>
     public init(openSocket: @escaping (Query<Model>) -> Observable<Array<Model>>) {
         self.openSocket = openSocket
-        self.alreadyOpen = ([:] as Dictionary<Query<Model>, Observable<Array<Model>>>)
+        self.alreadyOpen = Dictionary<Query<Model>, Observable<Array<Model>>>()
         super.init()
         //Necessary properties should be initialized now
     }
@@ -51,7 +51,7 @@ public final class LiveObserveModelApiCompanion {
     public static let INSTANCE = LiveObserveModelApiCompanion()
     
     public func create<Model : HasId>(multiplexUrl: String, token: String, headers: Dictionary<String, String>, path: String) -> LiveObserveModelApi<Model> {
-        return LiveObserveModelApi<Model>(openSocket: { (query) -> Observable<Array<Model>> in xObservableToListObservable((multiplexedSocket(url: "\(String(kotlin: multiplexUrl))?jwt=\(String(kotlin: token))", path: path) as Observable<WebSocketIsh<ListChange<Model>, Query<Model>>>)
+        return LiveObserveModelApi<Model>(openSocket: { (query) -> Observable<Array<Model>> in xObservableToListObservable((multiplexedSocket(url: multiplexUrl, path: path, queryParams: dictionaryOf(Pair("jwt", [token]))) as Observable<WebSocketIsh<ListChange<Model>, Query<Model>>>)
                 .switchMap { (it) -> Observable<ListChange<Model>> in
                 it.send(query)
                 return it.messages.catchError({ (it) -> Observable<ListChange<Model>> in Observable.never() })

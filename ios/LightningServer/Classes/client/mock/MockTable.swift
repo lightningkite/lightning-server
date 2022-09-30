@@ -4,7 +4,7 @@ import KhrysalisRuntime
 import RxSwift
 import Foundation
 
-public final class MockTable<Model : HasId> where Model.ID == UUID {
+public final class MockTable<Model : HasId> {
     public init() {
         self.data = dictionaryOf()
         self.signals = PublishSubject()
@@ -28,17 +28,17 @@ public final class MockTable<Model : HasId> where Model.ID == UUID {
     }
     
     public func addItem(item: Model) -> Model {
-        var array51 = self.data
-        array51[item._id] = item
-        self.data = array51
+        var array55 = self.data
+        array55[item._id] = item
+        self.data = array55
         self.signals.onNext(SignalData(item: item, created: true, deleted: false))
         return item
     }
     
     public func replaceItem(item: Model) -> Model {
-        var array55 = self.data
-        array55[item._id] = item
-        self.data = array55
+        var array59 = self.data
+        array59[item._id] = item
+        self.data = array59
         self.signals.onNext(SignalData(item: item, created: false, deleted: false))
         return item
     }

@@ -20,9 +20,12 @@ class LiveObserveModelApi extends ObserveModelApi_1.ObserveModelApi {
     }
     observe(query) {
         //multiplexedSocket<ListChange<Model>, Query<Model>>("$multiplexUrl?jwt=$token", path)
-        return (0, khrysalis_runtime_1.xMutableMapGetOrPut)(this.alreadyOpen, query, () => (this.openSocket(query).pipe((0, operators_1.finalize)(() => {
-            this.alreadyOpen.delete(query);
-        })).pipe((0, operators_1.publishReplay)(1)).pipe((0, operators_1.refCount)())));
+        return (0, khrysalis_runtime_1.xMutableMapGetOrPut)(this.alreadyOpen, query, () => (this.openSocket(query)
+            .pipe((0, operators_1.tap)({ unsubscribe: () => {
+                this.alreadyOpen.delete(query);
+            } }))
+            .pipe((0, operators_1.publishReplay)(1))
+            .pipe((0, operators_1.refCount)())));
     }
 }
 exports.LiveObserveModelApi = LiveObserveModelApi;
@@ -34,7 +37,8 @@ exports.LiveObserveModelApi = LiveObserveModelApi;
         create(Model, multiplexUrl, token, headers, path) {
             return new LiveObserveModelApi((query) => {
                 var _a;
-                return (xObservableToListObservable((0, sockets_1.multiplexedSocketReified)([ListChange_1.ListChange, Model], [Query_1.Query, Model], `${multiplexUrl}?jwt=${token}`, path, undefined).pipe((0, operators_1.switchMap)((it) => {
+                return (xObservableToListObservable((0, sockets_1.multiplexedSocketReified)([ListChange_1.ListChange, Model], [Query_1.Query, Model], multiplexUrl, path, new Map([["jwt", [token]]]))
+                    .pipe((0, operators_1.switchMap)((it) => {
                     it.send(query);
                     return it.messages.pipe((0, operators_1.catchError)((it) => (rxjs_1.NEVER)));
                 })), (_a = (0, SortPart_1.xListComparatorGet)(query.orderBy)) !== null && _a !== void 0 ? _a : (0, khrysalis_runtime_1.compareBy)((it) => (it._id))));
@@ -48,24 +52,24 @@ exports.LiveObserveModelApi = LiveObserveModelApi;
 function xObservableToListObservable(this_, ordering) {
     const localList = [];
     return this_.pipe((0, operators_1.map)((it) => {
-        const it_11 = it.wholeList;
-        if (it_11 !== null) {
+        const it_12 = it.wholeList;
+        if (it_12 !== null) {
             localList.length = 0;
-            localList.push(...it_11.slice().sort(ordering));
+            localList.push(...it_12.slice().sort(ordering));
         }
-        const it_13 = it._new;
-        if (it_13 !== null) {
-            (0, khrysalis_runtime_1.listRemoveAll)(localList, (o) => ((0, khrysalis_runtime_1.safeEq)(it_13._id, o._id)));
-            let index = localList.findIndex((inList) => (ordering(it_13, inList) < 0));
+        const it_14 = it._new;
+        if (it_14 !== null) {
+            (0, khrysalis_runtime_1.listRemoveAll)(localList, (o) => ((0, khrysalis_runtime_1.safeEq)(it_14._id, o._id)));
+            let index = localList.findIndex((inList) => (ordering(it_14, inList) < 0));
             if (index === (-1)) {
                 index = localList.length;
             }
-            localList.splice(index, 0, it_13);
+            localList.splice(index, 0, it_14);
         }
         else {
-            const it_20 = it.old;
-            if (it_20 !== null) {
-                (0, khrysalis_runtime_1.listRemoveAll)(localList, (o) => ((0, khrysalis_runtime_1.safeEq)(it_20._id, o._id)));
+            const it_21 = it.old;
+            if (it_21 !== null) {
+                (0, khrysalis_runtime_1.listRemoveAll)(localList, (o) => ((0, khrysalis_runtime_1.safeEq)(it_21._id, o._id)));
             }
         }
         return localList;

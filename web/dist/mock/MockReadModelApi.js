@@ -17,7 +17,11 @@ class MockReadModelApi extends ReadModelApi_1.ReadModelApi {
     list(query) {
         var _a;
         return (0, rxjs_1.of)(this.table
-            .asList().filter((item) => (query.condition.invoke(item))).slice().sort((_a = (0, SortPart_1.xListComparatorGet)(query.orderBy)) !== null && _a !== void 0 ? _a : (0, khrysalis_runtime_1.compareBy)((it) => (it._id))).slice(query.skip).slice(0, query.limit));
+            .asList()
+            .filter((item) => (query.condition.invoke(item)))
+            .slice().sort((_a = (0, SortPart_1.xListComparatorGet)(query.orderBy)) !== null && _a !== void 0 ? _a : (0, khrysalis_runtime_1.compareBy)((it) => (it._id)))
+            .slice(query.skip)
+            .slice(0, query.limit));
     }
     get(id) {
         var _a;

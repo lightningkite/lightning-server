@@ -22,21 +22,26 @@ function sharedSocket(url) {
         var _a;
         const shortUrl = (0, khrysalis_runtime_1.xStringSubstringBefore)(url, '?', undefined);
         //        println("Creating socket to $url")
-        return ((_a = (0, khrysalis_runtime_1.runOrNull)(get_overrideWebSocketProvider(), _ => _(url))) !== null && _a !== void 0 ? _a : rxjs_plus_1.HttpClient.INSTANCE.webSocket(url)).pipe((0, operators_1.switchMap)((it) => {
+        return ((_a = (0, khrysalis_runtime_1.runOrNull)(get_overrideWebSocketProvider(), _ => _(url))) !== null && _a !== void 0 ? _a : rxjs_plus_1.HttpClient.INSTANCE.webSocket(url))
+            .pipe((0, operators_1.switchMap)((it) => {
             //                println("Connection to $shortUrl established, starting pings")
             // Only have this observable until it fails
             const pingMessages = (0, rxjs_1.interval)(5000).pipe((0, operators_1.map)((_0) => {
                 //                    println("Sending ping to $url")
-                return it.write.next({ text: "", binary: null });
+                return it.write.next({ text: " ", binary: null });
             })).pipe((0, operators_1.switchMap)((it) => (rxjs_1.NEVER)));
-            const timeoutAfterSeconds = it.read.pipe((0, operators_1.timeout)(10000)).pipe((0, operators_1.switchMap)((it) => (rxjs_1.NEVER)));
+            const timeoutAfterSeconds = it.read
+                .pipe((0, operators_1.timeout)(10000))
+                .pipe((0, operators_1.switchMap)((it) => (rxjs_1.NEVER)));
             return (0, rxjs_1.merge)((0, rxjs_1.of)(it), pingMessages, timeoutAfterSeconds);
-        })).pipe((0, operators_1.tap)(undefined, (it) => {
-            console.log(`Socket to ${shortUrl} FAILED with ${it}`);
-        })).pipe((0, operators_1.retryWhen)((it) => (it.pipe((0, operators_1.delay)(1000))))).pipe((0, operators_1.finalize)(() => {
-            //                println("Disconnecting socket to $shortUrl")
-            sharedSocketCache.delete(url);
-        })).pipe((0, operators_1.publishReplay)(1)).pipe((0, operators_1.refCount)());
+        }))
+            .pipe((0, operators_1.retryWhen)((it) => (it.pipe((0, operators_1.delay)(1000)))))
+            .pipe((0, operators_1.tap)({ unsubscribe: () => {
+                //                println("Disconnecting socket to $shortUrl")
+                sharedSocketCache.delete(url);
+            } }))
+            .pipe((0, operators_1.publishReplay)(1))
+            .pipe((0, operators_1.refCount)());
     });
 }
 exports.sharedSocket = sharedSocket;
@@ -57,20 +62,22 @@ class WebSocketIsh {
 }
 exports.WebSocketIsh = WebSocketIsh;
 //! Declares com.lightningkite.lightningdb.live.multiplexedSocket
-function multiplexedSocketReified(IN, OUT, url, path, onSetup = (it) => { }) {
-    return multiplexedSocket(url, path, IN, OUT, onSetup);
+function multiplexedSocketReified(IN, OUT, url, path, queryParams = new Map([])) {
+    return multiplexedSocket(url, path, queryParams, IN, OUT);
 }
 exports.multiplexedSocketReified = multiplexedSocketReified;
 //! Declares com.lightningkite.lightningdb.live.multiplexedSocket
-function multiplexedSocket(url, path, inType, outType, onSetup = (it) => { }) {
+function multiplexedSocket(url, path, queryParams = new Map([]), inType, outType) {
     const shortUrl = (0, khrysalis_runtime_1.xStringSubstringBefore)(url, '?', undefined);
     const channel = (0, uuid_1.v4)();
     let lastSocket = null;
-    return sharedSocket(url).pipe((0, operators_1.map)((it) => {
+    return sharedSocket(url)
+        .pipe((0, operators_1.map)((it) => {
         //            println("Setting up socket to $shortUrl with $path")
         lastSocket = it;
-        it.write.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, true, undefined, undefined, undefined)), binary: null });
+        it.write.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, queryParams, true, undefined, undefined, undefined)), binary: null });
         const part = new MultiplexedWebsocketPart(it.read.pipe((0, rxjs_1.map)((it) => {
+            console.log(`Got ${it}`);
             const text = it.text;
             if (text === null) {
                 return null;
@@ -84,22 +91,22 @@ function multiplexedSocket(url, path, inType, outType, onSetup = (it) => { }) {
             }
             return message.channel === channel ? message.data : null;
         }), (0, rxjs_1.filter)(rxjs_plus_1.isNonNull)), (message) => {
-            it.write.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, undefined, undefined, undefined, message, undefined)), binary: null });
+            it.write.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, undefined, undefined, undefined, undefined, message, undefined)), binary: null });
         });
         const typedPart = new WebSocketIsh(part.messages.pipe((0, rxjs_1.map)((it) => (rxjs_plus_1.JSON2.parse(it, inType))), (0, rxjs_1.filter)(rxjs_plus_1.isNonNull)), (m) => {
             part.send(JSON.stringify(m));
         });
-        onSetup(typedPart);
         return typedPart;
-    })).pipe((0, operators_1.finalize)(() => {
-        var _a;
-        //            println("Disconnecting channel on socket to $shortUrl with $path")
-        const temp41 = ((_a = lastSocket === null || lastSocket === void 0 ? void 0 : lastSocket.write) !== null && _a !== void 0 ? _a : null);
-        if (temp41 !== null) {
-            temp41.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, undefined, true, undefined, undefined)), binary: null });
-        }
-        ;
-    }));
+    }))
+        .pipe((0, operators_1.tap)({ unsubscribe: () => {
+            var _a;
+            //            println("Disconnecting channel on socket to $shortUrl with $path")
+            const temp38 = ((_a = lastSocket === null || lastSocket === void 0 ? void 0 : lastSocket.write) !== null && _a !== void 0 ? _a : null);
+            if (temp38 !== null) {
+                temp38.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, undefined, undefined, true, undefined, undefined)), binary: null });
+            }
+            ;
+        } }));
 }
 exports.multiplexedSocket = multiplexedSocket;
 //# sourceMappingURL=sockets.js.map
