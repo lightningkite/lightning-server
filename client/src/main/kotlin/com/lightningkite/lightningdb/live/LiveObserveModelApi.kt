@@ -7,7 +7,9 @@ import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.ListChange
 import com.lightningkite.lightningdb.Query
 import io.reactivex.rxjava3.core.Observable
+import io.reactivex.rxjava3.schedulers.Schedulers
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 class LiveObserveModelApi<Model : HasId<UUID>>(
     val openSocket: (query: Query<Model>) -> Observable<List<Model>>
@@ -64,6 +66,9 @@ fun <T : HasId<ID>, ID> Observable<ListChange<T>>.toListObservable(ordering: Com
 
 fun <T : HasId<ID>, ID: Comparable<ID>> Observable<WebSocketIsh<ListChange<T>, Query<T>>>.filter(query: Query<T>): Observable<List<T>> =
     this
-        .doOnNext { it.send(query) }
+        .delay(100L, TimeUnit.MILLISECONDS)
+        .doOnNext {
+            it.send(query)
+        }
         .switchMap { it.messages }
         .toListObservable(query.orderBy.comparator ?: compareBy { it._id })
