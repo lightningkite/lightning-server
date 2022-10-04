@@ -6,12 +6,8 @@ import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.*
-import io.ktor.util.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.RandomAccessFile
-import java.nio.file.Files
 
 
 class LocalFileSystem(rootFile: File, val serveDirectory: String, val signer: JwtSigner) : FileSystem {
@@ -31,31 +27,53 @@ class LocalFileSystem(rootFile: File, val serveDirectory: String, val signer: Jw
         if (location != wildcard) throw BadRequestException("Token does not match file - token had ${location}, path had ${it.wildcard}")
         if (wildcard.contains("..")) throw IllegalStateException()
         val file = rootFile.resolve(wildcard)
-        if(!file.exists()) throw NotFoundException("No file ${wildcard} found")
+        if (!file.exists()) throw NotFoundException("No file ${wildcard} found")
         val fileObject = LocalFile(this, file)
         if (!file.absolutePath.startsWith(rootFile.absolutePath)) throw IllegalStateException()
         val range = it.headers[HttpHeader.ContentRange] ?: it.headers[HttpHeader.Range]
+        val contentType = fileObject.contentTypeFile
+            .takeIf { it.exists() }
+            ?.readText()
+            ?.let { ContentType(it) }
+            ?: ContentType.Application.OctetStream
         if (range != null) {
-            val r = range.substringBefore('-').toLong() until range.substringAfter('-').toLong()
+            val trimmed = range.substringAfter("=")
+            val parts = trimmed.split(",").map { it.trim() }
+
+            val content = parts.map { part ->
+                val start = part.substringBefore('-').takeIf { it.isNotEmpty() }?.toLong() ?: 0
+                val end = part.substringAfter('-').takeIf { it.isNotEmpty() }?.toLong()
+                if (start == 0L && end == null) {
+                    HttpContent.Stream(
+                        getStream = { file.inputStream() },
+                        length = file.length(),
+                        type = contentType
+                    )
+                } else {
+                    val f = RandomAccessFile(file, "r")
+                    val array = if (end != null)
+                        ByteArray(end.minus(start).plus(1).coerceAtLeast(0L).toInt())
+                    else
+                        ByteArray(f.length().minus(start).plus(1).coerceAtLeast(0L).toInt())
+                    f.seek(start)
+                    f.readFully(array)
+                    HttpContent.Binary(
+                        bytes = array,
+                        type = contentType
+                    )
+                }
+            }
+
+            //TODO: Support sending multiple parts back. Currently it only uses the first part.
             HttpResponse(
-                body = HttpContent.Binary(
-                    bytes = run {
-                        val f = RandomAccessFile(file, "r")
-                        val array =
-                            ByteArray(r.run { (endInclusive - start + 1).coerceAtLeast(0L) }.toInt())
-                        f.seek(r.start)
-                        f.readFully(array)
-                        array
-                    },
-                    type = fileObject.contentTypeFile.takeIf { it.exists() }?.readText()?.let { ContentType(it) } ?: ContentType.Application.OctetStream
-                ),
+                body = content.first(),
             )
         } else {
             HttpResponse(
                 body = HttpContent.Stream(
                     getStream = { file.inputStream() },
                     length = file.length(),
-                    type = fileObject.contentTypeFile.takeIf { it.exists() }?.readText()?.let { ContentType(it) } ?: ContentType.Application.OctetStream
+                    type = contentType
                 ),
             )
         }
