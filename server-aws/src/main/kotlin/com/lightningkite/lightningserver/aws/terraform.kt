@@ -641,7 +641,9 @@ private fun handlers() {
         },
         domainOverride = { key ->
             TerraformSituationOverride(
-                inputs = listOf(),
+                inputs = listOf(
+                    inputString("reporting_email", null)
+                ),
                 resources = """
                     resource "aws_ses_domain_identity" "${key}" {
                       domain = var.domain_name
@@ -652,6 +654,40 @@ private fun handlers() {
                       type    = "TXT"
                       ttl     = "600"
                       records = [aws_ses_domain_identity.${key}.verification_token]
+                    }
+                    resource "aws_route53_record" "${key}_spf" {
+                      zone_id = data.aws_route53_zone.main.zone_id
+                      name    = var.domain_name
+                      type    = "TXT"
+                      ttl     = "300"
+                      records = [
+                        "v=spf1 include:amazonses.com -all"
+                      ]
+                    }
+                    resource "aws_ses_domain_identity" "${key}_domain_identity" {
+                      domain = var.domain_name
+                    }
+                    resource "aws_ses_domain_dkim" "${key}_dkim" {
+                      domain = aws_ses_domain_identity.${key}_domain_identity.domain
+                    }
+                    resource "aws_route53_record" "${key}_dkim_records" {
+                      count   = 3
+                      zone_id = data.aws_route53_zone.main.zone_id
+                      name    = "${'$'}{element(aws_ses_domain_dkim.${key}_dkim.dkim_tokens, count.index)}._domainkey.${'$'}{var.domain_name}"
+                      type    = "CNAME"
+                      ttl     = "300"
+                      records = [
+                        "${'$'}{element(aws_ses_domain_dkim.${key}_dkim.dkim_tokens, count.index)}.dkim.amazonses.com",
+                      ]
+                    }
+                    resource "aws_route53_record" "${key}_route_53_dmarc_txt" {
+                      zone_id = data.aws_route53_zone.main.zone_id
+                      name    = "_dmarc.${'$'}{var.domain_name}"
+                      type    = "TXT"
+                      ttl     = "300"
+                      records = [
+                        "v=DMARC1;p=quarantine;pct=75;rua=mailto:${'$'}{var.reporting_email}"
+                      ]
                     }
                 """.trimIndent(),
                 passOn = mapOf("${key}_sender" to "\"noreply@${'$'}{var.domain_name}\"")
