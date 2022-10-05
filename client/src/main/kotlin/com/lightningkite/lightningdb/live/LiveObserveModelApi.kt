@@ -2,10 +2,12 @@
 package com.lightningkite.lightningdb.live
 
 import com.lightningkite.khrysalis.SharedCode
+import com.lightningkite.khrysalis.SwiftReturnType
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.ListChange
 import com.lightningkite.lightningdb.Query
+import com.lightningkite.rx.okhttp.HttpClient
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.schedulers.Schedulers
 import java.util.*
@@ -66,9 +68,10 @@ fun <T : HasId<ID>, ID> Observable<ListChange<T>>.toListObservable(ordering: Com
 
 fun <T : HasId<ID>, ID: Comparable<ID>> Observable<WebSocketIsh<ListChange<T>, Query<T>>>.filter(query: Query<T>): Observable<List<T>> =
     this
-        .delay(100L, TimeUnit.MILLISECONDS)
+        .delay(200L, TimeUnit.MILLISECONDS)
         .doOnNext {
             it.send(query)
         }
         .switchMap { it.messages }
+        .retryWhen @SwiftReturnType("Observable<Error>") { it.delay(5000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!) }
         .toListObservable(query.orderBy.comparator ?: compareBy { it._id })

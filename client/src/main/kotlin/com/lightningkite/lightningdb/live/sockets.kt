@@ -27,14 +27,14 @@ fun sharedSocket(url: String): Observable<WebSocketInterface> {
 //                println("Connection to $shortUrl established, starting pings")
                 // Only have this observable until it fails
 
-                val pingMessages: Observable<WebSocketInterface> = Observable.interval(5000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!).map { _ ->
+                val pingMessages: Observable<WebSocketInterface> = Observable.interval(30_000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!).map { _ ->
 //                    println("Sending ping to $url")
                     it.write.onNext(WebSocketFrame(text = " "))
                 }.switchMap { Observable.never() }
 
                 val timeoutAfterSeconds: Observable<WebSocketInterface> = it.read
 //                    .doOnNext { println("Got message from $shortUrl: ${it}") }
-                    .timeout(10_000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!)
+                    .timeout(60_000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!)
                     .switchMap { Observable.never() }
 
                 Observable.merge(
@@ -43,9 +43,8 @@ fun sharedSocket(url: String): Observable<WebSocketInterface> {
                     timeoutAfterSeconds
                 )
             }
-//            .doOnError { println("Socket to $shortUrl FAILED with $it") }
-            .retryWhen @SwiftReturnType("Observable<Error>") { it.delay(1000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!) }
-            .doOnDispose {
+            .doOnError { println("Socket to $shortUrl FAILED with $it") }
+            .doOnComplete {
 //                println("Disconnecting socket to $shortUrl")
                 sharedSocketCache.remove(url)
             }
@@ -54,7 +53,6 @@ fun sharedSocket(url: String): Observable<WebSocketInterface> {
     }
 }
 
-class MultiplexedWebsocketPart(val messages: Observable<String>, val send: (String) -> Unit)
 class WebSocketIsh<IN: IsCodableAndHashable, OUT: IsCodableAndHashable>(val messages: Observable<IN>, val send: (OUT) -> Unit)
 
 @JsName("multiplexedSocketReified")
@@ -71,7 +69,19 @@ fun <IN: IsCodableAndHashableNotNull, OUT: IsCodableAndHashable> multiplexedSock
     queryParams: Map<String, List<String>> = mapOf(),
     inType: KSerializer<IN>,
     outType: KSerializer<OUT>
-): Observable<WebSocketIsh<IN, OUT>> {
+): Observable<WebSocketIsh<IN, OUT>> = multiplexedSocketRaw(url, path, queryParams)
+    .map {
+        WebSocketIsh(
+            messages = it.messages.mapNotNull { it.fromJsonString(inType) },
+            send = { m -> it.send(m.toJsonString(outType)) }
+        )
+    }
+@JsName("multiplexedSocket")
+fun multiplexedSocketRaw(
+    url: String,
+    path: String,
+    queryParams: Map<String, List<String>> = mapOf()
+): Observable<WebSocketIsh<String, String>> {
     val shortUrl = url.substringBefore('?')
     val channel = UUID.randomUUID().toString()
     var lastSocket: WebSocketInterface? = null
@@ -79,6 +89,7 @@ fun <IN: IsCodableAndHashableNotNull, OUT: IsCodableAndHashable> multiplexedSock
         .map {
 //            println("Setting up socket to $shortUrl with $path")
             lastSocket = it
+//            println("Connected to $it")
             it.write.onNext(
                 WebSocketFrame(
                     text = MultiplexMessage(
@@ -89,23 +100,20 @@ fun <IN: IsCodableAndHashableNotNull, OUT: IsCodableAndHashable> multiplexedSock
                     ).toJsonString()
                 )
             )
-            val part = MultiplexedWebsocketPart(
+            val part = WebSocketIsh<String, String>(
                 messages = it.read.mapNotNull {
-                    println("Got raw from websocket $it")
+//                    println("Got raw from websocket $it")
                     val text = it.text ?: return@mapNotNull null
                     if (text.isEmpty()) return@mapNotNull null
                     val message: MultiplexMessage = text.fromJsonString() ?: return@mapNotNull null
                     if(message.channel == channel) message.data else null
-                },
+                }.doOnSubscribe { _ -> println("Subscribed to listen to ${it}") },
                 send = { message ->
+//                    println("Sending $message to $it")
                     it.write.onNext(WebSocketFrame(text = MultiplexMessage(channel = channel, data = message).toJsonString()))
                 }
             )
-            val typedPart = WebSocketIsh<IN, OUT>(
-                messages = part.messages.mapNotNull { it.fromJsonString(inType) },
-                send = { m -> part.send(m.toJsonString(outType)) }
-            )
-            typedPart
+            part
         }
         .doOnDispose {
 //            println("Disconnecting channel on socket to $shortUrl with $path")

@@ -48,6 +48,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
 import software.amazon.awssdk.core.SdkBytes
+import software.amazon.awssdk.http.SdkHttpFullResponse
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.apigatewaymanagementapi.ApiGatewayManagementApiAsyncClient
 import software.amazon.awssdk.services.apigatewaymanagementapi.model.GoneException
@@ -108,15 +109,17 @@ abstract class AwsAdapter : RequestStreamHandler {
                                 )
                             }.await()
                             val r = result.sdkHttpResponse()
-                            if (!r.isSuccessful) {
-                                logger.warn(
+                            if (r.isSuccessful) {
+                                println("Sending $content to ${id} was successful")
+                            } else {
+                                throw Exception(
                                     "Failed to send socket message to $id: ${r.statusCode()} - ${
                                         try {
                                             r.statusText().get()
                                         } catch (e: Exception) {
                                             "?"
                                         }
-                                    }"
+                                    } - ${(r as? SdkHttpFullResponse)?.content()?.get()?.use { it.reader().readText() }}"
                                 )
                             }
                         } else {
@@ -125,15 +128,17 @@ abstract class AwsAdapter : RequestStreamHandler {
                                 it.data(SdkBytes.fromUtf8String(content))
                             }.await()
                             val r = result.sdkHttpResponse()
-                            if (!r.isSuccessful) {
-                                logger.warn(
+                            if (r.isSuccessful) {
+                                println("Sending $content to ${id} was successful")
+                            } else {
+                                throw Exception(
                                     "Failed to send socket message to $id: ${r.statusCode()} - ${
                                         try {
                                             r.statusText().get()
                                         } catch (e: Exception) {
                                             "?"
                                         }
-                                    }"
+                                    } - ${(r as? SdkHttpFullResponse)?.content()?.get()?.use { it.reader().readText() }}"
                                 )
                             }
                         }
