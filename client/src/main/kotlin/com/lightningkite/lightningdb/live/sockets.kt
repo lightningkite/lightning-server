@@ -76,7 +76,6 @@ fun <IN: IsCodableAndHashableNotNull, OUT: IsCodableAndHashable> multiplexedSock
             send = { m -> it.send(m.toJsonString(outType)) }
         )
     }
-@JsName("multiplexedSocket")
 fun multiplexedSocketRaw(
     url: String,
     path: String,

@@ -8,7 +8,7 @@ import { xListComparatorGet } from '../db/SortPart'
 import { WebSocketIsh, multiplexedSocketReified } from './sockets'
 import { Comparable, Comparator, EqualOverrideMap, compareBy, listRemoveAll, runOrNull, safeEq, xMutableMapGetOrPut } from '@lightningkite/khrysalis-runtime'
 import { NEVER, Observable } from 'rxjs'
-import { catchError, map, publishReplay, refCount, switchMap, tap } from 'rxjs/operators'
+import { catchError, delay, map, publishReplay, refCount, retryWhen, switchMap, tap } from 'rxjs/operators'
 
 //! Declares com.lightningkite.lightningdb.live.LiveObserveModelApi
 export class LiveObserveModelApi<Model extends HasId<string>> extends ObserveModelApi<Model> {
@@ -40,7 +40,7 @@ export namespace LiveObserveModelApi {
         public static INSTANCE = new Companion();
         
         public create<Model extends HasId<string>>(Model: Array<any>, multiplexUrl: string, token: string, headers: Map<string, string>, path: string): LiveObserveModelApi<Model> {
-            return new LiveObserveModelApi<Model>((query: Query<Model>): Observable<Array<Model>> => (xObservableToListObservable<Model>(multiplexedSocketReified<ListChange<Model>, Query<Model>>([ListChange, Model], [Query, Model], multiplexUrl, path, new Map([["jwt", [token]]]))
+            return new LiveObserveModelApi<Model>((query: Query<Model>): Observable<Array<Model>> => (xObservableToListObservable<Model, string>(multiplexedSocketReified<ListChange<Model>, Query<Model>>([ListChange, Model], [Query, Model], multiplexUrl, path, new Map([["jwt", [token]]]))
                     .pipe(switchMap((it: WebSocketIsh<ListChange<Model>, Query<Model>>): Observable<ListChange<Model>> => {
                     it.send(query);
                     return it.messages.pipe(catchError((it: any): Observable<ListChange<Model>> => (NEVER)));
@@ -50,7 +50,7 @@ export namespace LiveObserveModelApi {
 }
 
 //! Declares com.lightningkite.lightningdb.live.toListObservable>io.reactivex.rxjava3.core.Observablecom.lightningkite.lightningdb.ListChangecom.lightningkite.lightningdb.live.toListObservable.T
-export function xObservableToListObservable<T extends HasId<string>>(this_: Observable<ListChange<T>>, ordering: Comparator<T>): Observable<Array<T>> {
+export function xObservableToListObservable<T extends HasId<ID>, ID extends Comparable<ID>>(this_: Observable<ListChange<T>>, ordering: Comparator<T>): Observable<Array<T>> {
     const localList = ([] as Array<T>);
     return this_.pipe(map((it: ListChange<T>): Array<T> => {
         const it_12 = it.wholeList;
@@ -71,4 +71,15 @@ export function xObservableToListObservable<T extends HasId<string>>(this_: Obse
         }
         return localList;
     }));
+}
+
+//! Declares com.lightningkite.lightningdb.live.filter>io.reactivex.rxjava3.core.Observablecom.lightningkite.lightningdb.live.WebSocketIshcom.lightningkite.lightningdb.ListChangecom.lightningkite.lightningdb.live.filter.T, com.lightningkite.lightningdb.Querycom.lightningkite.lightningdb.live.filter.T
+export function xObservableFilter<T extends HasId<ID>, ID extends Comparable<ID>>(this_: Observable<WebSocketIsh<ListChange<T>, Query<T>>>, query: Query<T>): Observable<Array<T>> {
+    return xObservableToListObservable<T, ID>(this_
+            .pipe(delay(200))
+            .pipe(tap((it: WebSocketIsh<ListChange<T>, Query<T>>): void => {
+            it.send(query);
+        }))
+            .pipe(switchMap((it: WebSocketIsh<ListChange<T>, Query<T>>): Observable<ListChange<T>> => (it.messages)))
+        .pipe(retryWhen( (it: Observable<any>): Observable<any> => (it.pipe(delay(5000))))), xListComparatorGet(query.orderBy) ?? compareBy<T>((it: T): (Comparable<(any | null)> | null) => (it._id)));
 }

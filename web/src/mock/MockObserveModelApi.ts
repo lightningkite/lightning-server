@@ -4,7 +4,7 @@ import { ObserveModelApi } from '../ObserveModelApi'
 import { HasId } from '../db/HasId'
 import { Query } from '../db/Query'
 import { MockTable } from './MockTable'
-import { Observable, concat, of } from 'rxjs'
+import { Observable, startWith } from 'rxjs'
 
 //! Declares com.lightningkite.lightningdb.mock.MockObserveModelApi
 export class MockObserveModelApi<Model extends HasId<string>> extends ObserveModelApi<Model> {
@@ -13,6 +13,6 @@ export class MockObserveModelApi<Model extends HasId<string>> extends ObserveMod
     }
     
     public observe(query: Query<Model>): Observable<Array<Model>> {
-        return concat(of(this.table.asList().filter((item: Model): boolean => (query.condition.invoke(item)))), this.table.observe(query.condition));
+        return this.table.observe(query.condition).pipe(startWith(this.table.asList().filter((item: Model): boolean => (query.condition.invoke(item)))));
     }
 }

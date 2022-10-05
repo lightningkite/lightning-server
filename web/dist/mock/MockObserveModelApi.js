@@ -12,7 +12,7 @@ class MockObserveModelApi extends ObserveModelApi_1.ObserveModelApi {
         this.table = table;
     }
     observe(query) {
-        return (0, rxjs_1.concat)((0, rxjs_1.of)(this.table.asList().filter((item) => (query.condition.invoke(item)))), this.table.observe(query.condition));
+        return this.table.observe(query.condition).pipe((0, rxjs_1.startWith)(this.table.asList().filter((item) => (query.condition.invoke(item)))));
     }
 }
 exports.MockObserveModelApi = MockObserveModelApi;
