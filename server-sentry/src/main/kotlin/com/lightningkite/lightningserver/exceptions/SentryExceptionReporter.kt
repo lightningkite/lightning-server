@@ -111,6 +111,7 @@ class SentryExceptionReporter(val dsn: String): ExceptionReporter {
             }
             else -> {
                 ctx.clear()
+                ctx.addExtra("customContext", context.toString())
                 Sentry.capture(t)
                 ctx.clear()
             }
