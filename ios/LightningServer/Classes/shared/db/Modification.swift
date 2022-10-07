@@ -113,7 +113,7 @@ public final class ModificationIfNotNull<T : Codable & Hashable> : Modification<
     public func copy(_ modification: Modification<T>? = nil) -> ModificationIfNotNull<T> { return ModificationIfNotNull(modification ?? self.modification) }
     
     override public func invoke(on: T?) -> T? {
-        return on.flatMap { temp81 in ({ (it) -> T in self.modification.invoke(on: it) })(temp81) };
+        return on.flatMap { temp77 in ({ (it) -> T in self.modification.invoke(on: it) })(temp77) };
     }
     override public func invokeDefault() -> T? {
         return nil;
