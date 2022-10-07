@@ -48,7 +48,6 @@ public func xObservableToListObservable<T : HasId>(_ this: Observable<ListChange
 
 public func xObservableFilter<T : HasId>(_ this: Observable<WebSocketIsh<ListChange<T>, Query<T>>>, _ query: Query<T>) -> Observable<Array<T>> {
     return xObservableToListObservable(this
-            .delay(.milliseconds(200), scheduler: MainScheduler.instance)
             .doOnNext { (it) -> Void in it.send(query) }
             .switchMap { (it) -> Observable<ListChange<T>> in it.messages }
         .retry(when:  { (it) -> Observable<Error> in it.delay(.milliseconds(5000), scheduler: MainScheduler.instance) }), ordering: getListComparator(query.orderBy) ?? compareBy(selector: { (it) in it._id }));
@@ -61,10 +60,6 @@ public final class LiveObserveModelApiCompanion {
     public static let INSTANCE = LiveObserveModelApiCompanion()
     
     public func create<Model : HasId>(multiplexUrl: String, token: String, headers: Dictionary<String, String>, path: String) -> LiveObserveModelApi<Model> {
-        return LiveObserveModelApi<Model>(openSocket: { (query) -> Observable<Array<Model>> in xObservableToListObservable((multiplexedSocket(url: multiplexUrl, path: path, queryParams: dictionaryOf(Pair("jwt", [token]))) as Observable<WebSocketIsh<ListChange<Model>, Query<Model>>>)
-                .switchMap { (it) -> Observable<ListChange<Model>> in
-                it.send(query)
-                return it.messages.catchError({ (it) -> Observable<ListChange<Model>> in Observable.never() })
-        }, ordering: getListComparator(query.orderBy) ?? compareBy(selector: { (it) in it._id })) });
+        return LiveObserveModelApi<Model>(openSocket: { (query) -> Observable<Array<Model>> in xObservableFilter((multiplexedSocket(url: multiplexUrl, path: path, queryParams: dictionaryOf(Pair("jwt", [token]))) as Observable<WebSocketIsh<ListChange<Model>, Query<Model>>>), query) });
     }
 }

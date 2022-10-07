@@ -4,7 +4,7 @@ import { MultiplexMessage } from '../db/MultiplexMessage'
 import { ReifiedType, runOrNull, xMutableMapGetOrPut, xStringSubstringBefore } from '@lightningkite/khrysalis-runtime'
 import { HttpClient, JSON2, WebSocketFrame, WebSocketInterface, doOnSubscribe, isNonNull } from '@lightningkite/rxjs-plus'
 import { NEVER, Observable, SubscriptionLike, filter, interval, merge, of, map as rMap } from 'rxjs'
-import { map, publishReplay, refCount, switchMap, tap, timeout } from 'rxjs/operators'
+import { map, filter as oFilter, publishReplay, refCount, switchMap, take, tap, timeout } from 'rxjs/operators'
 import { v4 as randomUuidV4 } from 'uuid'
 
 //! Declares com.lightningkite.lightningdb.live._overrideWebSocketProvider
@@ -69,32 +69,33 @@ export function multiplexedSocketRaw(url: string, path: string, queryParams: Map
     const channel = randomUuidV4();
     let lastSocket: (WebSocketInterface | null) = null;
     return sharedSocket(url)
-        .pipe(map((it: WebSocketInterface): WebSocketIsh<string, string> => {
+        .pipe(switchMap((it: WebSocketInterface): Observable<WebSocketIsh<string, string>> => {
         //            println("Setting up socket to $shortUrl with $path")
         lastSocket = it;
         //            println("Connected to $it")
-        it.write.next({ text: JSON.stringify(new MultiplexMessage(channel, path, queryParams, true, undefined, undefined, undefined)), binary: null });
-        const part = new WebSocketIsh<string, string>(it.read.pipe(rMap((it: WebSocketFrame): (string | null) => {
-                        //                    println("Got raw from websocket $it")
-                        const text = it.text
-                        if(text === null) { return null }
-                        if (text === "") { return null }
-                        const message: MultiplexMessage | null = JSON2.parse<(MultiplexMessage | null)>(text, [MultiplexMessage])
-                        if(message === null) { return null }
-                        return message.channel === channel ? message.data : null
-            }), filter(isNonNull)).pipe(doOnSubscribe((_0: SubscriptionLike): void => {
-                console.log(`Subscribed to listen to ${it}`);
-            })), (message: string): void => {
-                //                    println("Sending $message to $it")
-                it.write.next({ text: JSON.stringify(new MultiplexMessage(channel, undefined, undefined, undefined, undefined, message, undefined)), binary: null });
-        });
-        return part;
+        const multiplexedIn = it.read.pipe(rMap((it: WebSocketFrame): (MultiplexMessage | null) => {
+            //                    println("Got raw from websocket $it")
+            const text = it.text
+            if(text === null) { return null }
+            if (text === "") { return null }
+            return JSON2.parse<MultiplexMessage>(text, [MultiplexMessage]);
+        }), filter(isNonNull));
+        return multiplexedIn
+            .pipe(oFilter((it: MultiplexMessage): boolean => (it.channel === channel && it.start)))
+            .pipe(take(1))
+            .pipe(map((_0: MultiplexMessage): WebSocketIsh<string, string> => (new WebSocketIsh<string, string>(multiplexedIn.pipe(rMap((it: MultiplexMessage): (string | null) => (it.channel === channel ? it.data : null)), filter(isNonNull)), (message: string): void => {
+            //                    println("Sending $message to $it")
+            it.write.next({ text: JSON.stringify(new MultiplexMessage(channel, undefined, undefined, undefined, undefined, message, undefined)), binary: null });
+        }))))
+            .pipe(doOnSubscribe((_0: SubscriptionLike): void => {
+            it.write.next({ text: JSON.stringify(new MultiplexMessage(channel, path, queryParams, true, undefined, undefined, undefined)), binary: null });
+        }));
     }))
         .pipe(tap({ unsubscribe: (): void => {
         //            println("Disconnecting channel on socket to $shortUrl with $path")
-        const temp43 = (lastSocket?.write ?? null);
-        if (temp43 !== null) {
-            temp43.next({ text: JSON.stringify(new MultiplexMessage(channel, path, undefined, undefined, true, undefined, undefined)), binary: null })
+        const temp49 = (lastSocket?.write ?? null);
+        if (temp49 !== null && temp49 !== undefined) {
+            temp49.next({ text: JSON.stringify(new MultiplexMessage(channel, path, undefined, undefined, true, undefined, undefined)), binary: null })
         };
     } }));
 }

@@ -95,6 +95,7 @@ class DynamoDbCache(val client: DynamoDbAsyncClient, val tableName: String = "ca
         ready.await()
         val r = client.getItem {
             it.tableName(tableName)
+            it.consistentRead(true)
             it.key(mapOf("key" to AttributeValue.fromS(key)))
         }.await()
         if (r.hasItem()) {

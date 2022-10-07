@@ -229,7 +229,7 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                                         )
                                         send(Serialization.json.encodeToString(message))
                                     } catch (e: Exception) {
-                                        send(Serialization.json.encodeToString(message.copy(error = e.message)))
+                                        send(Serialization.json.encodeToString(message.copy(start = false, error = e.message)))
                                     }
                                 }
 

@@ -30,7 +30,7 @@ class MockWriteModelApi extends WriteModelApi_1.WriteModelApi {
         return (_a = (() => {
             var _a;
             const temp6 = ((_a = this.table.data.get(id)) !== null && _a !== void 0 ? _a : null);
-            if (temp6 === null) {
+            if (temp6 === null || temp6 === undefined) {
                 return null;
             }
             return ((item) => {

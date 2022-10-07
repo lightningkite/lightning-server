@@ -109,9 +109,7 @@ abstract class AwsAdapter : RequestStreamHandler {
                                 )
                             }.await()
                             val r = result.sdkHttpResponse()
-                            if (r.isSuccessful) {
-                                println("Sending $content to ${id} was successful")
-                            } else {
+                            if (!r.isSuccessful) {
                                 throw Exception(
                                     "Failed to send socket message to $id: ${r.statusCode()} - ${
                                         try {
@@ -128,9 +126,7 @@ abstract class AwsAdapter : RequestStreamHandler {
                                 it.data(SdkBytes.fromUtf8String(content))
                             }.await()
                             val r = result.sdkHttpResponse()
-                            if (r.isSuccessful) {
-                                println("Sending $content to ${id} was successful")
-                            } else {
+                            if (!r.isSuccessful) {
                                 throw Exception(
                                     "Failed to send socket message to $id: ${r.statusCode()} - ${
                                         try {
@@ -265,6 +261,7 @@ abstract class AwsAdapter : RequestStreamHandler {
             (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v } }
 
         suspend fun isMultiplex() = cache().get<Boolean>("${event.requestContext.connectionId}-isMultiplex") == true
+        val multiplexSetId = event.requestContext.connectionId + "-channels"
         return when (event.requestContext.routeKey) {
             "\$connect" -> {
                 val path = headers["x-path"] ?: queryParams.find { it.first == "path" }?.second ?: ""
@@ -283,10 +280,10 @@ abstract class AwsAdapter : RequestStreamHandler {
                 val isMultiplex = isMultiplex()
                 cache().remove("${event.requestContext.connectionId}-isMultiplex")
                 if (isMultiplex) {
-                    cache().get<Set<String>>(event.requestContext.connectionId)?.forEach {
+                    cache().get<Set<String>>(multiplexSetId)?.forEach {
                         handleWebsocketDisconnect(event.requestContext.connectionId + "/" + it)
                     }
-                    cache().remove(event.requestContext.connectionId)
+                    cache().remove(multiplexSetId)
                     APIGatewayV2HTTPResponse(200)
                 } else handleWebsocketDisconnect(event.requestContext.connectionId)
             }
@@ -302,22 +299,43 @@ abstract class AwsAdapter : RequestStreamHandler {
                 val cacheId = event.requestContext.connectionId + "/" + message.channel
                 when {
                     message.start -> {
-                        handleWebsocketConnect(
-                            event,
-                            cacheId,
-                            message.path!!,
-                            message.queryParams ?: mapOf()
-                        ).also {
-                            if (it.statusCode == 200) {
-                                cache().modify<Set<String>>(event.requestContext.connectionId, 40, timeToLive = Duration.ofHours(8)) {
-                                    it?.plus(message.channel) ?: setOf(message.channel)
+                        try {
+                            val result = handleWebsocketConnect(
+                                event,
+                                cacheId,
+                                message.path!!,
+                                message.queryParams ?: mapOf()
+                            ).also {
+                                if (it.statusCode == 200) {
+                                    cache().modify<Set<String>>(multiplexSetId, 40, timeToLive = Duration.ofHours(8)) {
+                                        it?.plus(message.channel) ?: setOf(message.channel)
+                                    }
                                 }
                             }
+                            WebSockets.send(
+                                event.requestContext.connectionId, Serialization.json.encodeToString(
+                                    MultiplexMessage(
+                                        channel = message.channel,
+                                        start = true
+                                    )
+                                )
+                            )
+                            result
+                        } catch(e: Exception) {
+                            WebSockets.send(
+                                event.requestContext.connectionId, Serialization.json.encodeToString(
+                                    MultiplexMessage(
+                                        channel = message.channel,
+                                        error = e.message
+                                    )
+                                )
+                            )
+                            throw e
                         }
                     }
 
                     message.end -> {
-                        cache().modify<Set<String>>(event.requestContext.connectionId, 40, timeToLive = Duration.ofHours(8)) {
+                        cache().modify<Set<String>>(multiplexSetId, 40, timeToLive = Duration.ofHours(8)) {
                             it?.minus(message.channel) ?: setOf(message.channel)
                         }
                         handleWebsocketDisconnect(cacheId)

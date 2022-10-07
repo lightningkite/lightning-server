@@ -29,12 +29,7 @@ class LiveObserveModelApi<Model : HasId<UUID>>(
                     multiplexUrl,
                     path,
                     queryParams = mapOf("jwt" to listOf(token))
-                )
-                    .switchMap {
-                        it.send(query)
-                        it.messages.onErrorResumeNext { Observable.never() }
-                    }
-                    .toListObservable(query.orderBy.comparator ?: compareBy { it._id })
+                ).filter(query)
             }
         )
     }
@@ -68,7 +63,6 @@ fun <T : HasId<ID>, ID:Comparable<ID>> Observable<ListChange<T>>.toListObservabl
 
 fun <T : HasId<ID>, ID: Comparable<ID>> Observable<WebSocketIsh<ListChange<T>, Query<T>>>.filter(query: Query<T>): Observable<List<T>> =
     this
-        .delay(200L, TimeUnit.MILLISECONDS)
         .doOnNext {
             it.send(query)
         }

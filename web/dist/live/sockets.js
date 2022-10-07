@@ -74,12 +74,11 @@ function multiplexedSocketRaw(url, path, queryParams = new Map([])) {
     const channel = (0, uuid_1.v4)();
     let lastSocket = null;
     return sharedSocket(url)
-        .pipe((0, operators_1.map)((it) => {
+        .pipe((0, operators_1.switchMap)((it) => {
         //            println("Setting up socket to $shortUrl with $path")
         lastSocket = it;
         //            println("Connected to $it")
-        it.write.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, queryParams, true, undefined, undefined, undefined)), binary: null });
-        const part = new WebSocketIsh(it.read.pipe((0, rxjs_1.map)((it) => {
+        const multiplexedIn = it.read.pipe((0, rxjs_1.map)((it) => {
             //                    println("Got raw from websocket $it")
             const text = it.text;
             if (text === null) {
@@ -88,25 +87,25 @@ function multiplexedSocketRaw(url, path, queryParams = new Map([])) {
             if (text === "") {
                 return null;
             }
-            const message = rxjs_plus_1.JSON2.parse(text, [MultiplexMessage_1.MultiplexMessage]);
-            if (message === null) {
-                return null;
-            }
-            return message.channel === channel ? message.data : null;
-        }), (0, rxjs_1.filter)(rxjs_plus_1.isNonNull)).pipe((0, rxjs_plus_1.doOnSubscribe)((_0) => {
-            console.log(`Subscribed to listen to ${it}`);
-        })), (message) => {
+            return rxjs_plus_1.JSON2.parse(text, [MultiplexMessage_1.MultiplexMessage]);
+        }), (0, rxjs_1.filter)(rxjs_plus_1.isNonNull));
+        return multiplexedIn
+            .pipe((0, operators_1.filter)((it) => (it.channel === channel && it.start)))
+            .pipe((0, operators_1.take)(1))
+            .pipe((0, operators_1.map)((_0) => (new WebSocketIsh(multiplexedIn.pipe((0, rxjs_1.map)((it) => (it.channel === channel ? it.data : null)), (0, rxjs_1.filter)(rxjs_plus_1.isNonNull)), (message) => {
             //                    println("Sending $message to $it")
             it.write.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, undefined, undefined, undefined, undefined, message, undefined)), binary: null });
-        });
-        return part;
+        }))))
+            .pipe((0, rxjs_plus_1.doOnSubscribe)((_0) => {
+            it.write.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, queryParams, true, undefined, undefined, undefined)), binary: null });
+        }));
     }))
         .pipe((0, operators_1.tap)({ unsubscribe: () => {
             var _a;
             //            println("Disconnecting channel on socket to $shortUrl with $path")
-            const temp43 = ((_a = lastSocket === null || lastSocket === void 0 ? void 0 : lastSocket.write) !== null && _a !== void 0 ? _a : null);
-            if (temp43 !== null) {
-                temp43.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, undefined, undefined, true, undefined, undefined)), binary: null });
+            const temp49 = ((_a = lastSocket === null || lastSocket === void 0 ? void 0 : lastSocket.write) !== null && _a !== void 0 ? _a : null);
+            if (temp49 !== null && temp49 !== undefined) {
+                temp49.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, undefined, undefined, true, undefined, undefined)), binary: null });
             }
             ;
         } }));

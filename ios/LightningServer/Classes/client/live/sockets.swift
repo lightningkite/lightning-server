@@ -31,7 +31,7 @@ public func sharedSocket(url: String) -> Observable<WebSocketInterface> {
     }
 }
 
-public final class WebSocketIsh<IN, OUT> {
+public final class WebSocketIsh<IN : Any, OUT> {
     public var messages: Observable<IN>
     public var send: (OUT) -> Void
     public init(messages: Observable<IN>, send: @escaping (OUT) -> Void) {
@@ -54,20 +54,22 @@ public func multiplexedSocketRaw(url: String, path: String, queryParams: Diction
     let channel = String(kotlin: UUID.randomUUID())
     var lastSocket: WebSocketInterface? = nil
     return sharedSocket(url: url)
-        .map { (it) -> WebSocketIsh<String, String> in
+        .flatMap({ (it) -> Single<WebSocketIsh<String, String>> in
         //            println("Setting up socket to $shortUrl with $path")
         lastSocket = it
         //            println("Connected to $it")
-        it.write.onNext(WebSocketFrame(text: MultiplexMessage(channel: channel, path: path, queryParams: queryParams, start: true).toJsonString()))
-        let part = (WebSocketIsh(messages: it.read.compactMap({ (it) -> String? in
+        let multiplexedIn = it.read.compactMap({ (it) -> MultiplexMessage? in
             //                    println("Got raw from websocket $it")
             guard let text = it.text else { return nil }
             if text.isEmpty { return nil }
-            guard let message: MultiplexMessage = text.fromJsonString() else { return nil }
-            return message.channel == channel ? message.data : nil
-        }).doOnSubscribe { (_) -> Void in print("Subscribed to listen to \(it)") } as Observable<String>, send: { (message) -> Void in it.write.onNext(WebSocketFrame(text: MultiplexMessage(channel: channel, data: message).toJsonString())) } as (String) -> Void) as WebSocketIsh<String, String>)
-        return part
-    }
+            return (text.fromJsonString() as MultiplexMessage?)
+        })
+        return multiplexedIn
+            .filter { (it) -> Bool in it.channel == channel && it.start }
+            .firstOrError()
+            .map { (_) -> WebSocketIsh<String, String> in (WebSocketIsh(messages: multiplexedIn.compactMap({ (it) -> String? in it.channel == channel ? it.data : nil }) as Observable<String>, send: { (message) -> Void in it.write.onNext(WebSocketFrame(text: MultiplexMessage(channel: channel, data: message).toJsonString())) } as (String) -> Void) as WebSocketIsh<String, String>) }
+            .doOnSubscribe { (_) -> Void in it.write.onNext(WebSocketFrame(text: MultiplexMessage(channel: channel, path: path, queryParams: queryParams, start: true).toJsonString())) }
+    })
         .doOnDispose { () -> Void in lastSocket?.write.onNext(WebSocketFrame(text: MultiplexMessage(channel: channel, path: path, end: true).toJsonString())) }
 }
 

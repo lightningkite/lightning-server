@@ -38,7 +38,7 @@ export class MockWriteModelApi<Model extends HasId<string>> extends WriteModelAp
     public patch(id: UUIDFor<Model>, modification: Modification<Model>): Observable<Model> {
         return ((): (Observable<Model> | null) => {
             const temp6 = (this.table.data.get(id) ?? null);
-            if (temp6 === null) { return null }
+            if (temp6 === null || temp6 === undefined) { return null }
             return ((item: Model): Observable<Model> => {
                 const modified = modification.invoke(item);
                 this.table.replaceItem(modified);

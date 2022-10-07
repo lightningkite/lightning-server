@@ -29,7 +29,7 @@ export class MockReadModelApi<Model extends HasId<string>> extends ReadModelApi<
     public get(id: UUIDFor<Model>): Observable<Model> {
         return ((): (Observable<Model> | null) => {
             const temp9 = this.table.getItem(id);
-            if (temp9 === null) { return null }
+            if (temp9 === null || temp9 === undefined) { return null }
             return ((it: Model): Observable<Model> => (of(it)))(temp9)
         })() ?? throwError(new ItemNotFound(`404 item with key ${id} not found`));
     }

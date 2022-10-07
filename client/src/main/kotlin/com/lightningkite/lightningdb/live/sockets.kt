@@ -53,7 +53,7 @@ fun sharedSocket(url: String): Observable<WebSocketInterface> {
     }
 }
 
-class WebSocketIsh<IN: IsCodableAndHashable, OUT: IsCodableAndHashable>(val messages: Observable<IN>, val send: (OUT) -> Unit)
+class WebSocketIsh<IN: Any, OUT>(val messages: Observable<IN>, val send: (OUT) -> Unit)
 
 @JsName("multiplexedSocketReified")
 inline fun <reified IN: IsCodableAndHashableNotNull, reified OUT: IsCodableAndHashable> multiplexedSocket(
@@ -85,34 +85,42 @@ fun multiplexedSocketRaw(
     val channel = UUID.randomUUID().toString()
     var lastSocket: WebSocketInterface? = null
     return sharedSocket(url)
-        .map {
+        .switchMapSingle {
 //            println("Setting up socket to $shortUrl with $path")
             lastSocket = it
 //            println("Connected to $it")
-            it.write.onNext(
-                WebSocketFrame(
-                    text = MultiplexMessage(
-                        channel = channel,
-                        path = path,
-                        queryParams = queryParams,
-                        start = true
-                    ).toJsonString()
-                )
-            )
-            val part = WebSocketIsh<String, String>(
-                messages = it.read.mapNotNull {
+            val multiplexedIn = it.read.mapNotNull {
 //                    println("Got raw from websocket $it")
-                    val text = it.text ?: return@mapNotNull null
-                    if (text.isEmpty()) return@mapNotNull null
-                    val message: MultiplexMessage = text.fromJsonString() ?: return@mapNotNull null
-                    if(message.channel == channel) message.data else null
-                }.doOnSubscribe { _ -> println("Subscribed to listen to ${it}") },
-                send = { message ->
+                val text = it.text ?: return@mapNotNull null
+                if (text.isEmpty()) return@mapNotNull null
+                text.fromJsonString<MultiplexMessage>()
+            }
+            multiplexedIn
+                .filter { it.channel == channel && it.start }
+                .firstOrError()
+                .map { _ ->
+                    WebSocketIsh<String, String>(
+                        messages = multiplexedIn.mapNotNull {
+                            if(it.channel == channel) it.data else null
+                        },
+                        send = { message ->
 //                    println("Sending $message to $it")
-                    it.write.onNext(WebSocketFrame(text = MultiplexMessage(channel = channel, data = message).toJsonString()))
+                            it.write.onNext(WebSocketFrame(text = MultiplexMessage(channel = channel, data = message).toJsonString()))
+                        }
+                    )
                 }
-            )
-            part
+                .doOnSubscribe { _ ->
+                    it.write.onNext(
+                        WebSocketFrame(
+                            text = MultiplexMessage(
+                                channel = channel,
+                                path = path,
+                                queryParams = queryParams,
+                                start = true
+                            ).toJsonString()
+                        )
+                    )
+                }
         }
         .doOnDispose {
 //            println("Disconnecting channel on socket to $shortUrl with $path")

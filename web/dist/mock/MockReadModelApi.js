@@ -27,7 +27,7 @@ class MockReadModelApi extends ReadModelApi_1.ReadModelApi {
         var _a;
         return (_a = (() => {
             const temp9 = this.table.getItem(id);
-            if (temp9 === null) {
+            if (temp9 === null || temp9 === undefined) {
                 return null;
             }
             return ((it) => ((0, rxjs_1.of)(it)))(temp9);
