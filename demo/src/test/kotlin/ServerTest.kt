@@ -13,21 +13,21 @@ import org.junit.Test
 
 class ServerTest {
     @Test fun test() {
-        defaultJsonMapper = Serialization.Internal.json
-        val m = LiveObserveModelApi.create<TestModel>(
-            multiplexUrl = "wss://ws.example.demo.ivieleague.com?path=multiplex",
-            token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuZGVtby5pdmllbGVhZ3VlLmNvbSIsInN1YiI6Ijc4ZDBmNWI5LTZkMTgtNGYwMC05ZjZhLWYyMjk0YTY0OTQ3OCIsImF1ZCI6Imh0dHBzOi8vZXhhbXBsZS5kZW1vLml2aWVsZWFndWUuY29tIiwiZXhwIjoxNjk1MzM4MjU0LCJpYXQiOjE2NjM4MDIyNTR9.5tKOXfNCgiFVcrd946e0rhBh853kedzNJvqjtlJDTCg=",
-            headers = mapOf(),
-            path = "test-model/rest"
-        )
-        HttpClient.ioScheduler = Schedulers.io()
-        HttpClient.responseScheduler = Schedulers.computation()
-        m.observe(Query())
-            .blockingSubscribeBy(
-                onError = { it.printStackTrace() },
-                onNext = {
-                    println(it)
-                }
-            )
+//        defaultJsonMapper = Serialization.Internal.json
+//        val m = LiveObserveModelApi.create<TestModel>(
+//            multiplexUrl = "wss://ws.example.demo.ivieleague.com?path=multiplex",
+//            token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuZGVtby5pdmllbGVhZ3VlLmNvbSIsInN1YiI6Ijc4ZDBmNWI5LTZkMTgtNGYwMC05ZjZhLWYyMjk0YTY0OTQ3OCIsImF1ZCI6Imh0dHBzOi8vZXhhbXBsZS5kZW1vLml2aWVsZWFndWUuY29tIiwiZXhwIjoxNjk1MzM4MjU0LCJpYXQiOjE2NjM4MDIyNTR9.5tKOXfNCgiFVcrd946e0rhBh853kedzNJvqjtlJDTCg=",
+//            headers = mapOf(),
+//            path = "test-model/rest"
+//        )
+//        HttpClient.ioScheduler = Schedulers.io()
+//        HttpClient.responseScheduler = Schedulers.computation()
+//        m.observe(Query())
+//            .blockingSubscribeBy(
+//                onError = { it.printStackTrace() },
+//                onNext = {
+//                    println(it)
+//                }
+//            )
     }
 }
