@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.engine
 import com.lightningkite.lightningserver.cache.CacheInterface
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.set
+import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.pubsub.PubSubInterface
 import com.lightningkite.lightningserver.pubsub.get
 import com.lightningkite.lightningserver.tasks.Task
@@ -41,7 +42,9 @@ class LocalEngine(val pubSub: PubSubInterface, val cache: CacheInterface): Engin
         logger.debug("Launching ${task.name} with $input")
         GlobalScope.launch {
             logger.debug("Executing ${task.name} with $input")
-            task.implementation(this, input)
+            Metrics.handlerPerformance(task) {
+                task.implementation(this, input)
+            }
         }
     }
 }

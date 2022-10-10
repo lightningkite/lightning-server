@@ -20,6 +20,7 @@ import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.handler
 import com.lightningkite.lightningserver.meta.metaEndpoints
+import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.FileRedirectHandler
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -45,6 +46,7 @@ object Server : ServerPathGroup(ServerPath.root) {
     val cache = setting("cache", CacheSettings())
 
     init {
+        Metrics
         SesClient
         PostgresDatabase
         DynamoDbCache
@@ -53,6 +55,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         S3FileSystem
         prepareModels()
         Tasks.onSettingsReady {
+            Metrics.main()
             println("Files started, got ${files().root.url}")
         }
         Serialization.handler(FileRedirectHandler)

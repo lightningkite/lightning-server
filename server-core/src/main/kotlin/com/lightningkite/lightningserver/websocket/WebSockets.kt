@@ -28,6 +28,12 @@ object WebSockets {
     ) {
         fun queryParameter(key: String): String? = queryParameters.find { it.first == key }?.second
     }
+    enum class WsHandlerType {
+        CONNECT, MESSAGE, DISCONNECT
+    }
+    data class HandlerSection(val path: ServerPath, val type: WsHandlerType){
+        override fun toString(): String = "$type $path"
+    }
     data class MessageEvent(val id: String, val content: String)
     data class DisconnectEvent(val id: String)
     suspend fun send(id: String, content: String): Boolean {

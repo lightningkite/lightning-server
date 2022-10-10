@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.pubsub.PubSubInterface
 import com.lightningkite.lightningserver.pubsub.get
 import com.lightningkite.lightningserver.schedule.Schedule
@@ -140,34 +141,40 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                     val handler = WebSockets.handlers[entry.path] ?: throw NotFoundException()
                     val id = UUID.randomUUID().toString()
                     try {
-                        handler.connect(
-                            WebSockets.ConnectEvent(
-                                path = entry.path,
-                                parts = entry.parts,
-                                wildcard = entry.wildcard,
-                                queryParameters = call.request.queryParameters.flattenEntries(),
-                                id = id,
-                                headers = call.request.headers.adapt(),
-                                domain = call.request.origin.host,
-                                protocol = call.request.origin.scheme,
-                                sourceIp = call.request.origin.remoteHost
+                        Metrics.handlerPerformance(WebSockets.HandlerSection(entry.path, WebSockets.WsHandlerType.CONNECT)) {
+                            handler.connect(
+                                WebSockets.ConnectEvent(
+                                    path = entry.path,
+                                    parts = entry.parts,
+                                    wildcard = entry.wildcard,
+                                    queryParameters = call.request.queryParameters.flattenEntries(),
+                                    id = id,
+                                    headers = call.request.headers.adapt(),
+                                    domain = call.request.origin.host,
+                                    protocol = call.request.origin.scheme,
+                                    sourceIp = call.request.origin.remoteHost
+                                )
                             )
-                        )
+                        }
                         launch {
                             pubSub.get<String>("ws-$id").collect {
                                 send(it)
                             }
                         }
                         for (incoming in this.incoming) {
-                            handler.message(
-                                WebSockets.MessageEvent(
-                                    id = id,
-                                    content = (incoming as? Frame.Text)?.readText() ?: ""
+                            Metrics.handlerPerformance(WebSockets.HandlerSection(entry.path, WebSockets.WsHandlerType.MESSAGE)) {
+                                handler.message(
+                                    WebSockets.MessageEvent(
+                                        id = id,
+                                        content = (incoming as? Frame.Text)?.readText() ?: ""
+                                    )
                                 )
-                            )
+                            }
                         }
                     } finally {
-                        handler.disconnect(WebSockets.DisconnectEvent(id))
+                        Metrics.handlerPerformance(WebSockets.HandlerSection(entry.path, WebSockets.WsHandlerType.DISCONNECT)) {
+                            handler.disconnect(WebSockets.DisconnectEvent(id))
+                        }
                     }
                 } ?: run {
 
@@ -218,15 +225,18 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                                         }
                                     }
                                     try {
-                                        handler.connect(
-                                            connectEvent.copy(
-                                                path = match.path,
-                                                parts = match.parts,
-                                                wildcard = match.wildcard,
-                                                queryParameters = message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf(),
-                                                id = cacheId
+                                        Metrics.handlerPerformance(WebSockets.HandlerSection(match.path, WebSockets.WsHandlerType.CONNECT)) {
+                                            handler.connect(
+                                                connectEvent.copy(
+                                                    path = match.path,
+                                                    parts = match.parts,
+                                                    wildcard = match.wildcard,
+                                                    queryParameters = message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } }
+                                                        ?: listOf(),
+                                                    id = cacheId
+                                                )
                                             )
-                                        )
+                                        }
                                         send(Serialization.json.encodeToString(message))
                                     } catch (e: Exception) {
                                         send(Serialization.json.encodeToString(message.copy(start = false, error = e.message)))
@@ -248,7 +258,9 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                                     }
                                     jobs[message.channel]?.cancel()
                                     try {
-                                        handler.disconnect(WebSockets.DisconnectEvent(cacheId))
+                                        Metrics.handlerPerformance(WebSockets.HandlerSection(match.path, WebSockets.WsHandlerType.DISCONNECT)) {
+                                            handler.disconnect(WebSockets.DisconnectEvent(cacheId))
+                                        }
                                         send(Serialization.json.encodeToString(message))
                                     } catch (e: Exception) {
                                         send(Serialization.json.encodeToString(message.copy(error = e.message)))
@@ -269,7 +281,10 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                                         logger.warn("handler is null!"); continue
                                     }
                                     try {
-                                        handler.message(WebSockets.MessageEvent(cacheId, message.data ?: continue))
+                                        val d = message.data ?: continue
+                                        Metrics.handlerPerformance(WebSockets.HandlerSection(match.path, WebSockets.WsHandlerType.MESSAGE)) {
+                                            handler.message(WebSockets.MessageEvent(cacheId, d))
+                                        }
                                     } catch (e: Exception) {
                                         send(Serialization.json.encodeToString(message.copy(error = e.message)))
                                     }
@@ -288,11 +303,7 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                 route(routeString, HttpMethod.parse(entry.key.method.toString())) {
                     handle {
                         val request = call.adapt(entry.key)
-                        val result = try {
-                            entry.value(request)
-                        } catch (e: Exception) {
-                            Http.exception(request, e)
-                        }
+                        val result = Http.execute(request)
                         for (header in result.headers.entries) {
                             call.response.header(header.first, header.second)
                         }
@@ -334,7 +345,9 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                     if (cache.setIfNotExists(it.name + "-lock", true)) {
                         cache.set(it.name + "-lock", true, Duration.ofHours(1))
                         try {
-                            it.handler()
+                            Metrics.handlerPerformance(it) {
+                                it.handler()
+                            }
                         } catch (t: Throwable) {
                             exceptionSettings().report(t)
                         }
