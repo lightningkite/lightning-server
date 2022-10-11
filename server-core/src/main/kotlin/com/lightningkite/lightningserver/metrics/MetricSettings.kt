@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.metrics
 
+import com.lightningkite.lightningdb.Database
 import com.lightningkite.lightningserver.cache.CacheInterface
-import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.settings.Pluggable
 import com.lightningkite.lightningserver.settings.Settings
 import kotlinx.serialization.Serializable
@@ -30,8 +30,8 @@ data class MetricSettings(
                     }
                 }
             }
-            register("cache-circular") {
-                CacheCircularMetrics(it) { Settings.requirements[it.url.substringAfter("://")]!!() as CacheInterface }
+            register("db-circular") {
+                DatabaseCircularMetrics(it) { Settings.requirements[it.url.substringAfter("://")]!!() as Database }
             }
         }
     }
