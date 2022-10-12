@@ -81,7 +81,6 @@ function multiplexedSocketRaw(url, path, queryParams = new Map([])) {
         console.log(`Setting up socket to ${shortUrl} with ${path}`);
         lastSocket = it;
         const multiplexedIn = it.read.pipe((0, rxjs_1.map)((it) => {
-            console.log(`Got raw from websocket ${it}`);
             const text = it.text;
             if (text === null) {
                 return null;

@@ -65,7 +65,6 @@ public func multiplexedSocketRaw(url: String, path: String, queryParams: Diction
         print("Setting up socket to \(String(kotlin: shortUrl)) with \(String(kotlin: path))")
         lastSocket = it
         let multiplexedIn = it.read.compactMap({ (it) -> MultiplexMessage? in
-            print("Got raw from websocket \(it)")
             guard let text = it.text else { return nil }
             if text.isEmpty { return nil }
             return (text.fromJsonString() as MultiplexMessage?)

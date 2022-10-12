@@ -76,7 +76,6 @@ export function multiplexedSocketRaw(url: string, path: string, queryParams: Map
         console.log(`Setting up socket to ${shortUrl} with ${path}`);
         lastSocket = it;
         const multiplexedIn = it.read.pipe(rMap((it: WebSocketFrame): (MultiplexMessage | null) => {
-            console.log(`Got raw from websocket ${it}`);
             const text = it.text
             if(text === null) { return null }
             if (text === "") { return null }

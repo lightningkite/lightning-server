@@ -89,7 +89,6 @@ fun multiplexedSocketRaw(
             println("Setting up socket to $shortUrl with $path")
             lastSocket = it
             val multiplexedIn = it.read.mapNotNull {
-                println("Got raw from websocket $it")
                 val text = it.text ?: return@mapNotNull null
                 if (text.isEmpty()) return@mapNotNull null
                 text.fromJsonString<MultiplexMessage>()

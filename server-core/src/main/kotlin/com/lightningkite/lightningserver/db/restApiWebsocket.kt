@@ -93,12 +93,12 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
                         it.condition
                     )
                     for (entry in changes.changes) {
-                        if (!send(it._id, ListChange(
-                                old = entry.old?.takeIf { c.condition(it) }?.let { m(it) },
-                                new = entry.new?.takeIf { c.condition(it) }?.let { m(it) },
-                            )
-                            )
-                        ) {
+                        val change = ListChange(
+                            old = entry.old?.takeIf { c.condition(it) }?.let { m(it) },
+                            new = entry.new?.takeIf { c.condition(it) }?.let { m(it) },
+                        )
+                        if(change.new == null && change.old == null) continue
+                        if (!send(it._id, change)) {
                             subscriptionDb().deleteOneById(it._id)
                             break
                         }
