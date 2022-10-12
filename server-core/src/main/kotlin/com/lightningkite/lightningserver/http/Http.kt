@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 
 object Http {
+    init { Metrics }
     var fixEndingSlash: Boolean = true
     val endpoints = mutableMapOf<HttpEndpoint, suspend (HttpRequest) -> HttpResponse>()
     var exception: suspend (HttpRequest, Exception) -> HttpResponse =

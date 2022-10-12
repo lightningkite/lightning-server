@@ -6,14 +6,13 @@ import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.pubsub.PubSubInterface
 import com.lightningkite.lightningserver.pubsub.get
+import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Task
 import com.lightningkite.lightningserver.tasks.Tasks
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onCompletion
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.serializer
 import org.slf4j.LoggerFactory
 import java.time.Duration
 
@@ -25,23 +24,34 @@ interface Engine {
 
 class LocalEngine(val pubSub: PubSubInterface, val cache: CacheInterface): Engine {
     val logger = LoggerFactory.getLogger(this::class.java)
+    suspend fun webSocketConnected(id: String) {
+        cache.set("ws-$id-connected", true, timeToLive = Duration.ofDays(1))
+    }
+
     override suspend fun sendWebSocketMessage(id: String, content: String): Boolean {
-        logger.debug("Sending $content to $id")
         pubSub.string("ws-$id").emit(content)
         return cache.get<Boolean>("ws-$id-connected") ?: false
     }
 
     override suspend fun listenForWebSocketMessage(id: String): Flow<String> {
-        logger.debug("Listener for $id made")
-        return pubSub.string("ws-$id").map { println("Send intercept $id $it"); it }
-            .onStart { cache.set("ws-$id-connected", true, timeToLive = Duration.ofDays(1)) }
-            .onCompletion { cache.set("ws-$id-connected", false) }
+        return pubSub.string("ws-$id")
+            .onEach {
+                if(generalSettings().debug) {
+                    logger.trace("Sending $it to $id")
+                }
+            }
+            .onStart {
+                cache.set("ws-$id-connected", true, timeToLive = Duration.ofDays(1))
+                logger.debug("Ready for outgoing messages to $id")
+            }
+            .onCompletion {
+                cache.set("ws-$id-connected", false)
+                logger.debug("Done watching for outgoing messages $id")
+            }
     }
 
     override suspend fun launchTask(task: Task<Any?>, input: Any?) {
-        logger.debug("Launching ${task.name} with $input")
         GlobalScope.launch {
-            logger.debug("Executing ${task.name} with $input")
             Metrics.handlerPerformance(task) {
                 task.implementation(this, input)
             }

@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory
 
 @Serializable
 data class MetricSettings(
-    val url: String = "log",
+    val url: String = "none",
     val trackingByEntryPoint: Set<String> = setOf("executionTime"),
     val trackingTotalsOnly: Set<String> = setOf(),
 ) : () -> Metrics {

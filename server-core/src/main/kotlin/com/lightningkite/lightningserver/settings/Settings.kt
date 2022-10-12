@@ -12,6 +12,7 @@ import kotlin.reflect.KProperty
 
 @kotlinx.serialization.Serializable(SettingsSerializer::class)
 object Settings {
+    var lazyLoadResources = false
     var sealed = false
         private set
     fun populate(map: Map<String, Any?>){
@@ -21,7 +22,8 @@ object Settings {
         if(missing.isNotEmpty()) {
             throw IllegalStateException("Settings for ${missing.joinToString()} are missing.")
         }
-//        requirements.values.forEach { it() }
+        if(!lazyLoadResources)
+            requirements.values.forEach { it() }
     }
     private data class Box<T>(val item: T)
     private val values = ConcurrentHashMap<String, Box<*>>()

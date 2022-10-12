@@ -4,8 +4,10 @@ import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.websocket.WebSockets
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
@@ -29,10 +31,10 @@ class ServerEntryPointElement(val entryPoint: Any) : AbstractCoroutineContextEle
     companion object Key : CoroutineContext.Key<ServerEntryPointElement>
 }
 
-suspend inline fun <T> serverEntryPoint(entryPoint: Any, crossinline action: suspend () -> T): T {
-    return withContext(ServerEntryPointElement(entryPoint)) {
-        action()
-    }
+val serverLogger = LoggerFactory.getLogger("LightningServer")
+suspend fun <T> serverEntryPoint(entryPoint: Any, action: suspend CoroutineScope.() -> T): T {
+    serverLogger.debug("Handling $entryPoint")
+    return withContext(ServerEntryPointElement(entryPoint), action)
 }
 
 suspend fun serverEntryPoint(): Any? = coroutineContext[ServerEntryPointElement.Key]?.entryPoint

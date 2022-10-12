@@ -21,19 +21,19 @@ private val sharedSocketCache = HashMap<String, Observable<WebSocketInterface>>(
 fun sharedSocket(url: String): Observable<WebSocketInterface> {
     return sharedSocketCache.getOrPut(url) {
         val shortUrl = url.substringBefore('?')
-//        println("Creating socket to $url")
+        println("Creating socket to $url")
         (_overrideWebSocketProvider?.invoke(url) ?: HttpClient.webSocket(url))
             .switchMap {
-//                println("Connection to $shortUrl established, starting pings")
+                println("Connection to $shortUrl established, starting pings")
                 // Only have this observable until it fails
 
                 val pingMessages: Observable<WebSocketInterface> = Observable.interval(30_000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!).map { _ ->
-//                    println("Sending ping to $url")
+                    println("Sending ping to $url")
                     it.write.onNext(WebSocketFrame(text = " "))
                 }.switchMap { Observable.never() }
 
                 val timeoutAfterSeconds: Observable<WebSocketInterface> = it.read
-//                    .doOnNext { println("Got message from $shortUrl: ${it}") }
+                    .doOnNext { println("Got message from $shortUrl: ${it}") }
                     .timeout(60_000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!)
                     .switchMap { Observable.never() }
 
@@ -45,7 +45,7 @@ fun sharedSocket(url: String): Observable<WebSocketInterface> {
             }
             .doOnError { println("Socket to $shortUrl FAILED with $it") }
             .doOnComplete {
-//                println("Disconnecting socket to $shortUrl")
+                println("Disconnecting socket to $shortUrl")
                 sharedSocketCache.remove(url)
             }
             .replay(1)
@@ -86,11 +86,10 @@ fun multiplexedSocketRaw(
     var lastSocket: WebSocketInterface? = null
     return sharedSocket(url)
         .switchMapSingle {
-//            println("Setting up socket to $shortUrl with $path")
+            println("Setting up socket to $shortUrl with $path")
             lastSocket = it
-//            println("Connected to $it")
             val multiplexedIn = it.read.mapNotNull {
-//                    println("Got raw from websocket $it")
+                println("Got raw from websocket $it")
                 val text = it.text ?: return@mapNotNull null
                 if (text.isEmpty()) return@mapNotNull null
                 text.fromJsonString<MultiplexMessage>()
@@ -99,12 +98,13 @@ fun multiplexedSocketRaw(
                 .filter { it.channel == channel && it.start }
                 .firstOrError()
                 .map { _ ->
+                    println("Connected to channel $channel")
                     WebSocketIsh<String, String>(
                         messages = multiplexedIn.mapNotNull {
                             if(it.channel == channel) it.data else null
                         },
                         send = { message ->
-//                    println("Sending $message to $it")
+                    println("Sending $message to $it")
                             it.write.onNext(WebSocketFrame(text = MultiplexMessage(channel = channel, data = message).toJsonString()))
                         }
                     )
@@ -123,7 +123,7 @@ fun multiplexedSocketRaw(
                 }
         }
         .doOnDispose {
-//            println("Disconnecting channel on socket to $shortUrl with $path")
+            println("Disconnecting channel on socket to $shortUrl with $path")
             lastSocket?.write?.onNext(
                 WebSocketFrame(
                     text = MultiplexMessage(
