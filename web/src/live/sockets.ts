@@ -16,18 +16,21 @@ const sharedSocketCache = new Map<string, Observable<WebSocketInterface>>();
 export function sharedSocket(url: string): Observable<WebSocketInterface> {
     return xMutableMapGetOrPut<string, Observable<WebSocketInterface>>(sharedSocketCache, url, (): Observable<WebSocketInterface> => {
         const shortUrl = xStringSubstringBefore(url, '?', undefined);
-        //        println("Creating socket to $url")
+        console.log(`Creating socket to ${url}`);
         return (runOrNull(get_overrideWebSocketProvider(), _ => _(url)) ?? HttpClient.INSTANCE.webSocket(url))
             .pipe(switchMap((it: WebSocketInterface): Observable<WebSocketInterface> => {
-            //                println("Connection to $shortUrl established, starting pings")
+            console.log(`Connection to ${shortUrl} established, starting pings`);
             // Only have this observable until it fails
             
             const pingMessages: Observable<WebSocketInterface> = interval(30000).pipe(map((_0: number): void => {
-                //                    println("Sending ping to $url")
+                console.log(`Sending ping to ${url}`);
                 return it.write.next({ text: " ", binary: null });
             })).pipe(switchMap((it: void): Observable<WebSocketInterface> => (NEVER)));
             
             const timeoutAfterSeconds: Observable<WebSocketInterface> = it.read
+                .pipe(tap((it: WebSocketFrame): void => {
+                console.log(`Got message from ${shortUrl}: ${it}`);
+            }))
                 .pipe(timeout(60000))
                 .pipe(switchMap((it: WebSocketFrame): Observable<WebSocketInterface> => (NEVER)));
             
@@ -37,7 +40,7 @@ export function sharedSocket(url: string): Observable<WebSocketInterface> {
             console.log(`Socket to ${shortUrl} FAILED with ${it}`);
         }))
             .pipe(tap(undefined, undefined, (): void => {
-            //                println("Disconnecting socket to $shortUrl")
+            console.log(`Disconnecting socket to ${shortUrl}`);
             sharedSocketCache.delete(url);
         }))
             .pipe(publishReplay(1))
@@ -46,7 +49,7 @@ export function sharedSocket(url: string): Observable<WebSocketInterface> {
 }
 
 //! Declares com.lightningkite.lightningdb.live.WebSocketIsh
-export class WebSocketIsh<IN extends any, OUT extends any> {
+export class WebSocketIsh<IN extends any, OUT> {
     public constructor(public readonly messages: Observable<IN>, public readonly send: ((a: OUT) => void)) {
     }
 }
@@ -70,11 +73,10 @@ export function multiplexedSocketRaw(url: string, path: string, queryParams: Map
     let lastSocket: (WebSocketInterface | null) = null;
     return sharedSocket(url)
         .pipe(switchMap((it: WebSocketInterface): Observable<WebSocketIsh<string, string>> => {
-        //            println("Setting up socket to $shortUrl with $path")
+        console.log(`Setting up socket to ${shortUrl} with ${path}`);
         lastSocket = it;
-        //            println("Connected to $it")
         const multiplexedIn = it.read.pipe(rMap((it: WebSocketFrame): (MultiplexMessage | null) => {
-            //                    println("Got raw from websocket $it")
+            console.log(`Got raw from websocket ${it}`);
             const text = it.text
             if(text === null) { return null }
             if (text === "") { return null }
@@ -83,19 +85,22 @@ export function multiplexedSocketRaw(url: string, path: string, queryParams: Map
         return multiplexedIn
             .pipe(oFilter((it: MultiplexMessage): boolean => (it.channel === channel && it.start)))
             .pipe(take(1))
-            .pipe(map((_0: MultiplexMessage): WebSocketIsh<string, string> => (new WebSocketIsh<string, string>(multiplexedIn.pipe(rMap((it: MultiplexMessage): (string | null) => (it.channel === channel ? it.data : null)), filter(isNonNull)), (message: string): void => {
-            //                    println("Sending $message to $it")
-            it.write.next({ text: JSON.stringify(new MultiplexMessage(channel, undefined, undefined, undefined, undefined, message, undefined)), binary: null });
-        }))))
+            .pipe(map((_0: MultiplexMessage): WebSocketIsh<string, string> => {
+            console.log(`Connected to channel ${channel}`);
+            return new WebSocketIsh<string, string>(multiplexedIn.pipe(rMap((it: MultiplexMessage): (string | null) => (it.channel === channel ? it.data : null)), filter(isNonNull)), (message: string): void => {
+                console.log(`Sending ${message} to ${it}`);
+                it.write.next({ text: JSON.stringify(new MultiplexMessage(channel, undefined, undefined, undefined, undefined, message, undefined)), binary: null });
+            });
+        }))
             .pipe(doOnSubscribe((_0: SubscriptionLike): void => {
             it.write.next({ text: JSON.stringify(new MultiplexMessage(channel, path, queryParams, true, undefined, undefined, undefined)), binary: null });
         }));
     }))
         .pipe(tap({ unsubscribe: (): void => {
-        //            println("Disconnecting channel on socket to $shortUrl with $path")
-        const temp49 = (lastSocket?.write ?? null);
-        if (temp49 !== null && temp49 !== undefined) {
-            temp49.next({ text: JSON.stringify(new MultiplexMessage(channel, path, undefined, undefined, true, undefined, undefined)), binary: null })
+        console.log(`Disconnecting channel on socket to ${shortUrl} with ${path}`);
+        const temp61 = (lastSocket?.write ?? null);
+        if (temp61 !== null && temp61 !== undefined) {
+            temp61.next({ text: JSON.stringify(new MultiplexMessage(channel, path, undefined, undefined, true, undefined, undefined)), binary: null })
         };
     } }));
 }

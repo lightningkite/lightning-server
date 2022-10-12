@@ -46,6 +46,8 @@ module "Base" {
   logging = var.logging
   # files
   files_expiry = var.files_expiry
+  # metrics
+  metrics = var.metrics
   # exceptions
   exceptions = var.exceptions
   # email
@@ -78,6 +80,40 @@ resource "aws_route53_record" "email" {
   type    = "TXT"
   ttl     = "600"
   records = [aws_ses_domain_identity.email.verification_token]
+}
+resource "aws_route53_record" "email_spf" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = var.domain_name
+  type    = "TXT"
+  ttl     = "300"
+  records = [
+    "v=spf1 include:amazonses.com -all"
+  ]
+}
+resource "aws_ses_domain_identity" "email_domain_identity" {
+  domain = var.domain_name
+}
+resource "aws_ses_domain_dkim" "email_dkim" {
+  domain = aws_ses_domain_identity.email_domain_identity.domain
+}
+resource "aws_route53_record" "email_dkim_records" {
+  count   = 3
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "${element(aws_ses_domain_dkim.email_dkim.dkim_tokens, count.index)}._domainkey.${var.domain_name}"
+  type    = "CNAME"
+  ttl     = "300"
+  records = [
+    "${element(aws_ses_domain_dkim.email_dkim.dkim_tokens, count.index)}.dkim.amazonses.com",
+  ]
+}
+resource "aws_route53_record" "email_route_53_dmarc_txt" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "_dmarc.${var.domain_name}"
+  type    = "TXT"
+  ttl     = "300"
+  records = [
+    "v=DMARC1;p=quarantine;pct=75;rua=mailto:${var.reporting_email}"
+  ]
 }
 
 ##########

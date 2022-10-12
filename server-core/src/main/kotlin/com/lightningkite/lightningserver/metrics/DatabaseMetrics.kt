@@ -21,6 +21,7 @@ class DatabaseMetrics(val settings: MetricSettings, val database: ()-> Database)
                 if (type in settings.trackingByEntryPoint) {
                     typeEvents.groupBy { it.time.roundTo(span) }.forEach { (rounded, spanEvents) ->
                         val stats = spanEvents.stats(entryPoint, type, rounded, span)
+                        println("Reporting set $stats")
                         collection.upsertOneIgnoringResult(
                             condition { m -> m._id eq stats._id },
                             stats.asModification(),
@@ -30,9 +31,10 @@ class DatabaseMetrics(val settings: MetricSettings, val database: ()-> Database)
                 }
             }
             events.groupBy { it.type }.forEach { (type, typeEvents) ->
-                if (type in settings.trackingByEntryPoint) {
+                if (type in settings.trackingTotalsOnly || type in settings.trackingByEntryPoint) {
                     typeEvents.groupBy { it.time.roundTo(span) }.forEach { (rounded, spanEvents) ->
                         val stats = spanEvents.stats("total", type, rounded, span)
+                        println("Reporting set $stats")
                         collection.upsertOneIgnoringResult(
                             condition { m -> m._id eq stats._id },
                             stats.asModification(),

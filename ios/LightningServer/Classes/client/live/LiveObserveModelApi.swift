@@ -28,7 +28,7 @@ public final class LiveObserveModelApi<Model : HasId> : ObserveModelApi<Model> {
     }
 }
 
-public func xObservableToListObservable<T : HasId>(_ this: Observable<ListChange<T>>, ordering: @escaping TypedComparator<T>) -> Observable<Array<T>> {
+public func xObservableToListObservable<T : HasId, ID : Comparable>(_ this: Observable<ListChange<T>>, ordering: @escaping TypedComparator<T>) -> Observable<Array<T>> {
     var localList = [] as Array<T>
     return this.map({ (it) -> Array<T> in
         if let it = (it.wholeList) {
@@ -46,7 +46,7 @@ public func xObservableToListObservable<T : HasId>(_ this: Observable<ListChange
     })
 }
 
-public func xObservableFilter<T : HasId>(_ this: Observable<WebSocketIsh<ListChange<T>, Query<T>>>, _ query: Query<T>) -> Observable<Array<T>> {
+public func xObservableFilter<T : HasId, ID : Comparable>(_ this: Observable<WebSocketIsh<ListChange<T>, Query<T>>>, _ query: Query<T>) -> Observable<Array<T>> {
     return xObservableToListObservable(this
             .doOnNext { (it) -> Void in it.send(query) }
             .switchMap { (it) -> Observable<ListChange<T>> in it.messages }

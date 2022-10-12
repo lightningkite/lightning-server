@@ -66,6 +66,14 @@ object DurationSerializer: KSerializer<Duration> {
     override fun serialize(encoder: Encoder, value: Duration) = encoder.encodeString(value.toString())
 }
 
+object DurationMsSerializer: KSerializer<Duration> {
+    override fun deserialize(decoder: Decoder): Duration {
+        return Duration.ofMillis(decoder.decodeLong())
+    }
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.time.Duration", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: Duration) = encoder.encodeLong(value.toMillis())
+}
+
 val ClientModule = SerializersModule {
     contextual(UUID::class, UUIDSerializer)
     contextual(Instant::class, InstantSerializer)

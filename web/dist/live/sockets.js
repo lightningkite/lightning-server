@@ -21,16 +21,19 @@ function sharedSocket(url) {
     return (0, khrysalis_runtime_1.xMutableMapGetOrPut)(sharedSocketCache, url, () => {
         var _a;
         const shortUrl = (0, khrysalis_runtime_1.xStringSubstringBefore)(url, '?', undefined);
-        //        println("Creating socket to $url")
+        console.log(`Creating socket to ${url}`);
         return ((_a = (0, khrysalis_runtime_1.runOrNull)(get_overrideWebSocketProvider(), _ => _(url))) !== null && _a !== void 0 ? _a : rxjs_plus_1.HttpClient.INSTANCE.webSocket(url))
             .pipe((0, operators_1.switchMap)((it) => {
-            //                println("Connection to $shortUrl established, starting pings")
+            console.log(`Connection to ${shortUrl} established, starting pings`);
             // Only have this observable until it fails
             const pingMessages = (0, rxjs_1.interval)(30000).pipe((0, operators_1.map)((_0) => {
-                //                    println("Sending ping to $url")
+                console.log(`Sending ping to ${url}`);
                 return it.write.next({ text: " ", binary: null });
             })).pipe((0, operators_1.switchMap)((it) => (rxjs_1.NEVER)));
             const timeoutAfterSeconds = it.read
+                .pipe((0, operators_1.tap)((it) => {
+                console.log(`Got message from ${shortUrl}: ${it}`);
+            }))
                 .pipe((0, operators_1.timeout)(60000))
                 .pipe((0, operators_1.switchMap)((it) => (rxjs_1.NEVER)));
             return (0, rxjs_1.merge)((0, rxjs_1.of)(it), pingMessages, timeoutAfterSeconds);
@@ -39,7 +42,7 @@ function sharedSocket(url) {
             console.log(`Socket to ${shortUrl} FAILED with ${it}`);
         }))
             .pipe((0, operators_1.tap)(undefined, undefined, () => {
-            //                println("Disconnecting socket to $shortUrl")
+            console.log(`Disconnecting socket to ${shortUrl}`);
             sharedSocketCache.delete(url);
         }))
             .pipe((0, operators_1.publishReplay)(1))
@@ -75,11 +78,10 @@ function multiplexedSocketRaw(url, path, queryParams = new Map([])) {
     let lastSocket = null;
     return sharedSocket(url)
         .pipe((0, operators_1.switchMap)((it) => {
-        //            println("Setting up socket to $shortUrl with $path")
+        console.log(`Setting up socket to ${shortUrl} with ${path}`);
         lastSocket = it;
-        //            println("Connected to $it")
         const multiplexedIn = it.read.pipe((0, rxjs_1.map)((it) => {
-            //                    println("Got raw from websocket $it")
+            console.log(`Got raw from websocket ${it}`);
             const text = it.text;
             if (text === null) {
                 return null;
@@ -92,20 +94,23 @@ function multiplexedSocketRaw(url, path, queryParams = new Map([])) {
         return multiplexedIn
             .pipe((0, operators_1.filter)((it) => (it.channel === channel && it.start)))
             .pipe((0, operators_1.take)(1))
-            .pipe((0, operators_1.map)((_0) => (new WebSocketIsh(multiplexedIn.pipe((0, rxjs_1.map)((it) => (it.channel === channel ? it.data : null)), (0, rxjs_1.filter)(rxjs_plus_1.isNonNull)), (message) => {
-            //                    println("Sending $message to $it")
-            it.write.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, undefined, undefined, undefined, undefined, message, undefined)), binary: null });
-        }))))
+            .pipe((0, operators_1.map)((_0) => {
+            console.log(`Connected to channel ${channel}`);
+            return new WebSocketIsh(multiplexedIn.pipe((0, rxjs_1.map)((it) => (it.channel === channel ? it.data : null)), (0, rxjs_1.filter)(rxjs_plus_1.isNonNull)), (message) => {
+                console.log(`Sending ${message} to ${it}`);
+                it.write.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, undefined, undefined, undefined, undefined, message, undefined)), binary: null });
+            });
+        }))
             .pipe((0, rxjs_plus_1.doOnSubscribe)((_0) => {
             it.write.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, queryParams, true, undefined, undefined, undefined)), binary: null });
         }));
     }))
         .pipe((0, operators_1.tap)({ unsubscribe: () => {
             var _a;
-            //            println("Disconnecting channel on socket to $shortUrl with $path")
-            const temp49 = ((_a = lastSocket === null || lastSocket === void 0 ? void 0 : lastSocket.write) !== null && _a !== void 0 ? _a : null);
-            if (temp49 !== null && temp49 !== undefined) {
-                temp49.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, undefined, undefined, true, undefined, undefined)), binary: null });
+            console.log(`Disconnecting channel on socket to ${shortUrl} with ${path}`);
+            const temp61 = ((_a = lastSocket === null || lastSocket === void 0 ? void 0 : lastSocket.write) !== null && _a !== void 0 ? _a : null);
+            if (temp61 !== null && temp61 !== undefined) {
+                temp61.next({ text: JSON.stringify(new MultiplexMessage_1.MultiplexMessage(channel, path, undefined, undefined, true, undefined, undefined)), binary: null });
             }
             ;
         } }));

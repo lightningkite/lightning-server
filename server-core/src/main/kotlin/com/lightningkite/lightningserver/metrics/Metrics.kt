@@ -8,6 +8,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.time.delay
+import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -18,16 +19,20 @@ interface Metrics {
     companion object {
         val main = setting("metrics", MetricSettings())
         val toReport = ConcurrentLinkedQueue<MetricEvent>()
+        val logger = LoggerFactory.getLogger(Metrics::class.java)
         init {
             Tasks.onEngineReady {
-                regularlyAndOnShutdown(Duration.ofSeconds(15)) {
-//                regularlyAndOnShutdown(Duration.ofMinutes(5)) {
+//                regularlyAndOnShutdown(Duration.ofSeconds(15)) {
+                regularlyAndOnShutdown(Duration.ofMinutes(5)) {
+                    logger.info("Assembling metrics to report...")
                     val assembledData = ArrayList<MetricEvent>(toReport.size)
                     while(true) {
                         val item = toReport.poll() ?: break
                         assembledData.add(item)
                     }
+                    logger.info("Reporting ${assembledData.size} metric events to ${main()}...")
                     main().report(assembledData)
+                    logger.info("Report complete.")
                 }
             }
         }

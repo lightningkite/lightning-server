@@ -55,7 +55,7 @@ fun List<MetricEvent>.stats(
 ): MetricSpanStats {
     val sum = this.sumOf { it.value }
     return MetricSpanStats(
-        _id = "$endpoint|$type|$timeStamp",
+        _id = "$endpoint|$type|$timeStamp|$timeSpan",
         endpoint = endpoint,
         type = type,
         timeStamp = timeStamp,

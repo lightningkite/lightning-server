@@ -46,6 +46,8 @@ module "Base" {
   logging = var.logging
   # files
   files_expiry = var.files_expiry
+  # metrics
+  metrics = var.metrics
   # exceptions
   exceptions = var.exceptions
   # email
