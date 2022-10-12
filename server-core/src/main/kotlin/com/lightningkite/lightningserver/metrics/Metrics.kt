@@ -19,9 +19,9 @@ interface Metrics {
         val main = setting("metrics", MetricSettings())
         val toReport = ConcurrentLinkedQueue<MetricEvent>()
         init {
-//            regularlyAndOnShutdown(Duration.ofSeconds(15)) {
             Tasks.onEngineReady {
-                regularlyAndOnShutdown(Duration.ofMinutes(5)) {
+                regularlyAndOnShutdown(Duration.ofSeconds(15)) {
+//                regularlyAndOnShutdown(Duration.ofMinutes(5)) {
                     val assembledData = ArrayList<MetricEvent>(toReport.size)
                     while(true) {
                         val item = toReport.poll() ?: break

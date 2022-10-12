@@ -1,17 +1,24 @@
+@file:UseContextualSerialization(Instant::class, Duration::class)
 package com.lightningkite.lightningserver.metrics
 
 import com.lightningkite.lightningdb.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseContextualSerialization
+import java.time.Duration
+import java.time.Instant
 import kotlin.math.max
 import kotlin.math.min
 
 @DatabaseModel
+@IndexSet(["type", "endpoint", "timeSpan", "timeStamp"])
+@IndexSet(["timeSpan", "timeStamp"])
 @Serializable
-data class MetricStats(
+data class MetricSpanStats(
     override val _id: String,
     val endpoint: String,
     val type: String,
-    val timeString: String,
+    val timeStamp: Instant = Instant.EPOCH,
+    val timeSpan: Duration = Duration.ofMinutes(1),
     val min: Double,
     val max: Double,
     val sum: Double,
@@ -20,7 +27,7 @@ data class MetricStats(
     val average: Double get() = sum / count.toDouble()
 }
 
-operator fun MetricStats.plus(other: MetricStats): MetricStats {
+operator fun MetricSpanStats.plus(other: MetricSpanStats): MetricSpanStats {
     return copy(
         min = min(this.min, other.min),
         max = max(this.max, other.max),
@@ -29,7 +36,7 @@ operator fun MetricStats.plus(other: MetricStats): MetricStats {
     )
 }
 
-fun MetricStats.asModification(): Modification<MetricStats> {
+fun MetricSpanStats.asModification(): Modification<MetricSpanStats> {
     return modification {
         Modification.Chain(listOf(
             it.min coerceAtMost this.min,
@@ -43,17 +50,21 @@ fun MetricStats.asModification(): Modification<MetricStats> {
 fun List<MetricEvent>.stats(
     endpoint: String,
     type: String,
-    timeString: String,
-): MetricStats {
+    timeStamp: Instant,
+    timeSpan: Duration = Duration.ofMinutes(1),
+): MetricSpanStats {
     val sum = this.sumOf { it.value }
-    return MetricStats(
-        _id = "$endpoint|$type|$timeString",
+    return MetricSpanStats(
+        _id = "$endpoint|$type|$timeStamp",
         endpoint = endpoint,
         type = type,
-        timeString = timeString,
+        timeStamp = timeStamp,
+        timeSpan = timeSpan,
         min = this.minOf { it.value },
         max = this.maxOf { it.value },
         sum = sum,
         count = size
     )
 }
+
+fun Instant.roundTo(span: Duration): Instant = Instant.ofEpochMilli(this.toEpochMilli() / span.toMillis() * span.toMillis())

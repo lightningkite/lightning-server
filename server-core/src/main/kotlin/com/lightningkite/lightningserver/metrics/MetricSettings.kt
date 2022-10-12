@@ -1,17 +1,23 @@
+@file:UseContextualSerialization(Duration::class)
 package com.lightningkite.lightningserver.metrics
 
 import com.lightningkite.lightningdb.Database
-import com.lightningkite.lightningserver.cache.CacheInterface
 import com.lightningkite.lightningserver.settings.Pluggable
 import com.lightningkite.lightningserver.settings.Settings
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseContextualSerialization
 import org.slf4j.LoggerFactory
+import java.time.Duration
 
 @Serializable
 data class MetricSettings(
     val url: String = "none",
     val trackingByEntryPoint: Set<String> = setOf("executionTime"),
     val trackingTotalsOnly: Set<String> = setOf(),
+    val keepFor: Map<Duration, Duration> = mapOf(
+        Duration.ofHours(1) to Duration.ofDays(1),
+        Duration.ofMinutes(1) to Duration.ofHours(2),
+    )
 ) : () -> Metrics {
     companion object : Pluggable<MetricSettings, Metrics>() {
         init {
@@ -30,8 +36,8 @@ data class MetricSettings(
                     }
                 }
             }
-            register("db-circular") {
-                DatabaseCircularMetrics(it) { Settings.requirements[it.url.substringAfter("://")]!!() as Database }
+            register("db") {
+                DatabaseMetrics(it) { Settings.requirements[it.url.substringAfter("://")]!!() as Database }
             }
         }
     }

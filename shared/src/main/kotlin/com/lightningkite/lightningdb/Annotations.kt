@@ -138,12 +138,14 @@ annotation class TextIndex(val fields: Array<String>)
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
+@Repeatable
 annotation class IndexSet(val fields: Array<String>)
 
 
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
+@Repeatable
 annotation class UniqueSet(val fields: Array<String>)
 
 
@@ -168,10 +170,12 @@ annotation class NamedTextIndex(val fields: Array<String>, val indexName: String
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
+@Repeatable
 annotation class NamedIndexSet(val fields: Array<String>, val indexName: String)
 
 
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
+@Repeatable
 annotation class NamedUniqueSet(val fields: Array<String>, val indexName: String)
