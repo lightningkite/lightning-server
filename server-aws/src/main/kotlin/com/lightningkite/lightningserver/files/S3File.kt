@@ -6,9 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
 import software.amazon.awssdk.core.sync.RequestBody
-import software.amazon.awssdk.services.s3.model.GetObjectRequest
-import software.amazon.awssdk.services.s3.model.NoSuchKeyException
-import software.amazon.awssdk.services.s3.model.PutObjectRequest
+import software.amazon.awssdk.services.s3.model.*
 import java.io.File
 import java.io.InputStream
 import java.math.BigInteger
@@ -52,9 +50,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
                 it.key(path.toString())
             }.await().let {
                 FileInfo(
-                    type = ContentType(it.contentType()),
-                    size = it.contentLength(),
-                    lastModified = it.lastModified()
+                    type = ContentType(it.contentType()), size = it.contentLength(), lastModified = it.lastModified()
                 )
             }
         } catch (e: NoSuchKeyException) {
@@ -67,15 +63,11 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             system.s3.putObject(PutObjectRequest.builder().also {
                 it.bucket(system.bucket)
                 it.key(path.path)
-            }.build(),
-                content.length?.let {
-                    RequestBody.fromContentProvider(
-                        { content.stream() },
-                        it,
-                        content.type.toString()
-                    )
-                }
-                    ?: RequestBody.fromContentProvider({ content.stream() }, content.type.toString())
+            }.build(), content.length?.let {
+                RequestBody.fromContentProvider(
+                    { content.stream() }, it, content.type.toString()
+                )
+            } ?: RequestBody.fromContentProvider({ content.stream() }, content.type.toString())
             )
         }
     }
@@ -103,8 +95,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             val headers = queryParams.split('&').associate {
                 URLDecoder.decode(it.substringBefore('='), Charsets.UTF_8) to URLDecoder.decode(
                     it.substringAfter(
-                        '=',
-                        ""
+                        '=', ""
                     ), Charsets.UTF_8
                 )
             }
@@ -134,10 +125,8 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         ${canonicalRequest.sha256()}
         """.trimIndent()
 
-            val signingKey = "AWS4$secretKey".toByteArray()
-                .let { date.substringBefore('T').toByteArray().mac(it) }
-                .let { system.region.id().toByteArray().mac(it) }
-                .let { "s3".toByteArray().mac(it) }
+            val signingKey = "AWS4$secretKey".toByteArray().let { date.substringBefore('T').toByteArray().mac(it) }
+                .let { system.region.id().toByteArray().mac(it) }.let { "s3".toByteArray().mac(it) }
                 .let { "aws4_request".toByteArray().mac(it) }
 
             val regeneratedSig = toSignString.toByteArray().mac(signingKey).toHex()
@@ -168,6 +157,18 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
     }.url().toString()
 
     override fun toString(): String = url
+
+    override suspend fun startMultipart(): FileObject.FileObjectMultipartUpload {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun uploadPartUrl(multipartKey: String, multipartId: String, partNumber: Int): String {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun finishMultipart(multipartKey: String, multipartId: String) {
+        TODO("Not yet implemented")
+    }
 }
 
 private fun ByteArray.toHex(): String = BigInteger(1, this@toHex).toString(16)

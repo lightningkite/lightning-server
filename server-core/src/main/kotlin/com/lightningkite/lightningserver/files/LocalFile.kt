@@ -5,40 +5,38 @@ import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.settings.generalSettings
 import java.io.File
 import java.io.InputStream
-import java.nio.file.OpenOption
 import java.time.Duration
 import java.time.Instant
 import kotlin.io.path.inputStream
-import kotlin.io.path.outputStream
 
-val File.unixPath:String get() = path.replace("\\","/")
+val File.unixPath: String get() = path.replace("\\", "/")
 
-class LocalFile(val system: LocalFileSystem, val file: File): FileObject {
+class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
     init {
-        if(!file.absolutePath.startsWith(system.rootFile.absolutePath)) throw IllegalStateException()
+        if (!file.absolutePath.startsWith(system.rootFile.absolutePath)) throw IllegalStateException()
     }
+
     override fun resolve(path: String): FileObject = LocalFile(system, file.resolve(path).absoluteFile)
 
     val contentTypeFile = file.parentFile!!.resolve(file.name + ".contenttype")
 
-    override val parent: FileObject? get() = if(this.file == system.rootFile) null else LocalFile(
-        system,
-        file.parentFile
-    )
-    override suspend fun list(): List<FileObject>? = if(!file.isDirectory) null else file.listFiles()?.map {
+    override val parent: FileObject?
+        get() = if (this.file == system.rootFile) null else LocalFile(
+            system, file.parentFile
+        )
+
+    override suspend fun list(): List<FileObject>? = if (!file.isDirectory) null else file.listFiles()?.map {
         LocalFile(
-            system,
-            it
+            system, it
         )
     }
 
     override suspend fun info(): FileInfo? {
-        if(!file.exists()) return null
-        return FileInfo(
-            type = contentTypeFile.takeIf { it.exists() }?.readText()?.let { ContentType(it) } ?: ContentType.fromExtension(file.extension),
+        if (!file.exists()) return null
+        return FileInfo(type = contentTypeFile.takeIf { it.exists() }?.readText()?.let { ContentType(it) }
+            ?: ContentType.fromExtension(file.extension),
             size = file.length(),
-            lastModified = Instant.ofEpochMilli(file.lastModified())
-        )
+            lastModified = Instant.ofEpochMilli(file.lastModified()))
     }
 
     override suspend fun write(content: HttpContent) {
@@ -54,27 +52,50 @@ class LocalFile(val system: LocalFileSystem, val file: File): FileObject {
     override suspend fun read(): InputStream = file.toPath().inputStream()
 
     override suspend fun delete() {
-        if(contentTypeFile.exists()) contentTypeFile.delete()
+        if (contentTypeFile.exists()) contentTypeFile.delete()
         assert(file.delete())
     }
 
     override fun checkSignature(queryParams: String): Boolean {
         return try {
             system.signer.verify<String>(queryParams.substringAfter('=')) == file.relativeTo(system.rootFile).unixPath
-        } catch(e: Exception) {
+        } catch (e: Exception) {
             false
         }
     }
 
-    override val url: String get() = generalSettings().publicUrl + "/" + system.serveDirectory + "/" + file.relativeTo(system.rootFile).unixPath
+    override val url: String
+        get() = generalSettings().publicUrl + "/" + system.serveDirectory + "/" + file.relativeTo(
+            system.rootFile
+        ).unixPath
 
     override val signedUrl: String get() = url + "?token=" + system.signer.token(file.relativeTo(system.rootFile).unixPath)
 
-    override fun uploadUrl(timeout: Duration): String = url + "?token=" + system.signer.token("W|" + file.relativeTo(system.rootFile).unixPath, timeout)
+    override fun uploadUrl(timeout: Duration): String =
+        url + "?token=" + system.signer.token("W|" + file.relativeTo(system.rootFile).unixPath, timeout)
 
     override fun toString(): String = file.toString()
 
     override fun hashCode(): Int = file.hashCode()
 
     override fun equals(other: Any?): Boolean = other is LocalFile && this.file == other.file
+
+    override suspend fun startMultipart() = FileObject.FileObjectMultipartUpload(
+        fileObject = this, key = file.path, id = ""
+    )
+
+    override suspend fun uploadPartUrl(multipartKey: String, multipartId: String, partNumber: Int): String =
+        url + "/part.$partNumber?token=" + system.signer.token("W|" + file.relativeTo(system.rootFile).unixPath + "/part.$partNumber")
+
+    override suspend fun finishMultipart(multipartKey: String, multipartId: String) {
+        val fileList: List<LocalFile> = (list()?.filterIsInstance<LocalFile>()
+            ?: listOf()).filter { it.file.nameWithoutExtension == "part" && it.file.extension.all { it.isDigit() } }
+        val content = StringBuilder()
+        for (file in fileList) {
+            content.append(file.file.readText())
+        }
+        list()?.forEach { it.delete() }
+        delete()
+        write(HttpContent.Text(content.toString(), ContentType.Text.Any))
+    }
 }
