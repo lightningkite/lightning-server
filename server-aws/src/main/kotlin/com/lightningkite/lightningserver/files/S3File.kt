@@ -162,11 +162,11 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         TODO("Not yet implemented")
     }
 
-    override suspend fun uploadPartUrl(multipartKey: String, multipartId: String, partNumber: Int): String {
+    override suspend fun uploadPartUrl(multipartId: String, multipartKey: String, partNumber: Int): String {
         TODO("Not yet implemented")
     }
 
-    override suspend fun finishMultipart(multipartKey: String, multipartId: String) {
+    override suspend fun finishMultipart(multipartId: String, multipartKey: String) {
         TODO("Not yet implemented")
     }
 }

@@ -84,10 +84,10 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
         fileObject = this, key = file.path, id = ""
     )
 
-    override suspend fun uploadPartUrl(multipartKey: String, multipartId: String, partNumber: Int): String =
+    override suspend fun uploadPartUrl(multipartId: String, multipartKey: String, partNumber: Int): String =
         url + "/part.$partNumber?token=" + system.signer.token("W|" + file.relativeTo(system.rootFile).unixPath + "/part.$partNumber")
 
-    override suspend fun finishMultipart(multipartKey: String, multipartId: String) {
+    override suspend fun finishMultipart(multipartId: String, multipartKey: String) {
         val fileList: List<LocalFile> = (list()?.filterIsInstance<LocalFile>()
             ?: listOf()).filter { it.file.nameWithoutExtension == "part" && it.file.extension.all { it.isDigit() } }
         val byteContent = fileList.flatMap { it.file.readBytes().asList() }.toByteArray()
