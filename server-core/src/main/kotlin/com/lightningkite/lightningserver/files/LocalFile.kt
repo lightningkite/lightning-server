@@ -90,12 +90,9 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
     override suspend fun finishMultipart(multipartKey: String, multipartId: String) {
         val fileList: List<LocalFile> = (list()?.filterIsInstance<LocalFile>()
             ?: listOf()).filter { it.file.nameWithoutExtension == "part" && it.file.extension.all { it.isDigit() } }
-        val content = StringBuilder()
-        for (file in fileList) {
-            content.append(file.file.readText())
-        }
+        val byteContent = fileList.flatMap { it.file.readBytes().asList() }.toByteArray()
         list()?.forEach { it.delete() }
         delete()
-        write(HttpContent.Text(content.toString(), ContentType.Text.Any))
+        write(HttpContent.Binary(byteContent, ContentType.Text.Any))
     }
 }
