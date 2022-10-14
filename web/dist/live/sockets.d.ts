@@ -5,7 +5,7 @@ export declare let __overrideWebSocketProvider: (((url: string) => Observable<We
 export declare function get_overrideWebSocketProvider(): (((url: string) => Observable<WebSocketInterface>) | null);
 export declare function set_overrideWebSocketProvider(value: (((url: string) => Observable<WebSocketInterface>) | null)): void;
 export declare function sharedSocket(url: string): Observable<WebSocketInterface>;
-export declare class WebSocketIsh<IN extends any, OUT extends any> {
+export declare class WebSocketIsh<IN extends any, OUT> {
     readonly messages: Observable<IN>;
     readonly send: ((a: OUT) => void);
     constructor(messages: Observable<IN>, send: ((a: OUT) => void));

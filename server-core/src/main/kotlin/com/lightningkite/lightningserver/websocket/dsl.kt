@@ -16,3 +16,11 @@ fun ServerPath.websocket(
     }
     return this
 }
+
+@LightningServerDsl
+fun ServerPath.websocket(
+    handler: WebSockets.Handler
+): ServerPath {
+    WebSockets.handlers[this] = handler
+    return this
+}

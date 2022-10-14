@@ -14,4 +14,8 @@ data class Task<INPUT>(
     }
     @Suppress("UNCHECKED_CAST")
     suspend operator fun invoke(input: INPUT) = engine.launchTask(this as Task<Any?>, input)
+
+    override fun toString(): String {
+        return "TASK $name"
+    }
 }

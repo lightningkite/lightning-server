@@ -10,7 +10,9 @@ object Scheduler {
     val schedules: MutableMap<String, ScheduledTask> = HashMap()
 }
 
-data class ScheduledTask(val name: String, val schedule: Schedule, val handler: suspend () -> Unit)
+data class ScheduledTask(val name: String, val schedule: Schedule, val handler: suspend () -> Unit) {
+    override fun toString(): String = "SCHEDULE $name"
+}
 
 sealed class Schedule {
     data class Frequency(val gap: Duration): Schedule()

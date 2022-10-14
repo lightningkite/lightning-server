@@ -172,7 +172,7 @@ resource "aws_security_group" "lambdainvoke" {
 resource "mongodbatlas_project" "database" {
   name   = "demo${var.deployment_name}database"
   org_id = var.database_org_id
-
+  
   is_collect_database_specifics_statistics_enabled = true
   is_data_explorer_enabled                         = true
   is_performance_advisor_enabled                   = true
@@ -713,8 +713,8 @@ resource "aws_s3_object" "app_settings" {
         url = "dynamodb://${var.deployment_location}/demo-${var.deployment_name}_${var.deployment_name}"
     }
     jwt = {
-        expirationMilliseconds = var.jwt_expirationMilliseconds
-        emailExpirationMilliseconds = var.jwt_emailExpirationMilliseconds
+        expirationMilliseconds = var.jwt_expirationMilliseconds 
+        emailExpirationMilliseconds = var.jwt_emailExpirationMilliseconds 
         secret = random_password.jwt.result
     }
     oauth_github = var.oauth_github
@@ -723,9 +723,10 @@ resource "aws_s3_object" "app_settings" {
         storageUrl = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
         signedUrlExpiration = var.files_expiry
     }
+    metrics = var.metrics
     exceptions = var.exceptions
     email = {
-        url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587"
+        url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
         fromEmail = var.email_sender
     }
     oauth_google = var.oauth_google
@@ -740,7 +741,7 @@ resource "aws_lambda_function" "main" {
 
   runtime = "java11"
   handler = "com.lightningkite.lightningserver.demo.AwsHandler"
-
+  
   memory_size = "2048"
   timeout = 30
   # memory_size = "1024"
@@ -748,7 +749,7 @@ resource "aws_lambda_function" "main" {
   source_code_hash = filebase64sha256(local.lambda_source)
 
   role = aws_iam_role.main_exec.arn
-
+  
   dynamic "vpc_config" {
     for_each = var.lambda_in_vpc ? [1] : []
     content {
@@ -756,14 +757,14 @@ resource "aws_lambda_function" "main" {
       security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
     }
   }
-
+  
   environment {
     variables = {
       LIGHTNING_SERVER_SETTINGS_BUCKET = aws_s3_object.app_settings.bucket
       LIGHTNING_SERVER_SETTINGS_FILE = aws_s3_object.app_settings.key
     }
   }
-
+  
   depends_on = [aws_s3_object.app_storage]
 }
 

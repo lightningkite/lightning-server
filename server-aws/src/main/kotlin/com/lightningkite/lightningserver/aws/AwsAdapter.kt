@@ -23,6 +23,7 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.pubsub.get
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -208,7 +209,9 @@ abstract class AwsAdapter : RequestStreamHandler {
                                 body = "No schedule '${parsed.scheduled}' found"
                             )
                         try {
-                            schedule.handler()
+                            Metrics.handlerPerformance(schedule) {
+                                schedule.handler()
+                            }
                         } catch (e: Exception) {
                             e.report(schedule)
                             APIGatewayV2HTTPResponse(statusCode = 500)
@@ -235,7 +238,9 @@ abstract class AwsAdapter : RequestStreamHandler {
                 logger.error("Task ${event.taskName} not found")
                 APIGatewayV2HTTPResponse(statusCode = 404, body = "Task ${event.taskName} not found")
             } else try {
-                task.implementation(this, Serialization.json.decodeFromString(task.serializer, event.input))
+                Metrics.handlerPerformance(task) {
+                    task.implementation(this, Serialization.json.decodeFromString(task.serializer, event.input))
+                }
                 APIGatewayV2HTTPResponse(statusCode = 204)
             } catch (e: Exception) {
                 e.report(task)
@@ -379,7 +384,9 @@ abstract class AwsAdapter : RequestStreamHandler {
             sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0"
         )
         try {
-            handler.connect(event)
+            Metrics.handlerPerformance(WebSockets.HandlerSection(match.path, WebSockets.WsHandlerType.CONNECT)) {
+                handler.connect(event)
+            }
             return APIGatewayV2HTTPResponse(200)
         } catch (e: Exception) {
             e.report(event)
@@ -405,7 +412,9 @@ abstract class AwsAdapter : RequestStreamHandler {
         }
         val event = WebSockets.MessageEvent(cacheId, content)
         try {
-            handler.message(event)
+            Metrics.handlerPerformance(WebSockets.HandlerSection(match.path, WebSockets.WsHandlerType.MESSAGE)) {
+                handler.message(event)
+            }
             return APIGatewayV2HTTPResponse(200)
         } catch (e: Exception) {
             e.report(event)
@@ -431,7 +440,9 @@ abstract class AwsAdapter : RequestStreamHandler {
         }
         val event = WebSockets.DisconnectEvent(cacheId)
         try {
-            handler.disconnect(event)
+            Metrics.handlerPerformance(WebSockets.HandlerSection(match.path, WebSockets.WsHandlerType.DISCONNECT)) {
+                handler.disconnect(event)
+            }
             return APIGatewayV2HTTPResponse(200)
         } catch (e: Exception) {
             e.report(event)
@@ -477,14 +488,16 @@ abstract class AwsAdapter : RequestStreamHandler {
                         )
                     )
                 } else {
-                    return APIGatewayV2HTTPResponse(
-                        statusCode = 404,
-                        body = "No matching path for '${path}' found"
+                    HttpEndpointMatcher.Match(
+                        HttpEndpoint(path, method),
+                        parts = mapOf(),
+                        wildcard = null
                     )
                 }
-            } else return APIGatewayV2HTTPResponse(
-                statusCode = 404,
-                body = "No matching path for '${path}' found"
+            } else HttpEndpointMatcher.Match(
+                HttpEndpoint(path, method),
+                parts = mapOf(),
+                wildcard = null
             )
         }
         val request = HttpRequest(
@@ -498,16 +511,7 @@ abstract class AwsAdapter : RequestStreamHandler {
             protocol = "https",
             sourceIp = event.requestContext.identity.sourceIp
         )
-        val result = try {
-            Http.endpoints[match.endpoint]!!.invoke(request)
-        } catch (e: Exception) {
-            try {
-                Http.exception(request, e)
-            } catch (e: Exception) {
-                e.report(request)
-                HttpResponse.plainText(e.message ?: "?", HttpStatus.InternalServerError)
-            }
-        }.addCors(request)
+        val result = Http.execute(request).addCors(request)
         val outHeaders = HashMap<String, String>()
         result.headers.entries.forEach { outHeaders.put(it.first, it.second) }
         val b = result.body

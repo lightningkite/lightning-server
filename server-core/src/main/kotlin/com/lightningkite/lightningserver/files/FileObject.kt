@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.files
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.http.HttpContent
 import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import java.io.InputStream
@@ -28,5 +27,16 @@ interface FileObject {
     val url: String
     val signedUrl: String
     fun uploadUrl(timeout: Duration): String
+
+    data class FileObjectMultipartUpload(val fileObject: FileObject, val id: String, val key: String) {
+        suspend fun part(partNumber: Int): String = fileObject.uploadPartUrl(id, key, partNumber)
+        suspend fun finish(): FileObject {
+            fileObject.finishMultipart(id, key)
+            return fileObject
+        }
+    }
+    suspend fun startMultipart(): FileObjectMultipartUpload
+    suspend fun uploadPartUrl(multipartId: String, multipartKey: String, partNumber: Int): String
+    suspend fun finishMultipart(multipartId: String, multipartKey: String)
 }
 

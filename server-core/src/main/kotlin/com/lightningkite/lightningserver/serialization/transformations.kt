@@ -25,7 +25,7 @@ fun <T> HttpRequest.queryParameters(serializer: KSerializer<T>): T {
         if (serializer == Unit.serializer()) return Unit as T
         return Serialization.properties.decodeFromStringMap<T>(
             serializer,
-            queryParameters.groupBy { it.first }.mapValues { it.value.joinToString(",") }
+            queryParameters.groupBy { it.first }.mapValues { it.value.joinToString(","){ it.second } }
         )
     } catch (e: SerializationException) {
         throw BadRequestException(e.message, cause = e.cause)

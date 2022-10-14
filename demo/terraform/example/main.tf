@@ -56,4 +56,12 @@ module "domain" {
   }
   oauth_google = local.oauth_google
   oauth_apple = local.oauth_apple
+  reporting_email = "joseph@lightningkite.com"
+  metrics = {
+    url = "db://database"
+    trackingByEntryPoint = [
+      "executionTime"
+    ]
+    trackingTotalsOnly = []
+  }
 }

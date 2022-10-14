@@ -7,6 +7,7 @@ private var fixed = false
 fun registerRequiredSerializers() {
     if (fixed) return
     registerSerializer(ServerFileSerialization)
+    registerSerializer(DurationMsSerializer)
     registerSerializer(UUIDSerializer)
     fixed = true
 }

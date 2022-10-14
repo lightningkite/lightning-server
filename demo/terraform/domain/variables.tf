@@ -83,11 +83,26 @@ variable "files_expiry" {
 }
 
 ##########
+# metrics
+##########
+variable "metrics" {
+    type = any
+    default = {}
+}
+
+##########
 # exceptions
 ##########
 variable "exceptions" {
     type = any
     default = {}
+}
+
+##########
+# email
+##########
+variable "reporting_email" {
+    type = string
 }
 
 ##########
