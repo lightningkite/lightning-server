@@ -21,7 +21,7 @@ object Settings {
         if(missing.isNotEmpty()) {
             throw IllegalStateException("Settings for ${missing.joinToString()} are missing.")
         }
-//        requirements.values.forEach { it() }
+        requirements.values.forEach { it() }
     }
     private data class Box<T>(val item: T)
     private val values = ConcurrentHashMap<String, Box<*>>()
