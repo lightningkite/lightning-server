@@ -3,6 +3,7 @@ package com.lightningkite.lightningdb
 import com.github.jershell.kbson.Configuration
 import com.github.jershell.kbson.KBson
 import com.lightningkite.lightningserver.db.DatabaseSettings
+import com.lightningkite.lightningserver.settings.Settings
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.reactivestreams.client.MongoClient
@@ -20,6 +21,7 @@ import org.litote.kmongo.serialization.configuration
 import org.litote.kmongo.serialization.kmongoSerializationModule
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
@@ -39,6 +41,12 @@ class MongoDatabase(val database: CoroutineDatabase) : Database {
                     MongoClientSettings.builder()
                         .applyConnectionString(ConnectionString(it.url))
                         .uuidRepresentation(UuidRepresentation.STANDARD)
+                        .applyToConnectionPoolSettings {
+                            if(Settings.isServerless) {
+                                it.maxSize(1)
+                                it.maxConnectionIdleTime(15, TimeUnit.SECONDS)
+                            }
+                        }
                         .build()
                 ).database(it.databaseName)
             }
@@ -47,6 +55,12 @@ class MongoDatabase(val database: CoroutineDatabase) : Database {
                     MongoClientSettings.builder()
                         .applyConnectionString(ConnectionString(it.url))
                         .uuidRepresentation(UuidRepresentation.STANDARD)
+                        .applyToConnectionPoolSettings {
+                            if(Settings.isServerless) {
+                                it.maxSize(1)
+                                it.maxConnectionIdleTime(15, TimeUnit.SECONDS)
+                            }
+                        }
                         .build()
                 ).database(it.databaseName)
             }

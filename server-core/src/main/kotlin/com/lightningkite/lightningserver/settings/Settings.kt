@@ -49,6 +49,10 @@ object Settings {
         }
         override fun invoke(): Goal = value
     }
+
+    val isServerless: Boolean by lazy {
+        System.getenv("FUNCTIONS_WORKER_RUNTIME") != null || System.getenv("AWS_EXECUTION_ENV") != null
+    }
 }
 
 inline fun <reified Goal> setting(name: String, default: Goal): Settings.Requirement<Goal, Goal> {
