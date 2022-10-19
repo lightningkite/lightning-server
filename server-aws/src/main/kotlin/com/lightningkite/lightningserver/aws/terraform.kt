@@ -21,7 +21,7 @@ import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.util.Properties
 
-private data class TerraformProvider(
+internal data class TerraformProvider(
     val name: String,
     val source: String,
     val version: String
@@ -34,7 +34,7 @@ private data class TerraformProvider(
         val local = TerraformProvider("local", "hashicorp/local", "~> 2.2")
     }
 }
-private data class TerraformSection(
+internal data class TerraformSection(
     val name: String,
     val providers: List<TerraformProvider> = listOf(TerraformProvider.aws, TerraformProvider.local, TerraformProvider.random, TerraformProvider.archive),
     val inputs: List<TerraformInput> = listOf(),
@@ -90,20 +90,20 @@ private data class TerraformSection(
     }
 }
 
-private data class TerraformHandler(
+internal data class TerraformHandler(
     val name: String,
     val priority: Int = 0,
     val makeSection: TerraformProjectInfo.(settingKey: String) -> TerraformSection
 )
 
-private data class TerraformSituationOverride(
+internal data class TerraformSituationOverride(
     val inputs: List<TerraformInput> = listOf(),
     val resources: String? = null,
     val passOn: Map<String, String> = mapOf(),
     val outputs: List<TerraformOutput> = listOf()
 )
 
-private data class TerraformProjectInfo(val projectName: String) {
+internal data class TerraformProjectInfo(val projectName: String) {
     fun input(name: String, type: String, default: String?) = TerraformInput(name, type, default)
     fun inputString(name: String, default: String?) = TerraformInput(name, "string", default?.let { "\"$it\"" })
     fun inputBoolean(name: String, default: Boolean?) = TerraformInput(name, "bool", default?.toString())
@@ -113,10 +113,10 @@ private data class TerraformProjectInfo(val projectName: String) {
     val namePrefixPath: String = "${projectName}/\${var.deployment_name}"
 }
 
-private data class TerraformInput(val name: String, val type: String, val default: String?)
-private data class TerraformOutput(val name: String, val value: String)
+internal data class TerraformInput(val name: String, val type: String, val default: String?)
+internal data class TerraformOutput(val name: String, val value: String)
 
-private fun handlers() {
+internal fun handlers() {
     TerraformSection.handler<GeneralServerSettings>(
         inputs = {
             listOf(
@@ -696,7 +696,7 @@ private fun handlers() {
     )
 }
 
-private fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(projectInfo) {
+internal fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(projectInfo) {
     TerraformSection(
         name = "main",
         inputs = listOf(
@@ -865,30 +865,31 @@ private fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(projectI
     )
 }
 
-private fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(projectInfo) {
+internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(projectInfo) {
     Scheduler.schedules.values.map {
+        val safeName = it.name.filter { it.isLetterOrDigit() || it == '_' }
         when (val s = it.schedule) {
             is Schedule.Daily -> {
                 val utcTime = ZonedDateTime.of(LocalDate.now(), s.time, s.zone)
                 TerraformSection(
                     name = "Schedule ${it.name}",
                     resources = """
-                    resource "aws_cloudwatch_event_rule" "scheduled_task_${it.name}" {
-                      name                = "${namePrefix}_${it.name.filter { it.isLetterOrDigit() || it == '_' }}"
+                    resource "aws_cloudwatch_event_rule" "scheduled_task_${safeName}" {
+                      name                = "${namePrefix}_${safeName}"
                       schedule_expression = "cron(${utcTime.minute} ${utcTime.hour} * * ? *)"
                     }
-                    resource "aws_cloudwatch_event_target" "scheduled_task_${it.name}" {
-                      rule      = aws_cloudwatch_event_rule.scheduled_task_${it.name}.name
+                    resource "aws_cloudwatch_event_target" "scheduled_task_${safeName}" {
+                      rule      = aws_cloudwatch_event_rule.scheduled_task_${safeName}.name
                       target_id = "lambda"
                       arn       = aws_lambda_function.main.arn
                       input     = "{\"scheduled\": \"${it.name}\"}"
                     }
-                    resource "aws_lambda_permission" "scheduled_task_${it.name}" {
+                    resource "aws_lambda_permission" "scheduled_task_${safeName}" {
                       statement_id  = "AllowExecutionFromCloudWatch"
                       action        = "lambda:InvokeFunction"
                       function_name = aws_lambda_function.main.function_name
                       principal     = "events.amazonaws.com"
-                      source_arn    = aws_cloudwatch_event_rule.scheduled_task_${it.name}.arn
+                      source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
                     }
                 """.trimIndent()
                 )
@@ -898,8 +899,8 @@ private fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(projec
                 TerraformSection(
                     name = "Schedule ${it.name}",
                     resources = """
-                    resource "aws_cloudwatch_event_rule" "scheduled_task_${it.name}" {
-                      name                = "${namePrefix}_${it.name.filter { it.isLetterOrDigit() || it == '_' }}"
+                    resource "aws_cloudwatch_event_rule" "scheduled_task_${safeName}" {
+                      name                = "${namePrefix}_${safeName}"
                       schedule_expression = "rate(${s.gap.toMinutes()} minute${if (s.gap.toMinutes() > 1) "s" else ""})"
                     }
                     resource "aws_cloudwatch_event_target" "scheduled_task_${it.name}" {
@@ -908,12 +909,12 @@ private fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(projec
                       arn       = aws_lambda_function.main.arn
                       input     = "{\"scheduled\": \"${it.name}\"}"
                     }
-                    resource "aws_lambda_permission" "scheduled_task_${it.name}" {
-                      statement_id  = "scheduled_task_${it.name}"
+                    resource "aws_lambda_permission" "scheduled_task_${safeName}" {
+                      statement_id  = "scheduled_task_${safeName}"
                       action        = "lambda:InvokeFunction"
                       function_name = aws_lambda_function.main.function_name
                       principal     = "events.amazonaws.com"
-                      source_arn    = aws_cloudwatch_event_rule.scheduled_task_${it.name}.arn
+                      source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
                     }
                 """.trimIndent()
                 )
@@ -922,7 +923,7 @@ private fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(projec
     }
 }
 
-private fun awsMainAppHandler(projectInfo: TerraformProjectInfo, handlerFqn: String, otherSections: List<TerraformSection>) = TerraformSection(
+internal fun awsMainAppHandler(projectInfo: TerraformProjectInfo, handlerFqn: String, otherSections: List<TerraformSection>) = TerraformSection(
     name = "Main",
     resources = """
         resource "aws_s3_bucket" "lambda_bucket" {
@@ -1087,7 +1088,7 @@ private fun awsMainAppHandler(projectInfo: TerraformProjectInfo, handlerFqn: Str
     """.trimIndent()
 )
 
-private fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
+internal fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
     name = "HTTP",
     resources = """
         
@@ -1210,7 +1211,7 @@ private fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection
         passOn = mapOf("public_http_url" to "\"https://${'$'}{var.domain_name}\"")
     )
 )
-private fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
+internal fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
     name = "WebSockets",
     resources = """
         variable "public_ws_url" {

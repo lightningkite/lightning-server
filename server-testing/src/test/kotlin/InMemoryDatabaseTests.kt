@@ -11,6 +11,8 @@ import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.db.InMemoryDatabase
 import com.lightningkite.lightningserver.email.EmailSettings
+import com.lightningkite.lightningserver.engine.LocalEngine
+import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.files.FileSystem
 import com.lightningkite.lightningserver.files.FileSystemTests
 import com.lightningkite.lightningserver.files.FilesSettings
@@ -18,6 +20,7 @@ import com.lightningkite.lightningserver.files.LocalFileSystem
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.test
+import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
@@ -132,5 +135,6 @@ object TestSettings {
         Settings.populateDefaults(mapOf(
             "database" to DatabaseSettings("ram")
         ))
+        engine = LocalEngine(LocalPubSub, LocalCache)
     }
 }

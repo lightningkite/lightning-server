@@ -157,18 +157,6 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
     }.url().toString()
 
     override fun toString(): String = url
-
-    override suspend fun startMultipart(): FileObject.FileObjectMultipartUpload {
-        TODO("Not yet implemented")
-    }
-
-    override suspend fun uploadPartUrl(multipartId: String, multipartKey: String, partNumber: Int): String {
-        TODO("Not yet implemented")
-    }
-
-    override suspend fun finishMultipart(multipartId: String, multipartKey: String) {
-        TODO("Not yet implemented")
-    }
 }
 
 private fun ByteArray.toHex(): String = BigInteger(1, this@toHex).toString(16)

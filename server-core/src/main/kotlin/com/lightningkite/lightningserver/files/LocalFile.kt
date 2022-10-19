@@ -79,20 +79,4 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
     override fun hashCode(): Int = file.hashCode()
 
     override fun equals(other: Any?): Boolean = other is LocalFile && this.file == other.file
-
-    override suspend fun startMultipart() = FileObject.FileObjectMultipartUpload(
-        fileObject = this, key = file.path, id = ""
-    )
-
-    override suspend fun uploadPartUrl(multipartId: String, multipartKey: String, partNumber: Int): String =
-        url + "/part.$partNumber?token=" + system.signer.token("W|" + file.relativeTo(system.rootFile).unixPath + "/part.$partNumber")
-
-    override suspend fun finishMultipart(multipartId: String, multipartKey: String) {
-        val fileList: List<LocalFile> = (list()?.filterIsInstance<LocalFile>()
-            ?: listOf()).filter { it.file.nameWithoutExtension == "part" && it.file.extension.all { it.isDigit() } }
-        val byteContent = fileList.flatMap { it.file.readBytes().asList() }.toByteArray()
-        list()?.forEach { it.delete() }
-        delete()
-        write(HttpContent.Binary(byteContent, ContentType.Text.Any))
-    }
 }

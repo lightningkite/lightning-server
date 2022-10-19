@@ -105,16 +105,4 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
         return client.blobUrl + "?" + client.generateSas(signatureValues)
     }
     override fun toString(): String = url
-
-    override suspend fun startMultipart(): FileObject.FileObjectMultipartUpload {
-        TODO("Not yet implemented")
-    }
-
-    override suspend fun uploadPartUrl(multipartId: String, multipartKey: String, partNumber: Int): String {
-        TODO("Not yet implemented")
-    }
-
-    override suspend fun finishMultipart(multipartId: String, multipartKey: String) {
-        TODO("Not yet implemented")
-    }
 }

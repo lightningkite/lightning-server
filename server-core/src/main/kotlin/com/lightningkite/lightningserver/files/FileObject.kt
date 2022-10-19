@@ -27,16 +27,5 @@ interface FileObject {
     val url: String
     val signedUrl: String
     fun uploadUrl(timeout: Duration): String
-
-    data class FileObjectMultipartUpload(val fileObject: FileObject, val id: String, val key: String) {
-        suspend fun part(partNumber: Int): String = fileObject.uploadPartUrl(id, key, partNumber)
-        suspend fun finish(): FileObject {
-            fileObject.finishMultipart(id, key)
-            return fileObject
-        }
-    }
-    suspend fun startMultipart(): FileObjectMultipartUpload
-    suspend fun uploadPartUrl(multipartId: String, multipartKey: String, partNumber: Int): String
-    suspend fun finishMultipart(multipartId: String, multipartKey: String)
 }
 
