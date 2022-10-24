@@ -30,11 +30,6 @@ open class SmsAuthEndpoints<USER : Any, ID>(
         errorCases = listOf(),
         successCode = HttpStatus.NoContent,
         implementation = { user: Unit, phone: String ->
-            val jwt = base.jwtSigner().token(
-                phoneAccess.idSerializer,
-                phoneAccess.byPhone(phone).let(phoneAccess::id),
-                base.jwtSigner().emailExpiration
-            )
             val pin = SecureRandom().nextInt(1000000).toString().padStart(6, '0')
             cache().set(cacheKey(phone), pin.secureHash(), Duration.ofMinutes(15))
             sms().send(
