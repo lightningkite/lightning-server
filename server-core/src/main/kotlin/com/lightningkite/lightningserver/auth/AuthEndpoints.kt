@@ -20,126 +20,7 @@ import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
 import java.util.*
 
-
-@Serializable
-data class SSOAuthSubmission(
-    val userKey: String,
-    val clientKey: UUID,
-)
-
-@Serializable
-data class SSOCredentials<ID>(
-    val userId: ID,
-    val userKey: String,
-    val clientKey: UUID,
-)
-
-private const val availableNumbers = "1234567890"
-val smsTemplate:suspend (code: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." }
-
-open class SMSAuthEndpoints<USER, ID>(
-    path: ServerPath,
-    private val idSerializer: KSerializer<ID>,
-    private val jwtSigner: () -> JwtSigner,
-    private val sms: () -> SMSClient,
-    private val userByPhone: (suspend (phone: String) -> USER?),
-    private val userId: (user:USER) -> ID,
-    private val storeCredentials: (suspend (SSOCredentials<ID>) -> Unit),
-    private val validateCredentials: (suspend (SSOAuthSubmission) -> ID?),
-    private val template: (suspend (code: String) -> String) = smsTemplate
-) : ServerPathGroup(path) {
-
-    init {
-        path.docName = "SMSAuth"
-    }
-
-    val loginSMS = path("login-sms").post.typed(
-        summary = "Request SMS SSO",
-        description = "Sends a SSO password to the given Phone Number",
-        errorCases = listOf(),
-        successCode = HttpStatus.OK,
-        implementation = { _: Unit, phone: String ->
-            val user = userByPhone(phone) ?: return@typed UUID.randomUUID()
-            val userId = userId(user)
-            val clientCode = UUID.randomUUID()
-            val userCode = (1..7)
-                .map { availableNumbers.random() }
-                .joinToString("")
-
-            storeCredentials(SSOCredentials(userId, userCode, clientCode))
-
-            sms().send(phone, template(userCode))
-
-            clientCode
-        }
-    )
-
-    val submitLoginSSO = post("submit-sso").typed(
-        summary = "Submit SMS SSO",
-        description = "Submit the SSO sent to the user to finalize login.",
-        errorCases = listOf(),
-        implementation = { user: Unit, input: SSOAuthSubmission ->
-            val id = validateCredentials(input)
-
-            if (id != null)
-                jwtSigner().token(
-                    idSerializer,
-                    id,
-                    jwtSigner().emailExpiration
-                )
-            else throw BadRequestException()
-        }
-    )
-}
-
-inline fun <reified USER, reified ID : Comparable<ID>> ServerPath.smsAuthEndpoints(
-    noinline database: () -> Database,
-    noinline jwtSigner: () -> JwtSigner,
-    noinline sms: () -> SMSClient,
-    noinline storeCredentials: (suspend (SSOCredentials<ID>) -> Unit),
-    noinline validateCredentials: (suspend (SSOAuthSubmission) -> ID?),
-    noinline template: (suspend (code: String) -> String) = smsTemplate,
-) where USER : HasPhoneNumber, USER : HasId<ID> = SMSAuthEndpoints(
-    path = this,
-    idSerializer = Serialization.module.serializer(),
-    jwtSigner = jwtSigner,
-    sms = sms,
-    userId = {
-        @Suppress("UNCHECKED_CAST")
-        (it as HasId<ID>)._id
-    },
-    userByPhone = {
-        database()
-            .collection<USER>()
-            .find(Condition.OnField(HasPhoneNumberFields.phoneNumber<USER>(), Condition.Equal(it)))
-            .singleOrNull()
-    },
-    storeCredentials = storeCredentials,
-    validateCredentials = validateCredentials,
-    template = template,
-)
-
-inline fun <reified USER, reified ID : Comparable<ID>> ServerPath.smsAuthEndpoints(
-    noinline jwtSigner: () -> JwtSigner,
-    noinline sms: () -> SMSClient,
-    noinline userByPhone: (phone: String) -> USER?,
-    noinline userId: (user: USER) -> ID,
-    noinline storeCredentials: (SSOCredentials<ID>) -> Unit,
-    noinline validateCredentials: (SSOAuthSubmission) -> ID?,
-    noinline template: (suspend (code: String) -> String) = smsTemplate,
-) where USER : HasPhoneNumber, USER : HasId<ID> = SMSAuthEndpoints(
-    path = this,
-    idSerializer = Serialization.module.serializer(),
-    jwtSigner = jwtSigner,
-    sms = sms,
-    userId = userId,
-    userByPhone = userByPhone,
-    storeCredentials = storeCredentials,
-    validateCredentials = validateCredentials,
-    template = template,
-)
-
-
+@Deprecated("Use the new auth endpoint sets instead")
 open class AuthEndpoints<USER : Any, ID>(
     path: ServerPath,
     private val userSerializer: KSerializer<USER>,
@@ -251,6 +132,7 @@ open class AuthEndpoints<USER : Any, ID>(
  * @param emailSubject The subject of the login emails that will be sent out.
  * @param template A lambda to return what the email to send will be given the email and the login link.
  */
+@Deprecated("Use the new auth endpoint sets instead")
 @LightningServerDsl
 inline fun <reified USER, reified ID : Comparable<ID>> ServerPath.authEndpoints(
     noinline jwtSigner: () -> JwtSigner,
@@ -306,6 +188,7 @@ inline fun <reified USER, reified ID : Comparable<ID>> ServerPath.authEndpoints(
  * @param emailSubject The subject of the login emails that will be sent out.
  * @param template A lambda to return what the email to send will be given the email and the login link.
  */
+@Deprecated("Use the new auth endpoint sets instead")
 @LightningServerDsl
 inline fun <reified USER : Any, reified ID> ServerPath.authEndpoints(
     noinline jwtSigner: () -> JwtSigner,
@@ -352,6 +235,7 @@ inline fun <reified USER : Any, reified ID> ServerPath.authEndpoints(
  * @param emailSubject The subject of the login emails that will be sent out.
  * @param template A lambda to return what the email to send will be given the email and the login link.
  */
+@Deprecated("Use the new auth endpoint sets instead")
 inline fun <reified USER, reified ID : Comparable<ID>> AuthEndpoints(
     path: ServerPath,
     noinline jwtSigner: () -> JwtSigner,
@@ -407,6 +291,7 @@ inline fun <reified USER, reified ID : Comparable<ID>> AuthEndpoints(
  * @param emailSubject The subject of the login emails that will be sent out.
  * @param template A lambda to return what the email to send will be given the email and the login link.
  */
+@Deprecated("Use the new auth endpoint sets instead")
 inline fun <reified USER : Any, reified ID> AuthEndpoints(
     path: ServerPath,
     noinline jwtSigner: () -> JwtSigner,

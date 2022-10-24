@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningdb.MongoDatabase
+import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.MemcachedCache
@@ -10,6 +11,7 @@ import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.db.DynamoDbCache
+import com.lightningkite.lightningserver.db.ModelInfo
 import com.lightningkite.lightningserver.db.PostgresDatabase
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.email.SesClient
@@ -61,15 +63,16 @@ object Server : ServerPathGroup(ServerPath.root) {
         Serialization.handler(FileRedirectHandler)
     }
 
-    val auth = AuthEndpoints(
-        path = path("auth"),
-        jwtSigner = jwtSigner,
-        database = database,
-        email = email,
-        onNewUser = { User(email = it) }
-    )
+    val auth = object: ServerPathGroup(path("auth")) {
+        val info = ModelInfo<User, User, UUID>(
+            getCollection = { database().collection<User>() },
+            forUser = { this }
+        )
+        val emailAccess = info.userEmailAccess { User(email = it) }
+        val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner)
+        val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
+    }
     val uploadEarly = UploadEarlyEndpoint(path("upload"), files, database, jwtSigner)
-    val authHtml = AuthEndpointsHtml(auth)
     val testModel = TestModelEndpoints(path("test-model"))
 
     val root = path.get.handler {
