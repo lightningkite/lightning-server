@@ -36,7 +36,7 @@ fun startupOnce(name: String, database: ()-> Database, maxDuration: Long = 60_00
         val a = database().collection<ActionHasOccurred>()
         val existing = a.get(name)
         val lock = a.updateOne(
-            condition { it._id eq name and (it.completed neq null) and (it.started eq null or (it.started.notNull lt Instant.now().minusSeconds(maxDuration))) },
+            condition { it._id eq name and (it.completed eq null) and (it.started eq null or (it.started.notNull lt Instant.now().minusSeconds(maxDuration))) },
             modification { it.started assign Instant.now() }
         )
         if (lock.new == null && existing != null) return@startup
