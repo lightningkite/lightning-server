@@ -10,3 +10,6 @@ settings.yaml
 *.tfstate
 settings.json
 local.tf
+
+
+demo/terraform/bssoftware
