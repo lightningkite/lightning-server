@@ -64,4 +64,6 @@ module "domain" {
     ]
     trackingTotalsOnly = []
   }
+  emergencyContact = "joseph@lightningkite.com"
+  panicInvocationsPerMinuteThreshold = 5
 }

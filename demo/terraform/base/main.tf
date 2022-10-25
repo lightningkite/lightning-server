@@ -496,6 +496,133 @@ resource "aws_iam_role_policy_attachment" "api_gateway_ws" {
 }
 
 ##########
+# Alarms
+##########
+resource "aws_sns_topic" "emergency" {
+  name = "demo-${var.deployment_name}_emergencies"
+}
+resource "aws_sns_topic_subscription" "emergency_primary" {
+  topic_arn = aws_sns_topic.emergency.arn
+  protocol  = "email"
+  endpoint  = var.emergencyContact
+}
+resource "aws_cloudwatch_metric_alarm" "emergency_invocations" {
+  alarm_name                = "demo-${var.deployment_name}_emergency_invocations"
+  comparison_operator       = "GreaterThanOrEqualToThreshold"
+  evaluation_periods        = "1"
+  metric_name               = "Invocations"
+  namespace                 = "AWS/Lambda"
+  period                    = "60"
+  statistic                 = "Sum"
+  threshold                 = "${var.emergencyInvocationsPerMinuteThreshold}"
+  alarm_description         = ""
+  insufficient_data_actions = []
+  dimensions = {
+    FunctionName = aws_lambda_function.main.function_name
+  }
+  alarm_actions = [aws_sns_topic.emergency.arn]
+}
+resource "aws_cloudwatch_metric_alarm" "emergency_compute" {
+  alarm_name                = "demo-${var.deployment_name}_emergency_compute"
+  comparison_operator       = "GreaterThanOrEqualToThreshold"
+  evaluation_periods        = "1"
+  metric_name               = "Duration"
+  namespace                 = "AWS/Lambda"
+  period                    = "60"
+  statistic                 = "Sum"
+  threshold                 = "${var.emergencyComputePerMinuteThreshold}"
+  alarm_description         = ""
+  insufficient_data_actions = []
+  dimensions = {
+    FunctionName = aws_lambda_function.main.function_name
+  }
+  alarm_actions = [aws_sns_topic.emergency.arn]
+}
+resource "aws_cloudwatch_metric_alarm" "panic_invocations" {
+  alarm_name                = "demo-${var.deployment_name}_panic_invocations"
+  comparison_operator       = "GreaterThanOrEqualToThreshold"
+  evaluation_periods        = "1"
+  metric_name               = "Invocations"
+  namespace                 = "AWS/Lambda"
+  period                    = "60"
+  statistic                 = "Sum"
+  threshold                 = "${var.panicInvocationsPerMinuteThreshold}"
+  alarm_description         = ""
+  insufficient_data_actions = []
+  dimensions = {
+    FunctionName = aws_lambda_function.main.function_name
+  }
+  alarm_actions = [aws_sns_topic.emergency.arn]
+}
+resource "aws_cloudwatch_metric_alarm" "panic_compute" {
+  alarm_name                = "demo-${var.deployment_name}_panic_compute"
+  comparison_operator       = "GreaterThanOrEqualToThreshold"
+  evaluation_periods        = "1"
+  metric_name               = "Duration"
+  namespace                 = "AWS/Lambda"
+  period                    = "60"
+  statistic                 = "Sum"
+  threshold                 = "${var.panicComputePerMinuteThreshold}"
+  alarm_description         = ""
+  insufficient_data_actions = []
+  dimensions = {
+    FunctionName = aws_lambda_function.main.function_name
+  }
+  alarm_actions = [aws_sns_topic.emergency.arn]
+}
+resource "aws_cloudwatch_event_rule" "panic" {
+  name        = "demo-${var.deployment_name}_panic"
+  description = "Throttle the function in a true emergency."
+
+  event_pattern = jsonencode({
+    source = ["aws.cloudwatch"]
+    "detail-type" = ["CloudWatch Alarm State Change"]
+    detail = {
+      alarmName = [
+        aws_cloudwatch_metric_alarm.panic_invocations.alarm_name, 
+        aws_cloudwatch_metric_alarm.panic_compute.alarm_name
+      ]
+    }
+  })
+}
+resource "aws_cloudwatch_event_target" "panic" {
+  rule      = aws_cloudwatch_event_rule.panic.name
+  target_id = "lambda"
+  arn       = aws_lambda_function.main.arn
+  input     = "{\"panic\": true}"
+}
+resource "aws_lambda_permission" "panic" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.main.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.panic.arn
+}
+
+resource "aws_iam_role_policy_attachment" "panic" {
+  role       = aws_iam_role.main_exec.name
+  policy_arn = aws_iam_policy.panic.arn
+}
+
+resource "aws_iam_policy" "panic" {
+  name        = "demo-${var.deployment_name}-panic"
+  path = "/demo/${var.deployment_name}/panic/"
+  description = "Access to self-throttle"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "lambda:PutFunctionConcurrency",
+        ]
+        Effect   = "Allow"
+        Resource = [aws_lambda_function.main.arn]
+      },
+    ]
+  })
+}
+
+##########
 # Schedule cleanRedirectToFiles
 ##########
 resource "aws_cloudwatch_event_rule" "scheduled_task_cleanRedirectToFiles" {
@@ -519,43 +646,43 @@ resource "aws_lambda_permission" "scheduled_task_cleanRedirectToFiles" {
 ##########
 # Schedule test-schedule2
 ##########
-resource "aws_cloudwatch_event_rule" "scheduled_task_test-schedule2" {
+resource "aws_cloudwatch_event_rule" "scheduled_task_testschedule2" {
   name                = "demo-${var.deployment_name}_testschedule2"
   schedule_expression = "rate(1 minute)"
 }
-resource "aws_cloudwatch_event_target" "scheduled_task_test-schedule2" {
-  rule      = aws_cloudwatch_event_rule.scheduled_task_test-schedule2.name
+resource "aws_cloudwatch_event_target" "scheduled_task_testschedule2" {
+  rule      = aws_cloudwatch_event_rule.scheduled_task_testschedule2.name
   target_id = "lambda"
   arn       = aws_lambda_function.main.arn
   input     = "{\"scheduled\": \"test-schedule2\"}"
 }
-resource "aws_lambda_permission" "scheduled_task_test-schedule2" {
-  statement_id  = "scheduled_task_test-schedule2"
+resource "aws_lambda_permission" "scheduled_task_testschedule2" {
+  statement_id  = "scheduled_task_testschedule2"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.main.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.scheduled_task_test-schedule2.arn
+  source_arn    = aws_cloudwatch_event_rule.scheduled_task_testschedule2.arn
 }
 
 ##########
 # Schedule test-schedule
 ##########
-resource "aws_cloudwatch_event_rule" "scheduled_task_test-schedule" {
+resource "aws_cloudwatch_event_rule" "scheduled_task_testschedule" {
   name                = "demo-${var.deployment_name}_testschedule"
   schedule_expression = "rate(1 minute)"
 }
-resource "aws_cloudwatch_event_target" "scheduled_task_test-schedule" {
-  rule      = aws_cloudwatch_event_rule.scheduled_task_test-schedule.name
+resource "aws_cloudwatch_event_target" "scheduled_task_testschedule" {
+  rule      = aws_cloudwatch_event_rule.scheduled_task_testschedule.name
   target_id = "lambda"
   arn       = aws_lambda_function.main.arn
   input     = "{\"scheduled\": \"test-schedule\"}"
 }
-resource "aws_lambda_permission" "scheduled_task_test-schedule" {
-  statement_id  = "scheduled_task_test-schedule"
+resource "aws_lambda_permission" "scheduled_task_testschedule" {
+  statement_id  = "scheduled_task_testschedule"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.main.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.scheduled_task_test-schedule.arn
+  source_arn    = aws_cloudwatch_event_rule.scheduled_task_testschedule.arn
 }
 
 ##########

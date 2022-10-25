@@ -121,3 +121,26 @@ variable "oauth_apple" {
     default = null
 }
 
+##########
+# Alarms
+##########
+variable "emergencyInvocationsPerMinuteThreshold" {
+    type = number
+    default = 100
+}
+variable "emergencyComputePerMinuteThreshold" {
+    type = number
+    default = 10000
+}
+variable "panicInvocationsPerMinuteThreshold" {
+    type = number
+    default = 500
+}
+variable "panicComputePerMinuteThreshold" {
+    type = number
+    default = 50000
+}
+variable "emergencyContact" {
+    type = string
+}
+

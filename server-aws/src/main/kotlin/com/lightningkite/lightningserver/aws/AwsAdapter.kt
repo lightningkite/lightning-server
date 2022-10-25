@@ -218,6 +218,23 @@ abstract class AwsAdapter : RequestStreamHandler {
                         }
                     }
 
+                    // The suicide function.  Exists to handle the panic handler to prevent cost issues.
+                    asJson.containsKey("panic") -> {
+                        try {
+                            println("Activating the panic shutdown...")
+                            val result = LambdaAsyncClient.builder().region(region).build().putFunctionConcurrency {
+                                it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+                                it.reservedConcurrentExecutions(0)
+                            }.await()
+                            println("Panic got code ${result.sdkHttpResponse().statusCode()}")
+                            assert(result.sdkHttpResponse().isSuccessful)
+                            APIGatewayV2HTTPResponse(statusCode = 200)
+                        } catch (e: Exception) {
+                            e.report("Panic")
+                            APIGatewayV2HTTPResponse(statusCode = 500)
+                        }
+                    }
+
                     else -> {
                         println("Input is $asJson")
                         asJson.jankMeADataClass("Something")

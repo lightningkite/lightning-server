@@ -60,6 +60,12 @@ module "Base" {
   public_http_url = "https://${var.domain_name}"
   # WebSockets
   public_ws_url = "wss://ws.${var.domain_name}"
+  # Alarms
+  emergencyInvocationsPerMinuteThreshold = var.emergencyInvocationsPerMinuteThreshold
+  emergencyComputePerMinuteThreshold = var.emergencyComputePerMinuteThreshold
+  panicInvocationsPerMinuteThreshold = var.panicInvocationsPerMinuteThreshold
+  panicComputePerMinuteThreshold = var.panicComputePerMinuteThreshold
+  emergencyContact = var.emergencyContact
 }
 ##########
 # main

@@ -865,6 +865,144 @@ internal fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(project
     )
 }
 
+internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo) {
+    TerraformSection(
+        name = "Alarms",
+        inputs = listOf(
+            inputNumber("emergencyInvocationsPerMinuteThreshold", 100),
+            inputNumber("emergencyComputePerMinuteThreshold", 10_000),
+            inputNumber("panicInvocationsPerMinuteThreshold", 500),
+            inputNumber("panicComputePerMinuteThreshold", 50_000),
+            inputString("emergencyContact", null)
+        ),
+        resources = """
+            resource "aws_sns_topic" "emergency" {
+              name = "${namePrefix}_emergencies"
+            }
+            resource "aws_sns_topic_subscription" "emergency_primary" {
+              topic_arn = aws_sns_topic.emergency.arn
+              protocol  = "email"
+              endpoint  = var.emergencyContact
+            }
+            resource "aws_cloudwatch_metric_alarm" "emergency_invocations" {
+              alarm_name                = "${namePrefix}_emergency_invocations"
+              comparison_operator       = "GreaterThanOrEqualToThreshold"
+              evaluation_periods        = "1"
+              metric_name               = "Invocations"
+              namespace                 = "AWS/Lambda"
+              period                    = "60"
+              statistic                 = "Sum"
+              threshold                 = "${'$'}{var.emergencyInvocationsPerMinuteThreshold}"
+              alarm_description         = ""
+              insufficient_data_actions = []
+              dimensions = {
+                FunctionName = aws_lambda_function.main.function_name
+              }
+              alarm_actions = [aws_sns_topic.emergency.arn]
+            }
+            resource "aws_cloudwatch_metric_alarm" "emergency_compute" {
+              alarm_name                = "${namePrefix}_emergency_compute"
+              comparison_operator       = "GreaterThanOrEqualToThreshold"
+              evaluation_periods        = "1"
+              metric_name               = "Duration"
+              namespace                 = "AWS/Lambda"
+              period                    = "60"
+              statistic                 = "Sum"
+              threshold                 = "${'$'}{var.emergencyComputePerMinuteThreshold}"
+              alarm_description         = ""
+              insufficient_data_actions = []
+              dimensions = {
+                FunctionName = aws_lambda_function.main.function_name
+              }
+              alarm_actions = [aws_sns_topic.emergency.arn]
+            }
+            resource "aws_cloudwatch_metric_alarm" "panic_invocations" {
+              alarm_name                = "${namePrefix}_panic_invocations"
+              comparison_operator       = "GreaterThanOrEqualToThreshold"
+              evaluation_periods        = "1"
+              metric_name               = "Invocations"
+              namespace                 = "AWS/Lambda"
+              period                    = "60"
+              statistic                 = "Sum"
+              threshold                 = "${'$'}{var.panicInvocationsPerMinuteThreshold}"
+              alarm_description         = ""
+              insufficient_data_actions = []
+              dimensions = {
+                FunctionName = aws_lambda_function.main.function_name
+              }
+              alarm_actions = [aws_sns_topic.emergency.arn]
+            }
+            resource "aws_cloudwatch_metric_alarm" "panic_compute" {
+              alarm_name                = "${namePrefix}_panic_compute"
+              comparison_operator       = "GreaterThanOrEqualToThreshold"
+              evaluation_periods        = "1"
+              metric_name               = "Duration"
+              namespace                 = "AWS/Lambda"
+              period                    = "60"
+              statistic                 = "Sum"
+              threshold                 = "${'$'}{var.panicComputePerMinuteThreshold}"
+              alarm_description         = ""
+              insufficient_data_actions = []
+              dimensions = {
+                FunctionName = aws_lambda_function.main.function_name
+              }
+              alarm_actions = [aws_sns_topic.emergency.arn]
+            }
+            resource "aws_cloudwatch_event_rule" "panic" {
+              name        = "${namePrefix}_panic"
+              description = "Throttle the function in a true emergency."
+
+              event_pattern = jsonencode({
+                source = ["aws.cloudwatch"]
+                "detail-type" = ["CloudWatch Alarm State Change"]
+                detail = {
+                  alarmName = [
+                    aws_cloudwatch_metric_alarm.panic_invocations.alarm_name, 
+                    aws_cloudwatch_metric_alarm.panic_compute.alarm_name
+                  ]
+                }
+              })
+            }
+            resource "aws_cloudwatch_event_target" "panic" {
+              rule      = aws_cloudwatch_event_rule.panic.name
+              target_id = "lambda"
+              arn       = aws_lambda_function.main.arn
+              input     = "{\"panic\": true}"
+            }
+            resource "aws_lambda_permission" "panic" {
+              statement_id  = "AllowExecutionFromCloudWatch"
+              action        = "lambda:InvokeFunction"
+              function_name = aws_lambda_function.main.function_name
+              principal     = "events.amazonaws.com"
+              source_arn    = aws_cloudwatch_event_rule.panic.arn
+            }
+            
+            resource "aws_iam_role_policy_attachment" "panic" {
+              role       = aws_iam_role.main_exec.name
+              policy_arn = aws_iam_policy.panic.arn
+            }
+    
+            resource "aws_iam_policy" "panic" {
+              name        = "${projectInfo.namePrefix}-panic"
+              path = "/${projectInfo.namePrefixPath}/panic/"
+              description = "Access to self-throttle"
+              policy = jsonencode({
+                Version = "2012-10-17"
+                Statement = [
+                  {
+                    Action = [
+                      "lambda:PutFunctionConcurrency",
+                    ]
+                    Effect   = "Allow"
+                    Resource = [aws_lambda_function.main.arn]
+                  },
+                ]
+              })
+            }
+        """.trimIndent()
+    )
+}
+
 internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(projectInfo) {
     Scheduler.schedules.values.map {
         val safeName = it.name.filter { it.isLetterOrDigit() || it == '_' }
@@ -903,8 +1041,8 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                       name                = "${namePrefix}_${safeName}"
                       schedule_expression = "rate(${s.gap.toMinutes()} minute${if (s.gap.toMinutes() > 1) "s" else ""})"
                     }
-                    resource "aws_cloudwatch_event_target" "scheduled_task_${it.name}" {
-                      rule      = aws_cloudwatch_event_rule.scheduled_task_${it.name}.name
+                    resource "aws_cloudwatch_event_target" "scheduled_task_${safeName}" {
+                      rule      = aws_cloudwatch_event_rule.scheduled_task_${safeName}.name
                       target_id = "lambda"
                       arn       = aws_lambda_function.main.arn
                       input     = "{\"scheduled\": \"${it.name}\"}"
@@ -1394,6 +1532,7 @@ fun terraformAws(handlerFqn: String, projectName: String = "project", root: File
             httpAwsHandler(info),
 //            if(WebSockets.handlers.isNotEmpty()) wsAwsHandler(info) else null,
             wsAwsHandler(info),
+            awsCloudwatch(info),
         ),
         scheduleAwsHandlers(info)
     ).flatten()

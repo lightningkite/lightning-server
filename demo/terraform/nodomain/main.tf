@@ -56,6 +56,12 @@ module "Base" {
   oauth_google = var.oauth_google
   # oauth_apple
   oauth_apple = var.oauth_apple
+  # Alarms
+  emergencyInvocationsPerMinuteThreshold = var.emergencyInvocationsPerMinuteThreshold
+  emergencyComputePerMinuteThreshold = var.emergencyComputePerMinuteThreshold
+  panicInvocationsPerMinuteThreshold = var.panicInvocationsPerMinuteThreshold
+  panicComputePerMinuteThreshold = var.panicComputePerMinuteThreshold
+  emergencyContact = var.emergencyContact
 }
 ##########
 # main
