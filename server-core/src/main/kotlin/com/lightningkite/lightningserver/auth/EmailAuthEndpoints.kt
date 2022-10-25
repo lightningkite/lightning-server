@@ -74,7 +74,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         summary = "Email PIN Login",
         description = "Logs in to the given email with a PIN",
         errorCases = listOf(),
-        successCode = HttpStatus.NoContent,
+        successCode = HttpStatus.OK,
         implementation = { anon: Unit, input: EmailPinLogin ->
             val pin = cache().get<String>(cacheKey(input.email))
                 ?: throw NotFoundException("No PIN found for email ${input.email}; perhaps it has expired?")

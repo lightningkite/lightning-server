@@ -43,7 +43,7 @@ open class SmsAuthEndpoints<USER : Any, ID>(
         summary = "SMS PIN Login",
         description = "Logs in to the given phone with a PIN",
         errorCases = listOf(),
-        successCode = HttpStatus.NoContent,
+        successCode = HttpStatus.OK,
         implementation = { anon: Unit, input: PhonePinLogin ->
             val pin = cache().get<String>(cacheKey(input.phone))
                 ?: throw NotFoundException("No PIN found for phone ${input.phone}; perhaps it has expired?")
