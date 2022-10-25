@@ -951,7 +951,10 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
             resource "aws_cloudwatch_event_rule" "panic" {
               name        = "${namePrefix}_panic"
               description = "Throttle the function in a true emergency."
-
+              retry_policy = {
+                maximum_event_age_in_seconds = 300
+                maximum_retry_apptempts = 5
+              }
               event_pattern = jsonencode({
                 source = ["aws.cloudwatch"]
                 "detail-type" = ["CloudWatch Alarm State Change"]
