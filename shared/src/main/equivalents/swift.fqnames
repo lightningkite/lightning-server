@@ -128,6 +128,7 @@ com.lightningkite.lightningdb.LocalDateSerializer
 com.lightningkite.lightningdb.LocalTimeSerializer
 com.lightningkite.lightningdb.OffsetDateTimeSerializer
 com.lightningkite.lightningdb.DurationSerializer
+com.lightningkite.lightningdb.DurationMsSerializer
 com.lightningkite.lightningdb.ClientModule
 com.lightningkite.lightningdb.OptionalSerializer
 com.lightningkite.lightningdb.listElement
@@ -181,6 +182,9 @@ com.lightningkite.lightningdb.dropFirst
 com.lightningkite.lightningdb.mapIf
 com.lightningkite.lightningdb.modifyByKey
 com.lightningkite.lightningdb.removeKeys
+com.lightningkite.lightningserver.auth.EmailPinLogin
+com.lightningkite.lightningserver.auth.PhonePinLogin
+com.lightningkite.lightningserver.auth
 com.lightningkite.lightningserver.files.UploadForNextRequest
 com.lightningkite.lightningserver.files.UploadInformation
 com.lightningkite.lightningserver.serverhealth.HealthStatus
