@@ -968,8 +968,8 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
               arn       = aws_lambda_function.main.arn
               input     = "{\"panic\": true}"
               retry_policy {
-                maximum_event_age_in_seconds = 300
-                maximum_retry_attempts = 5
+                maximum_event_age_in_seconds = 60
+                maximum_retry_attempts = 1
               }
             }
             resource "aws_lambda_permission" "panic" {

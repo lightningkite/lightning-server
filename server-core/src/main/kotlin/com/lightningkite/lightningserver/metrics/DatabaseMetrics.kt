@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.metrics
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
+import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.flow.toList
@@ -55,6 +56,20 @@ class DatabaseMetrics(val settings: MetricSettings, val database: ()-> Database)
         }
     )
 
+    val clearOldEndpoint = path("clear").get.typed(
+        summary = "Get Metrics",
+        description = "Get the metrics for various statistics",
+        errorCases = listOf(),
+        implementation = { anon: Unit, input: Unit ->
+            settings.keepFor.entries.forEach { entry ->
+                collection.deleteManyIgnoringOld(condition {
+                    (it.timeSpan eq entry.key) and
+                            (it.timeStamp lt Instant.now().minus(entry.value))
+                })
+            }
+            "Cleared as requested"
+        }
+    )
     val clearOld = schedule("com.lightningkite.lightningserver.metrics.DatabaseMetrics.clearOld", Duration.ofHours(1)) {
         settings.keepFor.entries.forEach { entry ->
             collection.deleteManyIgnoringOld(condition {
