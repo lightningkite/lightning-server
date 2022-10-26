@@ -10,7 +10,7 @@ fun <T, USER, ID: Comparable<ID>> T.userEmailAccess(
     val info = this
     return object: UserEmailAccess<USER, ID>{
         override suspend fun byEmail(email: String): USER =
-            info.collection().findOne(Condition.OnField(HasEmailFields.email(), Condition.Equal(email))) ?: newUser(email)
+            info.collection().findOne(Condition.OnField(HasEmailFields.email(), Condition.Equal(email))) ?: newUser(email).let { info.collection().insertOne(it)!! }
 
         override val serializer: KSerializer<USER>
             get() = info.serialization.serializer
@@ -31,7 +31,7 @@ fun <T, USER, ID: Comparable<ID>> T.userPhoneAccess(
     val info = this
     return object: UserPhoneAccess<USER, ID>{
         override suspend fun byPhone(phone: String): USER =
-            info.collection().findOne(Condition.OnField(HasPhoneNumberFields.phoneNumber(), Condition.Equal(phone))) ?: newUser(phone)
+            info.collection().findOne(Condition.OnField(HasPhoneNumberFields.phoneNumber(), Condition.Equal(phone))) ?: newUser(phone).let { info.collection().insertOne(it)!! }
 
         override val serializer: KSerializer<USER>
             get() = info.serialization.serializer
@@ -53,9 +53,9 @@ fun <T, USER, ID: Comparable<ID>> T.userEmailPhoneAccess(
     val info = this
     return object: UserPhoneAccess<USER, ID>, UserEmailAccess<USER, ID>{
         override suspend fun byEmail(email: String): USER =
-            info.collection().findOne(Condition.OnField(HasEmailFields.email(), Condition.Equal(email))) ?: newEmailUser(email)
+            info.collection().findOne(Condition.OnField(HasEmailFields.email(), Condition.Equal(email))) ?: newEmailUser(email).let { info.collection().insertOne(it)!! }
         override suspend fun byPhone(phone: String): USER =
-            info.collection().findOne(Condition.OnField(HasPhoneNumberFields.phoneNumber(), Condition.Equal(phone))) ?: newPhoneUser(phone)
+            info.collection().findOne(Condition.OnField(HasPhoneNumberFields.phoneNumber(), Condition.Equal(phone))) ?: newPhoneUser(phone).let { info.collection().insertOne(it)!! }
 
         override val serializer: KSerializer<USER>
             get() = info.serialization.serializer

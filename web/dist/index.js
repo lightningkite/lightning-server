@@ -45,6 +45,7 @@ __exportStar(require("./mock/MockWriteModelApi"), exports);
 __exportStar(require("./mock/MockFullReadModelApi"), exports);
 __exportStar(require("./mock/MockCompleteModelApi"), exports);
 __exportStar(require("./mock/MockReadModelApi"), exports);
+__exportStar(require("./server/auth/EmailPinLogin"), exports);
 __exportStar(require("./server/files/init"), exports);
 __exportStar(require("./server/files/UploadForNextRequestFields"), exports);
 __exportStar(require("./server/files/UploadEarlyEndpointModels"), exports);
