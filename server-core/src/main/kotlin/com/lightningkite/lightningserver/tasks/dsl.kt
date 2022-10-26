@@ -33,35 +33,36 @@ data class ActionHasOccurred(override val _id: String, val started: Instant? = n
 fun startupOnce(name: String, database: ()-> Database, maxDuration: Long = 60_000, priority: Double = 0.0, action: suspend ()->Unit): StartupAction {
     prepareModels()
     return startup(priority) {
-        val a = database().collection<ActionHasOccurred>()
-        val existing = a.get(name)
-        val lock = a.updateOne(
-            condition { it._id eq name and (it.completed eq null) and (it.started eq null or (it.started.notNull lt Instant.now().minusSeconds(maxDuration))) },
-            modification { it.started assign Instant.now() }
-        )
-        if (lock.new == null && existing != null) return@startup
-        if(lock.new == null) {
-            a.insertOne(ActionHasOccurred(_id = name, started = Instant.now()))
-        }
-        try {
-            action()
-            a.updateOneById(
-                name,
-                modification { it.completed assign Instant.now() }
-            )
-        } catch(e: Exception) {
-            a.updateOneById(
-                name,
-                modification {
-                    (it.errorMessage assign e.message) then
-                        (it.started assign null)
-                }
-            )
-        }
+        doOnce(name, database, maxDuration, priority, action)
     }
 }
 
-private fun example(database: ()->Database) {
-    startup { println("Happens on every function invocation.  Things that must be configured for operation belong here.") }
-    startupOnce("one time action", database) { println("An action that only ever occurs one time.") }
+@LightningServerDsl
+suspend fun doOnce(name: String, database: ()-> Database, maxDuration: Long = 60_000, priority: Double = 0.0, action: suspend ()->Unit) {
+    prepareModels()
+    val a = database().collection<ActionHasOccurred>()
+    val existing = a.get(name)
+    val lock = a.updateOne(
+        condition { it._id eq name and (it.completed eq null) and (it.started eq null or (it.started.notNull lt Instant.now().minusSeconds(maxDuration))) },
+        modification { it.started assign Instant.now() }
+    )
+    if (lock.new == null && existing != null) return
+    if(lock.new == null) {
+        a.insertOne(ActionHasOccurred(_id = name, started = Instant.now()))
+    }
+    try {
+        action()
+        a.updateOneById(
+            name,
+            modification { it.completed assign Instant.now() }
+        )
+    } catch(e: Exception) {
+        a.updateOneById(
+            name,
+            modification {
+                (it.errorMessage assign e.message) then
+                    (it.started assign null)
+            }
+        )
+    }
 }

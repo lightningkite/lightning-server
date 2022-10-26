@@ -43,7 +43,7 @@ class MongoDatabase(val database: CoroutineDatabase) : Database {
                         .uuidRepresentation(UuidRepresentation.STANDARD)
                         .applyToConnectionPoolSettings {
                             if(Settings.isServerless) {
-                                it.maxSize(1)
+                                it.maxSize(4)
                                 it.maxConnectionIdleTime(15, TimeUnit.SECONDS)
                             }
                         }
@@ -57,7 +57,7 @@ class MongoDatabase(val database: CoroutineDatabase) : Database {
                         .uuidRepresentation(UuidRepresentation.STANDARD)
                         .applyToConnectionPoolSettings {
                             if(Settings.isServerless) {
-                                it.maxSize(1)
+                                it.maxSize(4)
                                 it.maxConnectionIdleTime(15, TimeUnit.SECONDS)
                             }
                         }

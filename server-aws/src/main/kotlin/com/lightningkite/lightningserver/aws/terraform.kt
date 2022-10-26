@@ -1066,6 +1066,10 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
 
 internal fun awsMainAppHandler(projectInfo: TerraformProjectInfo, handlerFqn: String, otherSections: List<TerraformSection>) = TerraformSection(
     name = "Main",
+    inputs = listOf(
+        projectInfo.inputNumber("lambda_memory_size", 1024),
+        projectInfo.inputNumber("lambda_timeout", 30),
+    ),
     resources = """
         resource "aws_s3_bucket" "lambda_bucket" {
           bucket_prefix = "${projectInfo.namePrefix}-lambda-bucket"
@@ -1196,8 +1200,8 @@ internal fun awsMainAppHandler(projectInfo: TerraformProjectInfo, handlerFqn: St
           runtime = "java11"
           handler = "$handlerFqn"
           
-          memory_size = "2048"
-          timeout = 30
+          memory_size = "${'$'}{var.lambda_memory_size}"
+          timeout = var.lambda_timeout
           # memory_size = "1024"
 
           source_code_hash = filebase64sha256(local.lambda_source)
