@@ -959,6 +959,12 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
                     aws_cloudwatch_metric_alarm.panic_invocations.alarm_name, 
                     aws_cloudwatch_metric_alarm.panic_compute.alarm_name
                   ]
+                  previousState = {
+                    value = ["OK", "INSUFFICIENT_DATA"]
+                  }
+                  state = {
+                    value = ["ALARM"]
+                  }
                 }
               })
             }
