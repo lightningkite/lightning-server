@@ -216,7 +216,7 @@ private fun Appendable.functionHeader(documentable: Documentable, skipAuth: Bool
         if (argComma) append(", ")
         else argComma = true
         append(it.name)
-        if(it.optional) append('?')
+        if(it.optional) append(" | undefined")
         append(": ")
         it.type?.write()?.let { append(it) } ?: it.stringType?.let { append(it) }
     }
