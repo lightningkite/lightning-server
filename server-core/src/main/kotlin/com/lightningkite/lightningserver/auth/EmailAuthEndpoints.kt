@@ -83,7 +83,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
             base.jwtSigner().token(
                 emailAccess.idSerializer,
                 emailAccess.byEmail(input.email).let(emailAccess::id),
-                base.jwtSigner().emailExpiration
+                base.jwtSigner().expiration
             )
         }
     )

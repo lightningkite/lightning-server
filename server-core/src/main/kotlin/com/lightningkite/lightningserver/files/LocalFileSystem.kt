@@ -35,7 +35,7 @@ class LocalFileSystem(rootFile: File, val serveDirectory: String, val signer: Jw
             .takeIf { it.exists() }
             ?.readText()
             ?.let { ContentType(it) }
-            ?: ContentType.Application.OctetStream
+            ?: ContentType.fromExtension(file.extension)
         if (range != null) {
             val trimmed = range.substringAfter("=")
             val parts = trimmed.split(",").map { it.trim() }

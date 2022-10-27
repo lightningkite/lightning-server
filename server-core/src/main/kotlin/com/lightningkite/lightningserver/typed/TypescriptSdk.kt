@@ -263,7 +263,7 @@ private data class TArg(
 private fun arguments(documentable: Documentable, skipAuth: Boolean = false, overrideUserType: String? = null): List<TArg> = when (documentable) {
     is ApiEndpoint<*, *, *> -> listOfNotNull(
         documentable.authInfo.type?.takeUnless { skipAuth }?.let {
-            TArg(name = (overrideUserType ?: it).userTypeTokenName(), stringType = "string")
+            TArg(name = (overrideUserType ?: it).userTypeTokenName(), stringType = "string", optional = !documentable.authInfo.required)
         }?.let(::listOf),
         documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {
@@ -278,7 +278,7 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false, ove
     ).flatten()
     is ApiWebsocket<*, *, *> -> listOfNotNull(
         documentable.authInfo.type?.takeUnless { skipAuth }?.let {
-            TArg(name = (overrideUserType ?: it).userTypeTokenName(), stringType = "String")
+            TArg(name = (overrideUserType ?: it).userTypeTokenName(), stringType = "string", optional = !documentable.authInfo.required)
         }?.let(::listOf),
         documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {

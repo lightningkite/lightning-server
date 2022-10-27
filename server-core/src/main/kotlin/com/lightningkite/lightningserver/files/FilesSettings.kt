@@ -27,9 +27,10 @@ data class FilesSettings(
     companion object : Pluggable<FilesSettings, FileSystem>() {
         init {
             register("file") {
+                val root = File(it.storageUrl.substringAfter("file://").substringBefore('|'))
                 LocalFileSystem(
-                    rootFile = File(it.storageUrl.substringAfter("file://")),
-                    serveDirectory = "uploaded-files",
+                    rootFile = root,
+                    serveDirectory = it.storageUrl.substringAfter('|', "").takeUnless { it.isEmpty() } ?: "uploaded-files",
                     signer = it.jwtSigner
                 )
             }
