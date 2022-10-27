@@ -143,7 +143,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
             appendLine("            return apiCall(`\${this.httpUrl}${entry.route.path.escaped}`, ${if(hasInput) "input" else "undefined"}, {")
             appendLine("                method: \"${entry.route.method}\",")
             entry.authInfo.type?.let {
-                appendLine("                headers: { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` },")
+                appendLine("                headers: userToken ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}}` } : this.extraHeaders,")
             }
             append("            }, ")
             if(entry.inputType.descriptor.hasServerFile()) {
@@ -166,7 +166,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         appendLine("        return apiCall(`\${this.httpUrl}${entry.route.path.escaped}`, ${if(hasInput) "input" else "undefined"}, {")
         appendLine("            method: \"${entry.route.method}\",")
         entry.authInfo.type?.let {
-            appendLine("            headers: { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` },")
+            appendLine("            headers: userToken ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}}` } : this.extraHeaders,")
         }
         append("            }, ")
         if(entry.inputType.descriptor.hasServerFile()) {
@@ -216,7 +216,7 @@ private fun Appendable.functionHeader(documentable: Documentable, skipAuth: Bool
         if (argComma) append(", ")
         else argComma = true
         append(it.name)
-        if(it.optional) append(" | undefined")
+        if(it.optional) append("?")
         append(": ")
         it.type?.write()?.let { append(it) } ?: it.stringType?.let { append(it) }
     }
@@ -262,15 +262,15 @@ private data class TArg(
 
 private fun arguments(documentable: Documentable, skipAuth: Boolean = false, overrideUserType: String? = null): List<TArg> = when (documentable) {
     is ApiEndpoint<*, *, *> -> listOfNotNull(
-        documentable.authInfo.type?.takeUnless { skipAuth }?.let {
-            TArg(name = (overrideUserType ?: it).userTypeTokenName(), stringType = "string", optional = !documentable.authInfo.required)
-        }?.let(::listOf),
         documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {
                 TArg(name = it.name, type = documentable.routeTypes[it.name], stringType = "string")
             },
         documentable.inputType.takeUnless { it == Unit.serializer() }?.let {
             TArg(name = "input", type = it)
+        }?.let(::listOf),
+        documentable.authInfo.type?.takeUnless { skipAuth }?.let {
+            TArg(name = (overrideUserType ?: it).userTypeTokenName(), stringType = "string", optional = !documentable.authInfo.required)
         }?.let(::listOf),
         if(documentable.inputType.descriptor.hasServerFile())
             listOf(TArg(name = "files", stringType = "Record<Path<${documentable.inputType.write()}>, File>", optional = true))
