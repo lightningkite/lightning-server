@@ -52,7 +52,7 @@ open class SmsAuthEndpoints<USER : Any, ID>(
             base.jwtSigner().token(
                 phoneAccess.idSerializer,
                 phoneAccess.byPhone(input.phone).let(phoneAccess::id),
-                base.jwtSigner().emailExpiration
+                base.jwtSigner().expiration
             )
         }
     )
