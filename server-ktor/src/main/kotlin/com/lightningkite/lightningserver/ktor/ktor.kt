@@ -377,8 +377,8 @@ private suspend fun DefaultWebSocketServerSession.handleBaseWebsocket(
                                         path = match.path,
                                         parts = match.parts,
                                         wildcard = match.wildcard,
-                                        queryParameters = message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } }
-                                            ?: listOf(),
+                                        queryParameters = connectEvent.queryParameters + (message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } }
+                                            ?: listOf()),
                                         id = cacheId
                                     )
                                 )
