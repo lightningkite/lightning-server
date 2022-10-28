@@ -326,6 +326,7 @@ private suspend fun DefaultWebSocketServerSession.handleBaseWebsocket(
             protocol = call.request.origin.scheme,
             sourceIp = call.request.origin.remoteHost
         )
+        val tokenToCarryOver = connectEvent.queryParameters.find { it.first == "jwt" }?.second
         val jobs = HashMap<String, Job>()
         try {
             for (incoming in this.incoming) {
@@ -377,8 +378,8 @@ private suspend fun DefaultWebSocketServerSession.handleBaseWebsocket(
                                         path = match.path,
                                         parts = match.parts,
                                         wildcard = match.wildcard,
-                                        queryParameters = connectEvent.queryParameters + (message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } }
-                                            ?: listOf()),
+                                        queryParameters = (message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } }
+                                            ?: listOf()) + (tokenToCarryOver?.let { listOf("jwt" to it) } ?: listOf()),
                                         id = cacheId
                                     )
                                 )
