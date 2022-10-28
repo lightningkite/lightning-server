@@ -289,8 +289,12 @@ abstract class AwsAdapter : RequestStreamHandler {
                 val path = headers["x-path"] ?: queryParams.find { it.first == "path" }?.second ?: ""
                 val isMultiplex = path.isEmpty() || path.trim('/') == "multiplex"
                 cache().set("${event.requestContext.connectionId}-isMultiplex", isMultiplex, Duration.ofHours(8))
-                if (isMultiplex) APIGatewayV2HTTPResponse(200)
-                else handleWebsocketConnect(
+                if (isMultiplex) {
+                    queryParams.find { it.first == "jwt" }?.second?.let { jwt ->
+                        cache().set("${event.requestContext.connectionId}-auth", jwt, Duration.ofHours(8))
+                    }
+                    APIGatewayV2HTTPResponse(200)
+                } else handleWebsocketConnect(
                     event,
                     event.requestContext.connectionId,
                     path,
@@ -322,11 +326,13 @@ abstract class AwsAdapter : RequestStreamHandler {
                 when {
                     message.start -> {
                         try {
+                            val jwt = cache().get<String>("${event.requestContext.connectionId}-auth")
                             val result = handleWebsocketConnect(
                                 event,
                                 cacheId,
                                 message.path!!,
-                                message.queryParams ?: mapOf()
+                                (message.queryParams ?: mapOf()),
+                                jwt
                             ).also {
                                 if (it.statusCode == 200) {
                                     cache().modify<Set<String>>(multiplexSetId, 40, timeToLive = Duration.ofHours(8)) {
@@ -376,6 +382,7 @@ abstract class AwsAdapter : RequestStreamHandler {
         cacheId: String,
         path: String,
         queryParams: Map<String, List<String>>,
+        jwt: String? = null
     ): APIGatewayV2HTTPResponse {
         logger.debug("Connecting $cacheId")
         val match = wsMatcher.match(path)
@@ -387,14 +394,16 @@ abstract class AwsAdapter : RequestStreamHandler {
             logger.warn("handler is null!"); return APIGatewayV2HTTPResponse(400)
         }
         cache().set(cacheId, path, Duration.ofHours(1))
-        val event = WebSockets.ConnectEvent(
+        val lkEvent = WebSockets.ConnectEvent(
             path = match.path,
             parts = match.parts,
             wildcard = match.wildcard,
             id = cacheId,
             queryParameters = queryParams.flatMap { it.value.map { v -> it.key to v } },
             headers = HttpHeaders(
-                event.multiValueHeaders?.flatMap { it.value.map { v -> it.key to v } } ?: listOf()
+                (event.multiValueHeaders?.flatMap { it.value.map { v -> it.key to v } } ?: listOf()).plus(
+                    jwt?.let { listOf("jwt" to it) } ?: listOf()
+                )
             ),
             domain = event.requestContext.domainName,
             protocol = "https",
@@ -402,11 +411,11 @@ abstract class AwsAdapter : RequestStreamHandler {
         )
         try {
             Metrics.handlerPerformance(WebSockets.HandlerSection(match.path, WebSockets.WsHandlerType.CONNECT)) {
-                handler.connect(event)
+                handler.connect(lkEvent)
             }
             return APIGatewayV2HTTPResponse(200)
         } catch (e: Exception) {
-            e.report(event)
+            e.report(lkEvent)
             return APIGatewayV2HTTPResponse(500, body = Serialization.json.encodeToString(e.message ?: ""))
         }
     }
