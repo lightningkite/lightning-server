@@ -20,7 +20,7 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
     override fun resolve(path: String): FileObject = AzureFile(system, this.path.resolve(path))
 
     override val parent: FileObject?
-        get() = path.parentFile?.let { AzureFile(system, path) } ?: if (path.path.isNotEmpty()) system.root else null
+        get() = path.parentFile?.let { AzureFile(system, path) } ?: if (path.unixPath.isNotEmpty()) system.root else null
 
     override suspend fun info(): FileInfo? = withContext(Dispatchers.IO) {
         try {
@@ -39,7 +39,7 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
     override suspend fun list(): List<FileObject>? = withContext(Dispatchers.IO) {
         try {
             system.blobContainerClient.listBlobs(
-                ListBlobsOptions().setPrefix(path.path),
+                ListBlobsOptions().setPrefix(path.unixPath),
                 Duration.ofSeconds(5)
             )
                 .filter { !it.name.substringAfter(path.toString()).contains('/') }

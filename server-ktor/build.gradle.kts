@@ -20,6 +20,7 @@ dependencies {
     api("io.ktor:ktor-server-websockets-jvm:$ktorVersion")
     api("io.ktor:ktor-server-core-jvm:$ktorVersion")
     api("io.ktor:ktor-server-cio-jvm:$ktorVersion")
+    api("io.ktor:ktor-server-netty-jvm:$ktorVersion")
     api("io.ktor:ktor-server-cors:$ktorVersion")
 
     testImplementation("io.ktor:ktor-server-test-host-jvm:$ktorVersion")

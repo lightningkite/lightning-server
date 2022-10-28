@@ -20,7 +20,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
     override fun resolve(path: String): FileObject = S3File(system, this.path.resolve(path))
 
     override val parent: FileObject?
-        get() = path.parentFile?.let { S3File(system, path) } ?: if (path.path.isNotEmpty()) system.root else null
+        get() = path.parentFile?.let { S3File(system, path) } ?: if (path.unixPath.isNotEmpty()) system.root else null
 
     override suspend fun list(): List<FileObject>? = withContext(Dispatchers.IO) {
         try {
@@ -29,7 +29,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             while (true) {
                 val r = system.s3Async.listObjectsV2 {
                     it.bucket(system.bucket)
-                    it.prefix(path.path)
+                    it.prefix(path.unixPath)
                     token?.let { t -> it.continuationToken(t) }
                 }.await()
                 results += r.contents().filter { !it.key().substringAfter(path.toString()).contains('/') }
@@ -62,7 +62,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         withContext(Dispatchers.IO) {
             system.s3.putObject(PutObjectRequest.builder().also {
                 it.bucket(system.bucket)
-                it.key(path.path)
+                it.key(path.unixPath)
             }.build(), content.length?.let {
                 RequestBody.fromContentProvider(
                     { content.stream() }, it, content.type.toString()
@@ -76,7 +76,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         system.s3.getObject(
             GetObjectRequest.builder().also {
                 it.bucket(system.bucket)
-                it.key(path.path)
+                it.key(path.unixPath)
             }.build()
         )
     }
@@ -85,7 +85,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         withContext(Dispatchers.IO) {
             system.s3Async.deleteObject {
                 it.bucket(system.bucket)
-                it.key(path.path)
+                it.key(path.unixPath)
             }.await()
         }
     }
@@ -101,7 +101,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             }
             val accessKey = system.credentialProvider.resolveCredentials().accessKeyId()
             val secretKey = system.credentialProvider.resolveCredentials().secretAccessKey()
-            val objectPath = path.path
+            val objectPath = path.unixPath
             val date = headers["X-Amz-Date"]!!
             val algorithm = headers["X-Amz-Algorithm"]!!
             val expires = headers["X-Amz-Expires"]!!
@@ -137,14 +137,14 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
     }
 
     override val url: String
-        get() = "https://${system.bucket}.s3.${system.region.id()}.amazonaws.com/${path.path}"
+        get() = "https://${system.bucket}.s3.${system.region.id()}.amazonaws.com/${path.unixPath}"
 
     override val signedUrl: String
         get() = system.signer.presignGetObject {
             system.signedUrlExpirationSeconds?.let { e -> it.signatureDuration(Duration.ofSeconds(e.toLong())) }
             it.getObjectRequest {
                 it.bucket(system.bucket)
-                it.key(path.path)
+                it.key(path.unixPath)
             }
         }.url().toString()
 
@@ -152,7 +152,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         it.signatureDuration(timeout)
         it.putObjectRequest {
             it.bucket(system.bucket)
-            it.key(path.path)
+            it.key(path.unixPath)
         }
     }.url().toString()
 

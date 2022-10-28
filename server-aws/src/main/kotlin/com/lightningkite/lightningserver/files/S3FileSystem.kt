@@ -20,6 +20,11 @@ class S3FileSystem(
     val bucket: String,
     val signedUrlExpirationSeconds: Int? = null
 ) : FileSystem {
+    override val rootUrls: List<String> = listOf(
+        "https://${bucket}.s3.${region.id()}.amazonaws.com/",
+        "https://s3-${region.id()}.amazonaws.com/${bucket}/",
+    )
+
     val s3: S3Client = S3Client.builder()
         .region(region)
         .credentialsProvider(credentialProvider)
@@ -36,11 +41,15 @@ class S3FileSystem(
     companion object {
         init {
             FilesSettings.register("s3") {
-                val withoutScheme = it.storageUrl.substringAfter("://")
+                val beforeOptions = it.storageUrl.substringBefore('?')
+                val withoutScheme = beforeOptions.substringAfter("://")
                 val credentials = withoutScheme.substringBefore('@', "").split(':').filter { it.isNotBlank() }
                 val endpoint = withoutScheme.substringAfter('@').substringBefore('/')
                 val bucket = endpoint.substringBefore('.')
                 val region = endpoint.substringAfter('.').substringBefore('.').substringAfter('-')
+                val options = it.storageUrl.substringAfter('?', "").split("&").filter { it.isNotBlank() }.associate {
+                    it.substringBefore('=') to it.substringAfter('=', "true")
+                }
                 S3FileSystem(
                     Region.of(region),
                     if (credentials.isNotEmpty()) {

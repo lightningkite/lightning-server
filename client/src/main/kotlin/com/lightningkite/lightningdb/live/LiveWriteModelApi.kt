@@ -46,6 +46,13 @@ class LiveWriteModelApi<Model : HasId<UUID>>(
         body = values.toJsonRequestBody(ListSerializer(serializer)),
     ).readJson(ListSerializer(serializer))
 
+    override fun upsert(value: Model, id: UUIDFor<Model>): Single<Model> = HttpClient.call(
+        url = "$url/${value._id}",
+        method = HttpClient.POST,
+        headers = authHeaders,
+        body = value.toJsonRequestBody(serializer),
+    ).readJson(serializer)
+
     override fun put(value: Model): Single<Model> = HttpClient.call(
         url = "$url/${value._id}",
         method = HttpClient.PUT,

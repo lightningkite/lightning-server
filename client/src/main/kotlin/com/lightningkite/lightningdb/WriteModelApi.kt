@@ -8,7 +8,8 @@ import java.util.*
 
 abstract class WriteModelApi<Model : IsCodableAndHashable> {
     abstract fun post(value: Model): Single<Model>
-    abstract fun postBulk(values:List<Model>): Single<List<Model>>
+    abstract fun postBulk(values: List<Model>): Single<List<Model>>
+    abstract fun upsert(value: Model, id: UUIDFor<Model>): Single<Model>
     abstract fun put(value: Model): Single<Model>
     abstract fun putBulk(values:List<Model>): Single<List<Model>>
     abstract fun patch(id: UUIDFor<Model>, modification: Modification<Model>): Single<Model>

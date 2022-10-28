@@ -16,37 +16,61 @@ import java.util.concurrent.TimeUnit
 import kotlin.collections.HashMap
 import java.util.*
 
+
+var sharedSocketShouldBeActive: Observable<Boolean> = Observable.just(false)
+private var retryTime = 1000L
+private var lastRetry = 0L
+
 var _overrideWebSocketProvider: ((url: String) -> Observable<WebSocketInterface>)? = null
 private val sharedSocketCache = HashMap<String, Observable<WebSocketInterface>>()
 fun sharedSocket(url: String): Observable<WebSocketInterface> {
     return sharedSocketCache.getOrPut(url) {
-        val shortUrl = url.substringBefore('?')
-        println("Creating socket to $url")
-        (_overrideWebSocketProvider?.invoke(url) ?: HttpClient.webSocket(url))
+        sharedSocketShouldBeActive
+            .distinctUntilChanged()
             .switchMap {
-                println("Connection to $shortUrl established, starting pings")
-                // Only have this observable until it fails
+                val shortUrl = url.substringBefore('?')
+                if (!it) Observable.never<WebSocketInterface>()
+                else {
+                    println("Creating socket to $url")
+                    (_overrideWebSocketProvider?.invoke(url) ?: HttpClient.webSocket(url))
+                        .switchMap {
+                            lastRetry = System.currentTimeMillis()
+//                            println("Connection to $shortUrl established, starting pings")
+                            // Only have this observable until it fails
 
-                val pingMessages: Observable<WebSocketInterface> = Observable.interval(30_000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!).map { _ ->
-                    println("Sending ping to $url")
-                    it.write.onNext(WebSocketFrame(text = " "))
-                }.switchMap { Observable.never() }
+                            val pingMessages: Observable<WebSocketInterface> =
+                                Observable.interval(30_000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!)
+                                    .map { _ ->
+//                                        println("Sending ping to $url")
+                                        it.write.onNext(WebSocketFrame(text = " "))
+                                    }.switchMap { Observable.never() }
 
-                val timeoutAfterSeconds: Observable<WebSocketInterface> = it.read
-                    .doOnNext { println("Got message from $shortUrl: ${it}") }
-                    .timeout(60_000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!)
-                    .switchMap { Observable.never() }
+                            val timeoutAfterSeconds: Observable<WebSocketInterface> = it.read
+                                .doOnNext {
+//                                    println("Got message from $shortUrl: ${it}")
+                                    if (System.currentTimeMillis() > lastRetry + 60_000L) {
+                                        retryTime = 1000L
+                                    }
+                                }
+                                .timeout(40_000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!)
+                                .switchMap { Observable.never() }
 
-                Observable.merge(
-                    Observable.just(it),
-                    pingMessages,
-                    timeoutAfterSeconds
-                )
-            }
-            .doOnError { println("Socket to $shortUrl FAILED with $it") }
-            .doOnComplete {
-                println("Disconnecting socket to $shortUrl")
-                sharedSocketCache.remove(url)
+                            Observable.merge(
+                                Observable.just(it),
+                                pingMessages,
+                                timeoutAfterSeconds
+                            )
+                        }
+                        .doOnError { println("Socket to $shortUrl FAILED with $it") }
+                        .retryWhen @SwiftReturnType("Observable<Error>") {
+                            val temp = retryTime
+                            retryTime = temp * 2L
+                            it.delay(temp, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!)
+                        }
+                        .doOnDispose {
+                            println("Disconnecting socket to $shortUrl")
+                        }
+                }
             }
             .replay(1)
             .refCount()

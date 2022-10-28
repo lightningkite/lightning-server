@@ -5,15 +5,18 @@ import com.lightningkite.lightningserver.serverhealth.HealthStatus
 
 interface FileSystem: HealthCheckable {
     val root: FileObject
+    val rootUrls: List<String> get() = listOf(root.url)
     companion object {
         fun register(system: FileSystem) {
-            registered.add(system)
+            system.rootUrls.forEach {
+                roots.add(it to system)
+            }
         }
-        val urlRoots get() = registered.map { it.root.url }
-        private val registered = ArrayList<FileSystem>()
+        val urlRoots get() = roots.map { it.first }
+        private val roots = ArrayList<Pair<String, FileSystem>>()
         fun resolve(url: String): FileObject? {
-            val sys = registered.find { url.startsWith(it.root.url) } ?: return null
-            return sys.root.resolve(url.removePrefix(sys.root.url).substringBefore('?'))
+            val (root, sys) = roots.find { url.startsWith(it.first) } ?: return null
+            return sys.root.resolve(url.removePrefix(root).substringBefore('?'))
         }
     }
 

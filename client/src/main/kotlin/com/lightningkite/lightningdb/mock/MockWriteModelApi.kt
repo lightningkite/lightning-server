@@ -16,6 +16,9 @@ class MockWriteModelApi<Model : HasId<UUID>>(
     override fun postBulk(values: List<Model>): Single<List<Model>> =
         Single.just(values.map { table.addItem(it) })
 
+    override fun upsert(value: Model, id: UUIDFor<Model>): Single<Model> =
+        Single.just(table.addItem(value))
+
     override fun put(value: Model): Single<Model> =
         Single.just(table.replaceItem(value))
 

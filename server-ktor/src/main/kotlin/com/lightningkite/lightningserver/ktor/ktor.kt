@@ -25,6 +25,7 @@ import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import io.ktor.server.netty.*
 import io.ktor.server.plugins.*
 import io.ktor.server.plugins.cors.CORSConfig.Companion.CorsSimpleResponseHeaders
 import io.ktor.server.plugins.cors.routing.*
@@ -41,6 +42,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.time.*
 import java.util.*
@@ -160,215 +162,10 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
         routing {
             val wsMatcher = ServerPathMatcher(WebSockets.handlers.keys.asSequence())
             webSocket {
-                call.request.queryParameters["path"]?.let { path ->
-                    if (path.trim('/').lowercase() == "multiplex") return@let null
-                    val entry = wsMatcher.match(path) ?: throw NotFoundException("No path $path found")
-                    val handler =
-                        WebSockets.handlers[entry.path] ?: throw NotFoundException("No handler found for $path")
-                    val id = UUID.randomUUID().toString()
-                    try {
-                        launch {
-                            myEngine.listenForWebSocketMessage(id).collect {
-                                send(it)
-                            }
-                        }
-                        Metrics.handlerPerformance(
-                            WebSockets.HandlerSection(
-                                entry.path,
-                                WebSockets.WsHandlerType.CONNECT
-                            )
-                        ) {
-                            handler.connect(
-                                WebSockets.ConnectEvent(
-                                    path = entry.path,
-                                    parts = entry.parts,
-                                    wildcard = entry.wildcard,
-                                    queryParameters = call.request.queryParameters.flattenEntries(),
-                                    id = id,
-                                    headers = call.request.headers.adapt(),
-                                    domain = call.request.origin.host,
-                                    protocol = call.request.origin.scheme,
-                                    sourceIp = call.request.origin.remoteHost
-                                )
-                            )
-                        }
-                        for (incoming in this.incoming) {
-                            Metrics.handlerPerformance(
-                                WebSockets.HandlerSection(
-                                    entry.path,
-                                    WebSockets.WsHandlerType.MESSAGE
-                                )
-                            ) {
-                                handler.message(
-                                    WebSockets.MessageEvent(
-                                        id = id,
-                                        content = (incoming as? Frame.Text)?.readText() ?: ""
-                                    )
-                                )
-                            }
-                        }
-                    } finally {
-                        Metrics.handlerPerformance(
-                            WebSockets.HandlerSection(
-                                entry.path,
-                                WebSockets.WsHandlerType.DISCONNECT
-                            )
-                        ) {
-                            handler.disconnect(WebSockets.DisconnectEvent(id))
-                        }
-                    }
-                } ?: run {
-
-                    val parts = HashMap<String, String>()
-                    var wildcard: String? = null
-                    call.parameters.forEach { s, strings ->
-                        if (strings.size > 1) wildcard = strings.joinToString("/")
-                        parts[s] = strings.single()
-                    }
-                    val id = UUID.randomUUID().toString()
-                    val connectEvent = WebSockets.ConnectEvent(
-                        path = ServerPath.root,
-                        parts = parts,
-                        wildcard = wildcard,
-                        queryParameters = call.request.queryParameters.flattenEntries(),
-                        id = id,
-                        headers = call.request.headers.adapt(),
-                        domain = call.request.origin.host,
-                        protocol = call.request.origin.scheme,
-                        sourceIp = call.request.origin.remoteHost
-                    )
-                    val jobs = HashMap<String, Job>()
-                    try {
-                        for (incoming in this.incoming) {
-                            val messageText = (incoming as Frame.Text).readText()
-                            if (messageText.isBlank()) {
-                                send("")
-                                continue
-                            }
-                            val message =
-                                Serialization.json.decodeFromString<MultiplexMessage>(messageText)
-                            val cacheId = "$id/${message.channel}"
-                            when {
-                                message.start -> {
-                                    val path = message.path!!
-                                    val match = wsMatcher.match(path)
-                                    if (match == null) {
-                                        logger.warn("match is null!"); continue
-                                    }
-                                    val handler = WebSockets.handlers[match.path]
-                                    if (handler == null) {
-                                        logger.warn("handler is null!"); continue
-                                    }
-                                    cache.set(cacheId, path)
-                                    jobs[message.channel] = launch {
-                                        try {
-                                            myEngine.listenForWebSocketMessage(cacheId).collect {
-                                                send(
-                                                    Serialization.json.encodeToString(
-                                                        MultiplexMessage(
-                                                            data = it,
-                                                            channel = message.channel
-                                                        )
-                                                    )
-                                                )
-                                            }
-                                        } catch (e: CancellationException) {
-                                            throw e
-                                        }
-                                    }
-                                    try {
-                                        Metrics.handlerPerformance(
-                                            WebSockets.HandlerSection(
-                                                match.path,
-                                                WebSockets.WsHandlerType.CONNECT
-                                            )
-                                        ) {
-                                            handler.connect(
-                                                connectEvent.copy(
-                                                    path = match.path,
-                                                    parts = match.parts,
-                                                    wildcard = match.wildcard,
-                                                    queryParameters = message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } }
-                                                        ?: listOf(),
-                                                    id = cacheId
-                                                )
-                                            )
-                                        }
-                                        send(Serialization.json.encodeToString(message))
-                                    } catch (e: Exception) {
-                                        send(
-                                            Serialization.json.encodeToString(
-                                                message.copy(
-                                                    start = false,
-                                                    error = e.message
-                                                )
-                                            )
-                                        )
-                                    }
-                                }
-
-                                message.end -> {
-                                    val path = cache.get<String>(cacheId)
-                                    if (path == null) {
-                                        logger.warn("path at $cacheId is null!"); continue
-                                    }
-                                    val match = wsMatcher.match(path)
-                                    if (match == null) {
-                                        logger.warn("match is null!"); continue
-                                    }
-                                    val handler = WebSockets.handlers[match.path]
-                                    if (handler == null) {
-                                        logger.warn("handler is null!"); continue
-                                    }
-                                    jobs[message.channel]?.cancel()
-                                    try {
-                                        Metrics.handlerPerformance(
-                                            WebSockets.HandlerSection(
-                                                match.path,
-                                                WebSockets.WsHandlerType.DISCONNECT
-                                            )
-                                        ) {
-                                            handler.disconnect(WebSockets.DisconnectEvent(cacheId))
-                                        }
-                                        send(Serialization.json.encodeToString(message))
-                                    } catch (e: Exception) {
-                                        send(Serialization.json.encodeToString(message.copy(error = e.message)))
-                                    }
-                                }
-
-                                message.data != null -> {
-                                    val path = cache.get<String>(cacheId)
-                                    if (path == null) {
-                                        logger.warn("path at $cacheId is null!"); continue
-                                    }
-                                    val match = wsMatcher.match(path)
-                                    if (match == null) {
-                                        logger.warn("match is null!"); continue
-                                    }
-                                    val handler = WebSockets.handlers[match.path]
-                                    if (handler == null) {
-                                        logger.warn("handler is null!"); continue
-                                    }
-                                    try {
-                                        val d = message.data ?: continue
-                                        Metrics.handlerPerformance(
-                                            WebSockets.HandlerSection(
-                                                match.path,
-                                                WebSockets.WsHandlerType.MESSAGE
-                                            )
-                                        ) {
-                                            handler.message(WebSockets.MessageEvent(cacheId, d))
-                                        }
-                                    } catch (e: Exception) {
-                                        send(Serialization.json.encodeToString(message.copy(error = e.message)))
-                                    }
-                                }
-                            }
-                        }
-                    } finally {
-                        jobs.values.forEach { it.cancelAndJoin() }
-                    }
-                }
+                handleBaseWebsocket(wsMatcher, myEngine, logger, cache)
+            }
+            webSocket("multiplex") {
+                handleBaseWebsocket(wsMatcher, myEngine, logger, cache)
             }
         }
         Http.endpoints.forEach { entry ->
@@ -446,11 +243,236 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
     }
 }
 
+private suspend fun DefaultWebSocketServerSession.handleBaseWebsocket(
+    wsMatcher: ServerPathMatcher,
+    myEngine: LocalEngine,
+    logger: Logger,
+    cache: CacheInterface
+) {
+    call.request.queryParameters["path"]?.let { path ->
+        if (path.trim('/').lowercase() == "multiplex") return@let null
+        val entry = wsMatcher.match(path) ?: throw NotFoundException("No path $path found")
+        val handler =
+            WebSockets.handlers[entry.path] ?: throw NotFoundException("No handler found for $path")
+        val id = UUID.randomUUID().toString()
+        try {
+            launch {
+                myEngine.listenForWebSocketMessage(id).collect {
+                    send(it)
+                }
+            }
+            Metrics.handlerPerformance(
+                WebSockets.HandlerSection(
+                    entry.path,
+                    WebSockets.WsHandlerType.CONNECT
+                )
+            ) {
+                handler.connect(
+                    WebSockets.ConnectEvent(
+                        path = entry.path,
+                        parts = entry.parts,
+                        wildcard = entry.wildcard,
+                        queryParameters = call.request.queryParameters.flattenEntries(),
+                        id = id,
+                        headers = call.request.headers.adapt(),
+                        domain = call.request.origin.host,
+                        protocol = call.request.origin.scheme,
+                        sourceIp = call.request.origin.remoteHost
+                    )
+                )
+            }
+            for (incoming in this.incoming) {
+                Metrics.handlerPerformance(
+                    WebSockets.HandlerSection(
+                        entry.path,
+                        WebSockets.WsHandlerType.MESSAGE
+                    )
+                ) {
+                    handler.message(
+                        WebSockets.MessageEvent(
+                            id = id,
+                            content = (incoming as? Frame.Text)?.readText() ?: ""
+                        )
+                    )
+                }
+            }
+        } finally {
+            Metrics.handlerPerformance(
+                WebSockets.HandlerSection(
+                    entry.path,
+                    WebSockets.WsHandlerType.DISCONNECT
+                )
+            ) {
+                handler.disconnect(WebSockets.DisconnectEvent(id))
+            }
+        }
+    } ?: run {
+
+        val parts = HashMap<String, String>()
+        var wildcard: String? = null
+        call.parameters.forEach { s, strings ->
+            if (strings.size > 1) wildcard = strings.joinToString("/")
+            parts[s] = strings.single()
+        }
+        val id = UUID.randomUUID().toString()
+        val connectEvent = WebSockets.ConnectEvent(
+            path = ServerPath.root,
+            parts = parts,
+            wildcard = wildcard,
+            queryParameters = call.request.queryParameters.flattenEntries(),
+            id = id,
+            headers = call.request.headers.adapt(),
+            domain = call.request.origin.host,
+            protocol = call.request.origin.scheme,
+            sourceIp = call.request.origin.remoteHost
+        )
+        val jobs = HashMap<String, Job>()
+        try {
+            for (incoming in this.incoming) {
+                val messageText = (incoming as Frame.Text).readText()
+                if (messageText.isBlank()) {
+                    send("")
+                    continue
+                }
+                val message =
+                    Serialization.json.decodeFromString<MultiplexMessage>(messageText)
+                val cacheId = "$id/${message.channel}"
+                when {
+                    message.start -> {
+                        val path = message.path!!
+                        val match = wsMatcher.match(path)
+                        if (match == null) {
+                            logger.warn("match is null!"); continue
+                        }
+                        val handler = WebSockets.handlers[match.path]
+                        if (handler == null) {
+                            logger.warn("handler is null!"); continue
+                        }
+                        cache.set(cacheId, path)
+                        jobs[message.channel] = launch {
+                            try {
+                                myEngine.listenForWebSocketMessage(cacheId).collect {
+                                    send(
+                                        Serialization.json.encodeToString(
+                                            MultiplexMessage(
+                                                data = it,
+                                                channel = message.channel
+                                            )
+                                        )
+                                    )
+                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            }
+                        }
+                        try {
+                            Metrics.handlerPerformance(
+                                WebSockets.HandlerSection(
+                                    match.path,
+                                    WebSockets.WsHandlerType.CONNECT
+                                )
+                            ) {
+                                handler.connect(
+                                    connectEvent.copy(
+                                        path = match.path,
+                                        parts = match.parts,
+                                        wildcard = match.wildcard,
+                                        queryParameters = message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } }
+                                            ?: listOf(),
+                                        id = cacheId
+                                    )
+                                )
+                            }
+                            send(Serialization.json.encodeToString(message))
+                        } catch (e: Exception) {
+                            send(
+                                Serialization.json.encodeToString(
+                                    message.copy(
+                                        start = false,
+                                        error = e.message
+                                    )
+                                )
+                            )
+                        }
+                    }
+
+                    message.end -> {
+                        val path = cache.get<String>(cacheId)
+                        if (path == null) {
+                            logger.warn("path at $cacheId is null!"); continue
+                        }
+                        val match = wsMatcher.match(path)
+                        if (match == null) {
+                            logger.warn("match is null!"); continue
+                        }
+                        val handler = WebSockets.handlers[match.path]
+                        if (handler == null) {
+                            logger.warn("handler is null!"); continue
+                        }
+                        jobs[message.channel]?.cancel()
+                        try {
+                            Metrics.handlerPerformance(
+                                WebSockets.HandlerSection(
+                                    match.path,
+                                    WebSockets.WsHandlerType.DISCONNECT
+                                )
+                            ) {
+                                handler.disconnect(WebSockets.DisconnectEvent(cacheId))
+                            }
+                            send(Serialization.json.encodeToString(message))
+                        } catch (e: Exception) {
+                            send(Serialization.json.encodeToString(message.copy(error = e.message)))
+                        }
+                    }
+
+                    message.data != null -> {
+                        val path = cache.get<String>(cacheId)
+                        if (path == null) {
+                            logger.warn("path at $cacheId is null!"); continue
+                        }
+                        val match = wsMatcher.match(path)
+                        if (match == null) {
+                            logger.warn("match is null!"); continue
+                        }
+                        val handler = WebSockets.handlers[match.path]
+                        if (handler == null) {
+                            logger.warn("handler is null!"); continue
+                        }
+                        try {
+                            val d = message.data ?: continue
+                            Metrics.handlerPerformance(
+                                WebSockets.HandlerSection(
+                                    match.path,
+                                    WebSockets.WsHandlerType.MESSAGE
+                                )
+                            ) {
+                                handler.message(WebSockets.MessageEvent(cacheId, d))
+                            }
+                        } catch (e: Exception) {
+                            send(Serialization.json.encodeToString(message.copy(error = e.message)))
+                        }
+                    }
+                }
+            }
+        } finally {
+            jobs.values.forEach { it.cancelAndJoin() }
+        }
+    }
+}
+
 /**
  * A helper function to start a Ktor server using GeneralServerSettings and the provided Module.
  */
 fun runServer(pubSub: PubSubInterface, cache: CacheInterface) = embeddedServer(
     factory = CIO,
+    port = generalSettings().port,
+    host = generalSettings().host,
+    module = { lightningServer(pubSub, cache) },
+    watchPaths = listOf()
+).start(wait = true)
+
+fun runServerNetty(pubSub: PubSubInterface, cache: CacheInterface) = embeddedServer(
+    factory = Netty,
     port = generalSettings().port,
     host = generalSettings().host,
     module = { lightningServer(pubSub, cache) },
