@@ -69,51 +69,6 @@ fun <T> FORM.insideHtmlForm(
     input(InputType.hidden, name = "__json") {
         id = "$jsEditorName-input"
     }
-    script {
-        unsafe {
-            //language=JavaScript
-            raw(
-                """
-                const fileEditorSet = new Map([${
-                    serializer.descriptor.fileFieldNames().joinToString {
-                        "[\"$title${it.joinToString { "[$it]" }}\", \"$title.${it.joinToString(separator = ".")}\"]"
-                    }
-                }]);
-                const obs = new MutationObserver((mutations) => {
-                    window.setTimeout(()=>{
-                      for(const mut of mutations) {
-                        for(const added of mut.addedNodes) {
-                          if(!(added instanceof HTMLElement)) continue;
-                          for(const [name, path] of fileEditorSet) {
-                            const part = added.querySelector(`label[for="${'$'}{name}"]`);
-                            if(!part) continue;
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.onchange = async (ev) => {
-                              const urlsResponse = await fetch("${uploadEarlyEndpoint?.endpoint?.path?.fullUrl()}");
-                              const urls = await urlsResponse.json();
-                              const uploadResult = await fetch(urls.uploadUrl, {
-                                method: "PUT",
-                                body: input.files[0],
-                                headers: {
-                                  'x-ms-blob-type': 'BlockBlob'
-                                }
-                              });
-                              if(uploadResult.ok) {
-                                window.${jsEditorName}.getEditor(path).setValue(urls.futureCallToken);
-                              }
-                            };
-                            part.after(input);
-                          }
-                        }
-                      }
-                    }, 10);
-                }).observe(document.getElementById('${this@insideHtmlForm.id}'), { childList: true });
-                window.${jsEditorName}_mutObs = obs;
-                """.trimIndent()
-            )
-        }
-    }
     jsForm(
         title = title,
         jsEditorName = jsEditorName,
@@ -131,54 +86,6 @@ fun <T> FORM.insideHtmlForm(
                 });
                 """.trimIndent()
             )
-        }
-    }
-    if (uploadEarlyEndpoint != null) {
-        h3 {
-            id = "uploaderHeader"
-            +"Uploader +"
-        }
-        div {
-            id = "uploaderSection"
-            hidden = true
-            input(type = InputType.file) {
-                id = "fileUploaderInput"
-            }
-            textInput { id = "fileUploaderResult" }
-            button(type = ButtonType.button) {
-                id = "fileUploaderCopy"
-                +"Copy to Clipboard"
-            }
-        }
-        script {
-            unsafe {
-                raw(
-                    """
-                document.getElementById("uploaderHeader").onclick = ev => {
-                    const section = document.getElementById("uploaderSection")
-                    section.hidden = !section.hidden
-                }
-                document.getElementById("fileUploaderCopy").onclick = ev => {
-                    navigator.clipboard.writeText(document.getElementById("fileUploaderResult").value)
-                }
-                const input = document.getElementById("fileUploaderInput")
-                input.onchange = async (ev) => {
-                  const urlsResponse = await fetch("${uploadEarlyEndpoint.endpoint.path.fullUrl()}");
-                  const urls = await urlsResponse.json();
-                  const uploadResult = await fetch(urls.uploadUrl, {
-                    method: "PUT",
-                    body: input.files[0],
-                    headers: {
-                      'x-ms-blob-type': 'BlockBlob'
-                    }
-                  });
-                  if(uploadResult.ok) {
-                    document.getElementById("fileUploaderResult").value = urls.futureCallToken
-                  }
-                };
-            """.trimIndent()
-                )
-            }
         }
     }
 }
@@ -220,6 +127,31 @@ fun <T> FlowContent.jsForm(
     div { this.id = id }
     script {
         unsafe {
+            UploadEarlyEndpoint.default?.endpoint?.path?.fullUrl()?.let { uploadUrl ->
+                +"""
+                JSONEditor.defaults.callbacks = {
+                    upload: {
+                        mainUploadHandler: async (jseditor, type, file, callbacks) => {
+                            const urlsResponse = await fetch("$uploadUrl");
+                            const urls = await urlsResponse.json();
+                            callbacks.updateProgress(25);
+                            const uploadResult = await fetch(urls.uploadUrl, {
+                                method: "PUT",
+                                body: file,
+                                headers: {
+                                    'x-ms-blob-type': 'BlockBlob'
+                                }
+                            });
+                            callbacks.updateProgress(100);
+                            if(uploadResult.ok) {
+                                callbacks.success(urls.futureCallToken);
+                            }
+                        }
+                    }
+                }
+                """.trimIndent()
+            }
+            +"\n"
             +"""
                 const ${jsEditorName} = new JSONEditor(document.getElementById('$id'), {
                     disable_properties: true,
