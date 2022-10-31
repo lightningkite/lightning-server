@@ -133,6 +133,54 @@ fun <T> FORM.insideHtmlForm(
             )
         }
     }
+    if (uploadEarlyEndpoint != null) {
+        h3 {
+            id = "uploaderHeader"
+            +"Uploader +"
+        }
+        div {
+            id = "uploaderSection"
+            hidden = true
+            input(type = InputType.file) {
+                id = "fileUploaderInput"
+            }
+            textInput { id = "fileUploaderResult" }
+            button(type = ButtonType.button) {
+                id = "fileUploaderCopy"
+                +"Copy to Clipboard"
+            }
+        }
+        script {
+            unsafe {
+                raw(
+                    """
+                document.getElementById("uploaderHeader").onclick = ev => {
+                    const section = document.getElementById("uploaderSection")
+                    section.hidden = !section.hidden
+                }
+                document.getElementById("fileUploaderCopy").onclick = ev => {
+                    navigator.clipboard.writeText(document.getElementById("fileUploaderResult").value)
+                }
+                const input = document.getElementById("fileUploaderInput")
+                input.onchange = async (ev) => {
+                  const urlsResponse = await fetch("${uploadEarlyEndpoint.endpoint.path.fullUrl()}");
+                  const urls = await urlsResponse.json();
+                  const uploadResult = await fetch(urls.uploadUrl, {
+                    method: "PUT",
+                    body: input.files[0],
+                    headers: {
+                      'x-ms-blob-type': 'BlockBlob'
+                    }
+                  });
+                  if(uploadResult.ok) {
+                    document.getElementById("fileUploaderResult").value = urls.futureCallToken
+                  }
+                };
+            """.trimIndent()
+                )
+            }
+        }
+    }
 }
 
 internal fun SerialDescriptor.fileFieldNames(visited: MutableSet<SerialDescriptor> = mutableSetOf()): List<List<String>> {
