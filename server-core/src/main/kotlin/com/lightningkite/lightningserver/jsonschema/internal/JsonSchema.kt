@@ -200,7 +200,7 @@ internal fun SerialDescriptor.jsonSchemaString(
                     it["links"] = buildJsonArray {
                         this.addJsonObject {
                             put("href", "{{self}}")
-                            put("rel", "view")
+                            put("rel", "View File")
                         }
                     }
                 }
