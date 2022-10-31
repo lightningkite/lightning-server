@@ -423,6 +423,10 @@ abstract class AwsAdapter : RequestStreamHandler {
     suspend fun handleWebsocketMessage(cacheId: String, content: String): APIGatewayV2HTTPResponse {
         logger.debug("Handling message $content to $cacheId")
         val path = cache().get<String>(cacheId) ?: run {
+            delay(1000)
+            logger.warn("checking cache for $cacheId after 1 sec")
+            cache().get<String>(cacheId)
+        } ?: run {
             logger.warn("cache has no id $cacheId")
             return APIGatewayV2HTTPResponse(400)
         }
@@ -451,6 +455,10 @@ abstract class AwsAdapter : RequestStreamHandler {
     suspend fun handleWebsocketDisconnect(cacheId: String): APIGatewayV2HTTPResponse {
         logger.debug("Disconnecting $cacheId")
         val path = cache().get<String>(cacheId) ?: run {
+            delay(1000)
+             logger.warn("checking cache for $cacheId after 1 sec")
+            cache().get<String>(cacheId)
+        } ?: run {
             logger.warn("cache has no id $cacheId")
             return APIGatewayV2HTTPResponse(400)
         }
