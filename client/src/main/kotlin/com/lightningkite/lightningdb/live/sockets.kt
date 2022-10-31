@@ -114,7 +114,7 @@ fun multiplexedSocketRaw(
             lastSocket = it
             val multiplexedIn = it.read.mapNotNull {
                 val text = it.text ?: return@mapNotNull null
-                if (text.isEmpty()) return@mapNotNull null
+                if (text.isBlank()) return@mapNotNull null
                 text.fromJsonString<MultiplexMessage>()
             }
             multiplexedIn
