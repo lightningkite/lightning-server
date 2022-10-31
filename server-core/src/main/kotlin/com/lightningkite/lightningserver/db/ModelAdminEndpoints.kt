@@ -121,6 +121,20 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         val propItems = items.map { Serialization.properties.encodeToStringMap(info.serialization.serializer, it) }
         val keys = propItems.flatMap { it.keys }.distinct()
         HttpResponse.html {
+            head {
+                style {
+                    unsafe {
+                        +"""
+                        td {
+                          max-width: 25rem;
+                          padding: 1rem;
+                          overflow: hidden;
+                          min-width: 5rem;
+                        }
+                        """.trimIndent()
+                    }
+                }
+            }
             body {
                 a(href = "create/") {
                     +"Create"
@@ -137,6 +151,10 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                                 td {
                                     if (key == "_id") {
                                         a(href = item["_id"]!! + "/") {
+                                            +(item[key] ?: "-")
+                                        }
+                                    } else if(item[key]?.let { it.startsWith("https://") || it.startsWith("http://") } == true) {
+                                        a(href = item[key]!!, target = "_blank") {
                                             +(item[key] ?: "-")
                                         }
                                     } else {
