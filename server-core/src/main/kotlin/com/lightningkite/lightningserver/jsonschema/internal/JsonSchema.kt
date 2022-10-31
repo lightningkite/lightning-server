@@ -161,11 +161,6 @@ internal fun SerialDescriptor.jsonSchemaString(
         val pattern = annotations.lastOfInstance<ExpectedPattern>()?.pattern ?: ""
         val format = annotations.lastOfInstance<JsonSchemaFormat>()?.format
 
-        println("Processing descriptor ${this.serialName} for schema")
-        println("Server file descriptor is ${Serialization.module.getContextual(ServerFile::class)?.descriptor?.serialName}")
-
-
-
         when(this.capturedKClass) {
             Instant::class -> {
                 return jsonSchemaElement(annotations) {
