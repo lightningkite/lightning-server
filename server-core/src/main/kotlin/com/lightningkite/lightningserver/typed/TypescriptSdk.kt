@@ -143,7 +143,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
             appendLine("            return apiCall(`\${this.httpUrl}${entry.route.path.escaped}`, ${if(hasInput) "input" else "undefined"}, {")
             appendLine("                method: \"${entry.route.method}\",")
             entry.authInfo.type?.let {
-                appendLine("                headers: userToken ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}}` } : this.extraHeaders,")
+                appendLine("                headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}}` } : this.extraHeaders,")
             }
             append("            }, ")
             if(entry.inputType.descriptor.hasServerFile()) {
@@ -166,7 +166,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         appendLine("        return apiCall(`\${this.httpUrl}${entry.route.path.escaped}`, ${if(hasInput) "input" else "undefined"}, {")
         appendLine("            method: \"${entry.route.method}\",")
         entry.authInfo.type?.let {
-            appendLine("            headers: userToken ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}}` } : this.extraHeaders,")
+            appendLine("            headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}}` } : this.extraHeaders,")
         }
         append("            }, ")
         if(entry.inputType.descriptor.hasServerFile()) {
