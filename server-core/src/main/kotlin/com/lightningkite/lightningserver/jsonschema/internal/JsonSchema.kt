@@ -161,6 +161,57 @@ internal fun SerialDescriptor.jsonSchemaString(
         val pattern = annotations.lastOfInstance<ExpectedPattern>()?.pattern ?: ""
         val format = annotations.lastOfInstance<JsonSchemaFormat>()?.format
 
+        when(this.capturedKClass) {
+            Instant::class -> {
+                return jsonSchemaElement(annotations) {
+                    it["format"] = "datetime-local"
+                    it["options"] = buildJsonObject {
+                        putJsonObject("flatpickr") {
+                            put("dateFormat", "Z")
+                            put("time_24hr", true)
+                        }
+                    }
+                }
+            }
+//        Serialization.module.getContextual(ZonedDateTime::class)?.descriptor -> {
+//            return jsonSchemaElement(annotations) {
+//                it["format"] = "datetime-local"
+//            }
+//        }
+//        Serialization.module.getContextual(UUID::class)?.descriptor -> {
+//            return jsonSchemaElement(annotations) {
+//                it["format"] = "uuid"
+//            }
+//        }
+            ServerFile::class -> {
+                return jsonSchemaElement(annotations) {
+                    it["format"] = "url"
+                    it["options"] = buildJsonObject {
+                        putJsonObject("upload") {
+                            put("upload_handler", "mainUploadHandler")
+                            put("auto_upload", true)
+                        }
+                    }
+                    it["links"] = buildJsonArray {
+                        this.addJsonObject {
+                            put("href", "{{self}}")
+                            put("rel", "View File")
+                        }
+                    }
+                }
+            }
+            LocalDate::class -> {
+                return jsonSchemaElement(annotations) {
+                    it["format"] = "date"
+                }
+            }
+            LocalTime::class -> {
+                return jsonSchemaElement(annotations) {
+                    it["format"] = "time"
+                }
+            }
+        }
+
         if (pattern.isNotEmpty()) {
             it["pattern"] = pattern
         }
@@ -240,45 +291,6 @@ internal fun SerialDescriptor.createJsonSchema(
 
     val combinedAnnotations = annotations + this.annotations
     val key = JsonSchemaDefinitions.Key(this, combinedAnnotations)
-
-    when(this) {
-        Serialization.module.getContextual(Instant::class)?.descriptor -> {
-            return jsonSchemaElement(annotations) {
-                it["format"] = "datetime-local"
-                it["options"] = buildJsonObject {
-                    putJsonObject("flatpickr") {
-                        put("dateFormat", "Z")
-                        put("time_24hr", true)
-                    }
-                }
-            }
-        }
-//        Serialization.module.getContextual(ZonedDateTime::class)?.descriptor -> {
-//            return jsonSchemaElement(annotations) {
-//                it["format"] = "datetime-local"
-//            }
-//        }
-//        Serialization.module.getContextual(UUID::class)?.descriptor -> {
-//            return jsonSchemaElement(annotations) {
-//                it["format"] = "uuid"
-//            }
-//        }
-//        Serialization.module.getContextual(ServerFile::class)?.descriptor -> {
-//            return jsonSchemaElement(annotations) {
-//                it["format"] = "file"
-//            }
-//        }
-        Serialization.module.getContextual(LocalDate::class)?.descriptor -> {
-            return jsonSchemaElement(annotations) {
-                it["format"] = "date"
-            }
-        }
-        Serialization.module.getContextual(LocalTime::class)?.descriptor -> {
-            return jsonSchemaElement(annotations) {
-                it["format"] = "time"
-            }
-        }
-    }
 
     return when (jsonType) {
         JsonType.NUMBER -> definitions.get(key) { jsonSchemaNumber(combinedAnnotations) }
