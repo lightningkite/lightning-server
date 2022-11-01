@@ -165,7 +165,7 @@ internal fun handlers() {
                 
                   cors_rule {
                     allowed_headers = ["*"]
-                    allowed_methods = ["PUT", "POST"]
+                    allowed_methods = ["PUT", "POST", "HEAD"]
                     allowed_origins = ["*"]
                     expose_headers  = ["ETag"]
                     max_age_seconds = 3000
