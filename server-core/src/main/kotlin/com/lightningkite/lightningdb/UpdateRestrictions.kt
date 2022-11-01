@@ -15,9 +15,9 @@ data class UpdateRestrictions<T>(
         for(pair in fields) {
             if(on.matchesPath(pair.first)) {
                 totalConditions.add(pair.second)
-            }
-            if(pair.third !is Condition.Always) {
-                if(!pair.third.invoke(on)) return Condition.Never()
+                if(pair.third !is Condition.Always) {
+                    if(!pair.third.invoke(on)) return Condition.Never()
+                }
             }
         }
         return when(totalConditions.size) {

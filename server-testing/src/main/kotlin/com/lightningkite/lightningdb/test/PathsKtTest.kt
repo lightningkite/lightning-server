@@ -77,6 +77,7 @@ class PathsKtTest {
             assertFalse(condition.invoke(modification { it.int assign 2 }))
             assertTrue(condition.invoke(modification { it.int assign 3 }))
             assertFalse(condition.invoke(modification { it.int plus 1 }))
+            assertTrue(condition.invoke(modification { it.short plus 1 }))
         }
         (startChain<LargeTestModel>().intNullable.notNull gt 2).let { condition ->
             assertFalse(condition.invoke(modification { it.intNullable assign 2 }))

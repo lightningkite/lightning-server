@@ -50,7 +50,7 @@ fun Condition<*>.matchesPath(field: KProperty1<*, *>): Boolean {
 fun <T> Modification<T>.matchesPath(modification: Modification<T>): Boolean {
     return when(this) {
         is Modification.OnField<*, *> -> {
-            val field = modification as? Modification.OnField<*, *> ?: return false
+            val field = modification as? Modification.OnField<*, *> ?: return true
             @Suppress("UNCHECKED_CAST")
             field.key == this.key && (this.modification as Modification<Any?>).matchesPath(field.modification as Modification<Any?>)
         }
@@ -100,9 +100,9 @@ fun <T> Condition<T>.invoke(modification: Modification<T>): Boolean {
     return when(modification) {
         is Modification.Assign -> this(modification.value)
         is Modification.OnField<*, *> -> {
-            val field = this as? Condition.OnField<*, *> ?: return false
+            val field = this as? Condition.OnField<*, *> ?: return true
             @Suppress("UNCHECKED_CAST")
-            field.key == this.key && (field.condition as Condition<Any?>).invoke<Any?>(modification.modification as Modification<Any?>)
+            field.key != modification.key || (field.condition as Condition<Any?>).invoke<Any?>(modification.modification as Modification<Any?>)
         }
         is Modification.SetPerElement<*> -> {
             @Suppress("UNCHECKED_CAST")
@@ -116,7 +116,7 @@ fun <T> Condition<T>.invoke(modification: Modification<T>): Boolean {
                 (it as Condition<Any?>).invoke<Any?>(modification.modification as Modification<Any?>)
             } ?: false
         }
-        is Modification.Chain -> modification.modifications.any { invoke(it) }
+        is Modification.Chain -> modification.modifications.all { invoke(it) }
         is Modification.IfNotNull<*> -> {
             @Suppress("UNCHECKED_CAST")
             (this as Condition<Any?>).invoke<Any?>(modification.modification as Modification<Any?>)
