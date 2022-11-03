@@ -17,7 +17,7 @@ import kotlin.collections.HashMap
 import java.util.*
 
 
-var sharedSocketShouldBeActive: Observable<Boolean> = Observable.just(false)
+var sharedSocketShouldBeActive: Observable<Boolean> = Observable.just(true)
 private var retryTime = 1000L
 private var lastRetry = 0L
 
