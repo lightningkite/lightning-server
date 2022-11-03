@@ -13,7 +13,7 @@ data class Mask<T>(
     operator fun invoke(on: T): T {
         var value = on
         for(pair in pairs) {
-            if(!pair.first(on)) value = pair.second(on)
+            if(!pair.first(on)) value = pair.second(value)
         }
         return value
     }

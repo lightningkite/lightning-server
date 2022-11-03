@@ -1,0 +1,22 @@
+import { Condition } from "./Condition";
+import { Modification } from "./Modification";
+import { Query, MassModification, EntryChange, GroupCountQuery, AggregateQuery, GroupAggregateQuery } from "./otherModels";
+import { HasId } from "./sessionRest";
+export declare function mockRestEndpointFunctions<T extends HasId>(items: T[], label: string): {
+    query(requesterToken: string, input: Query<T>): Promise<Array<T>>;
+    detail(requesterToken: string, id: string): Promise<T>;
+    insertBulk(requesterToken: string, input: Array<T>): Promise<Array<T>>;
+    insert(requesterToken: string, input: T): Promise<T>;
+    upsert(requesterToken: string, id: string, input: T): Promise<T>;
+    bulkReplace(requesterToken: string, input: Array<T>): Promise<Array<T>>;
+    replace(requesterToken: string, id: string, input: T): Promise<T>;
+    bulkModify(requesterToken: string, input: MassModification<T>): Promise<number>;
+    modifyWithDiff(requesterToken: string, id: string, input: Modification<T>): Promise<EntryChange<T>>;
+    modify(requesterToken: string, id: string, input: Modification<T>): Promise<T>;
+    bulkDelete(requesterToken: string, input: Condition<T>): Promise<number>;
+    delete(requesterToken: string, id: string): Promise<void>;
+    count(requesterToken: string, input: Condition<T>): Promise<number>;
+    groupCount(requesterToken: string, input: GroupCountQuery<T>): Promise<Record<string, number>>;
+    aggregate(requesterToken: string, input: AggregateQuery<T>): Promise<number>;
+    groupAggregate(requesterToken: string, input: GroupAggregateQuery<T>): Promise<Record<string, number>>;
+};
