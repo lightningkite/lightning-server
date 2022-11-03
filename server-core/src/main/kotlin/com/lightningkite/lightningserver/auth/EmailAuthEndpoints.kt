@@ -39,7 +39,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
                     <tr><td align="center" style="padding:16px;background-color: ${HtmlDefaults.primaryColor};border-radius: 8px"><a style="color:white;text-decoration: none;font-size: 22px;" href="$link">Click here to login</a></td></tr>
                 </table>
             </td></tr>
-            <tr><td align="center" style="padding:0px;"><p>PIN: $pin</p></td></tr>
+            <tr><td align="center" style="padding:0px;"><h2>PIN: $pin</h2></td></tr>
             <tr><td align="center" style="padding:0px;"><p>If you did not request to be logged in, you can simply ignore this email.</p></td></tr>
             <tr><td align="center" style="padding:0px;"><h3>${generalSettings().projectName}</h3></td></tr>
         </table>
