@@ -208,7 +208,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
         : items;
 
       const result = performAggregate(
-        filteredItems.map((item) => item[property] as number),
+        filteredItems.map((item) => Number(item[property])),
         aggregate
       );
 
@@ -232,7 +232,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
           typeof item[groupBy] === "string"
             ? (item[groupBy] as unknown as string)
             : JSON.stringify(item[groupBy]);
-        result[key] = [...(result[key] || []), item[property] as number];
+        result[key] = [...(result[key] || []), Number(item[property])];
         return result;
       }, {} as Record<string, number[]>);
 
