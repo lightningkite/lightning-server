@@ -113,7 +113,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
             for (entry in byGroup[group]!!) {
                 append("        ")
                 append(entry.functionName)
-                append(" = ")
+                append(": ")
                 this.functionHeader(entry, skipAuth = true)
                 append(" => { return this.api.")
                 append(group.groupToPartName())
@@ -157,7 +157,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         for (entry in byGroup[group]!!) {
             append("        ")
             append(entry.functionName)
-            append(" = ")
+            append(": ")
             this.functionHeader(entry, skipAuth = false)
             appendLine(" => {")
             val hasInput = entry.inputType != Unit.serializer()
