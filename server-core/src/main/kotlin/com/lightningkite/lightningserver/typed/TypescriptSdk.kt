@@ -74,6 +74,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         appendLine("    readonly ${group.groupToPartName()}: {")
         for (entry in byGroup[group]!!) {
             append("        ")
+            append(entry.functionName)
             this.functionHeader(entry)
             appendLine()
         }
@@ -81,6 +82,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     }
     for (entry in byGroup[null] ?: listOf()) {
         append("    ")
+        append(entry.functionName)
         this.functionHeader(entry)
         appendLine()
     }
@@ -100,6 +102,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         appendLine("    constructor(public api: Api, public ${userType.userTypeTokenName()}: string) {}")
         for (entry in byGroup[null] ?: listOf()) {
             append("    ")
+            append(entry.functionName)
             this.functionHeader(entry, skipAuth = true)
             append(" { return this.api.")
             functionCall(entry, skipAuth = false, authUsesThis = true, overrideUserType = userType)
@@ -107,12 +110,12 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         }
         for (group in groups) {
             appendLine("    readonly ${group.groupToPartName()} = {")
-            appendLine("        api: this.api,")
-            appendLine("        ${userType.userTypeTokenName()}: this.${userType.userTypeTokenName()},")
             for (entry in byGroup[group]!!) {
                 append("        ")
+                append(entry.functionName)
+                append(" = ")
                 this.functionHeader(entry, skipAuth = true)
-                append(" { return this.api.")
+                append(" => { return this.api.")
                 append(group.groupToPartName())
                 append(".")
                 functionCall(entry, skipAuth = false, authUsesThis = true, overrideUserType = userType)
@@ -130,25 +133,40 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
 
     appendLine("export class LiveApi implements Api {")
     appendLine("    public constructor(public httpUrl: string, public socketUrl: string = httpUrl, public extraHeaders: Record<string, string> = {}) {}")
+    for (entry in byGroup[null] ?: listOf()) {
+        append("    ")
+        append(entry.functionName)
+        this.functionHeader(entry, skipAuth = false)
+        appendLine(" {")
+        val hasInput = entry.inputType != Unit.serializer()
+        appendLine("        return apiCall(`\${this.httpUrl}${entry.route.path.escaped}`, ${if(hasInput) "input" else "undefined"}, {")
+        appendLine("            method: \"${entry.route.method}\",")
+        entry.authInfo.type?.let {
+            appendLine("            headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
+        }
+        appendLine("            }, ")
+        entry.outputType.takeUnless { it == Unit.serializer() }?.let {
+            appendLine("        ).then(x => x.json())")
+        } ?: run {
+            appendLine("        ).then(x => undefined)")
+        }
+        appendLine("    }")
+    }
     for (group in groups) {
         appendLine("    readonly ${group.groupToPartName()} = {")
-        appendLine("        httpUrl: this.httpUrl,")
-        appendLine("        socketUrl: this.socketUrl,")
-        appendLine("        extraHeaders: this.extraHeaders,")
         for (entry in byGroup[group]!!) {
             append("        ")
+            append(entry.functionName)
+            append(" = ")
             this.functionHeader(entry, skipAuth = false)
-            appendLine(" {")
+            appendLine(" => {")
             val hasInput = entry.inputType != Unit.serializer()
             appendLine("            return apiCall(`\${this.httpUrl}${entry.route.path.escaped}`, ${if(hasInput) "input" else "undefined"}, {")
             appendLine("                method: \"${entry.route.method}\",")
             entry.authInfo.type?.let {
                 appendLine("                headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
             }
-            append("            }, ")
-            if(entry.inputType.descriptor.hasServerFile()) {
-                    appendLine("            files")
-            }
+            appendLine("            }, ")
             entry.outputType.takeUnless { it == Unit.serializer() }?.let {
                 appendLine("            ).then(x => x.json())")
             } ?: run {
@@ -158,36 +176,8 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         }
         appendLine("    }")
     }
-    for (entry in byGroup[null] ?: listOf()) {
-        append("    ")
-        this.functionHeader(entry, skipAuth = false)
-        appendLine(" {")
-        val hasInput = entry.inputType != Unit.serializer()
-        appendLine("        return apiCall(`\${this.httpUrl}${entry.route.path.escaped}`, ${if(hasInput) "input" else "undefined"}, {")
-        appendLine("            method: \"${entry.route.method}\",")
-        entry.authInfo.type?.let {
-            appendLine("            headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
-        }
-        append("            }, ")
-        if(entry.inputType.descriptor.hasServerFile()) {
-                appendLine("            files")
-        }
-        entry.outputType.takeUnless { it == Unit.serializer() }?.let {
-            appendLine("        ).then(x => x.json())")
-        } ?: run {
-            appendLine("        ).then(x => undefined)")
-        }
-        appendLine("    }")
-    }
     appendLine("}")
     appendLine()
-}
-
-private val serverFileDescriptor = Serialization.module.getContextual(ServerFile::class)?.descriptor
-private fun SerialDescriptor.hasServerFile(seen: HashSet<SerialDescriptor> = HashSet()): Boolean {
-    val t = if(this.kind == SerialKind.CONTEXTUAL) Serialization.module.getContextualDescriptor(this)!!
-    else this
-    return t == serverFileDescriptor || (t.elementDescriptors.any { !seen.add(it) || it.hasServerFile(seen) })
 }
 
 private val skipSet = setOf(
@@ -210,7 +200,7 @@ private fun KClass<*>.userTypeTokenName(): String =
     simpleName?.replaceFirstChar { it.lowercase() }?.plus("Token") ?: "token"
 
 private fun Appendable.functionHeader(documentable: Documentable, skipAuth: Boolean = false, overrideUserType: String? = null) {
-    append("${documentable.functionName}(")
+    append("(")
     var argComma = false
     arguments(documentable, skipAuth, overrideUserType).forEach {
         if (argComma) append(", ")
@@ -271,10 +261,7 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false, ove
         }?.let(::listOf),
         documentable.authInfo.type?.takeUnless { skipAuth }?.let {
             TArg(name = (overrideUserType ?: it).userTypeTokenName(), stringType = "string", optional = !documentable.authInfo.required)
-        }?.let(::listOf),
-        if(documentable.inputType.descriptor.hasServerFile())
-            listOf(TArg(name = "files", stringType = "Record<Path<${documentable.inputType.write()}>, File>", optional = true))
-        else null
+        }?.let(::listOf)
     ).flatten()
     is ApiWebsocket<*, *, *> -> listOfNotNull(
         documentable.authInfo.type?.takeUnless { skipAuth }?.let {
