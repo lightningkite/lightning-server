@@ -16,7 +16,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
   label: string
 ) {
   return {
-    query(requesterToken: string, input: Query<T>): Promise<Array<T>> {
+    query(input: Query<T>, requesterToken: string): Promise<Array<T>> {
       const { limit, skip = 0, orderBy, condition } = input;
 
       const filteredItems = condition
@@ -59,7 +59,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
       return Promise.resolve(result);
     },
 
-    detail(requesterToken: string, id: string): Promise<T> {
+    detail(id: string, requesterToken: string): Promise<T> {
       const result = items.find((item) => item._id === id);
       console.info(label, "detail", { id, result });
       return new Promise((resolve, reject) => {
@@ -68,17 +68,17 @@ export function mockRestEndpointFunctions<T extends HasId>(
       });
     },
 
-    insertBulk(requesterToken: string, input: Array<T>): Promise<Array<T>> {
+    insertBulk(input: Array<T>, requesterToken: string): Promise<Array<T>> {
       input.forEach((item) => items.push(item));
       return Promise.resolve(input);
     },
 
-    insert(requesterToken: string, input: T): Promise<T> {
+    insert(input: T, requesterToken: string): Promise<T> {
       items.push(input);
       return Promise.resolve(input);
     },
 
-    upsert(requesterToken: string, id: string, input: T): Promise<T> {
+    upsert(id: string, input: T, requesterToken: string): Promise<T> {
       console.info(label, "upsert", { id, input });
 
       const existingItemIndex = items.findIndex((item) => item._id === id);
@@ -90,14 +90,14 @@ export function mockRestEndpointFunctions<T extends HasId>(
       return Promise.resolve(input);
     },
 
-    bulkReplace(requesterToken: string, input: Array<T>): Promise<Array<T>> {
+    bulkReplace(input: Array<T>, requesterToken: string): Promise<Array<T>> {
       console.info(label, "bulkReplace", { input });
 
-      input.forEach((item) => this.replace(requesterToken, item._id, item));
+      input.forEach((item) => this.replace(item._id, item, requesterToken));
       return Promise.resolve(input);
     },
 
-    replace(requesterToken: string, id: string, input: T): Promise<T> {
+    replace(id: string, input: T, requesterToken: string): Promise<T> {
       console.info(label, "replace", { id, input });
 
       const existingItemIndex = items.findIndex((item) => item._id === id);
@@ -108,9 +108,9 @@ export function mockRestEndpointFunctions<T extends HasId>(
       return Promise.reject();
     },
 
-    bulkModify(
-      requesterToken: string,
-      input: MassModification<T>
+    async bulkModify(
+      input: MassModification<T>,
+      requesterToken: string
     ): Promise<number> {
       console.info(label, "bulkModify", { input });
 
@@ -118,21 +118,21 @@ export function mockRestEndpointFunctions<T extends HasId>(
         evaluateCondition(input.condition, item)
       );
 
-      return Promise.resolve(filteredItems.length);
+      return filteredItems.length;
     },
 
     modifyWithDiff(
-      requesterToken: string,
       id: string,
-      input: Modification<T>
+      input: Modification<T>,
+      requesterToken: string
     ): Promise<EntryChange<T>> {
       return Promise.resolve({});
     },
 
     modify(
-      requesterToken: string,
       id: string,
-      input: Modification<T>
+      input: Modification<T>,
+      requesterToken: string
     ): Promise<T> {
       console.info(label, "modify", { id, input });
 
@@ -144,7 +144,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
       return Promise.resolve({} as T);
     },
 
-    bulkDelete(requesterToken: string, input: Condition<T>): Promise<number> {
+    bulkDelete(input: Condition<T>, requesterToken: string): Promise<number> {
       console.info(label, "bulkDelete", { input });
 
       if (!items) return Promise.reject();
@@ -153,7 +153,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
       return Promise.resolve(previousLength - items.length);
     },
 
-    delete(requesterToken: string, id: string): Promise<void> {
+    delete(id: string, requesterToken: string): Promise<void> {
       console.info(label, "delete", { id });
 
       const existingItemIndex = items.findIndex((item) => item._id === id);
@@ -165,17 +165,17 @@ export function mockRestEndpointFunctions<T extends HasId>(
       }
     },
 
-    count(requesterToken: string, input: Condition<T>): Promise<number> {
+    count(input: Condition<T>, requesterToken: string): Promise<number> {
       console.info(label, "count", { input });
 
-      return this.query(requesterToken, { condition: input }).then(
+      return this.query({ condition: input }, requesterToken).then(
         (it) => it.length
       );
     },
 
     groupCount(
-      requesterToken: string,
-      input: GroupCountQuery<T>
+      input: GroupCountQuery<T>,
+      requesterToken: string
     ): Promise<Record<string, number>> {
       const { condition, groupBy } = input;
 
@@ -198,8 +198,8 @@ export function mockRestEndpointFunctions<T extends HasId>(
     },
 
     aggregate(
-      requesterToken: string,
-      input: AggregateQuery<T>
+      input: AggregateQuery<T>,
+      requesterToken: string
     ): Promise<number> {
       const { condition, aggregate, property } = input;
 
@@ -208,7 +208,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
         : items;
 
       const result = performAggregate(
-        filteredItems.map((item) => Number(item[property])),
+        filteredItems.map((item) => item[property] as number),
         aggregate
       );
 
@@ -218,8 +218,8 @@ export function mockRestEndpointFunctions<T extends HasId>(
     },
 
     groupAggregate(
-      requesterToken: string,
-      input: GroupAggregateQuery<T>
+      input: GroupAggregateQuery<T>,
+      requesterToken: string
     ): Promise<Record<string, number>> {
       const { aggregate, condition, property, groupBy } = input;
 
@@ -232,7 +232,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
           typeof item[groupBy] === "string"
             ? (item[groupBy] as unknown as string)
             : JSON.stringify(item[groupBy]);
-        result[key] = [...(result[key] || []), Number(item[property])];
+        result[key] = [...(result[key] || []), item[property] as number];
         return result;
       }, {} as Record<string, number[]>);
 
