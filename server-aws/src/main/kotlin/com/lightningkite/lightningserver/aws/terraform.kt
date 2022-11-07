@@ -176,9 +176,30 @@ internal fun handlers() {
                     allowed_origins = ["*"]
                   }
                 }
+                resource "aws_s3_bucket_policy" "$key" {  
+                  bucket = aws_s3_bucket.$key.id   
+                  policy = <<POLICY
+                {    
+                    "Version": "2012-10-17",    
+                    "Statement": [        
+                      {            
+                          "Sid": "PublicReadGetObject",            
+                          "Effect": "Allow",            
+                          "Principal": "*",            
+                          "Action": [                
+                             "s3:GetObject"            
+                          ],            
+                          "Resource": [
+                             "arn:aws:s3:::${'$'}{aws_s3_bucket.$key.id}/*"            
+                          ]        
+                      }    
+                    ]
+                }
+                POLICY
+                }
                 resource "aws_s3_bucket_acl" "${key}" {
                   bucket = aws_s3_bucket.${key}.id
-                  acl    = "private"
+                  acl    = var.${key}_expiry == null ? "public-read" : "private" 
                 }
                 resource "aws_iam_policy" "${key}" {
                   name        = "${namePrefix}-${key}"

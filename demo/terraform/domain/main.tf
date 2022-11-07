@@ -66,6 +66,9 @@ module "Base" {
   panicInvocationsPerMinuteThreshold = var.panicInvocationsPerMinuteThreshold
   panicComputePerMinuteThreshold = var.panicComputePerMinuteThreshold
   emergencyContact = var.emergencyContact
+  # Main
+  lambda_memory_size = var.lambda_memory_size
+  lambda_timeout = var.lambda_timeout
 }
 ##########
 # main

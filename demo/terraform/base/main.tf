@@ -247,13 +247,34 @@ resource "aws_s3_bucket_cors_configuration" "files" {
   }
 
   cors_rule {
-    allowed_methods = ["GET"]
+    allowed_methods = ["GET", "HEAD"]
     allowed_origins = ["*"]
   }
 }
+resource "aws_s3_bucket_policy" "files" {  
+  bucket = aws_s3_bucket.files.id   
+  policy = <<POLICY
+{    
+    "Version": "2012-10-17",    
+    "Statement": [        
+      {            
+          "Sid": "PublicReadGetObject",            
+          "Effect": "Allow",            
+          "Principal": "*",            
+          "Action": [                
+             "s3:GetObject"            
+          ],            
+          "Resource": [
+             "arn:aws:s3:::${aws_s3_bucket.files.id}/*"            
+          ]        
+      }    
+    ]
+}
+POLICY
+}
 resource "aws_s3_bucket_acl" "files" {
   bucket = aws_s3_bucket.files.id
-  acl    = "private"
+  acl    = var.files_expiry == null ? "public-read" : "private" 
 }
 resource "aws_iam_policy" "files" {
   name        = "demo-${var.deployment_name}-files"
@@ -581,6 +602,12 @@ resource "aws_cloudwatch_event_rule" "panic" {
         aws_cloudwatch_metric_alarm.panic_invocations.alarm_name, 
         aws_cloudwatch_metric_alarm.panic_compute.alarm_name
       ]
+      previousState = {
+        value = ["OK", "INSUFFICIENT_DATA"]
+      }
+      state = {
+        value = ["ALARM"]
+      }
     }
   })
 }
@@ -590,8 +617,8 @@ resource "aws_cloudwatch_event_target" "panic" {
   arn       = aws_lambda_function.main.arn
   input     = "{\"panic\": true}"
   retry_policy {
-    maximum_event_age_in_seconds = 300
-    maximum_retry_attempts = 5
+    maximum_event_age_in_seconds = 60
+    maximum_retry_attempts = 1
   }
 }
 resource "aws_lambda_permission" "panic" {
@@ -872,8 +899,8 @@ resource "aws_lambda_function" "main" {
   runtime = "java11"
   handler = "com.lightningkite.lightningserver.demo.AwsHandler"
   
-  memory_size = "2048"
-  timeout = 30
+  memory_size = "${var.lambda_memory_size}"
+  timeout = var.lambda_timeout
   # memory_size = "1024"
 
   source_code_hash = filebase64sha256(local.lambda_source)
