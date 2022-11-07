@@ -140,13 +140,15 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         get() = "https://${system.bucket}.s3.${system.region.id()}.amazonaws.com/${path.unixPath}"
 
     override val signedUrl: String
-        get() = system.signer.presignGetObject {
-            system.signedUrlExpirationSeconds?.let { e -> it.signatureDuration(Duration.ofSeconds(e.toLong())) }
-            it.getObjectRequest {
-                it.bucket(system.bucket)
-                it.key(path.unixPath)
-            }
-        }.url().toString()
+        get() = system.signedUrlExpirationSeconds?.let { e ->
+            system.signer.presignGetObject {
+                it.signatureDuration(Duration.ofSeconds(e.toLong()))
+                it.getObjectRequest {
+                    it.bucket(system.bucket)
+                    it.key(path.unixPath)
+                }
+            }.url().toString()
+        } ?: url
 
     override fun uploadUrl(timeout: Duration): String = system.signer.presignPutObject {
         it.signatureDuration(timeout)

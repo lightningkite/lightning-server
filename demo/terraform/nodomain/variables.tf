@@ -138,3 +138,15 @@ variable "emergencyContact" {
     type = string
 }
 
+##########
+# Main
+##########
+variable "lambda_memory_size" {
+    type = number
+    default = 1024
+}
+variable "lambda_timeout" {
+    type = number
+    default = 30
+}
+

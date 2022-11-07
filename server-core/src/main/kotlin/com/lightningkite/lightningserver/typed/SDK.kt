@@ -83,10 +83,42 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
     imports.add("java.util.UUID")
     imports.add("java.util.Optional")
     imports.add("java.time.*")
-    val byUserType = safeDocumentables.groupBy { it.authInfo.type }
-    val userTypes = byUserType.keys.filterNotNull()
+    run {
+        val sessionClassName = "AbstractAnonymousSession"
+        val byGroup = safeDocumentables
+            .distinctBy { it.docGroup.toString() + "/" + it.summary }.groupBy { it.docGroup }
+            .mapValues { it.value.filter { !it.authInfo.required || it.authInfo.type == null } }
+        val groups = byGroup.keys.filterNotNull()
+        appendLine("open class $sessionClassName(val api: Api) {")
+        for(group in groups) {
+            appendLine("    val ${group.groupToPartName()}: $sessionClassName${group.groupToInterfaceName()} = $sessionClassName${group.groupToInterfaceName()}(api.${group.groupToPartName()})")
+        }
+        for(entry in byGroup[null] ?: listOf()) {
+            append("    ")
+            this.functionHeader(entry, skipAuth = true)
+            append(" = api.")
+            functionCall(entry, skipAuth = false, nullAuth = true)
+            appendLine()
+        }
+        for(group in groups) {
+            appendLine("    open class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()}) {")
+            for(entry in byGroup[group]!!) {
+                append("        ")
+                this.functionHeader(entry, skipAuth = true)
+                append(" = api.")
+                functionCall(entry, skipAuth = false, nullAuth = true)
+                appendLine()
+            }
+            appendLine("    }")
+        }
+        appendLine("}")
+        appendLine()
+    }
+    val userTypes = safeDocumentables.groupBy { it.authInfo.type }.keys.filterNotNull()
     userTypes.forEach { userType ->
-        val byGroup = ((byUserType[userType] ?: listOf()) + (byUserType[null]?: listOf())).groupBy { it.docGroup }
+        val byGroup = safeDocumentables
+            .distinctBy { it.docGroup.toString() + "/" + it.summary }.groupBy { it.docGroup }
+            .mapValues { it.value.filter { !it.authInfo.required || it.authInfo.type == null || it.authInfo.type == userType } }
         val groups = byGroup.keys.filterNotNull()
         val sessionClassName = "${userType.substringAfterLast('.')}Session"
         appendLine("abstract class Abstract$sessionClassName(api: Api, ${userType.userTypeTokenName()}: String) {")
@@ -97,18 +129,18 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
         }
         for(entry in byGroup[null] ?: listOf()) {
             append("    ")
-            this.functionHeader(entry, skipAuth = true)
+            this.functionHeader(entry, skipAuth = entry.authInfo.type == userType)
             append(" = api.")
-            functionCall(entry, skipAuth = false)
+            functionCall(entry, skipAuth = false, nullAuth = entry.authInfo.type != userType)
             appendLine()
         }
         for(group in groups) {
             appendLine("    class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()}, val ${userType.userTypeTokenName()}: String) {")
             for(entry in byGroup[group]!!) {
                 append("        ")
-                this.functionHeader(entry, skipAuth = true)
+                this.functionHeader(entry, skipAuth = entry.authInfo.type == userType)
                 append(" = api.")
-                functionCall(entry, skipAuth = false)
+                functionCall(entry, skipAuth = false, nullAuth = entry.authInfo.type != userType)
                 appendLine()
             }
             appendLine("    }")
@@ -302,46 +334,49 @@ private fun CodeEmitter.functionHeader(documentable: Documentable, skipAuth: Boo
     }
 }
 
-private fun CodeEmitter.functionCall(documentable: Documentable, skipAuth: Boolean = false) {
+private fun CodeEmitter.functionCall(documentable: Documentable, skipAuth: Boolean = false, nullAuth: Boolean = false) {
     append("${documentable.functionName}(")
     var argComma = false
     arguments(documentable, skipAuth).forEach {
         if(argComma) append(", ")
         else argComma = true
-        append(it.name)
+        if(it.isAuth && nullAuth)
+            append("null")
+        else
+            append(it.name)
     }
     append(")")
 }
 
-private data class Arg(val name: String, val type: KSerializer<*>? = null, val stringType: String? = null, val default: String? = null)
+private data class Arg(val name: String, val type: KSerializer<*>? = null, val stringType: String? = null, val default: String? = null, val isAuth: Boolean = false)
 
 private fun arguments(documentable: Documentable, skipAuth: Boolean = false): List<Arg> = when (documentable) {
     is ApiEndpoint<*, *, *> -> listOfNotNull(
-        documentable.authInfo.type?.takeUnless { skipAuth }?.let {
-            if(documentable.authInfo.required)
-                Arg(name = it.userTypeTokenName(), stringType = "String")
-            else
-                Arg(name = it.userTypeTokenName(), stringType = "String?", default = "null")
-        }?.let(::listOf),
         documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {
                 Arg(name = it.name, type = documentable.routeTypes[it.name], stringType = "String")
             },
         documentable.inputType.takeUnless { it == Unit.serializer() }?.let {
             Arg(name = "input", type = it)
-        }?.let(::listOf)
-    ).flatten()
-    is ApiWebsocket<*, *, *> -> listOfNotNull(
+        }?.let(::listOf),
         documentable.authInfo.type?.takeUnless { skipAuth }?.let {
             if(documentable.authInfo.required)
-                Arg(name = it.userTypeTokenName(), stringType = "String")
+                Arg(name = it.userTypeTokenName(), stringType = "String", isAuth = true)
             else
-                Arg(name = it.userTypeTokenName(), stringType = "String?", default = "null")
+                Arg(name = it.userTypeTokenName(), stringType = "String?", default = "null", isAuth = true)
         }?.let(::listOf),
+    ).flatten()
+    is ApiWebsocket<*, *, *> -> listOfNotNull(
         documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {
                 Arg(name = it.name, stringType = "String")
-            }
+            },
+        documentable.authInfo.type?.takeUnless { skipAuth }?.let {
+            if(documentable.authInfo.required)
+                Arg(name = it.userTypeTokenName(), stringType = "String", isAuth = true)
+            else
+                Arg(name = it.userTypeTokenName(), stringType = "String?", default = "null", isAuth = true)
+        }?.let(::listOf),
     ).flatten()
     else -> TODO()
 }
