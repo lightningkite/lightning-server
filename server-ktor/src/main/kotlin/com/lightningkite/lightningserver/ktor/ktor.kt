@@ -208,9 +208,20 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
             GlobalScope.launch {
                 while (true) {
                     val upcomingRun = cache.get<Long>(it.name + "-nextRun") ?: run {
-                        val now = System.currentTimeMillis()
-                        cache.set<Long>(it.name + "-nextRun", now)
-                        now
+                        val time = when (val s = it.schedule) {
+                            is Schedule.Daily -> {
+                                val now = ZonedDateTime.now(s.zone)
+                                val runTimeToday = ZonedDateTime.of(LocalDate.now(), s.time, s.zone)
+                                if (now > runTimeToday) runTimeToday.plusDays(1).toInstant().toEpochMilli()
+                                else runTimeToday.toInstant().toEpochMilli()
+                            }
+
+                            is Schedule.Frequency -> {
+                                System.currentTimeMillis()
+                            }
+                        }
+                        cache.set<Long>(it.name + "-nextRun", time)
+                        time
                     }
                     delay((upcomingRun - System.currentTimeMillis()).coerceAtLeast(1L))
                     if (cache.setIfNotExists(it.name + "-lock", true)) {
