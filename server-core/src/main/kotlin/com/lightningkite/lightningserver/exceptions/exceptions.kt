@@ -1,12 +1,15 @@
 package com.lightningkite.lightningserver.exceptions
 
+import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.serialization.Serialization
 
 import com.lightningkite.lightningserver.serialization.toHttpContent
+import io.ktor.util.*
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.serializer
 import java.io.InputStream
 
@@ -22,11 +25,41 @@ open class HttpStatusException(
     companion object {
         inline fun <reified T> toBody(value: T): Body<T> = Body(value, Serialization.module.serializer())
     }
-    suspend fun toResponse(request: HttpRequest): HttpResponse = HttpResponse(
-        status = status,
-        body = body?.toHttpContent(request.headers.accept),
-        headers = headers
-    )
+    suspend fun toResponse(request: HttpRequest): HttpResponse {
+        if(request.headers.accept.firstOrNull() == ContentType.Text.Html) {
+            val title = when(status) {
+                HttpStatus.Forbidden -> "Forbidden"
+                HttpStatus.Unauthorized -> "Not Authorized"
+                HttpStatus.BadRequest -> "Bad Request"
+                HttpStatus.NotFound -> "Not Found"
+                HttpStatus.InternalServerError -> "Server Error"
+                else -> "Problem"
+            }
+            val help = when(status) {
+                HttpStatus.Forbidden -> "You are not allowed to perform this action."
+                HttpStatus.Unauthorized -> "You need to log in."
+                HttpStatus.BadRequest -> "The request you made wasn't valid."
+                HttpStatus.NotFound -> "The resource you requested was not found."
+                HttpStatus.InternalServerError -> "Something went wrong on the server, and it's our bad."
+                else -> "An unrecognized problem occurred."
+            }
+            val properDetail = body?.data?.let { it as? String }
+            val backupDetail = body?.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.data) }
+            return HttpResponse.html(content = HtmlDefaults.basePage("""
+                <h1>${title.escapeHTML()}</h1>
+                <p>${help.escapeHTML()}</p>
+                ${properDetail?.let { "<p>${it.escapeHTML()}</p>" } ?: ""}
+                ${backupDetail?.let { "<!--${it.escapeHTML()}-->" } ?: ""}
+            """.trimIndent()))
+
+        } else {
+            return HttpResponse(
+                status = status,
+                body = body?.toHttpContent(request.headers.accept),
+                headers = headers
+            )
+        }
+    }
 }
 
 

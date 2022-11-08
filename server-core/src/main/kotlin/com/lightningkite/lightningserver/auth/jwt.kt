@@ -145,7 +145,10 @@ fun <T> Json.encodeJwt(
     append(Base64.getUrlEncoder().withoutPadding().encodeToString(hasher.sign(soFar.toByteArray())))
 }
 
-class JwtException(message: String) : Exception(message)
+open class JwtException(message: String) : Exception(message)
+open class JwtFormatException(message: String) : JwtException(message)
+open class JwtSignatureException(message: String) : JwtException(message)
+open class JwtExpiredException(message: String) : JwtException(message)
 
 fun <T> Json.decodeJwt(
     hasher: SecureHasher,
@@ -154,18 +157,18 @@ fun <T> Json.decodeJwt(
     requireAudience: String? = generalSettings().publicUrl,
 ): T {
     val parts = token.split('.')
-    if (parts.size != 3) throw JwtException("JWT does not have three parts.  This JWT is either missing pieces, corrupt, or not a JWT.")
+    if (parts.size != 3) throw JwtFormatException("JWT does not have three parts.  This JWT is either missing pieces, corrupt, or not a JWT.")
     val signature = Base64.getUrlDecoder().decode(parts[2])
     if (!hasher.verify(
             token.substringBeforeLast('.').toByteArray(),
             signature
         )
-    ) throw JwtException("JWT Signature is incorrect.")
+    ) throw JwtSignatureException("JWT Signature is incorrect.")
     val header: JwtHeader = decodeFromString(Base64.getUrlDecoder().decode(parts[0]).toString(Charsets.UTF_8))
     val claims: JwtClaims = decodeFromString(Base64.getUrlDecoder().decode(parts[1]).toString(Charsets.UTF_8))
-    val textSubject = claims.sub ?: claims.userId ?: throw JwtException("JWT does not have a subject.")
-    if (System.currentTimeMillis() / 1000L > claims.exp) throw JwtException("JWT has expired.")
-    requireAudience?.let { if (claims.aud != it) throw JwtException("JWT has expired.") }
+    val textSubject = claims.sub ?: claims.userId ?: throw JwtFormatException("JWT does not have a subject.")
+    if (System.currentTimeMillis() / 1000L > claims.exp) throw JwtExpiredException("JWT has expired.")
+    requireAudience?.let { if (claims.aud != it) throw JwtFormatException("JWT for a different audience.") }
     return if (serializer.isPrimitive())
         decodeFromJsonElement(
             serializer,

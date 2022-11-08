@@ -60,9 +60,14 @@ data class JwtSigner(
     fun <T> verify(serializer: KSerializer<T>, token: String): T {
         return try {
             Serialization.json.decodeJwt(hasher, serializer, token, audience ?: generalSettings().publicUrl)
+        } catch (e: JwtExpiredException) {
+            throw UnauthorizedException(
+                body = "This authorization has expired.",
+                cause = e
+            )
         } catch (e: JwtException) {
             throw UnauthorizedException(
-                body = "Invalid token $token: ${e.message}",
+                body = "Invalid token",
                 cause = e
             )
         }
