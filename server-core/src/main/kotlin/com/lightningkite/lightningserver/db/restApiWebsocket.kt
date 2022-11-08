@@ -108,7 +108,11 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             asyncs.awaitAll()
         }
         startup {
-            info.collection().registerRawSignal { changes -> sendWsChanges(changes) }
+            info.collection().registerRawSignal { changes ->
+                changes.changes.chunked(20).forEach {
+                    sendWsChanges(CollectionChanges(changes = it))
+                }
+            }
         }
     }
 }

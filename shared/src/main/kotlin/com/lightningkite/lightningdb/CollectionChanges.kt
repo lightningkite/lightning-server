@@ -10,17 +10,13 @@ import java.util.ArrayList
 
 @Serializable
 data class CollectionChanges<T: IsCodableAndHashable>(
-    val changes: List<EntryChange<T>> = listOf(),
-    val replace: List<T>? = null
+    val changes: List<EntryChange<T>> = listOf()
 ) {
     @JsName("pair")
     constructor(old: T? = null, new: T? = null):this(changes = if(old != null || new != null) listOf(EntryChange(old, new)) else listOf())
 }
 
 fun <T: HasId<ID>, ID: Comparable<ID>> List<T>.apply(changes: CollectionChanges<T>): List<T> {
-    if(changes.replace != null) {
-        return changes.replace
-    }
     val changeable = this.toMutableList()
     for(change in changes.changes) {
         change.old?.let { old -> changeable.removeAll { it._id == old._id }}
@@ -31,5 +27,5 @@ fun <T: HasId<ID>, ID: Comparable<ID>> List<T>.apply(changes: CollectionChanges<
 
 // This will not convert well. Manually add the type argument to the return EntryChange on the swift side. "EntryChange<B>"
 inline fun <T: IsCodableAndHashable, B: IsCodableAndHashable> CollectionChanges<T>.map(mapper: (T)->B): CollectionChanges<B> {
-    return CollectionChanges<B>(changes = changes.map { it.map(mapper) }, replace = replace?.map(mapper))
+    return CollectionChanges<B>(changes = changes.map { it.map(mapper) })
 }

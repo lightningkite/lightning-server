@@ -42,13 +42,14 @@ suspend fun doOnce(name: String, database: ()-> Database, maxDuration: Long = 60
     prepareModels()
     val a = database().collection<ActionHasOccurred>()
     val existing = a.get(name)
-    val lock = a.updateOne(
-        condition { it._id eq name and (it.completed eq null) and (it.started eq null or (it.started.notNull lt Instant.now().minusSeconds(maxDuration))) },
-        modification { it.started assign Instant.now() }
-    )
-    if (lock.new == null && existing != null) return
-    if(lock.new == null) {
+    if(existing == null) {
         a.insertOne(ActionHasOccurred(_id = name, started = Instant.now()))
+    } else {
+        val lock = a.updateOne(
+            condition { it._id eq name and (it.completed eq null) and (it.started eq null or (it.started.notNull lt Instant.now().minusSeconds(maxDuration))) },
+            modification { it.started assign Instant.now() }
+        )
+        if(lock.new == null) return
     }
     try {
         action()
