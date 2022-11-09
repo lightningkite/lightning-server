@@ -65,5 +65,5 @@ module "domain" {
     trackingTotalsOnly = []
   }
   emergencyContact = "joseph@lightningkite.com"
-  files_expiry = null
+#  files_expiry = null
 }
