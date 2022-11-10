@@ -78,7 +78,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         implementation = { anon: Unit, input: EmailPinLogin ->
             val pin = cache().get<String>(cacheKey(input.email))
                 ?: throw NotFoundException("No PIN found for email ${input.email}; perhaps it has expired?")
-            if(pin.checkHash(input.pin)) throw BadRequestException("Incorrect PIN")
+            if(!input.pin.checkHash(pin)) throw BadRequestException("Incorrect PIN")
             cache().remove(cacheKey(input.email))
             base.jwtSigner().token(
                 emailAccess.idSerializer,
