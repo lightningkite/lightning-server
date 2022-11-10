@@ -47,7 +47,7 @@ open class SmsAuthEndpoints<USER : Any, ID>(
         implementation = { anon: Unit, input: PhonePinLogin ->
             val pin = cache().get<String>(cacheKey(input.phone))
                 ?: throw NotFoundException("No PIN found for phone ${input.phone}; perhaps it has expired?")
-            if(pin.checkHash(input.pin)) throw BadRequestException("Incorrect PIN")
+            if(!input.pin.checkHash(pin)) throw BadRequestException("Incorrect PIN")
             cache().remove(cacheKey(input.phone))
             base.jwtSigner().token(
                 phoneAccess.idSerializer,
