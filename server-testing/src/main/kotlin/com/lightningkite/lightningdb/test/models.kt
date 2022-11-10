@@ -16,10 +16,11 @@ import com.lightningkite.lightningdb.*
 @Serializable
 data class User(
     override val _id: UUID = UUID.randomUUID(),
-    @Unique var email: String,
+    @Unique override var email: String,
+    @Unique override val phoneNumber: String,
     var age: Long = 0,
     var friends: List<UUIDFor<User>> = listOf()
-) : HasId<UUID> {
+) : HasId<UUID>, HasEmail, HasPhoneNumber {
     companion object
 }
 

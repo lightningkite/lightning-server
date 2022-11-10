@@ -4,6 +4,7 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.auth.OauthProviderCredentials
 import com.lightningkite.lightningserver.cache.CacheInterface
+import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.CacheTest
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.client
@@ -24,6 +25,7 @@ import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
+import com.lightningkite.lightningserver.sms.SMSSettings
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -125,11 +127,13 @@ class SecurityTest() {
 object TestSettings {
     val database = setting("database", DatabaseSettings())
     val email = setting("email", EmailSettings())
+    val sms = setting("sms", SMSSettings())
     val jwtSigner = setting("jwt", JwtSigner())
+    val cache = setting("cache", CacheSettings())
     val files = setting("files", FilesSettings())
-    val oauthGoogle = setting<OauthProviderCredentials?>("oauth-google", null)
-    val oauthApple = setting<OauthProviderCredentials?>("oauth-apple", null)
-    val oauthGithub = setting<OauthProviderCredentials?>("oauth-github", null)
+    val oauthGoogle = setting<OauthProviderCredentials?>("oauth_google", null)
+    val oauthApple = setting<OauthProviderCredentials?>("oauth_apple", null)
+    val oauthGithub = setting<OauthProviderCredentials?>("oauth_github", null)
 
     init {
         Settings.populateDefaults(mapOf(
