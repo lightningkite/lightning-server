@@ -29,7 +29,8 @@ open class SmsAuthEndpoints<USER : Any, ID>(
         description = "Sends a login text to the given phone",
         errorCases = listOf(),
         successCode = HttpStatus.NoContent,
-        implementation = { user: Unit, phone: String ->
+        implementation = { user: Unit, phoneUnsafe: String ->
+            val phone = phoneUnsafe.filter { it.isDigit() }
             val pin = SecureRandom().nextInt(1000000).toString().padStart(6, '0')
             cache().set(cacheKey(phone), pin.secureHash(), Duration.ofMinutes(15))
             sms().send(
@@ -45,6 +46,7 @@ open class SmsAuthEndpoints<USER : Any, ID>(
         errorCases = listOf(),
         successCode = HttpStatus.OK,
         implementation = { anon: Unit, input: PhonePinLogin ->
+            val phone = input.phone.filter { it.isDigit() }
             val pin = cache().get<String>(cacheKey(input.phone))
                 ?: throw NotFoundException("No PIN found for phone ${input.phone}; perhaps it has expired?")
             if(!input.pin.checkHash(pin)) throw BadRequestException("Incorrect PIN")
@@ -76,7 +78,7 @@ open class SmsAuthEndpoints<USER : Any, ID>(
     val loginSmsHtmlPost = path("login-sms/form-post/").post.handler {
         val phone = it.body!!.text().split('&')
             .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
-            .get("phone")!!
+            .get("phone")!!.filter { it.isDigit() }
         val basis = try {
             loginSms.implementation(Unit, phone)
         } catch (e: Exception) {
@@ -105,7 +107,7 @@ open class SmsAuthEndpoints<USER : Any, ID>(
             val content = it.body!!.text().split('&')
                 .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             val pin = content.get("pin")!!
-            val phone = content.get("phone")!!
+            val phone = content.get("phone")!!.filter { it.isDigit() }
             loginSmsPin.implementation(Unit, PhonePinLogin(phone, pin))
         } catch (e: Exception) {
             e.printStackTrace()

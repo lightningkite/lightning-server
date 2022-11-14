@@ -69,7 +69,7 @@ abstract class OauthEndpoints(
             HttpResponse.redirectToGet(
                 generalSettings().publicUrl + landing.path.toString() + "?jwt=${
                     jwtSigner().token(
-                        emailToId(fetchEmail(response))
+                        emailToId(fetchEmail(response).lowercase())
                     )
                 }"
             )

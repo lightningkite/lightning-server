@@ -52,7 +52,8 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         description = "Sends a login email to the given address",
         errorCases = listOf(),
         successCode = HttpStatus.NoContent,
-        implementation = { user: Unit, address: String ->
+        implementation = { user: Unit, addressUnsafe: String ->
+            val address = addressUnsafe.lowercase()
             val jwt = base.jwtSigner().token(
                 emailAccess.idSerializer,
                 emailAccess.byEmail(address).let(emailAccess::id),
@@ -76,13 +77,14 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         errorCases = listOf(),
         successCode = HttpStatus.OK,
         implementation = { anon: Unit, input: EmailPinLogin ->
-            val pin = cache().get<String>(cacheKey(input.email))
-                ?: throw NotFoundException("No PIN found for email ${input.email}; perhaps it has expired?")
+            val email = input.email.lowercase()
+            val pin = cache().get<String>(cacheKey(email))
+                ?: throw NotFoundException("No PIN found for email ${email}; perhaps it has expired?")
             if(!input.pin.checkHash(pin)) throw BadRequestException("Incorrect PIN")
-            cache().remove(cacheKey(input.email))
+            cache().remove(cacheKey(email))
             base.jwtSigner().token(
                 emailAccess.idSerializer,
-                emailAccess.byEmail(input.email).let(emailAccess::id),
+                emailAccess.byEmail(email).let(emailAccess::id),
                 base.jwtSigner().expiration
             )
         }
@@ -118,7 +120,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
     val loginEmailHtmlPost = path("login-email/form-post/").post.handler {
         val email = it.body!!.text().split('&')
             .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
-            .get("email")!!
+            .get("email")!!.lowercase()
         val basis = try {
             loginEmail.implementation(Unit, email)
         } catch (e: Exception) {
@@ -147,7 +149,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
             val content = it.body!!.text().split('&')
                 .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             val pin = content.get("pin")!!
-            val email = content.get("email")!!
+            val email = content.get("email")!!.lowercase()
             loginEmailPin.implementation(Unit, EmailPinLogin(email, pin))
         } catch (e: Exception) {
             e.printStackTrace()
