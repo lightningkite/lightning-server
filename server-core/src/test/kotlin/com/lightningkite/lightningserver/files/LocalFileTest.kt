@@ -14,7 +14,7 @@ class LocalFileTest {
     @Test fun test() {
         TestSettings
         runBlocking {
-            val system = LocalFileSystem(File("./build/test-files"), "local-file-test", JwtSigner())
+            val system = LocalFileSystem(File("./build/test-files").absoluteFile, "local-file-test", JwtSigner())
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
             testFile.write(HttpContent.Text(message, ContentType.Text.Plain))
