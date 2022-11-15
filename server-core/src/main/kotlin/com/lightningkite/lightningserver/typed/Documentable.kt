@@ -63,7 +63,8 @@ internal fun KSerializer<*>.subAndChildSerializers(): Array<KSerializer<*>> = li
     ?: arrayOf()
 internal fun KSerializer<*>.uncontextualize(): KSerializer<*> {
     return if (this.descriptor.kind == SerialKind.CONTEXTUAL) {
-        Serialization.json.serializersModule.getContextual(descriptor.capturedKClass!!)!!
+        Serialization.json.serializersModule.getContextual(descriptor.capturedKClass ?: throw IllegalStateException("No captured KClass found for $descriptor"))
+            ?: throw IllegalStateException("No contextual serializer found for ${descriptor.capturedKClass!!.qualifiedName}")
     }
     else this
 }
