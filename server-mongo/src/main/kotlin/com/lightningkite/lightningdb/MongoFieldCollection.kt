@@ -297,9 +297,45 @@ class MongoFieldCollection<Model : Any>(
                             mongo.ensureIndex(
                                 Sorts.ascending(it.fields.toList()),
                                 IndexOptions().unique(true).partialFilterExpression(
-                                    documentOf(*it.fields.map { it to documentOf("\$type" to descriptor.getElementDescriptor(descriptor.getElementIndex(it)).bsonType().value) }.toTypedArray())
+                                    documentOf(*it.fields.map {
+                                        it to documentOf(
+                                            "\$type" to descriptor.getElementDescriptor(
+                                                descriptor.getElementIndex(it)
+                                            ).bsonType().value
+                                        )
+                                    }.toTypedArray())
                                 )
                             )
+                        }
+                    }
+
+                    is UniqueSetJankPatch -> {
+                        requireCompletion += launch {
+                            val sets: MutableList<MutableList<String>> = mutableListOf()
+                            var current = mutableListOf<String>()
+                            it.fields.forEach { value ->
+                                if (value == ":") {
+                                    sets.add(current)
+                                    current = mutableListOf()
+                                } else {
+                                    current.add(value)
+                                }
+                            }
+                            sets.add(current)
+                            sets.forEach { set ->
+                                mongo.ensureIndex(
+                                    Sorts.ascending(set),
+                                    IndexOptions().unique(true).partialFilterExpression(
+                                        documentOf(*set.map {
+                                            it to documentOf(
+                                                "\$type" to descriptor.getElementDescriptor(
+                                                    descriptor.getElementIndex(it)
+                                                ).bsonType().value
+                                            )
+                                        }.toTypedArray())
+                                    )
+                                )
+                            }
                         }
                     }
 
@@ -309,6 +345,28 @@ class MongoFieldCollection<Model : Any>(
                                 Sorts.ascending(it.fields.toList()),
                                 IndexOptions().unique(false).background(true)
                             )
+                        }
+                    }
+
+                    is IndexSetJankPatch -> {
+                        launch {
+                            val sets: MutableList<MutableList<String>> = mutableListOf()
+                            var current = mutableListOf<String>()
+                            it.fields.forEach { value ->
+                                if (value == ":") {
+                                    sets.add(current)
+                                    current = mutableListOf()
+                                } else {
+                                    current.add(value)
+                                }
+                            }
+                            sets.add(current)
+                            sets.forEach { set ->
+                                mongo.ensureIndex(
+                                    Sorts.ascending(set),
+                                    IndexOptions().unique(false).background(true)
+                                )
+                            }
                         }
                     }
 
@@ -326,9 +384,54 @@ class MongoFieldCollection<Model : Any>(
                             mongo.ensureIndex(
                                 Sorts.ascending(it.fields.toList()),
                                 IndexOptions().unique(true).name(it.indexName).partialFilterExpression(
-                                    documentOf(*it.fields.map { it to documentOf("\$type" to descriptor.getElementDescriptor(descriptor.getElementIndex(it)).bsonType().value) }.toTypedArray())
+                                    documentOf(*it.fields.map {
+                                        it to documentOf(
+                                            "\$type" to descriptor.getElementDescriptor(
+                                                descriptor.getElementIndex(it)
+                                            ).bsonType().value
+                                        )
+                                    }.toTypedArray())
                                 )
                             )
+                        }
+                    }
+
+                    is NamedUniqueSetJankPatch -> {
+                        requireCompletion += launch {
+                            val sets: MutableList<MutableList<String>> = mutableListOf()
+                            var current = mutableListOf<String>()
+                            it.fields.forEach { value ->
+                                if (value == ":") {
+                                    sets.add(current)
+                                    current = mutableListOf()
+                                } else {
+                                    current.add(value)
+                                }
+                            }
+                            sets.add(current)
+                            val names = it.indexNames.split(":").map { it.trim() }
+
+                            sets.forEachIndexed { index, set ->
+                                val options = IndexOptions()
+                                    .unique(true)
+                                    .partialFilterExpression(
+                                        documentOf(*set.map {
+                                            it to documentOf(
+                                                "\$type" to descriptor.getElementDescriptor(
+                                                    descriptor.getElementIndex(it)
+                                                ).bsonType().value
+                                            )
+                                        }.toTypedArray())
+                                    )
+                                names.getOrNull(index)?.let { name ->
+                                    options.name(name)
+                                }
+
+                                mongo.ensureIndex(
+                                    Sorts.ascending(set.toList()),
+                                    options
+                                )
+                            }
                         }
                     }
 
@@ -338,6 +441,36 @@ class MongoFieldCollection<Model : Any>(
                                 Sorts.ascending(it.fields.toList()),
                                 IndexOptions().unique(false).name(it.indexName).background(true)
                             )
+                        }
+                    }
+
+                    is NamedIndexSetJankPatch -> {
+                        launch {
+
+                            val sets: MutableList<MutableList<String>> = mutableListOf()
+                            var current = mutableListOf<String>()
+                            it.fields.forEach { value ->
+                                if (value == ":") {
+                                    sets.add(current)
+                                    current = mutableListOf()
+                                } else {
+                                    current.add(value)
+                                }
+                            }
+                            sets.add(current)
+                            val names = it.indexNames.split(":").map { it.trim() }
+
+                            sets.forEachIndexed { index, set ->
+                                val options = IndexOptions().unique(false).background(true)
+                                names.getOrNull(index)?.let { name ->
+                                    options.name(name)
+                                }
+                                mongo.ensureIndex(
+                                    Sorts.ascending(set.toList()),
+                                    options
+                                )
+                            }
+
                         }
                     }
 
@@ -378,7 +511,13 @@ class MongoFieldCollection<Model : Any>(
                                     Sorts.ascending(descriptor.getElementName(index)),
                                     IndexOptions().unique(true).name(it.indexName.takeUnless { it.isBlank() })
                                         .partialFilterExpression(
-                                            documentOf(descriptor.getElementName(index) to documentOf("\$type" to descriptor.getElementDescriptor(index).bsonType().value))
+                                            documentOf(
+                                                descriptor.getElementName(index) to documentOf(
+                                                    "\$type" to descriptor.getElementDescriptor(
+                                                        index
+                                                    ).bsonType().value
+                                                )
+                                            )
                                         )
                                 )
                             }
@@ -389,7 +528,13 @@ class MongoFieldCollection<Model : Any>(
                                 mongo.ensureIndex(
                                     Sorts.ascending(descriptor.getElementName(index)),
                                     IndexOptions().unique(true).partialFilterExpression(
-                                        documentOf(descriptor.getElementName(index) to documentOf("\$type" to descriptor.getElementDescriptor(index).bsonType().value))
+                                        documentOf(
+                                            descriptor.getElementName(index) to documentOf(
+                                                "\$type" to descriptor.getElementDescriptor(
+                                                    index
+                                                ).bsonType().value
+                                            )
+                                        )
                                     )
                                 )
                             }
