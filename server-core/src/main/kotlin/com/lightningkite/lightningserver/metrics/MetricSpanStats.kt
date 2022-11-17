@@ -10,8 +10,9 @@ import kotlin.math.max
 import kotlin.math.min
 
 @DatabaseModel
-@IndexSet(["type", "endpoint", "timeSpan", "timeStamp"])
-@IndexSet(["timeSpan", "timeStamp"])
+@IndexSetJankPatch(["type", "endpoint", "timeSpan", "timeStamp", ":", "timeSpan", "timeStamp"])
+//@IndexSet(["type", "endpoint", "timeSpan", "timeStamp"])
+//@IndexSet(["timeSpan", "timeStamp"])
 @Serializable
 data class MetricSpanStats(
     override val _id: String,

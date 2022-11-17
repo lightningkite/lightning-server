@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.serialization.Serialization
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
@@ -29,7 +30,7 @@ fun loadSettings(settingsFile: File): Settings {
     }
     try {
         return Serialization.json.decodeFromStream(settingsFile.inputStream())
-    } catch (e: Exception) {
+    } catch (e: SerializationException) {
         val json = Json {
             encodeDefaults = true
             serializersModule = Serialization.module
