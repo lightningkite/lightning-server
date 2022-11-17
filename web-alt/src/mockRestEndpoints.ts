@@ -70,11 +70,13 @@ export function mockRestEndpointFunctions<T extends HasId>(
 
     insertBulk(input: Array<T>, requesterToken: string): Promise<Array<T>> {
       input.forEach((item) => items.push(item));
+      console.info(label, "insertBulk", { input });
       return Promise.resolve(input);
     },
 
     insert(input: T, requesterToken: string): Promise<T> {
       items.push(input);
+      console.info(label, "insert", { input });
       return Promise.resolve(input);
     },
 
@@ -141,7 +143,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
 
       const newItem = evaluateModification(input, items[existingItemIndex]);
       items[existingItemIndex] = newItem;
-      return Promise.resolve({} as T);
+      return Promise.resolve(newItem);
     },
 
     bulkDelete(input: Condition<T>, requesterToken: string): Promise<number> {
