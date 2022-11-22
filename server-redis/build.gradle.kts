@@ -20,7 +20,7 @@ dependencies {
     api("io.lettuce:lettuce-core:6.2.0.RELEASE")
     api("org.signal:embedded-redis:0.8.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutines")
-    testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     ksp(project(":processor"))
     kspTest(project(":processor"))
 }

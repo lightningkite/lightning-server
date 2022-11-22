@@ -19,7 +19,7 @@ dependencies {
     api(project(":server-core"))
     api("com.googlecode.xmemcached:xmemcached:2.4.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutines")
-    testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     ksp(project(":processor"))
     kspTest(project(":processor"))
 }

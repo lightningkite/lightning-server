@@ -30,7 +30,7 @@ dependencies {
     api("org.jetbrains.exposed:exposed-jdbc:0.39.2")
     api("org.postgresql:postgresql:42.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.6.4")
-    testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation(project(":server-testing"))
     testImplementation("io.zonky.test:embedded-postgres:2.0.1")
     ksp(project(":processor"))

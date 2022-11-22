@@ -20,7 +20,7 @@ dependencies {
     api("io.sentry:sentry:1.7.30")
     api("io.sentry:sentry-logback:1.7.30")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutines")
-    testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     ksp(project(":processor"))
     kspTest(project(":processor"))
 }

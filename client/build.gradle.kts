@@ -24,7 +24,7 @@ dependencies {
     kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
     kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 }
 
 khrysalis {
