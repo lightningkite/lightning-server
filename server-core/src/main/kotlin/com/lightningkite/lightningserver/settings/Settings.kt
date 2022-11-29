@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.settings
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.logging.loggingSettings
 import com.lightningkite.lightningserver.metrics.Metrics
+import com.lightningkite.lightningserver.metrics.metricsSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 
 import kotlinx.serialization.KSerializer
@@ -34,7 +35,7 @@ object Settings {
         generalSettings
         loggingSettings
         exceptionSettings
-        Metrics.main
+        metricsSettings
     }
 
     fun populateDefaults(map: Map<String, Any?> = mapOf()) {
