@@ -3,6 +3,7 @@ package com.lightningkite.lightningdb.test
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.properties.encodeToStringMap
 import org.junit.Test
 import java.time.Instant
 import kotlin.test.assertEquals
@@ -18,6 +19,8 @@ class ConditionSimplifyKtTest {
         condition<LargeTestModel> { it.boolean.eq(false) and it.boolean.eq(true) }.simplifyOk()
         condition<LargeTestModel> { it.boolean.eq(false) and it.boolean.inside(listOf(true, false)) }.simplifyOk()
         val conditions = listOf<Condition<LargeTestModel>>(
+            Condition.Always(),
+            Condition.Never(),
             condition { it.int eq 1 },
             condition { it.int gt 1 },
             condition { it.int lt 1 },
@@ -37,6 +40,12 @@ class ConditionSimplifyKtTest {
                 (a and b).simplifyOk()
             }
         }
+    }
+
+    @Test fun serializeUrlTest() {
+        Serialization.properties.encodeToStringMap(
+        condition<LargeTestModel> { it.listNullable.notNull.any { it eq 429 } }
+        ).also { println(it) }
     }
 
     val sampleData = listOf(

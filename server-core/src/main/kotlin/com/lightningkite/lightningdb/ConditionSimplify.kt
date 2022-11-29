@@ -159,20 +159,30 @@ private fun <T> Condition<T>.simplifyWithoutMerge(): Condition<T> {
 fun <T> Condition<T>.simplify(): Condition<T> {
     return when(this) {
         is Condition.And -> {
-            this.unpackAndMerge().filter { it !is Condition.Always }.let {
+            var foundAlways = false
+            this.unpackAndMerge().filter {
+                if(it is Condition.Always) {
+                    foundAlways = true
+                    false
+                } else true
+            }.let {
                 when(it.size) {
-                    0 -> Condition.Never()
+                    0 -> if(foundAlways) Condition.Always() else Condition.Never()
                     1 -> it.first().simplifyWithoutMerge()
                     else -> Condition.And(it.map { it.simplifyWithoutMerge() })
                 }
             }
         }
         is Condition.Not -> (this.condition as? Condition.Not)?.condition?.simplify() ?: Condition.Not(simplify())
-        is Condition.Or -> this.conditions.distinct().map { it.simplify() }.filter { it !is Condition.Never }.let {
-            when(it.size) {
-                0 -> Condition.Always()
-                1 -> it.first().simplify()
-                else -> Condition.Or(it)
+        is Condition.Or -> {
+            this.conditions.distinct().map { it.simplify() }.filter {
+                it !is Condition.Never
+            }.let {
+                when(it.size) {
+                    0 -> Condition.Always()
+                    1 -> it.first().simplify()
+                    else -> Condition.Or(it)
+                }
             }
         }
         is Condition.Inside -> this.values.distinct().let {
