@@ -32,9 +32,8 @@ an abstract class called [`ServerPathGroup`](#serverpathgroups). Create this obj
 Additionally, you'll need to call it in main:
 
 <pre><code>fun main() {
-    Server
-
     loadSettings(File("settings.json"))
+    Server
     runServer(LocalPubSub, LocalCache)
 }</code></pre>
 
