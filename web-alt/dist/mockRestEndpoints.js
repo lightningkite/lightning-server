@@ -60,10 +60,12 @@ function mockRestEndpointFunctions(items, label) {
         },
         insertBulk(input, requesterToken) {
             input.forEach((item) => items.push(item));
+            console.info(label, "insertBulk", { input });
             return Promise.resolve(input);
         },
         insert(input, requesterToken) {
             items.push(input);
+            console.info(label, "insert", { input });
             return Promise.resolve(input);
         },
         upsert(id, input, requesterToken) {
@@ -108,7 +110,7 @@ function mockRestEndpointFunctions(items, label) {
                 return Promise.reject();
             const newItem = (0, Modification_1.evaluateModification)(input, items[existingItemIndex]);
             items[existingItemIndex] = newItem;
-            return Promise.resolve({});
+            return Promise.resolve(newItem);
         },
         bulkDelete(input, requesterToken) {
             console.info(label, "bulkDelete", { input });

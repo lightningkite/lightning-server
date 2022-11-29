@@ -55,7 +55,7 @@ dependencies {
 
     testImplementation("com.auth0:java-jwt:4.0.0")
 
-    testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 
     ksp(project(":processor"))
     kspTest(project(":processor"))

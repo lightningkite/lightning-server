@@ -172,6 +172,7 @@ internal fun handlers() {
                   }
                 
                   cors_rule {
+                    allowed_headers = ["*"]
                     allowed_methods = ["GET", "HEAD"]
                     allowed_origins = ["*"]
                   }

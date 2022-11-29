@@ -22,7 +22,7 @@ dependencies {
     api(project(":server"))
     ksp(project(":processor"))
     implementation("io.ktor:ktor-server-call-logging:2.1.0")
-    testImplementation("org.jetbrains.kotlin:kotlin-test")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation(project(":client"))
 }
 

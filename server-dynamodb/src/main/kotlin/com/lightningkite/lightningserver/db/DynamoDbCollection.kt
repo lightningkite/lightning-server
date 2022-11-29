@@ -35,14 +35,14 @@ class DynamoDbCollection<T : Any>(
         //TODO: Need to use the serial name
         val orderKey = orderBy.map { it.field.property.name }
         val index = indices[orderKey]
-        val key = if(index != null) orderKey.first() else "_id"
+        val key = if (index != null) orderKey.first() else "_id"
         val c = condition.dynamo(serializer, key)
         if (c.never) return emptyFlow()
         val parsed = if (c.writeKey != null) {
             client.queryPaginator {
                 it.tableName(tableName)
                 index?.let { i -> it.indexName(tableName + "_" + i) }
-                if(orderBy.firstOrNull()?.ascending == false) it.scanIndexForward(false)
+                if (orderBy.firstOrNull()?.ascending == false) it.scanIndexForward(false)
                 if (c.local == null) it.limit(limit + skip)
                 it.apply(c)
             }.items().map { it to serializer.fromDynamoMap(it) }.asFlow()
@@ -50,7 +50,7 @@ class DynamoDbCollection<T : Any>(
             client.scanPaginator {
                 it.tableName(tableName)
                 index?.let { i -> it.indexName(tableName + "_" + i) }
-                if(orderBy.firstOrNull()?.ascending == false) throw IllegalArgumentException()
+                if (orderBy.firstOrNull()?.ascending == false) throw IllegalArgumentException()
                 if (c.local == null) it.limit(limit)
                 it.apply(c)
             }.items().map { it to serializer.fromDynamoMap(it) }.asFlow()
@@ -293,6 +293,7 @@ class DynamoDbCollection<T : Any>(
 
     private var prepared = false
     private lateinit var indices: Map<List<String>, String>
+
     @OptIn(ExperimentalSerializationApi::class)
     internal suspend fun prepare() {
         if (prepared) return
@@ -303,10 +304,87 @@ class DynamoDbCollection<T : Any>(
             descriptor.annotations.forEach {
                 when (it) {
                     is UniqueSet -> expectedIndices[it.fields.joinToString("_")] = it.fields.toList()
+
+                    is UniqueSetJankPatch -> {
+                        val sets: MutableList<MutableList<String>> = mutableListOf()
+                        var current = mutableListOf<String>()
+                        it.fields.forEach { value ->
+                            if (value == ":") {
+                                sets.add(current)
+                                current = mutableListOf()
+                            } else {
+                                current.add(value)
+                            }
+                        }
+                        sets.add(current)
+                        sets.forEach { set ->
+                            expectedIndices[set.joinToString("_")] = set.toList()
+                        }
+                    }
+
                     is IndexSet -> expectedIndices[it.fields.joinToString("_")] = it.fields.toList()
+
+                    is IndexSetJankPatch -> {
+                        val sets: MutableList<MutableList<String>> = mutableListOf()
+                        var current = mutableListOf<String>()
+                        it.fields.forEach { value ->
+                            if (value == ":") {
+                                sets.add(current)
+                                current = mutableListOf()
+                            } else {
+                                current.add(value)
+                            }
+                        }
+                        sets.add(current)
+                        sets.forEach { set ->
+                            expectedIndices[set.joinToString("_")] = set.toList()
+                        }
+                    }
+
                     is TextIndex -> throw IllegalArgumentException()
                     is NamedUniqueSet -> expectedIndices[it.indexName] = it.fields.toList()
+
+                    is NamedUniqueSetJankPatch -> {
+                        val sets: MutableList<MutableList<String>> = mutableListOf()
+                        var current = mutableListOf<String>()
+                        it.fields.forEach { value ->
+                            if (value == ":") {
+                                sets.add(current)
+                                current = mutableListOf()
+                            } else {
+                                current.add(value)
+                            }
+                        }
+                        sets.add(current)
+                        val names = it.indexNames.split(":").map { it.trim() }
+
+                        sets.forEachIndexed { index, set ->
+                            expectedIndices[names.getOrNull(index) ?: set.joinToString("_")] = set.toList()
+                        }
+                    }
+
                     is NamedIndexSet -> expectedIndices[it.indexName] = it.fields.toList()
+
+                    is NamedIndexSetJankPatch -> {
+
+                        val sets: MutableList<MutableList<String>> = mutableListOf()
+                        var current = mutableListOf<String>()
+                        it.fields.forEach { value ->
+                            if (value == ":") {
+                                sets.add(current)
+                                current = mutableListOf()
+                            } else {
+                                current.add(value)
+                            }
+                        }
+                        sets.add(current)
+                        val names = it.indexNames.split(":").map { it.trim() }
+
+                        sets.forEachIndexed { index, set ->
+                            expectedIndices[names.getOrNull(index) ?: set.joinToString("_")] = set.toList()
+                        }
+
+                    }
                 }
             }
             (0 until descriptor.elementsCount).forEach { index ->
@@ -337,13 +415,18 @@ class DynamoDbCollection<T : Any>(
                 it.billingMode(BillingMode.PAY_PER_REQUEST)
                 it.keySchema(KeySchemaElement.builder().attributeName("_id").keyType(KeyType.HASH).build())
                 val k = expectedIndices.values.flatten().toSet() + "_id"
-                it.attributeDefinitions((0 until serializer.descriptor.elementsCount).filter { serializer.descriptor.getElementName(it) in k }.mapNotNull { index ->
+                it.attributeDefinitions((0 until serializer.descriptor.elementsCount).filter {
+                    serializer.descriptor.getElementName(
+                        it
+                    ) in k
+                }.mapNotNull { index ->
                     serializer.descriptor.getElementDescriptor(index).dynamoType().scalar()?.let { t ->
-                        AttributeDefinition.builder().attributeName(serializer.descriptor.getElementName(index)).attributeType(t).build()
+                        AttributeDefinition.builder().attributeName(serializer.descriptor.getElementName(index))
+                            .attributeType(t).build()
                     }
                 })
                 it.globalSecondaryIndexes(expectedIndices.map {
-                    when(it.value.size) {
+                    when (it.value.size) {
                         1 -> GlobalSecondaryIndex.builder()
                             .indexName(tableName + "_" + it.key)
                             .keySchema(
@@ -354,6 +437,7 @@ class DynamoDbCollection<T : Any>(
                             )
                             .projection(Projection.builder().projectionType(ProjectionType.ALL).build())
                             .build()
+
                         2 -> GlobalSecondaryIndex.builder()
                             .indexName(tableName + "_" + it.key)
                             .keySchema(
@@ -368,6 +452,7 @@ class DynamoDbCollection<T : Any>(
                             )
                             .projection(Projection.builder().projectionType(ProjectionType.ALL).build())
                             .build()
+
                         else -> throw IllegalArgumentException("")
                     }
                 })

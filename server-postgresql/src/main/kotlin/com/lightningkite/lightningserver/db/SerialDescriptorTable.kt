@@ -57,10 +57,50 @@ class SerialDescriptorTable(name: String, val descriptor: SerialDescriptor) : Ta
                         columns = it.fields.flatMap { columnsByDotPath[it.split('.')]!! }.toTypedArray()
                     )
 
+                    is UniqueSetJankPatch -> {
+                        val sets: MutableList<MutableList<String>> = mutableListOf()
+                        var current = mutableListOf<String>()
+                        it.fields.forEach { value ->
+                            if (value == ":") {
+                                sets.add(current)
+                                current = mutableListOf()
+                            } else {
+                                current.add(value)
+                            }
+                        }
+                        sets.add(current)
+                        sets.forEach { set ->
+                            index(
+                                isUnique = true,
+                                columns = set.flatMap { columnsByDotPath[it.split('.')]!! }.toTypedArray()
+                            )
+                        }
+                    }
+
                     is IndexSet -> index(
                         isUnique = false,
                         columns = it.fields.flatMap { columnsByDotPath[it.split('.')]!! }.toTypedArray()
                     )
+
+                    is IndexSetJankPatch -> {
+                        val sets: MutableList<MutableList<String>> = mutableListOf()
+                        var current = mutableListOf<String>()
+                        it.fields.forEach { value ->
+                            if (value == ":") {
+                                sets.add(current)
+                                current = mutableListOf()
+                            } else {
+                                current.add(value)
+                            }
+                        }
+                        sets.add(current)
+                        sets.forEach { set ->
+                            index(
+                                isUnique = true,
+                                columns = set.flatMap { columnsByDotPath[it.split('.')]!! }.toTypedArray()
+                            )
+                        }
+                    }
 
                     is TextIndex -> {
                         // TODO
@@ -72,11 +112,59 @@ class SerialDescriptorTable(name: String, val descriptor: SerialDescriptor) : Ta
                         columns = it.fields.flatMap { columnsByDotPath[it.split('.')]!! }.toTypedArray()
                     )
 
+                    is NamedUniqueSetJankPatch -> {
+                        val sets: MutableList<MutableList<String>> = mutableListOf()
+                        var current = mutableListOf<String>()
+                        it.fields.forEach { value ->
+                            if (value == ":") {
+                                sets.add(current)
+                                current = mutableListOf()
+                            } else {
+                                current.add(value)
+                            }
+                        }
+                        sets.add(current)
+                        val names = it.indexNames.split(":").map { it.trim() }
+
+                        sets.forEachIndexed { index, set ->
+                            index(
+                                customIndexName = names.getOrNull(index),
+                                isUnique = true,
+                                columns = it.fields.flatMap { columnsByDotPath[it.split('.')]!! }.toTypedArray()
+                            )
+                        }
+                    }
+
                     is NamedIndexSet -> index(
                         customIndexName = it.indexName,
                         isUnique = false,
                         columns = it.fields.flatMap { columnsByDotPath[it.split('.')]!! }.toTypedArray()
                     )
+
+                    is NamedIndexSetJankPatch -> {
+
+                        val sets: MutableList<MutableList<String>> = mutableListOf()
+                        var current = mutableListOf<String>()
+                        it.fields.forEach { value ->
+                            if (value == ":") {
+                                sets.add(current)
+                                current = mutableListOf()
+                            } else {
+                                current.add(value)
+                            }
+                        }
+                        sets.add(current)
+                        val names = it.indexNames.split(":").map { it.trim() }
+
+                        sets.forEachIndexed { index, set ->
+                            index(
+                                customIndexName = names.getOrNull(index),
+                                isUnique = true,
+                                columns = it.fields.flatMap { columnsByDotPath[it.split('.')]!! }.toTypedArray()
+                            )
+                        }
+
+                    }
                 }
             }
             (0 until descriptor.elementsCount).forEach { index ->

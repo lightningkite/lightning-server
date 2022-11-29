@@ -30,7 +30,7 @@ dependencies {
     api("software.amazon.awssdk:dynamodb:2.17.276")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.6.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.4")
-    testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation(project(":server-testing"))
     ksp(project(":processor"))
     kspTest(project(":processor"))

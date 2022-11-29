@@ -138,15 +138,42 @@ annotation class TextIndex(val fields: Array<String>)
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-@Repeatable
+//@Repeatable
 annotation class IndexSet(val fields: Array<String>)
+
+// Jank patch? For what and how?
+// The problem this works around is that Repeatable annotations currently do not
+// work correct with kotlinx serialization. Only the last instance shows up.
+// To jank a patch for this, I created a second version that allows you to
+// include multiple sets by adding a delimiter, ":", into the list.
+// An example ["field1", "field2", ":", "field1", "field3"]
+// If the kotlinx issue is resolved, then this will become deprecated, and
+// repeatable added back into the normal one.
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS)
+annotation class IndexSetJankPatch(val fields: Array<String>)
 
 
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-@Repeatable
+//@Repeatable
 annotation class UniqueSet(val fields: Array<String>)
+
+
+// Jank patch? For what and how?
+// The problem this works around is that Repeatable annotations currently do not
+// work correct with kotlinx serialization. Only the last instance shows up.
+// To jank a patch for this, I created a second version that allows you to
+// include multiple sets by adding a delimiter(":") into the list.
+// An example ["field1", "field2", ":", "field1", "field3"]
+// If the kotlinx issue is resolved, then this will become deprecated, and
+// repeatable added back into the normal one.
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS)
+annotation class UniqueSetJankPatch(val fields: Array<String>)
 
 
 @SerialInfo
@@ -164,12 +191,40 @@ annotation class NamedUnique(val indexName: String)
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-@Repeatable
+//@Repeatable
 annotation class NamedIndexSet(val fields: Array<String>, val indexName: String)
+
+
+// Jank patch? For what and how?
+// The problem this works around is that Repeatable annotations currently do not
+// work correct with kotlinx serialization. Only the last instance shows up.
+// To jank a patch for this, I created a second version that allows you to
+// include multiple sets by adding a delimiter(":") into the list and names.
+// An example ["field1", "field2", ":", "field1", "field3"], "Name 1:Name 2"
+// If the kotlinx issue is resolved, then this will become deprecated, and
+// repeatable added back into the normal one.
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS)
+annotation class NamedIndexSetJankPatch(val fields: Array<String>, val indexNames: String)
 
 
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-@Repeatable
+//@Repeatable
 annotation class NamedUniqueSet(val fields: Array<String>, val indexName: String)
+
+
+// Jank patch? For what and how?
+// The problem this works around is that Repeatable annotations currently do not
+// work correct with kotlinx serialization. Only the last instance shows up.
+// To jank a patch for this, I created a second version that allows you to
+// include multiple sets by adding a delimiter(":") into the list.
+// An example ["field1", "field2", ":", "field1", "field3"], "Name 1:Name 2"
+// If the kotlinx issue is resolved, then this will become deprecated, and
+// repeatable added back into the normal one.
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS)
+annotation class NamedUniqueSetJankPatch(val fields: Array<String>, val indexNames: String)
