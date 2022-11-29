@@ -164,12 +164,6 @@ annotation class NamedUnique(val indexName: String)
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-annotation class NamedTextIndex(val fields: Array<String>, val indexName: String)
-
-
-@SerialInfo
-@Retention(AnnotationRetention.BINARY)
-@Target(AnnotationTarget.CLASS)
 @Repeatable
 annotation class NamedIndexSet(val fields: Array<String>, val indexName: String)
 

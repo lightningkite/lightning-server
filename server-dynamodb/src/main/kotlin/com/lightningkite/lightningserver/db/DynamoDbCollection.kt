@@ -307,7 +307,6 @@ class DynamoDbCollection<T : Any>(
                     is TextIndex -> throw IllegalArgumentException()
                     is NamedUniqueSet -> expectedIndices[it.indexName] = it.fields.toList()
                     is NamedIndexSet -> expectedIndices[it.indexName] = it.fields.toList()
-                    is NamedTextIndex -> throw IllegalArgumentException()
                 }
             }
             (0 until descriptor.elementsCount).forEach { index ->

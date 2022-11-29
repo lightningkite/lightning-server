@@ -19,6 +19,12 @@ class PropChain<From : IsCodableAndHashable, To : IsCodableAndHashable>(
         getProp = { prop.get(getProp(it)) },
         setProp = { from, to -> setProp(from, prop.setCopy(getProp(from), to)) }
     )
+    fun <V : IsCodableAndHashable> chain(other: PropChain<To, V>): PropChain<From, V> = PropChain(
+        mapCondition = { mapCondition(other.mapCondition(it)) },
+        mapModification = { mapModification(other.mapModification(it)) },
+        getProp = { other.getProp(getProp(it)) },
+        setProp = { from, to -> setProp(from, other.setProp(getProp(from), to)) }
+    )
 
 //    override fun hashCode(): Int = mapCondition(Condition.Always()).hashCode()
 

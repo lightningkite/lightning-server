@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.mongodb.MongoCommandException
 import com.mongodb.client.model.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
@@ -9,8 +10,11 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.*
 import org.bson.BsonDocument
+import org.bson.Document
+import org.bson.conversions.Bson
 import org.litote.kmongo.coroutine.CoroutineCollection
 import org.litote.kmongo.coroutine.aggregate
+import org.litote.kmongo.descending
 import org.litote.kmongo.group
 import org.litote.kmongo.match
 import java.util.concurrent.TimeUnit
@@ -287,118 +291,44 @@ class MongoFieldCollection<Model : Any>(
     @OptIn(DelicateCoroutinesApi::class, ExperimentalSerializationApi::class)
     val prepare = GlobalScope.async(Dispatchers.Unconfined, start = CoroutineStart.LAZY) {
         val requireCompletion = ArrayList<Job>()
-        val seen = HashSet<SerialDescriptor>()
-        fun handleDescriptor(descriptor: SerialDescriptor) {
-            if (!seen.add(descriptor)) return
-            descriptor.annotations.forEach {
-                when (it) {
-                    is UniqueSet -> {
-                        requireCompletion += launch {
-                            mongo.ensureIndex(
-                                Sorts.ascending(it.fields.toList()),
-                                IndexOptions().unique(true).partialFilterExpression(
-                                    documentOf(*it.fields.map { it to documentOf("\$type" to descriptor.getElementDescriptor(descriptor.getElementIndex(it)).bsonType().value) }.toTypedArray())
-                                )
-                            )
-                        }
-                    }
 
-                    is IndexSet -> {
-                        launch {
-                            mongo.ensureIndex(
-                                Sorts.ascending(it.fields.toList()),
-                                IndexOptions().unique(false).background(true)
-                            )
-                        }
-                    }
-
-                    is TextIndex -> {
-                        requireCompletion += launch {
-                            mongo.ensureIndex(
-                                documentOf(*it.fields.map { it to "text" }.toTypedArray()),
-                                IndexOptions().name("${mongo.namespace.fullName}TextIndex")
-                            )
-                        }
-                    }
-
-                    is NamedUniqueSet -> {
-                        requireCompletion += launch {
-                            mongo.ensureIndex(
-                                Sorts.ascending(it.fields.toList()),
-                                IndexOptions().unique(true).name(it.indexName).partialFilterExpression(
-                                    documentOf(*it.fields.map { it to documentOf("\$type" to descriptor.getElementDescriptor(descriptor.getElementIndex(it)).bsonType().value) }.toTypedArray())
-                                )
-                            )
-                        }
-                    }
-
-                    is NamedIndexSet -> {
-                        launch {
-                            mongo.ensureIndex(
-                                Sorts.ascending(it.fields.toList()),
-                                IndexOptions().unique(false).name(it.indexName).background(true)
-                            )
-                        }
-                    }
-
-                    is NamedTextIndex -> {
-                        requireCompletion += launch {
-                            mongo.ensureIndex(documentOf(*it.fields.map { it to "text" }.toTypedArray()))
+        serializer.descriptor.annotations.filterIsInstance<TextIndex>().firstOrNull()?.let {
+            requireCompletion += launch {
+                mongo.ensureIndex(
+                    documentOf(*it.fields.map { it to "text" }.toTypedArray()),
+                    IndexOptions().name("${mongo.namespace.fullName}TextIndex")
+                )
+            }
+        }
+        serializer.descriptor.indexes().forEach {
+            if(it.unique) {
+                requireCompletion += launch {
+                    val keys = Sorts.ascending(it.fields)
+                    val options = IndexOptions().unique(true).name(it.name)
+                    try {
+                        mongo.ensureIndex(keys, options)
+                    } catch(e: MongoCommandException) {
+                        if(e.errorCode == 85) {
+                            mongo.dropIndex(keys)
+                            mongo.ensureIndex(keys, options)
                         }
                     }
                 }
-            }
-            (0 until descriptor.elementsCount).forEach { index ->
-                val sub = descriptor.getElementDescriptor(index)
-                if (sub.kind == StructureKind.CLASS) handleDescriptor(sub)
-                descriptor.getElementAnnotations(index).forEach {
-                    when (it) {
-                        is NamedIndex -> {
-                            launch {
-                                mongo.ensureIndex(
-                                    Sorts.ascending(descriptor.getElementName(index)),
-                                    IndexOptions().unique(false).name(it.indexName.takeUnless { it.isBlank() })
-                                        .background(true)
-                                )
-                            }
-                        }
-
-                        is Index -> {
-                            launch {
-                                mongo.ensureIndex(
-                                    Sorts.ascending(descriptor.getElementName(index)),
-                                    IndexOptions().unique(false).background(true)
-                                )
-                            }
-                        }
-
-                        is NamedUnique -> {
-                            requireCompletion += launch {
-                                mongo.ensureIndex(
-                                    Sorts.ascending(descriptor.getElementName(index)),
-                                    IndexOptions().unique(true).name(it.indexName.takeUnless { it.isBlank() })
-                                        .partialFilterExpression(
-                                            documentOf(descriptor.getElementName(index) to documentOf("\$type" to descriptor.getElementDescriptor(index).bsonType().value))
-                                        )
-                                )
-                            }
-                        }
-
-                        is Unique -> {
-                            requireCompletion += launch {
-                                mongo.ensureIndex(
-                                    Sorts.ascending(descriptor.getElementName(index)),
-                                    IndexOptions().unique(true).partialFilterExpression(
-                                        documentOf(descriptor.getElementName(index) to documentOf("\$type" to descriptor.getElementDescriptor(index).bsonType().value))
-                                    )
-                                )
-                            }
+            } else {
+                launch {
+                    val keys = Sorts.ascending(it.fields)
+                    val options = IndexOptions().unique(false).background(true).name(it.name)
+                    try {
+                        mongo.ensureIndex(keys, options)
+                    } catch(e: MongoCommandException) {
+                        if(e.errorCode == 85) {
+                            mongo.dropIndex(keys)
+                            mongo.ensureIndex(keys, options)
                         }
                     }
                 }
             }
         }
-        handleDescriptor(serializer.descriptor)
         requireCompletion.forEach { it.join() }
     }
 }

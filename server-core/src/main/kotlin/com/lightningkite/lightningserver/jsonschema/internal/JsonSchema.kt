@@ -9,6 +9,7 @@ import kotlinx.serialization.json.*
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import kotlin.math.absoluteValue
 
 @PublishedApi
 internal inline val SerialDescriptor.jsonLiteral
@@ -375,9 +376,10 @@ internal class JsonSchemaDefinitions(private val isEnabled: Boolean = true) {
         return annotations
             .lastOfInstance<JsonSchemaDefinition>()?.id
             ?.takeIf(String::isNotEmpty)
-            ?: (descriptor.hashCode().toLong() shl 32 xor annotations.hashCode().toLong())
+            ?: (descriptor.serialName.filter { it.isLetterOrDigit() } + (descriptor.hashCode().toLong() xor annotations.hashCode().toLong())
+                .absoluteValue
                 .toString(36)
-                .replaceFirst("-", "x")
+                .take(3))
     }
 
     fun canGenerateDefinitions(key: Key): Boolean {

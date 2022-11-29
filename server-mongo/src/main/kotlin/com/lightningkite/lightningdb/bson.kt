@@ -28,6 +28,7 @@ import java.time.*
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
+import kotlin.reflect.KProperty1
 
 fun documentOf(): Document {
     return Document()
@@ -47,7 +48,15 @@ fun Condition<*>.dump(into: Document = Document(), key: String?): Document {
     when (this) {
         is Condition.Always -> {}
         is Condition.Never -> into["thisFieldWillNeverExist"] = "no never"
-        is Condition.And -> if(conditions.isNotEmpty()) into["\$and"] = conditions.map { it.dump(key = key)  }
+        is Condition.And -> {
+            if(conditions.any { it is Condition.Or }) {
+                into["\$and"] = conditions.map { it.dump(key = key)  }
+            } else {
+                conditions.forEach {
+                    it.dump(into, key)
+                }
+            }
+        }
         is Condition.Or -> if(conditions.isEmpty()) into["thisFieldWillNeverExist"] = "no never" else into["\$or"] = conditions.map { it.dump(key = key)  }
         is Condition.Equal -> into.sub(key)["\$eq"] = value
         is Condition.NotEqual -> into.sub(key)["\$ne"] = value

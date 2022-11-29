@@ -77,10 +77,6 @@ class SerialDescriptorTable(name: String, val descriptor: SerialDescriptor) : Ta
                         isUnique = false,
                         columns = it.fields.flatMap { columnsByDotPath[it.split('.')]!! }.toTypedArray()
                     )
-
-                    is NamedTextIndex -> {
-                        // TODO
-                    }
                 }
             }
             (0 until descriptor.elementsCount).forEach { index ->
