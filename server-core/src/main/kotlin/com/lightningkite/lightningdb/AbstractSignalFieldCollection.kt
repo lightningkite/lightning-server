@@ -15,7 +15,7 @@ abstract class AbstractSignalFieldCollection<Model: Any>: FieldCollection<Model>
         signals.forEach { it(change) }
     }
 
-    final override suspend fun insert(models: List<Model>): List<Model> {
+    final override suspend fun insert(models: Iterable<Model>): List<Model> {
         val result = insertImpl(models)
         val change = CollectionChanges(changes = result.map { EntryChange(new = it) })
         signal(change)
@@ -97,7 +97,7 @@ abstract class AbstractSignalFieldCollection<Model: Any>: FieldCollection<Model>
         if(signals.isEmpty()) deleteManyIgnoringOldImpl(condition)
         else deleteMany(condition).size
 
-    protected abstract suspend fun insertImpl(models: List<Model>): List<Model>
+    protected abstract suspend fun insertImpl(models: Iterable<Model>): List<Model>
     protected abstract suspend fun replaceOneImpl(condition: Condition<Model>, model: Model): EntryChange<Model>
     protected abstract suspend fun replaceOneIgnoringResultImpl(condition: Condition<Model>, model: Model): Boolean
     protected abstract suspend fun upsertOneImpl(condition: Condition<Model>, modification: Modification<Model>, model: Model): EntryChange<Model>

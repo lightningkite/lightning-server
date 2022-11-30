@@ -18,7 +18,7 @@ fun <Model : Any> FieldCollection<Model>.postCreate(
     onCreate: suspend (Model)->Unit
 ): FieldCollection<Model> = object : FieldCollection<Model> by this@postCreate {
     override val wraps = this@postCreate
-    override suspend fun insert(models: List<Model>): List<Model> {
+    override suspend fun insert(models: Iterable<Model>): List<Model> {
         val result = wraps.insertMany(models)
         result.forEach { onCreate(it) }
         return result

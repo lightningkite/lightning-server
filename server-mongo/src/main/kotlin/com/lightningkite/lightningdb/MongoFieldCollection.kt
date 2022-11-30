@@ -129,12 +129,13 @@ class MongoFieldCollection<Model : Any>(
     }
 
     override suspend fun insertImpl(
-        models: List<Model>,
+        models: Iterable<Model>,
     ): List<Model> {
         prepare.await()
-        if (models.isEmpty()) return models
-        mongo.insertMany(models)
-        return models
+        if(models.count() == 0) return emptyList()
+        val asList = models.toList()
+        mongo.insertMany(asList)
+        return asList
     }
 
     override suspend fun replaceOneImpl(condition: Condition<Model>, model: Model): EntryChange<Model> {

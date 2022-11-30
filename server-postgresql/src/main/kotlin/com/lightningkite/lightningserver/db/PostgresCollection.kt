@@ -119,14 +119,14 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun insertImpl(models: List<T>): List<T> {
+    override suspend fun insertImpl(models: Iterable<T>): List<T> {
         prepare.await()
         t {
             table.batchInsert(models) {
                 format.encode(serializer, it, this)
             }
         }
-        return models
+        return models.toList()
     }
 
     override suspend fun replaceOneImpl(condition: Condition<T>, model: T): EntryChange<T> {

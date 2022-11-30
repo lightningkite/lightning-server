@@ -52,11 +52,23 @@ infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.n
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.ne(value: T) =
     mapCondition(Condition.NotEqual(value))
 
+@JsName("xPropChainInsideSet")
+infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.inside(values: Set<T>) =
+    mapCondition(Condition.Inside(values.toList()))
+
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.inside(values: List<T>) =
     mapCondition(Condition.Inside(values))
 
+@JsName("xPropChainNinSet")
+infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.nin(values: Set<T>) =
+    mapCondition(Condition.NotInside(values.toList()))
+
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.nin(values: List<T>) =
     mapCondition(Condition.NotInside(values))
+
+@JsName("xPropChainNotInSet")
+infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.notIn(values: Set<T>) =
+    mapCondition(Condition.NotInside(values.toList()))
 
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.notIn(values: List<T>) =
     mapCondition(Condition.NotInside(values))

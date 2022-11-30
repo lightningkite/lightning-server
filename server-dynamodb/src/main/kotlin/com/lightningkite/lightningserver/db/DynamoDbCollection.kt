@@ -66,7 +66,7 @@ class DynamoDbCollection<T : Any>(
         maxQueryMs: Long,
     ): Flow<T> = findRaw(condition, orderBy, skip, limit, maxQueryMs).map { it.second }
 
-    override suspend fun insertImpl(models: List<T>): List<T> {
+    override suspend fun insertImpl(models: Iterable<T>): List<T> {
         client.batchWriteItem {
             it.requestItems(mapOf(tableName to models.map {
                 WriteRequest.builder().putRequest(
@@ -74,7 +74,7 @@ class DynamoDbCollection<T : Any>(
                 ).build()
             }))
         }.await()
-        return models
+        return models.toList()
     }
 
     override suspend fun replaceOneImpl(condition: Condition<T>, model: T): EntryChange<T> {

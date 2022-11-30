@@ -55,9 +55,9 @@ open class InMemoryFieldCollection<Model : Any>(val data: MutableList<Model> = A
         property: KProperty1<Model, N>,
     ): Map<Key, Double?> = data.asSequence().filter { condition(it) }.mapNotNull { groupBy.get(it) to (property.get(it)?.toDouble() ?: return@mapNotNull null) }.aggregate(aggregate)
 
-    override suspend fun insertImpl(models: List<Model>): List<Model> = lock.withLock {
+    override suspend fun insertImpl(models: Iterable<Model>): List<Model> = lock.withLock {
         data.addAll(models)
-        return models
+        return models.toList()
     }
 
     override suspend fun replaceOneImpl(condition: Condition<Model>, model: Model): EntryChange<Model> = lock.withLock {

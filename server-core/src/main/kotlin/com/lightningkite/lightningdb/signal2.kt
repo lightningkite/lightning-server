@@ -3,7 +3,7 @@ package com.lightningkite.lightningdb
 inline fun <Model : Any> FieldCollection<Model>.interceptCreate(crossinline interceptor: suspend (Model) -> Model): FieldCollection<Model> =
     object : FieldCollection<Model> by this {
         override val wraps = this@interceptCreate
-        override suspend fun insert(models: List<Model>): List<Model> =
+        override suspend fun insert(models: Iterable<Model>): List<Model> =
             wraps.insertMany(models.map { interceptor(it) })
 
         override suspend fun upsertOne(

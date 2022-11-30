@@ -40,7 +40,7 @@ interface FieldCollection<Model: Any> {
 
 
     suspend fun insert(
-        models: List<Model>
+        models: Iterable<Model>
     ): List<Model>
 
 

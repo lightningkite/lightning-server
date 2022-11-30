@@ -29,7 +29,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         ).map { permissions.mask(it) }
     }
 
-    override suspend fun insert(models: List<Model>): List<Model> {
+    override suspend fun insert(models: Iterable<Model>): List<Model> {
         val passingModels = models.filter { permissions.create(it) }
         return wraps.insertMany(passingModels).map { permissions.mask(it) }
     }
