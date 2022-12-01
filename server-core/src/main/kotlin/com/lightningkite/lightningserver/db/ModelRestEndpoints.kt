@@ -32,6 +32,20 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         all.add(this)
     }
 
+    val default = (info as? ModelInfoWithDefault<USER, T, ID>)?.let {
+        get("_default_").typed(
+            authInfo = info.serialization.authInfo,
+            inputType = Unit.serializer(),
+            outputType = info.serialization.serializer,
+            summary = "Default",
+            description = "Gets the default ${modelName}.",
+            errorCases = listOf(),
+            implementation = { user: USER, input: Unit ->
+                info.defaultItem(user)
+            }
+        )
+    }
+
     val list = get.typed(
         authInfo = info.serialization.authInfo,
         inputType = Query.serializer(info.serialization.serializer),

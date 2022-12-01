@@ -110,7 +110,7 @@ abstract class Serialization {
 
     init {
         handler(FormDataHandler { properties })
-        handler(JsonFormatHandler { json })
+        handler(JsonFormatHandler(json = { json }, jsonWithoutDefaults = { jsonWithoutDefaults }))
         handler(StringFormatHandler({ csv }, ContentType.Text.CSV))
         handler(BinaryFormatHandler({ cbor }, ContentType.Application.Cbor))
         handler(BinaryFormatHandler({

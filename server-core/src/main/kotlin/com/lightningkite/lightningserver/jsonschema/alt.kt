@@ -310,15 +310,13 @@ class JsonSchemaBuilder(val json: Json) {
                         desc.getElementName(it) to get(childSerializers[it]).copy(
                             title = desc.getElementName(it).humanize()
                         ).applyAnnotations(desc.getElementAnnotations(it))
-                    },
-                    additionalProperties = JsonSchemaType(type = (JsonType2.NULL))
+                    }
                 ).applyAnnotations(annos)
             }
 
             StructureKind.OBJECT -> JsonSchemaType(
                 type = (JsonType2.OBJECT),
-                properties = mapOf(),
-                additionalProperties = JsonSchemaType(type = (JsonType2.NULL))
+                properties = mapOf()
             ).applyAnnotations(annos)
 
             PolymorphicKind.SEALED -> TODO()/*JsonSchemaType(
