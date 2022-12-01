@@ -27,6 +27,7 @@ val globalJson by lazy {
  * Represents the type of a json type
  */
 enum class JsonType(jsonType: String) {
+
   /**
    * Represents the json array type
    */

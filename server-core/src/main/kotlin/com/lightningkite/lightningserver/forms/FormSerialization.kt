@@ -280,4 +280,3 @@ class HtmlSerializer(val serializersModule: SerializersModule = EmptySerializers
 //    }
 //}
 
-fun String.humanize(): String = this

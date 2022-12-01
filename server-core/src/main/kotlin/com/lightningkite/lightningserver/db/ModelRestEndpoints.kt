@@ -21,10 +21,15 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     val info: ModelInfo<USER, T, ID>
 ) : ServerPathGroup(path) {
 
+    companion object {
+        val all = HashSet<ModelRestEndpoints<*, *, *>>()
+    }
+
     val modelName = info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
 
     init {
         path.docName = modelName
+        all.add(this)
     }
 
     val list = get.typed(

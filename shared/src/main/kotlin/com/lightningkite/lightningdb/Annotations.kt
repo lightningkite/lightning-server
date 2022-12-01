@@ -8,12 +8,28 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlin.reflect.KClass
 
 /**
- * Format, passed onto schema
+ * Which fields are text searched in the admin
  */
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-annotation class Watchable()
+annotation class AdminSearchFields(val fields: Array<String>)
+
+/**
+ * Which fields are columns in the admin
+ */
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS)
+annotation class AdminTableColumns(val fields: Array<String>)
+
+/**
+ * Which fields are used to create a title in the admin
+ */
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS)
+annotation class AdminTitleFields(val fields: Array<String>)
 
 /**
  * Format, passed onto schema
@@ -81,6 +97,22 @@ annotation class JsonSchemaDefinition(val id: String)
 annotation class JsonSchemaNoDefinition
 
 /**
+ * A display name of the item in question.
+ */
+@SerialInfo
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class DisplayName(val text: String)
+
+/**
+ * A display name of the item in question.
+ */
+@SerialInfo
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class MimeType(val mime: String)
+
+/**
  * A description of the item in question.
  */
 @SerialInfo
@@ -113,7 +145,7 @@ annotation class StoragePrefix(val prefix: String)
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 annotation class References(
-    @get:JvmName("grabTarget") val target: KClass<*>
+    val references: KClass<*>
 )
 
 

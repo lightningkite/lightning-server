@@ -39,6 +39,14 @@ abstract class Serialization {
         Json {
             ignoreUnknownKeys = true
             serializersModule = module
+            encodeDefaults = true
+        }
+    }
+    var jsonWithoutDefaults: Json by SetOnce {
+        Json {
+            ignoreUnknownKeys = true
+            serializersModule = module
+            encodeDefaults = false
         }
     }
     var csv: Csv by SetOnce {
@@ -64,6 +72,7 @@ abstract class Serialization {
         Cbor {
             ignoreUnknownKeys = true
             serializersModule = module
+            encodeDefaults = true
         }
     }
     var javaData: JavaData by SetOnce {
