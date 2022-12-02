@@ -31,11 +31,11 @@ data class ServerHealth(
 
     @Serializable
     data class Memory(
-        val maxMem: Long,
-        val totalMemory: Long,
-        val freeMemory: Long,
+        val max: Long,
+        val total: Long,
+        val free: Long,
         val systemAllocated: Long,
-        val memUsagePercent: Float,
+        val usage: Float,
     ) {
     }
 }

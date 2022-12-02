@@ -31,6 +31,10 @@ data class HttpResponse(
             status = HttpStatus.TemporaryRedirect,
             headers = { set(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)); headers() },
         )
+        fun pathMovedOld(to: String, headers: HttpHeaders.Builder.()->Unit = {}) = HttpResponse(
+            status = HttpStatus.Found,
+            headers = { set(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)); headers() },
+        )
         fun pathMovedPermanently(to: String, headers: HttpHeaders.Builder.()->Unit = {}) = HttpResponse(
             status = HttpStatus.PermanentRedirect,
             headers = { set(HttpHeader.Location, generalSettings().absolutePathAdjustment(to)); headers() },

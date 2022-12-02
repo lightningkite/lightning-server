@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.demo
 
+import com.lightningkite.kotlinercli.cli
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.aws.terraformAws
@@ -16,14 +17,24 @@ import java.io.File
 import java.time.Instant
 import java.util.*
 
-fun main(vararg args: String) {
+fun setup() {
     Server
+}
+
+private fun serve() {
     loadSettings(File("settings.json"))
     runServer(LocalPubSub, LocalCache)
+}
 
-//    println(Documentable.kotlinApi("test"))
+fun terraform() {
+    Server
+    terraformAws("com.lightningkite.lightningserver.demo.AwsHandler", "demo", File("demo/terraform"))
+}
 
-//    terraformAws("com.lightningkite.lightningserver.demo.AwsHandler", "demo", File("demo/terraform"))
-
-//    println(buildString { terraformAzure("demo", this) })
+fun main(vararg args: String) {
+    cli(
+        arguments = args,
+        setup = ::setup,
+        available = listOf(::serve, ::terraform),
+    )
 }

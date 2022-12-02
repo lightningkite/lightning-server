@@ -27,18 +27,18 @@ data class ServerHealth(
 
     @Serializable
     data class Memory(
-        val maxMem: Long,
-        val totalMemory: Long,
-        val freeMemory: Long,
+        val max: Long,
+        val total: Long,
+        val free: Long,
         val systemAllocated: Long,
-        val memUsagePercent: Float,
+        val usage: Float,
     ) {
         constructor() : this(
-            maxMem = Runtime.getRuntime().maxMemory(),
-            totalMemory = Runtime.getRuntime().totalMemory(),
-            freeMemory = Runtime.getRuntime().freeMemory(),
+            max = Runtime.getRuntime().maxMemory(),
+            total = Runtime.getRuntime().totalMemory(),
+            free = Runtime.getRuntime().freeMemory(),
             systemAllocated = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory(),
-            memUsagePercent = ((((Runtime.getRuntime().totalMemory() - Runtime.getRuntime()
+            usage = ((((Runtime.getRuntime().totalMemory() - Runtime.getRuntime()
                 .freeMemory()).toFloat() / Runtime.getRuntime().maxMemory().toFloat() * 100f) * 100).toInt()) / 100f,
         )
     }

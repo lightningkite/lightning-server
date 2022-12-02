@@ -11,6 +11,10 @@
     imports: [ LightningServer ]
 
 - id: com.lightningkite.lightningdb.ServerFile
+  type: call
+  template: '~0~'
+
+- id: com.lightningkite.lightningdb.ServerFile
   type: type
   template: 'String'
 
