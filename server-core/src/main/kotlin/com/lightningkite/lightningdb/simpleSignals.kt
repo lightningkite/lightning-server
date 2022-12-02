@@ -40,21 +40,21 @@ fun <Model : Any> FieldCollection<Model>.preDelete(
     onDelete: suspend (Model)->Unit
 ): FieldCollection<Model> = object: FieldCollection<Model> by this@preDelete {
     override val wraps = this@preDelete
-    override suspend fun deleteOne(condition: Condition<Model>): Model? {
-        wraps.find(condition).collect(FlowCollector(onDelete))
-        return wraps.deleteOne(condition)
+    override suspend fun deleteOne(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? {
+        wraps.find(condition, limit = 1, orderBy = orderBy).collect(FlowCollector(onDelete))
+        return wraps.deleteOne(condition, orderBy)
     }
     override suspend fun deleteMany(condition: Condition<Model>): List<Model> {
-        wraps.find(condition, limit = 1).collect(FlowCollector(onDelete))
+        wraps.find(condition).collect(FlowCollector(onDelete))
         return wraps.deleteMany(condition)
     }
     override suspend fun deleteManyIgnoringOld(condition: Condition<Model>): Int {
         wraps.find(condition).collect(FlowCollector(onDelete))
         return wraps.deleteManyIgnoringOld(condition)
     }
-    override suspend fun deleteOneIgnoringOld(condition: Condition<Model>): Boolean {
-        wraps.find(condition, limit = 1).collect(FlowCollector(onDelete))
-        return wraps.deleteOneIgnoringOld(condition)
+    override suspend fun deleteOneIgnoringOld(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Boolean {
+        wraps.find(condition, limit = 1, orderBy = orderBy).collect(FlowCollector(onDelete))
+        return wraps.deleteOneIgnoringOld(condition, orderBy)
     }
 }
 
@@ -65,14 +65,14 @@ fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.postDelete(
     override suspend fun deleteManyIgnoringOld(condition: Condition<Model>): Int {
         return wraps.deleteMany(condition).also { it.forEach { onDelete(it) } }.size
     }
-    override suspend fun deleteOneIgnoringOld(condition: Condition<Model>): Boolean {
-        return wraps.deleteOne(condition)?.also { onDelete(it) } != null
+    override suspend fun deleteOneIgnoringOld(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Boolean {
+        return wraps.deleteOne(condition, orderBy)?.also { onDelete(it) } != null
     }
     override suspend fun deleteMany(condition: Condition<Model>): List<Model> {
         return wraps.deleteMany(condition).also { it.forEach { onDelete(it) } }
     }
-    override suspend fun deleteOne(condition: Condition<Model>): Model? {
-        return wraps.deleteOne(condition)?.also { onDelete(it) }
+    override suspend fun deleteOne(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? {
+        return wraps.deleteOne(condition, orderBy)?.also { onDelete(it) }
     }
 }
 fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.postChange(
@@ -80,8 +80,8 @@ fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.postChange(
 ): FieldCollection<Model> = object: FieldCollection<Model> by this@postChange {
     override val wraps = this@postChange
 
-    override suspend fun replaceOne(condition: Condition<Model>, model: Model): EntryChange<Model> =
-        wraps.replaceOne(condition, model).also { if(it.old != null && it.new != null) changed(it.old!!, it.new!!) }
+    override suspend fun replaceOne(condition: Condition<Model>, model: Model, orderBy: List<SortPart<Model>>): EntryChange<Model> =
+        wraps.replaceOne(condition, model, orderBy).also { if(it.old != null && it.new != null) changed(it.old!!, it.new!!) }
 
     override suspend fun upsertOne(
         condition: Condition<Model>,
@@ -90,8 +90,12 @@ fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.postChange(
     ): EntryChange<Model>  =
         wraps.upsertOne(condition, modification, model).also { if(it.old != null && it.new != null) changed(it.old!!, it.new!!) }
 
-    override suspend fun updateOne(condition: Condition<Model>, modification: Modification<Model>): EntryChange<Model>  =
-        wraps.updateOne(condition, modification).also { if(it.old != null && it.new != null) changed(it.old!!, it.new!!) }
+    override suspend fun updateOne(
+        condition: Condition<Model>,
+        modification: Modification<Model>,
+        orderBy: List<SortPart<Model>>
+    ): EntryChange<Model>  =
+        wraps.updateOne(condition, modification, orderBy).also { if(it.old != null && it.new != null) changed(it.old!!, it.new!!) }
 
     override suspend fun updateMany(
         condition: Condition<Model>,
@@ -103,7 +107,14 @@ fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.postChange(
         }
     }
 
-    override suspend fun replaceOneIgnoringResult(condition: Condition<Model>, model: Model): Boolean = replaceOne(condition, model).new != null
+    override suspend fun replaceOneIgnoringResult(
+        condition: Condition<Model>,
+        model: Model,
+        orderBy: List<SortPart<Model>>
+    ): Boolean = replaceOne(
+        condition,
+        model
+    ).new != null
 
     override suspend fun upsertOneIgnoringResult(
         condition: Condition<Model>,
@@ -113,7 +124,8 @@ fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.postChange(
 
     override suspend fun updateOneIgnoringResult(
         condition: Condition<Model>,
-        modification: Modification<Model>
+        modification: Modification<Model>,
+        orderBy: List<SortPart<Model>>
     ): Boolean = updateOne(condition, modification).new != null
 
     override suspend fun updateManyIgnoringResult(condition: Condition<Model>, modification: Modification<Model>): Int = updateMany(condition, modification).changes.size

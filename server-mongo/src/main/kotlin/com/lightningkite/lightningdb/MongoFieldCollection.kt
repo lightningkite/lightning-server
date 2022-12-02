@@ -8,13 +8,10 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.*
 import org.bson.BsonDocument
-import org.bson.Document
 import org.bson.conversions.Bson
 import org.litote.kmongo.coroutine.CoroutineCollection
 import org.litote.kmongo.coroutine.aggregate
-import org.litote.kmongo.descending
 import org.litote.kmongo.group
 import org.litote.kmongo.match
 import java.util.concurrent.TimeUnit
@@ -27,6 +24,13 @@ class MongoFieldCollection<Model : Any>(
     val serializer: KSerializer<Model>,
     val mongo: CoroutineCollection<Model>,
 ) : AbstractSignalFieldCollection<Model>() {
+
+    private fun sort(orderBy: List<SortPart<Model>>): Bson = Sorts.orderBy(orderBy.map {
+        if (it.ascending)
+            Sorts.ascending(it.field.property.name)
+        else
+            Sorts.descending(it.field.property.name)
+    })
 
     override suspend fun find(
         condition: Condition<Model>,
@@ -50,12 +54,7 @@ class MongoFieldCollection<Model : Any>(
                 if (orderBy.isEmpty())
                     it
                 else
-                    it.sort(Sorts.orderBy(orderBy.map {
-                        if (it.ascending)
-                            Sorts.ascending(it.field.property.name)
-                        else
-                            Sorts.descending(it.field.property.name)
-                    }))
+                    it.sort(sort(orderBy))
             }
             .toFlow()
     }
@@ -138,16 +137,18 @@ class MongoFieldCollection<Model : Any>(
         return asList
     }
 
-    override suspend fun replaceOneImpl(condition: Condition<Model>, model: Model): EntryChange<Model> {
+    override suspend fun replaceOneImpl(condition: Condition<Model>, model: Model, orderBy: List<SortPart<Model>>): EntryChange<Model> {
         prepare.await()
-        return updateOne(condition, Modification.Assign(model))
+        return updateOne(condition, Modification.Assign(model), orderBy)
     }
 
     override suspend fun replaceOneIgnoringResultImpl(
         condition: Condition<Model>,
         model: Model,
+        orderBy: List<SortPart<Model>>,
     ): Boolean {
         prepare.await()
+        if(orderBy.isNotEmpty()) return updateOneIgnoringResultImpl(condition, Modification.Assign(model), orderBy)
         return mongo.replaceOne(condition.bson(), model).matchedCount != 0L
     }
 
@@ -194,6 +195,7 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun updateOneImpl(
         condition: Condition<Model>,
         modification: Modification<Model>,
+        orderBy: List<SortPart<Model>>,
     ): EntryChange<Model> {
         prepare.await()
         val m = modification.bson()
@@ -202,6 +204,7 @@ class MongoFieldCollection<Model : Any>(
             m.document,
             FindOneAndUpdateOptions()
                 .returnDocument(ReturnDocument.BEFORE)
+                .let { if(orderBy.isEmpty()) it else it.sort(sort(orderBy)) }
                 .upsert(m.options.isUpsert)
                 .bypassDocumentValidation(m.options.bypassDocumentValidation)
                 .collation(m.options.collation)
@@ -216,11 +219,8 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun updateOneIgnoringResultImpl(
         condition: Condition<Model>,
         modification: Modification<Model>,
-    ): Boolean {
-        prepare.await()
-        val m = modification.bson()
-        return mongo.updateOne(condition.bson(), m.document, m.options).matchedCount != 0L
-    }
+        orderBy: List<SortPart<Model>>,
+    ): Boolean = updateOneImpl(condition, modification, orderBy).new != null
 
     override suspend fun updateManyImpl(
         condition: Condition<Model>,
@@ -252,9 +252,11 @@ class MongoFieldCollection<Model : Any>(
         ).matchedCount.toInt()
     }
 
-    override suspend fun deleteOneImpl(condition: Condition<Model>): Model? {
+    override suspend fun deleteOneImpl(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? {
         prepare.await()
-        return mongo.withDocumentClass<BsonDocument>().find(condition.bson()).toFlow().firstOrNull()?.let {
+        return mongo.withDocumentClass<BsonDocument>().find(condition.bson())
+            .let { if(orderBy.isEmpty()) it else it.sort(sort(orderBy)) }
+            .limit(1).toFlow().firstOrNull()?.let {
             val id = it["_id"]
             mongo.deleteOne(Filters.eq("_id", id))
             MongoDatabase.bson.load(serializer, it)
@@ -263,7 +265,9 @@ class MongoFieldCollection<Model : Any>(
 
     override suspend fun deleteOneIgnoringOldImpl(
         condition: Condition<Model>,
+        orderBy: List<SortPart<Model>>,
     ): Boolean {
+        if(orderBy.isNotEmpty()) return deleteOneImpl(condition, orderBy) != null
         prepare.await()
         return mongo.deleteOne(condition.bson()).deletedCount > 0
     }

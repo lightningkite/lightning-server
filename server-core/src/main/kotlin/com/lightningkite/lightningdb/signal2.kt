@@ -35,16 +35,22 @@ inline fun <Model : Any> FieldCollection<Model>.interceptReplace(crossinline int
             model: Model
         ): Boolean = wraps.upsertOneIgnoringResult(condition, modification, interceptor(model))
 
-        override suspend fun replaceOne(condition: Condition<Model>, model: Model): EntryChange<Model> =
+        override suspend fun replaceOne(condition: Condition<Model>, model: Model, orderBy: List<SortPart<Model>>): EntryChange<Model> =
             wraps.replaceOne(
                 condition,
-                interceptor(model)
+                interceptor(model),
+                orderBy
             )
 
-        override suspend fun replaceOneIgnoringResult(condition: Condition<Model>, model: Model): Boolean =
+        override suspend fun replaceOneIgnoringResult(
+            condition: Condition<Model>,
+            model: Model,
+            orderBy: List<SortPart<Model>>
+        ): Boolean =
             wraps.replaceOneIgnoringResult(
                 condition,
-                interceptor(model)
+                interceptor(model),
+                orderBy
             )
     }
 
@@ -65,13 +71,15 @@ inline fun <Model : Any> FieldCollection<Model>.interceptModification(crossinlin
 
         override suspend fun updateOne(
             condition: Condition<Model>,
-            modification: Modification<Model>
-        ): EntryChange<Model> = wraps.updateOne(condition, interceptor(modification))
+            modification: Modification<Model>,
+            orderBy: List<SortPart<Model>>
+        ): EntryChange<Model> = wraps.updateOne(condition, interceptor(modification), orderBy)
 
         override suspend fun updateOneIgnoringResult(
             condition: Condition<Model>,
-            modification: Modification<Model>
-        ): Boolean = wraps.updateOneIgnoringResult(condition, interceptor(modification))
+            modification: Modification<Model>,
+            orderBy: List<SortPart<Model>>
+        ): Boolean = wraps.updateOneIgnoringResult(condition, interceptor(modification), orderBy)
 
         override suspend fun updateMany(
             condition: Condition<Model>,

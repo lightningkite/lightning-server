@@ -129,12 +129,12 @@ class PostgresCollection<T : Any>(
         return models.toList()
     }
 
-    override suspend fun replaceOneImpl(condition: Condition<T>, model: T): EntryChange<T> {
-        return updateOneImpl(condition, Modification.Assign(model))
+    override suspend fun replaceOneImpl(condition: Condition<T>, model: T, orderBy: List<SortPart<T>>): EntryChange<T> {
+        return updateOneImpl(condition, Modification.Assign(model), orderBy)
     }
 
-    override suspend fun replaceOneIgnoringResultImpl(condition: Condition<T>, model: T): Boolean {
-        return updateOneIgnoringResultImpl(condition, Modification.Assign(model))
+    override suspend fun replaceOneIgnoringResultImpl(condition: Condition<T>, model: T, orderBy: List<SortPart<T>>): Boolean {
+        return updateOneIgnoringResultImpl(condition, Modification.Assign(model), orderBy)
     }
 
     override suspend fun upsertOneImpl(condition: Condition<T>, modification: Modification<T>, model: T): EntryChange<T> {
@@ -158,11 +158,16 @@ class PostgresCollection<T : Any>(
                 insertImpl(listOf(model))
                 false
             } else
-                updateOneIgnoringResultImpl(condition, modification)
+                updateOneIgnoringResultImpl(condition, modification, listOf())
         }
     }
 
-    override suspend fun updateOneImpl(condition: Condition<T>, modification: Modification<T>): EntryChange<T> {
+    override suspend fun updateOneImpl(
+        condition: Condition<T>,
+        modification: Modification<T>,
+        orderBy: List<SortPart<T>>
+    ): EntryChange<T> {
+        if(orderBy.isNotEmpty()) throw UnsupportedOperationException()
         return t {
             val old = table.updateReturningOld(
                 where = { condition(condition, serializer, table).asOp() },
@@ -177,7 +182,12 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun updateOneIgnoringResultImpl(condition: Condition<T>, modification: Modification<T>): Boolean {
+    override suspend fun updateOneIgnoringResultImpl(
+        condition: Condition<T>,
+        modification: Modification<T>,
+        orderBy: List<SortPart<T>>
+    ): Boolean {
+        if(orderBy.isNotEmpty()) throw UnsupportedOperationException()
         return t {
             table.update(
                 where = { condition(condition, serializer, table).asOp() },
@@ -216,7 +226,8 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun deleteOneImpl(condition: Condition<T>): T? {
+    override suspend fun deleteOneImpl(condition: Condition<T>, orderBy: List<SortPart<T>>): T? {
+        if(orderBy.isNotEmpty()) throw UnsupportedOperationException()
         return t {
             table.deleteReturningWhere(
                 limit = 1,
@@ -225,7 +236,8 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun deleteOneIgnoringOldImpl(condition: Condition<T>): Boolean {
+    override suspend fun deleteOneIgnoringOldImpl(condition: Condition<T>, orderBy: List<SortPart<T>>): Boolean {
+        if(orderBy.isNotEmpty()) throw UnsupportedOperationException()
         return t {
             table.deleteWhere(
                 limit = 1,

@@ -9,7 +9,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.serialization.serializer
 import java.time.Instant
-import kotlin.coroutines.CoroutineContext
 
 @LightningServerDsl
 inline fun <reified INPUT> task(name: String, noinline implementation: suspend CoroutineScope.(INPUT)->Unit) = task(name, serializer<INPUT>(), implementation)

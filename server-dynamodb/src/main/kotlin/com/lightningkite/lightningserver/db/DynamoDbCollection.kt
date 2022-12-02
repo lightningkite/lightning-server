@@ -77,11 +77,15 @@ class DynamoDbCollection<T : Any>(
         return models.toList()
     }
 
-    override suspend fun replaceOneImpl(condition: Condition<T>, model: T): EntryChange<T> {
+    override suspend fun replaceOneImpl(condition: Condition<T>, model: T, orderBy: List<SortPart<T>>): EntryChange<T> {
         TODO("Not yet implemented")
     }
 
-    override suspend fun replaceOneIgnoringResultImpl(condition: Condition<T>, model: T): Boolean {
+    override suspend fun replaceOneIgnoringResultImpl(
+        condition: Condition<T>,
+        model: T,
+        orderBy: List<SortPart<T>>,
+    ): Boolean {
         TODO("Not yet implemented")
     }
 
@@ -118,7 +122,7 @@ class DynamoDbCollection<T : Any>(
         }
     }
 
-    override suspend fun updateOneImpl(condition: Condition<T>, modification: Modification<T>): EntryChange<T> {
+    override suspend fun updateOneImpl(condition: Condition<T>, modification: Modification<T>, orderBy: List<SortPart<T>>): EntryChange<T> {
         val m = modification.dynamo(serializer)
         return perKey(condition, limit = 1) { c, key ->
             val result = client.updateItem {
@@ -135,7 +139,7 @@ class DynamoDbCollection<T : Any>(
         }.singleOrNull() ?: EntryChange(null, null)
     }
 
-    override suspend fun updateOneIgnoringResultImpl(condition: Condition<T>, modification: Modification<T>): Boolean {
+    override suspend fun updateOneIgnoringResultImpl(condition: Condition<T>, modification: Modification<T>, orderBy: List<SortPart<T>>): Boolean {
         val m = modification.dynamo(serializer)
         return perKey(condition, limit = 1) { c, key ->
             client.updateItem {
@@ -180,7 +184,7 @@ class DynamoDbCollection<T : Any>(
         return changed
     }
 
-    override suspend fun deleteOneImpl(condition: Condition<T>): T? {
+    override suspend fun deleteOneImpl(condition: Condition<T>, orderBy: List<SortPart<T>>): T? {
         return perKey(condition, limit = 1) { c, key ->
             val result = client.deleteItem {
                 it.tableName(tableName)
@@ -192,7 +196,7 @@ class DynamoDbCollection<T : Any>(
         }.singleOrNull()
     }
 
-    override suspend fun deleteOneIgnoringOldImpl(condition: Condition<T>): Boolean {
+    override suspend fun deleteOneIgnoringOldImpl(condition: Condition<T>, orderBy: List<SortPart<T>>): Boolean {
         return perKey(condition, limit = 1) { c, key ->
             client.deleteItem {
                 it.tableName(tableName)
