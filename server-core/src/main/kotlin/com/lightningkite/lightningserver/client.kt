@@ -8,6 +8,6 @@ import io.ktor.serialization.kotlinx.json.*
 
 val client = HttpClient(CIO) {
     install(ContentNegotiation) {
-        json(Serialization.json)
+        json(Serialization.jsonWithoutDefaults)
     }
 }

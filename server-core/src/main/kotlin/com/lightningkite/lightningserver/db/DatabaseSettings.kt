@@ -26,13 +26,23 @@ import kotlin.reflect.KTypeProjection
 @Serializable
 data class DatabaseSettings(
     val url: String = "ram-unsafe-persist://${File("./local/database").absolutePath}",
-    val databaseName: String = "default"
-): ()->Database {
+    val databaseName: String = "default",
+) : () -> Database {
 
-    companion object: Pluggable<DatabaseSettings, Database>() {
+    companion object : Pluggable<DatabaseSettings, Database>() {
         init {
             register("ram") { InMemoryDatabase() }
-            register("ram-preload") { InMemoryDatabase(Serialization.Internal.json.parseToJsonElement(File(it.url.substringAfter("://")).readText()) as? JsonObject) }
+            register("ram-preload") {
+                InMemoryDatabase(
+                    Serialization.Internal.json.parseToJsonElement(
+                        File(
+                            it.url.substringAfter(
+                                "://"
+                            )
+                        ).readText()
+                    ) as? JsonObject
+                )
+            }
             register("ram-unsafe-persist") { InMemoryUnsafePersistenceDatabase(File(it.url.substringAfter("://"))) }
         }
     }
@@ -62,40 +72,55 @@ data class DatabaseSettings(
 //    }
 }
 
-class InMemoryDatabase(val premadeData: JsonObject? = null): Database {
+class InMemoryDatabase(val premadeData: JsonObject? = null) : Database {
     val collections = HashMap<String, FieldCollection<*>>()
+
     @Suppress("UNCHECKED_CAST")
-    override fun <T : Any> collection(type: KType, name: String): FieldCollection<T>
-            = collections.getOrPut(name) {
+    override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> = collections.getOrPut(name) {
         val made = InMemoryFieldCollection<T>()
         premadeData?.get(name)?.let {
-            val data = Serialization.Internal.json.decodeFromJsonElement(ListSerializer(Serialization.Internal.json.serializersModule.serializer(type) as KSerializer<T>), it)
+            val data = Serialization.Internal.json.decodeFromJsonElement(
+                ListSerializer(
+                    Serialization.Internal.json.serializersModule.serializer(type) as KSerializer<T>
+                ), it
+            )
             made.data.addAll(data)
         }
         made
     } as FieldCollection<T>
 
     fun drop() {
-        collections.forEach{
+        collections.forEach {
             (it.value as InMemoryFieldCollection).data.clear()
         }
     }
 }
 
-class InMemoryUnsafePersistenceDatabase(val folder: File): Database {
+class InMemoryUnsafePersistenceDatabase(val folder: File) : Database {
     init {
         folder.mkdirs()
     }
+
     val collections = HashMap<String, FieldCollection<*>>()
+
     @Suppress("UNCHECKED_CAST")
-    override fun <T : Any> collection(type: KType, name: String): FieldCollection<T>
-            = collections.getOrPut(name) {
-        InMemoryUnsafePersistentFieldCollection(Serialization.Internal.json, Serialization.Internal.json.serializersModule.serializer(type) as KSerializer<T>, folder.resolve(name))
-    } as FieldCollection<T>
+    override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> = synchronized(collections) {
+        collections.getOrPut(name) {
+            val oldStyle = folder.resolve(name)
+            val storage = folder.resolve("$name.json")
+            if (oldStyle.exists() && !storage.exists())
+                oldStyle.copyTo(storage, overwrite = true)
+            InMemoryUnsafePersistentFieldCollection(
+                Serialization.Internal.json,
+                Serialization.Internal.json.serializersModule.serializer(type) as KSerializer<T>,
+                storage
+            )
+        } as FieldCollection<T>
+    }
 
 
     fun drop() {
-        collections.forEach{
+        collections.forEach {
             (it.value as InMemoryFieldCollection).data.clear()
         }
     }
