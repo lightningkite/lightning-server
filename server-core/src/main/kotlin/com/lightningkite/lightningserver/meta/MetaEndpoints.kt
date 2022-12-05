@@ -64,7 +64,7 @@ class MetaEndpoints<USER>(
         """.trimIndent() + original.substringAfterLast("</body>"))
             .replace("/static/", admin.path.toString() + "/static/")
         return HttpResponse.html(content = page, headers = {
-            set("Content-Security-Policy", "script-src ${generalSettings().publicUrl}/ https://lightning-server-admin.s3.us-west-2.amazonaws.com/")
+            set("Content-Security-Policy", "script-src 'unsafe-eval' ${generalSettings().publicUrl}/ https://lightning-server-admin.s3.us-west-2.amazonaws.com/")
         })
     }
     val admin = path("admin/").get.handler {
