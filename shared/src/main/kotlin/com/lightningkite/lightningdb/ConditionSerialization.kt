@@ -83,7 +83,6 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): MySealedClassSerializerI
                 }
             }
             if (inner is GeneratedSerializer<*> && inner.descriptor.kind == StructureKind.CLASS && inner !is MySealedClassSerializerInterface) {
-                println("Is $inner a MySealedClassSerializer? ${inner is MySealedClassSerializer}")
                 val childSerializers = inner.childSerializers()
                 val fields = try {inner.attemptGrabFields() } catch(e: Exception) { throw Exception("Failed while getting inner fields from ${inner}", e)}
                 for (index in 0 until inner.descriptor.elementsCount) {
