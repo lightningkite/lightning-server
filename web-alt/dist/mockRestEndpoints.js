@@ -15,7 +15,10 @@ const Modification_1 = require("./Modification");
 const otherModels_1 = require("./otherModels");
 function mockRestEndpointFunctions(items, label) {
     return {
-        query(input, requesterToken) {
+        default(userToken) {
+            return Promise.reject(new Error("Not implemented"));
+        },
+        query(input, userToken) {
             const { limit, skip = 0, orderBy, condition } = input;
             const filteredItems = condition
                 ? items.filter((item) => (0, Condition_1.evaluateCondition)(condition, item))
@@ -48,7 +51,7 @@ function mockRestEndpointFunctions(items, label) {
             console.info(label, "query", { query: input, result });
             return Promise.resolve(result);
         },
-        detail(id, requesterToken) {
+        detail(id, userToken) {
             const result = items.find((item) => item._id === id);
             console.info(label, "detail", { id, result });
             return new Promise((resolve, reject) => {
@@ -58,17 +61,17 @@ function mockRestEndpointFunctions(items, label) {
                     reject();
             });
         },
-        insertBulk(input, requesterToken) {
+        insertBulk(input, userToken) {
             input.forEach((item) => items.push(item));
             console.info(label, "insertBulk", { input });
             return Promise.resolve(input);
         },
-        insert(input, requesterToken) {
+        insert(input, userToken) {
             items.push(input);
             console.info(label, "insert", { input });
             return Promise.resolve(input);
         },
-        upsert(id, input, requesterToken) {
+        upsert(id, input, userToken) {
             console.info(label, "upsert", { id, input });
             const existingItemIndex = items.findIndex((item) => item._id === id);
             if (existingItemIndex >= 0) {
@@ -79,12 +82,12 @@ function mockRestEndpointFunctions(items, label) {
             }
             return Promise.resolve(input);
         },
-        bulkReplace(input, requesterToken) {
+        bulkReplace(input, userToken) {
             console.info(label, "bulkReplace", { input });
-            input.forEach((item) => this.replace(item._id, item, requesterToken));
+            input.forEach((item) => this.replace(item._id, item, userToken));
             return Promise.resolve(input);
         },
-        replace(id, input, requesterToken) {
+        replace(id, input, userToken) {
             console.info(label, "replace", { id, input });
             const existingItemIndex = items.findIndex((item) => item._id === id);
             if (existingItemIndex >= 0) {
@@ -93,17 +96,17 @@ function mockRestEndpointFunctions(items, label) {
             }
             return Promise.reject();
         },
-        bulkModify(input, requesterToken) {
+        bulkModify(input, userToken) {
             return __awaiter(this, void 0, void 0, function* () {
                 console.info(label, "bulkModify", { input });
                 const filteredItems = items.filter((item) => (0, Condition_1.evaluateCondition)(input.condition, item));
                 return filteredItems.length;
             });
         },
-        modifyWithDiff(id, input, requesterToken) {
+        modifyWithDiff(id, input, userToken) {
             return Promise.resolve({});
         },
-        modify(id, input, requesterToken) {
+        modify(id, input, userToken) {
             console.info(label, "modify", { id, input });
             const existingItemIndex = items.findIndex((item) => item._id === id);
             if (existingItemIndex < 0)
@@ -112,7 +115,7 @@ function mockRestEndpointFunctions(items, label) {
             items[existingItemIndex] = newItem;
             return Promise.resolve(newItem);
         },
-        bulkDelete(input, requesterToken) {
+        bulkDelete(input, userToken) {
             console.info(label, "bulkDelete", { input });
             if (!items)
                 return Promise.reject();
@@ -120,7 +123,7 @@ function mockRestEndpointFunctions(items, label) {
             items = items.filter((item) => !(0, Condition_1.evaluateCondition)(input, item));
             return Promise.resolve(previousLength - items.length);
         },
-        delete(id, requesterToken) {
+        delete(id, userToken) {
             console.info(label, "delete", { id });
             const existingItemIndex = items.findIndex((item) => item._id === id);
             if (existingItemIndex >= 0) {
@@ -131,11 +134,11 @@ function mockRestEndpointFunctions(items, label) {
                 return Promise.reject();
             }
         },
-        count(input, requesterToken) {
+        count(input, userToken) {
             console.info(label, "count", { input });
-            return this.query({ condition: input }, requesterToken).then((it) => it.length);
+            return this.query({ condition: input }, userToken).then((it) => it.length);
         },
-        groupCount(input, requesterToken) {
+        groupCount(input, userToken) {
             const { condition, groupBy } = input;
             const filteredItems = condition
                 ? items.filter((item) => (0, Condition_1.evaluateCondition)(condition, item))
@@ -150,7 +153,7 @@ function mockRestEndpointFunctions(items, label) {
             console.info(label, "groupCount", { input, result });
             return Promise.resolve(result);
         },
-        aggregate(input, requesterToken) {
+        aggregate(input, userToken) {
             const { condition, aggregate, property } = input;
             const filteredItems = condition
                 ? items.filter((item) => (0, Condition_1.evaluateCondition)(condition, item))
@@ -159,7 +162,7 @@ function mockRestEndpointFunctions(items, label) {
             console.info(label, "aggregate", { input, result });
             return Promise.resolve(result);
         },
-        groupAggregate(input, requesterToken) {
+        groupAggregate(input, userToken) {
             const { aggregate, condition, property, groupBy } = input;
             const filteredItems = condition
                 ? items.filter((item) => (0, Condition_1.evaluateCondition)(condition, item))
