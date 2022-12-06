@@ -14,7 +14,7 @@ suspend fun <Model : Any>
         FieldCollection<Model>.insertOne(model: Model): Model? = insert(listOf(model)).firstOrNull()
 
 suspend fun <Model : Any>
-        FieldCollection<Model>.insertMany(models: List<Model>): List<Model> = insert(models)
+        FieldCollection<Model>.insertMany(models: Iterable<Model>): List<Model> = insert(models)
 
 suspend fun <Model : Any>
         FieldCollection<Model>.updateManyIgnoringResult(
@@ -67,9 +67,9 @@ suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
 
 suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
         FieldCollection<Model>.getMany(
-    ids: List<ID>
+    ids: Collection<ID>
 ): List<Model> {
-    return find(Condition.OnField(HasIdFields._id(), Condition.Inside(ids))).toList()
+    return find(Condition.OnField(HasIdFields._id(), Condition.Inside(ids.toList()))).toList()
 }
 
 

@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.metrics
 
 import com.lightningkite.lightningserver.core.serverEntryPoint
+import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -17,7 +18,7 @@ import kotlin.math.min
 interface Metrics {
     suspend fun report(events: List<MetricEvent>)
     companion object {
-        val main = setting("metrics", MetricSettings())
+        val main get() = metricsSettings
         val logger = LoggerFactory.getLogger(Metrics::class.java)
         suspend fun report(type: String, value: Double) = main().report(listOf(MetricEvent(type, serverEntryPoint()?.toString() ?: "Unknown", Instant.now(), value)))
         suspend fun <T> performance(type: String, action: suspend() -> T): T {
@@ -33,6 +34,7 @@ interface Metrics {
         }
     }
 }
+val metricsSettings = setting("metrics", MetricSettings())
 
 @OptIn(DelicateCoroutinesApi::class)
 inline fun regularlyAndOnShutdown(frequency: Duration, crossinline action: suspend () -> Unit) {

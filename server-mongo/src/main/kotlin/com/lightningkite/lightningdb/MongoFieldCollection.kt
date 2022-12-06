@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.mongodb.MongoCommandException
 import com.mongodb.client.model.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
@@ -7,8 +8,8 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.*
 import org.bson.BsonDocument
+import org.bson.conversions.Bson
 import org.litote.kmongo.coroutine.CoroutineCollection
 import org.litote.kmongo.coroutine.aggregate
 import org.litote.kmongo.group
@@ -23,6 +24,13 @@ class MongoFieldCollection<Model : Any>(
     val serializer: KSerializer<Model>,
     val mongo: CoroutineCollection<Model>,
 ) : AbstractSignalFieldCollection<Model>() {
+
+    private fun sort(orderBy: List<SortPart<Model>>): Bson = Sorts.orderBy(orderBy.map {
+        if (it.ascending)
+            Sorts.ascending(it.field.property.name)
+        else
+            Sorts.descending(it.field.property.name)
+    })
 
     override suspend fun find(
         condition: Condition<Model>,
@@ -46,12 +54,7 @@ class MongoFieldCollection<Model : Any>(
                 if (orderBy.isEmpty())
                     it
                 else
-                    it.sort(Sorts.orderBy(orderBy.map {
-                        if (it.ascending)
-                            Sorts.ascending(it.field.property.name)
-                        else
-                            Sorts.descending(it.field.property.name)
-                    }))
+                    it.sort(sort(orderBy))
             }
             .toFlow()
     }
@@ -125,24 +128,27 @@ class MongoFieldCollection<Model : Any>(
     }
 
     override suspend fun insertImpl(
-        models: List<Model>,
+        models: Iterable<Model>,
     ): List<Model> {
         prepare.await()
-        if (models.isEmpty()) return models
-        mongo.insertMany(models)
-        return models
+        if(models.count() == 0) return emptyList()
+        val asList = models.toList()
+        mongo.insertMany(asList)
+        return asList
     }
 
-    override suspend fun replaceOneImpl(condition: Condition<Model>, model: Model): EntryChange<Model> {
+    override suspend fun replaceOneImpl(condition: Condition<Model>, model: Model, orderBy: List<SortPart<Model>>): EntryChange<Model> {
         prepare.await()
-        return updateOne(condition, Modification.Assign(model))
+        return updateOne(condition, Modification.Assign(model), orderBy)
     }
 
     override suspend fun replaceOneIgnoringResultImpl(
         condition: Condition<Model>,
         model: Model,
+        orderBy: List<SortPart<Model>>,
     ): Boolean {
         prepare.await()
+        if(orderBy.isNotEmpty()) return updateOneIgnoringResultImpl(condition, Modification.Assign(model), orderBy)
         return mongo.replaceOne(condition.bson(), model).matchedCount != 0L
     }
 
@@ -189,6 +195,7 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun updateOneImpl(
         condition: Condition<Model>,
         modification: Modification<Model>,
+        orderBy: List<SortPart<Model>>,
     ): EntryChange<Model> {
         prepare.await()
         val m = modification.bson()
@@ -197,6 +204,7 @@ class MongoFieldCollection<Model : Any>(
             m.document,
             FindOneAndUpdateOptions()
                 .returnDocument(ReturnDocument.BEFORE)
+                .let { if(orderBy.isEmpty()) it else it.sort(sort(orderBy)) }
                 .upsert(m.options.isUpsert)
                 .bypassDocumentValidation(m.options.bypassDocumentValidation)
                 .collation(m.options.collation)
@@ -211,11 +219,8 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun updateOneIgnoringResultImpl(
         condition: Condition<Model>,
         modification: Modification<Model>,
-    ): Boolean {
-        prepare.await()
-        val m = modification.bson()
-        return mongo.updateOne(condition.bson(), m.document, m.options).matchedCount != 0L
-    }
+        orderBy: List<SortPart<Model>>,
+    ): Boolean = updateOneImpl(condition, modification, orderBy).new != null
 
     override suspend fun updateManyImpl(
         condition: Condition<Model>,
@@ -247,9 +252,11 @@ class MongoFieldCollection<Model : Any>(
         ).matchedCount.toInt()
     }
 
-    override suspend fun deleteOneImpl(condition: Condition<Model>): Model? {
+    override suspend fun deleteOneImpl(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? {
         prepare.await()
-        return mongo.withDocumentClass<BsonDocument>().find(condition.bson()).toFlow().firstOrNull()?.let {
+        return mongo.withDocumentClass<BsonDocument>().find(condition.bson())
+            .let { if(orderBy.isEmpty()) it else it.sort(sort(orderBy)) }
+            .limit(1).toFlow().firstOrNull()?.let {
             val id = it["_id"]
             mongo.deleteOne(Filters.eq("_id", id))
             MongoDatabase.bson.load(serializer, it)
@@ -258,7 +265,9 @@ class MongoFieldCollection<Model : Any>(
 
     override suspend fun deleteOneIgnoringOldImpl(
         condition: Condition<Model>,
+        orderBy: List<SortPart<Model>>,
     ): Boolean {
+        if(orderBy.isNotEmpty()) return deleteOneImpl(condition, orderBy) != null
         prepare.await()
         return mongo.deleteOne(condition.bson()).deletedCount > 0
     }
@@ -287,118 +296,44 @@ class MongoFieldCollection<Model : Any>(
     @OptIn(DelicateCoroutinesApi::class, ExperimentalSerializationApi::class)
     val prepare = GlobalScope.async(Dispatchers.Unconfined, start = CoroutineStart.LAZY) {
         val requireCompletion = ArrayList<Job>()
-        val seen = HashSet<SerialDescriptor>()
-        fun handleDescriptor(descriptor: SerialDescriptor) {
-            if (!seen.add(descriptor)) return
-            descriptor.annotations.forEach {
-                when (it) {
-                    is UniqueSet -> {
-                        requireCompletion += launch {
-                            mongo.ensureIndex(
-                                Sorts.ascending(it.fields.toList()),
-                                IndexOptions().unique(true).partialFilterExpression(
-                                    documentOf(*it.fields.map { it to documentOf("\$type" to descriptor.getElementDescriptor(descriptor.getElementIndex(it)).bsonType().value) }.toTypedArray())
-                                )
-                            )
-                        }
-                    }
 
-                    is IndexSet -> {
-                        launch {
-                            mongo.ensureIndex(
-                                Sorts.ascending(it.fields.toList()),
-                                IndexOptions().unique(false).background(true)
-                            )
-                        }
-                    }
-
-                    is TextIndex -> {
-                        requireCompletion += launch {
-                            mongo.ensureIndex(
-                                documentOf(*it.fields.map { it to "text" }.toTypedArray()),
-                                IndexOptions().name("${mongo.namespace.fullName}TextIndex")
-                            )
-                        }
-                    }
-
-                    is NamedUniqueSet -> {
-                        requireCompletion += launch {
-                            mongo.ensureIndex(
-                                Sorts.ascending(it.fields.toList()),
-                                IndexOptions().unique(true).name(it.indexName).partialFilterExpression(
-                                    documentOf(*it.fields.map { it to documentOf("\$type" to descriptor.getElementDescriptor(descriptor.getElementIndex(it)).bsonType().value) }.toTypedArray())
-                                )
-                            )
-                        }
-                    }
-
-                    is NamedIndexSet -> {
-                        launch {
-                            mongo.ensureIndex(
-                                Sorts.ascending(it.fields.toList()),
-                                IndexOptions().unique(false).name(it.indexName).background(true)
-                            )
-                        }
-                    }
-
-                    is NamedTextIndex -> {
-                        requireCompletion += launch {
-                            mongo.ensureIndex(documentOf(*it.fields.map { it to "text" }.toTypedArray()))
+        serializer.descriptor.annotations.filterIsInstance<TextIndex>().firstOrNull()?.let {
+            requireCompletion += launch {
+                mongo.ensureIndex(
+                    documentOf(*it.fields.map { it to "text" }.toTypedArray()),
+                    IndexOptions().name("${mongo.namespace.fullName}TextIndex")
+                )
+            }
+        }
+        serializer.descriptor.indexes().forEach {
+            if(it.unique) {
+                requireCompletion += launch {
+                    val keys = Sorts.ascending(it.fields)
+                    val options = IndexOptions().unique(true).name(it.name)
+                    try {
+                        mongo.ensureIndex(keys, options)
+                    } catch(e: MongoCommandException) {
+                        if(e.errorCode == 85) {
+                            mongo.dropIndex(keys)
+                            mongo.ensureIndex(keys, options)
                         }
                     }
                 }
-            }
-            (0 until descriptor.elementsCount).forEach { index ->
-                val sub = descriptor.getElementDescriptor(index)
-                if (sub.kind == StructureKind.CLASS) handleDescriptor(sub)
-                descriptor.getElementAnnotations(index).forEach {
-                    when (it) {
-                        is NamedIndex -> {
-                            launch {
-                                mongo.ensureIndex(
-                                    Sorts.ascending(descriptor.getElementName(index)),
-                                    IndexOptions().unique(false).name(it.indexName.takeUnless { it.isBlank() })
-                                        .background(true)
-                                )
-                            }
-                        }
-
-                        is Index -> {
-                            launch {
-                                mongo.ensureIndex(
-                                    Sorts.ascending(descriptor.getElementName(index)),
-                                    IndexOptions().unique(false).background(true)
-                                )
-                            }
-                        }
-
-                        is NamedUnique -> {
-                            requireCompletion += launch {
-                                mongo.ensureIndex(
-                                    Sorts.ascending(descriptor.getElementName(index)),
-                                    IndexOptions().unique(true).name(it.indexName.takeUnless { it.isBlank() })
-                                        .partialFilterExpression(
-                                            documentOf(descriptor.getElementName(index) to documentOf("\$type" to descriptor.getElementDescriptor(index).bsonType().value))
-                                        )
-                                )
-                            }
-                        }
-
-                        is Unique -> {
-                            requireCompletion += launch {
-                                mongo.ensureIndex(
-                                    Sorts.ascending(descriptor.getElementName(index)),
-                                    IndexOptions().unique(true).partialFilterExpression(
-                                        documentOf(descriptor.getElementName(index) to documentOf("\$type" to descriptor.getElementDescriptor(index).bsonType().value))
-                                    )
-                                )
-                            }
+            } else {
+                launch {
+                    val keys = Sorts.ascending(it.fields)
+                    val options = IndexOptions().unique(false).background(true).name(it.name)
+                    try {
+                        mongo.ensureIndex(keys, options)
+                    } catch(e: MongoCommandException) {
+                        if(e.errorCode == 85) {
+                            mongo.dropIndex(keys)
+                            mongo.ensureIndex(keys, options)
                         }
                     }
                 }
             }
         }
-        handleDescriptor(serializer.descriptor)
         requireCompletion.forEach { it.join() }
     }
 }

@@ -30,10 +30,10 @@ fun <K> KSerializer<K>.fieldSerializer(fieldName: String): KSerializer<*>? {
     return (this as? GeneratedSerializer<*>)?.childSerializers()?.get(index)
 }
 
-private val serializers = HashMap<KSerializer<*>, KSerializer<*>>()
+private val serializers = HashMap<KSerializer<*>, MySealedClassSerializerInterface<*>>()
 
 @Suppress("UNCHECKED_CAST")
-private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<Inner>> = serializers.getOrPut(inner) {
+private fun <Inner> getCond(inner: KSerializer<Inner>): MySealedClassSerializerInterface<Condition<Inner>> = serializers.getOrPut(inner) {
     MySealedClassSerializer(
         "com.lightningkite.lightningdb.Condition<${inner.descriptor.serialName}>",
         Condition::class as KClass<Condition<Inner>>,
@@ -82,9 +82,10 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
                     register(Condition.OnKey.serializer(element))
                 }
             }
-            if (inner is GeneratedSerializer<*> && inner.descriptor.kind == StructureKind.CLASS) {
+            if (inner is GeneratedSerializer<*> && inner.descriptor.kind == StructureKind.CLASS && inner !is MySealedClassSerializerInterface) {
+                println("Is $inner a MySealedClassSerializer? ${inner is MySealedClassSerializer}")
                 val childSerializers = inner.childSerializers()
-                val fields = inner.attemptGrabFields()
+                val fields = try {inner.attemptGrabFields() } catch(e: Exception) { throw Exception("Failed while getting inner fields from ${inner}", e)}
                 for (index in 0 until inner.descriptor.elementsCount) {
                     val name = inner.descriptor.getElementName(index)
                     val prop = fields[name]!!
@@ -145,24 +146,17 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): KSerializer<Condition<In
             else -> fatalError()
         }
     }
-} as KSerializer<Condition<Inner>>
+} as MySealedClassSerializerInterface<Condition<Inner>>
 
-class ConditionSerializer<Inner>(val inner: KSerializer<Inner>) : KSerializer<Condition<Inner>> by getCond(inner)
+class ConditionSerializer<Inner>(val inner: KSerializer<Inner>) : MySealedClassSerializerInterface<Condition<Inner>> by getCond(inner)
 
 class OnFieldSerializer<K : Any, V>(
     val field: KProperty1<K, V>,
     val conditionSerializer: KSerializer<Condition<V>>
-) : KSerializer<Condition.OnField<K, V>> {
-    override fun deserialize(decoder: Decoder): Condition.OnField<K, V> {
-        return Condition.OnField(field, condition = decoder.decodeSerializableValue(conditionSerializer))
-    }
-
-    override val descriptor: SerialDescriptor = SerialDescriptor(field.name, conditionSerializer.descriptor)
-
-    override fun serialize(encoder: Encoder, value: Condition.OnField<K, V>) {
-        encoder.encodeSerializableValue(conditionSerializer, value.condition)
-    }
-
+) : WrappingSerializer<Condition.OnField<K, V>, Condition<V>>(field.name) {
+    override fun getDeferred(): KSerializer<Condition<V>> = conditionSerializer
+    override fun inner(it: Condition.OnField<K, V>): Condition<V> = it.condition
+    override fun outer(it: Condition<V>): Condition.OnField<K, V> = Condition.OnField(field, it)
 }
 
 class LazyRenamedSerialDescriptor(override val serialName: String, val getter: () -> SerialDescriptor) :
@@ -177,249 +171,152 @@ class LazyRenamedSerialDescriptor(override val serialName: String, val getter: (
 }
 
 
-class ConditionNeverSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.Never<T>> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Never", PrimitiveKind.BOOLEAN)
-    override fun deserialize(decoder: Decoder): Condition.Never<T> {
-        decoder.decodeBoolean()
-        return Condition.Never()
-    }
-
-    override fun serialize(encoder: Encoder, value: Condition.Never<T>) = encoder.encodeBoolean(true)
+class ConditionNeverSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Condition.Never<T>, Boolean>("Never") {
+    override fun getDeferred(): KSerializer<Boolean> = Boolean.serializer()
+    override fun inner(it: Condition.Never<T>): Boolean = true
+    override fun outer(it: Boolean) = Condition.Never<T>()
 }
 
-class ConditionAlwaysSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.Always<T>> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Always", PrimitiveKind.BOOLEAN)
-    override fun deserialize(decoder: Decoder): Condition.Always<T> {
-        decoder.decodeBoolean()
-        return Condition.Always()
-    }
-
-    override fun serialize(encoder: Encoder, value: Condition.Always<T>) = encoder.encodeBoolean(true)
+class ConditionAlwaysSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Condition.Always<T>, Boolean>("Always") {
+    override fun getDeferred(): KSerializer<Boolean> = Boolean.serializer()
+    override fun inner(it: Condition.Always<T>): Boolean = true
+    override fun outer(it: Boolean) = Condition.Always<T>()
 }
 
-class ConditionAndSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.And<T>> {
-    val to by lazy { ListSerializer(Condition.serializer(inner)) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("And") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.And<T> = Condition.And(decoder.decodeSerializableValue(to))
-    override fun serialize(encoder: Encoder, value: Condition.And<T>) =
-        encoder.encodeSerializableValue(to, value.conditions)
+class ConditionAndSerializer<T>(val inner: KSerializer<T>): WrappingSerializer<Condition.And<T>, List<Condition<T>>>("And") {
+    override fun getDeferred(): KSerializer<List<Condition<T>>> = ListSerializer(Condition.serializer(inner))
+    override fun inner(it: Condition.And<T>): List<Condition<T>> = it.conditions
+    override fun outer(it: List<Condition<T>>): Condition.And<T> = Condition.And(it)
 }
 
-class ConditionOrSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.Or<T>> {
-    val to by lazy { ListSerializer(Condition.serializer(inner)) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Or") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.Or<T> = Condition.Or(decoder.decodeSerializableValue(to))
-    override fun serialize(encoder: Encoder, value: Condition.Or<T>) =
-        encoder.encodeSerializableValue(to, value.conditions)
+class ConditionOrSerializer<T>(val inner: KSerializer<T>): WrappingSerializer<Condition.Or<T>, List<Condition<T>>>("Or") {
+    override fun getDeferred(): KSerializer<List<Condition<T>>> = ListSerializer(Condition.serializer(inner))
+    override fun inner(it: Condition.Or<T>): List<Condition<T>> = it.conditions
+    override fun outer(it: List<Condition<T>>): Condition.Or<T> = Condition.Or(it)
 }
 
-class ConditionNotSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.Not<T>> {
-    val to by lazy { Condition.serializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Not") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.Not<T> = Condition.Not(decoder.decodeSerializableValue(to))
-    override fun serialize(encoder: Encoder, value: Condition.Not<T>) =
-        encoder.encodeSerializableValue(to, value.condition)
+class ConditionNotSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Condition.Not<T>, Condition<T>>("Not") {
+    override fun getDeferred(): KSerializer<Condition<T>> = Condition.serializer(inner)
+    override fun inner(it: Condition.Not<T>): Condition<T> = it.condition
+    override fun outer(it: Condition<T>): Condition.Not<T> = Condition.Not(it)
 }
 
-class ConditionEqualSerializer<T : IsEquatable>(val inner: KSerializer<T>) : KSerializer<Condition.Equal<T>> {
-    val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Equal") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.Equal<T> =
-        Condition.Equal(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.Equal<T>) =
-        encoder.encodeSerializableValue(to, value.value)
+class ConditionEqualSerializer<T : IsEquatable>(val inner: KSerializer<T>) : WrappingSerializer<Condition.Equal<T>, T>("Equal") {
+    override fun getDeferred(): KSerializer<T> = inner
+    override fun inner(it: Condition.Equal<T>): T = it.value
+    override fun outer(it: T): Condition.Equal<T> = Condition.Equal(it)
 }
 
-class ConditionNotEqualSerializer<T : IsEquatable>(val inner: KSerializer<T>) : KSerializer<Condition.NotEqual<T>> {
-    val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("NotEqual") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.NotEqual<T> =
-        Condition.NotEqual(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.NotEqual<T>) =
-        encoder.encodeSerializableValue(to, value.value)
+class ConditionNotEqualSerializer<T : IsEquatable>(val inner: KSerializer<T>) : WrappingSerializer<Condition.NotEqual<T>, T>("NotEqual") {
+    override fun getDeferred(): KSerializer<T> = inner
+    override fun inner(it: Condition.NotEqual<T>): T = it.value
+    override fun outer(it: T): Condition.NotEqual<T> = Condition.NotEqual(it)
 }
 
-class ConditionInsideSerializer<T : IsEquatable>(val inner: KSerializer<T>) : KSerializer<Condition.Inside<T>> {
-    val to by lazy { ListSerializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Inside") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.Inside<T> =
-        Condition.Inside(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.Inside<T>) =
-        encoder.encodeSerializableValue(to, value.values)
+class ConditionInsideSerializer<T : IsEquatable>(val inner: KSerializer<T>) : WrappingSerializer<Condition.Inside<T>, List<T>>("Inside") {
+    override fun getDeferred() = ListSerializer(inner)
+    override fun inner(it: Condition.Inside<T>): List<T> = it.values
+    override fun outer(it: List<T>) = Condition.Inside(it)
 }
 
-class ConditionNotInsideSerializer<T : IsEquatable>(val inner: KSerializer<T>) : KSerializer<Condition.NotInside<T>> {
-    val to by lazy { ListSerializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("NotInside") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.NotInside<T> =
-        Condition.NotInside(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.NotInside<T>) =
-        encoder.encodeSerializableValue(to, value.values)
+class ConditionNotInsideSerializer<T : IsEquatable>(val inner: KSerializer<T>) : WrappingSerializer<Condition.NotInside<T>, List<T>>("NotInside") {
+    override fun getDeferred() = ListSerializer(inner)
+    override fun inner(it: Condition.NotInside<T>): List<T> = it.values
+    override fun outer(it: List<T>) = Condition.NotInside(it)
 }
 
-class ConditionGreaterThanSerializer<T : Comparable<T>>(val inner: KSerializer<T>) :
-    KSerializer<Condition.GreaterThan<T>> {
-    val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("GreaterThan") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.GreaterThan<T> =
-        Condition.GreaterThan(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.GreaterThan<T>) =
-        encoder.encodeSerializableValue(to, value.value)
+class ConditionGreaterThanSerializer<T : Comparable<T>>(val inner: KSerializer<T>) : WrappingSerializer<Condition.GreaterThan<T>, T>("GreaterThan") {
+    override fun getDeferred() = inner
+    override fun inner(it: Condition.GreaterThan<T>): T = it.value
+    override fun outer(it: T) = Condition.GreaterThan(it)
 }
 
-class ConditionLessThanSerializer<T : Comparable<T>>(val inner: KSerializer<T>) : KSerializer<Condition.LessThan<T>> {
-    val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("LessThan") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.LessThan<T> =
-        Condition.LessThan(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.LessThan<T>) =
-        encoder.encodeSerializableValue(to, value.value)
+class ConditionLessThanSerializer<T : Comparable<T>>(val inner: KSerializer<T>) : WrappingSerializer<Condition.LessThan<T>, T>("LessThan") {
+    override fun getDeferred() = inner
+    override fun inner(it: Condition.LessThan<T>): T = it.value
+    override fun outer(it: T) = Condition.LessThan(it)
 }
 
-class ConditionGreaterThanOrEqualSerializer<T : Comparable<T>>(val inner: KSerializer<T>) :
-    KSerializer<Condition.GreaterThanOrEqual<T>> {
-    val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("GreaterThanOrEqual") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.GreaterThanOrEqual<T> =
-        Condition.GreaterThanOrEqual(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.GreaterThanOrEqual<T>) =
-        encoder.encodeSerializableValue(to, value.value)
+class ConditionGreaterThanOrEqualSerializer<T : Comparable<T>>(val inner: KSerializer<T>) : WrappingSerializer<Condition.GreaterThanOrEqual<T>, T>("GreaterThanOrEqual") {
+    override fun getDeferred() = inner
+    override fun inner(it: Condition.GreaterThanOrEqual<T>): T = it.value
+    override fun outer(it: T) = Condition.GreaterThanOrEqual(it)
 }
 
-class ConditionLessThanOrEqualSerializer<T : Comparable<T>>(val inner: KSerializer<T>) :
-    KSerializer<Condition.LessThanOrEqual<T>> {
-    val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("LessThanOrEqual") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.LessThanOrEqual<T> =
-        Condition.LessThanOrEqual(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.LessThanOrEqual<T>) =
-        encoder.encodeSerializableValue(to, value.value)
+class ConditionLessThanOrEqualSerializer<T : Comparable<T>>(val inner: KSerializer<T>) : WrappingSerializer<Condition.LessThanOrEqual<T>, T>("LessThanOrEqual") {
+    override fun getDeferred() = inner
+    override fun inner(it: Condition.LessThanOrEqual<T>): T = it.value
+    override fun outer(it: T) = Condition.LessThanOrEqual(it)
 }
 
-object ConditionIntBitsClearSerializer : KSerializer<Condition.IntBitsClear> {
-    val to by lazy { serializer<Int>() }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("IntBitsClear") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.IntBitsClear =
-        Condition.IntBitsClear(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.IntBitsClear) =
-        encoder.encodeSerializableValue(to, value.mask)
+object ConditionIntBitsClearSerializer : WrappingSerializer<Condition.IntBitsClear, Int>("IntBitsClear") {
+    override fun getDeferred() = Int.serializer()
+    override fun inner(it: Condition.IntBitsClear): Int = it.mask
+    override fun outer(it: Int): Condition.IntBitsClear = Condition.IntBitsClear(it)
 }
 
-object ConditionIntBitsSetSerializer : KSerializer<Condition.IntBitsSet> {
-    val to by lazy { serializer<Int>() }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("IntBitsSet") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.IntBitsSet =
-        Condition.IntBitsSet(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.IntBitsSet) =
-        encoder.encodeSerializableValue(to, value.mask)
+object ConditionIntBitsSetSerializer : WrappingSerializer<Condition.IntBitsSet, Int>("IntBitsSet") {
+    override fun getDeferred() = Int.serializer()
+    override fun inner(it: Condition.IntBitsSet): Int = it.mask
+    override fun outer(it: Int): Condition.IntBitsSet = Condition.IntBitsSet(it)
 }
 
-object ConditionIntBitsAnyClearSerializer : KSerializer<Condition.IntBitsAnyClear> {
-    val to by lazy { serializer<Int>() }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("IntBitsAnyClear") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.IntBitsAnyClear =
-        Condition.IntBitsAnyClear(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.IntBitsAnyClear) =
-        encoder.encodeSerializableValue(to, value.mask)
+object ConditionIntBitsAnyClearSerializer : WrappingSerializer<Condition.IntBitsAnyClear, Int>("IntBitsAnyClear") {
+    override fun getDeferred() = Int.serializer()
+    override fun inner(it: Condition.IntBitsAnyClear): Int = it.mask
+    override fun outer(it: Int): Condition.IntBitsAnyClear = Condition.IntBitsAnyClear(it)
 }
 
-object ConditionIntBitsAnySetSerializer : KSerializer<Condition.IntBitsAnySet> {
-    val to by lazy { serializer<Int>() }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("IntBitsAnySet") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.IntBitsAnySet =
-        Condition.IntBitsAnySet(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.IntBitsAnySet) =
-        encoder.encodeSerializableValue(to, value.mask)
+object ConditionIntBitsAnySetSerializer : WrappingSerializer<Condition.IntBitsAnySet, Int>("IntBitsAnySet") {
+    override fun getDeferred() = Int.serializer()
+    override fun inner(it: Condition.IntBitsAnySet): Int = it.mask
+    override fun outer(it: Int): Condition.IntBitsAnySet = Condition.IntBitsAnySet(it)
 }
 
-class ConditionListAllElementsSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.ListAllElements<T>> {
-    val to by lazy { Condition.serializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("ListAllElements") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.ListAllElements<T> =
-        Condition.ListAllElements(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.ListAllElements<T>) =
-        encoder.encodeSerializableValue(to, value.condition)
+class ConditionListAllElementsSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Condition.ListAllElements<T>, Condition<T>>("ListAllElements") {
+    override fun getDeferred(): KSerializer<Condition<T>> = Condition.serializer(inner)
+    override fun inner(it: Condition.ListAllElements<T>): Condition<T> = it.condition
+    override fun outer(it: Condition<T>): Condition.ListAllElements<T> = Condition.ListAllElements(it)
 }
 
-class ConditionListAnyElementsSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.ListAnyElements<T>> {
-    val to by lazy { Condition.serializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("ListAnyElements") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.ListAnyElements<T> =
-        Condition.ListAnyElements(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.ListAnyElements<T>) =
-        encoder.encodeSerializableValue(to, value.condition)
+class ConditionListAnyElementsSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Condition.ListAnyElements<T>, Condition<T>>("ListAnyElements") {
+    override fun getDeferred(): KSerializer<Condition<T>> = Condition.serializer(inner)
+    override fun inner(it: Condition.ListAnyElements<T>): Condition<T> = it.condition
+    override fun outer(it: Condition<T>): Condition.ListAnyElements<T> = Condition.ListAnyElements(it)
 }
 
-class ConditionListSizesEqualsSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.ListSizesEquals<T>> {
-    val to by lazy { serializer<Int>() }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("ListSizesEquals") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.ListSizesEquals<T> =
-        Condition.ListSizesEquals(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.ListSizesEquals<T>) =
-        encoder.encodeSerializableValue(to, value.count)
+class ConditionListSizesEqualsSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Condition.ListSizesEquals<T>, Int>("ListSizesEquals") {
+    override fun getDeferred() = Int.serializer()
+    override fun inner(it: Condition.ListSizesEquals<T>): Int = it.count
+    override fun outer(it: Int): Condition.ListSizesEquals<T> = Condition.ListSizesEquals(it)
 }
 
-class ConditionSetAllElementsSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.SetAllElements<T>> {
-    val to by lazy { Condition.serializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("SetAllElements") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.SetAllElements<T> =
-        Condition.SetAllElements(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.SetAllElements<T>) =
-        encoder.encodeSerializableValue(to, value.condition)
+class ConditionSetAllElementsSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Condition.SetAllElements<T>, Condition<T>>("SetAllElements") {
+    override fun getDeferred(): KSerializer<Condition<T>> = Condition.serializer(inner)
+    override fun inner(it: Condition.SetAllElements<T>): Condition<T> = it.condition
+    override fun outer(it: Condition<T>): Condition.SetAllElements<T> = Condition.SetAllElements(it)
 }
 
-class ConditionSetAnyElementsSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.SetAnyElements<T>> {
-    val to by lazy { Condition.serializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("SetAnyElements") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.SetAnyElements<T> =
-        Condition.SetAnyElements(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.SetAnyElements<T>) =
-        encoder.encodeSerializableValue(to, value.condition)
+class ConditionSetAnyElementsSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Condition.SetAnyElements<T>, Condition<T>>("SetAnyElements") {
+    override fun getDeferred(): KSerializer<Condition<T>> = Condition.serializer(inner)
+    override fun inner(it: Condition.SetAnyElements<T>): Condition<T> = it.condition
+    override fun outer(it: Condition<T>): Condition.SetAnyElements<T> = Condition.SetAnyElements(it)
 }
 
-class ConditionSetSizesEqualsSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.SetSizesEquals<T>> {
-    val to by lazy { serializer<Int>() }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("SetSizesEquals") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.SetSizesEquals<T> =
-        Condition.SetSizesEquals(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.SetSizesEquals<T>) =
-        encoder.encodeSerializableValue(to, value.count)
+class ConditionSetSizesEqualsSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Condition.SetSizesEquals<T>, Int>("SetSizesEquals") {
+    override fun getDeferred() = Int.serializer()
+    override fun inner(it: Condition.SetSizesEquals<T>): Int = it.count
+    override fun outer(it: Int): Condition.SetSizesEquals<T> = Condition.SetSizesEquals(it)
 }
 
-class ConditionExistsSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.Exists<T>> {
-    val to by lazy { serializer<String>() }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Exists") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.Exists<T> =
-        Condition.Exists(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.Exists<T>) =
-        encoder.encodeSerializableValue(to, value.key)
+class ConditionExistsSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Condition.Exists<T>, String>("Exists") {
+    override fun getDeferred(): KSerializer<String> = serializer<String>()
+    override fun inner(it: Condition.Exists<T>): String = it.key
+    override fun outer(it: String): Condition.Exists<T> = Condition.Exists(it)
 }
 
-class ConditionIfNotNullSerializer<T>(val inner: KSerializer<T>) : KSerializer<Condition.IfNotNull<T>> {
-    val to by lazy { Condition.serializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("IfNotNull") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Condition.IfNotNull<T> =
-        Condition.IfNotNull(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Condition.IfNotNull<T>) =
-        encoder.encodeSerializableValue(to, value.condition)
+class ConditionIfNotNullSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Condition.IfNotNull<T>, Condition<T>>("IfNotNull") {
+    override fun getDeferred(): KSerializer<Condition<T>> = Condition.serializer(inner)
+    override fun inner(it: Condition.IfNotNull<T>): Condition<T> = it.condition
+    override fun outer(it: Condition<T>): Condition.IfNotNull<T> = Condition.IfNotNull(it)
 }

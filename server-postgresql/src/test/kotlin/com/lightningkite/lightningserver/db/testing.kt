@@ -2,9 +2,7 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningdb.test.*
-import com.lightningkite.lightningserver.serialization.Serialization
 import io.zonky.test.db.postgres.junit.EmbeddedPostgresRules
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Contextual
@@ -12,12 +10,10 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.*
 import org.postgresql.util.PGobject
 import java.sql.ResultSet
 import java.time.Instant
-import java.time.LocalTime
 import java.time.ZonedDateTime
 import java.util.*
 import kotlin.collections.LinkedHashMap

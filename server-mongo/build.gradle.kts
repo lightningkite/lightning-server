@@ -28,7 +28,7 @@ dependencies {
     kspTest(project(":processor"))
     testImplementation(project(":client"))
     testImplementation(project(":server-testing"))
-    testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 }
 
 ksp {

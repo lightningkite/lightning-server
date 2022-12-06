@@ -18,10 +18,10 @@ import kotlin.reflect.KProperty1
 import kotlin.reflect.full.allSupertypes
 import kotlin.reflect.jvm.jvmErasure
 
-private val serializers = HashMap<KSerializer<*>, KSerializer<*>>()
+private val serializers = HashMap<KSerializer<*>, MySealedClassSerializerInterface<*>>()
 
 @Suppress("UNCHECKED_CAST")
-private fun <Inner> getMod(inner: KSerializer<Inner>): KSerializer<Modification<Inner>> = serializers.getOrPut(inner) {
+private fun <Inner> getMod(inner: KSerializer<Inner>): MySealedClassSerializerInterface<Modification<Inner>> = serializers.getOrPut(inner) {
     MySealedClassSerializer(
         "com.lightningkite.lightningdb.Modification<${inner.descriptor.serialName}>",
         Modification::class as KClass<Modification<Inner>>,
@@ -61,7 +61,7 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): KSerializer<Modification<
                     register(Modification.RemoveKeys.serializer(element))
                 }
             }
-            if (inner is GeneratedSerializer<*> && inner.descriptor.kind == StructureKind.CLASS) {
+            if (inner is GeneratedSerializer<*> && inner.descriptor.kind == StructureKind.CLASS && inner !is MySealedClassSerializerInterface) {
                 val childSerializers = inner.childSerializers()
                 val fields = inner.attemptGrabFields()
                 for (index in 0 until inner.descriptor.elementsCount) {
@@ -121,9 +121,9 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): KSerializer<Modification<
             else -> fatalError()
         }
     }
-} as KSerializer<Modification<Inner>>
+} as MySealedClassSerializerInterface<Modification<Inner>>
 
-class ModificationSerializer<Inner>(val inner: KSerializer<Inner>) : KSerializer<Modification<Inner>> by getMod(inner)
+class ModificationSerializer<Inner>(val inner: KSerializer<Inner>) : MySealedClassSerializerInterface<Modification<Inner>> by getMod(inner)
 
 class OnFieldSerializer2<K : Any, V>(
     val field: KProperty1<K, V>,

@@ -10,9 +10,10 @@ import kotlinx.serialization.serializer
 import kotlin.reflect.typeOf
 
 
+fun HttpRequest.jwt(): String? = headers[HttpHeader.Authorization]?.removePrefix("Bearer ") ?: headers.cookies[HttpHeader.Authorization]?.removePrefix("Bearer ") ?: queryParameter("jwt")
 inline fun <reified T> HttpRequest.jwt(jwtSigner: JwtSigner): T? = jwt(jwtSigner, Serialization.module.serializer())
 fun <T> HttpRequest.jwt(jwtSigner: JwtSigner, serializer: KSerializer<T>): T? =
-    (headers[HttpHeader.Authorization]?.removePrefix("Bearer ") ?: headers.cookies[HttpHeader.Authorization]?.removePrefix("Bearer ") ?: queryParameter("jwt"))?.let {
+    jwt()?.let {
         try {
             jwtSigner.verify(serializer, it)
         } catch(e: UnauthorizedException) {
@@ -26,9 +27,10 @@ fun <T> HttpRequest.jwt(jwtSigner: JwtSigner, serializer: KSerializer<T>): T? =
         }
     }
 
+fun WebSockets.ConnectEvent.jwt(): String? = queryParameter("jwt") ?: headers[HttpHeader.Authorization]?.removePrefix("Bearer ") ?: headers.cookies[HttpHeader.Authorization]?.removePrefix("Bearer ")
 inline fun <reified T> WebSockets.ConnectEvent.jwt(jwtSigner: JwtSigner): T? = jwt(jwtSigner, Serialization.module.serializer())
 fun <T> WebSockets.ConnectEvent.jwt(jwtSigner: JwtSigner, serializer: KSerializer<T>): T? =
-    (queryParameter("jwt") ?: headers[HttpHeader.Authorization]?.removePrefix("Bearer ") ?: headers.cookies[HttpHeader.Authorization]?.removePrefix("Bearer "))?.let {
+    jwt()?.let {
         try {
             jwtSigner.verify(serializer, it)
         } catch(e: UnauthorizedException) {

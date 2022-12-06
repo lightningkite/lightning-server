@@ -73,7 +73,8 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                     allowHost(it, listOf("http", "https", "ws", "wss"))
                 }
                 it.allowedHeaders.forEach {
-                    allowHeader(it)
+                    if(it == "*") allowHeaders { true }
+                    else allowHeader(it)
                 }
             }
         }

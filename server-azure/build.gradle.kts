@@ -19,7 +19,7 @@ dependencies {
     api("com.microsoft.azure.functions:azure-functions-java-library:2.0.1")
     api("com.azure:azure-storage-blob:12.19.1")
 
-    testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation(project(":server-testing"))
 
     ksp(project(":processor"))

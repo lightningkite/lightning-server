@@ -29,7 +29,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         ).map { permissions.mask(it) }
     }
 
-    override suspend fun insert(models: List<Model>): List<Model> {
+    override suspend fun insert(models: Iterable<Model>): List<Model> {
         val passingModels = models.filter { permissions.create(it) }
         return wraps.insertMany(passingModels).map { permissions.mask(it) }
     }
@@ -64,10 +64,12 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         property
     )
 
-    override suspend fun replaceOne(condition: Condition<Model>, model: Model): EntryChange<Model> {
+    override suspend fun replaceOne(condition: Condition<Model>, model: Model, orderBy: List<SortPart<Model>>): EntryChange<Model> {
+        val sortImposedConditions = permissions.readMask.permitSort(orderBy)
         return wraps.replaceOne(
-            condition and permissions.allowed(Modification.Assign(model)),
-            model
+            condition and permissions.allowed(Modification.Assign(model)) and sortImposedConditions,
+            model,
+            orderBy
         ).map { permissions.mask(it) }
     }
 
@@ -81,34 +83,48 @@ open class ModelPermissionsFieldCollection<Model : Any>(
             .map { permissions.mask(it) }
     }
 
-    override suspend fun updateOne(condition: Condition<Model>, modification: Modification<Model>): EntryChange<Model> {
-        return wraps.updateOne(condition and permissions.allowed(modification), modification)
+    override suspend fun updateOne(
+        condition: Condition<Model>,
+        modification: Modification<Model>,
+        orderBy: List<SortPart<Model>>
+    ): EntryChange<Model> {
+        val sortImposedConditions = permissions.readMask.permitSort(orderBy)
+        return wraps.updateOne(condition and permissions.allowed(modification) and sortImposedConditions, modification, orderBy)
             .map { permissions.mask(it) }
     }
 
     override suspend fun updateOneIgnoringResult(
         condition: Condition<Model>,
-        modification: Modification<Model>
+        modification: Modification<Model>,
+        orderBy: List<SortPart<Model>>
     ): Boolean {
-        return wraps.updateOneIgnoringResult(condition and permissions.allowed(modification), modification)
+        val sortImposedConditions = permissions.readMask.permitSort(orderBy)
+        return wraps.updateOneIgnoringResult(condition and permissions.allowed(modification) and sortImposedConditions, modification, orderBy)
     }
 
     override suspend fun updateManyIgnoringResult(condition: Condition<Model>, modification: Modification<Model>): Int {
         return wraps.updateManyIgnoringResult(condition and permissions.allowed(modification), modification)
     }
 
-    override suspend fun deleteOneIgnoringOld(condition: Condition<Model>): Boolean {
-        return wraps.deleteOneIgnoringOld(condition and permissions.delete)
+    override suspend fun deleteOneIgnoringOld(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Boolean {
+        val sortImposedConditions = permissions.readMask.permitSort(orderBy)
+        return wraps.deleteOneIgnoringOld(condition and permissions.delete and sortImposedConditions, orderBy)
     }
 
     override suspend fun deleteManyIgnoringOld(condition: Condition<Model>): Int {
         return wraps.deleteManyIgnoringOld(condition and permissions.delete)
     }
 
-    override suspend fun replaceOneIgnoringResult(condition: Condition<Model>, model: Model): Boolean {
+    override suspend fun replaceOneIgnoringResult(
+        condition: Condition<Model>,
+        model: Model,
+        orderBy: List<SortPart<Model>>
+    ): Boolean {
+        val sortImposedConditions = permissions.readMask.permitSort(orderBy)
         return wraps.replaceOneIgnoringResult(
-            condition and permissions.allowed(Modification.Assign(model)),
-            model
+            condition and permissions.allowed(Modification.Assign(model)) and sortImposedConditions,
+            model,
+            orderBy
         )
     }
 
@@ -129,8 +145,9 @@ open class ModelPermissionsFieldCollection<Model : Any>(
             .map { permissions.mask(it) }
     }
 
-    override suspend fun deleteOne(condition: Condition<Model>): Model? {
-        return wraps.deleteOne(condition and permissions.delete)?.let { permissions.mask(it) }
+    override suspend fun deleteOne(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? {
+        val sortImposedConditions = permissions.readMask.permitSort(orderBy)
+        return wraps.deleteOne(condition and permissions.delete and sortImposedConditions, orderBy)?.let { permissions.mask(it) }
     }
 
     override suspend fun deleteMany(condition: Condition<Model>): List<Model> {

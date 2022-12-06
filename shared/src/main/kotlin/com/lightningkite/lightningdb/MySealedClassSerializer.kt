@@ -5,9 +5,14 @@ package com.lightningkite.lightningdb
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
+import kotlinx.serialization.internal.GeneratedSerializer
 import kotlinx.serialization.json.JsonNames
 import kotlin.IllegalStateException
 import kotlin.reflect.KClass
+
+interface MySealedClassSerializerInterface<T: Any>: KSerializer<T> {
+    val serializerMap: Map<String, KSerializer<out T>>
+}
 
 public class MySealedClassSerializer<T : Any>(
     serialName: String,
@@ -16,9 +21,9 @@ public class MySealedClassSerializer<T : Any>(
     val alternateReadNames: Map<String, String> = mapOf(),
     val annotations: List<Annotation> = listOf(),
     val getName: (T) -> String
-) : KSerializer<T> {
+) : MySealedClassSerializerInterface<T> {
 
-    val serializerMap by lazy { getSerializerMap() }
+    override val serializerMap by lazy { getSerializerMap() }
     private val indexToName by lazy { serializerMap.keys.toTypedArray() }
     private val nameToIndex by lazy {
         val map = HashMap<String, Int>()

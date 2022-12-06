@@ -25,7 +25,7 @@ dependencies {
 
     testImplementation("io.ktor:ktor-server-test-host-jvm:$ktorVersion")
 
-    testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 
     ksp(project(":processor"))
     kspTest(project(":processor"))

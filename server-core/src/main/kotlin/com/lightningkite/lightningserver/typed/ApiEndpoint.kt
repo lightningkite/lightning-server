@@ -27,6 +27,8 @@ interface ApiEndpoint<USER, INPUT : Any, OUTPUT>: Documentable, (suspend (HttpRe
         get() = route.path
 
     data class ErrorCase(val status: HttpStatus, val internalCode: Int, val description: String)
+
+    suspend fun invokeAny(user: USER, input: INPUT, routes: Map<String, Any?>): OUTPUT
 }
 
 data class ApiEndpoint0<USER, INPUT : Any, OUTPUT>(
@@ -41,6 +43,8 @@ data class ApiEndpoint0<USER, INPUT : Any, OUTPUT>(
     val implementation: suspend (user: USER, input: INPUT) -> OUTPUT
 ): ApiEndpoint<USER, INPUT, OUTPUT> {
     override val routeTypes: Map<String, KSerializer<*>> get() = mapOf()
+    override suspend fun invokeAny(user: USER, input: INPUT, routes: Map<String, Any?>)
+        = implementation(user, input)
     override suspend fun invoke(it: HttpRequest): HttpResponse {
         val user = authInfo.checker(it.rawUser())
         @Suppress("UNCHECKED_CAST") val input: INPUT = when(route.method) {
@@ -68,6 +72,9 @@ data class ApiEndpoint1<USER, PATH: Comparable<PATH>, INPUT : Any, OUTPUT>(
     val implementation: suspend (user: USER, path: PATH, input: INPUT) -> OUTPUT
 ): ApiEndpoint<USER, INPUT, OUTPUT> {
     override val routeTypes: Map<String, KSerializer<*>> = mapOf(pathName to pathType)
+    @Suppress("UNCHECKED_CAST")
+    override suspend fun invokeAny(user: USER, input: INPUT, routes: Map<String, Any?>)
+            = implementation(user, routes[pathName] as PATH, input)
     override suspend fun invoke(it: HttpRequest): HttpResponse {
         val user = authInfo.checker(it.rawUser())
         @Suppress("UNCHECKED_CAST") val input: INPUT = when(route.method) {
@@ -97,6 +104,9 @@ data class ApiEndpoint2<USER, PATH: Comparable<PATH>, PATH2: Comparable<PATH2>, 
     val implementation: suspend (user: USER, path: PATH, path2: PATH2, input: INPUT) -> OUTPUT
 ): ApiEndpoint<USER, INPUT, OUTPUT> {
     override val routeTypes: Map<String, KSerializer<*>> = mapOf(pathName to pathType, path2Name to path2Type)
+    @Suppress("UNCHECKED_CAST")
+    override suspend fun invokeAny(user: USER, input: INPUT, routes: Map<String, Any?>)
+            = implementation(user, routes[pathName] as PATH, routes[path2Name] as PATH2, input)
     override suspend fun invoke(it: HttpRequest): HttpResponse {
         val user = authInfo.checker(it.rawUser())
         @Suppress("UNCHECKED_CAST") val input: INPUT = when(route.method) {
@@ -122,6 +132,8 @@ data class ApiEndpointX<USER, INPUT: Any, OUTPUT>(
     override val routeTypes: Map<String, KSerializer<*>>,
     val implementation: suspend (user: USER, input: INPUT, pathSegments: Map<String, Any?>) -> OUTPUT
 ): ApiEndpoint<USER, INPUT, OUTPUT> {
+    override suspend fun invokeAny(user: USER, input: INPUT, routes: Map<String, Any?>)
+            = implementation(user, input, routes)
     override suspend fun invoke(it: HttpRequest): HttpResponse {
         val user = authInfo.checker(it.rawUser())
         @Suppress("UNCHECKED_CAST") val input: INPUT = when(route.method) {
@@ -141,7 +153,7 @@ data class IdHolder<ID>(val id: ID)
 inline fun <reified T: Comparable<T>> String.parseUrlPartOrBadRequest(): T = parseUrlPartOrBadRequest(
     Serialization.module.serializer()
 )
-fun <T: Comparable<T>> String.parseUrlPartOrBadRequest(serializer: KSerializer<T>): T = try {
+fun <T> String.parseUrlPartOrBadRequest(serializer: KSerializer<T>): T = try {
     Serialization.properties.decodeFromStringMap(IdHolder.serializer(serializer), mapOf("id" to URLDecoder.decode(this, Charsets.UTF_8))).id
 } catch(e: Exception) {
     throw BadRequestException("ID ${this} could not be parsed as a ${serializer.descriptor.serialName}.")

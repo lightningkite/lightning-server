@@ -9,14 +9,25 @@ import java.util.*
 
 @Serializable
 @DatabaseModel
+@AdminTableColumns(["name", "number", "status"])
 data class TestModel(
     override val _id: UUID = UUID.randomUUID(),
     val timestamp: Instant = Instant.now(),
     val name: String = "No Name",
-    val number: Int = 3123,
-    @JsonSchemaFormat("jodit") val content: String = "",
-    val file: ServerFile? = null
+    @Description("The number") val number: Int = 3123,
+    @MimeType("text/html") @JsonSchemaFormat("jodit") val content: String = "",
+//    @MimeType("image/*") val file: ServerFile? = null,
+    @References(TestModel::class) val replyTo: UUID? = null,
+    val privateInfo: String? = null,
+    val status: Status = Status.DRAFT,
+    val allowedReplies: Condition<TestModel> = Condition.Always()
 ) : HasId<UUID>
+
+@Serializable
+enum class Status {
+    @DisplayName("Draft") DRAFT,
+    @DisplayName("Published") PUBLISHED
+}
 
 @Serializable
 @DatabaseModel

@@ -32,8 +32,8 @@ data class EmailSettings(
             }
             EmailSettings.register("smtp") {
                 val urlWithoutProtocol = it.url.substringAfter("://")
-                val urlAuth = urlWithoutProtocol.substringBefore('@')
-                val urlHost = urlWithoutProtocol.substringAfter('@')
+                val urlAuth = urlWithoutProtocol.substringBeforeLast('@')
+                val urlHost = urlWithoutProtocol.substringAfterLast('@')
                 val port = urlHost.substringAfter(':', "").toIntOrNull() ?: 22
                 SmtpEmailClient(
                     it.smtp ?: SmtpConfig(

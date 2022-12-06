@@ -40,13 +40,14 @@ interface FieldCollection<Model: Any> {
 
 
     suspend fun insert(
-        models: List<Model>
+        models: Iterable<Model>
     ): List<Model>
 
 
     suspend fun replaceOne(
         condition: Condition<Model>,
-        model: Model
+        model: Model,
+        orderBy: List<SortPart<Model>> = listOf()
     ): EntryChange<Model>
 
     /**
@@ -54,7 +55,8 @@ interface FieldCollection<Model: Any> {
      */
     suspend fun replaceOneIgnoringResult(
         condition: Condition<Model>,
-        model: Model
+        model: Model,
+        orderBy: List<SortPart<Model>> = listOf()
     ): Boolean
 
     suspend fun upsertOne(
@@ -76,6 +78,7 @@ interface FieldCollection<Model: Any> {
     suspend fun updateOne(
         condition: Condition<Model>,
         modification: Modification<Model>,
+        orderBy: List<SortPart<Model>> = listOf(),
     ): EntryChange<Model>
 
     /**
@@ -83,7 +86,8 @@ interface FieldCollection<Model: Any> {
      */
     suspend fun updateOneIgnoringResult(
         condition: Condition<Model>,
-        modification: Modification<Model>
+        modification: Modification<Model>,
+        orderBy: List<SortPart<Model>> = listOf()
     ): Boolean
 
 
@@ -102,14 +106,16 @@ interface FieldCollection<Model: Any> {
 
 
     suspend fun deleteOne(
-        condition: Condition<Model>
+        condition: Condition<Model>,
+        orderBy: List<SortPart<Model>> = listOf()
     ): Model?
 
     /**
      * @return Whether any items were deleted.
      */
     suspend fun deleteOneIgnoringOld(
-        condition: Condition<Model>
+        condition: Condition<Model>,
+        orderBy: List<SortPart<Model>> = listOf()
     ): Boolean
 
 

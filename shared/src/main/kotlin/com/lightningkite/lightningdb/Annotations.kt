@@ -8,12 +8,28 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlin.reflect.KClass
 
 /**
- * Format, passed onto schema
+ * Which fields are text searched in the admin
  */
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-annotation class Watchable()
+annotation class AdminSearchFields(val fields: Array<String>)
+
+/**
+ * Which fields are columns in the admin
+ */
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS)
+annotation class AdminTableColumns(val fields: Array<String>)
+
+/**
+ * Which fields are used to create a title in the admin
+ */
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS)
+annotation class AdminTitleFields(val fields: Array<String>)
 
 /**
  * Format, passed onto schema
@@ -81,6 +97,22 @@ annotation class JsonSchemaDefinition(val id: String)
 annotation class JsonSchemaNoDefinition
 
 /**
+ * A display name of the item in question.
+ */
+@SerialInfo
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class DisplayName(val text: String)
+
+/**
+ * A display name of the item in question.
+ */
+@SerialInfo
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class MimeType(val mime: String)
+
+/**
  * A description of the item in question.
  */
 @SerialInfo
@@ -113,7 +145,7 @@ annotation class StoragePrefix(val prefix: String)
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 annotation class References(
-    @get:JvmName("grabTarget") val target: KClass<*>
+    val references: KClass<*>
 )
 
 
@@ -138,15 +170,42 @@ annotation class TextIndex(val fields: Array<String>)
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-@Repeatable
+//@Repeatable
 annotation class IndexSet(val fields: Array<String>)
+
+// Jank patch? For what and how?
+// The problem this works around is that Repeatable annotations currently do not
+// work correct with kotlinx serialization. Only the last instance shows up.
+// To jank a patch for this, I created a second version that allows you to
+// include multiple sets by adding a delimiter, ":", into the list.
+// An example ["field1", "field2", ":", "field1", "field3"]
+// If the kotlinx issue is resolved, then this will become deprecated, and
+// repeatable added back into the normal one.
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS)
+annotation class IndexSetJankPatch(val fields: Array<String>)
 
 
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-@Repeatable
+//@Repeatable
 annotation class UniqueSet(val fields: Array<String>)
+
+
+// Jank patch? For what and how?
+// The problem this works around is that Repeatable annotations currently do not
+// work correct with kotlinx serialization. Only the last instance shows up.
+// To jank a patch for this, I created a second version that allows you to
+// include multiple sets by adding a delimiter(":") into the list.
+// An example ["field1", "field2", ":", "field1", "field3"]
+// If the kotlinx issue is resolved, then this will become deprecated, and
+// repeatable added back into the normal one.
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS)
+annotation class UniqueSetJankPatch(val fields: Array<String>)
 
 
 @SerialInfo
@@ -164,18 +223,40 @@ annotation class NamedUnique(val indexName: String)
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-annotation class NamedTextIndex(val fields: Array<String>, val indexName: String)
-
-
-@SerialInfo
-@Retention(AnnotationRetention.BINARY)
-@Target(AnnotationTarget.CLASS)
-@Repeatable
+//@Repeatable
 annotation class NamedIndexSet(val fields: Array<String>, val indexName: String)
 
 
+// Jank patch? For what and how?
+// The problem this works around is that Repeatable annotations currently do not
+// work correct with kotlinx serialization. Only the last instance shows up.
+// To jank a patch for this, I created a second version that allows you to
+// include multiple sets by adding a delimiter(":") into the list and names.
+// An example ["field1", "field2", ":", "field1", "field3"], "Name 1:Name 2"
+// If the kotlinx issue is resolved, then this will become deprecated, and
+// repeatable added back into the normal one.
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-@Repeatable
+annotation class NamedIndexSetJankPatch(val fields: Array<String>, val indexNames: String)
+
+
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS)
+//@Repeatable
 annotation class NamedUniqueSet(val fields: Array<String>, val indexName: String)
+
+
+// Jank patch? For what and how?
+// The problem this works around is that Repeatable annotations currently do not
+// work correct with kotlinx serialization. Only the last instance shows up.
+// To jank a patch for this, I created a second version that allows you to
+// include multiple sets by adding a delimiter(":") into the list.
+// An example ["field1", "field2", ":", "field1", "field3"], "Name 1:Name 2"
+// If the kotlinx issue is resolved, then this will become deprecated, and
+// repeatable added back into the normal one.
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS)
+annotation class NamedUniqueSetJankPatch(val fields: Array<String>, val indexNames: String)

@@ -1,10 +1,12 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.flow.Flow
 import kotlinx.html.HTML
 import kotlinx.html.html
 import kotlinx.html.stream.appendHTML
+import kotlinx.serialization.encodeToString
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
@@ -81,6 +83,12 @@ sealed class HttpContent {
             },
             type = ContentType.Text.Html,
             length = null
+        )
+        inline fun <reified T> Json(
+            value: T
+        ): Text = HttpContent.Text(
+            string = Serialization.json.encodeToString(value),
+            type = ContentType.Application.Json
         )
     }
 }

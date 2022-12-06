@@ -65,10 +65,10 @@ loadAverageCpu = ManagementFactory.getOperatingSystemMXBean().systemLoadAverage,
 private val healthCache = HashMap<HealthCheckable, HealthStatus>()
 
 private fun memory(): ServerHealth.Memory = ServerHealth.Memory(
-maxMem = Runtime.getRuntime().maxMemory(),
-totalMemory = Runtime.getRuntime().totalMemory(),
-freeMemory = Runtime.getRuntime().freeMemory(),
+max = Runtime.getRuntime().maxMemory(),
+total = Runtime.getRuntime().totalMemory(),
+free = Runtime.getRuntime().freeMemory(),
 systemAllocated = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory(),
-memUsagePercent = ((((Runtime.getRuntime().totalMemory() - Runtime.getRuntime()
+usage = ((((Runtime.getRuntime().totalMemory() - Runtime.getRuntime()
 .freeMemory()).toFloat() / Runtime.getRuntime().maxMemory().toFloat() * 100f) * 100).toInt()) / 100f,
 )
