@@ -272,18 +272,20 @@ class JsonSchemaBuilder(val json: Json) {
             )
         }
         override { it: ModificationSerializer<*> ->
-//            val desc = it.descriptor
-//            JsonSchemaType(
-//                title = desc.serialName.substringBefore('<').substringAfterLast('.').humanize(),
-//                type = JsonType3(JsonType2.OBJECT),
-//                anyOf = it.serializerMap.map { (key, ser) ->
-//                    val propTitle = key.humanize()
-//                    get(ser, listOf(), propTitle).copy(
-//                        title = propTitle
-//                    )
-//                }
-//            )
-            JsonSchemaType(type = JsonType3(JsonType2.OBJECT))
+            val desc = it.descriptor
+            JsonSchemaType(
+                title = desc.serialName.substringBefore('<').substringAfterLast('.').humanize(),
+                type = JsonType3(JsonType2.OBJECT),
+                oneOf = it.serializerMap.map { (key, ser) ->
+                    val propTitle = key.humanize()
+                    val value = get(ser, listOf(), propTitle)
+                    JsonSchemaType(
+                        title = propTitle,
+                        type = JsonType3(JsonType2.OBJECT),
+                        properties = mapOf(key to value)
+                    )
+                }
+            )
         }
     }
 

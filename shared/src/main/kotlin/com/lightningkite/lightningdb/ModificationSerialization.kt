@@ -127,230 +127,136 @@ class ModificationSerializer<Inner>(val inner: KSerializer<Inner>) : MySealedCla
 
 class OnFieldSerializer2<K : Any, V>(
     val field: KProperty1<K, V>,
-    val modificationSerializer: KSerializer<Modification<V>>
-) : KSerializer<Modification.OnField<K, V>> {
-    override fun deserialize(decoder: Decoder): Modification.OnField<K, V> {
-        return Modification.OnField(field, modification = decoder.decodeSerializableValue(modificationSerializer))
-    }
-
-    override val descriptor: SerialDescriptor = SerialDescriptor(field.name, modificationSerializer.descriptor)
-
-    override fun serialize(encoder: Encoder, value: Modification.OnField<K, V>) {
-        encoder.encodeSerializableValue(modificationSerializer, value.modification)
-    }
+    val conditionSerializer: KSerializer<Modification<V>>
+) : WrappingSerializer<Modification.OnField<K, V>, Modification<V>>(field.name) {
+    override fun getDeferred(): KSerializer<Modification<V>> = conditionSerializer
+    override fun inner(it: Modification.OnField<K, V>): Modification<V> = it.modification
+    override fun outer(it: Modification<V>): Modification.OnField<K, V> = Modification.OnField(field, it)
 }
 
-class ModificationChainSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.Chain<T>> {
-    val to by lazy { ListSerializer(Modification.serializer(inner)) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Chain") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.Chain<T> =
-        Modification.Chain(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.Chain<T>) =
-        encoder.encodeSerializableValue(to, value.modifications)
+class ModificationChainSerializer<T>(val inner: KSerializer<T>): WrappingSerializer<Modification.Chain<T>, List<Modification<T>>>("Chain") {
+    override fun getDeferred(): KSerializer<List<Modification<T>>> = ListSerializer(Modification.serializer(inner))
+    override fun inner(it: Modification.Chain<T>): List<Modification<T>> = it.modifications
+    override fun outer(it: List<Modification<T>>): Modification.Chain<T> = Modification.Chain(it)
 }
 
-class ModificationIfNotNullSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.IfNotNull<T>> {
-    val to by lazy { Modification.serializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("IfNotNull") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.IfNotNull<T> =
-        Modification.IfNotNull(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.IfNotNull<T>) =
-        encoder.encodeSerializableValue(to, value.modification)
+class ModificationIfNotNullSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.IfNotNull<T>, Modification<T>>("IfNotNull") {
+    override fun getDeferred(): KSerializer<Modification<T>> = Modification.serializer(inner)
+    override fun inner(it: Modification.IfNotNull<T>): Modification<T> = it.modification
+    override fun outer(it: Modification<T>): Modification.IfNotNull<T> = Modification.IfNotNull(it)
 }
 
-class ModificationAssignSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.Assign<T>> {
-    val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Assign") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.Assign<T> =
-        Modification.Assign(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.Assign<T>) =
-        encoder.encodeSerializableValue(to, value.value)
+class ModificationAssignSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.Assign<T>, T>("Assign") {
+    override fun getDeferred(): KSerializer<T> = inner
+    override fun inner(it: Modification.Assign<T>): T = it.value
+    override fun outer(it: T): Modification.Assign<T> = Modification.Assign(it)
 }
 
-class ModificationCoerceAtMostSerializer<T : Comparable<T>>(val inner: KSerializer<T>) :
-    KSerializer<Modification.CoerceAtMost<T>> {
-    val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("CoerceAtMost") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.CoerceAtMost<T> =
-        Modification.CoerceAtMost(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.CoerceAtMost<T>) =
-        encoder.encodeSerializableValue(to, value.value)
+class ModificationCoerceAtMostSerializer<T: Comparable<T>>(val inner: KSerializer<T>) : WrappingSerializer<Modification.CoerceAtMost<T>, T>("CoerceAtMost") {
+    override fun getDeferred(): KSerializer<T> = inner
+    override fun inner(it: Modification.CoerceAtMost<T>): T = it.value
+    override fun outer(it: T): Modification.CoerceAtMost<T> = Modification.CoerceAtMost(it)
 }
 
-class ModificationCoerceAtLeastSerializer<T : Comparable<T>>(val inner: KSerializer<T>) :
-    KSerializer<Modification.CoerceAtLeast<T>> {
-    val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("CoerceAtLeast") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.CoerceAtLeast<T> =
-        Modification.CoerceAtLeast(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.CoerceAtLeast<T>) =
-        encoder.encodeSerializableValue(to, value.value)
+class ModificationCoerceAtLeastSerializer<T: Comparable<T>>(val inner: KSerializer<T>) : WrappingSerializer<Modification.CoerceAtLeast<T>, T>("CoerceAtLeast") {
+    override fun getDeferred(): KSerializer<T> = inner
+    override fun inner(it: Modification.CoerceAtLeast<T>): T = it.value
+    override fun outer(it: T): Modification.CoerceAtLeast<T> = Modification.CoerceAtLeast(it)
 }
 
-class ModificationIncrementSerializer<T : Number>(val inner: KSerializer<T>) : KSerializer<Modification.Increment<T>> {
-    val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Increment") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.Increment<T> =
-        Modification.Increment(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.Increment<T>) =
-        encoder.encodeSerializableValue(to, value.by)
+class ModificationIncrementSerializer<T : Number>(val inner: KSerializer<T>) : WrappingSerializer<Modification.Increment<T>, T>("Increment") {
+    override fun getDeferred(): KSerializer<T> = inner
+    override fun inner(it: Modification.Increment<T>): T = it.by
+    override fun outer(it: T): Modification.Increment<T> = Modification.Increment(it)
 }
 
-class ModificationMultiplySerializer<T : Number>(val inner: KSerializer<T>) : KSerializer<Modification.Multiply<T>> {
-    val to by lazy { inner }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Multiply") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.Multiply<T> =
-        Modification.Multiply(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.Multiply<T>) =
-        encoder.encodeSerializableValue(to, value.by)
+class ModificationMultiplySerializer<T : Number>(val inner: KSerializer<T>) : WrappingSerializer<Modification.Multiply<T>, T>("Multiply") {
+    override fun getDeferred(): KSerializer<T> = inner
+    override fun inner(it: Modification.Multiply<T>): T = it.by
+    override fun outer(it: T): Modification.Multiply<T> = Modification.Multiply(it)
 }
 
-object ModificationAppendStringSerializer : KSerializer<Modification.AppendString> {
-    val to by lazy { serializer<String>() }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("AppendString") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.AppendString =
-        Modification.AppendString(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.AppendString) =
-        encoder.encodeSerializableValue(to, value.value)
+object ModificationAppendStringSerializer : WrappingSerializer<Modification.AppendString, String>("AppendString") {
+    override fun getDeferred(): KSerializer<String> = String.serializer()
+    override fun inner(it: Modification.AppendString): String = it.value
+    override fun outer(it: String): Modification.AppendString = Modification.AppendString(it)
 }
 
-class ModificationListAppendSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.ListAppend<T>> {
-    val to by lazy { ListSerializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("ListAppend") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.ListAppend<T> =
-        Modification.ListAppend(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.ListAppend<T>) =
-        encoder.encodeSerializableValue(to, value.items)
+class ModificationListAppendSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.ListAppend<T>, List<T>>("ListAppend") {
+    override fun getDeferred() = ListSerializer(inner)
+    override fun inner(it: Modification.ListAppend<T>): List<T> = it.items
+    override fun outer(it: List<T>): Modification.ListAppend<T> = Modification.ListAppend(it)
 }
 
-class ModificationSetAppendSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.SetAppend<T>> {
-    val to by lazy { SetSerializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("SetAppend") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.SetAppend<T> =
-        Modification.SetAppend(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.SetAppend<T>) =
-        encoder.encodeSerializableValue(to, value.items)
+class ModificationSetAppendSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.SetAppend<T>, Set<T>>("SetAppend") {
+    override fun getDeferred() = SetSerializer(inner)
+    override fun inner(it: Modification.SetAppend<T>): Set<T> = it.items
+    override fun outer(it: Set<T>): Modification.SetAppend<T> = Modification.SetAppend(it)
 }
 
-class ModificationListRemoveSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.ListRemove<T>> {
-    val to by lazy { Condition.serializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("ListRemove") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.ListRemove<T> =
-        Modification.ListRemove(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.ListRemove<T>) =
-        encoder.encodeSerializableValue(to, value.condition)
+class ModificationListRemoveSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.ListRemove<T>, Condition<T>>("ListRemove") {
+    override fun getDeferred() = Condition.serializer(inner)
+    override fun inner(it: Modification.ListRemove<T>): Condition<T> = it.condition
+    override fun outer(it: Condition<T>): Modification.ListRemove<T> = Modification.ListRemove(it)
 }
 
-class ModificationSetRemoveSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.SetRemove<T>> {
-    val to by lazy { Condition.serializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("SetRemove") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.SetRemove<T> =
-        Modification.SetRemove(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.SetRemove<T>) =
-        encoder.encodeSerializableValue(to, value.condition)
+class ModificationSetRemoveSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.SetRemove<T>, Condition<T>>("SetRemove") {
+    override fun getDeferred() = Condition.serializer(inner)
+    override fun inner(it: Modification.SetRemove<T>): Condition<T> = it.condition
+    override fun outer(it: Condition<T>): Modification.SetRemove<T> = Modification.SetRemove(it)
 }
 
-class ModificationListRemoveInstancesSerializer<T>(val inner: KSerializer<T>) :
-    KSerializer<Modification.ListRemoveInstances<T>> {
-    val to by lazy { ListSerializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("ListRemoveInstances") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.ListRemoveInstances<T> =
-        Modification.ListRemoveInstances(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.ListRemoveInstances<T>) =
-        encoder.encodeSerializableValue(to, value.items)
+class ModificationListRemoveInstancesSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.ListRemoveInstances<T>, List<T>>("ListRemoveInstances") {
+    override fun getDeferred() = ListSerializer(inner)
+    override fun inner(it: Modification.ListRemoveInstances<T>): List<T> = it.items
+    override fun outer(it: List<T>): Modification.ListRemoveInstances<T> = Modification.ListRemoveInstances(it)
 }
 
-class ModificationSetRemoveInstancesSerializer<T>(val inner: KSerializer<T>) :
-    KSerializer<Modification.SetRemoveInstances<T>> {
-    val to by lazy { SetSerializer(inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("SetRemoveInstances") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.SetRemoveInstances<T> =
-        Modification.SetRemoveInstances(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.SetRemoveInstances<T>) =
-        encoder.encodeSerializableValue(to, value.items)
+class ModificationSetRemoveInstancesSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.SetRemoveInstances<T>, Set<T>>("SetRemoveInstances") {
+    override fun getDeferred() = SetSerializer(inner)
+    override fun inner(it: Modification.SetRemoveInstances<T>): Set<T> = it.items
+    override fun outer(it: Set<T>): Modification.SetRemoveInstances<T> = Modification.SetRemoveInstances(it)
 }
 
-class ModificationCombineSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.Combine<T>> {
-    val to by lazy { MapSerializer(serializer<String>(), inner) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("Combine") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.Combine<T> =
-        Modification.Combine(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.Combine<T>) =
-        encoder.encodeSerializableValue(to, value.map)
+class ModificationCombineSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.Combine<T>, Map<String, T>>("Combine") {
+    override fun getDeferred(): KSerializer<Map<String, T>> = MapSerializer(serializer<String>(), inner)
+    override fun inner(it: Modification.Combine<T>): Map<String, T> = it.map
+    override fun outer(it: Map<String, T>): Modification.Combine<T> = Modification.Combine(it)
 }
 
-class ModificationModifyByKeySerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.ModifyByKey<T>> {
-    val to by lazy { MapSerializer(serializer<String>(), Modification.serializer(inner)) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("ModifyByKey") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.ModifyByKey<T> =
-        Modification.ModifyByKey(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.ModifyByKey<T>) =
-        encoder.encodeSerializableValue(to, value.map)
+class ModificationModifyByKeySerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.ModifyByKey<T>, Map<String, Modification<T>>>("ModifyByKey") {
+    override fun getDeferred(): KSerializer<Map<String, Modification<T>>> = MapSerializer(serializer<String>(), Modification.serializer(inner))
+    override fun inner(it: Modification.ModifyByKey<T>): Map<String, Modification<T>> = it.map
+    override fun outer(it: Map<String, Modification<T>>): Modification.ModifyByKey<T> = Modification.ModifyByKey(it)
 }
 
-class ModificationRemoveKeysSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.RemoveKeys<T>> {
-    val to by lazy { SetSerializer(serializer<String>()) }
-    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("RemoveKeys") { to.descriptor }
-    override fun deserialize(decoder: Decoder): Modification.RemoveKeys<T> =
-        Modification.RemoveKeys(decoder.decodeSerializableValue(to))
-
-    override fun serialize(encoder: Encoder, value: Modification.RemoveKeys<T>) =
-        encoder.encodeSerializableValue(to, value.fields)
+class ModificationRemoveKeysSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.RemoveKeys<T>, Set<String>>("RemoveKeys") {
+    override fun getDeferred(): KSerializer<Set<String>> = SetSerializer(serializer<String>())
+    override fun inner(it: Modification.RemoveKeys<T>): Set<String> = it.fields
+    override fun outer(it: Set<String>): Modification.RemoveKeys<T> = Modification.RemoveKeys(it)
 }
 
-class ModificationListDropFirstSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.ListDropFirst<T>> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ListDropFirst", PrimitiveKind.BOOLEAN)
-    override fun deserialize(decoder: Decoder): Modification.ListDropFirst<T> {
-        decoder.decodeBoolean()
-        return Modification.ListDropFirst()
-    }
-
-    override fun serialize(encoder: Encoder, value: Modification.ListDropFirst<T>) = encoder.encodeBoolean(true)
+class ModificationListDropFirstSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.ListDropFirst<T>, Boolean>("ListDropFirst") {
+    override fun getDeferred(): KSerializer<Boolean> = Boolean.serializer()
+    override fun inner(it: Modification.ListDropFirst<T>): Boolean = true
+    override fun outer(it: Boolean): Modification.ListDropFirst<T> = Modification.ListDropFirst()
 }
 
-class ModificationSetDropFirstSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.SetDropFirst<T>> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("SetDropFirst", PrimitiveKind.BOOLEAN)
-    override fun deserialize(decoder: Decoder): Modification.SetDropFirst<T> {
-        decoder.decodeBoolean()
-        return Modification.SetDropFirst()
-    }
-
-    override fun serialize(encoder: Encoder, value: Modification.SetDropFirst<T>) = encoder.encodeBoolean(true)
+class ModificationSetDropFirstSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.SetDropFirst<T>, Boolean>("SetDropFirst") {
+    override fun getDeferred(): KSerializer<Boolean> = Boolean.serializer()
+    override fun inner(it: Modification.SetDropFirst<T>): Boolean = true
+    override fun outer(it: Boolean): Modification.SetDropFirst<T> = Modification.SetDropFirst()
 }
 
-class ModificationListDropLastSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.ListDropLast<T>> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ListDropLast", PrimitiveKind.BOOLEAN)
-    override fun deserialize(decoder: Decoder): Modification.ListDropLast<T> {
-        decoder.decodeBoolean()
-        return Modification.ListDropLast()
-    }
-
-    override fun serialize(encoder: Encoder, value: Modification.ListDropLast<T>) = encoder.encodeBoolean(true)
+class ModificationListDropLastSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.ListDropLast<T>, Boolean>("ListDropLast") {
+    override fun getDeferred(): KSerializer<Boolean> = Boolean.serializer()
+    override fun inner(it: Modification.ListDropLast<T>): Boolean = true
+    override fun outer(it: Boolean): Modification.ListDropLast<T> = Modification.ListDropLast()
 }
 
-class ModificationSetDropLastSerializer<T>(val inner: KSerializer<T>) : KSerializer<Modification.SetDropLast<T>> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("SetDropLast", PrimitiveKind.BOOLEAN)
-    override fun deserialize(decoder: Decoder): Modification.SetDropLast<T> {
-        decoder.decodeBoolean()
-        return Modification.SetDropLast()
-    }
-
-    override fun serialize(encoder: Encoder, value: Modification.SetDropLast<T>) = encoder.encodeBoolean(true)
+class ModificationSetDropLastSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<Modification.SetDropLast<T>, Boolean>("SetDropLast") {
+    override fun getDeferred(): KSerializer<Boolean> = Boolean.serializer()
+    override fun inner(it: Modification.SetDropLast<T>): Boolean = true
+    override fun outer(it: Boolean): Modification.SetDropLast<T> = Modification.SetDropLast()
 }
 
