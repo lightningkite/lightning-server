@@ -10,8 +10,11 @@ import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.docGroup
 import io.ktor.util.reflect.*
 import kotlinx.serialization.*
+import kotlinx.serialization.builtins.ArraySerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.internal.GeneratedSerializer
 import kotlinx.serialization.json.*
 import kotlin.reflect.KClass
@@ -100,27 +103,54 @@ val lightningServerSchema: LightningServerSchema by lazy {
 }
 
 @Serializable
-enum class JsonType2 {
+enum class JsonType2(val isPrimitive: Boolean) {
     @SerialName("null")
-    NULL,
+    NULL(false),
 
     @SerialName("array")
-    ARRAY,
+    ARRAY(false),
 
     @SerialName("number")
-    NUMBER,
+    NUMBER(true),
 
     @SerialName("integer")
-    INTEGER,
+    INTEGER(true),
 
     @SerialName("string")
-    STRING,
+    STRING(true),
 
     @SerialName("boolean")
-    BOOLEAN,
+    BOOLEAN(true),
 
     @SerialName("object")
-    OBJECT,
+    OBJECT(false),
+}
+
+@Serializable(JsonType3Serializer::class)
+data class JsonType3(val inner: JsonType2, val nullable: Boolean = false)
+
+object JsonType3Serializer: KSerializer<JsonType3> {
+    val multi = ArraySerializer(JsonType2.serializer())
+    val single = JsonType2.serializer()
+    @OptIn(InternalSerializationApi::class)
+    override val descriptor: SerialDescriptor =
+        buildSerialDescriptor("JsonType3", PolymorphicKind.SEALED) {
+            // Resolve cyclic dependency in descriptors by late binding
+            element("JsonType3.MultiType", multi.descriptor)
+            element("JsonType3.SingleType", single.descriptor)
+        }
+
+    override fun serialize(encoder: Encoder, value: JsonType3) {
+        if(value.nullable) encoder.encodeSerializableValue(multi, arrayOf(value.inner, JsonType2.NULL))
+        else encoder.encodeSerializableValue(single, value.inner)
+    }
+
+    override fun deserialize(decoder: Decoder): JsonType3 {
+        val input = decoder as? JsonDecoder ?: throw IllegalStateException("This serializer can only be used with Json format")
+        val element = input.decodeJsonElement()
+        return if(element is JsonArray) JsonType3(decoder.json.decodeFromJsonElement(single, element[0]), true)
+        else JsonType3(decoder.json.decodeFromJsonElement(single, element))
+    }
 }
 
 @Serializable
@@ -132,7 +162,7 @@ data class JsonSchemaType(
     val minimum: Double? = null,
     val maximum: Double? = null,
     val mimeType: String? = null,
-    val type: JsonType2? = null,
+    val type: JsonType3? = null,
     val pattern: String? = null,
     val options: JsonObject? = null,
     val format: String? = null,
@@ -140,7 +170,7 @@ data class JsonSchemaType(
     val properties: Map<String, JsonSchemaType>? = null,
     val additionalProperties: JsonSchemaType? = null,
     val required: List<String>? = null,
-    val anyOf: List<JsonSchemaType>? = null,
+    val oneOf: List<JsonSchemaType>? = null,
     val const: String? = null,
     val links: List<JsonSchemaTypeLink>? = null,
 )
@@ -206,7 +236,7 @@ class JsonSchemaBuilder(val json: Json) {
         annotation { it: References -> copy(references = key(json.serializersModule.serializer(it.references.java))) }
         annotation { it: MimeType -> copy(mimeType = it.mime) }
         override { it: ServerFileSerialization ->
-            JsonSchemaType(type = (JsonType2.STRING), format = "file", options = buildJsonObject {
+            JsonSchemaType(type = JsonType3(JsonType2.STRING), format = "file", options = buildJsonObject {
                 putJsonObject("upload") {
                     put("upload_handler", "mainUploadHandler")
                     put("auto_upload", true)
@@ -214,19 +244,47 @@ class JsonSchemaBuilder(val json: Json) {
             }, links = listOf(JsonSchemaTypeLink("{{self}}", "View File")))
         }
         override { it: ExternalServerFileSerializer ->
-            JsonSchemaType(type = (JsonType2.STRING), format = "file", options = buildJsonObject {
+            JsonSchemaType(type = JsonType3(JsonType2.STRING), format = "file", options = buildJsonObject {
                 putJsonObject("upload") {
                     put("upload_handler", "mainUploadHandler")
                     put("auto_upload", true)
                 }
             }, links = listOf(JsonSchemaTypeLink("{{self}}", "View File")))
         }
-        override { it: LocalDateSerializer -> JsonSchemaType(type = (JsonType2.STRING), format = "date") }
-        override { it: LocalTimeSerializer -> JsonSchemaType(type = (JsonType2.STRING), format = "time") }
-        override { it: ZonedDateTimeSerializer -> JsonSchemaType(type = (JsonType2.STRING), format = "date-time-zone") }
-        override { it: InstantSerializer -> JsonSchemaType(type = (JsonType2.STRING), format = "date-time") }
-        override { it: ConditionSerializer<*> -> JsonSchemaType(type = (JsonType2.OBJECT)) }
-        override { it: ModificationSerializer<*> -> JsonSchemaType(type = (JsonType2.OBJECT)) }
+        override { it: LocalDateSerializer -> JsonSchemaType(type = JsonType3(JsonType2.STRING), format = "date") }
+        override { it: LocalTimeSerializer -> JsonSchemaType(type = JsonType3(JsonType2.STRING), format = "time") }
+        override { it: ZonedDateTimeSerializer -> JsonSchemaType(type = JsonType3(JsonType2.STRING), format = "date-time-zone") }
+        override { it: InstantSerializer -> JsonSchemaType(type = JsonType3(JsonType2.STRING), format = "date-time") }
+        override { it: ConditionSerializer<*> ->
+            val desc = it.descriptor
+            JsonSchemaType(
+                title = desc.serialName.substringBefore('<').substringAfterLast('.').humanize(),
+                type = JsonType3(JsonType2.OBJECT),
+                oneOf = it.serializerMap.map { (key, ser) ->
+                    val propTitle = key.humanize()
+                    val value = get(ser, listOf(), propTitle)
+                    JsonSchemaType(
+                        title = propTitle,
+                        type = JsonType3(JsonType2.OBJECT),
+                        properties = mapOf(key to value)
+                    )
+                }
+            )
+        }
+        override { it: ModificationSerializer<*> ->
+//            val desc = it.descriptor
+//            JsonSchemaType(
+//                title = desc.serialName.substringBefore('<').substringAfterLast('.').humanize(),
+//                type = JsonType3(JsonType2.OBJECT),
+//                anyOf = it.serializerMap.map { (key, ser) ->
+//                    val propTitle = key.humanize()
+//                    get(ser, listOf(), propTitle).copy(
+//                        title = propTitle
+//                    )
+//                }
+//            )
+            JsonSchemaType(type = JsonType3(JsonType2.OBJECT))
+        }
     }
 
     inline fun <reified T : Annotation> annotation(crossinline handler: JsonSchemaType.(T) -> JsonSchemaType) {
@@ -240,20 +298,27 @@ class JsonSchemaBuilder(val json: Json) {
     fun key(serializer: KSerializer<*>): String = serializer.descriptor.serialName
 
     @OptIn(InternalSerializationApi::class)
-    operator fun get(serializer: KSerializer<*>, annotationsToApply: List<Annotation> = listOf()): JsonSchemaType {
+    operator fun get(serializer: KSerializer<*>, annotationsToApply: List<Annotation> = listOf(), title: String = "Value"): JsonSchemaType {
         val desc = serializer.descriptor
         val annos = annotationsToApply + desc.annotations
+        if(serializer is WrappingSerializer<*, *>) {
+            return get(serializer.to, annotationsToApply, title)
+        }
         if (desc.kind == SerialKind.CONTEXTUAL) {
             val c2 = if (desc is LazyRenamedSerialDescriptor) desc.getter() else desc
             val contextual = c2.capturedKClass?.let { klass -> json.serializersModule.getContextual(klass) }
                 ?: throw IllegalStateException("Contextual missing for $this")
             return if (desc.isNullable)
-                get(contextual.nullable)
+                get(contextual.nullable, annotationsToApply = annos, title = title)
             else
-                get(contextual)
+                get(contextual, annotationsToApply = annos, title = title)
         }
         if (desc.isNullable) {
-            return JsonSchemaType(anyOf = listOf(get(serializer.nullElement()!!, annos).copy(title = "Present"), JsonSchemaType(type = (JsonType2.NULL), title = "N/A")))
+            val inner = get(serializer.nullElement()!!, annos, title)
+            if(inner.type?.inner?.isPrimitive == true) {
+                return inner.copy(type = inner.type.copy(nullable = true))
+            }
+            return JsonSchemaType(oneOf = listOf(inner.copy(title = title), JsonSchemaType(type = JsonType3(JsonType2.NULL), title = "$title N/A")))
         }
 
         fun defining(serializer: KSerializer<*>, action: ()->JsonSchemaType): JsonSchemaType {
@@ -268,22 +333,22 @@ class JsonSchemaBuilder(val json: Json) {
             return defining(serializer) { it(serializer).applyAnnotations(annos) }
         }
         return when (desc.kind) {
-            PrimitiveKind.BOOLEAN -> JsonSchemaType(type = (JsonType2.BOOLEAN)).applyAnnotations(annos)
+            PrimitiveKind.BOOLEAN -> JsonSchemaType(type = JsonType3(JsonType2.BOOLEAN)).applyAnnotations(annos)
             PrimitiveKind.BYTE,
             PrimitiveKind.SHORT,
             PrimitiveKind.LONG,
-            PrimitiveKind.INT -> JsonSchemaType(type = (JsonType2.INTEGER)).applyAnnotations(annos)
+            PrimitiveKind.INT -> JsonSchemaType(type = JsonType3(JsonType2.INTEGER)).applyAnnotations(annos)
             PrimitiveKind.FLOAT,
             PrimitiveKind.DOUBLE,
-            -> JsonSchemaType(type = (JsonType2.NUMBER)).applyAnnotations(annos)
+            -> JsonSchemaType(type = JsonType3(JsonType2.NUMBER)).applyAnnotations(annos)
 
             PrimitiveKind.CHAR,
             PrimitiveKind.STRING,
-            -> JsonSchemaType(type = (JsonType2.STRING)).applyAnnotations(annos)
+            -> JsonSchemaType(type = JsonType3(JsonType2.STRING)).applyAnnotations(annos)
 
             SerialKind.ENUM -> defining(serializer) { JsonSchemaType(
-                type = (JsonType2.STRING),
-                anyOf = (0 until desc.elementsCount)
+                type = JsonType3(JsonType2.STRING),
+                oneOf = (0 until desc.elementsCount)
                     .map {
                         val value = desc.getElementName(it)
                         JsonSchemaType(
@@ -294,36 +359,37 @@ class JsonSchemaBuilder(val json: Json) {
                     }
             ).applyAnnotations(annos) }
 
-            StructureKind.LIST -> JsonSchemaType(type = (JsonType2.ARRAY), items = get(serializer.listElement()!!)).applyAnnotations(annos)
+            StructureKind.LIST -> JsonSchemaType(type = JsonType3(JsonType2.ARRAY), items = get(serializer.listElement() ?: throw IllegalStateException("Could not find list element for ${serializer}"), title = title)).applyAnnotations(annos)
 
             StructureKind.MAP -> JsonSchemaType(
-                type = (JsonType2.OBJECT),
-                additionalProperties = get(serializer.mapValueElement()!!)
+                type = JsonType3(JsonType2.OBJECT),
+                additionalProperties = get(serializer.mapValueElement()!!, title = title)
             ).applyAnnotations(annos)
 
             StructureKind.CLASS -> defining(serializer) {
                 val childSerializers = (serializer as GeneratedSerializer<*>).childSerializers()
                 JsonSchemaType(
                     title = desc.serialName.substringBefore('<').substringAfterLast('.').humanize(),
-                    type = (JsonType2.OBJECT),
+                    type = JsonType3(JsonType2.OBJECT),
                     properties = (0 until desc.elementsCount).associate {
-                        desc.getElementName(it) to get(childSerializers[it]).copy(
-                            title = desc.getElementName(it).humanize()
-                        ).applyAnnotations(desc.getElementAnnotations(it))
+                        val propTitle = desc.getElementName(it).humanize()
+                        desc.getElementName(it) to get(childSerializers[it], desc.getElementAnnotations(it), propTitle).copy(
+                            title = propTitle
+                        )
                     }
                 ).applyAnnotations(annos)
             }
 
             StructureKind.OBJECT -> JsonSchemaType(
-                type = (JsonType2.OBJECT),
+                type = JsonType3(JsonType2.OBJECT),
                 properties = mapOf()
             ).applyAnnotations(annos)
 
             PolymorphicKind.SEALED -> TODO()/*JsonSchemaType(
-                type = (JsonType2.OBJECT),
+                type = JsonType3(JsonType2.OBJECT),
                 properties = mapOf(
                     "type" to JsonSchemaType(
-                        type = (JsonType2.STRING),
+                        type = JsonType3(JsonType2.STRING),
                         enum = desc.elementNames.toList(),
                         anyOf =
                     )

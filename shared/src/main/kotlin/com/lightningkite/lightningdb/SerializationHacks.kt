@@ -16,18 +16,32 @@ import kotlinx.serialization.modules.contextual
 import kotlin.reflect.KClass
 import kotlin.reflect.full.memberProperties
 
+abstract class WrappingSerializer<OUTER, INNER>(val name: String): KSerializer<OUTER> {
+    abstract fun getDeferred(): KSerializer<INNER>
+    abstract fun inner(it: OUTER): INNER
+    abstract fun outer(it: INNER): OUTER
+    val to by lazy { getDeferred() }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor(name) { to.descriptor }
+    override fun deserialize(decoder: Decoder): OUTER = outer(decoder.decodeSerializableValue(to))
+    override fun serialize(encoder: Encoder, value: OUTER) =
+        encoder.encodeSerializableValue(to, inner(value))
+}
+
 fun KSerializer<*>.listElement(): KSerializer<*>? {
+    if(this is WrappingSerializer<*, *>) return this.to.listElement()
     val inner = this.nullElement() ?: this
     val theoreticalMethod = inner::class.java.methods.find { it.name.contains("getElementSerializer") } ?: return null
     return theoreticalMethod.invoke(inner, inner) as KSerializer<*>
 }
 
 fun KSerializer<*>.mapKeyElement(): KSerializer<*>? {
+    if(this is WrappingSerializer<*, *>) return this.to.mapKeyElement()
     val inner = this.nullElement() ?: this
     val theoreticalMethod = inner::class.java.methods.find { it.name.contains("getKeySerializer") } ?: return null
     return theoreticalMethod.invoke(inner) as KSerializer<*>
 }
 fun KSerializer<*>.mapValueElement(): KSerializer<*>? {
+    if(this is WrappingSerializer<*, *>) return this.to.mapValueElement()
     val inner = this.nullElement() ?: this
     val theoreticalMethod = inner::class.java.methods.find { it.name.contains("getValueSerializer") } ?: return null
     return theoreticalMethod.invoke(inner) as KSerializer<*>

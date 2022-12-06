@@ -16,9 +16,11 @@ data class TestModel(
     val name: String = "No Name",
     @Description("The number") val number: Int = 3123,
     @MimeType("text/html") @JsonSchemaFormat("jodit") val content: String = "",
-    @MimeType("image/*") val file: ServerFile? = null,
+//    @MimeType("image/*") val file: ServerFile? = null,
     @References(TestModel::class) val replyTo: UUID? = null,
-    val status: Status = Status.DRAFT
+    val privateInfo: String? = null,
+    val status: Status = Status.DRAFT,
+    val allowedReplies: Condition<TestModel> = Condition.Always()
 ) : HasId<UUID>
 
 @Serializable

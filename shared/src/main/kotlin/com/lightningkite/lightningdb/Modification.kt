@@ -8,30 +8,6 @@ import kotlin.reflect.KProperty1
 
 @Serializable(ModificationSerializer::class)
 // Why is this class open instead of sealed?  See https://github.com/Kotlin/kotlinx.serialization/issues/1843
-@Description("""
-    Some kind of modification on a given type.
-    Formatted as a JSON object with one of the following keys:
-    <some property on the type> - A modification on that particular property.
-    "Chain" - Make multiple modifications.
-    "Assign" - Assign the given value.
-    "IfNotNull" - If the current value isn't null, apply the modification given.
-    "CoerceAtMost" - TODO: Document
-    "CoerceAtLeast" - TODO: Document
-    "Increment" - TODO: Document
-    "Multiply" - TODO: Document
-    "AppendString" - TODO: Document
-    "AppendList" - TODO: Document
-    "AppendSet" - TODO: Document
-    "Remove" - TODO: Document
-    "RemoveInstances" - TODO: Document
-    "DropFirst" - TODO: Document
-    "DropLast" - TODO: Document
-    "PerElement" - TODO: Document
-    "Combine" - TODO: Document
-    "ModifyByKey" - TODO: Document
-    "RemoveKeys" - TODO: Document
-    "OnField" - TODO: Document
-""")
 open class Modification<T: IsCodableAndHashable> protected constructor()  {
     open override fun hashCode(): Int { fatalError() }
     open override fun equals(other: Any?): Boolean { fatalError() }

@@ -8,39 +8,6 @@ import kotlin.reflect.KProperty1
 
 @Serializable(ConditionSerializer::class)
 // Why is this class open instead of sealed?  See https://github.com/Kotlin/kotlinx.serialization/issues/1843
-@Description(
-    """
-    Some kind of condition on a given type.
-    Formatted as a JSON object with one of the following keys:
-    <some property on the type> - A condition for that particular property.
-    "Never" - Set to true, indicates that the condition never passes.
-    "Always" - Set to true, indicates that the condition always passes.
-    "And" - A list of other conditions, which all must pass.
-    "Or" - A list of other conditions, any of which can pass.
-    "Not" - Another condition to invert.
-    "Equal" - Must be equal to the given value.
-    "NotEqual" - Must not be equal to the given value.
-    "Inside" - Must be inside the given list of values.
-    "NotInside" - Must not be inside the given list of values.
-    "GreaterThan" - Must be greater than the given value.
-    "LessThan" - Must be less than the given value.
-    "GreaterThanOrEqual" - Must be greater than or equal to the given value.
-    "LessThanOrEqual" - Must be less than or equal to the given value.
-    "StringContains" - TODO: Document
-    "FullTextSearch" - TODO: Document
-    "RegexMatches" - TODO: Document
-    "IntBitsClear" - TODO: Document
-    "IntBitsSet" - TODO: Document
-    "IntBitsAnyClear" - TODO: Document
-    "IntBitsAnySet" - TODO: Document
-    "AllElements" - TODO: Document
-    "AnyElements" - TODO: Document
-    "SizesEquals" - TODO: Document
-    "Exists" - TODO: Document
-    "OnKey" - TODO: Document
-    "IfNotNull" - TODO: Document
-"""
-)
 open class Condition<T : IsCodableAndHashable> protected constructor() {
     open override fun hashCode(): Int {
         fatalError()
