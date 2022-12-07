@@ -683,7 +683,7 @@ internal fun handlers() {
                       type    = "TXT"
                       ttl     = "300"
                       records = [
-                        "v=spf1 include:amazonses.com -all"
+                        "v=spf1 include:amazonses.com ~all"
                       ]
                     }
                     resource "aws_ses_domain_identity" "${key}_domain_identity" {
