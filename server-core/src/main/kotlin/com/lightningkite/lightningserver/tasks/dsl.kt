@@ -54,7 +54,7 @@ suspend fun doOnce(name: String, database: ()-> Database, maxDuration: Long = 60
         action()
         a.updateOneById(
             name,
-            modification { it.completed assign Instant.now() }
+            modification { (it.completed assign Instant.now()) then (it.errorMessage assign null)}
         )
     } catch(e: Exception) {
         a.updateOneById(
