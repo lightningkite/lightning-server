@@ -10,7 +10,7 @@ import kotlinx.serialization.serializer
 import kotlin.reflect.typeOf
 
 
-fun HttpRequest.jwt(): String? = headers[HttpHeader.Authorization]?.removePrefix("Bearer ") ?: headers.cookies[HttpHeader.Authorization]?.removePrefix("Bearer ") ?: queryParameter("jwt")
+fun HttpRequest.jwt(): String? = queryParameter("jwt") ?: headers[HttpHeader.Authorization]?.removePrefix("Bearer ") ?: headers.cookies[HttpHeader.Authorization]?.removePrefix("Bearer ")
 inline fun <reified T> HttpRequest.jwt(jwtSigner: JwtSigner): T? = jwt(jwtSigner, Serialization.module.serializer())
 fun <T> HttpRequest.jwt(jwtSigner: JwtSigner, serializer: KSerializer<T>): T? =
     jwt()?.let {

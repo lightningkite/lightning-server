@@ -96,7 +96,7 @@ resource "aws_route53_record" "email_spf" {
   type    = "TXT"
   ttl     = "300"
   records = [
-    "v=spf1 include:amazonses.com -all"
+    "v=spf1 include:amazonses.com ~all"
   ]
 }
 resource "aws_ses_domain_identity" "email_domain_identity" {

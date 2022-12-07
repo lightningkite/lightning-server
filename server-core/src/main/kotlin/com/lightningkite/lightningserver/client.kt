@@ -10,4 +10,7 @@ val client = HttpClient(CIO) {
     install(ContentNegotiation) {
         json(Serialization.jsonWithoutDefaults)
     }
+    engine {
+        this.requestTimeout = 60000
+    }
 }
