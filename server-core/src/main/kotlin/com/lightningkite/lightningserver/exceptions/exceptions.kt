@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.serialization.Serialization
 
 import com.lightningkite.lightningserver.serialization.toHttpContent
+import com.lightningkite.lightningserver.settings.generalSettings
 import io.ktor.util.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encodeToString
@@ -29,6 +30,14 @@ open class HttpStatusException(
         data = data,
     )
     suspend fun toResponse(request: HttpRequest): HttpResponse {
+        if(request.headers.accept.firstOrNull() == ContentType.Text.Html) {
+            return HttpResponse.html(content = HtmlDefaults.basePage("""
+                <h1>${status.toString().escapeHTML()}</h1>
+                <p>${message}</p>
+                ${detail.let { "<!--${it.escapeHTML()}-->" } ?: ""}
+                ${if(generalSettings().debug) "<!--${stackTraceToString().escapeHTML()}-->" else ""}
+            """.trimIndent()))
+        }
         return HttpResponse(
             body = toLSError().toHttpContent(request.headers.accept),
             status = status
