@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.typed
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.builtins.serializer
+import java.lang.Exception
 
 open class BaseAuthEndpoints<USER : Any, ID>(
     path: ServerPath,
@@ -65,5 +66,20 @@ open class BaseAuthEndpoints<USER : Any, ID>(
         description = "Retrieves the user that you currently are",
         errorCases = listOf(),
         implementation = { user: USER, _: Unit -> user }
+    )
+    val anonymous = path("anonymous").get.typed(
+        authInfo = AuthInfo(
+            checker = { try { userAccess.authInfo.checker(it) } catch(e: Exception) { null } },
+            type = userAccess.authInfo.type,
+            required = false
+        ),
+        inputType = Unit.serializer(),
+        outputType = String.serializer(),
+        summary = "Anonymous Token",
+        description = "Retrieves a token for a new, anonymous user.",
+        errorCases = listOf(),
+        implementation = { user: USER?, _: Unit ->
+            return@typed jwtSigner().token(userAccess.idSerializer, userAccess.anonymous().let(userAccess::id))
+        }
     )
 }

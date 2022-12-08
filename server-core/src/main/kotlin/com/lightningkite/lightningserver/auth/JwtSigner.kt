@@ -62,12 +62,12 @@ data class JwtSigner(
             Serialization.json.decodeJwt(hasher, serializer, token, audience ?: generalSettings().publicUrl)
         } catch (e: JwtExpiredException) {
             throw UnauthorizedException(
-                body = "This authorization has expired.",
+                message = "This authorization has expired.",
                 cause = e
             )
         } catch (e: JwtException) {
             throw UnauthorizedException(
-                body = "Invalid token",
+                message = "Invalid token",
                 cause = e
             )
         }

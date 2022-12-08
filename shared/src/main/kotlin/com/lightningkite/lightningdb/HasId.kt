@@ -36,3 +36,24 @@ interface HasPhoneNumber {
 object HasPhoneNumberFields {
     fun <T: HasPhoneNumber> phoneNumber() = HasPhoneNumber::phoneNumber as KProperty1<T, String>
 }
+
+@SwiftProtocolExtends("Codable", "Hashable")
+interface HasMaybeEmail {
+    val email: String?
+}
+
+@Suppress("UNCHECKED_CAST")
+object HasMaybeEmailFields {
+    fun <T: HasMaybeEmail> email() = HasMaybeEmail::email as KProperty1<T, String?>
+}
+
+
+@SwiftProtocolExtends("Codable", "Hashable")
+interface HasMaybePhoneNumber {
+    val phoneNumber: String?
+}
+
+@Suppress("UNCHECKED_CAST")
+object HasMaybePhoneNumberFields {
+    fun <T: HasMaybePhoneNumber> phoneNumber() = HasMaybePhoneNumber::phoneNumber as KProperty1<T, String?>
+}

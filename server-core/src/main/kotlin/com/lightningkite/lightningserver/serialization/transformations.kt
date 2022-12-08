@@ -28,7 +28,7 @@ fun <T> HttpRequest.queryParameters(serializer: KSerializer<T>): T {
             queryParameters.groupBy { it.first }.mapValues { it.value.joinToString(","){ it.second } }
         )
     } catch (e: SerializationException) {
-        throw BadRequestException(e.message, cause = e.cause)
+        throw BadRequestException(detail = "serialization", message = e.message ?: "Unknown serialization error", cause = e.cause)
     }
 }
 
@@ -39,7 +39,7 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
             ?: throw BadRequestException("Content type $type not accepted; available types are ${Serialization.parsers.keys.joinToString()}")
         return parser(this, serializer)
     } catch (e: SerializationException) {
-        throw BadRequestException(e.message, cause = e.cause)
+        throw BadRequestException(detail = "serialization", message = e.message ?: "Unknown serialization error", cause = e.cause)
     }
 }
 

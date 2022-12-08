@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
@@ -85,15 +86,11 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Detail",
         description = "Gets a single ${modelName} by ID.",
         errorCases = listOf(
-            ApiEndpoint.ErrorCase(
-                status = HttpStatus.NotFound,
-                internalCode = 0,
-                description = "There was no known object by that ID."
-            ),
-            ApiEndpoint.ErrorCase(
-                status = HttpStatus.BadRequest,
-                internalCode = 0,
-                description = "The ID could not be parsed."
+            LSError(
+                http = HttpStatus.NotFound.code,
+                detail = "",
+                message = "There was no known object by that ID.",
+                data = ""
             )
         ),
         implementation = { user: USER, id: ID, input: Unit ->
@@ -171,15 +168,11 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Replace",
         description = "Replaces a single ${modelName} by ID.",
         errorCases = listOf(
-            ApiEndpoint.ErrorCase(
-                status = HttpStatus.NotFound,
-                internalCode = 0,
-                description = "There was no known object by that ID."
-            ),
-            ApiEndpoint.ErrorCase(
-                status = HttpStatus.BadRequest,
-                internalCode = 0,
-                description = "The ID could not be parsed."
+            LSError(
+                http = HttpStatus.NotFound.code,
+                detail = "",
+                message = "There was no known object by that ID.",
+                data = ""
             )
         ),
         implementation = { user: USER, id: ID, value: T ->
@@ -211,15 +204,11 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Modify with Diff",
         description = "Modifies a ${modelName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
-            ApiEndpoint.ErrorCase(
-                status = HttpStatus.NotFound,
-                internalCode = 0,
-                description = "There was no known object by that ID."
-            ),
-            ApiEndpoint.ErrorCase(
-                status = HttpStatus.BadRequest,
-                internalCode = 0,
-                description = "The ID could not be parsed."
+            LSError(
+                http = HttpStatus.NotFound.code,
+                detail = "",
+                message = "There was no known object by that ID.",
+                data = ""
             )
         ),
         implementation = { user: USER, id: ID, input: Modification<T> ->
@@ -237,15 +226,11 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Modify",
         description = "Modifies a ${modelName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
-            ApiEndpoint.ErrorCase(
-                status = HttpStatus.NotFound,
-                internalCode = 0,
-                description = "There was no known object by that ID."
-            ),
-            ApiEndpoint.ErrorCase(
-                status = HttpStatus.BadRequest,
-                internalCode = 0,
-                description = "The ID could not be parsed."
+            LSError(
+                http = HttpStatus.NotFound.code,
+                detail = "",
+                message = "There was no known object by that ID.",
+                data = ""
             )
         ),
         implementation = { user: USER, id: ID, input: Modification<T> ->
@@ -277,15 +262,11 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Delete",
         description = "Deletes a ${modelName} by id.",
         errorCases = listOf(
-            ApiEndpoint.ErrorCase(
-                status = HttpStatus.NotFound,
-                internalCode = 0,
-                description = "There was no known object by that ID."
-            ),
-            ApiEndpoint.ErrorCase(
-                status = HttpStatus.BadRequest,
-                internalCode = 0,
-                description = "The ID could not be parsed."
+            LSError(
+                http = HttpStatus.NotFound.code,
+                detail = "",
+                message = "There was no known object by that ID.",
+                data = ""
             )
         ),
         implementation = { user: USER, id: ID, _: Unit ->
