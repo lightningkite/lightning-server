@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.HttpHeader
+import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.websocket.WebSockets
@@ -18,11 +19,13 @@ fun <T> HttpRequest.jwt(jwtSigner: JwtSigner, serializer: KSerializer<T>): T? =
             jwtSigner.verify(serializer, it)
         } catch(e: UnauthorizedException) {
             throw UnauthorizedException(
-                body = e.body,
-                headers = {
+                message = e.message,
+                detail = e.detail.takeUnless { it.isBlank() } ?: "jwt",
+                cause = e,
+                data = e.data,
+                headers = HttpHeaders.Builder().apply{
                     setCookie(HttpHeader.Authorization, "deleted", maxAge = 0)
-                },
-                cause = e.cause
+                }.build()
             )
         }
     }
@@ -35,11 +38,13 @@ fun <T> WebSockets.ConnectEvent.jwt(jwtSigner: JwtSigner, serializer: KSerialize
             jwtSigner.verify(serializer, it)
         } catch(e: UnauthorizedException) {
             throw UnauthorizedException(
-                body = e.body,
-                headers = {
+                message = e.message,
+                detail = e.detail.takeUnless { it.isBlank() } ?: "jwt",
+                cause = e,
+                data = e.data,
+                headers = HttpHeaders.Builder().apply{
                     setCookie(HttpHeader.Authorization, "deleted", maxAge = 0)
-                },
-                cause = e.cause
+                }.build()
             )
         }
     }

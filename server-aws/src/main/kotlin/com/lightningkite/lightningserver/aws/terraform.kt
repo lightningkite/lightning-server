@@ -400,57 +400,6 @@ internal fun handlers() {
         }
     )
     TerraformSection.handler<DatabaseSettings>(
-        name = "MongoDB Serverless Project",
-        priority = 0,
-        providers = listOf(TerraformProvider.mongodbatlas),
-        inputs = { key ->
-            listOf(
-                inputString("${key}_project_id", null)
-            )
-        },
-        resources = { key ->
-            """
-                resource "random_password" "${key}" {
-                  length           = 32
-                  special          = true
-                  override_special = "-_"
-                }
-                resource "mongodbatlas_serverless_instance" "$key" {
-                  project_id   = var.${key}_project_id
-                  name         = "$namePrefixSafe$key"
-
-                  provider_settings_backing_provider_name = "AWS"
-                  provider_settings_provider_name = "SERVERLESS"
-                  provider_settings_region_name = replace(upper(var.deployment_location), "-", "_")
-                }
-                resource "mongodbatlas_database_user" "test" {
-                  username           = "$namePrefixSafe$key-main"
-                  password           = random_password.$key.result
-                  project_id         = var.${key}_project_id
-                  auth_database_name = "admin"
-
-                  roles {
-                    role_name     = "readWrite"
-                    database_name = "default"
-                  }
-
-                  roles {
-                    role_name     = "readAnyDatabase"
-                    database_name = "admin"
-                  }
-
-                }
-            """.trimIndent()
-        },
-        settingOutput = { key ->
-            """
-                {
-                  url = "mongodb+srv://$namePrefixSafe$key-main:${'$'}{random_password.${key}.result}@${'$'}{replace(mongodbatlas_serverless_instance.$key.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
-                }
-            """.trimIndent()
-        }
-    )
-    TerraformSection.handler<DatabaseSettings>(
         name = "MongoDB Serverless",
         priority = 0,
         providers = listOf(TerraformProvider.mongodbatlas),
@@ -489,6 +438,86 @@ internal fun handlers() {
                   provider_settings_backing_provider_name = "AWS"
                   provider_settings_provider_name = "SERVERLESS"
                   provider_settings_region_name = replace(upper(var.deployment_location), "-", "_")
+                }
+                resource "mongodbatlas_database_user" "$key" {
+                  username           = "$namePrefixSafe$key-main"
+                  password           = random_password.$key.result
+                  project_id         = mongodbatlas_project.$key.id
+                  auth_database_name = "admin"
+
+                  roles {
+                    role_name     = "readWrite"
+                    database_name = "default"
+                  }
+
+                  roles {
+                    role_name     = "readAnyDatabase"
+                    database_name = "admin"
+                  }
+
+                }
+            """.trimIndent()
+        },
+        settingOutput = { key ->
+            """
+                {
+                  url = "mongodb+srv://$namePrefixSafe$key-main:${'$'}{random_password.${key}.result}@${'$'}{replace(mongodbatlas_serverless_instance.$key.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
+                }
+            """.trimIndent()
+        }
+    )
+    TerraformSection.handler<DatabaseSettings>(
+        name = "MongoDB Dedicated",
+        priority = 0,
+        providers = listOf(TerraformProvider.mongodbatlas),
+        inputs = { key ->
+            listOf(
+                inputString("${key}_org_id", null),
+//                inputString("${key}_team_id", null)
+            )
+        },
+        resources = { key ->
+            """
+                resource "mongodbatlas_project" "$key" {
+                  name   = "$namePrefixSafe$key"
+                  org_id = var.${key}_org_id
+                  
+                  is_collect_database_specifics_statistics_enabled = true
+                  is_data_explorer_enabled                         = true
+                  is_performance_advisor_enabled                   = true
+                  is_realtime_performance_panel_enabled            = true
+                  is_schema_advisor_enabled                        = true
+                }
+                resource "mongodbatlas_project_ip_access_list" "$key" {
+                  project_id   = mongodbatlas_project.$key.id
+                  cidr_block = "0.0.0.0/0"
+                  comment    = "Anywhere"
+                }
+                resource "random_password" "${key}" {
+                  length           = 32
+                  special          = true
+                  override_special = "-_"
+                }
+                resource "mongodbatlas_advanced_cluster" "$key" {
+                  project_id   = mongodbatlas_project.$key.id
+                  name         = "$namePrefixSafe$key"
+                  cluster_type = "REPLICASET"
+
+                  replication_specs {
+                    region_configs {
+                      electable_specs {
+                        instance_size = "M10"
+                        node_count    = 3
+                      }
+                      analytics_specs {
+                        instance_size = "M10"
+                        node_count    = 1
+                      }
+                      provider_name = "AWS"
+                      priority      = 1
+                      region_name   = replace(upper(var.deployment_location), "-", "_")
+                    }
+                  }
                 }
                 resource "mongodbatlas_database_user" "$key" {
                   username           = "$namePrefixSafe$key-main"
@@ -670,6 +699,10 @@ internal fun handlers() {
                     resource "aws_ses_domain_identity" "${key}" {
                       domain = var.domain_name
                     }
+                    resource "aws_ses_domain_mail_from" "$key" {
+                      domain           = aws_ses_domain_identity.$key.domain
+                      mail_from_domain = "mail.${'$'}{var.domain_name}"
+                    }
                     resource "aws_route53_record" "${key}" {
                       zone_id = data.aws_route53_zone.main.zone_id
                       name    = "_amazonses.${'$'}{var.domain_name}"
@@ -677,20 +710,26 @@ internal fun handlers() {
                       ttl     = "600"
                       records = [aws_ses_domain_identity.${key}.verification_token]
                     }
-                    resource "aws_route53_record" "${key}_spf" {
+                    resource "aws_ses_domain_dkim" "${key}_dkim" {
+                      domain = aws_ses_domain_identity.${key}.domain
+                    }
+                    resource "aws_route53_record" "${key}_spf_mail_from" {
                       zone_id = data.aws_route53_zone.main.zone_id
-                      name    = var.domain_name
+                      name    = aws_ses_domain_mail_from.$key.mail_from_domain
                       type    = "TXT"
                       ttl     = "300"
                       records = [
-                        "v=spf1 include:amazonses.com ~all"
+                        "v=spf1 include:amazonses.com -all"
                       ]
                     }
-                    resource "aws_ses_domain_identity" "${key}_domain_identity" {
-                      domain = var.domain_name
-                    }
-                    resource "aws_ses_domain_dkim" "${key}_dkim" {
-                      domain = aws_ses_domain_identity.${key}_domain_identity.domain
+                    resource "aws_route53_record" "${key}_spf_domain" {
+                      zone_id = data.aws_route53_zone.main.zone_id
+                      name    = aws_ses_domain_identity.$key.domain
+                      type    = "TXT"
+                      ttl     = "300"
+                      records = [
+                        "v=spf1 include:amazonses.com -all"
+                      ]
                     }
                     resource "aws_route53_record" "${key}_dkim_records" {
                       count   = 3

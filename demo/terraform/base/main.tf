@@ -247,6 +247,7 @@ resource "aws_s3_bucket_cors_configuration" "files" {
   }
 
   cors_rule {
+    allowed_headers = ["*"]
     allowed_methods = ["GET", "HEAD"]
     allowed_origins = ["*"]
   }
