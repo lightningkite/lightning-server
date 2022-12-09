@@ -63,7 +63,7 @@ class EmailAuthTest {
                 emailAuth.loginEmailPin.implementation(Unit, EmailPinLogin("joseph@lightningkite.com", pin))
                 fail()
             } catch (e: BadRequestException) {
-                assertEquals("Incorrect PIN", e.body?.data)
+                assertEquals("Incorrect PIN", e.message)
             }
         }
     }

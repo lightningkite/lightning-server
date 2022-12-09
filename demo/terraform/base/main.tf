@@ -189,13 +189,35 @@ resource "random_password" "database" {
   special          = true
   override_special = "-_"
 }
-resource "mongodbatlas_serverless_instance" "database" {
+resource "mongodbatlas_advanced_cluster" "database" {
   project_id   = mongodbatlas_project.database.id
-  name         = "demo${var.deployment_name}database"
+  name         = "demo${var.deployment_name}database2"
+  cluster_type = "REPLICASET"
 
-  provider_settings_backing_provider_name = "AWS"
-  provider_settings_provider_name = "SERVERLESS"
-  provider_settings_region_name = replace(upper(var.deployment_location), "-", "_")
+#  lifecycle { ignore_changes = [instance_size] }
+
+  replication_specs {
+    region_configs {
+      auto_scaling {
+        compute_enabled = true
+        compute_min_instance_size = "M10"
+        compute_max_instance_size = "M40"
+        compute_scale_down_enabled = true
+        disk_gb_enabled = true
+      }
+      electable_specs {
+        instance_size = "M10"
+        node_count    = 3
+      }
+      analytics_specs {
+        instance_size = "M10"
+        node_count    = 1
+      }
+      priority      = 7
+      provider_name = "AWS"
+      region_name   = replace(upper(var.deployment_location), "-", "_")
+    }
+  }
 }
 resource "mongodbatlas_database_user" "database" {
   username           = "demo${var.deployment_name}database-main"
@@ -865,7 +887,7 @@ resource "aws_s3_object" "app_settings" {
         cors = var.cors
     }
     database = {
-      url = "mongodb+srv://demo${var.deployment_name}database-main:${random_password.database.result}@${replace(mongodbatlas_serverless_instance.database.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
+      url = "mongodb+srv://demo${var.deployment_name}database-main:${random_password.database.result}@${replace(mongodbatlas_advanced_cluster.database.connection_strings[0].standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
     }
     cache = {
         url = "dynamodb://${var.deployment_location}/demo-${var.deployment_name}_${var.deployment_name}"

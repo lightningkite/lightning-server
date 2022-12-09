@@ -64,7 +64,7 @@ class SmsAuthTest {
                 phoneAuth.loginSmsPin.implementation(Unit, PhonePinLogin("8013693729", pin))
                 fail()
             } catch (e: BadRequestException) {
-                assertEquals("Incorrect PIN", e.body?.data)
+                assertEquals("Incorrect PIN", e.message)
             }
         }
     }

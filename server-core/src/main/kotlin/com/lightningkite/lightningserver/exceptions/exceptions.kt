@@ -49,10 +49,10 @@ open class HttpStatusException(
 }
 
 class BadRequestException(detail: String = "", message: String = "", data: String = "", cause: Throwable? = null, headers: HttpHeaders = HttpHeaders.EMPTY): HttpStatusException(HttpStatus.BadRequest, detail, message, data, headers, cause)
-fun BadRequestException(message: String): BadRequestException = BadRequestException(message = message)
+fun BadRequestException(message: String): BadRequestException = BadRequestException(message = message, detail = "")
 class UnauthorizedException(detail: String = "", message: String = "", data: String = "", cause: Throwable? = null, headers: HttpHeaders = HttpHeaders.EMPTY): HttpStatusException(HttpStatus.Unauthorized, detail, message, data, headers, cause)
-fun UnauthorizedException(message: String): UnauthorizedException = UnauthorizedException(message = message)
+fun UnauthorizedException(message: String): UnauthorizedException = UnauthorizedException(message = message, detail = "")
 class ForbiddenException(detail: String = "", message: String = "", data: String = "", cause: Throwable? = null, headers: HttpHeaders = HttpHeaders.EMPTY): HttpStatusException(HttpStatus.Forbidden, detail, message, data, headers, cause)
-fun ForbiddenException(message: String): ForbiddenException = ForbiddenException(message = message)
+fun ForbiddenException(message: String): ForbiddenException = ForbiddenException(message = message, detail = "")
 class NotFoundException(detail: String = "", message: String = "", data: String = "", cause: Throwable? = null, headers: HttpHeaders = HttpHeaders.EMPTY): HttpStatusException(HttpStatus.NotFound, detail, message, data, headers, cause)
-fun NotFoundException(message: String): NotFoundException = NotFoundException(message = message)
+fun NotFoundException(message: String): NotFoundException = NotFoundException(message = message, detail = "")
