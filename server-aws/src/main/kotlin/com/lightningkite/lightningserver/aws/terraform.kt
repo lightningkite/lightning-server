@@ -473,7 +473,8 @@ internal fun handlers() {
         inputs = { key ->
             listOf(
                 inputString("${key}_org_id", null),
-//                inputString("${key}_team_id", null)
+                inputString("${key}_min_size", "M10"),
+                inputString("${key}_max_size", "M40")
             )
         },
         resources = { key ->
@@ -498,23 +499,30 @@ internal fun handlers() {
                   special          = true
                   override_special = "-_"
                 }
-                resource "mongodbatlas_advanced_cluster" "$key" {
-                  project_id   = mongodbatlas_project.$key.id
+                resource "mongodbatlas_advanced_cluster" "database" {
+                  project_id   = mongodbatlas_project.database.id
                   name         = "$namePrefixSafe$key"
                   cluster_type = "REPLICASET"
-
+                #  lifecycle { ignore_changes = [instance_size] }
                   replication_specs {
                     region_configs {
+                      auto_scaling {
+                        compute_enabled = true
+                        compute_min_instance_size = "M10"
+                        compute_max_instance_size = var.${key}_max_size
+                        compute_scale_down_enabled = true
+                        disk_gb_enabled = true
+                      }
                       electable_specs {
-                        instance_size = "M10"
+                        instance_size = var.${key}_min_size
                         node_count    = 3
                       }
                       analytics_specs {
-                        instance_size = "M10"
+                        instance_size = var.${key}_min_size
                         node_count    = 1
                       }
+                      priority      = 7
                       provider_name = "AWS"
-                      priority      = 1
                       region_name   = replace(upper(var.deployment_location), "-", "_")
                     }
                   }
