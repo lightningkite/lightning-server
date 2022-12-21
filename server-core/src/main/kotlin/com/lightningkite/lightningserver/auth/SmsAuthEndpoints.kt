@@ -16,7 +16,6 @@ import java.net.URLDecoder
 import java.security.SecureRandom
 import java.time.Duration
 
-@Deprecated("Migrate to SmsAuthEndpoints2")
 open class SmsAuthEndpoints<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val phoneAccess: UserPhoneAccess<USER, ID>,
@@ -24,7 +23,7 @@ open class SmsAuthEndpoints<USER : Any, ID>(
     private val sms: () -> SMSClient,
     private val template: suspend (code: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." }
 ) : ServerPathGroup(base.path) {
-    private fun cacheKey(phone: String): String = phone + "_phone_login_pin"
+    val pin = PinHandler(cache, "sms")
     val loginSms = path("login-sms").post.typed(
         summary = "SMS Login Code",
         description = "Sends a login text to the given phone",
@@ -32,8 +31,7 @@ open class SmsAuthEndpoints<USER : Any, ID>(
         successCode = HttpStatus.NoContent,
         implementation = { user: Unit, phoneUnsafe: String ->
             val phone = phoneUnsafe.filter { it.isDigit() }
-            val pin = SecureRandom().nextInt(1000000).toString().padStart(6, '0')
-            cache().set(cacheKey(phone), pin.secureHash(), Duration.ofMinutes(15))
+            val pin = pin.generate(phone)
             sms().send(
                 to = phone,
                 message = template(pin)
@@ -48,10 +46,7 @@ open class SmsAuthEndpoints<USER : Any, ID>(
         successCode = HttpStatus.OK,
         implementation = { anon: Unit, input: PhonePinLogin ->
             val phone = input.phone.filter { it.isDigit() }
-            val pin = cache().get<String>(cacheKey(input.phone))
-                ?: throw NotFoundException("No PIN found for phone ${input.phone}; perhaps it has expired?")
-            if(!input.pin.checkHash(pin)) throw BadRequestException("Incorrect PIN")
-            cache().remove(cacheKey(input.phone))
+            pin.assert(phone, input.pin)
             base.typedHandler.token(phoneAccess.byPhone(input.phone))
         }
     )

@@ -68,49 +68,4 @@ class SmsAuthTest {
             }
         }
     }
-    @Test
-    fun testPinCorrect2() {
-        val info = ModelInfo<User, User, UUID>(
-            getCollection = { TestSettings.database().collection() },
-            forUser = { this }
-        )
-        val phoneAccess: UserPhoneAccess<User, UUID> = info.userPhoneAccess { User(email = "$it@phone", phoneNumber = it) }
-        val path = ServerPath("auth")
-        val baseAuth = BaseAuthEndpoints(path, phoneAccess, TestSettings.jwtSigner)
-        val phoneAuth = SmsAuthEndpoints2(baseAuth, phoneAccess, TestSettings.cache, TestSettings.sms)
-        runBlocking {
-            val secret = phoneAuth.loginSms.implementation(Unit, "8013693729")
-            val pinRegex = Regex("[0-9][0-9][0-9][0-9][0-9][0-9]")
-            val pin = (TestSettings.sms() as ConsoleSMSClient).lastMessageSent?.message?.let {
-                pinRegex.find(it)?.value
-            }!!
-            val token = phoneAuth.loginSmsPin.implementation(Unit, secret, pin)
-            assertEquals(
-                HttpStatus.OK, baseAuth.getSelf.route.test(
-                headers = HttpHeaders(HttpHeader.Authorization to token, HttpHeader.ContentType to "application/json")
-            ).status)
-        }
-    }
-    @Test
-    fun testPinIncorrect2() {
-        val info = ModelInfo<User, User, UUID>(
-            getCollection = { TestSettings.database().collection() },
-            forUser = { this }
-        )
-        val phoneAccess: UserPhoneAccess<User, UUID> = info.userPhoneAccess { User(email = "$it@phone", phoneNumber = it) }
-        val path = ServerPath("auth")
-        val baseAuth = BaseAuthEndpoints(path, phoneAccess, TestSettings.jwtSigner)
-        val phoneAuth = SmsAuthEndpoints2(baseAuth, phoneAccess, TestSettings.cache, TestSettings.sms)
-        runBlocking {
-            val secret = phoneAuth.loginSms.implementation(Unit, "8013693729")
-            val pinRegex = Regex("[0-9][0-9][0-9][0-9][0-9][0-9]")
-            val pin = "wrong"
-            try {
-                phoneAuth.loginSmsPin.implementation(Unit, secret, pin)
-                fail()
-            } catch (e: BadRequestException) {
-                assertEquals("Incorrect PIN", e.message)
-            }
-        }
-    }
 }
