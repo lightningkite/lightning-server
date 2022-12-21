@@ -711,6 +711,13 @@ internal fun handlers() {
                       domain           = aws_ses_domain_identity.$key.domain
                       mail_from_domain = "mail.${'$'}{var.domain_name}"
                     }
+                    resource "aws_route53_record" "${key}_mx" {
+                      zone_id = data.aws_route53_zone.main.zone_id
+                      name    = aws_ses_domain_mail_from.$key.mail_from_domain
+                      type    = "MX"
+                      ttl     = "600"
+                      records = ["10 feedback-smtp.${'$'}{var.deployment_location}.amazonses.com"] # Change to the region in which `aws_ses_domain_identity.example` is created
+                    }
                     resource "aws_route53_record" "${key}" {
                       zone_id = data.aws_route53_zone.main.zone_id
                       name    = "_amazonses.${'$'}{var.domain_name}"

@@ -15,16 +15,16 @@ import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
 import java.security.SecureRandom
 import java.time.Duration
+import java.util.*
 
-@Deprecated("Migrate to SmsAuthEndpoints2")
-open class SmsAuthEndpoints<USER : Any, ID>(
+open class SmsAuthEndpoints2<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val phoneAccess: UserPhoneAccess<USER, ID>,
     private val cache: () -> CacheInterface,
     private val sms: () -> SMSClient,
-    private val template: suspend (code: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." }
+    private val template: suspend (code: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." },
 ) : ServerPathGroup(base.path) {
-    private fun cacheKey(phone: String): String = phone + "_phone_login_pin"
+    private fun cacheKey(uuid: UUID): String = "sms_pin_login_$uuid"
     val loginSms = path("login-sms").post.typed(
         summary = "SMS Login Code",
         description = "Sends a login text to the given phone",
@@ -33,37 +33,39 @@ open class SmsAuthEndpoints<USER : Any, ID>(
         implementation = { user: Unit, phoneUnsafe: String ->
             val phone = phoneUnsafe.filter { it.isDigit() }
             val pin = SecureRandom().nextInt(1000000).toString().padStart(6, '0')
-            cache().set(cacheKey(phone), pin.secureHash(), Duration.ofMinutes(15))
+            val secret = UUID.randomUUID()
+            cache().set(cacheKey(secret), phone + "|" + pin.secureHash(), base.jwtSigner().emailExpiration)
             sms().send(
                 to = phone,
                 message = template(pin)
             )
-            Unit
+            secret
         }
     )
-    val loginSmsPin = path("login-sms-pin").post.typed(
+    val loginSmsPin = path("login-sms/{secret}").post.typed(
         summary = "SMS PIN Login",
         description = "Logs in to the given phone with a PIN",
         errorCases = listOf(),
         successCode = HttpStatus.OK,
-        implementation = { anon: Unit, input: PhonePinLogin ->
-            val phone = input.phone.filter { it.isDigit() }
-            val pin = cache().get<String>(cacheKey(input.phone))
-                ?: throw NotFoundException("No PIN found for phone ${input.phone}; perhaps it has expired?")
-            if(!input.pin.checkHash(pin)) throw BadRequestException("Incorrect PIN")
-            cache().remove(cacheKey(input.phone))
-            base.typedHandler.token(phoneAccess.byPhone(input.phone))
+        implementation = { anon: Unit, secret: UUID, input: String ->
+            val data = cache().get<String>(cacheKey(secret))
+                ?: throw NotFoundException("PIN has expired.")
+            val phone = data.substringBefore('|')
+            val hashedPin = data.substringAfter('|')
+            if (!input.checkHash(hashedPin)) throw BadRequestException("Incorrect PIN")
+            cache().remove(cacheKey(secret))
+            base.typedHandler.token(phoneAccess.byPhone(phone))
         }
     )
 
-    val loginSmsHtml = path("login-sms/").get.handler {
+    val loginEmailHtml = path("login-sms/").get.handler {
         HttpResponse(
             body = HttpContent.Text(
                 string = HtmlDefaults.basePage(
                     """
                     <form action='form-post/' enctype='application/x-www-form-urlencoded' method='post'>
-                        <p>Log in or sign up via SMS magic link</p>
-                        <input type='text' name='phone'/>
+                        <p>Log in or sign up via SMS PIN</p>
+                        <input type='sms' name='sms'/>
                         <button type='submit'>Submit</button>
                     </form>
                 """.trimIndent()
@@ -72,12 +74,12 @@ open class SmsAuthEndpoints<USER : Any, ID>(
             )
         )
     }
-    val loginSmsHtmlPost = path("login-sms/form-post/").post.handler {
-        val phone = it.body!!.text().split('&')
+    val loginEmailHtmlPost = path("login-sms/form-post/").post.handler {
+        val sms = it.body!!.text().split('&')
             .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
-            .get("phone")!!.filter { it.isDigit() }
-        val basis = try {
-            loginSms.implementation(Unit, phone)
+            .get("sms")!!.lowercase()
+        val secret = try {
+            loginSms.implementation(Unit, sms)
         } catch (e: Exception) {
             e.printStackTrace()
             throw e
@@ -86,10 +88,9 @@ open class SmsAuthEndpoints<USER : Any, ID>(
             body = HttpContent.Text(
                 string = HtmlDefaults.basePage(
                     """
-                <p>Success!  A text has been sent with a code to log in.</p>
-                <form action='../form-post-code/' enctype='application/x-www-form-urlencoded' method='post'>
-                    <input type='text' name='phone' value='$phone'/>
-                    <p>Enter SMS PIN</p>
+                <p>Success!  An sms has been sent with a code to log in.</p>
+                <form action='../form-post-code/$secret/' enctype='application/x-www-form-urlencoded' method='post'>
+                    <p>Enter Sms PIN</p>
                     <input type='text' name='pin'/>
                     <button type='submit'>Submit</button>
                 </form>
@@ -99,13 +100,13 @@ open class SmsAuthEndpoints<USER : Any, ID>(
             )
         )
     }
-    val loginSmsPinHtmlPost = path("login-sms/form-post-code/").post.handler {
+    val loginEmailPinHtmlPost = path("login-sms/form-post-code/{secret}/").post.handler {
         val basis = try {
             val content = it.body!!.text().split('&')
                 .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             val pin = content.get("pin")!!
-            val phone = content.get("phone")!!.filter { it.isDigit() }
-            loginSmsPin.implementation(Unit, PhonePinLogin(phone, pin))
+            val secret = UUID.fromString(it.parts["secret"]!!)
+            loginSmsPin.implementation(Unit, secret, pin)
         } catch (e: Exception) {
             e.printStackTrace()
             throw e

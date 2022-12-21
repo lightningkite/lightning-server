@@ -58,7 +58,7 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
 
     override fun checkSignature(queryParams: String): Boolean {
         return try {
-            system.signer.verify<String>(queryParams.substringAfter('=')) == file.absoluteFile.relativeTo(system.rootFile).unixPath
+            system.signer.verify(queryParams.substringAfter('=')) == file.absoluteFile.relativeTo(system.rootFile).unixPath
         } catch (e: Exception) {
             false
         }

@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthInfo
+import com.lightningkite.lightningserver.auth.cast
 import com.lightningkite.lightningserver.auth.rawUser
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
@@ -45,7 +46,7 @@ data class ApiEndpoint0<USER, INPUT : Any, OUTPUT>(
     override suspend fun invokeAny(user: USER, input: INPUT, routes: Map<String, Any?>)
         = implementation(user, input)
     override suspend fun invoke(it: HttpRequest): HttpResponse {
-        val user = authInfo.checker(it.rawUser())
+        val user = authInfo.cast(it.rawUser())
         @Suppress("UNCHECKED_CAST") val input: INPUT = when(route.method) {
             HttpMethod.GET, HttpMethod.HEAD -> it.queryParameters(inputType)
             else -> if(inputType == Unit.serializer()) Unit as INPUT else it.body!!.parse(inputType)
@@ -75,7 +76,7 @@ data class ApiEndpoint1<USER, PATH: Comparable<PATH>, INPUT : Any, OUTPUT>(
     override suspend fun invokeAny(user: USER, input: INPUT, routes: Map<String, Any?>)
             = implementation(user, routes[pathName] as PATH, input)
     override suspend fun invoke(it: HttpRequest): HttpResponse {
-        val user = authInfo.checker(it.rawUser())
+        val user = authInfo.cast(it.rawUser())
         @Suppress("UNCHECKED_CAST") val input: INPUT = when(route.method) {
             HttpMethod.GET, HttpMethod.HEAD -> it.queryParameters(inputType)
             else -> if(inputType == Unit.serializer()) Unit as INPUT else it.body!!.parse(inputType)
@@ -107,7 +108,7 @@ data class ApiEndpoint2<USER, PATH: Comparable<PATH>, PATH2: Comparable<PATH2>, 
     override suspend fun invokeAny(user: USER, input: INPUT, routes: Map<String, Any?>)
             = implementation(user, routes[pathName] as PATH, routes[path2Name] as PATH2, input)
     override suspend fun invoke(it: HttpRequest): HttpResponse {
-        val user = authInfo.checker(it.rawUser())
+        val user = authInfo.cast(it.rawUser())
         @Suppress("UNCHECKED_CAST") val input: INPUT = when(route.method) {
             HttpMethod.GET, HttpMethod.HEAD -> it.queryParameters(inputType)
             else -> if(inputType == Unit.serializer()) Unit as INPUT else it.body!!.parse(inputType)
@@ -134,7 +135,7 @@ data class ApiEndpointX<USER, INPUT: Any, OUTPUT>(
     override suspend fun invokeAny(user: USER, input: INPUT, routes: Map<String, Any?>)
             = implementation(user, input, routes)
     override suspend fun invoke(it: HttpRequest): HttpResponse {
-        val user = authInfo.checker(it.rawUser())
+        val user = authInfo.cast(it.rawUser())
         @Suppress("UNCHECKED_CAST") val input: INPUT = when(route.method) {
             HttpMethod.GET, HttpMethod.HEAD -> it.queryParameters(inputType)
             else -> if(inputType == Unit.serializer()) Unit as INPUT else it.body!!.parse(inputType)
@@ -146,19 +147,16 @@ data class ApiEndpointX<USER, INPUT: Any, OUTPUT>(
         )
     }
 }
-
-@kotlinx.serialization.Serializable
-data class IdHolder<ID>(val id: ID)
 inline fun <reified T: Comparable<T>> String.parseUrlPartOrBadRequest(): T = parseUrlPartOrBadRequest(
     Serialization.module.serializer()
 )
 fun <T> String.parseUrlPartOrBadRequest(serializer: KSerializer<T>): T = try {
-    Serialization.properties.decodeFromStringMap(IdHolder.serializer(serializer), mapOf("id" to URLDecoder.decode(this, Charsets.UTF_8))).id
+    Serialization.fromString(URLDecoder.decode(this, Charsets.UTF_8), serializer)
 } catch(e: Exception) {
     throw BadRequestException("ID ${this} could not be parsed as a ${serializer.descriptor.serialName}.")
 }
 private fun String.parseUrlPartOrBadRequestUntyped(serializer: KSerializer<*>): Any? = try {
-    Serialization.properties.decodeFromStringMap(IdHolder.serializer(serializer), mapOf("id" to URLDecoder.decode(this, Charsets.UTF_8))).id
+    Serialization.fromString(URLDecoder.decode(this, Charsets.UTF_8), serializer)
 } catch(e: Exception) {
     throw BadRequestException("ID ${this} could not be parsed as a ${serializer.descriptor.serialName}.")
 }

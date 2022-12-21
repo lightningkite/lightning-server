@@ -15,9 +15,9 @@ import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
 import java.security.SecureRandom
 import java.time.Duration
+import java.util.*
 
-@Deprecated("Transition to using EmailAuthEndpoints2 for security reasons")
-open class EmailAuthEndpoints<USER : Any, ID>(
+open class EmailAuthEndpoints2<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val emailAccess: UserEmailAccess<USER, ID>,
     private val cache: () -> CacheInterface,
@@ -47,7 +47,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         """.trimIndent())
     },
 ) : ServerPathGroup(base.path) {
-    private fun cacheKey(email: String): String = email + "_email_login_pin"
+    private fun cacheKey(uuid: UUID): String = "email_pin_login_$uuid"
     val loginEmail = path("login-email").post.typed(
         summary = "Email Login Link",
         description = "Sends a login email to the given address",
@@ -57,7 +57,8 @@ open class EmailAuthEndpoints<USER : Any, ID>(
             val address = addressUnsafe.lowercase()
             val jwt = base.typedHandler.token(emailAccess.byEmail(address), base.jwtSigner().emailExpiration)
             val pin = SecureRandom().nextInt(1000000).toString().padStart(6, '0')
-            cache().set(cacheKey(address), pin.secureHash(), Duration.ofMinutes(15))
+            val secret = UUID.randomUUID()
+            cache().set(cacheKey(secret), address + "|" + pin.secureHash(), base.jwtSigner().emailExpiration)
             val link = "${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$jwt"
             email().send(
                 subject = emailSubject(),
@@ -65,29 +66,32 @@ open class EmailAuthEndpoints<USER : Any, ID>(
                 message = "Log in to ${generalSettings().projectName} as ${address}:\n$link\nPIN: $pin",
                 htmlMessage = template(address, link, pin)
             )
-            Unit
+            secret
         }
     )
-    val loginEmailPin = path("login-email-pin").post.typed(
+    val loginEmailPin = path("login-email/{secret}").post.typed(
         summary = "Email PIN Login",
         description = "Logs in to the given email with a PIN",
         errorCases = listOf(),
         successCode = HttpStatus.OK,
-        implementation = { anon: Unit, input: EmailPinLogin ->
-            val email = input.email.lowercase()
-            val pin = cache().get<String>(cacheKey(email))
-                ?: throw NotFoundException("No PIN found for email ${email}; perhaps it has expired?")
-            if(!input.pin.checkHash(pin)) throw BadRequestException("Incorrect PIN")
-            cache().remove(cacheKey(email))
-            base.typedHandler.token(emailAccess.byEmail(email))
+        implementation = { anon: Unit, secret: UUID, input: String ->
+            val data = cache().get<String>(cacheKey(secret))
+                ?: throw NotFoundException("PIN has expired.")
+            val address = data.substringBefore('|')
+            val hashedPin = data.substringAfter('|')
+            if (!input.checkHash(hashedPin)) throw BadRequestException("Incorrect PIN")
+            cache().remove(cacheKey(secret))
+            base.typedHandler.token(emailAccess.byEmail(address))
         }
     )
-    val oauthGoogle = OauthGoogleEndpoints(path = path("oauth/google"), jwtSigner = base.jwtSigner, landing = base.landingRoute) {
-        emailAccess.byEmail(it).let(emailAccess::id).toString()
-    }
-    val oauthGithub = OauthGitHubEndpoints(path = path("oauth/github"), jwtSigner = base.jwtSigner, landing = base.landingRoute) {
-        emailAccess.byEmail(it).let(emailAccess::id).toString()
-    }
+    val oauthGoogle =
+        OauthGoogleEndpoints(path = path("oauth/google"), jwtSigner = base.jwtSigner, landing = base.landingRoute) {
+            emailAccess.byEmail(it).let(emailAccess::id).toString()
+        }
+    val oauthGithub =
+        OauthGitHubEndpoints(path = path("oauth/github"), jwtSigner = base.jwtSigner, landing = base.landingRoute) {
+            emailAccess.byEmail(it).let(emailAccess::id).toString()
+        }
     val oauthApple = OauthAppleEndpoints(
         path = path("oauth/apple"),
         jwtSigner = base.jwtSigner,
@@ -114,7 +118,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         val email = it.body!!.text().split('&')
             .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             .get("email")!!.lowercase()
-        val basis = try {
+        val secret = try {
             loginEmail.implementation(Unit, email)
         } catch (e: Exception) {
             e.printStackTrace()
@@ -125,8 +129,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
                 string = HtmlDefaults.basePage(
                     """
                 <p>Success!  An email has been sent with a code to log in.</p>
-                <form action='../form-post-code/' enctype='application/x-www-form-urlencoded' method='post'>
-                    <input type='text' name='email' value='$email'/>
+                <form action='../form-post-code/$secret/' enctype='application/x-www-form-urlencoded' method='post'>
                     <p>Enter Email PIN</p>
                     <input type='text' name='pin'/>
                     <button type='submit'>Submit</button>
@@ -137,13 +140,13 @@ open class EmailAuthEndpoints<USER : Any, ID>(
             )
         )
     }
-    val loginEmailPinHtmlPost = path("login-email/form-post-code/").post.handler {
+    val loginEmailPinHtmlPost = path("login-email/form-post-code/{secret}/").post.handler {
         val basis = try {
             val content = it.body!!.text().split('&')
                 .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             val pin = content.get("pin")!!
-            val email = content.get("email")!!.lowercase()
-            loginEmailPin.implementation(Unit, EmailPinLogin(email, pin))
+            val secret = UUID.fromString(it.parts["secret"]!!)
+            loginEmailPin.implementation(Unit, secret, pin)
         } catch (e: Exception) {
             e.printStackTrace()
             throw e

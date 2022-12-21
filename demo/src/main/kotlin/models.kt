@@ -35,3 +35,10 @@ data class User(
     override val _id: UUID = UUID.randomUUID(),
     override val email: String
 ) : HasId<UUID>, HasEmail
+
+@Serializable
+@DatabaseModel
+data class UserAlt(
+    override val _id: UUID = UUID.randomUUID(),
+    override val email: String
+) : HasId<UUID>, HasEmail

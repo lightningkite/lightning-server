@@ -21,6 +21,10 @@ import kotlinx.serialization.properties.Properties
 import nl.adaptivity.xmlutil.XMLConstants
 import nl.adaptivity.xmlutil.XmlDeclMode
 import nl.adaptivity.xmlutil.serialization.*
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.getContextualDescriptor
+import java.net.URLDecoder
 
 /**
  * A place to hold all the support Serialization types.
@@ -106,6 +110,28 @@ abstract class Serialization {
     }
     fun parser(handler: HttpContentParser) {
         parsers[handler.contentType] = handler
+    }
+
+    private fun KSerializer<*>.isPrimitive(): Boolean {
+        var current = this.descriptor
+        while (true) {
+            when (current.kind) {
+                is PrimitiveKind -> return true
+                SerialKind.CONTEXTUAL -> current =
+                    Serialization.json.serializersModule.getContextualDescriptor(current)!!
+                else -> return false
+            }
+        }
+    }
+
+    @kotlinx.serialization.Serializable
+    data class IdHolder<ID>(val id: ID)
+
+    fun <T> toString(value: T, serializer: KSerializer<T>): String {
+        return Serialization.properties.encodeToStringMap(IdHolder.serializer(serializer), IdHolder(value))["id"]!!
+    }
+    fun <T> fromString(string: String, serializer: KSerializer<T>): T {
+        return Serialization.properties.decodeFromStringMap(IdHolder.serializer(serializer), mapOf("id" to string)).id
     }
 
     init {

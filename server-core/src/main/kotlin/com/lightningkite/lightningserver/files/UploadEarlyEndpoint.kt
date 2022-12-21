@@ -64,7 +64,7 @@ class UploadEarlyEndpoint(
     fun validateFile(url: String, params: Map<String, String>): Boolean {
         return params["token"]?.let { token ->
             try {
-                val tokenUrl = signer().verify<String>(token)
+                val tokenUrl = signer().verify(token)
                 if (url == tokenUrl) {
                     GlobalScope.launch {
                         database().collection<UploadForNextRequest>()

@@ -19,7 +19,7 @@ class LocalFileSystem(rootFile: File, val serveDirectory: String, val signer: Jw
     }
 
     val fetch = ServerPath("$serveDirectory/{...}").get.handler {
-        val location = signer.verify<String>(
+        val location = signer.verify(
             it.queryParameter("token") ?: throw BadRequestException("No token provided")
         ).removePrefix("/")
         if (it.wildcard == null) throw BadRequestException("No file to look up")
@@ -81,7 +81,7 @@ class LocalFileSystem(rootFile: File, val serveDirectory: String, val signer: Jw
 
     val upload = ServerPath("$serveDirectory/{...}").put.handler {
         if (it.wildcard == null) throw BadRequestException("No file to look up")
-        val parsedToken = signer.verify<String>(
+        val parsedToken = signer.verify(
             it.queryParameter("token") ?: throw BadRequestException("No token provided")
         )
         if (!parsedToken.startsWith("W|")) throw UnauthorizedException("Token does not hold write permissions")

@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.Authorization
+import com.lightningkite.lightningserver.auth.cast
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -61,7 +62,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
                 @Suppress("UNCHECKED_CAST")
                 (Authorization.handler as Authorization.Handler<USER>).idStringToUser(it)
             }
-            val p = info.collection(info.serialization.authInfo.checker(user))
+            val p = info.collection(info.serialization.authInfo.cast(user))
             val q = event.content.copy(condition = p.fullCondition(event.content.condition))
             val c = Serialization.json.encodeToString(Query.serializer(info.serialization.serializer), q)
             subscriptionDb().updateOne(
