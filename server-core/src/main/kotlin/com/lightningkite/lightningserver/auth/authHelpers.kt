@@ -42,7 +42,7 @@ suspend inline fun <reified USER> WebSockets.ConnectEvent.user(): USER {
     }
 }
 
-
+inline fun <reified T> HttpRequest.jwt(jwtSigner: JwtSigner): T? = jwt(jwtSigner, Serialization.module.serializer())
 fun <T> HttpRequest.jwt(jwtSigner: JwtSigner, serializer: KSerializer<T>): T? =
     jwt()?.let {
         try {
