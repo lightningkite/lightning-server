@@ -70,7 +70,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         )
         val emailAccess = info.userEmailAccess { User(email = it) }
         val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner)
-        val emailAuth = EmailAuthEndpoints2(baseAuth, emailAccess, cache, email)
+        val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
     }
     val auth2 = object: ServerPathGroup(path("auth2")) {
         val info = ModelInfo<UserAlt, UserAlt, UUID>(
@@ -79,7 +79,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         )
         val emailAccess = info.userEmailAccess { UserAlt(email = it) }
         val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner)
-        val emailAuth = EmailAuthEndpoints2(baseAuth, emailAccess, cache, email)
+        val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
     }
     val uploadEarly = UploadEarlyEndpoint(path("upload"), files, database, jwtSigner)
     val testModel = TestModelEndpoints(path("test-model"))

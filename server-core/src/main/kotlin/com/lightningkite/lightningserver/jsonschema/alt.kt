@@ -234,6 +234,7 @@ class JsonSchemaBuilder(val json: Json) {
         annotation { it: JsonSchemaFormat -> copy(format = it.format) }
         annotation { it: DisplayName -> copy(title = it.text) }
         annotation { it: References -> copy(references = key(json.serializersModule.serializer(it.references.java))) }
+        annotation { it: MultipleReferences -> copy(items = items!!.copy(references = key(json.serializersModule.serializer(it.references.java)))) }
         annotation { it: MimeType -> copy(mimeType = it.mime) }
         override { it: ServerFileSerialization ->
             JsonSchemaType(type = JsonType3(JsonType2.STRING), format = "file", options = buildJsonObject {

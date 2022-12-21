@@ -152,6 +152,14 @@ annotation class References(
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class MultipleReferences(
+    val references: KClass<*>
+)
+
+
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 annotation class Index
 
 
