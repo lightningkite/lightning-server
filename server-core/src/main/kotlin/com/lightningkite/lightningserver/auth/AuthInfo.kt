@@ -20,7 +20,7 @@ fun <USER> AuthInfo<USER>.cast(any: Any?): USER {
         if (any == null) "You need to be authorized to use this." else "You need to be a $type to use this."
     )
 }
-inline fun <reified USER> AuthInfo() = if(USER::class == Unit::class) AuthInfo<USER>(tryCast = { Unit as USER }, type = null, required = false)
+inline fun <reified USER> AuthInfo() = if(USER::class == Unit::class) AuthInfo<USER>(tryCast = { Unit as USER }, type = null, required = true)
 else AuthInfo<USER>(
     tryCast = { raw -> raw as? USER },
     type = typeOf<USER>().toString().substringBefore('<').substringAfterLast('.').removeSuffix("?"),
