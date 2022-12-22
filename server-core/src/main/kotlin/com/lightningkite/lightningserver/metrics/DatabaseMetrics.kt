@@ -55,8 +55,8 @@ class DatabaseMetrics(val settings: MetricSettings, val database: ()-> Database)
     )
 
     val clearOldEndpoint = path("clear").get.typed(
-        summary = "Get Metrics",
-        description = "Get the metrics for various statistics",
+        summary = "Clear Metrics",
+        description = "Clear the metrics for various statistics",
         errorCases = listOf(),
         implementation = { anon: Unit, input: Unit ->
             settings.keepFor.entries.forEach { entry ->

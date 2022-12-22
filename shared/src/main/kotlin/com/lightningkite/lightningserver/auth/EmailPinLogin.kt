@@ -17,3 +17,10 @@ data class PhonePinLogin(
     val pin: String,
 ) {
 }
+
+@Serializable
+data class PasswordLogin(
+    val username: String,
+    val password: String,
+) {
+}

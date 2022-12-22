@@ -23,6 +23,7 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.handler
 import com.lightningkite.lightningserver.meta.metaEndpoints
 import com.lightningkite.lightningserver.metrics.Metrics
+import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.FileRedirectHandler
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -80,6 +81,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         val emailAccess = info.userEmailAccess { UserAlt(email = it) }
         val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner)
         val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
+        init { path.docName = "auth2" }
     }
     val uploadEarly = UploadEarlyEndpoint(path("upload"), files, database, jwtSigner)
     val testModel = TestModelEndpoints(path("test-model"))
