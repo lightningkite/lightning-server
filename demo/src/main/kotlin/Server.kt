@@ -25,6 +25,7 @@ import com.lightningkite.lightningserver.serialization.FileRedirectHandler
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
+import com.lightningkite.lightningserver.tasks.startupOnce
 import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.apiHelp
 import com.lightningkite.lightningserver.typed.typed
@@ -59,6 +60,12 @@ object Server : ServerPathGroup(ServerPath.root) {
             println("Files started, got ${files().root.url}")
         }
         Serialization.handler(FileRedirectHandler)
+        startupOnce("adminUser", database) {
+            database().collection<User>().insertOne(User(
+                email = "joseph+admin@lightningkite.com",
+                isSuperUser = true
+            ))
+        }
     }
 
     val userInfo = ModelInfo<User, User, UUID>(
@@ -74,7 +81,23 @@ object Server : ServerPathGroup(ServerPath.root) {
                     }
                 }
         },
-        forUser = { this }
+        forUser = {  user ->
+            val everyone: Condition<User> = Condition.Always()
+            val self: Condition<User> = condition { it._id eq user._id }
+            val admin: Condition<User> = if(user.isSuperUser) Condition.Always() else Condition.Never()
+            withPermissions(ModelPermissions(
+                create = everyone,
+                read = self or admin,
+                readMask = mask {
+                    it.hashedPassword.maskedTo("MASKED").unless(admin)
+                },
+                update = self or admin,
+                updateRestrictions = updateRestrictions {
+                    it.isSuperUser.requires(admin)
+                },
+                delete = self or admin
+            ))
+        }
     )
     val user = object: ServerPathGroup(path("user")) {
         val rest = ModelRestEndpoints(path("rest"), userInfo)
