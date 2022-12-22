@@ -34,8 +34,9 @@ enum class Status {
 @DatabaseModel
 data class User(
     override val _id: UUID = UUID.randomUUID(),
-    override val email: String
-) : HasId<UUID>, HasEmail
+    override val email: String,
+    override val hashedPassword: String = ""
+) : HasId<UUID>, HasEmail, HasPassword
 
 @Serializable
 @DatabaseModel
