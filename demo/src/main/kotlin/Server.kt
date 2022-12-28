@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.demo
 
-import com.lightningkite.lightningdb.MongoDatabase
-import com.lightningkite.lightningdb.collection
+import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.MemcachedCache
@@ -9,10 +8,7 @@ import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.db.DatabaseSettings
-import com.lightningkite.lightningserver.db.DynamoDbCache
-import com.lightningkite.lightningserver.db.ModelInfo
-import com.lightningkite.lightningserver.db.PostgresDatabase
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.email.SesClient
 import com.lightningkite.lightningserver.files.FilesSettings
@@ -23,11 +19,13 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.handler
 import com.lightningkite.lightningserver.meta.metaEndpoints
 import com.lightningkite.lightningserver.metrics.Metrics
+import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.FileRedirectHandler
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
+import com.lightningkite.lightningserver.tasks.startupOnce
 import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.apiHelp
 import com.lightningkite.lightningserver.typed.typed
@@ -35,6 +33,7 @@ import com.lightningkite.lightningserver.websocket.websocket
 import io.ktor.client.*
 import io.ktor.client.request.*
 import kotlinx.coroutines.delay
+import java.lang.IllegalStateException
 import java.time.Duration
 import java.util.*
 import kotlin.random.Random
@@ -61,16 +60,64 @@ object Server : ServerPathGroup(ServerPath.root) {
             println("Files started, got ${files().root.url}")
         }
         Serialization.handler(FileRedirectHandler)
+        startupOnce("adminUser", database) {
+            database().collection<User>().insertOne(User(
+                email = "joseph+admin@lightningkite.com",
+                isSuperUser = true
+            ))
+        }
     }
 
+    val userInfo = ModelInfo<User, User, UUID>(
+        getCollection = {
+            database().collection<User>()
+                .interceptCreate { it.copy(hashedPassword = it.hashedPassword.secureHash()) }
+                .interceptModification {
+                    it.map(User::hashedPassword) {
+                        when(it) {
+                            is Modification.Assign -> it.copy(it.value.secureHash())
+                            else -> throw IllegalStateException()
+                        }
+                    }
+                }
+        },
+        forUser = {  user ->
+            val everyone: Condition<User> = Condition.Always()
+            val self: Condition<User> = condition { it._id eq user._id }
+            val admin: Condition<User> = if(user.isSuperUser) Condition.Always() else Condition.Never()
+            withPermissions(ModelPermissions(
+                create = everyone,
+                read = self or admin,
+                readMask = mask {
+                    it.hashedPassword.maskedTo("MASKED").unless(admin)
+                },
+                update = self or admin,
+                updateRestrictions = updateRestrictions {
+                    it.isSuperUser.requires(admin)
+                },
+                delete = self or admin
+            ))
+        }
+    )
+    val user = object: ServerPathGroup(path("user")) {
+        val rest = ModelRestEndpoints(path("rest"), userInfo)
+    }
     val auth = object: ServerPathGroup(path("auth")) {
-        val info = ModelInfo<User, User, UUID>(
-            getCollection = { database().collection<User>() },
-            forUser = { this }
-        )
-        val emailAccess = info.userEmailAccess { User(email = it) }
+        val emailAccess = userInfo.userEmailAccess { User(email = it) }
+        val passAccess = userInfo.userPasswordAccess { username, hashed -> User(email = username, hashedPassword = hashed)}
         val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner)
         val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
+        val passAuth = PasswordAuthEndpoints(baseAuth, passAccess)
+    }
+    val auth2 = object: ServerPathGroup(path("auth2")) {
+        val info = ModelInfo<UserAlt, UserAlt, UUID>(
+            getCollection = { database().collection<UserAlt>() },
+            forUser = { this }
+        )
+        val emailAccess = info.userEmailAccess { UserAlt(email = it) }
+        val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner)
+        val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
+        init { path.docName = "auth2" }
     }
     val uploadEarly = UploadEarlyEndpoint(path("upload"), files, database, jwtSigner)
     val testModel = TestModelEndpoints(path("test-model"))

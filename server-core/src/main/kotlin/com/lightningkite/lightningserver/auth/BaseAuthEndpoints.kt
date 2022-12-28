@@ -1,14 +1,20 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
+import com.lightningkite.lightningserver.exceptions.BadRequestException
+import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.typed.parseUrlPartOrBadRequest
 import com.lightningkite.lightningserver.typed.typed
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.builtins.serializer
 import java.lang.Exception
+import java.security.SecureRandom
+import java.util.*
 
 open class BaseAuthEndpoints<USER : Any, ID>(
     path: ServerPath,
@@ -24,28 +30,26 @@ open class BaseAuthEndpoints<USER : Any, ID>(
         )
     }
 ) : ServerPathGroup(path) {
+    val authType = object: JwtTypedAuthorizationHandler.AuthType<USER> {
+        override val name: String
+            get() = userAccess.authInfo.type!!
+
+        @Suppress("UNCHECKED_CAST")
+        override fun tryCast(item: Any): USER? = userAccess.authInfo.tryCast(item)
+        override suspend fun retrieve(reference: String): USER = userAccess.byId(Serialization.fromString(reference, userAccess.idSerializer))
+        override fun serializeReference(item: USER): String = Serialization.toString(userAccess.id(item), userAccess.idSerializer)
+    }
+
+    val typedHandler = JwtTypedAuthorizationHandler.current(jwtSigner)
     init {
-        Authorization.handler = object : Authorization.Handler<USER> {
-            override suspend fun http(request: HttpRequest): USER? {
-                return request.jwt<ID>(jwtSigner(), userAccess.idSerializer)?.let { userAccess.byId(it) }
-            }
-
-            override suspend fun ws(request: WebSockets.ConnectEvent): USER? {
-                return request.jwt<ID>(jwtSigner(), userAccess.idSerializer)?.let { userAccess.byId(it) }
-            }
-
-            override fun userToIdString(user: USER): String =
-                Serialization.json.encodeToString(userAccess.idSerializer, userAccess.id(user))
-
-            override suspend fun idStringToUser(id: String): USER =
-                userAccess.byId(Serialization.json.decodeFromString(userAccess.idSerializer, id))
-        }
+        typedHandler.types.add(authType)
+        typedHandler.defaultType = authType
         path.docName = "Auth"
     }
 
     val landingRoute: HttpEndpoint = path("login-landing").get.handler {
-        val subject = jwtSigner().verify(userAccess.idSerializer, it.queryParameter("jwt")!!)
-        it.handleToken(jwtSigner().token(userAccess.idSerializer, subject))
+        val subject = jwtSigner().verify(it.queryParameter("jwt")!!)
+        it.handleToken(jwtSigner().token(subject))
     }
     val refreshToken = path("refresh-token").get.typed(
         authInfo = userAccess.authInfo,
@@ -55,7 +59,7 @@ open class BaseAuthEndpoints<USER : Any, ID>(
         description = "Retrieves a new token for the user.",
         errorCases = listOf(),
         implementation = { user: USER, input: Unit ->
-            jwtSigner().token(userAccess.idSerializer, user.let(userAccess::id))
+            typedHandler.token(user)
         }
     )
     val getSelf = path("self").get.typed(
@@ -68,18 +72,14 @@ open class BaseAuthEndpoints<USER : Any, ID>(
         implementation = { user: USER, _: Unit -> user }
     )
     val anonymous = path("anonymous").get.typed(
-        authInfo = AuthInfo(
-            checker = { try { userAccess.authInfo.checker(it) } catch(e: Exception) { null } },
-            type = userAccess.authInfo.type,
-            required = false
-        ),
+        authInfo = userAccess.authInfo.copy(required = false),
         inputType = Unit.serializer(),
         outputType = String.serializer(),
         summary = "Anonymous Token",
         description = "Retrieves a token for a new, anonymous user.",
         errorCases = listOf(),
         implementation = { user: USER?, _: Unit ->
-            return@typed jwtSigner().token(userAccess.idSerializer, userAccess.anonymous().let(userAccess::id))
+            return@typed typedHandler.token(userAccess.anonymous())
         }
     )
 }

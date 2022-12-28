@@ -44,6 +44,32 @@ data class JwtSigner(
     @kotlinx.serialization.Transient
     val hasher = SecureHasher.HS256(secret.toByteArray())
 
+    /**
+     * @return A JWT with the [subject], expiring in [expireDuration].
+     */
+    fun token(subject: String, expireDuration: Duration = expiration): String =
+        Serialization.json.encodeJwt(hasher, subject, expireDuration, issuer ?: generalSettings().publicUrl, audience ?: generalSettings().publicUrl)
+
+    /**
+     * Returns the subject if the token was valid.
+     */
+    fun verify(token: String): String {
+        return try {
+            Serialization.json.decodeJwt(hasher, token, audience ?: generalSettings().publicUrl)
+        } catch (e: JwtExpiredException) {
+            throw UnauthorizedException(
+                message = "This authorization has expired.",
+                cause = e
+            )
+        } catch (e: JwtException) {
+            throw UnauthorizedException(
+                message = "Invalid token",
+                cause = e
+            )
+        }
+    }
+
+
     @Deprecated("Use the version with duration instead", ReplaceWith("token(subject, Duration.ofMillis(expireDuration))", "java.time.Duration"))
     inline fun <reified T> token(subject: T, expireDuration: Long): String =
         token(Serialization.module.serializer(), subject, Duration.ofMillis(expireDuration))
@@ -83,10 +109,6 @@ data class JwtSigner(
                 else -> return false
             }
         }
-    }
-
-    companion object {
-        const val userIdKey: String = "userId"
     }
 }
 

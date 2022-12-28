@@ -55,7 +55,7 @@ data class ApiWebsocket<USER, INPUT, OUTPUT>(
     data class TypedMessageEvent<INPUT>(val id: String, val content: INPUT)
 
     override suspend fun connect(event: WebSockets.ConnectEvent) {
-        this.connect.invoke(this, TypedConnectEvent(authInfo.checker(event.rawUser()), event.id))
+        this.connect.invoke(this, TypedConnectEvent(authInfo.cast(event.rawUser()), event.id))
     }
 
     override suspend fun message(event: WebSockets.MessageEvent) {

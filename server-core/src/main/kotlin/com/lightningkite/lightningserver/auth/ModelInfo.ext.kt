@@ -4,6 +4,31 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.db.ModelInfo
 import kotlinx.serialization.KSerializer
 
+fun <T, USER, ID: Comparable<ID>> T.userPasswordAccess(
+    newUser: suspend (email: String, hashedPassword: String) -> USER
+): UserPasswordAccess<USER, ID> where USER : HasId<ID>, USER: HasPassword, T: ModelInfo<USER, USER, ID>, USER: HasEmail {
+    val info = this
+    return object: UserPasswordAccess<USER, ID> {
+        override suspend fun byUsername(username: String, password: String): USER {
+            val lowercased = username.lowercase()
+            return info.collection().findOne(Condition.OnField(HasEmailFields.email(), Condition.Equal(lowercased))) ?: newUser(lowercased, password.secureHash()).let { info.collection().insertOne(it)!! }
+        }
+
+        override fun hashedPassword(user: USER): String = user.hashedPassword
+
+        override val serializer: KSerializer<USER>
+            get() = info.serialization.serializer
+        override val idSerializer: KSerializer<ID>
+            get() = info.serialization.idSerializer
+        override val authInfo: AuthInfo<USER>
+            get() = info.serialization.authInfo
+
+        override suspend fun byId(id: ID): USER = info.collection().get(id)!!
+
+        override fun id(user: USER): ID = user._id
+    }
+}
+
 fun <T, USER, ID: Comparable<ID>> T.userEmailAccess(
     newUser: suspend (email: String) -> USER
 ): UserEmailAccess<USER, ID> where USER : HasId<ID>, T: ModelInfo<USER, USER, ID>, USER: HasEmail {

@@ -1,6 +1,6 @@
 # Lightning Server
 
-A project that drastically speeds up server development by automating the creation of RESTful APIs from models.
+A project that drastically speeds up server development.  Comparable to Django for Python.
 
 Built to work for all common serverless platforms.
 
@@ -10,31 +10,41 @@ Built to work for all common serverless platforms.
   - Multiple backends - AWS, Azure, Ktor
     - Generates Terraform for AWS
   - Database Abstraction backed by KotlinX Serialization
-    - Supports MongoDB currently, built to expand in the future
+    - Supports MongoDB, partial Postgres, local JSON storage
     - Also supports a RAM mock for unit testing
   - Cache Abstraction
-    - Supports Redis, Memcached
+    - Supports Redis, Memcached, DynamoDB
     - Also supports a RAM mock for unit testing
   - Email Abstraction
     - Supports SMTP, Amazon SES
     - Also supports a console mock for testing
   - SMS Abstraction
     - Supports Twilio and a console mock for testing
+  - File System Abstraction
+    - Supports Local, AWS S3, and Azure Blob Storage
 - Easy Server Definitions
   - Simple HTTP Endpoint Definition
   - Typed API Endpoints
     - Typed input, output, and user
-    - Supports many content types
+    - Supports many content types, including JSON, BSON, CBOR, CSV, FormData
   - Event-Based Websocket Definition
   - Scheduled tasks
   - Asynchronous tasks
-- Quick generation of model-based endpoints
-  - REST endpoints
+  - Permission rules for users accessing databases
+- Pre-built Route Sets
+  - REST endpoints with permissions
   - Authentication endpoints
-  - admin pages for managing models and debugging
+    - Email Magic Links
+    - Email PIN
+    - SMS PIN
+    - Password
+    - OAuth for Google, Apple, and GitHub
 - Server management tools
+  - Built-in database admin and endpoint tester 
   - Health check page
+  - Built-in OpenAPI documentation
   - Automatically generated documentation for API
+  - Automatically generated SDKs for TypeScript and Kotlin
 
 ## Documentation
 
@@ -44,10 +54,10 @@ Built to work for all common serverless platforms.
 
 ## Road Map
 
-- [ ] Terraform AWS Test Mode (fewer availability zones for cheaper)
-- [ ] PostgreSQL Support (Aurora on AWS)
-- [ ] DynamoDB as Cache Support
-- [ ] Cleaner Terraform for AWS
+- [ ] Improved per-environment Terraform generation
+- [ ] Key-path ordering and grouping
+- [ ] Additional Documentation
+- [ ] Tutorial
 
 ### When Requested
 

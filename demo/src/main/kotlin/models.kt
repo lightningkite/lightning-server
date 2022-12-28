@@ -18,6 +18,7 @@ data class TestModel(
     @MimeType("text/html") @JsonSchemaFormat("jodit") val content: String = "",
 //    @MimeType("image/*") val file: ServerFile? = null,
     @References(TestModel::class) val replyTo: UUID? = null,
+    @MultipleReferences(TestModel::class) val comments: List<UUID> = listOf(),
     val privateInfo: String? = null,
     val status: Status = Status.DRAFT,
     val allowedReplies: Condition<TestModel> = Condition.Always()
@@ -32,6 +33,15 @@ enum class Status {
 @Serializable
 @DatabaseModel
 data class User(
+    override val _id: UUID = UUID.randomUUID(),
+    override val email: String,
+    override val hashedPassword: String = "",
+    val isSuperUser: Boolean = false,
+) : HasId<UUID>, HasEmail, HasPassword
+
+@Serializable
+@DatabaseModel
+data class UserAlt(
     override val _id: UUID = UUID.randomUUID(),
     override val email: String
 ) : HasId<UUID>, HasEmail

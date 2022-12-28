@@ -57,3 +57,14 @@ interface HasMaybePhoneNumber {
 object HasMaybePhoneNumberFields {
     fun <T: HasMaybePhoneNumber> phoneNumber() = HasMaybePhoneNumber::phoneNumber as KProperty1<T, String?>
 }
+
+@SwiftProtocolExtends("Codable", "Hashable")
+interface HasPassword {
+    val hashedPassword: String
+}
+
+@Suppress("UNCHECKED_CAST")
+object HasPasswordFields {
+    fun <T: HasPassword> hashedPassword() = HasPassword::hashedPassword as KProperty1<T, String>
+}
+
