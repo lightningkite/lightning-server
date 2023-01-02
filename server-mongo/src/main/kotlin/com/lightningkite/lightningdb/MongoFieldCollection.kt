@@ -131,13 +131,17 @@ class MongoFieldCollection<Model : Any>(
         models: Iterable<Model>,
     ): List<Model> {
         prepare.await()
-        if(models.count() == 0) return emptyList()
+        if (models.count() == 0) return emptyList()
         val asList = models.toList()
         mongo.insertMany(asList)
         return asList
     }
 
-    override suspend fun replaceOneImpl(condition: Condition<Model>, model: Model, orderBy: List<SortPart<Model>>): EntryChange<Model> {
+    override suspend fun replaceOneImpl(
+        condition: Condition<Model>,
+        model: Model,
+        orderBy: List<SortPart<Model>>
+    ): EntryChange<Model> {
         prepare.await()
         return updateOne(condition, Modification.Assign(model), orderBy)
     }
@@ -148,7 +152,7 @@ class MongoFieldCollection<Model : Any>(
         orderBy: List<SortPart<Model>>,
     ): Boolean {
         prepare.await()
-        if(orderBy.isNotEmpty()) return updateOneIgnoringResultImpl(condition, Modification.Assign(model), orderBy)
+        if (orderBy.isNotEmpty()) return updateOneIgnoringResultImpl(condition, Modification.Assign(model), orderBy)
         return mongo.replaceOne(condition.bson(), model).matchedCount != 0L
     }
 
@@ -204,7 +208,7 @@ class MongoFieldCollection<Model : Any>(
             m.document,
             FindOneAndUpdateOptions()
                 .returnDocument(ReturnDocument.BEFORE)
-                .let { if(orderBy.isEmpty()) it else it.sort(sort(orderBy)) }
+                .let { if (orderBy.isEmpty()) it else it.sort(sort(orderBy)) }
                 .upsert(m.options.isUpsert)
                 .bypassDocumentValidation(m.options.bypassDocumentValidation)
                 .collation(m.options.collation)
@@ -255,19 +259,19 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun deleteOneImpl(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? {
         prepare.await()
         return mongo.withDocumentClass<BsonDocument>().find(condition.bson())
-            .let { if(orderBy.isEmpty()) it else it.sort(sort(orderBy)) }
+            .let { if (orderBy.isEmpty()) it else it.sort(sort(orderBy)) }
             .limit(1).toFlow().firstOrNull()?.let {
-            val id = it["_id"]
-            mongo.deleteOne(Filters.eq("_id", id))
-            MongoDatabase.bson.load(serializer, it)
-        }
+                val id = it["_id"]
+                mongo.deleteOne(Filters.eq("_id", id))
+                MongoDatabase.bson.load(serializer, it)
+            }
     }
 
     override suspend fun deleteOneIgnoringOldImpl(
         condition: Condition<Model>,
         orderBy: List<SortPart<Model>>,
     ): Boolean {
-        if(orderBy.isNotEmpty()) return deleteOneImpl(condition, orderBy) != null
+        if (orderBy.isNotEmpty()) return deleteOneImpl(condition, orderBy) != null
         prepare.await()
         return mongo.deleteOne(condition.bson()).deletedCount > 0
     }
@@ -299,21 +303,31 @@ class MongoFieldCollection<Model : Any>(
 
         serializer.descriptor.annotations.filterIsInstance<TextIndex>().firstOrNull()?.let {
             requireCompletion += launch {
-                mongo.ensureIndex(
-                    documentOf(*it.fields.map { it to "text" }.toTypedArray()),
-                    IndexOptions().name("${mongo.namespace.fullName}TextIndex")
-                )
+                val name = "${mongo.namespace.fullName}TextIndex"
+                val keys = documentOf(*it.fields.map { it to "text" }.toTypedArray())
+                val options = IndexOptions().name(name)
+                try {
+                    mongo.createIndex(keys, options)
+                } catch (e: MongoCommandException) {
+                    //there is an exception if the parameters of an existing index are changed.
+                    //then drop the index and create a new one
+                    mongo.dropIndex(name)
+                    mongo.createIndex(
+                        keys,
+                        options
+                    )
+                }
             }
         }
         serializer.descriptor.indexes().forEach {
-            if(it.unique) {
+            if (it.unique) {
                 requireCompletion += launch {
                     val keys = Sorts.ascending(it.fields)
                     val options = IndexOptions().unique(true).name(it.name)
                     try {
                         mongo.ensureIndex(keys, options)
-                    } catch(e: MongoCommandException) {
-                        if(e.errorCode == 85) {
+                    } catch (e: MongoCommandException) {
+                        if (e.errorCode == 85) {
                             mongo.dropIndex(keys)
                             mongo.ensureIndex(keys, options)
                         }
@@ -325,8 +339,8 @@ class MongoFieldCollection<Model : Any>(
                     val options = IndexOptions().unique(false).background(true).name(it.name)
                     try {
                         mongo.ensureIndex(keys, options)
-                    } catch(e: MongoCommandException) {
-                        if(e.errorCode == 85) {
+                    } catch (e: MongoCommandException) {
+                        if (e.errorCode == 85) {
                             mongo.dropIndex(keys)
                             mongo.ensureIndex(keys, options)
                         }
