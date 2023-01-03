@@ -1,30 +1,46 @@
 package com.lightningkite.lightningserver.notifications
 
 
-enum class Priority {
+@Deprecated("Use the new name", ReplaceWith("NotificationPriority", "com.lightningkite.lightningserver.notifications"))
+typealias Priority = NotificationPriority
+enum class NotificationPriority {
     HIGH,
     NORMAL
 }
 
-data class Android(
+@Deprecated("Use the new name", ReplaceWith("NotificationAndroid", "com.lightningkite.lightningserver.notifications"))
+typealias Android = NotificationAndroid
+data class NotificationAndroid(
     val channel: String? = null,
-    val priority: Priority = Priority.NORMAL,
+    val priority: NotificationPriority = NotificationPriority.NORMAL,
     val sound:String? = null,
 )
 
 data class Notification(
-    val title: String?,
-    val body: String?,
-    val imageUrl: String?,
+    val title: String? = null,
+    val body: String? = null,
+    val imageUrl: String? = null,
 )
 
-data class iOS(
+@Deprecated("Use the new name", ReplaceWith("NotificationIos", "com.lightningkite.lightningserver.notifications"))
+typealias iOS = NotificationIos
+data class NotificationIos(
     val critical: Boolean = false,
     val sound: String? = null
 )
 
-data class Web(
-    val data: Map<String, String>,
+@Deprecated("Use the new name", ReplaceWith("NotificationWeb", "com.lightningkite.lightningserver.notifications"))
+typealias Web = NotificationWeb
+data class NotificationWeb(
+    val data: Map<String, String> = mapOf(),
+)
+
+data class NotificationData(
+    val notification: Notification? = null,
+    val data: Map<String, String>? = null,
+    val android: NotificationAndroid? = null,
+    val ios: NotificationIos? = null,
+    val web: NotificationWeb? = null,
 )
 
 
@@ -37,14 +53,24 @@ interface NotificationInterface {
         data: Map<String, String>? = null,
         critical: Boolean = false,
         androidChannel: String? = null
+    ) = send(
+        targets = targets,
+        data = NotificationData(
+            notification = Notification(title, body, imageUrl),
+            data = data,
+            android = androidChannel?.let { NotificationAndroid(it, priority = if(critical) NotificationPriority.HIGH else NotificationPriority.NORMAL) },
+            ios = NotificationIos(critical = critical)
+        )
     )
 
     suspend fun send(
         targets: List<String>,
         notification: Notification? = null,
         data: Map<String, String>? = null,
-        android: Android? = null,
-        ios: iOS? = null,
-        web: Web? = null,
-    )
+        android: NotificationAndroid? = null,
+        ios: NotificationIos? = null,
+        web: NotificationWeb? = null,
+    ) = send(targets, NotificationData(notification, data, android, ios, web))
+
+    suspend fun send(targets: List<String>, data: NotificationData)
 }
