@@ -1,0 +1,22 @@
+{
+    "projectName": "demo-example",
+    "bucket": "ivieleague-deployment-states",
+    "bucketPathOverride": "demo/example",
+    "vpc": false,
+    "domain": true,
+    "profile": "default",
+    "handlers": {
+        "general": "Standard",
+        "database": "MongoDB Serverless",
+        "cache": "DynamoDB",
+        "jwt": "Standard",
+        "oauth_github": "Direct",
+        "logging": "Direct",
+        "files": "S3",
+        "metrics": "Direct",
+        "exceptions": "Direct",
+        "email": "SMTP through SES",
+        "oauth_google": "Direct",
+        "oauth_apple": "Direct"
+    }
+}
