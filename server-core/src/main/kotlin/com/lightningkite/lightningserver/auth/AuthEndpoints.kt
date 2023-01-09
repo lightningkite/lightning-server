@@ -43,50 +43,27 @@ open class AuthEndpoints<USER : Any, ID>(
     private val emailSubject: () -> String = { "${generalSettings().projectName} Log In" },
     private val template: (suspend (email: String, link: String) -> String) = HtmlDefaults.defaultLoginEmailTemplate
 ) : ServerPathGroup(path) {
+    val authType = object: JwtTypedAuthorizationHandler.AuthType<USER> {
+        override val name: String
+            get() = authInfo.type!!
+
+        @Suppress("UNCHECKED_CAST")
+        override fun tryCast(item: Any): USER? = authInfo.tryCast(item)
+        override suspend fun retrieve(reference: String): USER = userById(Serialization.fromString(reference, idSerializer))
+        override fun serializeReference(item: USER): String = Serialization.toString(userId(item), idSerializer)
+    }
+
+    val typedHandler = JwtTypedAuthorizationHandler.current(jwtSigner)
     init {
-        Authorization.handler = object : Authorization.Handler<USER> {
-            override suspend fun http(request: HttpRequest): USER? {
-                return request.jwt<ID>(jwtSigner(), idSerializer)?.let { userById(it) }
-            }
-
-            override suspend fun ws(request: WebSockets.ConnectEvent): USER? {
-                return request.jwt<ID>(jwtSigner(), idSerializer)?.let { userById(it) }
-            }
-
-            override fun userToIdString(user: USER): String =
-                Serialization.json.encodeToString(idSerializer, userId(user))
-
-            override suspend fun idStringToUser(id: String): USER =
-                userById(Serialization.json.decodeFromString(idSerializer, id))
-        }
+        typedHandler.types.add(authType)
+        typedHandler.defaultType = authType
         path.docName = "Auth"
     }
 
     val landingRoute: HttpEndpoint = path("login-landing").get.handler {
-        val subject = jwtSigner().verify(idSerializer, it.queryParameter("jwt")!!)
-        it.handleToken(jwtSigner().token(idSerializer, subject))
+        val subject = jwtSigner().verify(it.queryParameter("jwt")!!)
+        it.handleToken(jwtSigner().token(subject))
     }
-    val loginEmail = path("login-email").post.typed(
-        summary = "Email Login Link",
-        description = "Sends a login email to the given address",
-        errorCases = listOf(),
-        successCode = HttpStatus.NoContent,
-        implementation = { user: Unit, address: String ->
-            val jwt = jwtSigner().token(
-                idSerializer,
-                userByEmail(address).let(userId),
-                jwtSigner().emailExpiration
-            )
-            val link = "${generalSettings().publicUrl}${landingRoute.path}?jwt=$jwt"
-            email().send(
-                subject = emailSubject(),
-                to = listOf(address),
-                message = "Log in to ${generalSettings().projectName} as ${address}:\n$link",
-                htmlMessage = template(address, link)
-            )
-            Unit
-        }
-    )
     val refreshToken = path("refresh-token").get.typed(
         authInfo = authInfo,
         inputType = Unit.serializer(),
@@ -95,7 +72,7 @@ open class AuthEndpoints<USER : Any, ID>(
         description = "Retrieves a new token for the user.",
         errorCases = listOf(),
         implementation = { user: USER, input: Unit ->
-            jwtSigner().token(idSerializer, user.let(userId))
+            typedHandler.token(user)
         }
     )
     val getSelf = path("self").get.typed(
@@ -106,6 +83,24 @@ open class AuthEndpoints<USER : Any, ID>(
         description = "Retrieves the user that you currently are",
         errorCases = listOf(),
         implementation = { user: USER, _: Unit -> user }
+    )
+
+    val loginEmail = path("login-email").post.typed(
+        summary = "Email Login Link",
+        description = "Sends a login email to the given address",
+        errorCases = listOf(),
+        successCode = HttpStatus.NoContent,
+        implementation = { user: Unit, address: String ->
+            val jwt = typedHandler.token(userByEmail(address.lowercase()))
+            val link = "${generalSettings().publicUrl}${landingRoute.path}?jwt=$jwt"
+            email().send(
+                subject = emailSubject(),
+                to = listOf(address),
+                message = "Log in to ${generalSettings().projectName} as ${address}:\n$link",
+                htmlMessage = template(address, link)
+            )
+            Unit
+        }
     )
     val oauthGoogle = OauthGoogleEndpoints(path = path("oauth/google"), jwtSigner = jwtSigner, landing = landingRoute) {
         userByEmail(it).let(userId).toString()

@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.auth.cast
 import com.lightningkite.lightningserver.auth.rawUser
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
@@ -34,7 +35,7 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
 
     val name = info.serialization.serializer.descriptor.serialName.substringAfterLast('.')
     val edit = get("{id}/").handler {
-        val secured = info.collection(info.serialization.authInfo.checker(it.rawUser()))
+        val secured = info.collection(info.serialization.authInfo.cast(it.rawUser()))
         val item = secured.get(it.parts["id"]!!.parseUrlPartOrBadRequest(info.serialization.idSerializer))
         HttpResponse.html {
             head { includeFormScript() }
@@ -70,7 +71,7 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         }
     }
     val editDeletePost = post("{id}/delete/").handler {
-        info.collection(info.serialization.authInfo.checker(it.rawUser())).deleteOneById(
+        info.collection(info.serialization.authInfo.cast(it.rawUser())).deleteOneById(
             it.parts["id"]!!.parseUrlPartOrBadRequest(
                 info.serialization.idSerializer
             )
@@ -79,7 +80,7 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     }
     val editPost = post("{id}/").handler {
         val item: T = it.body!!.parse(info.serialization.serializer)
-        info.collection(info.serialization.authInfo.checker(it.rawUser())).replaceOneById(
+        info.collection(info.serialization.authInfo.cast(it.rawUser())).replaceOneById(
             it.parts["id"]!!.parseUrlPartOrBadRequest(
                 info.serialization.idSerializer
             ), item
@@ -87,7 +88,7 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         HttpResponse.redirectToGet("..")
     }
     val create = get("create/").handler {
-        val user = info.serialization.authInfo.checker(it.rawUser())
+        val user = info.serialization.authInfo.cast(it.rawUser())
         val item = info.defaultItem(user)
         HttpResponse.html {
             head { includeFormScript() }
@@ -111,11 +112,11 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     }
     val createPost = post("create/").handler {
         val item: T = it.body!!.parse(info.serialization.serializer)
-        info.collection(info.serialization.authInfo.checker(it.rawUser())).insertOne(item)
+        info.collection(info.serialization.authInfo.cast(it.rawUser())).insertOne(item)
         HttpResponse.redirectToGet("..")
     }
     val list = get("/").handler {
-        val secured = info.collection(info.serialization.authInfo.checker(it.rawUser()))
+        val secured = info.collection(info.serialization.authInfo.cast(it.rawUser()))
         val query = Serialization.properties.decodeFromStringMap<Query<T>>(Query.serializer(info.serialization.serializer), it.queryParameters.associate { it })
         val items = secured.query(query).toList()
         val propItems = items.map { Serialization.properties.encodeToStringMap(info.serialization.serializer, it) }

@@ -1,33 +1,61 @@
 package com.lightningkite.lightningdb
 
-import com.github.jershell.kbson.Configuration
-import com.github.jershell.kbson.KBson
+import com.github.jershell.kbson.*
 import com.lightningkite.lightningserver.db.DatabaseSettings
+import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.reactivestreams.client.MongoClient
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.overwriteWith
 import kotlinx.serialization.serializer
+import org.bson.BsonTimestamp
 import org.bson.UuidRepresentation
+import org.bson.types.Binary
+import org.bson.types.ObjectId
+import org.litote.kmongo.Id
 import org.litote.kmongo.coroutine.CoroutineDatabase
 import org.litote.kmongo.coroutine.coroutine
+import org.litote.kmongo.id.StringId
+import org.litote.kmongo.id.WrappedObjectId
 import org.litote.kmongo.reactivestreams.KMongo
-import org.litote.kmongo.serialization.configuration
-import org.litote.kmongo.serialization.kmongoSerializationModule
+import org.litote.kmongo.serialization.*
+import org.litote.kmongo.serialization.InstantSerializer
+import org.litote.kmongo.serialization.LocalDateSerializer
+import org.litote.kmongo.serialization.LocalTimeSerializer
+import org.litote.kmongo.serialization.OffsetDateTimeSerializer
+import org.litote.kmongo.serialization.ZonedDateTimeSerializer
 import java.io.File
+import java.math.BigDecimal
+import java.time.*
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.regex.Pattern
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
 class MongoDatabase(val database: CoroutineDatabase) : Database {
     init {
-        registerRequiredSerializers()
+        registerModule(Serialization.Internal.module.overwriteWith(SerializersModule {
+            contextual(Duration::class, DurationMsSerializer)
+            contextual(UUID::class, com.github.jershell.kbson.UUIDSerializer)
+            contextual(ObjectId::class, ObjectIdSerializer)
+            contextual(BigDecimal::class, BigDecimalSerializer)
+            contextual(ByteArray::class, ByteArraySerializer)
+            contextual(Instant::class, InstantSerializer)
+            contextual(ZonedDateTime::class, ZonedDateTimeSerializer)
+            contextual(OffsetDateTime::class, OffsetDateTimeSerializer)
+            contextual(LocalDate::class, LocalDateSerializer)
+            contextual(LocalDateTime::class, LocalDateTimeSerializer)
+            contextual(LocalTime::class, LocalTimeSerializer)
+            contextual(OffsetTime::class, OffsetTimeSerializer)
+            contextual(BsonTimestamp::class, BsonTimestampSerializer)
+            contextual(Locale::class, LocaleSerializer)
+            contextual(Binary::class, BinarySerializer)
+        }))
     }
 
     constructor(client: MongoClient, databaseName: String) : this(client.getDatabase(databaseName).coroutine) {}

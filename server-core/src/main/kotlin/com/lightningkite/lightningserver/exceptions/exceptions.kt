@@ -1,12 +1,15 @@
 package com.lightningkite.lightningserver.exceptions
 
 import com.lightningkite.lightningserver.HtmlDefaults
+import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.serialization.Serialization
 
 import com.lightningkite.lightningserver.serialization.toHttpContent
+import com.lightningkite.lightningserver.settings.generalSettings
+import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encodeToString
@@ -15,67 +18,41 @@ import java.io.InputStream
 
 open class HttpStatusException(
     val status: HttpStatus,
+    val detail: String = "",
+    message: String = "",
+    val data: String = "",
     val headers: HttpHeaders = HttpHeaders.EMPTY,
-    val body: Body<*>? = null,
     cause: Throwable? = null
-): Exception("$status: ${body?.data}", cause) {
-    class Body<T>(val data: T, val serializer: KSerializer<T>) {
-        suspend fun toHttpContent(acceptedTypes: List<ContentType>): HttpContent? = data.toHttpContent(acceptedTypes, serializer)
-    }
-    companion object {
-        inline fun <reified T> toBody(value: T): Body<T> = Body(value, Serialization.module.serializer())
-    }
+): Exception(message, cause) {
+    override val message: String get() = super.message!!
+    fun toLSError(): LSError = LSError(
+        http = status.code,
+        detail = detail,
+        message = message,
+        data = data,
+    )
     suspend fun toResponse(request: HttpRequest): HttpResponse {
         if(request.headers.accept.firstOrNull() == ContentType.Text.Html) {
-            val title = when(status) {
-                HttpStatus.Forbidden -> "Forbidden"
-                HttpStatus.Unauthorized -> "Not Authorized"
-                HttpStatus.BadRequest -> "Bad Request"
-                HttpStatus.NotFound -> "Not Found"
-                HttpStatus.InternalServerError -> "Server Error"
-                else -> "Problem"
-            }
-            val help = when(status) {
-                HttpStatus.Forbidden -> "You are not allowed to perform this action."
-                HttpStatus.Unauthorized -> "You need to log in."
-                HttpStatus.BadRequest -> "The request you made wasn't valid."
-                HttpStatus.NotFound -> "The resource you requested was not found."
-                HttpStatus.InternalServerError -> "Something went wrong on the server, and it's our bad."
-                else -> "An unrecognized problem occurred."
-            }
-            val properDetail = body?.data?.let { it as? String }
-            val backupDetail = body?.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.data) }
-            return HttpResponse.html(content = HtmlDefaults.basePage("""
-                <h1>${title.escapeHTML()}</h1>
-                <p>${help.escapeHTML()}</p>
-                ${properDetail?.let { "<p>${it.escapeHTML()}</p>" } ?: ""}
-                ${backupDetail?.let { "<!--${it.escapeHTML()}-->" } ?: ""}
-            """.trimIndent()))
-
-        } else {
-            return HttpResponse(
-                status = status,
-                body = body?.toHttpContent(request.headers.accept),
-                headers = headers
-            )
+            return HttpResponse(body = HttpContent.Text(string = HtmlDefaults.basePage("""
+                <h1>${status.toString().escapeHTML()}</h1>
+                <p>${message}</p>
+                ${detail.let { "<!--${it.escapeHTML()}-->" } ?: ""}
+                ${if(generalSettings().debug) "<!--${stackTraceToString().escapeHTML()}-->" else ""}
+            """.trimIndent()), type = ContentType.Text.Html), headers = headers)
         }
+        return HttpResponse(
+            body = toLSError().toHttpContent(request.headers.accept),
+            status = status,
+            headers = headers
+        )
     }
 }
 
-
-inline fun <reified T> BadRequestException(body: T, headers: HttpHeaders.Builder.()->Unit = {}, cause: Throwable? = null) = BadRequestException(HttpStatusException.toBody(body), HttpHeaders.Builder().apply(headers).build(), cause = cause)
-class BadRequestException(body: Body<*>? = null, headers: HttpHeaders = HttpHeaders.EMPTY, cause: Throwable? = null): HttpStatusException(HttpStatus.BadRequest, headers, body, cause) {
-    constructor(body: Body<*>? = null, headers: HttpHeaders.Builder.()->Unit, cause: Throwable? = null):this(body, HttpHeaders.Builder().apply(headers).build(), cause = cause)
-}
-inline fun <reified T> UnauthorizedException(body: T, headers: HttpHeaders.Builder.()->Unit = {}, cause: Throwable? = null) = UnauthorizedException(HttpStatusException.toBody(body), HttpHeaders.Builder().apply(headers).build(), cause = cause)
-class UnauthorizedException(body: Body<*>? = null, headers: HttpHeaders = HttpHeaders.EMPTY, cause: Throwable? = null): HttpStatusException(HttpStatus.Unauthorized, headers, body, cause) {
-    constructor(body: Body<*>? = null, headers: HttpHeaders.Builder.()->Unit, cause: Throwable? = null):this(body, HttpHeaders.Builder().apply(headers).build(), cause = cause)
-}
-inline fun <reified T> ForbiddenException(body: T, headers: HttpHeaders.Builder.()->Unit = {}, cause: Throwable? = null) = ForbiddenException(HttpStatusException.toBody(body), HttpHeaders.Builder().apply(headers).build(), cause = cause)
-class ForbiddenException(body: Body<*>? = null, headers: HttpHeaders = HttpHeaders.EMPTY, cause: Throwable? = null): HttpStatusException(HttpStatus.Forbidden, headers, body, cause) {
-    constructor(body: Body<*>? = null, headers: HttpHeaders.Builder.()->Unit, cause: Throwable? = null):this(body, HttpHeaders.Builder().apply(headers).build(), cause = cause)
-}
-inline fun <reified T> NotFoundException(body: T, headers: HttpHeaders.Builder.()->Unit = {}, cause: Throwable? = null) = NotFoundException(HttpStatusException.toBody(body), HttpHeaders.Builder().apply(headers).build(), cause = cause)
-class NotFoundException(body: Body<*>? = null, headers: HttpHeaders = HttpHeaders.EMPTY, cause: Throwable? = null): HttpStatusException(HttpStatus.NotFound, headers, body, cause) {
-    constructor(body: Body<*>? = null, headers: HttpHeaders.Builder.()->Unit, cause: Throwable? = null):this(body, HttpHeaders.Builder().apply(headers).build(), cause = cause)
-}
+class BadRequestException(detail: String = "", message: String = "", data: String = "", cause: Throwable? = null, headers: HttpHeaders = HttpHeaders.EMPTY): HttpStatusException(HttpStatus.BadRequest, detail, message, data, headers, cause)
+fun BadRequestException(message: String): BadRequestException = BadRequestException(message = message, detail = "")
+class UnauthorizedException(detail: String = "", message: String = "", data: String = "", cause: Throwable? = null, headers: HttpHeaders = HttpHeaders.EMPTY): HttpStatusException(HttpStatus.Unauthorized, detail, message, data, headers, cause)
+fun UnauthorizedException(message: String): UnauthorizedException = UnauthorizedException(message = message, detail = "")
+class ForbiddenException(detail: String = "", message: String = "", data: String = "", cause: Throwable? = null, headers: HttpHeaders = HttpHeaders.EMPTY): HttpStatusException(HttpStatus.Forbidden, detail, message, data, headers, cause)
+fun ForbiddenException(message: String): ForbiddenException = ForbiddenException(message = message, detail = "")
+class NotFoundException(detail: String = "", message: String = "", data: String = "", cause: Throwable? = null, headers: HttpHeaders = HttpHeaders.EMPTY): HttpStatusException(HttpStatus.NotFound, detail, message, data, headers, cause)
+fun NotFoundException(message: String): NotFoundException = NotFoundException(message = message, detail = "")

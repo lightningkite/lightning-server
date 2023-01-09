@@ -83,6 +83,10 @@ data "aws_route53_zone" "main" {
 resource "aws_ses_domain_identity" "email" {
   domain = var.domain_name
 }
+resource "aws_ses_domain_mail_from" "email" {
+  domain           = aws_ses_domain_identity.email.domain
+  mail_from_domain = "mail.${var.domain_name}"
+}
 resource "aws_route53_record" "email" {
   zone_id = data.aws_route53_zone.main.zone_id
   name    = "_amazonses.${var.domain_name}"
@@ -90,20 +94,26 @@ resource "aws_route53_record" "email" {
   ttl     = "600"
   records = [aws_ses_domain_identity.email.verification_token]
 }
-resource "aws_route53_record" "email_spf" {
+resource "aws_ses_domain_dkim" "email_dkim" {
+  domain = aws_ses_domain_identity.email.domain
+}
+resource "aws_route53_record" "email_spf_mail_from" {
   zone_id = data.aws_route53_zone.main.zone_id
-  name    = var.domain_name
+  name    = aws_ses_domain_mail_from.email.mail_from_domain
   type    = "TXT"
   ttl     = "300"
   records = [
     "v=spf1 include:amazonses.com -all"
   ]
 }
-resource "aws_ses_domain_identity" "email_domain_identity" {
-  domain = var.domain_name
-}
-resource "aws_ses_domain_dkim" "email_dkim" {
-  domain = aws_ses_domain_identity.email_domain_identity.domain
+resource "aws_route53_record" "email_spf_domain" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = aws_ses_domain_identity.email.domain
+  type    = "TXT"
+  ttl     = "300"
+  records = [
+    "v=spf1 include:amazonses.com -all"
+  ]
 }
 resource "aws_route53_record" "email_dkim_records" {
   count   = 3

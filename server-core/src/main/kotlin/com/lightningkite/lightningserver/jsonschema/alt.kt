@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.docGroup
+import io.ktor.http.*
 import io.ktor.util.reflect.*
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ArraySerializer
@@ -157,6 +158,7 @@ object JsonType3Serializer: KSerializer<JsonType3> {
 data class JsonSchemaType(
     @SerialName("\$ref") val ref: String? = null,
     val title: String? = null,
+    val nullable: Boolean? = null,
     val references: String? = null,
     val description: String? = null,
     val minimum: Double? = null,
@@ -220,7 +222,7 @@ fun Json.schema(type: KSerializer<*>): JsonSchemaDefinition {
     )
 }
 
-class JsonSchemaBuilder(val json: Json) {
+class JsonSchemaBuilder(val json: Json, val refString: String = "#/definitions/", val useNullableProperty: Boolean = false) {
     val definitions = mutableMapOf<String, JsonSchemaType>()
     val defining = mutableSetOf<String>()
     val overrides = mutableMapOf<KClass<out KSerializer<*>>, (KSerializer<*>) -> JsonSchemaType>()
@@ -234,6 +236,7 @@ class JsonSchemaBuilder(val json: Json) {
         annotation { it: JsonSchemaFormat -> copy(format = it.format) }
         annotation { it: DisplayName -> copy(title = it.text) }
         annotation { it: References -> copy(references = key(json.serializersModule.serializer(it.references.java))) }
+        annotation { it: MultipleReferences -> copy(items = items!!.copy(references = key(json.serializersModule.serializer(it.references.java)))) }
         annotation { it: MimeType -> copy(mimeType = it.mime) }
         override { it: ServerFileSerialization ->
             JsonSchemaType(type = JsonType3(JsonType2.STRING), format = "file", options = buildJsonObject {
@@ -272,18 +275,20 @@ class JsonSchemaBuilder(val json: Json) {
             )
         }
         override { it: ModificationSerializer<*> ->
-//            val desc = it.descriptor
-//            JsonSchemaType(
-//                title = desc.serialName.substringBefore('<').substringAfterLast('.').humanize(),
-//                type = JsonType3(JsonType2.OBJECT),
-//                anyOf = it.serializerMap.map { (key, ser) ->
-//                    val propTitle = key.humanize()
-//                    get(ser, listOf(), propTitle).copy(
-//                        title = propTitle
-//                    )
-//                }
-//            )
-            JsonSchemaType(type = JsonType3(JsonType2.OBJECT))
+            val desc = it.descriptor
+            JsonSchemaType(
+                title = desc.serialName.substringBefore('<').substringAfterLast('.').humanize(),
+                type = JsonType3(JsonType2.OBJECT),
+                oneOf = it.serializerMap.map { (key, ser) ->
+                    val propTitle = key.humanize()
+                    val value = get(ser, listOf(), propTitle)
+                    JsonSchemaType(
+                        title = propTitle,
+                        type = JsonType3(JsonType2.OBJECT),
+                        properties = mapOf(key to value)
+                    )
+                }
+            )
         }
     }
 
@@ -295,7 +300,7 @@ class JsonSchemaBuilder(val json: Json) {
         overrides[T::class] = { handler(it as T) }
     }
 
-    fun key(serializer: KSerializer<*>): String = serializer.descriptor.serialName
+    fun key(serializer: KSerializer<*>): String = serializer.descriptor.serialName.replace("<", "_").replace(", ", "_").replace(">", "").replace("?", "_n")
 
     @OptIn(InternalSerializationApi::class)
     operator fun get(serializer: KSerializer<*>, annotationsToApply: List<Annotation> = listOf(), title: String = "Value"): JsonSchemaType {
@@ -315,10 +320,14 @@ class JsonSchemaBuilder(val json: Json) {
         }
         if (desc.isNullable) {
             val inner = get(serializer.nullElement()!!, annos, title)
-            if(inner.type?.inner?.isPrimitive == true) {
-                return inner.copy(type = inner.type.copy(nullable = true))
+            if(useNullableProperty) {
+                return inner.copy(nullable = true)
+            } else {
+                if(inner.type?.inner?.isPrimitive == true) {
+                    return inner.copy(type = inner.type.copy(nullable = true))
+                }
+                return JsonSchemaType(oneOf = listOf(inner.copy(title = title), JsonSchemaType(type = JsonType3(JsonType2.NULL), title = "$title N/A")))
             }
-            return JsonSchemaType(oneOf = listOf(inner.copy(title = title), JsonSchemaType(type = JsonType3(JsonType2.NULL), title = "$title N/A")))
         }
 
         fun defining(serializer: KSerializer<*>, action: ()->JsonSchemaType): JsonSchemaType {
@@ -412,5 +421,5 @@ class JsonSchemaBuilder(val json: Json) {
         return current
     }
 
-    fun refString(serializer: KSerializer<*>): String = "#/definitions/${key(serializer)}"
+    fun refString(serializer: KSerializer<*>): String = refString + key(serializer)
 }

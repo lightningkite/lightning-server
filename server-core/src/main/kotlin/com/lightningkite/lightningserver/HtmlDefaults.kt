@@ -54,7 +54,7 @@ object HtmlDefaults {
         <table role="presentation" style="width:100%;border-collapse:collapse;border:0;border-spacing:0;">
             ${logo?.let {
                 """
-                    <tr><td align="center" style="padding:16px;"><img src="$it" alt="Lazy One"/></td></tr>
+                    <tr><td align="center" style="padding:16px;"><img src="$it" alt="${generalSettings().projectName}"/></td></tr>
                 """.trimIndent()
         } ?: ""}
             <tr><td align="center" style="padding:0px;"><h1>Log In to ${generalSettings().projectName}</h1></td></tr>

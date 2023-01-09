@@ -46,7 +46,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         """.trimIndent())
     },
 ) : ServerPathGroup(base.path) {
-    private fun cacheKey(email: String): String = email + "_email_login_pin"
+    val pin = PinHandler(cache, "email")
     val loginEmail = path("login-email").post.typed(
         summary = "Email Login Link",
         description = "Sends a login email to the given address",
@@ -54,13 +54,8 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         successCode = HttpStatus.NoContent,
         implementation = { user: Unit, addressUnsafe: String ->
             val address = addressUnsafe.lowercase()
-            val jwt = base.jwtSigner().token(
-                emailAccess.idSerializer,
-                emailAccess.byEmail(address).let(emailAccess::id),
-                base.jwtSigner().emailExpiration
-            )
-            val pin = SecureRandom().nextInt(1000000).toString().padStart(6, '0')
-            cache().set(cacheKey(address), pin.secureHash(), Duration.ofMinutes(15))
+            val jwt = base.typedHandler.token(emailAccess.byEmail(address), base.jwtSigner().emailExpiration)
+            val pin = pin.generate(address)
             val link = "${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$jwt"
             email().send(
                 subject = emailSubject(),
@@ -78,15 +73,8 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         successCode = HttpStatus.OK,
         implementation = { anon: Unit, input: EmailPinLogin ->
             val email = input.email.lowercase()
-            val pin = cache().get<String>(cacheKey(email))
-                ?: throw NotFoundException("No PIN found for email ${email}; perhaps it has expired?")
-            if(!input.pin.checkHash(pin)) throw BadRequestException("Incorrect PIN")
-            cache().remove(cacheKey(email))
-            base.jwtSigner().token(
-                emailAccess.idSerializer,
-                emailAccess.byEmail(email).let(emailAccess::id),
-                base.jwtSigner().expiration
-            )
+            pin.assert(email, input.pin)
+            base.typedHandler.token(emailAccess.byEmail(email))
         }
     )
     val oauthGoogle = OauthGoogleEndpoints(path = path("oauth/google"), jwtSigner = base.jwtSigner, landing = base.landingRoute) {

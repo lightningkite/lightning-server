@@ -7,34 +7,7 @@ package com.lightningkite.lightningserver.notifications
 object ConsoleNotificationInterface : NotificationInterface {
     override suspend fun send(
         targets: List<String>,
-        title: String?,
-        body: String?,
-        imageUrl: String?,
-        data: Map<String, String>?,
-        critical: Boolean,
-        androidChannel: String?,
-    ) {
-        println(buildString {
-            appendLine("-----NOTIFICATION-----")
-            appendLine("To: ")
-            for (target in targets) {
-                appendLine(target)
-            }
-            appendLine("Title: $title")
-            appendLine("Body: $body")
-            appendLine("Image URL: $imageUrl")
-            appendLine("Critical: $critical")
-            if (data?.isNotEmpty() == true) appendLine("Data: {${data.entries.joinToString { "${it.key}: ${it.value} " }}}")
-        })
-    }
-
-    override suspend fun send(
-        targets: List<String>,
-        notification: Notification?,
-        data: Map<String, String>?,
-        android: Android?,
-        ios: iOS?,
-        web: Web?
+        data: NotificationData
     ) {
 
         println(buildString {
@@ -43,12 +16,13 @@ object ConsoleNotificationInterface : NotificationInterface {
             for (target in targets) {
                 appendLine(target)
             }
-            if(notification != null) {
+            data.notification?.let {notification ->
                 appendLine("Title: ${notification.title}")
                 appendLine("Body: ${notification.body}")
                 appendLine("Image URL: ${notification.imageUrl}")
             }
-            if (data?.isNotEmpty() == true) appendLine("Data: {${data.entries.joinToString { "${it.key}: ${it.value} " }}}")
+            if (data.data?.isNotEmpty() == true)
+                appendLine("Data: {${data.data.entries.joinToString { "${it.key}: ${it.value} " }}}")
         })
     }
 

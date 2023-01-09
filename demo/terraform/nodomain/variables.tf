@@ -65,7 +65,7 @@ variable "oauth_github" {
 ##########
 variable "logging" {
     type = any
-    default = {}
+    default = {"default":{"filePattern":null,"toConsole":true,"level":"INFO","additive":false},"logger":null}
 }
 
 ##########
@@ -81,7 +81,7 @@ variable "files_expiry" {
 ##########
 variable "metrics" {
     type = any
-    default = {}
+    default = {"url":"none","trackingByEntryPoint":["executionTime"],"trackingTotalsOnly":[],"keepFor":{"PT1H":"PT24H","PT1M":"PT2H"}}
 }
 
 ##########
@@ -89,7 +89,7 @@ variable "metrics" {
 ##########
 variable "exceptions" {
     type = any
-    default = {}
+    default = {"url":"none","sentryDsn":null}
 }
 
 ##########
