@@ -5,6 +5,7 @@ export interface HasId {
     _id: string;
 }
 export interface SessionRestEndpoint<T extends HasId> {
+    default(): Promise<T>;
     query(input: Query<T>): Promise<Array<T>>;
     detail(id: string): Promise<T>;
     insertBulk(input: Array<T>): Promise<Array<T>>;
