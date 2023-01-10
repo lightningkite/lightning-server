@@ -34,7 +34,7 @@ fun terraform() {
 
 fun tfMigrate() {
     Server
-    terraformMigrate("com.lightningkite.lightningserver.demo.AwsHandler", File("demo/terraform"), File("demo/terraform2"))
+    terraformMigrate("com.lightningkite.lightningserver.demo.AwsHandler", File("demo/terraform"))
 }
 
 fun main(vararg args: String) {

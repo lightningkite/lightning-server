@@ -14,7 +14,8 @@ import software.amazon.awssdk.services.dynamodb.model.*
 import java.time.Duration
 import java.time.Instant
 
-class DynamoDbCache(val client: DynamoDbAsyncClient, val tableName: String = "cache") : CacheInterface {
+class DynamoDbCache(val makeClient: ()->DynamoDbAsyncClient, val tableName: String = "cache") : CacheInterface {
+    val client by lazy(makeClient)
     companion object {
         init {
             CacheSettings.register("dynamodb") {
@@ -24,7 +25,7 @@ class DynamoDbCache(val client: DynamoDbAsyncClient, val tableName: String = "ca
                 val endpoint = withoutScheme.substringAfter('@')
                 val region = endpoint.substringBefore('/')
                 val name = endpoint.substringAfter('/')
-                val client = DynamoDbAsyncClient.builder()
+                DynamoDbCache({ DynamoDbAsyncClient.builder()
                     .credentialsProvider(
                         if (credentials.isNotEmpty()) {
                             StaticCredentialsProvider.create(object : AwsCredentials {
@@ -34,8 +35,7 @@ class DynamoDbCache(val client: DynamoDbAsyncClient, val tableName: String = "ca
                         } else DefaultCredentialsProvider.create()
                     )
                     .region(Region.of(region))
-                    .build()
-                DynamoDbCache(client, name)
+                    .build() }, name)
             }
         }
     }

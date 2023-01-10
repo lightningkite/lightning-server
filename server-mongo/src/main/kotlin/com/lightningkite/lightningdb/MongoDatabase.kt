@@ -25,52 +25,54 @@ import java.util.concurrent.TimeUnit
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
-class MongoDatabase(val database: CoroutineDatabase) : Database {
+class MongoDatabase(val makeDatabase: () -> CoroutineDatabase) : Database {
+    val database by lazy { makeDatabase() }
+
     init {
         registerRequiredSerializers()
     }
-
-    constructor(client: MongoClient, databaseName: String) : this(client.getDatabase(databaseName).coroutine) {}
 
     companion object {
         val bson by lazy { KBson(serializersModule = kmongoSerializationModule, configuration = configuration) }
 
         init {
             DatabaseSettings.register("mongodb") {
-                KMongo.createClient(
-                    MongoClientSettings.builder()
-                        .applyConnectionString(ConnectionString(it.url))
-                        .uuidRepresentation(UuidRepresentation.STANDARD)
-                        .applyToConnectionPoolSettings {
-                            if(Settings.isServerless) {
-                                it.maxSize(4)
-                                it.maxConnectionIdleTime(15, TimeUnit.SECONDS)
+                MongoDatabase {
+                    KMongo.createClient(
+                        MongoClientSettings.builder()
+                            .applyConnectionString(ConnectionString(it.url))
+                            .uuidRepresentation(UuidRepresentation.STANDARD)
+                            .applyToConnectionPoolSettings {
+                                if (Settings.isServerless) {
+                                    it.maxSize(4)
+                                    it.maxConnectionIdleTime(15, TimeUnit.SECONDS)
+                                }
                             }
-                        }
-                        .build()
-                ).database(it.databaseName)
+                            .build()
+                    ).coroutine.getDatabase(it.databaseName)
+                }
             }
             DatabaseSettings.register("mongodb+srv") {
-                KMongo.createClient(
-                    MongoClientSettings.builder()
-                        .applyConnectionString(ConnectionString(it.url))
-                        .uuidRepresentation(UuidRepresentation.STANDARD)
-                        .applyToConnectionPoolSettings {
-                            if(Settings.isServerless) {
-                                it.maxSize(4)
-                                it.maxConnectionIdleTime(15, TimeUnit.SECONDS)
+                MongoDatabase {
+                    KMongo.createClient(
+                        MongoClientSettings.builder()
+                            .applyConnectionString(ConnectionString(it.url))
+                            .uuidRepresentation(UuidRepresentation.STANDARD)
+                            .applyToConnectionPoolSettings {
+                                if (Settings.isServerless) {
+                                    it.maxSize(4)
+                                    it.maxConnectionIdleTime(15, TimeUnit.SECONDS)
+                                }
                             }
-                        }
-                        .build()
-                ).database(it.databaseName)
+                            .build()
+                    ).coroutine.getDatabase(it.databaseName)
+                }
             }
             DatabaseSettings.register("mongodb-test") {
-                testMongo().database(it.databaseName)
+                MongoDatabase { testMongo().coroutine.getDatabase(it.databaseName) }
             }
             DatabaseSettings.register("mongodb-file") {
-                embeddedMongo(File(it.url.removePrefix("mongodb-file://"))).database(
-                    it.databaseName
-                )
+                MongoDatabase { embeddedMongo(File(it.url.removePrefix("mongodb-file://"))).coroutine.getDatabase(it.databaseName) }
             }
         }
     }
@@ -91,6 +93,3 @@ class MongoDatabase(val database: CoroutineDatabase) : Database {
             }
         } as Lazy<MongoFieldCollection<T>>).value
 }
-
-fun MongoClient.database(name: String): MongoDatabase =
-    MongoDatabase(this, name)

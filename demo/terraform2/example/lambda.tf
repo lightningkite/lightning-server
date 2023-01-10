@@ -10,6 +10,10 @@ variable "lambda_timeout" {
     type = number
     default = 30
 }
+variable "lambda_snapstart" {
+    type = bool
+    default = false
+}
 
 ##########
 # Outputs
@@ -117,25 +121,68 @@ resource "aws_iam_policy" "lambdainvoke" {
     ]
   })
 }
+
 resource "aws_iam_role_policy_attachment" "lambdainvoke" {
   role       = aws_iam_role.main_exec.name
   policy_arn = aws_iam_policy.lambdainvoke.arn
 }
-locals {
-  lambda_source = "../../build/dist/lambda.zip"
-}
+
 resource "aws_s3_object" "app_storage" {
   bucket = aws_s3_bucket.lambda_bucket.id
 
   key    = "lambda-functions.zip"
-  source = local.lambda_source
+  source = data.archive_file.lambda.output_path
 
-  source_hash = filemd5(local.lambda_source)
+  source_hash = data.archive_file.lambda.output_md5
+  depends_on = [data.archive_file.lambda]
 }
-resource "aws_s3_object" "app_settings" {
-  bucket = aws_s3_bucket.lambda_bucket.id
 
-  key    = "settings.json"
+resource "aws_lambda_function" "main" {
+  function_name = "demo-example-main"
+  publish = var.lambda_snapstart
+
+  s3_bucket = aws_s3_bucket.lambda_bucket.id
+  s3_key    = aws_s3_object.app_storage.key
+
+  runtime = "java11"
+  handler = "com.lightningkite.lightningserver.demo.AwsHandler"
+  
+  memory_size = "${var.lambda_memory_size}"
+  timeout = var.lambda_timeout
+  # memory_size = "1024"
+
+  source_code_hash = data.archive_file.lambda.output_base64sha256
+
+  role = aws_iam_role.main_exec.arn
+  
+  snap_start {
+    apply_on = "PublishedVersions"
+  }
+  
+  
+  
+  environment {
+    variables = {
+      LIGHTNING_SERVER_SETTINGS_DECRYPTION = random_password.settings.result
+    }
+  }
+  
+  depends_on = [aws_s3_object.app_storage]
+}
+
+resource "aws_lambda_alias" "main" {
+  name             = "prod"
+  description      = "The current production version of the lambda."
+  function_name    = aws_lambda_function.main.arn
+  function_version = var.lambda_snapstart ? aws_lambda_function.main.version : "$LATEST"
+}
+
+resource "aws_cloudwatch_log_group" "main" {
+  name = "demo-example-main-log"
+  retention_in_days = 30
+}
+
+resource "local_sensitive_file" "settings_raw" {
   content = jsonencode({
     general = {
         projectName = var.display_name
@@ -148,7 +195,7 @@ resource "aws_s3_object" "app_settings" {
       url = "mongodb+srv://demoexampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_serverless_instance.database.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
     }
     cache = {
-        url = "dynamodb://${var.deployment_location}/demo-example_${var.deployment_name}"
+        url = "dynamodb://${var.deployment_location}/demo_example"
     }
     jwt = {
         expirationMilliseconds = var.jwt_expirationMilliseconds 
@@ -168,40 +215,30 @@ resource "aws_s3_object" "app_settings" {
         fromEmail = "noreply@${var.domain_name}"
     }
     oauth_google = var.oauth_google
-    oauth_apple = var.oauth_apple
-  })
+    oauth_apple = var.oauth_apple})
+  filename = "${path.module}/build/raw-settings.json"
 }
-resource "aws_lambda_function" "main" {
-  function_name = "demo-example-main"
 
-  s3_bucket = aws_s3_bucket.lambda_bucket.id
-  s3_key    = aws_s3_object.app_storage.key
-
-  runtime = "java11"
-  handler = "com.lightningkite.lightningserver.demo.AwsHandler"
-  
-  memory_size = "${var.lambda_memory_size}"
-  timeout = var.lambda_timeout
-  # memory_size = "1024"
-
-  source_code_hash = filebase64sha256(local.lambda_source)
-
-  role = aws_iam_role.main_exec.arn
-  
-  
-  
-  environment {
-    variables = {
-      LIGHTNING_SERVER_SETTINGS_BUCKET = aws_s3_object.app_settings.bucket
-      LIGHTNING_SERVER_SETTINGS_FILE = aws_s3_object.app_settings.key
-    }
+resource "null_resource" "settings_encrypted" {
+  triggers = {
+    settingsRawHash = local_sensitive_file.settings_raw.content
   }
-  
-  depends_on = [aws_s3_object.app_storage]
+  provisioner "local-exec" {
+    command = "openssl enc -aes-256-cbc -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/../../build/dist/lambda/settings.enc\" -pass pass:${random_password.settings.result}"
+  }
 }
 
-resource "aws_cloudwatch_log_group" "main" {
-  name = "demo-example-main-log"
-  retention_in_days = 30
+resource "random_password" "settings" {
+  length           = 32
+  special          = true
+  override_special = "_"
 }
+
+data "archive_file" "lambda" {
+  depends_on = [null_resource.settings_encrypted]
+  type        = "zip"
+  source_dir = "${path.module}/../../build/dist/lambda"
+  output_path = "${path.module}/build/lambda.jar"
+}
+
 

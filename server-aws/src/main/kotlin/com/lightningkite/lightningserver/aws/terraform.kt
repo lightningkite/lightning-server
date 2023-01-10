@@ -37,11 +37,13 @@ internal val TerraformProjectInfo.projectNameSafe: String
             '-',
             '_'
         )
-    }.lowercase()
+    }
 internal val TerraformProjectInfo.namePrefix: String get() = projectNameSafe
+internal val TerraformProjectInfo.namePrefixLower: String get() = projectNameSafe.lowercase()
 internal val TerraformProjectInfo.namePrefixUnderscores: String get() = projectNameSafe.replace("-", "_")
 internal val TerraformProjectInfo.namePrefixSafe: String get() = projectNameSafe.filter { it.isLetterOrDigit() }
-internal val TerraformProjectInfo.namePrefixPath: String get() = projectNameSafe.replace("-", "/").replace("_", "")
+internal val TerraformProjectInfo.namePrefixPath: String get() = projectNameSafe.lowercase().replace("-", "/").replace("_", "")
+internal val TerraformProjectInfo.namePrefixPathSegment: String get() = projectNameSafe.lowercase().replace("_", "")
 
 internal data class TerraformRequirementBuildInfo(
     val project: TerraformProjectInfo,
@@ -52,9 +54,11 @@ internal data class TerraformRequirementBuildInfo(
 }
 
 internal val TerraformRequirementBuildInfo.namePrefix: String get() = project.namePrefix
+internal val TerraformRequirementBuildInfo.namePrefixLower: String get() = project.namePrefixLower
 internal val TerraformRequirementBuildInfo.namePrefixUnderscores: String get() = project.namePrefixUnderscores
 internal val TerraformRequirementBuildInfo.namePrefixSafe: String get() = project.namePrefixSafe
 internal val TerraformRequirementBuildInfo.namePrefixPath: String get() = project.namePrefixPath
+internal val TerraformRequirementBuildInfo.namePrefixPathSegment: String get() = project.namePrefixPathSegment
 
 internal data class TerraformProvider(
     val name: String,
@@ -67,6 +71,7 @@ internal data class TerraformProvider(
         val archive = TerraformProvider("archive", "hashicorp/archive", "~> 2.2.0")
         val mongodbatlas = TerraformProvider("mongodbatlas", "mongodb/mongodbatlas", "~> 1.4")
         val local = TerraformProvider("local", "hashicorp/local", "~> 2.2")
+        val nullProvider = TerraformProvider("null", "hashicorp/null", "~> 3.2")
     }
 }
 
@@ -76,6 +81,7 @@ internal data class TerraformSection(
         TerraformProvider.aws,
         TerraformProvider.local,
         TerraformProvider.random,
+        TerraformProvider.nullProvider,
         TerraformProvider.archive
     ),
     val inputs: List<TerraformInput> = listOf(),
@@ -190,7 +196,7 @@ internal fun handlers() {
             appendLine(
                 """
                 resource "aws_s3_bucket" "${key}" {
-                  bucket_prefix = "${namePrefix}-${key}"
+                  bucket_prefix = "${namePrefixPathSegment}-${key}"
                   force_destroy = var.debug
                 }
                 resource "aws_s3_bucket_cors_configuration" "${key}" {
@@ -1132,7 +1138,7 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
             resource "aws_lambda_permission" "panic" {
               statement_id  = "AllowExecutionFromCloudWatch"
               action        = "lambda:InvokeFunction"
-              function_name = aws_lambda_function.main.function_name
+              function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
               principal     = "events.amazonaws.com"
               source_arn    = aws_cloudwatch_event_rule.panic.arn
             }
@@ -1183,13 +1189,13 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                     resource "aws_cloudwatch_event_target" "scheduled_task_${safeName}" {
                       rule      = aws_cloudwatch_event_rule.scheduled_task_${safeName}.name
                       target_id = "lambda"
-                      arn       = aws_lambda_function.main.arn
+                      arn       = aws_lambda_alias.main.arn
                       input     = "{\"scheduled\": \"${it.name}\"}"
                     }
                     resource "aws_lambda_permission" "scheduled_task_${safeName}" {
                       statement_id  = "scheduled_task_${safeName}"
                       action        = "lambda:InvokeFunction"
-                      function_name = aws_lambda_function.main.function_name
+                      function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
                       principal     = "events.amazonaws.com"
                       source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
                     }
@@ -1212,13 +1218,13 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                     resource "aws_cloudwatch_event_target" "scheduled_task_${safeName}" {
                       rule      = aws_cloudwatch_event_rule.scheduled_task_${safeName}.name
                       target_id = "lambda"
-                      arn       = aws_lambda_function.main.arn
+                      arn       = aws_lambda_alias.main.arn
                       input     = "{\"scheduled\": \"${it.name}\"}"
                     }
                     resource "aws_lambda_permission" "scheduled_task_${safeName}" {
                       statement_id  = "scheduled_task_${safeName}"
                       action        = "lambda:InvokeFunction"
-                      function_name = aws_lambda_function.main.function_name
+                      function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
                       principal     = "events.amazonaws.com"
                       source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
                     }
@@ -1231,7 +1237,7 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
     }
 }
 
-internal fun awsMainAppHandler(
+internal fun awsLambdaHandler(
     projectInfo: TerraformProjectInfo,
     handlerFqn: String,
     otherSections: List<TerraformSection>,
@@ -1240,11 +1246,12 @@ internal fun awsMainAppHandler(
     inputs = listOf(
         TerraformInput.number("lambda_memory_size", 1024),
         TerraformInput.number("lambda_timeout", 30),
+        TerraformInput.boolean("lambda_snapstart", false),
     ),
     emit = {
         appendLine("""
         resource "aws_s3_bucket" "lambda_bucket" {
-          bucket_prefix = "${projectInfo.namePrefix}-lambda-bucket"
+          bucket_prefix = "${projectInfo.namePrefixPathSegment}-lambda-bucket"
           force_destroy = true
         }
         resource "aws_s3_bucket_acl" "lambda_bucket" {
@@ -1340,34 +1347,25 @@ internal fun awsMainAppHandler(
             ]
           })
         }
+        
         resource "aws_iam_role_policy_attachment" "lambdainvoke" {
           role       = aws_iam_role.main_exec.name
           policy_arn = aws_iam_policy.lambdainvoke.arn
         }
-        locals {
-          lambda_source = "../../build/dist/lambda.zip"
-        }
+        
         resource "aws_s3_object" "app_storage" {
           bucket = aws_s3_bucket.lambda_bucket.id
 
           key    = "lambda-functions.zip"
-          source = local.lambda_source
-
-          source_hash = filemd5(local.lambda_source)
+          source = data.archive_file.lambda.output_path
+        
+          source_hash = data.archive_file.lambda.output_md5
+          depends_on = [data.archive_file.lambda]
         }
-        resource "aws_s3_object" "app_settings" {
-          bucket = aws_s3_bucket.lambda_bucket.id
-
-          key    = "settings.json"
-          content = jsonencode({
-            ${
-            otherSections.mapNotNull { it.toLightningServer }.flatMap { it.entries }.map { "${it.key} = ${it.value}" }
-                .map { it.replace("\n", "\n            ") }.joinToString("\n            ")
-        }
-          })
-        }
+        
         resource "aws_lambda_function" "main" {
           function_name = "${projectInfo.namePrefix}-main"
+          publish = var.lambda_snapstart
 
           s3_bucket = aws_s3_bucket.lambda_bucket.id
           s3_key    = aws_s3_object.app_storage.key
@@ -1379,9 +1377,13 @@ internal fun awsMainAppHandler(
           timeout = var.lambda_timeout
           # memory_size = "1024"
 
-          source_code_hash = filebase64sha256(local.lambda_source)
+          source_code_hash = data.archive_file.lambda.output_base64sha256
 
           role = aws_iam_role.main_exec.arn
+          
+          snap_start {
+            apply_on = "PublishedVersions"
+          }
           
           ${
               if(projectInfo.vpc)
@@ -1395,18 +1397,56 @@ internal fun awsMainAppHandler(
           
           environment {
             variables = {
-              LIGHTNING_SERVER_SETTINGS_BUCKET = aws_s3_object.app_settings.bucket
-              LIGHTNING_SERVER_SETTINGS_FILE = aws_s3_object.app_settings.key
+              LIGHTNING_SERVER_SETTINGS_DECRYPTION = random_password.settings.result
             }
           }
           
           depends_on = [aws_s3_object.app_storage]
         }
 
+        resource "aws_lambda_alias" "main" {
+          name             = "prod"
+          description      = "The current production version of the lambda."
+          function_name    = aws_lambda_function.main.arn
+          function_version = var.lambda_snapstart ? aws_lambda_function.main.version : "${'$'}LATEST"
+        }
+
         resource "aws_cloudwatch_log_group" "main" {
           name = "${projectInfo.namePrefix}-main-log"
           retention_in_days = 30
         }
+        
+        resource "local_sensitive_file" "settings_raw" {
+          content = jsonencode({
+            ${
+            otherSections.mapNotNull { it.toLightningServer }.flatMap { it.entries }.map { "${it.key} = ${it.value}" }
+                .map { it.replace("\n", "\n            ") }.joinToString("\n            ")
+        }})
+          filename = "${'$'}{path.module}/build/raw-settings.json"
+        }
+
+        resource "null_resource" "settings_encrypted" {
+          triggers = {
+            settingsRawHash = local_sensitive_file.settings_raw.content
+          }
+          provisioner "local-exec" {
+            command = "openssl enc -aes-256-cbc -in \"${'$'}{local_sensitive_file.settings_raw.filename}\" -out \"${'$'}{path.module}/../../build/dist/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
+          }
+        }
+
+        resource "random_password" "settings" {
+          length           = 32
+          special          = true
+          override_special = "_"
+        }
+
+        data "archive_file" "lambda" {
+          depends_on = [null_resource.settings_encrypted]
+          type        = "zip"
+          source_dir = "${'$'}{path.module}/../../build/dist/lambda"
+          output_path = "${'$'}{path.module}/build/lambda.jar"
+        }
+        
     """.trimIndent()
         )
     }
@@ -1450,7 +1490,7 @@ internal fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSectio
                 resource "aws_apigatewayv2_integration" "http" {
                   api_id = aws_apigatewayv2_api.http.id
         
-                  integration_uri    = aws_lambda_function.main.invoke_arn
+                  integration_uri    = aws_lambda_alias.main.invoke_arn
                   integration_type   = "AWS_PROXY"
                   integration_method = "POST"
                 }
@@ -1470,7 +1510,7 @@ internal fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSectio
                 resource "aws_lambda_permission" "api_gateway_http" {
                   statement_id  = "AllowExecutionFromAPIGatewayHTTP"
                   action        = "lambda:InvokeFunction"
-                  function_name = aws_lambda_function.main.function_name
+                  function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
                   principal     = "apigateway.amazonaws.com"
         
                   source_arn = "${'$'}{aws_apigatewayv2_api.http.execution_arn}/*/*"
@@ -1575,7 +1615,7 @@ internal fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
             resource "aws_apigatewayv2_integration" "ws" {
               api_id = aws_apigatewayv2_api.ws.id
     
-              integration_uri    = aws_lambda_function.main.invoke_arn
+              integration_uri    = aws_lambda_alias.main.invoke_arn
               integration_type   = "AWS_PROXY"
               integration_method = "POST"
             }
@@ -1608,7 +1648,7 @@ internal fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
             resource "aws_lambda_permission" "api_gateway_ws" {
               statement_id  = "AllowExecutionFromAPIGatewayWS"
               action        = "lambda:InvokeFunction"
-              function_name = aws_lambda_function.main.function_name
+              function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
               principal     = "apigateway.amazonaws.com"
     
               source_arn = "${'$'}{aws_apigatewayv2_api.ws.execution_arn}/*/*"
@@ -1726,12 +1766,14 @@ fun terraformMigrate(handlerFqn: String, folder: File) {
                 .substringAfter('=')
                 .trim()
                 .substringBefore("$")
-                .trim('"') + oldTfText
+                .trim('"')
+                .trim('-') + "-" + oldTfText
                 .substringAfter("deployment_name")
                 .substringAfter('=')
                 .substringAfter('"')
                 .trim()
-                .substringBefore('"'),
+                .substringBefore('"')
+                .trim('-') ,
             bucket = oldTfText
                 .substringAfter("bucket")
                 .substringAfter('=')
@@ -1763,10 +1805,10 @@ fun terraformMigrate(handlerFqn: String, folder: File) {
             .redirectOutput(oldStateFile)
             .start()
             .waitFor()
-        terraformEnvironmentAws(handlerFqn, environmentNew)
         environmentNew.resolve("terraform.tfvars").takeIf { !it.exists() }?.writeText(
             oldTfText.substringAfter("module \"domain\" {").trim().removeSuffix("}")
         )
+        terraformEnvironmentAws(handlerFqn, environmentNew)
         println("For $environmentNew:")
         println(" - Clean up terraform.tfvars")
         println(" - Run `./tf init && ./tf state push newstate.json` to import a migrated state")
@@ -1776,6 +1818,11 @@ fun terraformMigrate(handlerFqn: String, folder: File) {
 fun terraformAws(handlerFqn: String, projectName: String = "project", root: File) {
     if(root.resolve("base").exists()) {
         println("Base folder detected; need to migrate to new Terraform format.")
+        println("***WARNING***")
+        println("You *MUST* rebuild your program to use the new terraform due to a new settings parser!")
+        println("Ensure the new AwsHandler uses 'loadSettings(AwsHandler::class.java)' to load settings.")
+        println("Enter 'understood' to proceed.")
+        assert(readln().equals("understood", true))
         terraformMigrate(handlerFqn, root)
         return
     }
@@ -1829,7 +1876,7 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
         ),
         scheduleAwsHandlers(info)
     ).flatten()
-    val allSections = sections + awsMainAppHandler(info, handlerFqn, sections)
+    val allSections = sections + awsLambdaHandler(info, handlerFqn, sections)
 
     val sectionToFile = allSections.associateWith { section ->
         folder.resolve(section.name.filter { it.isLetterOrDigit() } + ".tf")

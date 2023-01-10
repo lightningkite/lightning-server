@@ -6,9 +6,6 @@ variable "deployment_location" {
     type = string
     default = "us-west-2"
 }
-variable "deployment_name" {
-    type = string
-}
 variable "debug" {
     type = bool
     default = false

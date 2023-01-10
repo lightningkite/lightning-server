@@ -136,7 +136,7 @@ resource "aws_cloudwatch_event_target" "panic" {
 resource "aws_lambda_permission" "panic" {
   statement_id  = "AllowExecutionFromCloudWatch"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.main.function_name
+  function_name = "${aws_lambda_alias.main.function_name}:${aws_lambda_alias.main.name}"
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.panic.arn
 }

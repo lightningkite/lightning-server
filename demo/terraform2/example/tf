@@ -1,7 +1,4 @@
 #!/bin/bash
 export AWS_PROFILE=default
-if [ ! -f ~/.mongo/profiles/default.env ]
-then
-  export $(cat ~/.mongo/profiles/default.env | xargs)
-fi
+export $(cat ~/.mongo/profiles/default.env | xargs)
 terraform "$@"
