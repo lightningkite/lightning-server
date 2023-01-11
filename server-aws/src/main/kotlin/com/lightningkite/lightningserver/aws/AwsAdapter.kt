@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.aws
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler
 import com.lightningkite.lightningdb.MultiplexMessage
+import com.lightningkite.lightningserver.bytes.hexToByteArray
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.modify
 import com.lightningkite.lightningserver.cache.set
@@ -11,6 +12,7 @@ import com.lightningkite.lightningserver.core.ServerPathMatcher
 import com.lightningkite.lightningserver.cors.addCors
 import com.lightningkite.lightningserver.db.DynamoDbCache
 import com.lightningkite.lightningserver.encryption.OpenSsl
+import com.lightningkite.lightningserver.encryption.decryptAesCbcPkcs5
 import com.lightningkite.lightningserver.engine.Engine
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.exceptions.report
@@ -59,6 +61,11 @@ import java.nio.file.Paths
 import java.time.Duration
 import java.util.*
 import org.crac.Resource
+import java.math.BigInteger
+import java.security.MessageDigest
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 
 abstract class AwsAdapter : RequestStreamHandler, Resource {
@@ -86,15 +93,13 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             }
         }
         fun loadSettings(bytes: ByteArray) {
-            val decryptionKey = System.getenv("LIGHTNING_SERVER_SETTINGS_DECRYPTION")
-            if(decryptionKey == null || decryptionKey.isBlank()) {
-                Serialization.Internal.json.decodeFromString<Settings>(bytes.toString(Charsets.UTF_8))
-            } else {
-                Serialization.Internal.json.decodeFromString<Settings>(OpenSsl.decrypt(
-                    decryptionKey.toByteArray(),
-                    bytes
-                ).toString(Charsets.UTF_8))
-            }
+            val decryptedBytes = System.getenv("LIGHTNING_SERVER_SETTINGS_DECRYPTION")
+                ?.takeIf { it.isNotBlank() }
+                ?.let { sha256Password ->
+                    OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
+                }
+                ?: bytes
+            Serialization.Internal.json.decodeFromString<Settings>(decryptedBytes.toString(Charsets.UTF_8))
         }
 
         val logger: Logger = LoggerFactory.getLogger(AwsAdapter::class.java)

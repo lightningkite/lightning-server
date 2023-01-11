@@ -1430,7 +1430,7 @@ internal fun awsLambdaHandler(
             settingsRawHash = local_sensitive_file.settings_raw.content
           }
           provisioner "local-exec" {
-            command = "openssl enc -aes-256-cbc -in \"${'$'}{local_sensitive_file.settings_raw.filename}\" -out \"${'$'}{path.module}/../../build/dist/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
+            command = "openssl enc -aes-256-cbc -md sha256 -in \"${'$'}{local_sensitive_file.settings_raw.filename}\" -out \"${'$'}{path.module}/../../build/dist/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
           }
         }
 
@@ -1741,77 +1741,83 @@ fun terraformMigrate(handlerFqn: String, folder: File) {
     val oldFolder = folder.parentFile!!.resolve(folder.name + "-old")
     folder.renameTo(oldFolder)
     newFolder.mkdirs()
+    try {
 
-    val handlerFile = oldFolder.resolve("handlers.properties")
-    val handlerNames: Properties = handlerFile
-        .takeIf { it.exists() }
-        ?.let { Properties().apply { it.inputStream().use { s -> load(s) } } }
-        ?: Properties()
+        val handlerFile = oldFolder.resolve("handlers.properties")
+        val handlerNames: Properties = handlerFile
+            .takeIf { it.exists() }
+            ?.let { Properties().apply { it.inputStream().use { s -> load(s) } } }
+            ?: Properties()
 
-    val oldBaseTfText = oldFolder.resolve("base/main.tf").readText()
+        val oldBaseTfText = oldFolder.resolve("base/main.tf").readText()
 
-    for(environmentOld in oldFolder.listFiles()!!) {
-        if(!environmentOld.isDirectory) continue
-        if(environmentOld.name == "base") continue
-        if(environmentOld.name == "domain") continue
-        if(environmentOld.name == "nodomain") continue
-        val environmentNew = newFolder.resolve(environmentOld.name)
-        environmentNew.mkdirs()
-        println("AWS Profile for ${environmentOld.name}:")
-        val profile = readln()
-        val oldTfText = environmentOld.resolve("main.tf").readText()
-        val info = TerraformProjectInfo(
-            projectName = oldBaseTfText
-                .substringAfter("name")
-                .substringAfter('=')
-                .trim()
-                .substringBefore("$")
-                .trim('"')
-                .trim('-') + "-" + oldTfText
-                .substringAfter("deployment_name")
-                .substringAfter('=')
-                .substringAfter('"')
-                .trim()
-                .substringBefore('"')
-                .trim('-') ,
-            bucket = oldTfText
-                .substringAfter("bucket")
-                .substringAfter('=')
-                .substringAfter('"')
-                .trim()
-                .substringBefore('"'),
-            bucketPathOverride = oldTfText
-                .substringAfter("key")
-                .substringAfter('=')
-                .substringAfter('"')
-                .trim()
-                .substringBefore('"'),
-            vpc = false,
-            domain = oldTfText.contains("../domain"),
-            profile = profile,
-            handlers = handlerNames.keys.filterIsInstance<String>().associateWith { handlerNames.getProperty(it) }
-        )
-        val projectInfoFile = environmentNew.resolve("project.json")
-        @Suppress("JSON_FORMAT_REDUNDANT")
-        projectInfoFile.writeText(
-            Json(Serialization.Internal.json) { prettyPrint = true }
-                .encodeToString(TerraformProjectInfo.serializer(), info)
-        )
-        val oldStateFile = environmentNew.resolve("oldstate.json")
-        ProcessBuilder()
-            .directory(environmentOld)
-            .apply { environment()["AWS_PROFILE"] = profile }
-            .command("terraform", "state", "pull")
-            .redirectOutput(oldStateFile)
-            .start()
-            .waitFor()
-        environmentNew.resolve("terraform.tfvars").takeIf { !it.exists() }?.writeText(
-            oldTfText.substringAfter("module \"domain\" {").trim().removeSuffix("}")
-        )
-        terraformEnvironmentAws(handlerFqn, environmentNew)
-        println("For $environmentNew:")
-        println(" - Clean up terraform.tfvars")
-        println(" - Run `./tf init && ./tf state push newstate.json` to import a migrated state")
+        for (environmentOld in oldFolder.listFiles()!!) {
+            if (!environmentOld.isDirectory) continue
+            if (environmentOld.name == "base") continue
+            if (environmentOld.name == "domain") continue
+            if (environmentOld.name == "nodomain") continue
+            val environmentNew = newFolder.resolve(environmentOld.name)
+            environmentNew.mkdirs()
+            println("AWS Profile for ${environmentOld.name}:")
+            val profile = readln()
+            val oldTfText = environmentOld.resolve("main.tf").readText()
+            val info = TerraformProjectInfo(
+                projectName = oldBaseTfText
+                    .substringAfter("name")
+                    .substringAfter('=')
+                    .trim()
+                    .substringBefore("$")
+                    .trim('"')
+                    .trim('-') + "-" + oldTfText
+                    .substringAfter("deployment_name")
+                    .substringAfter('=')
+                    .substringAfter('"')
+                    .trim()
+                    .substringBefore('"')
+                    .trim('-'),
+                bucket = oldTfText
+                    .substringAfter("bucket")
+                    .substringAfter('=')
+                    .substringAfter('"')
+                    .trim()
+                    .substringBefore('"'),
+                bucketPathOverride = oldTfText
+                    .substringAfter("key")
+                    .substringAfter('=')
+                    .substringAfter('"')
+                    .trim()
+                    .substringBefore('"'),
+                vpc = false,
+                domain = oldTfText.contains("../domain"),
+                profile = profile,
+                handlers = handlerNames.keys.filterIsInstance<String>().associateWith { handlerNames.getProperty(it) }
+            )
+            val projectInfoFile = environmentNew.resolve("project.json")
+            @Suppress("JSON_FORMAT_REDUNDANT")
+            projectInfoFile.writeText(
+                Json(Serialization.Internal.json) { prettyPrint = true }
+                    .encodeToString(TerraformProjectInfo.serializer(), info)
+            )
+            val oldStateFile = environmentNew.resolve("oldstate.json")
+            assert(ProcessBuilder()
+                .directory(environmentOld)
+                .apply { environment()["AWS_PROFILE"] = profile }
+                .command("terraform", "state", "pull")
+                .inheritIO()
+                .redirectOutput(oldStateFile)
+                .start()
+                .waitFor() == 0)
+            environmentNew.resolve("terraform.tfvars").takeIf { !it.exists() }?.writeText(
+                oldTfText.substringAfter("module \"domain\" {").trim().removeSuffix("}")
+            )
+            terraformEnvironmentAws(handlerFqn, environmentNew)
+            println("For $environmentNew:")
+            println(" - Clean up terraform.tfvars")
+            println(" - Run `./tf init && ./tf state push newstate.json` to import a migrated state")
+        }
+    } catch(e: Exception) {
+        newFolder.deleteRecursively()
+        oldFolder.renameTo(newFolder)
     }
 }
 

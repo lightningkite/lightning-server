@@ -18,7 +18,7 @@ class OpenSslTest {
             .start()
             .waitFor()
             .also { println("Got code $it") }
-        OpenSsl.decrypt(
+        OpenSsl.decryptAesCbcPkcs5Sha256(
             testPass.toByteArray(),
             outFile.readBytes()
         ).toString(Charsets.UTF_8).also {
