@@ -1141,6 +1141,9 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
               function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
               principal     = "events.amazonaws.com"
               source_arn    = aws_cloudwatch_event_rule.panic.arn
+              lifecycle {
+                create_before_destroy = true
+              }
             }
             
             resource "aws_iam_role_policy_attachment" "panic" {
@@ -1198,6 +1201,9 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                       function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
                       principal     = "events.amazonaws.com"
                       source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
+                      lifecycle {
+                        create_before_destroy = true
+                      }
                     }
                 """.trimIndent()
                         )
@@ -1227,6 +1233,9 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                       function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
                       principal     = "events.amazonaws.com"
                       source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
+                      lifecycle {
+                        create_before_destroy = true
+                      }
                     }
                 """.trimIndent()
                         )
@@ -1514,6 +1523,9 @@ internal fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSectio
                   principal     = "apigateway.amazonaws.com"
         
                   source_arn = "${'$'}{aws_apigatewayv2_api.http.execution_arn}/*/*"
+                  lifecycle {
+                    create_before_destroy = true
+                  }
                 }
             """.trimIndent()
         )
@@ -1652,6 +1664,9 @@ internal fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
               principal     = "apigateway.amazonaws.com"
     
               source_arn = "${'$'}{aws_apigatewayv2_api.ws.execution_arn}/*/*"
+              lifecycle {
+                create_before_destroy = true
+              }
             }
             
             resource "aws_iam_policy" "api_gateway_ws" {
