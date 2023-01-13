@@ -41,6 +41,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
     // SnapStart feature effectively.  As such, we have to destroy and reproduce all the connections on demand.
     private var client = lazy { makeClient() }
     private var databaseLazy = lazy { client.value.coroutine.getDatabase(databaseName) }
+    val database get() = databaseLazy.value
     private var coroutineCollections = ConcurrentHashMap<String, Lazy<CoroutineCollection<*>>>()
     override fun disconnect() {
         if(client.isInitialized()) client.value.close()
