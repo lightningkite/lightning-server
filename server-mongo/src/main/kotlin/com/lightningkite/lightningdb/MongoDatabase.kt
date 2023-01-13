@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
 import com.github.jershell.kbson.*
+import com.lightningkite.lightningserver.core.Disconnectable
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
@@ -15,11 +16,8 @@ import org.bson.BsonTimestamp
 import org.bson.UuidRepresentation
 import org.bson.types.Binary
 import org.bson.types.ObjectId
-import org.litote.kmongo.Id
-import org.litote.kmongo.coroutine.CoroutineDatabase
+import org.litote.kmongo.coroutine.CoroutineCollection
 import org.litote.kmongo.coroutine.coroutine
-import org.litote.kmongo.id.StringId
-import org.litote.kmongo.id.WrappedObjectId
 import org.litote.kmongo.reactivestreams.KMongo
 import org.litote.kmongo.serialization.*
 import org.litote.kmongo.serialization.InstantSerializer
@@ -33,12 +31,24 @@ import java.time.*
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-import java.util.regex.Pattern
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
-class MongoDatabase(val makeDatabase: () -> CoroutineDatabase) : Database {
-    val database by lazy { makeDatabase() }
+class MongoDatabase(val databaseName: String, private val makeClient: () -> MongoClient) : Database, Disconnectable {
+
+    // You might be asking, "WHY?  WHY IS THIS SO COMPLICATED?"
+    // Well, we have to be able to fully disconnect and reconnect exising Mongo databases in order to support AWS's
+    // SnapStart feature effectively.  As such, we have to destroy and reproduce all the connections on demand.
+    private var client = lazy { makeClient() }
+    private var databaseLazy = lazy { client.value.coroutine.getDatabase(databaseName) }
+    private var coroutineCollections = ConcurrentHashMap<String, Lazy<CoroutineCollection<*>>>()
+    override fun disconnect() {
+        if(client.isInitialized()) client.value.close()
+        client.value.close()
+        client = lazy { makeClient() }
+        databaseLazy = lazy { client.value.coroutine.getDatabase(databaseName) }
+        coroutineCollections = ConcurrentHashMap<String, Lazy<CoroutineCollection<*>>>()
+    }
 
     init {
         registerModule(Serialization.Internal.module.overwriteWith(SerializersModule {
@@ -65,7 +75,7 @@ class MongoDatabase(val makeDatabase: () -> CoroutineDatabase) : Database {
 
         init {
             DatabaseSettings.register("mongodb") {
-                MongoDatabase {
+                MongoDatabase(databaseName = it.databaseName) {
                     KMongo.createClient(
                         MongoClientSettings.builder()
                             .applyConnectionString(ConnectionString(it.url))
@@ -77,11 +87,11 @@ class MongoDatabase(val makeDatabase: () -> CoroutineDatabase) : Database {
                                 }
                             }
                             .build()
-                    ).coroutine.getDatabase(it.databaseName)
+                    )
                 }
             }
             DatabaseSettings.register("mongodb+srv") {
-                MongoDatabase {
+                MongoDatabase(databaseName = it.databaseName) {
                     KMongo.createClient(
                         MongoClientSettings.builder()
                             .applyConnectionString(ConnectionString(it.url))
@@ -93,31 +103,35 @@ class MongoDatabase(val makeDatabase: () -> CoroutineDatabase) : Database {
                                 }
                             }
                             .build()
-                    ).coroutine.getDatabase(it.databaseName)
+                    )
                 }
             }
             DatabaseSettings.register("mongodb-test") {
-                MongoDatabase { testMongo().coroutine.getDatabase(it.databaseName) }
+                MongoDatabase(databaseName = it.databaseName) { testMongo() }
             }
             DatabaseSettings.register("mongodb-file") {
-                MongoDatabase { embeddedMongo(File(it.url.removePrefix("mongodb-file://"))).coroutine.getDatabase(it.databaseName) }
+                MongoDatabase(databaseName = it.databaseName) { embeddedMongo(File(it.url.removePrefix("mongodb-file://"))) }
             }
         }
     }
 
     private val collections = ConcurrentHashMap<String, Lazy<MongoFieldCollection<*>>>()
-
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any> collection(type: KType, name: String): MongoFieldCollection<T> =
         (collections.getOrPut(name) {
             lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
                 MongoFieldCollection(
-                    bson.serializersModule.serializer(type) as KSerializer<T>,
-                    database
-                        .database
-                        .getCollection(name, (type.classifier as KClass<*>).java as Class<T>)
-                        .coroutine
-                )
+                    bson.serializersModule.serializer(type) as KSerializer<T>
+                ) {
+                    (coroutineCollections.getOrPut(name) {
+                        lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+                            databaseLazy.value
+                                .database
+                                .getCollection(name, (type.classifier as KClass<*>).java as Class<T>)
+                                .coroutine
+                        }
+                    } as Lazy<CoroutineCollection<T>>).value
+                }
             }
         } as Lazy<MongoFieldCollection<T>>).value
 }

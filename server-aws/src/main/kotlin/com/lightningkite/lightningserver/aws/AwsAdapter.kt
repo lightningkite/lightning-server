@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.modify
 import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.core.Disconnectable
 import com.lightningkite.lightningserver.core.ServerPathMatcher
 import com.lightningkite.lightningserver.cors.addCors
 import com.lightningkite.lightningserver.db.DynamoDbCache
@@ -214,7 +215,14 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
     }
 
     override fun beforeCheckpoint(context: org.crac.Context<out Resource>?) {
-        println("beforeCheckpoint()")
+        println("beforeCheckpoint() - shutting down all connections...")
+        Settings.requirements.forEach { (key, value) ->
+            (value() as? Disconnectable)?.let {
+                println("Disconnecting $key...")
+                it.disconnect()
+            }
+        }
+        println("Disconnections complete.")
     }
 
     override fun afterRestore(context: org.crac.Context<out Resource>?) {
