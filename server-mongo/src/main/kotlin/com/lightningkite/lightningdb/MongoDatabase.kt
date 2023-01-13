@@ -51,30 +51,27 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
         coroutineCollections = ConcurrentHashMap<String, Lazy<CoroutineCollection<*>>>()
     }
 
-    init {
-        registerModule(Serialization.Internal.module.overwriteWith(SerializersModule {
-            contextual(Duration::class, DurationMsSerializer)
-            contextual(UUID::class, com.github.jershell.kbson.UUIDSerializer)
-            contextual(ObjectId::class, ObjectIdSerializer)
-            contextual(BigDecimal::class, BigDecimalSerializer)
-            contextual(ByteArray::class, ByteArraySerializer)
-            contextual(Instant::class, InstantSerializer)
-            contextual(ZonedDateTime::class, ZonedDateTimeSerializer)
-            contextual(OffsetDateTime::class, OffsetDateTimeSerializer)
-            contextual(LocalDate::class, LocalDateSerializer)
-            contextual(LocalDateTime::class, LocalDateTimeSerializer)
-            contextual(LocalTime::class, LocalTimeSerializer)
-            contextual(OffsetTime::class, OffsetTimeSerializer)
-            contextual(BsonTimestamp::class, BsonTimestampSerializer)
-            contextual(Locale::class, LocaleSerializer)
-            contextual(Binary::class, BinarySerializer)
-        }))
-    }
-
     companion object {
         val bson by lazy { KBson(serializersModule = kmongoSerializationModule, configuration = configuration) }
 
         init {
+            registerModule(Serialization.Internal.module.overwriteWith(SerializersModule {
+                contextual(Duration::class, DurationMsSerializer)
+                contextual(UUID::class, com.github.jershell.kbson.UUIDSerializer)
+                contextual(ObjectId::class, ObjectIdSerializer)
+                contextual(BigDecimal::class, BigDecimalSerializer)
+                contextual(ByteArray::class, ByteArraySerializer)
+                contextual(Instant::class, InstantSerializer)
+                contextual(ZonedDateTime::class, ZonedDateTimeSerializer)
+                contextual(OffsetDateTime::class, OffsetDateTimeSerializer)
+                contextual(LocalDate::class, LocalDateSerializer)
+                contextual(LocalDateTime::class, LocalDateTimeSerializer)
+                contextual(LocalTime::class, LocalTimeSerializer)
+                contextual(OffsetTime::class, OffsetTimeSerializer)
+                contextual(BsonTimestamp::class, BsonTimestampSerializer)
+                contextual(Locale::class, LocaleSerializer)
+                contextual(Binary::class, BinarySerializer)
+            }))
             DatabaseSettings.register("mongodb") {
                 MongoDatabase(databaseName = it.databaseName) {
                     KMongo.createClient(
