@@ -1136,13 +1136,12 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
               }
             }
             resource "aws_lambda_permission" "panic" {
-              statement_id  = "AllowExecutionFromCloudWatch"
               action        = "lambda:InvokeFunction"
               function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
               principal     = "events.amazonaws.com"
               source_arn    = aws_cloudwatch_event_rule.panic.arn
               lifecycle {
-                # create_before_destroy = true
+                create_before_destroy = true
               }
             }
             
@@ -1196,13 +1195,12 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                       input     = "{\"scheduled\": \"${it.name}\"}"
                     }
                     resource "aws_lambda_permission" "scheduled_task_${safeName}" {
-                      statement_id  = "scheduled_task_${safeName}"
                       action        = "lambda:InvokeFunction"
                       function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
                       principal     = "events.amazonaws.com"
                       source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
                       lifecycle {
-                        # create_before_destroy = true
+                        create_before_destroy = true
                       }
                     }
                 """.trimIndent()
@@ -1228,13 +1226,12 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                       input     = "{\"scheduled\": \"${it.name}\"}"
                     }
                     resource "aws_lambda_permission" "scheduled_task_${safeName}" {
-                      statement_id  = "scheduled_task_${safeName}"
                       action        = "lambda:InvokeFunction"
                       function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
                       principal     = "events.amazonaws.com"
                       source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
                       lifecycle {
-                        # create_before_destroy = true
+                        create_before_destroy = true
                       }
                     }
                 """.trimIndent()
@@ -1524,14 +1521,13 @@ internal fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSectio
                 }
         
                 resource "aws_lambda_permission" "api_gateway_http" {
-                  statement_id  = "AllowExecutionFromAPIGatewayHTTP"
                   action        = "lambda:InvokeFunction"
                   function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
                   principal     = "apigateway.amazonaws.com"
         
                   source_arn = "${'$'}{aws_apigatewayv2_api.http.execution_arn}/*/*"
                   lifecycle {
-                    # create_before_destroy = true
+                    create_before_destroy = true
                   }
                 }
             """.trimIndent()
@@ -1665,14 +1661,13 @@ internal fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
             }
     
             resource "aws_lambda_permission" "api_gateway_ws" {
-              statement_id  = "AllowExecutionFromAPIGatewayWS"
               action        = "lambda:InvokeFunction"
               function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
               principal     = "apigateway.amazonaws.com"
     
               source_arn = "${'$'}{aws_apigatewayv2_api.ws.execution_arn}/*/*"
               lifecycle {
-                # create_before_destroy = true
+                create_before_destroy = true
               }
             }
             
