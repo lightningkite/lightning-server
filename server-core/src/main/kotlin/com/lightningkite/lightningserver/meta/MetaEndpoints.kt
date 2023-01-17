@@ -176,7 +176,10 @@ class MetaEndpoints<USER>(
         docs,
         health.route,
         isOnline,
+        admin,
         adminIndex,
+        openApi,
+        openApiJson,
         schema,
         paths,
     )

@@ -1446,6 +1446,16 @@ internal fun awsLambdaHandler(
             interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
           }
         }
+        resource "null_resource" "settings_reread" {
+          triggers = {
+            settingsRawHash = local_sensitive_file.settings_raw.content
+          }
+          depends_on = [null_resource.settings_encrypted]
+          provisioner "local-exec" {
+            command     = "openssl enc -d -aes-256-cbc -md sha256 -out \"${'$'}{local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \"${'$'}{path.module}/../../build/dist/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
+            interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
+          }
+        }
         
         resource "random_password" "settings" {
           length           = 32
@@ -1454,7 +1464,7 @@ internal fun awsLambdaHandler(
         }
         
         data "archive_file" "lambda" {
-          depends_on = [null_resource.settings_encrypted]
+          depends_on  = [null_resource.settings_encrypted, null_resource.settings_reread]
           type        = "zip"
           source_dir = "${'$'}{path.module}/../../build/dist/lambda"
           output_path = "${'$'}{path.module}/build/lambda.jar"
@@ -1904,11 +1914,14 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
     val sectionToFile = allSections.associateWith { section ->
         folder.resolve(section.name.filter { it.isLetterOrDigit() } + ".tf")
     }
+    val warning = "# Generated via Lightning Server.  This file will be overwritten or deleted when regenerating."
     folder.listFiles()!!.filter {
-        it.extension == "tf" && it !in sectionToFile.values
+        it.extension == "tf" && it.readText().contains(warning)
     }.forEach { it.delete() }
     for((section, file) in sectionToFile) {
+//        if(!file.readText().contains(warning)) continue
         file.printWriter().use { it ->
+            it.appendLine(warning)
             it.appendLine("##########")
             it.appendLine("# Inputs")
             it.appendLine("##########")
