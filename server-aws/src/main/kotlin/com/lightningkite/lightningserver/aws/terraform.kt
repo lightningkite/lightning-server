@@ -1434,12 +1434,17 @@ internal fun awsLambdaHandler(
           filename = "${'$'}{path.module}/build/raw-settings.json"
         }
 
+        locals {
+          # Directories start with "C:..." on Windows; All other OSs use "/" for root.
+          is_windows = substr(pathexpand("~"), 0, 1) == "/" ? false : true
+        }
         resource "null_resource" "settings_encrypted" {
           triggers = {
             settingsRawHash = local_sensitive_file.settings_raw.content
           }
           provisioner "local-exec" {
             command = "openssl enc -aes-256-cbc -md sha256 -in \"${'$'}{local_sensitive_file.settings_raw.filename}\" -out \"${'$'}{path.module}/../../build/dist/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
+            interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
           }
         }
 
@@ -1940,24 +1945,34 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
     }
 
     val usingMongo = allSections.any { it.providers.any { it.name == "mongodbatlas" } }
+    if(usingMongo){
+        fun get(name: String): String {
+            println("$name for profile ${info.profile}:")
+            return readln()
+        }
+        val mongoCredsFile = File(System.getProperty("user.home")).resolve(".mongo/profiles/${info.profile}.env")
+        val mongoCredsFile2 = File(System.getProperty("user.home")).resolve(".mongo/profiles/${info.profile}.ps1")
+        mongoCredsFile.parentFile.mkdirs()
+        if(!mongoCredsFile.exists()) {
+            val mongoPublic = if(usingMongo) get("MongoDB Public Key") else null
+            val mongoPrivate = if(usingMongo) get("MongoDB Private Key") else null
+            mongoCredsFile.writeText("""
+                    MONGODB_ATLAS_PUBLIC_KEY="$mongoPublic"
+                    MONGODB_ATLAS_PRIVATE_KEY="$mongoPrivate"
+                """.trimIndent() + "\n")
+            mongoCredsFile.setExecutable(true)
+            mongoCredsFile2.writeText("""
+                    ${'$'}env:MONGODB_ATLAS_PUBLIC_KEY = "$mongoPublic"
+                    ${'$'}env:MONGODB_ATLAS_PRIVATE_KEY = "$mongoPrivate"
+                """.trimIndent() + "\n")
+            mongoCredsFile2.setExecutable(true)
+        }
+    }
 
     folder.resolve("tf").printWriter().use {
         it.appendLine("#!/bin/bash")
         it.appendLine("export AWS_PROFILE=${info.profile}")
         if(usingMongo){
-            val mongoCredsFile = File(System.getProperty("user.home")).resolve(".mongo/profiles/${info.profile}.env")
-            mongoCredsFile.parentFile.mkdirs()
-            if(!mongoCredsFile.exists()) {
-                fun get(name: String): String {
-                    println("$name for profile ${info.profile}:")
-                    return readln()
-                }
-                mongoCredsFile.writeText("""
-                    MONGODB_ATLAS_PUBLIC_KEY="${get("MongoDB Public Key")}"
-                    MONGODB_ATLAS_PRIVATE_KEY="${get("MongoDB Private Key")}"
-                """.trimIndent() + "\n")
-                mongoCredsFile.setExecutable(true)
-            }
             it.appendLine("""
                   export ${'$'}(cat ~/.mongo/profiles/${info.profile}.env | xargs)
             """.trimIndent())
@@ -1965,6 +1980,17 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
         it.appendLine("terraform \"$@\"")
     }
     folder.resolve("tf").setExecutable(true)
+
+    folder.resolve("tf.ps1").printWriter().use {
+        it.appendLine("\$env:AWS_PROFILE = \"${info.profile}\"")
+        if(usingMongo){
+            it.appendLine("""
+                  . ~/.mongo/profiles/${info.profile}.ps1
+            """.trimIndent())
+        }
+        it.appendLine("terraform \$args")
+    }
+    folder.resolve("tf.ps1").setExecutable(true)
 
     folder.resolve("main.tf").printWriter().use {
         it.appendLine("""terraform {""")
