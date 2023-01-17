@@ -15,7 +15,7 @@ import java.time.Duration
 import java.time.Instant
 
 class DynamoDbCache(val makeClient: ()->DynamoDbAsyncClient, val tableName: String = "cache") : CacheInterface {
-    val client by lazy(makeClient)
+    val client by lazy(LazyThreadSafetyMode.SYNCHRONIZED, makeClient)
     companion object {
         init {
             CacheSettings.register("dynamodb") {
