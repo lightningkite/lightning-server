@@ -1291,7 +1291,7 @@ internal fun awsLambdaHandler(
           role       = aws_iam_role.main_exec.name
           policy_arn = aws_iam_policy.lambda_bucket.arn
         }
-
+        
         resource "aws_iam_role" "main_exec" {
           name = "${projectInfo.namePrefix}-main-exec"
 
@@ -1308,7 +1308,7 @@ internal fun awsLambdaHandler(
             ]
           })
         }
-
+        
         resource "aws_iam_role_policy_attachment" "dynamo" {
           role       = aws_iam_role.main_exec.name
           policy_arn = aws_iam_policy.dynamo.arn
@@ -1385,9 +1385,9 @@ internal fun awsLambdaHandler(
           memory_size = "${'$'}{var.lambda_memory_size}"
           timeout = var.lambda_timeout
           # memory_size = "1024"
-
+        
           source_code_hash = data.archive_file.lambda.output_base64sha256
-
+        
           role = aws_iam_role.main_exec.arn
           
           snap_start {
@@ -1397,9 +1397,11 @@ internal fun awsLambdaHandler(
           ${
               if(projectInfo.vpc)
               """
-              subnet_ids = module.vpc.private_subnets
-              security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
-              """.trimIndent()
+              |  vpc_config {
+              |    subnet_ids = module.vpc.private_subnets
+              |    security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
+              |  }
+              """.trimMargin()
               else
               ""
           }
@@ -1412,14 +1414,14 @@ internal fun awsLambdaHandler(
           
           depends_on = [aws_s3_object.app_storage]
         }
-
+        
         resource "aws_lambda_alias" "main" {
           name             = "prod"
           description      = "The current production version of the lambda."
           function_name    = aws_lambda_function.main.arn
           function_version = var.lambda_snapstart ? aws_lambda_function.main.version : "${'$'}LATEST"
         }
-
+        
         resource "aws_cloudwatch_log_group" "main" {
           name = "${projectInfo.namePrefix}-main-log"
           retention_in_days = 30
@@ -1433,7 +1435,7 @@ internal fun awsLambdaHandler(
         }})
           filename = "${'$'}{path.module}/build/raw-settings.json"
         }
-
+        
         locals {
           # Directories start with "C:..." on Windows; All other OSs use "/" for root.
           is_windows = substr(pathexpand("~"), 0, 1) == "/" ? false : true
@@ -1447,13 +1449,13 @@ internal fun awsLambdaHandler(
             interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
           }
         }
-
+        
         resource "random_password" "settings" {
           length           = 32
           special          = true
           override_special = "_"
         }
-
+        
         data "archive_file" "lambda" {
           depends_on = [null_resource.settings_encrypted]
           type        = "zip"
