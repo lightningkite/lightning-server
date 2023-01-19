@@ -8,18 +8,18 @@ public func prepareUploadForNextRequestFields() -> Void {
     
     
 }
-public extension PropChain where To == UploadForNextRequest {
-    var _id: PropChain<From, UUID> {
+public extension KeyPath where To == UploadForNextRequest {
+    var _id: KeyPath<From, UUID> {
         get { return self.get(prop: UploadForNextRequest._idProp) }
     }
 }
-public extension PropChain where To == UploadForNextRequest {
-    var file: PropChain<From, String> {
+public extension KeyPath where To == UploadForNextRequest {
+    var file: KeyPath<From, String> {
         get { return self.get(prop: UploadForNextRequest.fileProp) }
     }
 }
-public extension PropChain where To == UploadForNextRequest {
-    var expires: PropChain<From, Date> {
+public extension KeyPath where To == UploadForNextRequest {
+    var expires: KeyPath<From, Date> {
         get { return self.get(prop: UploadForNextRequest.expiresProp) }
     }
 }

@@ -47,6 +47,7 @@ class SerializationTest {
     }
     @Test fun demoSorts() {
         listOf(SortPart(User::email), SortPart(User::age, ascending = false)).cycle()
+        listOf(SortPart(User::email, ignoreCase = true), SortPart(User::age, ascending = false)).cycle()
     }
     @Test fun hackTest() {
         println(serializer<List<Int>>().listElement())
@@ -95,12 +96,12 @@ class SerializationTest {
         (startChain<LargeTestModel>().set.any { it eq 2 }).cycle()
         (startChain<LargeTestModel>().set.sizesEquals(2)).cycle()
         (startChain<LargeTestModel>().map.containsKey("asdf")).cycle()
-        startChain<LargeTestModel>().intNullable.notNull.gt(4).cycle()
+        startChain<LargeTestModel>().intNullable.toPropChain().notNull.gt(4).cycle()
     }
 
     @Test fun modifications() {
         ((startChain<LargeTestModel>().int assign 2) then (startChain<LargeTestModel>().boolean assign true)).cycle()
-        (startChain<LargeTestModel>().intNullable.notNull + 1).cycle()
+        (startChain<LargeTestModel>().intNullable.toPropChain().notNull + 1).cycle()
         (startChain<LargeTestModel>().int assign 2).cycle()
         (startChain<LargeTestModel>().int coerceAtMost 2).cycle()
         (startChain<LargeTestModel>().int coerceAtLeast 2).cycle()
@@ -122,6 +123,11 @@ class SerializationTest {
             "c" to { it + 1 }
         ))).cycle()
         (startChain<LargeTestModel>().map.removeKeys(setOf("a"))).cycle()
+    }
+
+    @Test fun keyPaths() {
+        KeyPathSelf<LargeTestModel>()[LargeTestModel::embeddedNullable].safeGet(ClassUsedForEmbedding::value1).cycle()
+        KeyPathSelf<LargeTestModel>()[LargeTestModel::embedded][ClassUsedForEmbedding::value1].cycle()
     }
 
     private inline fun <reified T> Condition<T>.cycle() {
@@ -172,5 +178,13 @@ class SerializationTest {
         val recreated2 = myProperties.decodeFromStringMap<List<SortPart<T>>>(asString2)
         println(recreated2)
         assertEquals(this, recreated2)
+    }
+    private inline fun <reified T> KeyPathPartial<T>.cycle() {
+        println("----$this----")
+        val asString = myJson.encodeToString(this)
+        println(asString)
+        val recreated = myJson.decodeFromString<KeyPathPartial<T>>(asString)
+        println(recreated)
+        assertEquals(this, recreated)
     }
 }

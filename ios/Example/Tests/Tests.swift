@@ -66,7 +66,7 @@ class ExampleFields {
 }
 
 extension Example {
-    static func chain() -> PropChain<Example, Example> {
+    static func chain() -> KeyPath<Example, Example> {
         return startChain()
     }
 }

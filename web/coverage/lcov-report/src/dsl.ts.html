@@ -528,223 +528,223 @@ import { Comparable } from '@lightningkite/khrysalis-runtime'
 import { map as iMap } from 'iter-tools-es'
 &nbsp;
 //! Declares com.lightningkite.lightningdb.startChain
-export function startChain&lt;T extends any&gt;(): PropChain&lt;T, T&gt; {
-    return new PropChain&lt;T, T&gt;((it: Condition&lt;T&gt;): Condition&lt;T&gt; =&gt; it, <span class="fstat-no" title="function not covered" >(i</span>t: Modification&lt;T&gt;): Modification&lt;T&gt; =&gt; <span class="cstat-no" title="statement not covered" >it)</span>;
+export function startChain&lt;T extends any&gt;(): KeyPath&lt;T, T&gt; {
+    return new KeyPath&lt;T, T&gt;((it: Condition&lt;T&gt;): Condition&lt;T&gt; =&gt; it, <span class="fstat-no" title="function not covered" >(i</span>t: Modification&lt;T&gt;): Modification&lt;T&gt; =&gt; <span class="cstat-no" title="statement not covered" >it)</span>;
 }
-//! Declares com.lightningkite.lightningdb.PropChain
-export class PropChain&lt;From extends any, To extends any&gt; {
+//! Declares com.lightningkite.lightningdb.KeyPath
+export class KeyPath&lt;From extends any, To extends any&gt; {
     public constructor(public readonly mapCondition: ((a: Condition&lt;To&gt;) =&gt; Condition&lt;From&gt;), public readonly mapModification: ((a: Modification&lt;To&gt;) =&gt; Modification&lt;From&gt;)) {
     }
     
-    public get&lt;V extends any&gt;(prop: DataClassProperty&lt;To, V&gt;): PropChain&lt;From, V&gt; {
-        return new PropChain&lt;From, V&gt;((it: Condition&lt;V&gt;): Condition&lt;From&gt; =&gt; this.mapCondition(new Condition.OnField&lt;To, V&gt;(prop, it)), <span class="fstat-no" title="function not covered" >(i</span>t: Modification&lt;V&gt;): Modification&lt;From&gt; =&gt; <span class="cstat-no" title="statement not covered" >this.mapModification(new Modification.OnField&lt;To, V&gt;(prop, it)))</span>;
+    public get&lt;V extends any&gt;(prop: DataClassProperty&lt;To, V&gt;): KeyPath&lt;From, V&gt; {
+        return new KeyPath&lt;From, V&gt;((it: Condition&lt;V&gt;): Condition&lt;From&gt; =&gt; this.mapCondition(new Condition.OnField&lt;To, V&gt;(prop, it)), <span class="fstat-no" title="function not covered" >(i</span>t: Modification&lt;V&gt;): Modification&lt;From&gt; =&gt; <span class="cstat-no" title="statement not covered" >this.mapModification(new Modification.OnField&lt;To, V&gt;(prop, it)))</span>;
     }
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.eq&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.eq.K, com.lightningkite.lightningdb.eq.T
-export function xPropChainEq&lt;K extends any, T extends any&gt;(this_: PropChain&lt;K, T&gt;, value: T): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.eq&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.eq.K, com.lightningkite.lightningdb.eq.T
+export function xKeyPathEq&lt;K extends any, T extends any&gt;(this_: KeyPath&lt;K, T&gt;, value: T): Condition&lt;K&gt; {
     return this_.mapCondition(new Condition.Equal&lt;T&gt;(value));
 }
-//! Declares com.lightningkite.lightningdb.neq&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.neq.K, com.lightningkite.lightningdb.neq.T
-export function <span class="fstat-no" title="function not covered" >xPropChainNeq&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, T&gt;, value: T): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.neq&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.neq.K, com.lightningkite.lightningdb.neq.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathNeq&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, T&gt;, value: T): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.NotEqual&lt;T&gt;(value));</span>
 }
-//! Declares com.lightningkite.lightningdb.ne&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.ne.K, com.lightningkite.lightningdb.ne.T
-export function <span class="fstat-no" title="function not covered" >xPropChainNe&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, T&gt;, value: T): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.ne&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.ne.K, com.lightningkite.lightningdb.ne.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathNe&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, T&gt;, value: T): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.NotEqual&lt;T&gt;(value));</span>
 }
-//! Declares com.lightningkite.lightningdb.inside&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.inside.K, com.lightningkite.lightningdb.inside.T
-export function <span class="fstat-no" title="function not covered" >xPropChainInside&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, T&gt;, values: Array&lt;T&gt;): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.inside&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.inside.K, com.lightningkite.lightningdb.inside.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathInside&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, T&gt;, values: Array&lt;T&gt;): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.Inside&lt;T&gt;(values));</span>
 }
-//! Declares com.lightningkite.lightningdb.nin&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.nin.K, com.lightningkite.lightningdb.nin.T
-export function <span class="fstat-no" title="function not covered" >xPropChainNin&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, T&gt;, values: Array&lt;T&gt;): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.nin&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.nin.K, com.lightningkite.lightningdb.nin.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathNin&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, T&gt;, values: Array&lt;T&gt;): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.NotInside&lt;T&gt;(values));</span>
 }
-//! Declares com.lightningkite.lightningdb.notIn&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.notIn.K, com.lightningkite.lightningdb.notIn.T
-export function <span class="fstat-no" title="function not covered" >xPropChainNotIn&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, T&gt;, values: Array&lt;T&gt;): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.notIn&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.notIn.K, com.lightningkite.lightningdb.notIn.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathNotIn&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, T&gt;, values: Array&lt;T&gt;): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.NotInside&lt;T&gt;(values));</span>
 }
-//! Declares com.lightningkite.lightningdb.gt&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.gt.K, com.lightningkite.lightningdb.gt.T
-export function <span class="fstat-no" title="function not covered" >xPropChainGt&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, T&gt;, value: T): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.gt&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.gt.K, com.lightningkite.lightningdb.gt.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathGt&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, T&gt;, value: T): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.GreaterThan&lt;T&gt;(value));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.lt&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.lt.K, com.lightningkite.lightningdb.lt.T
-export function <span class="fstat-no" title="function not covered" >xPropChainLt&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, T&gt;, value: T): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.lt&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.lt.K, com.lightningkite.lightningdb.lt.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathLt&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, T&gt;, value: T): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.LessThan&lt;T&gt;(value));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.gte&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.gte.K, com.lightningkite.lightningdb.gte.T
-export function <span class="fstat-no" title="function not covered" >xPropChainGte&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, T&gt;, value: T): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.gte&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.gte.K, com.lightningkite.lightningdb.gte.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathGte&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, T&gt;, value: T): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.GreaterThanOrEqual&lt;T&gt;(value));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.lte&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.lte.K, com.lightningkite.lightningdb.lte.T
-export function <span class="fstat-no" title="function not covered" >xPropChainLte&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, T&gt;, value: T): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.lte&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.lte.K, com.lightningkite.lightningdb.lte.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathLte&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, T&gt;, value: T): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.LessThanOrEqual&lt;T&gt;(value));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.allClear&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.allClear.K, kotlin.Int
-export function <span class="fstat-no" title="function not covered" >xPropChainAllClear&lt;</span>K extends any&gt;(this_: PropChain&lt;K, number&gt;, mask: number): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.allClear&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.allClear.K, kotlin.Int
+export function <span class="fstat-no" title="function not covered" >xKeyPathAllClear&lt;</span>K extends any&gt;(this_: KeyPath&lt;K, number&gt;, mask: number): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.IntBitsClear(mask));</span>
 }
-//! Declares com.lightningkite.lightningdb.allSet&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.allSet.K, kotlin.Int
-export function <span class="fstat-no" title="function not covered" >xPropChainAllSet&lt;</span>K extends any&gt;(this_: PropChain&lt;K, number&gt;, mask: number): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.allSet&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.allSet.K, kotlin.Int
+export function <span class="fstat-no" title="function not covered" >xKeyPathAllSet&lt;</span>K extends any&gt;(this_: KeyPath&lt;K, number&gt;, mask: number): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.IntBitsSet(mask));</span>
 }
-//! Declares com.lightningkite.lightningdb.anyClear&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.anyClear.K, kotlin.Int
-export function <span class="fstat-no" title="function not covered" >xPropChainAnyClear&lt;</span>K extends any&gt;(this_: PropChain&lt;K, number&gt;, mask: number): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.anyClear&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.anyClear.K, kotlin.Int
+export function <span class="fstat-no" title="function not covered" >xKeyPathAnyClear&lt;</span>K extends any&gt;(this_: KeyPath&lt;K, number&gt;, mask: number): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.IntBitsAnyClear(mask));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.anySet&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.anySet.K, kotlin.Int
-export function <span class="fstat-no" title="function not covered" >xPropChainAnySet&lt;</span>K extends any&gt;(this_: PropChain&lt;K, number&gt;, mask: number): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.anySet&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.anySet.K, kotlin.Int
+export function <span class="fstat-no" title="function not covered" >xKeyPathAnySet&lt;</span>K extends any&gt;(this_: KeyPath&lt;K, number&gt;, mask: number): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.IntBitsAnySet(mask));</span>
 }
-//! Declares com.lightningkite.lightningdb.contains&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.contains.K, kotlin.String
-export function <span class="fstat-no" title="function not covered" >xPropChainContains&lt;</span>K extends any&gt;(this_: PropChain&lt;K, string&gt;, value: string): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.contains&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.contains.K, kotlin.String
+export function <span class="fstat-no" title="function not covered" >xKeyPathContains&lt;</span>K extends any&gt;(this_: KeyPath&lt;K, string&gt;, value: string): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.Search(value, true));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.contains&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.contains.K, kotlin.String
-export function <span class="fstat-no" title="function not covered" >xPropChainContainsCased&lt;</span>K extends any&gt;(this_: PropChain&lt;K, string&gt;, value: string, ignoreCase: boolean): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.contains&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.contains.K, kotlin.String
+export function <span class="fstat-no" title="function not covered" >xKeyPathContainsCased&lt;</span>K extends any&gt;(this_: KeyPath&lt;K, string&gt;, value: string, ignoreCase: boolean): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.Search(value, ignoreCase));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.all&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.all.K, kotlin.collections.Listcom.lightningkite.lightningdb.all.T
-export function <span class="fstat-no" title="function not covered" >xPropChainAll&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Array&lt;T&gt;&gt;, condition: ((a: PropChain&lt;T, T&gt;) =&gt; Condition&lt;T&gt;)): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.all&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.all.K, kotlin.collections.Listcom.lightningkite.lightningdb.all.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathAll&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Array&lt;T&gt;&gt;, condition: ((a: KeyPath&lt;T, T&gt;) =&gt; Condition&lt;T&gt;)): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.AllElements&lt;T&gt;((condition)(startChain&lt;T&gt;())));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.any&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.any.K, kotlin.collections.Listcom.lightningkite.lightningdb.any.T
-export function <span class="fstat-no" title="function not covered" >xPropChainAny&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Array&lt;T&gt;&gt;, condition: ((a: PropChain&lt;T, T&gt;) =&gt; Condition&lt;T&gt;)): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.any&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.any.K, kotlin.collections.Listcom.lightningkite.lightningdb.any.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathAny&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Array&lt;T&gt;&gt;, condition: ((a: KeyPath&lt;T, T&gt;) =&gt; Condition&lt;T&gt;)): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.AnyElements&lt;T&gt;((condition)(startChain&lt;T&gt;())));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.sizesEquals&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.sizesEquals.K, kotlin.collections.Listcom.lightningkite.lightningdb.sizesEquals.T
-export function <span class="fstat-no" title="function not covered" >xPropChainSizesEquals&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Array&lt;T&gt;&gt;, count: number): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.sizesEquals&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.sizesEquals.K, kotlin.collections.Listcom.lightningkite.lightningdb.sizesEquals.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathSizesEquals&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Array&lt;T&gt;&gt;, count: number): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.SizesEquals&lt;T&gt;(count));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.containsKey&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.containsKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.containsKey.T
-export function <span class="fstat-no" title="function not covered" >xPropChainContainsKey&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Map&lt;string, T&gt;&gt;, key: string): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.containsKey&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.containsKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.containsKey.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathContainsKey&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Map&lt;string, T&gt;&gt;, key: string): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(new Condition.Exists&lt;T&gt;(key));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.notNull&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.notNull.K, com.lightningkite.lightningdb.notNull.T
-export function <span class="fstat-no" title="function not covered" >xPropChainNotNullGet&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, (T | null)&gt;): PropChain&lt;K, T&gt; { <span class="cstat-no" title="statement not covered" >return new PropChain&lt;K, T&gt;(<span class="fstat-no" title="function not covered" >(i</span>t: Condition&lt;T&gt;): Condition&lt;K&gt; =&gt; <span class="cstat-no" title="statement not covered" >this_.mapCondition(new Condition.IfNotNull&lt;T&gt;(it)),</span> <span class="fstat-no" title="function not covered" >(i</span>t: Modification&lt;T&gt;): Modification&lt;K&gt; =&gt; <span class="cstat-no" title="statement not covered" >this_.mapModification(new Modification.IfNotNull&lt;T&gt;(it)))</span>; </span>}
+//! Declares com.lightningkite.lightningdb.notNull&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.notNull.K, com.lightningkite.lightningdb.notNull.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathNotNullGet&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, (T | null)&gt;): KeyPath&lt;K, T&gt; { <span class="cstat-no" title="statement not covered" >return new KeyPath&lt;K, T&gt;(<span class="fstat-no" title="function not covered" >(i</span>t: Condition&lt;T&gt;): Condition&lt;K&gt; =&gt; <span class="cstat-no" title="statement not covered" >this_.mapCondition(new Condition.IfNotNull&lt;T&gt;(it)),</span> <span class="fstat-no" title="function not covered" >(i</span>t: Modification&lt;T&gt;): Modification&lt;K&gt; =&gt; <span class="cstat-no" title="statement not covered" >this_.mapModification(new Modification.IfNotNull&lt;T&gt;(it)))</span>; </span>}
 &nbsp;
 &nbsp;
-//! Declares com.lightningkite.lightningdb.get&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.get.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.get.T
-export function <span class="fstat-no" title="function not covered" >xPropChainGet&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Map&lt;string, T&gt;&gt;, key: string): PropChain&lt;K, T&gt; {
-<span class="cstat-no" title="statement not covered" >    return new PropChain&lt;K, T&gt;(<span class="fstat-no" title="function not covered" >(i</span>t: Condition&lt;T&gt;): Condition&lt;K&gt; =&gt; <span class="cstat-no" title="statement not covered" >this_.mapCondition(new Condition.OnKey&lt;T&gt;(key, it)),</span> <span class="fstat-no" title="function not covered" >(i</span>t: Modification&lt;T&gt;): Modification&lt;K&gt; =&gt; <span class="cstat-no" title="statement not covered" >this_.mapModification(new Modification.ModifyByKey&lt;T&gt;(new Map([[key, it]]))))</span>;</span>
+//! Declares com.lightningkite.lightningdb.get&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.get.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.get.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathGet&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Map&lt;string, T&gt;&gt;, key: string): KeyPath&lt;K, T&gt; {
+<span class="cstat-no" title="statement not covered" >    return new KeyPath&lt;K, T&gt;(<span class="fstat-no" title="function not covered" >(i</span>t: Condition&lt;T&gt;): Condition&lt;K&gt; =&gt; <span class="cstat-no" title="statement not covered" >this_.mapCondition(new Condition.OnKey&lt;T&gt;(key, it)),</span> <span class="fstat-no" title="function not covered" >(i</span>t: Modification&lt;T&gt;): Modification&lt;K&gt; =&gt; <span class="cstat-no" title="statement not covered" >this_.mapModification(new Modification.ModifyByKey&lt;T&gt;(new Map([[key, it]]))))</span>;</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.condition&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.condition.K, com.lightningkite.lightningdb.condition.T
-export function <span class="fstat-no" title="function not covered" >xPropChainCondition&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, T&gt;, make: ((a: PropChain&lt;T, T&gt;) =&gt; Condition&lt;T&gt;)): Condition&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.condition&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.condition.K, com.lightningkite.lightningdb.condition.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathCondition&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, T&gt;, make: ((a: KeyPath&lt;T, T&gt;) =&gt; Condition&lt;T&gt;)): Condition&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapCondition(make(startChain&lt;T&gt;()));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.modification&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.modification.K, com.lightningkite.lightningdb.modification.T
-export function <span class="fstat-no" title="function not covered" >xPropChainModification&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, T&gt;, make: ((a: PropChain&lt;T, T&gt;) =&gt; Modification&lt;T&gt;)): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.modification&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.modification.K, com.lightningkite.lightningdb.modification.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathModification&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, T&gt;, make: ((a: KeyPath&lt;T, T&gt;) =&gt; Modification&lt;T&gt;)): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(make(startChain&lt;T&gt;()));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.assign&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.assign.K, com.lightningkite.lightningdb.assign.T
-export function <span class="fstat-no" title="function not covered" >xPropChainAssign&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, T&gt;, value: T): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.assign&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.assign.K, com.lightningkite.lightningdb.assign.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathAssign&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, T&gt;, value: T): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.Assign&lt;T&gt;(value));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.coerceAtMost&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.coerceAtMost.K, com.lightningkite.lightningdb.coerceAtMost.T
-export function <span class="fstat-no" title="function not covered" >xPropChainCoerceAtMost&lt;</span>K extends any, T extends Comparable&lt;T&gt;&gt;(this_: PropChain&lt;K, T&gt;, value: T): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.coerceAtMost&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.coerceAtMost.K, com.lightningkite.lightningdb.coerceAtMost.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathCoerceAtMost&lt;</span>K extends any, T extends Comparable&lt;T&gt;&gt;(this_: KeyPath&lt;K, T&gt;, value: T): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.CoerceAtMost&lt;T&gt;(value));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.coerceAtLeast&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.coerceAtLeast.K, com.lightningkite.lightningdb.coerceAtLeast.T
-export function <span class="fstat-no" title="function not covered" >xPropChainCoerceAtLeast&lt;</span>K extends any, T extends Comparable&lt;T&gt;&gt;(this_: PropChain&lt;K, T&gt;, value: T): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.coerceAtLeast&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.coerceAtLeast.K, com.lightningkite.lightningdb.coerceAtLeast.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathCoerceAtLeast&lt;</span>K extends any, T extends Comparable&lt;T&gt;&gt;(this_: KeyPath&lt;K, T&gt;, value: T): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.CoerceAtLeast&lt;T&gt;(value));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.plus&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.plus.K, com.lightningkite.lightningdb.plus.T
-export function <span class="fstat-no" title="function not covered" >xPropChainPlusNumber&lt;</span>K extends any, T extends number&gt;(this_: PropChain&lt;K, T&gt;, by: T): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.plus&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.plus.K, com.lightningkite.lightningdb.plus.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathPlusNumber&lt;</span>K extends any, T extends number&gt;(this_: KeyPath&lt;K, T&gt;, by: T): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.Increment&lt;T&gt;(by));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.times&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.times.K, com.lightningkite.lightningdb.times.T
-export function <span class="fstat-no" title="function not covered" >xPropChainTimes&lt;</span>K extends any, T extends number&gt;(this_: PropChain&lt;K, T&gt;, by: T): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.times&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.times.K, com.lightningkite.lightningdb.times.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathTimes&lt;</span>K extends any, T extends number&gt;(this_: KeyPath&lt;K, T&gt;, by: T): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.Multiply&lt;T&gt;(by));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.plus&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.plus.K, kotlin.String
-export function <span class="fstat-no" title="function not covered" >xPropChainPlusString&lt;</span>K extends any&gt;(this_: PropChain&lt;K, string&gt;, value: string): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.plus&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.plus.K, kotlin.String
+export function <span class="fstat-no" title="function not covered" >xKeyPathPlusString&lt;</span>K extends any&gt;(this_: KeyPath&lt;K, string&gt;, value: string): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.AppendString(value));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.plus&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.plus.K, kotlin.collections.Listcom.lightningkite.lightningdb.plus.T
-export function <span class="fstat-no" title="function not covered" >xPropChainPlusItems&lt;</span>K extends any, T&gt;(this_: PropChain&lt;K, Array&lt;T&gt;&gt;, items: Array&lt;T&gt;): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.plus&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.plus.K, kotlin.collections.Listcom.lightningkite.lightningdb.plus.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathPlusItems&lt;</span>K extends any, T&gt;(this_: KeyPath&lt;K, Array&lt;T&gt;&gt;, items: Array&lt;T&gt;): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.AppendList&lt;T&gt;(items));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.plus&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.plus.K, kotlin.collections.Listcom.lightningkite.lightningdb.plus.T
-export function <span class="fstat-no" title="function not covered" >xPropChainPlusItem&lt;</span>K extends any, T&gt;(this_: PropChain&lt;K, Array&lt;T&gt;&gt;, item: T): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.plus&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.plus.K, kotlin.collections.Listcom.lightningkite.lightningdb.plus.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathPlusItem&lt;</span>K extends any, T&gt;(this_: KeyPath&lt;K, Array&lt;T&gt;&gt;, item: T): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.AppendList&lt;T&gt;([item]));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.addAll&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.addAll.K, kotlin.collections.Listcom.lightningkite.lightningdb.addAll.T
-export function <span class="fstat-no" title="function not covered" >xPropChainAddAll&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Array&lt;T&gt;&gt;, items: Array&lt;T&gt;): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.addAll&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.addAll.K, kotlin.collections.Listcom.lightningkite.lightningdb.addAll.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathAddAll&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Array&lt;T&gt;&gt;, items: Array&lt;T&gt;): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.AppendList&lt;T&gt;(items));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.addUnique&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.addUnique.K, kotlin.collections.Listcom.lightningkite.lightningdb.addUnique.T
-export function <span class="fstat-no" title="function not covered" >xPropChainAddUnique&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Array&lt;T&gt;&gt;, items: Array&lt;T&gt;): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.addUnique&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.addUnique.K, kotlin.collections.Listcom.lightningkite.lightningdb.addUnique.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathAddUnique&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Array&lt;T&gt;&gt;, items: Array&lt;T&gt;): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.AppendSet&lt;T&gt;(items));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.removeAll&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.removeAll.K, kotlin.collections.Listcom.lightningkite.lightningdb.removeAll.T
-export function <span class="fstat-no" title="function not covered" >xPropChainRemoveAll&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Array&lt;T&gt;&gt;, condition: ((a: PropChain&lt;T, T&gt;) =&gt; Condition&lt;T&gt;)): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.removeAll&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.removeAll.K, kotlin.collections.Listcom.lightningkite.lightningdb.removeAll.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathRemoveAll&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Array&lt;T&gt;&gt;, condition: ((a: KeyPath&lt;T, T&gt;) =&gt; Condition&lt;T&gt;)): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.Remove&lt;T&gt;((condition)(startChain&lt;T&gt;())));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.removeAll&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.removeAll.K, kotlin.collections.Listcom.lightningkite.lightningdb.removeAll.T
-export function <span class="fstat-no" title="function not covered" >xPropChainRemoveList&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Array&lt;T&gt;&gt;, items: Array&lt;T&gt;): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.removeAll&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.removeAll.K, kotlin.collections.Listcom.lightningkite.lightningdb.removeAll.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathRemoveList&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Array&lt;T&gt;&gt;, items: Array&lt;T&gt;): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.RemoveInstances&lt;T&gt;(items));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.dropLast&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.dropLast.K, kotlin.collections.Listcom.lightningkite.lightningdb.dropLast.T
-export function <span class="fstat-no" title="function not covered" >xPropChainDropLast&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Array&lt;T&gt;&gt;): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.dropLast&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.dropLast.K, kotlin.collections.Listcom.lightningkite.lightningdb.dropLast.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathDropLast&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Array&lt;T&gt;&gt;): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.DropLast&lt;T&gt;());</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.dropFirst&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.dropFirst.K, kotlin.collections.Listcom.lightningkite.lightningdb.dropFirst.T
-export function <span class="fstat-no" title="function not covered" >xPropChainDropFirst&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Array&lt;T&gt;&gt;): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.dropFirst&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.dropFirst.K, kotlin.collections.Listcom.lightningkite.lightningdb.dropFirst.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathDropFirst&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Array&lt;T&gt;&gt;): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.DropFirst&lt;T&gt;());</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.map&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.map.K, kotlin.collections.Listcom.lightningkite.lightningdb.map.T
-export function <span class="fstat-no" title="function not covered" >xPropChainMap&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Array&lt;T&gt;&gt;, modification: ((a: PropChain&lt;T, T&gt;) =&gt; Modification&lt;T&gt;)): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.map&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.map.K, kotlin.collections.Listcom.lightningkite.lightningdb.map.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathMap&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Array&lt;T&gt;&gt;, modification: ((a: KeyPath&lt;T, T&gt;) =&gt; Modification&lt;T&gt;)): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.PerElement&lt;T&gt;(new Condition.Always&lt;T&gt;(), (modification)(startChain&lt;T&gt;())));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.mapIf&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.mapIf.K, kotlin.collections.Listcom.lightningkite.lightningdb.mapIf.T
-export function <span class="fstat-no" title="function not covered" >xPropChainMapIf&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Array&lt;T&gt;&gt;, condition: ((a: PropChain&lt;T, T&gt;) =&gt; Condition&lt;T&gt;), modification: ((a: PropChain&lt;T, T&gt;) =&gt; Modification&lt;T&gt;)): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.mapIf&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.mapIf.K, kotlin.collections.Listcom.lightningkite.lightningdb.mapIf.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathMapIf&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Array&lt;T&gt;&gt;, condition: ((a: KeyPath&lt;T, T&gt;) =&gt; Condition&lt;T&gt;), modification: ((a: KeyPath&lt;T, T&gt;) =&gt; Modification&lt;T&gt;)): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(</span>
         new Modification.PerElement&lt;T&gt;((condition)(startChain&lt;T&gt;()), (modification)(startChain&lt;T&gt;()))
     );
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.plus&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.plus.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.plus.T
-export function <span class="fstat-no" title="function not covered" >xPropChainPlusMap&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Map&lt;string, T&gt;&gt;, map: Map&lt;string, T&gt;): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.plus&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.plus.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.plus.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathPlusMap&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Map&lt;string, T&gt;&gt;, map: Map&lt;string, T&gt;): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.Combine&lt;T&gt;(map));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.modifyByKey&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.modifyByKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.modifyByKey.T
-export function <span class="fstat-no" title="function not covered" >xPropChainModifyByKey&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Map&lt;string, T&gt;&gt;, map: Map&lt;string, ((a: PropChain&lt;T, T&gt;) =&gt; Modification&lt;T&gt;)&gt;): Modification&lt;K&gt; {
-<span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.ModifyByKey&lt;T&gt;(new Map(iMap(<span class="fstat-no" title="function not covered" >x </span>=&gt; <span class="cstat-no" title="statement not covered" >[x[0], (<span class="fstat-no" title="function not covered" >(i</span>t: [string, (a: PropChain&lt;T, T&gt;) =&gt; Modification&lt;T&gt;]): Modification&lt;T&gt; =&gt; <span class="cstat-no" title="statement not covered" >(it[1])(startChain&lt;T&gt;()))</span>(x)],</span> map.entries()))));</span>
+//! Declares com.lightningkite.lightningdb.modifyByKey&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.modifyByKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.modifyByKey.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathModifyByKey&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Map&lt;string, T&gt;&gt;, map: Map&lt;string, ((a: KeyPath&lt;T, T&gt;) =&gt; Modification&lt;T&gt;)&gt;): Modification&lt;K&gt; {
+<span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.ModifyByKey&lt;T&gt;(new Map(iMap(<span class="fstat-no" title="function not covered" >x </span>=&gt; <span class="cstat-no" title="statement not covered" >[x[0], (<span class="fstat-no" title="function not covered" >(i</span>t: [string, (a: KeyPath&lt;T, T&gt;) =&gt; Modification&lt;T&gt;]): Modification&lt;T&gt; =&gt; <span class="cstat-no" title="statement not covered" >(it[1])(startChain&lt;T&gt;()))</span>(x)],</span> map.entries()))));</span>
 }
 &nbsp;
-//! Declares com.lightningkite.lightningdb.removeKeys&gt;com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.removeKeys.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.removeKeys.T
-export function <span class="fstat-no" title="function not covered" >xPropChainRemoveKeys&lt;</span>K extends any, T extends any&gt;(this_: PropChain&lt;K, Map&lt;string, T&gt;&gt;, fields: Set&lt;string&gt;): Modification&lt;K&gt; {
+//! Declares com.lightningkite.lightningdb.removeKeys&gt;com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.removeKeys.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.removeKeys.T
+export function <span class="fstat-no" title="function not covered" >xKeyPathRemoveKeys&lt;</span>K extends any, T extends any&gt;(this_: KeyPath&lt;K, Map&lt;string, T&gt;&gt;, fields: Set&lt;string&gt;): Modification&lt;K&gt; {
 <span class="cstat-no" title="statement not covered" >    return this_.mapModification(new Modification.RemoveKeys&lt;T&gt;(fields));</span>
 }
 &nbsp;</pre></td></tr></table></pre>

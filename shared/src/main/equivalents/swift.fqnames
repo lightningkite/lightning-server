@@ -143,7 +143,7 @@ com.lightningkite.lightningdb.comparator
 com.lightningkite.lightningdb.SortPartSerializer
 com.lightningkite.lightningdb.UUIDFor
 com.lightningkite.lightningdb.startChain
-com.lightningkite.lightningdb.PropChain
+com.lightningkite.lightningdb.KeyPath
 com.lightningkite.lightningdb.condition
 com.lightningkite.lightningdb.modification
 com.lightningkite.lightningdb.always

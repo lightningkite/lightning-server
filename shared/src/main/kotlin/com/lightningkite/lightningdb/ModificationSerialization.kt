@@ -66,7 +66,7 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): MySealedClassSerializerIn
                 val fields = inner.attemptGrabFields()
                 for (index in 0 until inner.descriptor.elementsCount) {
                     val name = inner.descriptor.getElementName(index)
-                    val prop = fields[name]!!.property
+                    val prop = fields[name]!!
                     register(
                         OnFieldSerializer2<Any, Any?>(
                             prop as KProperty1<Any, Any?>,

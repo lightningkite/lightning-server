@@ -71,13 +71,13 @@ fun generateConditionDsl() {
         if(entry.useGeneric) {
             println(entry.run {
                 """
-                    infix fun <K, T${constraint}> PropChain<K, T>.$name($field: $fieldType) = mapCondition(Condition.$name($field))
+                    infix fun <K, T${constraint}> KeyPath<K, T>.$name($field: $fieldType) = mapCondition(Condition.$name($field))
                 """.trimIndent()
             })
         } else {
             println(entry.run {
                 """
-                    infix fun <K> PropChain<K, $constraint>.$name($field: $fieldType) = mapCondition(Condition.$name($field))
+                    infix fun <K> KeyPath<K, $constraint>.$name($field: $fieldType) = mapCondition(Condition.$name($field))
                 """.trimIndent()
             })
         }
@@ -89,13 +89,13 @@ fun generateModificationDsl() {
         if(entry.useGeneric) {
             println(entry.run {
                 """
-                    infix fun <K, T${constraint}> PropChain<K, T>.$name($field: $fieldType) = mapModification(Modification.$name($field))
+                    infix fun <K, T${constraint}> KeyPath<K, T>.$name($field: $fieldType) = mapModification(Modification.$name($field))
                 """.trimIndent()
             })
         } else {
             println(entry.run {
                 """
-                    infix fun <K> PropChain<K, $constraint>.$name($field: $fieldType) = mapModification(Modification.$name($field))
+                    infix fun <K> KeyPath<K, $constraint>.$name($field: $fieldType) = mapModification(Modification.$name($field))
                 """.trimIndent()
             })
         }

@@ -14,8 +14,6 @@ fun <T, V> KProperty1<T, V>.setCopy(original: T, value: V): T {
     return impl(original, value) as T
 }
 
-@kotlinx.serialization.Serializable(KPropertyPartialSerializer::class)
-@Description("The name of a property on the given class.")
-data class KProperty1Partial<T>(val property: KProperty1<T, *>) {
-    val compare: Comparator<T> = compareBy { property.get(it) as? Comparable<*> }
-}
+@Deprecated("Don't use this!", ReplaceWith("KeyPathPartial<T>"))
+typealias KProperty1Partial<T> = KeyPathPartial<T>
+val <T> KeyPathPartial<T>.compare: Comparator<T> get() = compareBy { this.getAny(it) as? Comparable<*> }

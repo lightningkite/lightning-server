@@ -37,7 +37,7 @@ data class SlicedSortedQuerySet<Model : Any>(
     }
 }
 
-fun <Model : Any> FieldCollection<Model>.filter(conditionMaker: (PropChain<Model, Model>) -> Condition<Model>) =
+fun <Model : Any> FieldCollection<Model>.filter(conditionMaker: (KeyPath<Model, Model>) -> Condition<Model>) =
     QuerySet(
         this, conditionMaker(
             startChain()
@@ -45,25 +45,25 @@ fun <Model : Any> FieldCollection<Model>.filter(conditionMaker: (PropChain<Model
     )
 
 @Suppress("UNCHECKED_CAST")
-private fun <Model, V : Comparable<V>> PropChain<Model, V>.field(): KProperty1<Model, V> =
+private fun <Model, V : Comparable<V>> KeyPath<Model, V>.field(): KProperty1<Model, V> =
     (mapCondition(Condition.Always()) as Condition.OnField<Model, V>).key as KProperty1<Model, V>
 
-fun <Model : Any> QuerySet<Model>.filter(conditionMaker: (PropChain<Model, Model>) -> Condition<Model>) =
+fun <Model : Any> QuerySet<Model>.filter(conditionMaker: (KeyPath<Model, Model>) -> Condition<Model>) =
     copy(on, condition and conditionMaker(startChain()))
 
-fun <Model : Any> SortedQuerySet<Model>.filter(conditionMaker: (PropChain<Model, Model>) -> Condition<Model>) =
+fun <Model : Any> SortedQuerySet<Model>.filter(conditionMaker: (KeyPath<Model, Model>) -> Condition<Model>) =
     copy(on, condition and conditionMaker(startChain()))
 
 fun <Model : Any, V : Comparable<V>> QuerySet<Model>.sortedBy(field: KProperty1<Model, V>) =
     SortedQuerySet(on, condition, orderBy = listOf(SortPart(field)))
 
-fun <Model : IsCodableAndHashableNotNull, V : Comparable<V>> QuerySet<Model>.sortedBy(field: (PropChain<Model, Model>) -> PropChain<Model, V>) =
+fun <Model : IsCodableAndHashableNotNull, V : Comparable<V>> QuerySet<Model>.sortedBy(field: (KeyPath<Model, Model>) -> KeyPath<Model, V>) =
     SortedQuerySet(on, condition, orderBy = listOf(SortPart(field(startChain()).field())))
 
 fun <Model : Any, V : Comparable<V>> QuerySet<Model>.sortedByDescending(field: KProperty1<Model, V>) =
     SortedQuerySet(on, condition, orderBy = listOf(SortPart(field, ascending = false)))
 
-fun <Model : IsCodableAndHashableNotNull, V : Comparable<V>> QuerySet<Model>.sortedByDescending(field: (PropChain<Model, Model>) -> PropChain<Model, V>) =
+fun <Model : IsCodableAndHashableNotNull, V : Comparable<V>> QuerySet<Model>.sortedByDescending(field: (KeyPath<Model, Model>) -> KeyPath<Model, V>) =
     SortedQuerySet(on, condition, orderBy = listOf(SortPart((field(startChain()).field()), ascending = false)))
 
 fun <Model : Any> SortedQuerySet<Model>.take(count: Int) =

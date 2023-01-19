@@ -31,35 +31,35 @@ data class UpdateRestrictions<T>(
         val fields: ArrayList<Triple<Modification<T>, Condition<T>, Condition<T>>> = ArrayList()
     ) {
         val it = startChain<T>()
-        fun PropChain<T, *>.cannotBeModified() {
+        fun KeyPath<T, *>.cannotBeModified() {
             fields.add(Triple(
                 this.let {
                     @Suppress("UNCHECKED_CAST")
-                    it as PropChain<T, Any?>
+                    it as KeyPath<T, Any?>
                 }.assign(null), Condition.Never(), Condition.Always()
             ))
         }
-        infix fun PropChain<T, *>.requires(condition: Condition<T>) {
+        infix fun KeyPath<T, *>.requires(condition: Condition<T>) {
             fields.add(Triple(
                 this.let {
                     @Suppress("UNCHECKED_CAST")
-                    it as PropChain<T, Any?>
+                    it as KeyPath<T, Any?>
                 }.assign(null), condition, Condition.Always()
             ))
         }
-        fun <V> PropChain<T, V>.restrict(requires: Condition<T>, valueMust: (PropChain<V, V>)->Condition<V>) {
+        fun <V> KeyPath<T, V>.restrict(requires: Condition<T>, valueMust: (KeyPath<V, V>)->Condition<V>) {
             fields.add(Triple(
                 this.let {
                     @Suppress("UNCHECKED_CAST")
-                    it as PropChain<T, Any?>
+                    it as KeyPath<T, Any?>
                 }.assign(null), requires, this.condition(valueMust)
             ))
         }
-        fun <V> PropChain<T, V>.mustBe(valueMust: (PropChain<V, V>)->Condition<V>) {
+        fun <V> KeyPath<T, V>.mustBe(valueMust: (KeyPath<V, V>)->Condition<V>) {
             fields.add(Triple(
                 this.let {
                     @Suppress("UNCHECKED_CAST")
-                    it as PropChain<T, Any?>
+                    it as KeyPath<T, Any?>
                 }.assign(null), Condition.Always(), this.condition(valueMust)
             ))
         }

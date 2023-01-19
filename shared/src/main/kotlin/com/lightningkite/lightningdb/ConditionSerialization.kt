@@ -90,7 +90,7 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): MySealedClassSerializerI
                     val prop = fields[name]!!
                     register(
                         OnFieldSerializer<Any, Any?>(
-                            prop.property as KProperty1<Any, Any?>,
+                            prop as KProperty1<Any, Any?>,
                             Condition.serializer(childSerializers[index]) as KSerializer<Condition<Any?>>
                         )
                     )
