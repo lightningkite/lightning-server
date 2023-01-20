@@ -12,20 +12,22 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 data class OpenApiRoot(
     val openapi: String,
-    val info: OpenApiInfo,
-    val paths: Map<String, OpenApiPath>,
-    val components: OpenApiComponents,
-    val servers: List<OpenApiServer>,
-    val security: List<Map<String, List<String>>>,
+    val info: OpenApiInfo = OpenApiInfo(),
+    val paths: Map<String, OpenApiPath> = mapOf(),
+    val components: OpenApiComponents = OpenApiComponents(),
+    val servers: List<OpenApiServer> = listOf(),
+    val security: List<Map<String, List<String>>> = listOf(),
 )
 
 @Serializable
 data class OpenApiSecurity(
-    val type: OpenApiSecurityType,
+    val type: OpenApiSecurityType = OpenApiSecurityType.apiKey,
     val description: String? = null,
     val name: String? = null,
     @SerialName("in") val inside: OpenApiParameterType? = null,
@@ -40,19 +42,19 @@ enum class OpenApiSecurityType {
 
 @Serializable
 data class OpenApiServer(
-    val url: String,
-    val description: String,
+    val url: String = "",
+    val description: String = "",
 )
 
 @Serializable
 data class OpenApiComponents(
-    val schemas: Map<String, JsonSchemaType>,
-    val securitySchemes: Map<String, OpenApiSecurity>,
+    val schemas: Map<String, JsonSchemaType> = mapOf(),
+    val securitySchemes: Map<String, OpenApiSecurity> = mapOf(),
 )
 
 @Serializable
 data class OpenApiPath(
-    val parameters: List<OpenApiParameter>,
+    val parameters: List<OpenApiParameter> = listOf(),
     val get: OpenApiOperation? = null,
     val post: OpenApiOperation? = null,
     val put: OpenApiOperation? = null,
@@ -62,49 +64,49 @@ data class OpenApiPath(
 
 @Serializable
 data class OpenApiOperation(
-    val summary: String,
-    val description: String,
-    val tags: List<String>,
-    val operationId: String,
+    val summary: String = "",
+    val description: String = "",
+    val tags: List<String> = listOf(),
+    val operationId: String = "",
     val parameters: List<OpenApiParameter> = listOf(),
     val requestBody: OpenApiRequestBody? = null,
-    val responses: Map<String, OpenApiResponse>,
+    val responses: Map<String, OpenApiResponse> = mapOf(),
 )
 
 @Serializable
 data class OpenApiRequestBody(
     val description: String? = null,
-    val content: Map<String, OpenApiMediaType>,
-    val required: Boolean,
+    val content: Map<String, OpenApiMediaType> = mapOf(),
+    val required: Boolean = false,
 )
 
 @Serializable
 data class OpenApiMediaType(
     val schema: JsonSchemaType,
-    val examples: Map<String, OpenApiExample?>,
+    val examples: Map<String, OpenApiExample?> = mapOf(),
 )
 
 @Serializable
 data class OpenApiExample(
-    val summary: String,
-    val description: String,
-    val value: JsonElement,
+    val summary: String = "",
+    val description: String = "",
+    val value: JsonElement = JsonNull,
 )
 
 @Serializable
 data class OpenApiResponse(
-    val description: String,
-    val content: Map<String, OpenApiMediaType>,
+    val description: String = "",
+    val content: Map<String, OpenApiMediaType> = mapOf(),
 )
 
 @Serializable
 data class OpenApiParameter(
     val name: String,
-    @SerialName("in") val inside: OpenApiParameterType,
-    val schema: JsonSchemaType,
-    val description: String,
-    val required: Boolean,
-    val allowEmptyValue: Boolean,
+    @SerialName("in") val inside: OpenApiParameterType = OpenApiParameterType.cookie,
+    val schema: JsonSchemaType = JsonSchemaType(),
+    val description: String = "",
+    val required: Boolean = false,
+    val allowEmptyValue: Boolean = false,
 )
 
 @Serializable
@@ -114,8 +116,8 @@ enum class OpenApiParameterType {
 
 @Serializable
 data class OpenApiInfo(
-    val title: String,
-    val version: String,
+    val title: String = "",
+    val version: String = "",
     val description: String? = null,
     val termsOfService: String? = null,
     val contact: OpenApiContact? = null,
@@ -124,15 +126,15 @@ data class OpenApiInfo(
 
 @Serializable
 data class OpenApiLicense(
-    val name: String,
-    val url: String,
+    val name: String = "",
+    val url: String = "",
 )
 
 @Serializable
 data class OpenApiContact(
-    val name: String,
-    val url: String,
-    val email: String,
+    val name: String = "",
+    val url: String = "",
+    val email: String = "",
 )
 
 private fun <USER, INPUT : Any, OUTPUT> ApiEndpoint<USER, INPUT, OUTPUT>.openApi(builder: JsonSchemaBuilder): OpenApiOperation =

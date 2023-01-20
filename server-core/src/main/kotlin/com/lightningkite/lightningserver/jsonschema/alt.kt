@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.jsonschema
 
+import com.charleskorn.kaml.Yaml
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
@@ -134,12 +135,7 @@ object JsonType3Serializer: KSerializer<JsonType3> {
     val multi = ArraySerializer(JsonType2.serializer())
     val single = JsonType2.serializer()
     @OptIn(InternalSerializationApi::class)
-    override val descriptor: SerialDescriptor =
-        buildSerialDescriptor("JsonType3", PolymorphicKind.SEALED) {
-            // Resolve cyclic dependency in descriptors by late binding
-            element("JsonType3.MultiType", multi.descriptor)
-            element("JsonType3.SingleType", single.descriptor)
-        }
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("JsonType3", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: JsonType3) {
         if(value.nullable) encoder.encodeSerializableValue(multi, arrayOf(value.inner, JsonType2.NULL))
@@ -147,10 +143,12 @@ object JsonType3Serializer: KSerializer<JsonType3> {
     }
 
     override fun deserialize(decoder: Decoder): JsonType3 {
-        val input = decoder as? JsonDecoder ?: throw IllegalStateException("This serializer can only be used with Json format")
-        val element = input.decodeJsonElement()
-        return if(element is JsonArray) JsonType3(decoder.json.decodeFromJsonElement(single, element[0]), true)
-        else JsonType3(decoder.json.decodeFromJsonElement(single, element))
+        (decoder as? JsonDecoder)?.let { input ->
+            val element = input.decodeJsonElement()
+            return if(element is JsonArray) JsonType3(decoder.json.decodeFromJsonElement(single, element[0]), true)
+            else JsonType3(decoder.json.decodeFromJsonElement(single, element))
+        }
+        return JsonType3(JsonType2.serializer().deserialize(decoder))
     }
 }
 
