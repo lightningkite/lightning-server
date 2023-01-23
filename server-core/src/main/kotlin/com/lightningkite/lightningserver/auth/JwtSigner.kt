@@ -66,6 +66,11 @@ data class JwtSigner(
                 message = "Invalid token",
                 cause = e
             )
+        } catch (e: Exception){
+            throw UnauthorizedException(
+                message = "Invalid token",
+                cause = e
+            )
         }
     }
 
@@ -92,6 +97,11 @@ data class JwtSigner(
                 cause = e
             )
         } catch (e: JwtException) {
+            throw UnauthorizedException(
+                message = "Invalid token",
+                cause = e
+            )
+        } catch (e: Exception){
             throw UnauthorizedException(
                 message = "Invalid token",
                 cause = e
