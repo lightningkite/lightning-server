@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.tasks.Task
 import com.lightningkite.lightningserver.websocket.WebSockets
 import io.ktor.http.*
 import io.sentry.Sentry
+import io.sentry.SentryOptions
 import io.sentry.event.User
 import io.sentry.event.interfaces.HttpInterface
 
@@ -25,7 +26,9 @@ class SentryExceptionReporter(val dsn: String): ExceptionReporter {
     }
 
     init {
-        Sentry.init(dsn)
+        val name = generalSettings().projectName.filter { it.isLetterOrDigit() }
+        val version = System.getenv("AWS_LAMBDA_FUNCTION_VERSION").takeUnless { it.isBlank() } ?: "UNKNOWN"
+        Sentry.init("$dsn?release=$version&environment=$name")
     }
 
     override suspend fun report(t: Throwable, context: Any?): Boolean {

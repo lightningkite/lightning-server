@@ -1443,11 +1443,11 @@ internal fun awsLambdaHandler(
             settingsRawHash = local_sensitive_file.settings_raw.content
           }
           provisioner "local-exec" {
-            command = "cp -rf \${'$'}{path.module}/../../build/dist/lambda\" \${'$'}{path.module}/build/lambda\""
+            command = "cp -rf \"${'$'}{path.module}/../../build/dist/lambda\" \"${'$'}{path.module}/build/lambda\""
             interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
           }
           provisioner "local-exec" {
-            command = "openssl enc -aes-256-cbc -md sha256 -in \"${'$'}{local_sensitive_file.settings_raw.filename}\" -out \${'$'}{path.module}/build/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
+            command = "openssl enc -aes-256-cbc -md sha256 -in \"${'$'}{local_sensitive_file.settings_raw.filename}\" -out \"${'$'}{path.module}/build/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
             interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
           }
         }
@@ -1457,7 +1457,7 @@ internal fun awsLambdaHandler(
           }
           depends_on = [null_resource.lambda_jar_source]
           provisioner "local-exec" {
-            command     = "openssl enc -d -aes-256-cbc -md sha256 -out \"${'$'}{local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \${'$'}{path.module}/build/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
+            command     = "openssl enc -d -aes-256-cbc -md sha256 -out \"${'$'}{local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \"${'$'}{path.module}/build/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
             interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
           }
         }
@@ -1471,8 +1471,8 @@ internal fun awsLambdaHandler(
         data "archive_file" "lambda" {
           depends_on  = [null_resource.lambda_jar_source, null_resource.settings_reread]
           type        = "zip"
-          source_dir = ${'$'}{path.module}/build/lambda"
-          output_path = ${'$'}{path.module}/build/lambda.jar"
+          source_dir = "${'$'}{path.module}/build/lambda"
+          output_path = "${'$'}{path.module}/build/lambda.jar"
         }
         
 
