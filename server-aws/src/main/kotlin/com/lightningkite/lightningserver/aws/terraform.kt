@@ -1438,12 +1438,16 @@ internal fun awsLambdaHandler(
           # Directories start with "C:..." on Windows; All other OSs use "/" for root.
           is_windows = substr(pathexpand("~"), 0, 1) == "/" ? false : true
         }
-        resource "null_resource" "settings_encrypted" {
+        resource "null_resource" "lambda_jar_source" {
           triggers = {
             settingsRawHash = local_sensitive_file.settings_raw.content
           }
           provisioner "local-exec" {
-            command = "openssl enc -aes-256-cbc -md sha256 -in \"${'$'}{local_sensitive_file.settings_raw.filename}\" -out \"${'$'}{path.module}/../../build/dist/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
+            command = "cp -rf \${'$'}{path.module}/../../build/dist/lambda\" \${'$'}{path.module}/build/lambda\""
+            interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
+          }
+          provisioner "local-exec" {
+            command = "openssl enc -aes-256-cbc -md sha256 -in \"${'$'}{local_sensitive_file.settings_raw.filename}\" -out \${'$'}{path.module}/build/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
             interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
           }
         }
@@ -1451,9 +1455,9 @@ internal fun awsLambdaHandler(
           triggers = {
             settingsRawHash = local_sensitive_file.settings_raw.content
           }
-          depends_on = [null_resource.settings_encrypted]
+          depends_on = [null_resource.lambda_jar_source]
           provisioner "local-exec" {
-            command     = "openssl enc -d -aes-256-cbc -md sha256 -out \"${'$'}{local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \"${'$'}{path.module}/../../build/dist/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
+            command     = "openssl enc -d -aes-256-cbc -md sha256 -out \"${'$'}{local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \${'$'}{path.module}/build/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
             interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
           }
         }
@@ -1465,11 +1469,13 @@ internal fun awsLambdaHandler(
         }
         
         data "archive_file" "lambda" {
-          depends_on  = [null_resource.settings_encrypted, null_resource.settings_reread]
+          depends_on  = [null_resource.lambda_jar_source, null_resource.settings_reread]
           type        = "zip"
-          source_dir = "${'$'}{path.module}/../../build/dist/lambda"
-          output_path = "${'$'}{path.module}/build/lambda.jar"
+          source_dir = ${'$'}{path.module}/build/lambda"
+          output_path = ${'$'}{path.module}/build/lambda.jar"
         }
+        
+
         
     """.trimIndent()
         )
