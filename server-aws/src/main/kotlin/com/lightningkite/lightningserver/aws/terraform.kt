@@ -1441,9 +1441,10 @@ internal fun awsLambdaHandler(
         resource "null_resource" "lambda_jar_source" {
           triggers = {
             settingsRawHash = local_sensitive_file.settings_raw.content
+            sourceHash = sha1(join("", [for f in fileset("${'$'}{path.module}/../../build/dist/lambda", "*"): filesha1("${'$'}{path.module}/../../build/dist/lambda/${'$'}{f}")]))
           }
           provisioner "local-exec" {
-            command = "cp -rf \"${'$'}{path.module}/../../build/dist/lambda\" \"${'$'}{path.module}/build/lambda\""
+            command = local.is_windows ? "cp -r -force \"${'$'}{path.module}/../../build/dist/lambda/.\" \"${'$'}{path.module}/build/lambda/\"" : "cp -rf \"${'$'}{path.module}/../../build/dist/lambda/.\" \"${'$'}{path.module}/build/lambda/\""
             interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
           }
           provisioner "local-exec" {
@@ -1475,7 +1476,6 @@ internal fun awsLambdaHandler(
           output_path = "${'$'}{path.module}/build/lambda.jar"
         }
         
-
         
     """.trimIndent()
         )
