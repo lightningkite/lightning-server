@@ -1443,7 +1443,7 @@ internal fun awsLambdaHandler(
             always = timestamp()
           }
           provisioner "local-exec" {
-            command = local.is_windows ? "rd /S /Q \"${'$'}{path.module}/build/lambda/\"" : "rm -rf \"${'$'}{path.module}/build/lambda/\""
+            command = local.is_windows ? "if(test-path \"${'$'}{path.module}/build/lambda/\") { rd -Recurse \"${'$'}{path.module}/build/lambda/\" }" : "rm -rf \"${'$'}{path.module}/build/lambda/\""
             interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
           }
           provisioner "local-exec" {
