@@ -29,6 +29,7 @@ class UploadEarlyEndpoint(
     }
 
     init {
+        prepareModels()
         ExternalServerFileSerializer.fileValidators += this::validateFile
         ExternalServerFileSerializer.fileSystem = files
         default = this

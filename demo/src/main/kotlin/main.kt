@@ -5,6 +5,7 @@ package com.lightningkite.lightningserver.demo
 import com.lightningkite.kotlinercli.cli
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.aws.terraformMigrate
 import com.lightningkite.lightningserver.aws.terraformAws
 import com.lightningkite.lightningserver.cache.*
 import com.lightningkite.lightningserver.db.*
@@ -28,13 +29,18 @@ private fun serve() {
 
 fun terraform() {
     Server
-    terraformAws("com.lightningkite.lightningserver.demo.AwsHandler", "demo", File("demo/terraform"))
+    terraformAws("com.lightningkite.lightningserver.demo.AwsHandler", "demo", File("demo/terraform2"))
+}
+
+fun tfMigrate() {
+    Server
+    terraformMigrate("com.lightningkite.lightningserver.demo.AwsHandler", File("demo/terraform"))
 }
 
 fun main(vararg args: String) {
     cli(
         arguments = args,
         setup = ::setup,
-        available = listOf(::serve, ::terraform),
+        available = listOf(::serve, ::terraform, ::tfMigrate),
     )
 }

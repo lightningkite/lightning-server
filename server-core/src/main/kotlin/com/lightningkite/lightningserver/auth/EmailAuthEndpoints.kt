@@ -54,7 +54,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         successCode = HttpStatus.NoContent,
         implementation = { user: Unit, addressUnsafe: String ->
             val address = addressUnsafe.lowercase()
-            val jwt = base.typedHandler.token(emailAccess.byEmail(address), base.jwtSigner().emailExpiration)
+            val jwt = base.token(emailAccess.byEmail(address), base.jwtSigner().emailExpiration)
             val pin = pin.generate(address)
             val link = "${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$jwt"
             email().send(
@@ -74,7 +74,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         implementation = { anon: Unit, input: EmailPinLogin ->
             val email = input.email.lowercase()
             pin.assert(email, input.pin)
-            base.typedHandler.token(emailAccess.byEmail(email))
+            base.token(emailAccess.byEmail(email))
         }
     )
     val oauthGoogle = OauthGoogleEndpoints(path = path("oauth/google"), jwtSigner = base.jwtSigner, landing = base.landingRoute) {

@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.builtins.serializer
 import java.lang.Exception
 import java.security.SecureRandom
+import java.time.Duration
 import java.util.*
 
 open class BaseAuthEndpoints<USER : Any, ID>(
@@ -47,6 +48,8 @@ open class BaseAuthEndpoints<USER : Any, ID>(
         path.docName = "Auth"
     }
 
+    fun token(user: USER, expireDuration: Duration = jwtSigner().expiration): String = typedHandler.token(user, expireDuration)
+
     val landingRoute: HttpEndpoint = path("login-landing").get.handler {
         val subject = jwtSigner().verify(it.queryParameter("jwt")!!)
         it.handleToken(jwtSigner().token(subject))
@@ -59,7 +62,7 @@ open class BaseAuthEndpoints<USER : Any, ID>(
         description = "Retrieves a new token for the user.",
         errorCases = listOf(),
         implementation = { user: USER, input: Unit ->
-            typedHandler.token(user)
+            token(user)
         }
     )
     val getSelf = path("self").get.typed(
@@ -79,7 +82,7 @@ open class BaseAuthEndpoints<USER : Any, ID>(
         description = "Retrieves a token for a new, anonymous user.",
         errorCases = listOf(),
         implementation = { user: USER?, _: Unit ->
-            return@typed typedHandler.token(userAccess.anonymous())
+            return@typed token(userAccess.anonymous())
         }
     )
 }

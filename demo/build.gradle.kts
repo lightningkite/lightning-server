@@ -32,9 +32,8 @@ kotlin {
     }
 }
 
-tasks.create("buildZip", Zip::class.java) {
-    archiveFileName.set("lambda.zip")
-    destinationDirectory.set(project.buildDir.resolve("dist"))
+tasks.create("lambda", Copy::class.java) {
+    this.destinationDir = project.buildDir.resolve("dist/lambda")
     val jarTask = tasks.getByName("jar")
     dependsOn(jarTask)
     val output = jarTask.outputs.files.find { it.extension == "jar" }!!

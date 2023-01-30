@@ -19,6 +19,7 @@ val awsVersion = "2.17.276"
 dependencies {
     api(project(":server-dynamodb"))
     api(project(":server-core"))
+    api("io.github.crac:org-crac:0.1.3")
     api("software.amazon.awssdk:s3:$awsVersion")
     api("software.amazon.awssdk:lambda:$awsVersion")
     api("software.amazon.awssdk:ses:$awsVersion")

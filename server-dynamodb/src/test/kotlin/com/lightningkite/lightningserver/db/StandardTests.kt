@@ -13,7 +13,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import kotlin.test.assertEquals
 
 object DynamoForTests {
-    var d = DynamoDbCache(embeddedDynamo())
+    var d = DynamoDbCache( { embeddedDynamo() })
 
 }
 

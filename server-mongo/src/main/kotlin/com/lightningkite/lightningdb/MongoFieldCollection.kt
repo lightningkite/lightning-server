@@ -22,8 +22,9 @@ import kotlin.reflect.KProperty1
  */
 class MongoFieldCollection<Model : Any>(
     val serializer: KSerializer<Model>,
-    val mongo: CoroutineCollection<Model>,
+    private val getMongo: () -> CoroutineCollection<Model>,
 ) : AbstractSignalFieldCollection<Model>() {
+    val mongo: CoroutineCollection<Model> get() = getMongo()
 
     private fun sort(orderBy: List<SortPart<Model>>): Bson = Sorts.orderBy(orderBy.map {
         if (it.ascending)

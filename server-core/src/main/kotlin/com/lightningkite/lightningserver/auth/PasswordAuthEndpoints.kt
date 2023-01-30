@@ -28,7 +28,7 @@ open class PasswordAuthEndpoints<USER : Any, ID>(
             val user = info.byUsername(input.username, input.password)
             if(!input.password.checkHash(info.hashedPassword(user)))
                 throw BadRequestException(detail = "password-incorrect", message = "Password does not match the account.")
-            base.typedHandler.token(user, base.jwtSigner().expiration)
+            base.token(user, base.jwtSigner().expiration)
         }
     )
     val loginPasswordHtml = path("login-password/").get.handler {

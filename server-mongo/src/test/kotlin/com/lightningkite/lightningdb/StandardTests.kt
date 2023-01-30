@@ -16,7 +16,7 @@ class MongoAggregationsTest : AggregationsTest() {
         @JvmStatic
         fun start() {
             mongoClient = testMongo()
-            defaultMongo = mongoClient!!.database("default")
+            defaultMongo = MongoDatabase("default") { mongoClient!! }
             prepareModels()
         }
 
@@ -40,7 +40,7 @@ class MongoConditionTests : ConditionTests() {
         @JvmStatic
         fun start() {
             mongoClient = testMongo()
-            defaultMongo = mongoClient!!.database("default")
+            defaultMongo = MongoDatabase("default") { mongoClient!! }
             prepareModels()
         }
 
@@ -64,7 +64,7 @@ class MongoModificationTests : ModificationTests() {
         @JvmStatic
         fun start() {
             mongoClient = testMongo()
-            defaultMongo = mongoClient!!.database("default")
+            defaultMongo = MongoDatabase("default") { mongoClient!! }
             prepareModels()
         }
 
@@ -88,7 +88,7 @@ class MongoSortTest : SortTest() {
         @JvmStatic
         fun start() {
             mongoClient = testMongo()
-            defaultMongo = mongoClient!!.database("default")
+            defaultMongo = MongoDatabase("default") { mongoClient!! }
             prepareModels()
         }
 
@@ -112,7 +112,7 @@ class MongoMetaTest : MetaTest() {
         @JvmStatic
         fun start() {
             mongoClient = testMongo()
-            defaultMongo = mongoClient!!.database("default")
+            defaultMongo = MongoDatabase("default") { mongoClient!! }
             prepareModels()
         }
 

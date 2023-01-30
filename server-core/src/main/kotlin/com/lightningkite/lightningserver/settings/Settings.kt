@@ -25,7 +25,10 @@ object Settings {
             throw IllegalStateException("Settings for ${missing.joinToString()} are missing.")
         }
         if(!lazyLoadResources)
-            requirements.values.forEach { it() }
+            requirements.values.forEach {
+                println("Loading setting ${it.name}...")
+                it()
+            }
     }
     private data class Box<T>(val item: T)
     private val values = ConcurrentHashMap<String, Box<*>>()

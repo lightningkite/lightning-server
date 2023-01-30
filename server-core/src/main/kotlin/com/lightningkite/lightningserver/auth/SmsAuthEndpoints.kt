@@ -47,7 +47,7 @@ open class SmsAuthEndpoints<USER : Any, ID>(
         implementation = { anon: Unit, input: PhonePinLogin ->
             val phone = input.phone.filter { it.isDigit() }
             pin.assert(phone, input.pin)
-            base.typedHandler.token(phoneAccess.byPhone(input.phone))
+            base.token(phoneAccess.byPhone(input.phone))
         }
     )
 

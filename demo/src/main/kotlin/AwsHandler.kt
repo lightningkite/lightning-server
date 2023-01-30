@@ -13,14 +13,7 @@ class AwsHandler : AwsAdapter() {
     companion object {
         init {
             Server
-            S3Client.create().getObject {
-                it.bucket(System.getenv("LIGHTNING_SERVER_SETTINGS_BUCKET")!!)
-                it.key(System.getenv("LIGHTNING_SERVER_SETTINGS_FILE")!!)
-            }.use {
-                it.reader().readText().let {
-                    Serialization.Internal.json.decodeFromString<Settings>(it)
-                }
-            }
+            loadSettings(AwsHandler::class.java)
         }
     }
 

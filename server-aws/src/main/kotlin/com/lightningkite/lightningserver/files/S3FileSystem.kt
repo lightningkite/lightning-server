@@ -25,18 +25,24 @@ class S3FileSystem(
         "https://s3-${region.id()}.amazonaws.com/${bucket}/",
     )
 
-    val s3: S3Client = S3Client.builder()
-        .region(region)
-        .credentialsProvider(credentialProvider)
-        .build()
-    val s3Async: S3AsyncClient = S3AsyncClient.builder()
-        .region(region)
-        .credentialsProvider(credentialProvider)
-        .build()
-    val signer = S3Presigner.builder()
-        .region(region)
-        .credentialsProvider(credentialProvider)
-        .build()
+    val s3: S3Client by lazy {
+        S3Client.builder()
+            .region(region)
+            .credentialsProvider(credentialProvider)
+            .build()
+    }
+    val s3Async: S3AsyncClient by lazy {
+        S3AsyncClient.builder()
+            .region(region)
+            .credentialsProvider(credentialProvider)
+            .build()
+    }
+    val signer by lazy {
+        S3Presigner.builder()
+            .region(region)
+            .credentialsProvider(credentialProvider)
+            .build()
+    }
 
     companion object {
         init {

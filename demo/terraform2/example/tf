@@ -1,0 +1,4 @@
+#!/bin/bash
+export AWS_PROFILE=default
+export $(cat ~/.mongo/profiles/default.env | xargs)
+terraform "$@"

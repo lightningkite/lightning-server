@@ -1,35 +1,32 @@
 package com.lightningkite.lightningserver.aws
 
 import com.amazonaws.services.lambda.runtime.Context
-import com.amazonaws.services.lambda.runtime.RequestHandler
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler
 import com.lightningkite.lightningdb.MultiplexMessage
-import com.lightningkite.lightningserver.cache.CacheSettings
+import com.lightningkite.lightningserver.bytes.hexToByteArray
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.modify
 import com.lightningkite.lightningserver.cache.set
-import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
-import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.core.Disconnectable
 import com.lightningkite.lightningserver.core.ServerPathMatcher
 import com.lightningkite.lightningserver.cors.addCors
 import com.lightningkite.lightningserver.db.DynamoDbCache
+import com.lightningkite.lightningserver.encryption.OpenSsl
+import com.lightningkite.lightningserver.encryption.decryptAesCbcPkcs5
 import com.lightningkite.lightningserver.engine.Engine
 import com.lightningkite.lightningserver.engine.engine
-import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.metrics.Metrics
-import com.lightningkite.lightningserver.pubsub.get
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.CorsSettings
+import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.generalSettings
-import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Task
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.websocket.WebSockets
@@ -40,14 +37,13 @@ import io.ktor.http.content.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.future.await
-import kotlinx.html.A
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import org.crac.Core
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.http.SdkHttpFullResponse
 import software.amazon.awssdk.regions.Region
@@ -56,14 +52,24 @@ import software.amazon.awssdk.services.apigatewaymanagementapi.model.GoneExcepti
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.lambda.LambdaAsyncClient
 import software.amazon.awssdk.services.lambda.model.InvocationType
+import software.amazon.awssdk.services.s3.S3Client
+import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.URI
-import java.net.URLEncoder
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.time.Duration
 import java.util.*
+import org.crac.Resource
+import java.math.BigInteger
+import java.security.MessageDigest
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
-abstract class AwsAdapter : RequestStreamHandler {
+
+abstract class AwsAdapter : RequestStreamHandler, Resource {
     @Serializable
     data class TaskInvoke(val taskName: String, val input: String)
 
@@ -71,13 +77,39 @@ abstract class AwsAdapter : RequestStreamHandler {
     data class Scheduled(val scheduled: String)
 
     companion object {
+        fun loadSettings(jclass: Class<*>) {
+            println("Loading settings...")
+            val root = File(System.getenv("LAMBDA_TASK_ROOT"))
+            root.resolve("settings.json").takeIf { it.exists() }?.let {
+                it.readBytes().let { loadSettings(it) }
+            } ?: root.resolve("settings.enc").takeIf { it.exists() }?.let {
+                it.readBytes().let { loadSettings(it) }
+            } ?: run {
+                S3Client.create().getObject {
+                    it.bucket(System.getenv("LIGHTNING_SERVER_SETTINGS_BUCKET")!!)
+                    it.key(System.getenv("LIGHTNING_SERVER_SETTINGS_FILE")!!)
+                }.use {
+                    it.readBytes().let { loadSettings(it) }
+                }
+            }
+        }
+        fun loadSettings(bytes: ByteArray) {
+            val decryptedBytes = System.getenv("LIGHTNING_SERVER_SETTINGS_DECRYPTION")
+                ?.takeIf { it.isNotBlank() }
+                ?.let { sha256Password ->
+                    OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
+                }
+                ?: bytes
+            Serialization.Internal.json.decodeFromString<Settings>(decryptedBytes.toString(Charsets.UTF_8))
+        }
+
         val logger: Logger = LoggerFactory.getLogger(AwsAdapter::class.java)
         val region by lazy { Region.of(System.getenv("AWS_REGION")) }
         val httpMatcher by lazy { HttpEndpointMatcher(Http.endpoints.keys.asSequence()) }
         val wsMatcher by lazy { ServerPathMatcher(WebSockets.handlers.keys.asSequence()) }
         private val wsCache by lazy {
             DynamoDbCache(
-                DynamoDbAsyncClient.builder().region(region).build(),
+                { DynamoDbAsyncClient.builder().region(region).build() },
                 generalSettings().wsUrl.substringAfter("://").filter { it.isLetterOrDigit() || it == '_' || it == '.' || it == '-' }
             )
         }
@@ -152,6 +184,7 @@ abstract class AwsAdapter : RequestStreamHandler {
                 override suspend fun launchTask(task: Task<Any?>, input: Any?) {
                     lambdaClient.invoke {
                         it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+                        it.qualifier(System.getenv("AWS_LAMBDA_FUNCTION_VERSION"))
                         it.invocationType(InvocationType.EVENT)
                         it.payload(
                             SdkBytes.fromUtf8String(
@@ -161,17 +194,39 @@ abstract class AwsAdapter : RequestStreamHandler {
                                 )
                             )
                         )
-                    }.await()
+                    }.await().let {
+                        it.logResult()
+                    }
                 }
             }
+            println("Running Tasks.onEngineReady()...")
             runBlocking { Tasks.onEngineReady() }
+            println("Tasks.onEngineReady() complete.")
             Unit
         }
     }
 
     init {
+        println("Running Tasks.onSettingsReady()...")
         runBlocking { Tasks.onSettingsReady() }
+        println("Tasks.onSettingsReady() complete.")
         configureEngine
+        Core.getGlobalContext().register(this)
+    }
+
+    override fun beforeCheckpoint(context: org.crac.Context<out Resource>?) {
+        println("beforeCheckpoint() - shutting down all connections...")
+        Settings.requirements.forEach { (key, value) ->
+            (value() as? Disconnectable)?.let {
+                println("Disconnecting $key...")
+                it.disconnect()
+            }
+        }
+        println("Disconnections complete.")
+    }
+
+    override fun afterRestore(context: org.crac.Context<out Resource>?) {
+        println("afterRestore()")
     }
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context) {
@@ -382,7 +437,7 @@ abstract class AwsAdapter : RequestStreamHandler {
         cacheId: String,
         path: String,
         queryParams: Map<String, List<String>>,
-        jwt: String? = null
+        jwt: String? = null,
     ): APIGatewayV2HTTPResponse {
         logger.debug("Connecting $cacheId")
         val match = wsMatcher.match(path)
