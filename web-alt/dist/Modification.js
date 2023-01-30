@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.evaluateModification = void 0;
+const Condition_1 = require("./Condition");
 function evaluateModification(modification, model) {
     const key = Object.keys(modification)[0];
     const value = modification[key];
@@ -38,7 +39,14 @@ function evaluateModification(modification, model) {
         case "ListDropLast":
             throw new Error("ListDropLast is not supported yet");
         case "ListPerElement":
-            throw new Error("ListPerElement is not supported yet");
+            const typedValue = value;
+            const typedModel = model;
+            typedModel.forEach((item, index) => {
+                if ((0, Condition_1.evaluateCondition)(typedValue.condition, item)) {
+                    typedModel[index] = evaluateModification(typedValue.modification, item);
+                }
+            });
+            return model;
         case "SetAppend":
             throw new Error("SetAppend is not supported yet");
         case "SetRemove":
