@@ -59,23 +59,53 @@ export function evaluateModification<T>(
       throw new Error("CoerceAtMost is not supported yet");
     case "CoerceAtLeast":
       throw new Error("CoerceAtLeast is not supported yet");
-    case "Increment":
-      throw new Error("Increment is not supported yet");
-    case "Multiply":
-      throw new Error("Multiply is not supported yet");
-    case "AppendString":
-      throw new Error("AppendString is not supported yet");
-    case "ListAppend":
-      throw new Error("ListAppend is not supported yet");
-    case "ListRemove":
-      throw new Error("ListRemove is not supported yet");
-    case "ListRemoveInstances":
-      throw new Error("ListRemoveInstances is not supported yet");
-    case "ListDropFirst":
-      throw new Error("ListDropFirst is not supported yet");
-    case "ListDropLast":
-      throw new Error("ListDropLast is not supported yet");
-    case "ListPerElement":
+    case "Increment": {
+      const typedValue = value as number;
+      const typedModel = model as unknown as number;
+      return (typedModel + typedValue) as unknown as T;
+    }
+    case "Multiply": {
+      const typedValue = value as number;
+      const typedModel = model as unknown as number;
+      return (typedModel * typedValue) as unknown as T;
+    }
+    case "AppendString": {
+      const typedValue = value as string;
+      const typedModel = model as unknown as string;
+      return (typedModel + typedValue) as unknown as T;
+    }
+    case "ListAppend": {
+      const typedValue = value as Array<any>;
+      const typedModel = model as unknown as Array<any>;
+      return [...typedModel, ...typedValue] as unknown as T;
+    }
+    case "ListRemove": {
+      const typedValue = value as Condition<any>;
+      const typedModel = model as unknown as Array<any>;
+      return typedModel.filter(
+        (item) => !evaluateCondition(typedValue, item)
+      ) as unknown as T;
+    }
+    case "ListRemoveInstances": {
+      const typedValue = value as Array<any>;
+      const typedModel = model as unknown as Array<any>;
+      return typedModel.filter((item) => !typedValue.includes(item)) as unknown as T;
+    }
+    case "ListDropFirst": {
+      const typedValue = value as boolean;
+      const typedModel = model as unknown as Array<any>;
+      if (typedValue) {
+        return typedModel.slice(1) as unknown as T;
+      }
+    }
+    case "ListDropLast": {
+      const typedValue = value as boolean;
+      const typedModel = model as unknown as Array<any>;
+      if (typedValue) {
+        return typedModel.slice(0, -1) as unknown as T;
+      }
+    }
+    case "ListPerElement": {
       const typedValue = value as {
         condition: Condition<any>;
         modification: Modification<any>;
@@ -91,25 +121,67 @@ export function evaluateModification<T>(
         }
       });
       return model;
-
-    case "SetAppend":
-      throw new Error("SetAppend is not supported yet");
-    case "SetRemove":
-      throw new Error("SetRemove is not supported yet");
-    case "SetRemoveInstances":
-      throw new Error("SetRemoveInstances is not supported yet");
+    }
+    case "SetAppend": {
+      const typedModel = model as unknown as Array<any>;
+      const typedValue = value as unknown as Array<any>;
+      return [...typedModel, ...typedValue] as unknown as T;
+    }
+    case "SetRemove": {
+      const typedModel = model as unknown as Array<any>;
+      const typedValue = value as Condition<any>;
+      return typedModel.filter(
+        (item) => !evaluateCondition(typedValue, item)
+      ) as unknown as T;
+    }
+    case "SetRemoveInstances": {
+      const typedModel = model as unknown as Array<any>;
+      const typedValue = value as unknown as Array<any>;
+      return typedModel.filter((item) => !typedValue.includes(item)) as unknown as T;
+    }
     case "SetDropFirst":
       throw new Error("SetDropFirst is not supported yet");
     case "SetDropLast":
       throw new Error("SetDropLast is not supported yet");
-    case "SetPerElement":
-      throw new Error("SetPerElement is not supported yet");
+    case "SetPerElement": {
+      const typedValue = value as {
+        condition: Condition<any>;
+        modification: Modification<any>;
+      };
+      const typedModel = model as unknown as Array<any>;
+
+      typedModel.forEach((item, index) => {
+        if (evaluateCondition(typedValue.condition, item)) {
+          typedModel[index] = evaluateModification(
+            typedValue.modification,
+            item
+          );
+        }
+      });
+      return model;
+    }
     case "Combine":
       throw new Error("Combine is not supported yet");
-    case "ModifyByKey":
-      throw new Error("ModifyByKey is not supported yet");
-    case "RemoveKeys":
-      throw new Error("RemoveKeys is not supported yet");
+    case "ModifyByKey": {
+      const typedValue = value as Record<string, Modification<any>>;
+      const typedModel = model as unknown as Record<string, any>;
+      const copy: any = { ...typedModel };
+
+      Object.keys(typedValue).forEach((key) => {
+        copy[key] = evaluateModification(typedValue[key], copy[key]);
+      });
+      return copy;
+    }
+    case "RemoveKeys": {
+      const typedValue = value as Array<string>;
+      const typedModel = model as unknown as Record<string, any>;
+      const copy: any = { ...typedModel };
+
+      typedValue.forEach((key) => {
+        delete copy[key];
+      });
+      return copy;
+    }
     default:
       const copy: any = { ...model };
       copy[key] = evaluateModification(
