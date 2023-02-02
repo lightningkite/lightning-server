@@ -53,19 +53,19 @@ export declare class ServerHealth {
 }
 export declare namespace ServerHealth {
     class Memory {
-        readonly maxMem: number;
-        readonly totalMemory: number;
-        readonly freeMemory: number;
+        readonly max: number;
+        readonly total: number;
+        readonly free: number;
         readonly systemAllocated: number;
-        readonly memUsagePercent: number;
-        constructor(maxMem: number, totalMemory: number, freeMemory: number, systemAllocated: number, memUsagePercent: number);
+        readonly usage: number;
+        constructor(max: number, total: number, free: number, systemAllocated: number, usage: number);
         static properties: string[];
         static propertyTypes(): {
-            maxMem: NumberConstructor[];
-            totalMemory: NumberConstructor[];
-            freeMemory: NumberConstructor[];
+            max: NumberConstructor[];
+            total: NumberConstructor[];
+            free: NumberConstructor[];
             systemAllocated: NumberConstructor[];
-            memUsagePercent: NumberConstructor[];
+            usage: NumberConstructor[];
         };
         copy: (values: Partial<Memory>) => this;
         equals: (other: any) => boolean;

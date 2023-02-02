@@ -60,10 +60,10 @@ setUpDataClass(ServerHealth)
 export namespace ServerHealth {
     //! Declares com.lightningkite.lightningserver.serverhealth.ServerHealth.Memory
     export class Memory {
-        public constructor(public readonly maxMem: number, public readonly totalMemory: number, public readonly freeMemory: number, public readonly systemAllocated: number, public readonly memUsagePercent: number) {
+        public constructor(public readonly max: number, public readonly total: number, public readonly free: number, public readonly systemAllocated: number, public readonly usage: number) {
         }
-        public static properties = ["maxMem", "totalMemory", "freeMemory", "systemAllocated", "memUsagePercent"]
-        public static propertyTypes() { return {maxMem: [Number], totalMemory: [Number], freeMemory: [Number], systemAllocated: [Number], memUsagePercent: [Number]} }
+        public static properties = ["max", "total", "free", "systemAllocated", "usage"]
+        public static propertyTypes() { return {max: [Number], total: [Number], free: [Number], systemAllocated: [Number], usage: [Number]} }
         copy: (values: Partial<Memory>) => this;
         equals: (other: any) => boolean;
         hashCode: () => number;

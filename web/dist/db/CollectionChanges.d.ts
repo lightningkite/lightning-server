@@ -3,12 +3,10 @@ import { HasId } from './HasId';
 import { Comparable, ReifiedType } from '@lightningkite/khrysalis-runtime';
 export declare class CollectionChanges<T extends any> {
     readonly changes: Array<EntryChange<T>>;
-    readonly replace: (Array<T> | null);
-    constructor(changes?: Array<EntryChange<T>>, replace?: (Array<T> | null));
+    constructor(changes?: Array<EntryChange<T>>);
     static properties: string[];
     static propertyTypes(T: ReifiedType): {
         changes: (ArrayConstructor | (ReifiedType<unknown> | typeof EntryChange)[])[];
-        replace: (ArrayConstructor | ReifiedType<unknown>)[];
     };
     copy: (values: Partial<CollectionChanges<T>>) => this;
     equals: (other: any) => boolean;

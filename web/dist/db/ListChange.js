@@ -11,7 +11,9 @@ class ListChange {
         this.old = old;
         this._new = _new;
     }
-    static propertyTypes(T) { return { wholeList: [Array, T], old: T, _new: T }; }
+    static propertyTypes(T) {
+        return { wholeList: [Array, T], old: T, _new: T };
+    }
 }
 exports.ListChange = ListChange;
 ListChange.properties = ["wholeList", "old", "_new"];

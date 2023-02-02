@@ -11,10 +11,18 @@ const iter_tools_es_1 = require("iter-tools-es");
 class Modification {
     constructor() {
     }
-    hashCode() { throw undefined; }
-    equals(other) { throw undefined; }
-    invoke(on) { throw undefined; }
-    invokeDefault() { throw undefined; }
+    hashCode() {
+        throw undefined;
+    }
+    equals(other) {
+        throw undefined;
+    }
+    invoke(on) {
+        throw undefined;
+    }
+    invokeDefault() {
+        throw undefined;
+    }
     then(other) {
         return new Modification.Chain([this, other]);
     }
@@ -27,7 +35,9 @@ exports.Modification = Modification;
             super();
             this.modifications = modifications;
         }
-        static propertyTypes(T) { return { modifications: [Array, [Modification, T]] }; }
+        static propertyTypes(T) {
+            return { modifications: [Array, [Modification, T]] };
+        }
         invoke(on) {
             return (0, iter_tools_es_1.reduce)(on, (item, mod) => (mod.invoke(item)), this.modifications);
         }
@@ -47,10 +57,12 @@ exports.Modification = Modification;
             super();
             this.modification = modification;
         }
-        static propertyTypes(T) { return { modification: [Modification, T] }; }
+        static propertyTypes(T) {
+            return { modification: [Modification, T] };
+        }
         invoke(on) {
             return (() => {
-                if (on === null) {
+                if (on === null || on === undefined) {
                     return null;
                 }
                 return ((it) => (this.modification.invoke(it)))(on);
@@ -71,7 +83,9 @@ exports.Modification = Modification;
             super();
             this.value = value;
         }
-        static propertyTypes(T) { return { value: T }; }
+        static propertyTypes(T) {
+            return { value: T };
+        }
         invoke(on) {
             return this.value;
         }
@@ -90,7 +104,9 @@ exports.Modification = Modification;
             super();
             this.value = value;
         }
-        static propertyTypes(T) { return { value: T }; }
+        static propertyTypes(T) {
+            return { value: T };
+        }
         invoke(on) {
             return (0, khrysalis_runtime_1.cMin)(on, this.value);
         }
@@ -109,7 +125,9 @@ exports.Modification = Modification;
             super();
             this.value = value;
         }
-        static propertyTypes(T) { return { value: T }; }
+        static propertyTypes(T) {
+            return { value: T };
+        }
         invoke(on) {
             return (0, khrysalis_runtime_1.cMax)(on, this.value);
         }
@@ -128,7 +146,9 @@ exports.Modification = Modification;
             super();
             this.by = by;
         }
-        static propertyTypes(T) { return { by: T }; }
+        static propertyTypes(T) {
+            return { by: T };
+        }
         invoke(on) {
             return (on + this.by);
         }
@@ -147,7 +167,9 @@ exports.Modification = Modification;
             super();
             this.by = by;
         }
-        static propertyTypes(T) { return { by: T }; }
+        static propertyTypes(T) {
+            return { by: T };
+        }
         invoke(on) {
             return (on * this.by);
         }
@@ -188,7 +210,9 @@ exports.Modification = Modification;
             super();
             this.value = value;
         }
-        static propertyTypes() { return { value: [String] }; }
+        static propertyTypes() {
+            return { value: [String] };
+        }
         invoke(on) {
             return on + this.value;
         }
@@ -207,7 +231,9 @@ exports.Modification = Modification;
             super();
             this.items = items;
         }
-        static propertyTypes(T) { return { items: [Array, T] }; }
+        static propertyTypes(T) {
+            return { items: [Array, T] };
+        }
         invoke(on) {
             return on.concat(this.items);
         }
@@ -226,7 +252,9 @@ exports.Modification = Modification;
             super();
             this.condition = condition;
         }
-        static propertyTypes(T) { return { condition: [Condition_1.Condition, T] }; }
+        static propertyTypes(T) {
+            return { condition: [Condition_1.Condition, T] };
+        }
         invoke(on) {
             return on.filter((it) => ((!this.condition.invoke(it))));
         }
@@ -245,7 +273,9 @@ exports.Modification = Modification;
             super();
             this.items = items;
         }
-        static propertyTypes(T) { return { items: [Array, T] }; }
+        static propertyTypes(T) {
+            return { items: [Array, T] };
+        }
         invoke(on) {
             return (0, khrysalis_runtime_1.xIterableMinusMultiple)(on, this.items);
         }
@@ -307,7 +337,9 @@ exports.Modification = Modification;
             this.condition = condition;
             this.modification = modification;
         }
-        static propertyTypes(T) { return { condition: [Condition_1.Condition, T], modification: [Modification, T] }; }
+        static propertyTypes(T) {
+            return { condition: [Condition_1.Condition, T], modification: [Modification, T] };
+        }
         invoke(on) {
             return on.map((it) => (this.condition.invoke(it) ? this.modification.invoke(it) : it));
         }
@@ -326,7 +358,9 @@ exports.Modification = Modification;
             super();
             this.items = items;
         }
-        static propertyTypes(T) { return { items: [Set, T] }; }
+        static propertyTypes(T) {
+            return { items: [Set, T] };
+        }
         invoke(on) {
             return (new khrysalis_runtime_1.EqualOverrideSet([...on, ...this.items]));
         }
@@ -345,7 +379,9 @@ exports.Modification = Modification;
             super();
             this.condition = condition;
         }
-        static propertyTypes(T) { return { condition: [Condition_1.Condition, T] }; }
+        static propertyTypes(T) {
+            return { condition: [Condition_1.Condition, T] };
+        }
         invoke(on) {
             return new khrysalis_runtime_1.EqualOverrideSet((0, iter_tools_es_1.execPipe)(on, (0, iter_tools_es_1.filter)((it) => ((!this.condition.invoke(it)))), iter_tools_es_1.toArray));
         }
@@ -364,7 +400,9 @@ exports.Modification = Modification;
             super();
             this.items = items;
         }
-        static propertyTypes(T) { return { items: [Set, T] }; }
+        static propertyTypes(T) {
+            return { items: [Set, T] };
+        }
         invoke(on) {
             return new khrysalis_runtime_1.EqualOverrideSet([...on].filter(x => !this.items.has(x)));
         }
@@ -426,7 +464,9 @@ exports.Modification = Modification;
             this.condition = condition;
             this.modification = modification;
         }
-        static propertyTypes(T) { return { condition: [Condition_1.Condition, T], modification: [Modification, T] }; }
+        static propertyTypes(T) {
+            return { condition: [Condition_1.Condition, T], modification: [Modification, T] };
+        }
         invoke(on) {
             return new khrysalis_runtime_1.EqualOverrideSet((0, iter_tools_es_1.execPipe)(on, (0, iter_tools_es_1.map)((it) => (this.condition.invoke(it) ? this.modification.invoke(it) : it)), iter_tools_es_1.toArray));
         }
@@ -445,7 +485,9 @@ exports.Modification = Modification;
             super();
             this.map = map;
         }
-        static propertyTypes(T) { return { map: [Map, [String], T] }; }
+        static propertyTypes(T) {
+            return { map: [Map, [String], T] };
+        }
         invoke(on) {
             return new Map([...on, ...this.map]);
         }
@@ -464,14 +506,16 @@ exports.Modification = Modification;
             super();
             this.map = map;
         }
-        static propertyTypes(T) { return { map: [Map, [String], [Modification, T]] }; }
+        static propertyTypes(T) {
+            return { map: [Map, [String], [Modification, T]] };
+        }
         invoke(on) {
             return new Map([...on, ...new Map((0, iter_tools_es_1.map)(x => [x[0], ((it) => {
                         var _a;
                         return (((_a = (() => {
                             var _a;
                             const temp31 = ((_a = on.get(it[0])) !== null && _a !== void 0 ? _a : null);
-                            if (temp31 === null) {
+                            if (temp31 === null || temp31 === undefined) {
                                 return null;
                             }
                             return ((e) => (it[1].invoke(e)))(temp31);
@@ -493,7 +537,9 @@ exports.Modification = Modification;
             super();
             this.fields = fields;
         }
-        static propertyTypes(T) { return { fields: [Set, [String]] }; }
+        static propertyTypes(T) {
+            return { fields: [Set, [String]] };
+        }
         invoke(on) {
             return new Map((0, iter_tools_es_1.filter)(x => ((it) => (!(this.fields.has(it))))(x[0]), on.entries()));
         }
@@ -513,7 +559,9 @@ exports.Modification = Modification;
             this.key = key;
             this.modification = modification;
         }
-        static propertyTypes(K, V) { return { key: [String, K, V], modification: [Modification, V] }; }
+        static propertyTypes(K, V) {
+            return { key: [String, K, V], modification: [Modification, V] };
+        }
         invoke(on) {
             return (0, TProperty1Extensions_1.keySet)(on, this.key, this.modification.invoke((0, khrysalis_runtime_1.reflectiveGet)(on, this.key)));
         }

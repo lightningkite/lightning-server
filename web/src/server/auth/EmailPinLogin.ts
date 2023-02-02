@@ -27,3 +27,16 @@ export class PhonePinLogin {
     
 }
 setUpDataClass(PhonePinLogin)
+
+//! Declares com.lightningkite.lightningserver.auth.PasswordLogin
+export class PasswordLogin {
+    public constructor(public readonly username: string, public readonly password: string) {
+    }
+    public static properties = ["username", "password"]
+    public static propertyTypes() { return {username: [String], password: [String]} }
+    copy: (values: Partial<PasswordLogin>) => this;
+    equals: (other: any) => boolean;
+    hashCode: () => number;
+    
+}
+setUpDataClass(PasswordLogin)

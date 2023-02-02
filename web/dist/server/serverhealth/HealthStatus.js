@@ -55,16 +55,16 @@ ServerHealth.properties = ["serverId", "version", "memory", "features", "loadAve
 (function (ServerHealth) {
     //! Declares com.lightningkite.lightningserver.serverhealth.ServerHealth.Memory
     class Memory {
-        constructor(maxMem, totalMemory, freeMemory, systemAllocated, memUsagePercent) {
-            this.maxMem = maxMem;
-            this.totalMemory = totalMemory;
-            this.freeMemory = freeMemory;
+        constructor(max, total, free, systemAllocated, usage) {
+            this.max = max;
+            this.total = total;
+            this.free = free;
             this.systemAllocated = systemAllocated;
-            this.memUsagePercent = memUsagePercent;
+            this.usage = usage;
         }
-        static propertyTypes() { return { maxMem: [Number], totalMemory: [Number], freeMemory: [Number], systemAllocated: [Number], memUsagePercent: [Number] }; }
+        static propertyTypes() { return { max: [Number], total: [Number], free: [Number], systemAllocated: [Number], usage: [Number] }; }
     }
-    Memory.properties = ["maxMem", "totalMemory", "freeMemory", "systemAllocated", "memUsagePercent"];
+    Memory.properties = ["max", "total", "free", "systemAllocated", "usage"];
     ServerHealth.Memory = Memory;
     (0, khrysalis_runtime_1.setUpDataClass)(Memory);
 })(ServerHealth = exports.ServerHealth || (exports.ServerHealth = {}));
