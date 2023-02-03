@@ -104,9 +104,10 @@ class Sftp(
         }
 
         override suspend fun write(content: HttpContent) = withContext(Dispatchers.IO) {
+            val stream = content.stream()
             system.withClient {
                 val file = File.createTempFile("temp", ".file")
-                content.stream().use {
+                stream.use {
                     file.outputStream().use { o ->
                         it.copyTo(o)
                     }
