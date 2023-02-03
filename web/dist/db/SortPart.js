@@ -10,7 +10,9 @@ class SortPart {
         this.field = field;
         this.ascending = ascending;
     }
-    static propertyTypes(T) { return { field: [String, T], ascending: [Boolean] }; }
+    static propertyTypes(T) {
+        return { field: [String, T], ascending: [Boolean] };
+    }
     static constructorKProperty1comSortPartTAnyBoolean(field, ascending = true) {
         let result = new SortPart(field, ascending);
         return result;

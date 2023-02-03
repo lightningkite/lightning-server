@@ -9,6 +9,7 @@ export declare class PropChain<From extends any, To extends any> {
     readonly setProp: ((a: From, b: To) => From);
     constructor(mapCondition: ((a: Condition<To>) => Condition<From>), mapModification: ((a: Modification<To>) => Modification<From>), getProp: ((a: From) => To), setProp: ((a: From, b: To) => From));
     get<V extends any>(prop: TProperty1<To, V>): PropChain<From, V>;
+    chain<V extends any>(other: PropChain<To, V>): PropChain<From, V>;
     toString(): string;
 }
 export declare function condition<T extends any>(setup: ((a: PropChain<T, T>) => Condition<T>)): Condition<T>;
@@ -18,8 +19,11 @@ export declare function xPropChainNeverGet<K extends any>(this_: PropChain<K, K>
 export declare function xPropChainEq<K extends any, T extends any>(this_: PropChain<K, T>, value: T): Condition<K>;
 export declare function xPropChainNeq<K extends any, T extends any>(this_: PropChain<K, T>, value: T): Condition<K>;
 export declare function xPropChainNe<K extends any, T extends any>(this_: PropChain<K, T>, value: T): Condition<K>;
+export declare function xPropChainInsideSet<K extends any, T extends any>(this_: PropChain<K, T>, values: Set<T>): Condition<K>;
 export declare function xPropChainInside<K extends any, T extends any>(this_: PropChain<K, T>, values: Array<T>): Condition<K>;
+export declare function xPropChainNinSet<K extends any, T extends any>(this_: PropChain<K, T>, values: Set<T>): Condition<K>;
 export declare function xPropChainNin<K extends any, T extends any>(this_: PropChain<K, T>, values: Array<T>): Condition<K>;
+export declare function xPropChainNotInSet<K extends any, T extends any>(this_: PropChain<K, T>, values: Set<T>): Condition<K>;
 export declare function xPropChainNotIn<K extends any, T extends any>(this_: PropChain<K, T>, values: Array<T>): Condition<K>;
 export declare function xPropChainGt<K extends any, T extends any>(this_: PropChain<K, T>, value: T): Condition<K>;
 export declare function xPropChainLt<K extends any, T extends any>(this_: PropChain<K, T>, value: T): Condition<K>;

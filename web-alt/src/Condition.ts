@@ -121,7 +121,7 @@ export function evaluateCondition<T>(condition: Condition<T>, model: T): boolean
         case "Exists":
             return true
         case "IfNotNull":
-            return model !== null && model !== undefined
+            return model !== null && model !== undefined && evaluateCondition(value as Condition<any>, model)
         default:
             return evaluateCondition(value as Condition<any>, (model as any)[key])
     }
