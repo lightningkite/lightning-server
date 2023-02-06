@@ -54,7 +54,7 @@ public class HasPhoneNumberFields {
     }
     public static let INSTANCE = HasPhoneNumberFields()
     
-    public func phoneNumber<T : HasPhoneNumber>() -> PropertyIterableProperty<T, String> {
+    public func phoneNumber<T : HasPhoneNumber>() -> KeyPath<T, String> {
         return \T.phoneNumber
     }
 }
@@ -72,7 +72,7 @@ public class HasMaybeEmailFields {
     }
     public static let INSTANCE = HasMaybeEmailFields()
     
-    public func email<T : HasMaybeEmail>() -> PropertyIterableProperty<T, String?> {
+    public func email<T : HasMaybeEmail>() -> KeyPath<T, String?> {
         return \T.email
     }
 }
@@ -91,7 +91,7 @@ public  class HasMaybePhoneNumberFields {
     }
     public static let INSTANCE = HasMaybePhoneNumberFields()
     
-    public func phoneNumber<T : HasMaybePhoneNumber>() -> PropertyIterableProperty<T, String?> {
+    public func phoneNumber<T : HasMaybePhoneNumber>() -> KeyPath<T, String?> {
         return \T.phoneNumber
     }
 }
@@ -109,7 +109,7 @@ public  class HasPasswordFields {
     }
     public static let INSTANCE = HasPasswordFields()
     
-    public func hashedPassword<T : HasPassword>() -> PropertyIterableProperty<T, String> {
+    public func hashedPassword<T : HasPassword>() -> KeyPath<T, String> {
         return \T.hashedPassword
     }
 }
