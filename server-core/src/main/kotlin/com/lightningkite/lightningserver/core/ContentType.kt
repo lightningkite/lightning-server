@@ -144,41 +144,43 @@ class ContentType(val type: String, val subtype: String, val parameters: Map<Str
     }
 
     companion object {
-        private val fromFileExtension = mapOf(
-            "bin" to Application.OctetStream,
-            "cbor" to Application.Cbor,
-            "json" to Application.Json,
-            "bson" to Application.Bson,
-            "js" to Application.JavaScript,
-            "xml" to Application.Xml,
-            "zip" to Application.Zip,
-            "wav" to Audio.WAV,
-            "mp3" to Audio.MP3,
-            "mpg" to Video.MPEG,
-            "mpeg" to Video.MPEG,
-            "mp4" to Video.MP4,
-            "ogg" to Video.OGG,
-            "mov" to Video.QuickTime,
-            "txt" to Text.Plain,
-            "css" to Text.CSS,
-            "csv" to Text.CSV,
-            "htm" to Text.Html,
-            "html" to Text.Html,
-            "js" to Text.JavaScript,
-            "xml" to Text.Xml,
-            "gif" to Image.GIF,
-            "jpg" to Image.JPEG,
-            "jpeg" to Image.JPEG,
-            "png" to Image.PNG,
-            "svg" to Image.SVG,
-            "webp" to Image.WebP,
-            "jp2" to Image.JPEG2000,
-            "pdf" to Application.Pdf,
-            "xlsx" to Application.Xlsx,
-            "docx" to Application.Docx,
-            "pptx" to Application.Pptx,
-        )
-        private val toFileExtension = fromFileExtension.entries.associate { it.value to it.key }
+        private val fromFileExtension by lazy {
+            mapOf(
+                "bin" to Application.OctetStream,
+                "cbor" to Application.Cbor,
+                "json" to Application.Json,
+                "bson" to Application.Bson,
+                "js" to Application.JavaScript,
+                "xml" to Application.Xml,
+                "zip" to Application.Zip,
+                "wav" to Audio.WAV,
+                "mp3" to Audio.MP3,
+                "mpg" to Video.MPEG,
+                "mpeg" to Video.MPEG,
+                "mp4" to Video.MP4,
+                "ogg" to Video.OGG,
+                "mov" to Video.QuickTime,
+                "txt" to Text.Plain,
+                "css" to Text.CSS,
+                "csv" to Text.CSV,
+                "htm" to Text.Html,
+                "html" to Text.Html,
+                "js" to Text.JavaScript,
+                "xml" to Text.Xml,
+                "gif" to Image.GIF,
+                "jpg" to Image.JPEG,
+                "jpeg" to Image.JPEG,
+                "png" to Image.PNG,
+                "svg" to Image.SVG,
+                "webp" to Image.WebP,
+                "jp2" to Image.JPEG2000,
+                "pdf" to Application.Pdf,
+                "xlsx" to Application.Xlsx,
+                "docx" to Application.Docx,
+                "pptx" to Application.Pptx,
+            )
+        }
+        private val toFileExtension by lazy { fromFileExtension.entries.associate { it.value to it.key } }
         fun fromExtension(extension: String) = fromFileExtension[extension.lowercase()] ?: Application.OctetStream
     }
     val extension: String? get() = toFileExtension[this]
