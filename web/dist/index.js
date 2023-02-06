@@ -48,6 +48,7 @@ __exportStar(require("./server/auth/EmailPinLogin"), exports);
 __exportStar(require("./server/files/init"), exports);
 __exportStar(require("./server/files/UploadEarlyEndpointModels"), exports);
 __exportStar(require("./server/files/UploadForNextRequestFields"), exports);
+__exportStar(require("./server/LSError"), exports);
 __exportStar(require("./server/serverhealth/HealthStatus"), exports);
 __exportStar(require("./SignalData"), exports);
 __exportStar(require("./WriteModelApi"), exports);
