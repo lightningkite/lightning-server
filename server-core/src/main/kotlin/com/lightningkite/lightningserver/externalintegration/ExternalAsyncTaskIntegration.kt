@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.tasks.Task
+import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.tasks.task
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
@@ -31,6 +32,9 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
     val taskTimeout: Duration = Duration.ofMinutes(2),
     val checkChunking: Int = 15,
 ) : ServerPathGroup(path) {
+    init {
+        prepareModels()
+    }
 
     // Collection exposed to admins only for tasks
     val info = ModelInfoWithDefault<USER, ExternalAsyncTaskRequest, String>(
@@ -111,7 +115,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
         expiration: Duration = Duration.ofDays(1),
         noinline expired: suspend (OURDATA) -> Unit = {},
         noinline action: suspend (OURDATA, RESULT) -> Unit,
-    ): ResultAction<OURDATA, RESULT> = resultAction(key, serializer(), expiration, expired, action)
+    ): ResultAction<OURDATA, RESULT> = resultAction(key, Serialization.Internal.module.serializer(), expiration, expired, action)
 
     val runActionResult: Task<ExternalAsyncTaskRequest> = task("$path/runActionResult") { sig: ExternalAsyncTaskRequest ->
         @Suppress("UNCHECKED_CAST")
@@ -178,7 +182,12 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
         })
     }
 
+    init {
+        Tasks.onSettingsReady { api().ready(this) }
+    }
+
     interface Api<REQUEST, RESPONSE : HasId<String>, RESULT> {
+        suspend fun <USER> ready(integration: ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE, RESULT>) {}
         suspend fun begin(request: REQUEST): RESPONSE
         suspend fun check(ids: List<String>): Map<String, RESULT>
     }

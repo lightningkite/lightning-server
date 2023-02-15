@@ -31,6 +31,14 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
             )
         )
     }
+    get("sdk.dart").handler {
+        HttpResponse(
+            HttpContent.Text(
+                string = buildString { Documentable.dartSdk("sdk.dart", this) },
+                type = ContentType.Text.Plain
+            )
+        )
+    }
     get("sdk.zip").handler {
         HttpResponse(
             HttpContent.OutStream(
@@ -50,6 +58,7 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                     ol {
                         li { a(href = "sdk.ts") { +"Typescript SDK" }}
                         li { a(href = "sdk.zip") { +"Kotlin SDK" }}
+                        li { a(href = "sdk.dart") { +"Dart SDK" }}
                     }
                 }
                 h2 { +"Endpoints" }

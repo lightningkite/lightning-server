@@ -5,6 +5,8 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
+import com.lightningkite.lightningserver.humanize
+import com.lightningkite.lightningserver.kabobCase
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.Documentable
@@ -187,23 +189,6 @@ data class JsonSchemaTypeLink(
     val href: String,
     val rel: String,
 )
-
-private val camelRegex = "[a-z][A-Z]".toRegex()
-private val snakeRegex = "_[a-zA-Z]".toRegex()
-fun String.humanize(): String = camelRegex.replace(this) {
-    "${it.value[0]} ${it.value[1].uppercase()}"
-}.let {
-    snakeRegex.replace(it) {
-        " " + it.value[1].uppercase()
-    }
-}.replaceFirstChar { it.uppercaseChar() }.trim()
-fun String.kabobCase(): String = camelRegex.replace(this) {
-    "${it.value[0]}-${it.value[1]}"
-}.let {
-    snakeRegex.replace(it) {
-        "-" + it.value[1]
-    }
-}.lowercase().trim()
 
 fun Json.schemaDefinitions(types: Iterable<KSerializer<*>>): Map<String, JsonSchemaType> {
     val b = JsonSchemaBuilder(this)

@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.jsonschema
 
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.humanize
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.ApiEndpoint
