@@ -20,8 +20,12 @@ import java.util.*
 /**
  * A shortcut function that sets up OAuth for Google accounts specifically.
  *
- * @param defaultLanding The final page to send the user after authentication.
- * @param emailToId A lambda that returns the users ID given an email.
+ * You can set up a new Google project in the [Google console](https://console.cloud.google.com)
+ * Fill out the [OAuth Consent Screen](https://console.cloud.google.com/apis/credentials/consent)
+ * Enable the non-sensitive scopes for '.../auth/userinfo.email' and '.../auth/userinfo.profile'
+ * Add an [OAuth 2.0 Client ID](https://console.cloud.google.com/apis/credentials/oauthclient)
+ * 'Authorized redirect URIs' are your auth url + /oauth/google/callback
+ *
  */
 class OauthGoogleEndpoints<USER: Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
@@ -41,7 +45,7 @@ class OauthGoogleEndpoints<USER: Any, ID>(
     }
 
     override val callback: HttpEndpoint = path.post("callback").handler { request ->
-        val response = codeToToken("https://oauth2.googleapis.com/token", request.queryParameters())
+        val response = codeToToken("https://oauth2.googleapis.com/token", request.body!!.parse())
         val response2: GoogleResponse2 = client.get("https://www.googleapis.com/oauth2/v2/userinfo") {
             headers {
                 append("Authorization", "${response.token_type} ${response.access_token}")

@@ -27,13 +27,13 @@ import java.util.*
  * A shortcut function that sets up OAuth for Apple accounts specifically.
  *
  * SETUP STEPS:
- * Get an Apple Developer Account
- * Go to Certificates, Identities, and Profiles
- * Add or edit an App Identifier to have "Sign in with Apple" capability
- * Add a Service Identifier for the server
+ * Get an [Apple Developer Account](https://developer.apple.com)
+ * Go to [Certificates, Identities, and Profiles](https://developer.apple.com/account/resources/certificates/list)
+ * Add or edit an [App Identifier](https://developer.apple.com/account/resources/identifiers/list/bundleId) to have "Sign in with Apple" capability
+ * Add a [Service Identifier](https://developer.apple.com/account/resources/identifiers/list/serviceId) for the server
  * Add Sign In With Apple to said service identifier
- *     Return URLs are your url + /auth/oauth/apple/callback
- * Make a key for the server
+ *     Return URLs are your auth url + /oauth/apple/callback
+ * Make a [key](https://developer.apple.com/account/resources/authkeys/list) for the server
  * Download the .p8
  * Copy out the contents of the P8 (it's a regular text file)
  * Set the credentials to:

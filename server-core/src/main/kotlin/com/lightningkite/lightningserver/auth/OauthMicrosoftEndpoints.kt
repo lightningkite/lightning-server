@@ -20,8 +20,11 @@ import java.util.*
 /**
  * A shortcut function that sets up OAuth for Microsoft accounts specifically.
  *
- * @param defaultLanding The final page to send the user after authentication.
- * @param emailToId A lambda that returns the users ID given an email.
+ * You can set up a Microsoft sign-in app in the [Azure Console's Active Directory section](https://portal.azure.com/#view/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/~/RegisteredApps)
+ * Note your 'Application (client) ID'.  You'll put that into [setting] as the [OauthProviderCredentials.id].
+ * In the API Permissions section, add the permissions 'email' and 'User.Read'.
+ * In the Certificates & secrets section, create a new client secret.  Copy out the value and put it into [setting] as the [OauthProviderCredentials.secret].
+ *
  */
 class OauthMicrosoftEndpoints<USER: Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,

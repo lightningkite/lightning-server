@@ -24,8 +24,9 @@ import java.util.*
 /**
  * A shortcut function that sets up OAuth for GitHub accounts specifically.
  *
- * @param defaultLanding The final page to send the user after authentication.
- * @param emailToId A lambda that returns the users ID given an email.
+ * You can set up a new app for GitHub in your [developer settings](https://github.com/settings/developers).
+ * Get the client ID and a client secret to put into your [setting] parameter.
+ * Return URLs are your auth url + /oauth/github/callback
  */
 class OauthGitHubEndpoints<USER: Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
@@ -56,11 +57,11 @@ class OauthGitHubEndpoints<USER: Any, ID>(
     )
 
     val login = path.get("login").handler { request ->
-        val params = codeRequest().let { Serialization.properties.encodeToFormData(it) }
+        val params = codeRequest().copy(response_mode = "query").let { Serialization.properties.encodeToFormData(it) }
         HttpResponse.redirectToGet("https://github.com/login/oauth/authorize?$params")
     }
 
-    override val callback: HttpEndpoint = path.post("callback").handler { request ->
+    override val callback: HttpEndpoint = path.get("callback").handler { request ->
         val response = codeToToken("https://github.com/login/oauth/access_token", request.queryParameters())
         val user = run {
             client.get("https://api.github.com/user") {
