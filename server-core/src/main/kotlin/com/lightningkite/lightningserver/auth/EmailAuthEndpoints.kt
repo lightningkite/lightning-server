@@ -11,6 +11,8 @@ import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.settings.generalSettings
+import com.lightningkite.lightningserver.settings.setting
+import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
 import java.security.SecureRandom
@@ -77,17 +79,31 @@ open class EmailAuthEndpoints<USER : Any, ID>(
             base.token(emailAccess.byEmail(email))
         }
     )
-    val oauthGoogle = OauthGoogleEndpoints(path = path("oauth/google"), jwtSigner = base.jwtSigner, landing = base.landingRoute) {
-        emailAccess.byEmail(it).let(emailAccess::id).toString()
+    val oauthGoogleSettings = setting<OauthProviderCredentials?>("oauth_google", null)
+    val oauthGithubSettings = setting<OauthProviderCredentials?>("oauth_github", null)
+    val oauthAppleSettings = setting<OauthAppleEndpoints.OauthAppleSettings?>("oauth_apple", null)
+    val oauthMicrosoftSettings = setting<OauthProviderCredentials?>("oauth_microsoft", null)
+
+    private val oauthGoogle: OauthGoogleEndpoints<USER, ID>? by lazy {
+        oauthGoogleSettings()?.let { OauthGoogleEndpoints(base, emailAccess.asExternal(), { it }) }
     }
-    val oauthGithub = OauthGitHubEndpoints(path = path("oauth/github"), jwtSigner = base.jwtSigner, landing = base.landingRoute) {
-        emailAccess.byEmail(it).let(emailAccess::id).toString()
+    private val oauthGithub: OauthGitHubEndpoints<USER, ID>? by lazy {
+        oauthGithubSettings()?.let { OauthGitHubEndpoints(base, emailAccess.asExternal(), { it }) }
     }
-    val oauthApple = OauthAppleEndpoints(
-        path = path("oauth/apple"),
-        jwtSigner = base.jwtSigner,
-        landing = base.landingRoute
-    ) { emailAccess.byEmail(it).let(emailAccess::id).toString() }
+    private val oauthApple: OauthAppleEndpoints<USER, ID>? by lazy {
+        oauthAppleSettings()?.let { OauthAppleEndpoints(base, emailAccess.asExternal(), { it }) }
+    }
+    private val oauthMicrosoft: OauthMicrosoftEndpoints<USER, ID>? by lazy {
+        oauthMicrosoftSettings()?.let { OauthMicrosoftEndpoints(base, emailAccess.asExternal(), { it }) }
+    }
+    init {
+        Tasks.onSettingsReady {
+            oauthGoogle
+            oauthGithub
+            oauthApple
+            oauthMicrosoft
+        }
+    }
 
     val loginEmailHtml = path("login-email/").get.handler {
         HttpResponse(
@@ -143,7 +159,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
             e.printStackTrace()
             throw e
         }
-        HttpResponse.redirectToGet(base.landingRoute.path.toString() + "?jwt=$basis")
+        base.redirectToLanding(basis)
     }
 }
 

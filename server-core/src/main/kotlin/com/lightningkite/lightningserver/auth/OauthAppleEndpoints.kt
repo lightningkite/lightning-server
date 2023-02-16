@@ -1,11 +1,21 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
-import com.lightningkite.lightningserver.http.HttpEndpoint
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.serialization.encodeToFormData
+import com.lightningkite.lightningserver.serialization.parse
+import com.lightningkite.lightningserver.statusFailing
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.http.*
 import io.ktor.util.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
@@ -16,47 +26,37 @@ import java.util.*
 /**
  * A shortcut function that sets up OAuth for Apple accounts specifically.
  *
- * @param defaultLanding The final page to send the user after authentication.
- * @param emailToId A lambda that returns the users ID given an email.
+ * SETUP STEPS:
+ * Get an Apple Developer Account
+ * Go to Certificates, Identities, and Profiles
+ * Add or edit an App Identifier to have "Sign in with Apple" capability
+ * Add a Service Identifier for the server
+ * Add Sign In With Apple to said service identifier
+ *     Return URLs are your url + /auth/oauth/apple/callback
+ * Make a key for the server
+ * Download the .p8
+ * Copy out the contents of the P8 (it's a regular text file)
+ * Set the credentials to:
+ *     appId: the App ID above
+ *     serviceId: the Service ID above
+ *     teamId: Your team identifier
+ *     keyId: Your key's ID
+ *     keyString: the contents of the P8 without the begin/end private key annotations
  */
-class OauthAppleEndpoints(
-    path: ServerPath,
-    jwtSigner: () -> JwtSigner,
-    landing: HttpEndpoint,
-    emailToId: suspend (String) -> String,
-) : OauthEndpoints(
-    path = path,
-    codeName = "apple",
-    jwtSigner = jwtSigner,
-    landing = landing,
-    emailToId = emailToId,
-) {
-    override val niceName = "Apple"
-    override val authUrl = "https://appleid.apple.com/auth/authorize"
-    override val getTokenUrl = "https://appleid.apple.com/auth/token"
-    override val scope = "email"
-    override val additionalParams = "&response_mode=form_post"
-    override suspend fun fetchEmail(response: OauthResponse): String {
-        val id = (response.id_token ?: throw BadRequestException("No id_token found in response"))
-        val decoded = Serialization.json.parseToJsonElement(
-            Base64.getUrlDecoder().decode(id.split('.')[1]).toString(Charsets.UTF_8)
-        ) as JsonObject
-        if (!decoded.get("email_verified")!!.jsonPrimitive.boolean)
-            throw BadRequestException("Apple has not verified the email address.")
-        return decoded.get("email")!!.jsonPrimitive.content
-    }
+class OauthAppleEndpoints<USER: Any, ID>(
+    val base: BaseAuthEndpoints<USER, ID>,
+    val access: UserExternalServiceAccess<USER, ID>,
+    val setting: ()->OauthAppleSettings,
+): ServerPathGroup(base.path.path("oauth/apple")) {
 
-    override fun secretTransform(secret: String): String {
-        val settings = settings() ?: throw NotFoundException("Oauth is not configured for Apple.")
-        return generateJwt(settings.id, settings.secret)
-    }
-
-    companion object {
-        fun generateJwt(id: String, secret: String): String {
-            val parts = secret.split('|')
-            val teamId = parts[0]
-            val keyId = parts[1]
-            val keyString = parts[2]
+    @Serializable data class OauthAppleSettings(
+        val appId: String,
+        val serviceId: String,
+        val teamId: String,
+        val keyId: String,
+        val keyString: String
+    ) {
+        fun generateJwt(): String {
             return buildString {
                 val withDefaults = Json { encodeDefaults = true; explicitNulls = false }
                 append(Base64.getUrlEncoder().withoutPadding().encodeToString(withDefaults.encodeToString(buildJsonObject {
@@ -74,7 +74,7 @@ class OauthAppleEndpoints(
                                 put("iat", issuedAt.toEpochMilli().div(1000))
                                 put("exp", issuedAt.plus(Duration.ofDays(5)).toEpochMilli().div(1000))
                                 put("aud", "https://appleid.apple.com")
-                                put("sub", id)
+                                put("sub", appId)
                             }
                         ).toByteArray()
                     )
@@ -87,4 +87,57 @@ class OauthAppleEndpoints(
             }
         }
     }
+
+    val niceName = "Apple"
+    val scope = "email"
+
+    val login = path.get("login").handler { request ->
+        val params = codeRequest().let { Serialization.properties.encodeToFormData(it) }
+        HttpResponse.redirectToGet("https://appleid.apple.com/auth/authorize?$params")
+    }
+
+    val callback: HttpEndpoint = path.post("callback").handler { request ->
+        val response = codeToToken("https://appleid.apple.com/auth/token", request.body!!.parse())
+        val id = (response.id_token ?: throw BadRequestException("No id_token found in response"))
+        val decoded = Serialization.json.parseToJsonElement(
+            Base64.getUrlDecoder().decode(id.split('.')[1]).toString(Charsets.UTF_8)
+        ) as JsonObject
+        if (!decoded.get("email_verified")!!.jsonPrimitive.boolean)
+            throw BadRequestException("Apple has not verified the email address.")
+        val email = decoded.get("email")!!.jsonPrimitive.content
+        val idResults = ExternalServiceLogin(
+            service = niceName,
+            username = null,
+            email = email,
+        )
+        base.redirectToLanding(access.byExternalService(idResults))
+    }
+
+    fun codeRequest(): OauthCodeRequest = OauthCodeRequest(
+        response_type = "code",
+        scope = scope,
+        redirect_uri = callback.path.fullUrl(),
+        client_id = setting().serviceId,
+        response_mode = "form_post"
+    )
+
+    suspend fun codeToToken(getTokenUrl: String, oauth: OauthCode): OauthResponse {
+        oauth.error?.let {
+            throw BadRequestException("Got error code '${it}' from $niceName.")
+        } ?: oauth.code?.let { code ->
+            return client.post(getTokenUrl) {
+                setBody(Serialization.properties.encodeToFormData(OauthTokenRequest(
+                    code = code,
+                    client_id = setting().appId,
+                    client_secret = setting().generateJwt(),
+                    redirect_uri = callback.path.fullUrl(),
+                    grant_type = "authorization_code",
+                )))
+                contentType(ContentType.Application.FormUrlEncoded)
+                accept(ContentType.Application.Json)
+            }.statusFailing().body<OauthResponse>()
+        }
+        throw BadRequestException("Code is empty")
+    }
+
 }
