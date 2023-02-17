@@ -1,6 +1,6 @@
 import { HasId, SessionRestEndpoint } from "sessionRest";
 export declare type WithAnnotations<T, A> = T & {
-    annotations: A;
+    _annotations: A;
 };
 /**
  * Annotates the data returned by an endpoint with additional data.

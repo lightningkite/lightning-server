@@ -2,7 +2,7 @@ import { Condition } from "Condition";
 import { Query } from "otherModels";
 import { HasId, SessionRestEndpoint } from "sessionRest";
 
-export type WithAnnotations<T, A> = T & { annotations: A };
+export type WithAnnotations<T, A> = T & { _annotations: A };
 
 /**
  * Annotates the data returned by an endpoint with additional data.
