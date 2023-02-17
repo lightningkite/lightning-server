@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.db.ModelAdminEndpoints
 import com.lightningkite.lightningserver.db.ModelInfoWithDefault
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
+import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.tasks.Task
@@ -73,6 +74,9 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
     )
     val rest = ModelRestEndpoints(path("rest"), info)
     val admin = ModelAdminEndpoints(path("admin"), info)
+    init {
+        path.docName = path.toString().replace("/", "_")
+    }
 
     // Kick it off
     suspend fun <OURDATA> start(request: REQUEST, ourData: OURDATA, action: ResultAction<OURDATA, RESULT>): RESPONSE {
