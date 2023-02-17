@@ -23,3 +23,27 @@ export declare class HasPhoneNumberFields {
     static INSTANCE: HasPhoneNumberFields;
     phoneNumber<T extends HasPhoneNumber>(): TProperty1<T, string>;
 }
+export interface HasMaybeEmail {
+    readonly email: (string | null);
+}
+export declare class HasMaybeEmailFields {
+    private constructor();
+    static INSTANCE: HasMaybeEmailFields;
+    email<T extends HasMaybeEmail>(): TProperty1<T, (string | null)>;
+}
+export interface HasMaybePhoneNumber {
+    readonly phoneNumber: (string | null);
+}
+export declare class HasMaybePhoneNumberFields {
+    private constructor();
+    static INSTANCE: HasMaybePhoneNumberFields;
+    phoneNumber<T extends HasMaybePhoneNumber>(): TProperty1<T, (string | null)>;
+}
+export interface HasPassword {
+    readonly hashedPassword: string;
+}
+export declare class HasPasswordFields {
+    private constructor();
+    static INSTANCE: HasPasswordFields;
+    hashedPassword<T extends HasPassword>(): TProperty1<T, string>;
+}

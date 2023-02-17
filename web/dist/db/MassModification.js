@@ -12,7 +12,9 @@ class MassModification {
         this.condition = condition;
         this.modification = modification;
     }
-    static propertyTypes(T) { return { condition: [Condition_1.Condition, T], modification: [Modification_1.Modification, T] }; }
+    static propertyTypes(T) {
+        return { condition: [Condition_1.Condition, T], modification: [Modification_1.Modification, T] };
+    }
 }
 exports.MassModification = MassModification;
 MassModification.properties = ["condition", "modification"];

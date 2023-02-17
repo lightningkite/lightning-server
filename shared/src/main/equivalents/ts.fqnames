@@ -2,14 +2,15 @@
 com.lightningkite.lightningdb.ObserveModelApi
 com.lightningkite.lightningdb.live.multiplexedSocketRaw
 com.lightningkite.lightningdb.any>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.any.K, kotlin.collections.Listcom.lightningkite.lightningdb.any.T
-com.lightningkite.lightningdb.mapIf>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.mapIf.K, kotlin.collections.Listcom.lightningkite.lightningdb.mapIf.T
 com.lightningkite.lightningdb.Condition
+com.lightningkite.lightningdb.mapIf>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.mapIf.K, kotlin.collections.Listcom.lightningkite.lightningdb.mapIf.T
 com.lightningkite.lightningserver.files._id
 com.lightningkite.lightningdb.apply
 com.lightningkite.lightningdb.addAll
-com.lightningkite.lightningdb.ne>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.ne.K, com.lightningkite.lightningdb.ne.T
 com.lightningkite.lightningdb.Aggregator
+com.lightningkite.lightningdb.ne>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.ne.K, com.lightningkite.lightningdb.ne.T
 com.lightningkite.lightningdb.MultiplexMessage
+com.lightningkite.lightningserver.auth.PasswordLogin
 com.lightningkite.lightningdb.notNull
 com.lightningkite.lightningdb.mock.MockFullReadModelApi
 com.lightningkite.lightningdb.nin>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.nin.K, com.lightningkite.lightningdb.nin.T
@@ -20,9 +21,10 @@ com.lightningkite.lightningdb.always>com.lightningkite.lightningdb.PropChaincom.
 com.lightningkite.lightningdb.anyClear>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.anyClear.K, kotlin.Int
 com.lightningkite.lightningdb.sizesEquals>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.sizesEquals.K, kotlin.collections.Setcom.lightningkite.lightningdb.sizesEquals.T
 com.lightningkite.lightningdb.apply>kotlin.collections.Listcom.lightningkite.lightningdb.apply.T
+com.lightningkite.lightningdb.HasMaybeEmailFields
 com.lightningkite.lightningdb.HasPhoneNumber
-com.lightningkite.lightningdb.live.multiplexedSocket
 com.lightningkite.lightningdb.sizesEquals>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.sizesEquals.K, kotlin.collections.Listcom.lightningkite.lightningdb.sizesEquals.T
+com.lightningkite.lightningdb.live.multiplexedSocket
 com.lightningkite.lightningserver.auth.PhonePinLogin
 com.lightningkite.lightningdb.SignalData
 com.lightningkite.lightningserver.files.UploadInformation
@@ -35,6 +37,7 @@ com.lightningkite.lightningdb.live._overrideWebSocketProvider
 com.lightningkite.lightningdb.modifyByKey
 com.lightningkite.lightningdb.AverageAggregator
 com.lightningkite.lightningdb.map>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.map.K, kotlin.collections.Setcom.lightningkite.lightningdb.map.T
+com.lightningkite.lightningdb.HasMaybePhoneNumberFields
 com.lightningkite.lightningdb.all>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.all.K, kotlin.collections.Listcom.lightningkite.lightningdb.all.T
 com.lightningkite.lightningdb.addAll>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.addAll.K, kotlin.collections.Listcom.lightningkite.lightningdb.addAll.T
 com.lightningkite.lightningdb.neq
@@ -57,6 +60,7 @@ com.lightningkite.lightningserver.files.prepareUploadForNextRequestFields
 com.lightningkite.lightningdb.CompleteModelApi
 com.lightningkite.lightningdb.SortPart
 com.lightningkite.lightningdb.dropLast
+com.lightningkite.lightningdb.HasMaybePhoneNumber
 com.lightningkite.lightningdb.gt
 com.lightningkite.lightningdb.condition>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.condition.K, com.lightningkite.lightningdb.condition.T
 com.lightningkite.lightningdb.gt>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.gt.K, com.lightningkite.lightningdb.gt.T
@@ -71,9 +75,10 @@ com.lightningkite.lightningdb.MassModification
 com.lightningkite.lightningdb.GroupCountQuery
 com.lightningkite.lightningserver.files.expires>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningserver.files.expires.K, com.lightningkite.lightningserver.files.UploadForNextRequest
 com.lightningkite.lightningdb.get
+com.lightningkite.lightningdb.HasPasswordFields
 com.lightningkite.lightningdb.containsKey
-com.lightningkite.lightningdb.EntryChange
 com.lightningkite.lightningdb.modifyByKey>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.modifyByKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.modifyByKey.T
+com.lightningkite.lightningdb.EntryChange
 com.lightningkite.lightningdb.get>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.get.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.get.T
 com.lightningkite.lightningdb.mock.MockCompleteModelApi
 com.lightningkite.lightningdb.map
@@ -87,12 +92,12 @@ com.lightningkite.lightningdb.anyClear
 com.lightningkite.lightningdb.fullTextSearch>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.fullTextSearch.K, com.lightningkite.lightningdb.fullTextSearch.V
 com.lightningkite.lightningdb.any
 com.lightningkite.lightningdb.StandardDeviationPopulationAggregator
-com.lightningkite.lightningdb.live.LiveReadModelApi
 com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.plus.K, kotlin.String
+com.lightningkite.lightningdb.live.LiveReadModelApi
 com.lightningkite.lightningdb.contains>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.contains.K, kotlin.String
 com.lightningkite.lightningdb.ReadModelApi
-com.lightningkite.lightningdb.live.WebSocketIsh
 com.lightningkite.lightningdb.SumAggregator
+com.lightningkite.lightningdb.live.WebSocketIsh
 com.lightningkite.lightningserver.files.expires
 com.lightningkite.lightningdb.inside
 com.lightningkite.lightningdb.allClear>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.allClear.K, kotlin.Int
@@ -119,30 +124,32 @@ com.lightningkite.lightningdb.gte
 com.lightningkite.lightningdb.dropLast>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.dropLast.K, kotlin.collections.Setcom.lightningkite.lightningdb.dropLast.T
 com.lightningkite.lightningdb.aggregator>com.lightningkite.lightningdb.Aggregate
 com.lightningkite.lightningdb.assign>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.assign.K, com.lightningkite.lightningdb.assign.T
-com.lightningkite.lightningdb.live.LiveCompleteModelApi
 com.lightningkite.lightningdb.map>com.lightningkite.lightningdb.EntryChangecom.lightningkite.lightningdb.map.T
+com.lightningkite.lightningdb.live.LiveCompleteModelApi
 com.lightningkite.lightningdb.aggregate
 com.lightningkite.lightningdb.sizesEquals
 com.lightningkite.lightningdb.comparator
 com.lightningkite.lightningdb.contains
-com.lightningkite.lightningdb.anySet>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.anySet.K, kotlin.Int
 com.lightningkite.lightningdb.aggregate>kotlin.sequences.Sequencekotlin.Double
+com.lightningkite.lightningdb.anySet>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.anySet.K, kotlin.Int
 com.lightningkite.lightningdb.live.LiveFullReadModelApi
 com.lightningkite.lightningserver.serverhealth.ServerHealth
-com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.plus.K, kotlin.collections.Setcom.lightningkite.lightningdb.plus.T
 com.lightningkite.lightningdb.StandardDeviationSampleAggregator
+com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.plus.K, kotlin.collections.Setcom.lightningkite.lightningdb.plus.T
 com.lightningkite.lightningdb.mock.MockTable
 com.lightningkite.lightningdb.notIn
 com.lightningkite.lightningdb.never>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.never.K, com.lightningkite.lightningdb.never.K
 com.lightningkite.lightningdb.mock.MockReadModelApi
+com.lightningkite.lightningserver.LSError
 com.lightningkite.lightningdb.allSet
 com.lightningkite.lightningdb.removeKeys
 com.lightningkite.lightningdb.containsKey>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.containsKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.containsKey.T
 com.lightningkite.lightningdb.neq>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.neq.K, com.lightningkite.lightningdb.neq.T
 com.lightningkite.lightningdb.comparator>kotlin.collections.Listcom.lightningkite.lightningdb.SortPartcom.lightningkite.lightningdb.comparator.T
 com.lightningkite.lightningdb.HasId
-com.lightningkite.lightningdb.live.LiveWriteModelApi
 com.lightningkite.lightningdb.HasIdFields
+com.lightningkite.lightningdb.HasPassword
+com.lightningkite.lightningdb.live.LiveWriteModelApi
 com.lightningkite.lightningdb.coerceAtLeast
 com.lightningkite.lightningdb.map>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.map.K, kotlin.collections.Listcom.lightningkite.lightningdb.map.T
 com.lightningkite.lightningdb.always
@@ -157,6 +164,7 @@ com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.PropChaincom.li
 com.lightningkite.lightningdb.Aggregate
 com.lightningkite.lightningdb.coerceAtLeast>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.coerceAtLeast.K, com.lightningkite.lightningdb.coerceAtLeast.T
 com.lightningkite.lightningdb.coerceAtMost>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.coerceAtMost.K, com.lightningkite.lightningdb.coerceAtMost.T
+com.lightningkite.lightningdb.HasMaybeEmail
 com.lightningkite.lightningdb.lte
 com.lightningkite.lightningdb.HasEmail
 com.lightningkite.lightningdb.inside>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.inside.K, com.lightningkite.lightningdb.inside.T

@@ -24,3 +24,16 @@ export declare class PhonePinLogin {
     equals: (other: any) => boolean;
     hashCode: () => number;
 }
+export declare class PasswordLogin {
+    readonly username: string;
+    readonly password: string;
+    constructor(username: string, password: string);
+    static properties: string[];
+    static propertyTypes(): {
+        username: StringConstructor[];
+        password: StringConstructor[];
+    };
+    copy: (values: Partial<PasswordLogin>) => this;
+    equals: (other: any) => boolean;
+    hashCode: () => number;
+}

@@ -121,58 +121,58 @@ public final class ServerHealth : CustomStringConvertible, Hashable, Codable {
     
     
     public final class Memory : CustomStringConvertible, Hashable, Codable {
-        public var maxMem: Int
-        public var totalMemory: Int
-        public var freeMemory: Int
+        public var max: Int
+        public var total: Int
+        public var free: Int
         public var systemAllocated: Int
-        public var memUsagePercent: Float
-        public init(maxMem: Int, totalMemory: Int, freeMemory: Int, systemAllocated: Int, memUsagePercent: Float) {
-            self.maxMem = maxMem
-            self.totalMemory = totalMemory
-            self.freeMemory = freeMemory
+        public var usage: Float
+        public init(max: Int, total: Int, free: Int, systemAllocated: Int, usage: Float) {
+            self.max = max
+            self.total = total
+            self.free = free
             self.systemAllocated = systemAllocated
-            self.memUsagePercent = memUsagePercent
+            self.usage = usage
             //Necessary properties should be initialized now
         }
         convenience required public init(from decoder: Decoder) throws {
             let values = try decoder.container(keyedBy: CodingKeys.self)
             self.init(
-                maxMem: try values.decode(Int.self, forKey: .maxMem),
-                totalMemory: try values.decode(Int.self, forKey: .totalMemory),
-                freeMemory: try values.decode(Int.self, forKey: .freeMemory),
+                max: try values.decode(Int.self, forKey: .max),
+                total: try values.decode(Int.self, forKey: .total),
+                free: try values.decode(Int.self, forKey: .free),
                 systemAllocated: try values.decode(Int.self, forKey: .systemAllocated),
-                memUsagePercent: try values.decode(Float.self, forKey: .memUsagePercent)
+                usage: try values.decode(Float.self, forKey: .usage)
             )
         }
         
         enum CodingKeys: String, CodingKey {
-            case maxMem = "maxMem"
-            case totalMemory = "totalMemory"
-            case freeMemory = "freeMemory"
+            case max = "max"
+            case total = "total"
+            case free = "free"
             case systemAllocated = "systemAllocated"
-            case memUsagePercent = "memUsagePercent"
+            case usage = "usage"
         }
         
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(self.maxMem, forKey: .maxMem)
-            try container.encode(self.totalMemory, forKey: .totalMemory)
-            try container.encode(self.freeMemory, forKey: .freeMemory)
+            try container.encode(self.max, forKey: .max)
+            try container.encode(self.total, forKey: .total)
+            try container.encode(self.free, forKey: .free)
             try container.encode(self.systemAllocated, forKey: .systemAllocated)
-            try container.encode(self.memUsagePercent, forKey: .memUsagePercent)
+            try container.encode(self.usage, forKey: .usage)
         }
         
         public func hash(into hasher: inout Hasher) {
-            hasher.combine(maxMem)
-            hasher.combine(totalMemory)
-            hasher.combine(freeMemory)
+            hasher.combine(max)
+            hasher.combine(total)
+            hasher.combine(free)
             hasher.combine(systemAllocated)
-            hasher.combine(memUsagePercent)
+            hasher.combine(usage)
             
         }
-        public static func == (lhs: Memory, rhs: Memory) -> Bool { return lhs.maxMem == rhs.maxMem && lhs.totalMemory == rhs.totalMemory && lhs.freeMemory == rhs.freeMemory && lhs.systemAllocated == rhs.systemAllocated && lhs.memUsagePercent == rhs.memUsagePercent }
-        public var description: String { return "Memory(maxMem=\(String(kotlin: self.maxMem)), totalMemory=\(String(kotlin: self.totalMemory)), freeMemory=\(String(kotlin: self.freeMemory)), systemAllocated=\(String(kotlin: self.systemAllocated)), memUsagePercent=\(String(kotlin: self.memUsagePercent)))" }
-        public func copy(maxMem: Int? = nil, totalMemory: Int? = nil, freeMemory: Int? = nil, systemAllocated: Int? = nil, memUsagePercent: Float? = nil) -> Memory { return Memory(maxMem: maxMem ?? self.maxMem, totalMemory: totalMemory ?? self.totalMemory, freeMemory: freeMemory ?? self.freeMemory, systemAllocated: systemAllocated ?? self.systemAllocated, memUsagePercent: memUsagePercent ?? self.memUsagePercent) }
+        public static func == (lhs: Memory, rhs: Memory) -> Bool { return lhs.max == rhs.max && lhs.total == rhs.total && lhs.free == rhs.free && lhs.systemAllocated == rhs.systemAllocated && lhs.usage == rhs.usage }
+        public var description: String { return "Memory(max=\(String(kotlin: self.max)), total=\(String(kotlin: self.total)), free=\(String(kotlin: self.free)), systemAllocated=\(String(kotlin: self.systemAllocated)), usage=\(String(kotlin: self.usage)))" }
+        public func copy(max: Int? = nil, total: Int? = nil, free: Int? = nil, systemAllocated: Int? = nil, usage: Float? = nil) -> Memory { return Memory(max: max ?? self.max, total: total ?? self.total, free: free ?? self.free, systemAllocated: systemAllocated ?? self.systemAllocated, usage: usage ?? self.usage) }
         
     }
 }
