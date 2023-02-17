@@ -8,9 +8,10 @@ import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.*
 import java.io.File
 import java.io.RandomAccessFile
+import java.time.Duration
 
 
-class LocalFileSystem(rootFile: File, val serveDirectory: String, val signer: JwtSigner) : FileSystem {
+class LocalFileSystem(rootFile: File, val serveDirectory: String, val signedUrlExpiration: Duration?,  val signer: JwtSigner) : FileSystem {
     val rootFile: File = rootFile.absoluteFile
     override val root: FileObject = LocalFile(this, rootFile)
 
@@ -19,13 +20,15 @@ class LocalFileSystem(rootFile: File, val serveDirectory: String, val signer: Jw
     }
 
     val fetch = ServerPath("$serveDirectory/{...}").get.handler {
-        val location = signer.verify(
-            it.queryParameter("token") ?: throw BadRequestException("No token provided")
-        ).removePrefix("/")
-        if (it.wildcard == null) throw BadRequestException("No file to look up")
-        val wildcard = it.wildcard.removePrefix("/")
-        if (location != wildcard) throw BadRequestException("Token does not match file - token had ${location}, path had ${it.wildcard}")
+        val wildcard = it.wildcard?.removePrefix("/") ?: throw BadRequestException("No file to look up")
         if (wildcard.contains("..")) throw IllegalStateException()
+
+        signedUrlExpiration?.let{ duration ->
+            val location = signer.verify(
+                it.queryParameter("token") ?: throw BadRequestException("No token provided")
+            ).removePrefix("/")
+            if (location != wildcard) throw BadRequestException("Token does not match file - token had ${location}, path had ${it.wildcard}")
+        }
         val file = rootFile.resolve(wildcard)
         if (!file.exists()) throw NotFoundException("No file ${wildcard} found")
         val fileObject = LocalFile(this, file)

@@ -31,6 +31,7 @@ data class FilesSettings(
                 LocalFileSystem(
                     rootFile = root,
                     serveDirectory = it.storageUrl.substringAfter('|', "").takeUnless { it.isEmpty() } ?: "uploaded-files",
+                    signedUrlExpiration = it.signedUrlExpiration,
                     signer = it.jwtSigner
                 )
             }

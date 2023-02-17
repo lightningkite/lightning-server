@@ -58,7 +58,9 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
 
     override fun checkSignature(queryParams: String): Boolean {
         return try {
-            system.signer.verify(queryParams.substringAfter('=')) == file.absoluteFile.relativeTo(system.rootFile).unixPath
+            system.signedUrlExpiration?.let{
+                system.signer.verify(queryParams.substringAfter('=')) == file.absoluteFile.relativeTo(system.rootFile).unixPath
+            } ?: true
         } catch (e: Exception) {
             false
         }
@@ -69,7 +71,7 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
             system.rootFile
         ).unixPath
 
-    override val signedUrl: String get() = url + "?token=" + system.signer.token(file.absoluteFile.relativeTo(system.rootFile).unixPath)
+    override val signedUrl: String get() = url + (system.signedUrlExpiration?.let{expiration -> "?token=" + system.signer.token(file.absoluteFile.relativeTo(system.rootFile).unixPath, expiration) } ?: "")
 
     override fun uploadUrl(timeout: Duration): String =
         url + "?token=" + system.signer.token("W|" + file.absoluteFile.relativeTo(system.rootFile).unixPath, timeout)
