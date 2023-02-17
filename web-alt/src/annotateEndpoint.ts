@@ -4,6 +4,11 @@ import { HasId, SessionRestEndpoint } from "sessionRest";
 
 export type WithAnnotations<T, A> = T & { _annotations: A };
 
+export type AnnotateEndpointReturn<T extends HasId, Annotation> = Pick<
+  SessionRestEndpoint<WithAnnotations<T, Annotation>>,
+  "query" | "detail" | "bulkDelete" | "delete" | "count"
+>;
+
 /**
  * Annotates the data returned by an endpoint with additional data.
  *
@@ -16,10 +21,7 @@ export function annotateEndpoint<T extends HasId, Annotation>(
   addAnnotations: (
     originalItems: T[]
   ) => Promise<WithAnnotations<T, Annotation>[]>
-): Pick<
-  SessionRestEndpoint<WithAnnotations<T, Annotation>>,
-  "query" | "detail" | "bulkDelete" | "delete" | "count"
-> {
+): AnnotateEndpointReturn<T, Annotation> {
   return {
     async query(
       input: Query<WithAnnotations<T, Annotation>>
