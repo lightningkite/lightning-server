@@ -59,6 +59,7 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                         li { a(href = "sdk.ts") { +"Typescript SDK" }}
                         li { a(href = "sdk.zip") { +"Kotlin SDK" }}
                         li { a(href = "sdk.dart") { +"Dart SDK" }}
+                        li { a(href = "#types") { +"Types" }}
                     }
                 }
                 h2 { +"Endpoints" }
@@ -104,7 +105,57 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                     }
                 }
 
-                h2 { +"Types" }
+                h2 {
+                    id = "types"
+                    +"Types"
+                }
+
+                h3 { +"Types stored directly in the database" }
+
+                ul {
+                    Documentable.usedTypes
+                        .sortedBy { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') }
+                        .forEach { serializer ->
+                            val desc = serializer.descriptor
+                            when (desc.kind) {
+                                StructureKind.CLASS -> {
+                                    if(desc.elementNames.none { it == "_id" }) return@forEach
+                                    val baseName = desc.serialName.substringBefore('<').substringAfterLast('.')
+                                    li { a(href = "#$baseName") { +baseName }}
+                                }
+                                else -> {}
+                            }
+                        }
+                }
+
+                h3 { +"Index" }
+
+                ul {
+                    Documentable.usedTypes
+                        .sortedBy { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') }
+                        .forEach { serializer ->
+                            val desc = serializer.descriptor
+                            when (desc.kind) {
+                                StructureKind.CLASS,
+                                SerialKind.ENUM,
+                                PrimitiveKind.BOOLEAN ,
+                                PrimitiveKind.STRING,
+                                PrimitiveKind.BYTE,
+                                PrimitiveKind.CHAR,
+                                PrimitiveKind.SHORT,
+                                PrimitiveKind.INT,
+                                PrimitiveKind.LONG,
+                                PrimitiveKind.FLOAT,
+                                PrimitiveKind.DOUBLE,
+                                StructureKind.LIST,
+                                StructureKind.MAP -> {
+                                    val baseName = desc.serialName.substringBefore('<').substringAfterLast('.')
+                                    li { a(href = "#$baseName") { +baseName }}
+                                }
+                                else -> {}
+                            }
+                        }
+                }
 
                 Documentable.usedTypes
                     .sortedBy { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') }

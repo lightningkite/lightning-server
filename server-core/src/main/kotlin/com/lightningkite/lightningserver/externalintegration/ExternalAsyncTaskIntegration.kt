@@ -72,10 +72,14 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
                 )
         }
     )
-    val rest = ModelRestEndpoints(path("rest"), info)
-    val admin = ModelAdminEndpoints(path("admin"), info)
     init {
         path.docName = path.toString().replace("/", "_")
+    }
+    val rest = ModelRestEndpoints(path("rest"), info).apply {
+        path.docName = this@ExternalAsyncTaskIntegration.path.docName
+    }
+    val admin = ModelAdminEndpoints(path("admin"), info).apply {
+        path.docName = this@ExternalAsyncTaskIntegration.path.docName
     }
 
     // Kick it off
