@@ -79,10 +79,10 @@ open class EmailAuthEndpoints<USER : Any, ID>(
             base.token(emailAccess.byEmail(email))
         }
     )
-    val oauthGoogleSettings = setting<OauthProviderCredentials?>("oauth_google", null)
-    val oauthGithubSettings = setting<OauthProviderCredentials?>("oauth_github", null)
-    val oauthAppleSettings = setting<OauthAppleEndpoints.OauthAppleSettings?>("oauth_apple", null)
-    val oauthMicrosoftSettings = setting<OauthProviderCredentials?>("oauth_microsoft", null)
+    val oauthGoogleSettings = setting<OauthProviderCredentials?>("oauth_google", null, optional = true)
+    val oauthGithubSettings = setting<OauthProviderCredentials?>("oauth_github", null, optional = true)
+    val oauthAppleSettings = setting<OauthAppleEndpoints.OauthAppleSettings?>("oauth_apple", null, optional = true)
+    val oauthMicrosoftSettings = setting<OauthProviderCredentials?>("oauth_microsoft", null, optional = true)
 
     private val oauthGoogle: OauthGoogleEndpoints<USER, ID>? by lazy {
         oauthGoogleSettings()?.let { OauthGoogleEndpoints(base, emailAccess.asExternal(), { it }) }

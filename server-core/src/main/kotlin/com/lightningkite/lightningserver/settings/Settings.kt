@@ -21,7 +21,7 @@ object Settings {
         sealed = true
         values.putAll(map.mapValues { Box(it.value) })
         val missing = requirements.keys - values.keys
-        if(missing.isNotEmpty()) {
+        if(requirements.filter { it.key in missing }.any { !it.value.optional }) {
             throw IllegalStateException("Settings for ${missing.joinToString()} are missing.")
         }
         if(!lazyLoadResources)
@@ -48,10 +48,10 @@ object Settings {
         populate(missing.associateWith { requirements[it]!!.default })
     }
 
-    data class Requirement<Serializable, Goal>(val name: String, val serializer: KSerializer<Serializable>, val default: Serializable, val getter: (Serializable)->Goal): ()->Goal {
+    data class Requirement<Serializable, Goal>(val name: String, val serializer: KSerializer<Serializable>, val default: Serializable, val optional: Boolean, val getter: (Serializable)->Goal): ()->Goal {
         val value by lazy<Goal> {
             @Suppress("UNCHECKED_CAST")
-            getter(values[name]!!.item as Serializable)
+            getter(values[name]?.item as? Serializable ?: default)
         }
         override fun invoke(): Goal = value
     }
@@ -61,20 +61,20 @@ object Settings {
     }
 }
 
-inline fun <reified Goal> setting(name: String, default: Goal): Settings.Requirement<Goal, Goal> {
+inline fun <reified Goal> setting(name: String, default: Goal, optional: Boolean = false): Settings.Requirement<Goal, Goal> {
     @Suppress("UNCHECKED_CAST")
     if(Settings.requirements.containsKey(name)) return Settings.requirements[name] as Settings.Requirement<Goal, Goal>
     if(Settings.sealed) throw Error("Settings have already been set; you cannot add more requirements now.  Attempted to add '$name'")
-    val req = Settings.Requirement(name, Serialization.module.serializer(), default) { it }
+    val req = Settings.Requirement(name, Serialization.module.serializer(), default, optional) { it }
     Settings.requirements[name] = req
     return req
 }
 
-inline fun <reified Serializable: ()->Goal, Goal> setting(name: String, default: Serializable): Settings.Requirement<Serializable, Goal> {
+inline fun <reified Serializable: ()->Goal, Goal> setting(name: String, default: Serializable, optional: Boolean = false): Settings.Requirement<Serializable, Goal> {
     @Suppress("UNCHECKED_CAST")
     if(Settings.requirements.containsKey(name)) return Settings.requirements[name] as Settings.Requirement<Serializable, Goal>
     if(Settings.sealed) throw Error("Settings have already been set; you cannot add more requirements now.  Attempted to add '$name'")
-    val req = Settings.Requirement(name, Serialization.module.serializer(), default) { it() }
+    val req = Settings.Requirement(name, Serialization.module.serializer(), default, optional) { it() }
     Settings.requirements[name] = req
     return req
 }
