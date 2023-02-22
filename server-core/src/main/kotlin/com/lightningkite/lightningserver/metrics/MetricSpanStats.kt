@@ -39,12 +39,10 @@ operator fun MetricSpanStats.plus(other: MetricSpanStats): MetricSpanStats {
 
 fun MetricSpanStats.asModification(): Modification<MetricSpanStats> {
     return modification {
-        Modification.Chain(listOf(
-            it.min coerceAtMost this.min,
-            it.max coerceAtLeast this.max,
-            it.sum + this.sum,
-            it.count + this.count
-        ))
+        it.min coerceAtMost this@asModification.min
+        it.max coerceAtLeast this@asModification.max
+        it.sum + this@asModification.sum
+        it.count + this@asModification.count
     }
 }
 

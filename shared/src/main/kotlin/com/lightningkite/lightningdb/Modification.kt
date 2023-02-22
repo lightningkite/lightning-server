@@ -14,6 +14,7 @@ open class Modification<T: IsCodableAndHashable> protected constructor()  {
     open operator fun invoke(on: T): T { fatalError() }
     open fun invokeDefault(): T { fatalError() }
 
+    @Deprecated("Use the modification {} builder instead")
     infix fun then(other: Modification<T>): Modification.Chain<T> = Modification.Chain(listOf(this, other))
 
     @Serializable(ModificationChainSerializer::class)

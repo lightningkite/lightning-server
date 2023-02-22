@@ -2,6 +2,7 @@ package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.JwtSigner
+import com.lightningkite.lightningserver.auth.OauthAppleEndpoints
 import com.lightningkite.lightningserver.auth.OauthProviderCredentials
 import com.lightningkite.lightningserver.cache.CacheInterface
 import com.lightningkite.lightningserver.cache.CacheSettings
@@ -132,8 +133,9 @@ object TestSettings {
     val cache = setting("cache", CacheSettings())
     val files = setting("files", FilesSettings())
     val oauthGoogle = setting<OauthProviderCredentials?>("oauth_google", null)
-    val oauthApple = setting<OauthProviderCredentials?>("oauth_apple", null)
+    val oauthApple = setting<OauthAppleEndpoints.OauthAppleSettings?>("oauth_apple", null)
     val oauthGithub = setting<OauthProviderCredentials?>("oauth_github", null)
+    val oauthMicrosoft = setting<OauthProviderCredentials?>("oauth_microsoft", null)
 
     init {
         Settings.populateDefaults(mapOf(
