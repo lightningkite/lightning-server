@@ -50,6 +50,9 @@ open class BaseAuthEndpoints<USER : Any, ID>(
 
     fun token(user: USER, expireDuration: Duration = jwtSigner().expiration): String = typedHandler.token(user, expireDuration)
 
+    fun redirectToLanding(token: String): HttpResponse = HttpResponse.redirectToGet(landingRoute.path.toString() + "?jwt=${token}")
+    fun redirectToLanding(user: USER): HttpResponse = HttpResponse.redirectToGet(landingRoute.path.toString() + "?jwt=${token(user, Duration.ofMinutes(5))}")
+
     val landingRoute: HttpEndpoint = path("login-landing").get.handler {
         val subject = jwtSigner().verify(it.queryParameter("jwt")!!)
         it.handleToken(jwtSigner().token(subject))

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import kotlinx.serialization.KSerializer
 
@@ -21,4 +22,12 @@ interface UserPhoneAccess<USER: Any, ID>: UserAccess<USER, ID> {
 interface UserPasswordAccess<USER: Any, ID>: UserAccess<USER, ID> {
     suspend fun byUsername(username: String, password: String): USER
     fun hashedPassword(user: USER): String
+}
+interface UserExternalServiceAccess<USER: Any, ID>: UserAccess<USER, ID> {
+    suspend fun byExternalService(oauth: ExternalServiceLogin): USER
+}
+fun <USER: Any, ID> UserEmailAccess<USER, ID>.asExternal(): UserExternalServiceAccess<USER, ID> = object: UserExternalServiceAccess<USER, ID>, UserAccess<USER, ID> by this {
+    override suspend fun byExternalService(oauth: ExternalServiceLogin): USER {
+        return this@asExternal.byEmail(oauth.email ?: throw BadRequestException("No verified email found in external service"))
+    }
 }

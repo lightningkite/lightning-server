@@ -31,36 +31,28 @@ data class UpdateRestrictions<T>(
         val fields: ArrayList<Triple<Modification<T>, Condition<T>, Condition<T>>> = ArrayList()
     ) {
         val it = startChain<T>()
+        @Suppress("UNCHECKED_CAST")
         fun PropChain<T, *>.cannotBeModified() {
             fields.add(Triple(
-                this.let {
-                    @Suppress("UNCHECKED_CAST")
-                    it as PropChain<T, Any?>
-                }.assign(null), Condition.Never(), Condition.Always()
+                modification { (this@cannotBeModified as PropChain<T, Any?>).assign(null) }, Condition.Never(), Condition.Always()
             ))
         }
+        @Suppress("UNCHECKED_CAST")
         infix fun PropChain<T, *>.requires(condition: Condition<T>) {
             fields.add(Triple(
-                this.let {
-                    @Suppress("UNCHECKED_CAST")
-                    it as PropChain<T, Any?>
-                }.assign(null), condition, Condition.Always()
+                modification { (this@requires as PropChain<T, Any?>).assign(null) }, condition, Condition.Always()
             ))
         }
+        @Suppress("UNCHECKED_CAST")
         fun <V> PropChain<T, V>.restrict(requires: Condition<T>, valueMust: (PropChain<V, V>)->Condition<V>) {
             fields.add(Triple(
-                this.let {
-                    @Suppress("UNCHECKED_CAST")
-                    it as PropChain<T, Any?>
-                }.assign(null), requires, this.condition(valueMust)
+                modification { (this@restrict as PropChain<T, Any?>).assign(null) }, requires, this.condition(valueMust)
             ))
         }
+        @Suppress("UNCHECKED_CAST")
         fun <V> PropChain<T, V>.mustBe(valueMust: (PropChain<V, V>)->Condition<V>) {
             fields.add(Triple(
-                this.let {
-                    @Suppress("UNCHECKED_CAST")
-                    it as PropChain<T, Any?>
-                }.assign(null), Condition.Always(), this.condition(valueMust)
+                modification { (this@mustBe as PropChain<T, Any?>).assign(null) }, Condition.Always(), this.condition(valueMust)
             ))
         }
         fun build() = UpdateRestrictions(fields)

@@ -54,14 +54,17 @@ suspend fun doOnce(name: String, database: ()-> Database, maxDuration: Long = 60
         action()
         a.updateOneById(
             name,
-            modification { (it.completed assign Instant.now()) then (it.errorMessage assign null)}
+            modification {
+                it.completed assign Instant.now()
+                it.errorMessage assign null
+            }
         )
     } catch(e: Exception) {
         a.updateOneById(
             name,
             modification {
-                (it.errorMessage assign e.message) then
-                    (it.started assign null)
+                (it.errorMessage assign e.message)
+                (it.started assign null)
             }
         )
     }

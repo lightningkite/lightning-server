@@ -22,11 +22,11 @@ import kotlin.reflect.KType
 
 fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     val safeDocumentables = endpoints.filter { it.inputType == Unit.serializer() || it.route.method != HttpMethod.GET }.toList()
-    appendLine("import { ${skipSet.joinToString()}, apiCall, Path } from '@lightningkite/lightning-server-simplified'")
+    appendLine("import { ${fromLightningServerPackage.joinToString()}, apiCall, Path } from '@lightningkite/lightning-server-simplified'")
     appendLine()
     usedTypes
-        .sortedBy { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') }
-        .filter { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') !in skipSet }
+        .sortedBy { it.descriptor.simpleSerialName }
+        .filter { it.descriptor.simpleSerialName !in skipSet }
         .forEach {
             when(it.descriptor.kind) {
                 is StructureKind.CLASS -> {
@@ -56,6 +56,11 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
                         appendLine()
                     }
                     appendLine("}")
+                }
+                is PrimitiveKind.STRING -> {
+                    if(it.descriptor.simpleSerialName != "String") {
+                        appendLine("type ${it.descriptor.simpleSerialName} = string  // ${it.descriptor.serialName}")
+                    }
                 }
                 else -> {}
             }
@@ -178,7 +183,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     appendLine()
 }
 
-private val skipSet = setOf(
+private val fromLightningServerPackage = setOf(
     "Query",
     "MassModification",
     "EntryChange",
@@ -189,6 +194,10 @@ private val skipSet = setOf(
     "AggregateQuery",
     "GroupAggregateQuery",
     "Aggregate",
+)
+private val skipSet = fromLightningServerPackage + setOf(
+    "SortPart",
+    "KProperty1Partial",
 )
 private fun String.groupToInterfaceName(): String = replaceFirstChar { it.uppercase() } + "Api"
 private fun String.groupToPartName(): String = replaceFirstChar { it.lowercase() }
@@ -284,7 +293,14 @@ private fun KSerializer<*>.write(): String = if(this == Unit.serializer()) "void
         PrimitiveKind.FLOAT,
         PrimitiveKind.DOUBLE -> out.append("number")
         PrimitiveKind.CHAR,
-        PrimitiveKind.STRING -> out.append("string")
+        PrimitiveKind.STRING -> {
+            val cleanName = this.descriptor.simpleSerialName
+            if(cleanName != "String") {
+                out.append(cleanName)
+            } else {
+                out.append("string")
+            }
+        }
         StructureKind.LIST -> {
             out.append("Array<${this.listElement()!!.write()}>")
         }
@@ -301,7 +317,7 @@ private fun KSerializer<*>.write(): String = if(this == Unit.serializer()) "void
         StructureKind.OBJECT,
         SerialKind.ENUM,
         StructureKind.CLASS -> {
-            out.append(descriptor.serialName.substringBefore('<').substringAfterLast('.').removeSuffix("?"))
+            out.append(descriptor.simpleSerialName)
             this.subSerializers().takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.write() }?.let {
                 out.append(it)
             }
@@ -310,4 +326,5 @@ private fun KSerializer<*>.write(): String = if(this == Unit.serializer()) "void
     if(descriptor.isNullable) out.append(" | null | undefined")
 }.toString()
 
+private val SerialDescriptor.simpleSerialName: String get() = serialName.substringBefore('<').substringAfterLast('.').removeSuffix("?")
 private fun String.userTypeTokenName(): String = this.substringAfterLast('.').replaceFirstChar { it.lowercase() }.plus("Token")

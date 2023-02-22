@@ -19,48 +19,30 @@ import kotlin.test.assertEquals
 import kotlin.test.fail
 
 class EmailAuthTest {
-    init {
-        TestSettings
-    }
+
     @Test
     fun testPinCorrect() {
-        val info = ModelInfo<User, User, UUID>(
-            getCollection = { TestSettings.database().collection() },
-            forUser = { this }
-        )
-        val emailAccess: UserEmailAccess<User, UUID> = info.userEmailAccess { User(email = it, phoneNumber = it) }
-        val path = ServerPath("auth")
-        val baseAuth = BaseAuthEndpoints(path, emailAccess, TestSettings.jwtSigner)
-        val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, TestSettings.cache, TestSettings.email)
         runBlocking {
-            emailAuth.loginEmail.implementation(Unit, "joseph@lightningkite.com")
+            TestSettings.emailAuth.loginEmail.implementation(Unit, "joseph@lightningkite.com")
             val pinRegex = Regex("[0-9][0-9][0-9][0-9][0-9][0-9]")
             val pin = (TestSettings.email() as ConsoleEmailClient).lastEmailSent?.message?.let {
                 pinRegex.find(it)?.value
             }!!
-            val token = emailAuth.loginEmailPin.implementation(Unit, EmailPinLogin("joseph@lightningkite.com", pin))
+            val token = TestSettings.emailAuth.loginEmailPin.implementation(Unit, EmailPinLogin("joseph@lightningkite.com", pin))
             assertEquals(
-                HttpStatus.OK, baseAuth.getSelf.route.test(
+                HttpStatus.OK, TestSettings.baseAuth.getSelf.route.test(
                 headers = HttpHeaders(HttpHeader.Authorization to token, HttpHeader.ContentType to "application/json")
             ).status)
         }
     }
     @Test
     fun testPinIncorrect() {
-        val info = ModelInfo<User, User, UUID>(
-            getCollection = { TestSettings.database().collection() },
-            forUser = { this }
-        )
-        val emailAccess: UserEmailAccess<User, UUID> = info.userEmailAccess { User(email = it, phoneNumber = it) }
-        val path = ServerPath("auth")
-        val baseAuth = BaseAuthEndpoints(path, emailAccess, TestSettings.jwtSigner)
-        val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, TestSettings.cache, TestSettings.email)
         runBlocking {
-            emailAuth.loginEmail.implementation(Unit, "joseph@lightningkite.com")
+            TestSettings.emailAuth.loginEmail.implementation(Unit, "joseph@lightningkite.com")
             val pinRegex = Regex("[0-9][0-9][0-9][0-9][0-9][0-9]")
             val pin = "wrong"
             try {
-                emailAuth.loginEmailPin.implementation(Unit, EmailPinLogin("joseph@lightningkite.com", pin))
+                TestSettings.emailAuth.loginEmailPin.implementation(Unit, EmailPinLogin("joseph@lightningkite.com", pin))
                 fail()
             } catch (e: BadRequestException) {
                 assertEquals("Incorrect PIN.  4 attempts remain.", e.message)

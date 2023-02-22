@@ -17,17 +17,11 @@ open class FormDataHandler(
 ) : Serialization.HttpContentHandler {
     override val contentType: ContentType = ContentType.Application.FormUrlEncoded
     override suspend fun <T> invoke(content: HttpContent, serializer: KSerializer<T>): T {
-        return properties().decodeFromStringMap<T>(
-            serializer,
-            content.text().split('&').associate { URLDecoder.decode(it.substringBefore('='), Charsets.UTF_8) to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
-        )
+        return properties().decodeFromFormData(serializer, content.text())
     }
     override suspend fun <T> invoke(contentType: ContentType, serializer: KSerializer<T>, value: T): HttpContent {
         return HttpContent.Text(
-            properties().encodeToStringMap<T>(
-                serializer,
-                value
-            ).entries.joinToString("&") { URLEncoder.encode(it.key, Charsets.UTF_8) + "=" + URLEncoder.encode(it.value, Charsets.UTF_8) },
+            properties().encodeToFormData(serializer, value),
             contentType
         )
     }

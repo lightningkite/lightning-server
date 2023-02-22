@@ -106,8 +106,9 @@ class InMemoryUnsafePersistenceDatabase(val folder: File) : Database {
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> = synchronized(collections) {
         collections.getOrPut(name) {
-            val oldStyle = folder.resolve(name)
-            val storage = folder.resolve("$name.json")
+            val fileName = name.filter { it.isLetterOrDigit() }
+            val oldStyle = folder.resolve(fileName)
+            val storage = folder.resolve("$fileName.json")
             if (oldStyle.exists() && !storage.exists())
                 oldStyle.copyTo(storage, overwrite = true)
             InMemoryUnsafePersistentFieldCollection(
