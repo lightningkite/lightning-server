@@ -17,6 +17,7 @@ import software.amazon.awssdk.services.ses.SesAsyncClient
 import software.amazon.awssdk.services.ses.SesClient
 import software.amazon.awssdk.services.ses.model.RawMessage
 import java.io.ByteArrayOutputStream
+import java.lang.IllegalStateException
 import java.util.*
 import javax.mail.Session
 
@@ -39,7 +40,7 @@ class SesClient(
                             override fun secretAccessKey(): String = credentials[1]
                         })
                     } else DefaultCredentialsProvider.create(),
-                    fromEmail = it.fromEmail
+                    fromEmail = it.fromEmail ?: throw IllegalStateException("SES Email requires a fromEmail to be set.")
                 )
             }
         }
