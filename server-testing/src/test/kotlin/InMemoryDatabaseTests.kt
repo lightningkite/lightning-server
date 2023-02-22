@@ -1,17 +1,17 @@
 package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.JwtSigner
-import com.lightningkite.lightningserver.auth.OauthAppleEndpoints
-import com.lightningkite.lightningserver.auth.OauthProviderCredentials
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cache.CacheInterface
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.CacheTest
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.db.InMemoryDatabase
+import com.lightningkite.lightningserver.db.ModelInfo
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.engine.LocalEngine
 import com.lightningkite.lightningserver.engine.engine
@@ -36,6 +36,7 @@ import kotlinx.serialization.encodeToString
 import org.junit.Test
 import java.io.File
 import java.time.Duration
+import java.util.*
 import kotlin.test.assertEquals
 
 class RamAggregationsTest: AggregationsTest() {
@@ -136,6 +137,16 @@ object TestSettings {
     val oauthApple = setting<OauthAppleEndpoints.OauthAppleSettings?>("oauth_apple", null)
     val oauthGithub = setting<OauthProviderCredentials?>("oauth_github", null)
     val oauthMicrosoft = setting<OauthProviderCredentials?>("oauth_microsoft", null)
+
+
+    val info = ModelInfo<User, User, UUID>(
+        getCollection = { database().collection() },
+        forUser = { this }
+    )
+    val emailAccess: UserEmailAccess<User, UUID> = info.userEmailAccess { User(email = it, phoneNumber = it) }
+    val path = ServerPath("auth")
+    val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner)
+    val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
 
     init {
         Settings.populateDefaults(mapOf(
