@@ -40,3 +40,78 @@ public class HasEmailFields {
     }
 }
 
+
+public protocol HasPhoneNumber: AnyObject, Codable, Hashable {
+    
+    var phoneNumber: String { get }
+    
+}
+
+
+public class HasPhoneNumberFields {
+    public init() {
+        //Necessary properties should be initialized now
+    }
+    public static let INSTANCE = HasPhoneNumberFields()
+    
+    public func phoneNumber<T : HasPhoneNumber>() -> KeyPath<T, String> {
+        return \T.phoneNumber
+    }
+}
+
+public protocol HasMaybeEmail: AnyObject, Codable, Hashable {
+    
+    var email: String? { get }
+    
+}
+
+
+public class HasMaybeEmailFields {
+    public init() {
+        //Necessary properties should be initialized now
+    }
+    public static let INSTANCE = HasMaybeEmailFields()
+    
+    public func email<T : HasMaybeEmail>() -> KeyPath<T, String?> {
+        return \T.email
+    }
+}
+
+
+public protocol HasMaybePhoneNumber: AnyObject, Codable, Hashable {
+    
+    var phoneNumber: String? { get }
+    
+}
+
+
+public  class HasMaybePhoneNumberFields {
+    public init() {
+        //Necessary properties should be initialized now
+    }
+    public static let INSTANCE = HasMaybePhoneNumberFields()
+    
+    public func phoneNumber<T : HasMaybePhoneNumber>() -> KeyPath<T, String?> {
+        return \T.phoneNumber
+    }
+}
+
+public protocol HasPassword: AnyObject, Codable, Hashable {
+    
+    var hashedPassword: String { get }
+    
+}
+
+
+public  class HasPasswordFields {
+    public init() {
+        //Necessary properties should be initialized now
+    }
+    public static let INSTANCE = HasPasswordFields()
+    
+    public func hashedPassword<T : HasPassword>() -> KeyPath<T, String> {
+        return \T.hashedPassword
+    }
+}
+
+

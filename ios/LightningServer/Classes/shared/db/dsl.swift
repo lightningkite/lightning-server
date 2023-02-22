@@ -22,6 +22,9 @@ public final class PropChain<From : Codable & Hashable, To : Codable & Hashable>
     public func get<V : Codable & Hashable>(prop: PropertyIterableProperty<To, V>) -> PropChain<From, V> {
         return PropChain<From, V>(mapCondition: { (it) -> Condition<From> in self.mapCondition(ConditionOnField(key: prop, condition: it)) }, mapModification: { (it) -> Modification<From> in self.mapModification(ModificationOnField(key: prop, modification: it)) }, getProp: { (it) -> V in prop.get(self.getProp(it)) }, setProp: { (from, to) -> From in self.setProp(from, prop.set(self.getProp(from), to)) });
     }
+    public func chain<V : Codable & Hashable>(other: PropChain<To, V>) -> PropChain<From, V> {
+        return PropChain<From, V>(mapCondition: { (it) -> Condition<From> in self.mapCondition(other.mapCondition(it)) }, mapModification: { (it) -> Modification<From> in self.mapModification(other.mapModification(it)) }, getProp: { (it) -> V in other.getProp(self.getProp(it)) }, setProp: { (from, to) -> From in self.setProp(from, other.setProp(self.getProp(from), to)) });
+    }
     
     //    override fun hashCode(): Int = mapCondition(Condition.Always()).hashCode()
     
@@ -71,14 +74,32 @@ public extension PropChain where From : Codable & Hashable, To : Codable & Hasha
 }
 
 public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
+    func inside(values: Set<To>) -> Condition<From> {
+        return self.mapCondition(ConditionInside(values: Array(values)));
+    }
+}
+
+public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
     func inside(values: Array<To>) -> Condition<From> {
         return self.mapCondition(ConditionInside(values: values));
     }
 }
 
 public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
+    func nin(values: Set<To>) -> Condition<From> {
+        return self.mapCondition(ConditionNotInside(values: Array(values)));
+    }
+}
+
+public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
     func nin(values: Array<To>) -> Condition<From> {
         return self.mapCondition(ConditionNotInside(values: values));
+    }
+}
+
+public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
+    func notIn(values: Set<To>) -> Condition<From> {
+        return self.mapCondition(ConditionNotInside(values: Array(values)));
     }
 }
 

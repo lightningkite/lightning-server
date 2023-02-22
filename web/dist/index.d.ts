@@ -36,6 +36,7 @@ export * from './server/auth/EmailPinLogin';
 export * from './server/files/init';
 export * from './server/files/UploadEarlyEndpointModels';
 export * from './server/files/UploadForNextRequestFields';
+export * from './server/LSError';
 export * from './server/serverhealth/HealthStatus';
 export * from './SignalData';
 export * from './WriteModelApi';

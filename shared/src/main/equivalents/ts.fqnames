@@ -140,6 +140,7 @@ com.lightningkite.lightningdb.mock.MockTable
 com.lightningkite.lightningdb.notIn
 com.lightningkite.lightningdb.never>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.never.K, com.lightningkite.lightningdb.never.K
 com.lightningkite.lightningdb.mock.MockReadModelApi
+com.lightningkite.lightningserver.LSError
 com.lightningkite.lightningdb.allSet
 com.lightningkite.lightningdb.removeKeys
 com.lightningkite.lightningdb.containsKey>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.containsKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.containsKey.T
@@ -147,8 +148,8 @@ com.lightningkite.lightningdb.neq>com.lightningkite.lightningdb.PropChaincom.lig
 com.lightningkite.lightningdb.comparator>kotlin.collections.Listcom.lightningkite.lightningdb.SortPartcom.lightningkite.lightningdb.comparator.T
 com.lightningkite.lightningdb.HasId
 com.lightningkite.lightningdb.HasIdFields
-com.lightningkite.lightningdb.live.LiveWriteModelApi
 com.lightningkite.lightningdb.HasPassword
+com.lightningkite.lightningdb.live.LiveWriteModelApi
 com.lightningkite.lightningdb.coerceAtLeast
 com.lightningkite.lightningdb.map>com.lightningkite.lightningdb.PropChaincom.lightningkite.lightningdb.map.K, kotlin.collections.Listcom.lightningkite.lightningdb.map.T
 com.lightningkite.lightningdb.always

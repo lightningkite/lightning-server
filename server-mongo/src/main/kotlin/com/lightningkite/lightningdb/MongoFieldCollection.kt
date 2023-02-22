@@ -225,7 +225,11 @@ class MongoFieldCollection<Model : Any>(
         condition: Condition<Model>,
         modification: Modification<Model>,
         orderBy: List<SortPart<Model>>,
-    ): Boolean = updateOneImpl(condition, modification, orderBy).new != null
+    ): Boolean {
+        prepare.await()
+        val m = modification.bson()
+        return mongo.updateOne(condition.bson(), m.document, m.options).matchedCount != 0L
+    }
 
     override suspend fun updateManyImpl(
         condition: Condition<Model>,
