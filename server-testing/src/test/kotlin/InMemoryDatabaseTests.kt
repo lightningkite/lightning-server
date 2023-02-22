@@ -62,7 +62,7 @@ class LocalFilesTest: FileSystemTests() {
     init {
         TestSettings
     }
-    override val system: LocalFileSystem = LocalFileSystem(File("build/local-files-test"), "hosted-files", JwtSigner())
+    override val system: LocalFileSystem = LocalFileSystem(File("build/local-files-test"), "hosted-files", null, JwtSigner())
     override fun testSignedUrlAccess() {
         runBlocking {
             val testFile = system.root.resolve("test.txt")
