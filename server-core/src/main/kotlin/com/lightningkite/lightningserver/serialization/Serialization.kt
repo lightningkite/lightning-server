@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.serialization
 
+import com.charleskorn.kaml.Yaml
+import com.charleskorn.kaml.YamlConfiguration
 import com.github.jershell.kbson.Configuration
 import com.github.jershell.kbson.KBson
 import com.lightningkite.lightningdb.ClientModule
@@ -30,13 +32,17 @@ import java.net.URLDecoder
  * A place to hold all the support Serialization types.
  */
 abstract class Serialization {
-    companion object: Serialization() {
-        override fun defaultModule(): SerializersModule  = ClientModule.overwriteWith(serializersModuleOf(ExternalServerFileSerializer)).overwriteWith(additionalModule)
+    companion object : Serialization() {
+        override fun defaultModule(): SerializersModule =
+            ClientModule.overwriteWith(serializersModuleOf(ExternalServerFileSerializer))
+                .overwriteWith(additionalModule)
     }
-    object Internal: Serialization() {
-        override fun defaultModule(): SerializersModule  = ClientModule.overwriteWith(additionalModule)
+
+    object Internal : Serialization() {
+        override fun defaultModule(): SerializersModule = ClientModule.overwriteWith(additionalModule)
     }
-    var additionalModule: SerializersModule by SetOnce { SerializersModule {  } }
+
+    var additionalModule: SerializersModule by SetOnce { SerializersModule { } }
     protected abstract fun defaultModule(): SerializersModule
     var module: SerializersModule by SetOnce { defaultModule() }
     var json: Json by SetOnce {
@@ -59,6 +65,9 @@ abstract class Serialization {
             ignoreUnknownColumns = true
             serializersModule = module
         }
+    }
+    val yaml: Yaml by SetOnce {
+        Yaml(module, YamlConfiguration(encodeDefaults = false, strictMode = false))
     }
     var bson: KBson by SetOnce {
         KBson(module, Configuration())
@@ -94,7 +103,8 @@ abstract class Serialization {
     interface HttpContentEmitter {
         val contentType: ContentType
         suspend operator fun <T> invoke(contentType: ContentType, serializer: KSerializer<T>, value: T): HttpContent
-        suspend fun <T> streaming(contentType: ContentType, serializer: KSerializer<T>, value: T): HttpContent = invoke(contentType, serializer, value)
+        suspend fun <T> streaming(contentType: ContentType, serializer: KSerializer<T>, value: T): HttpContent =
+            invoke(contentType, serializer, value)
     }
 
     interface HttpContentHandler : HttpContentParser, HttpContentEmitter
@@ -105,9 +115,11 @@ abstract class Serialization {
         parsers[handler.contentType] = handler
         emitters[handler.contentType] = handler
     }
+
     fun emitter(handler: HttpContentEmitter) {
         emitters[handler.contentType] = handler
     }
+
     fun parser(handler: HttpContentParser) {
         parsers[handler.contentType] = handler
     }
@@ -119,6 +131,7 @@ abstract class Serialization {
                 is PrimitiveKind -> return true
                 SerialKind.CONTEXTUAL -> current =
                     Serialization.json.serializersModule.getContextualDescriptor(current)!!
+
                 else -> return false
             }
         }
@@ -130,6 +143,7 @@ abstract class Serialization {
     fun <T> toString(value: T, serializer: KSerializer<T>): String {
         return Serialization.properties.encodeToStringMap(IdHolder.serializer(serializer), IdHolder(value))["id"]!!
     }
+
     fun <T> fromString(string: String, serializer: KSerializer<T>): T {
         return Serialization.properties.decodeFromStringMap(IdHolder.serializer(serializer), mapOf("id" to string)).id
     }

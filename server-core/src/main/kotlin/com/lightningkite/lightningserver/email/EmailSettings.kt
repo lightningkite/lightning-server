@@ -3,20 +3,22 @@ package com.lightningkite.lightningserver.email
 import com.lightningkite.lightningserver.settings.Pluggable
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import java.lang.IllegalStateException
 
 /**
  * EmailSettings defines where to send emails, and any credentials that may be required to do so.
  * There are two options currently with email. You can send it to the console, or you can use SMTP to send real emails.
  *
- * @param option An Enum defining where to send email. This can be "Console" or "Smtp"
- * @param smtp Required only if [option] is Smtp. These are the SMTP Credentials you wish to use to send real emails
+ * @param url A string containing everything needed to connect to an email server. The format is defined by the EmailClient that will consume it.
+ *  For SMTP: smtp://username:password@host:port
+ *  For mailgun: mailgun://key@domain
+ *  For Console: console
+ * @param fromEmail Required by at least the SMTP option. This will be the email that recipients see as the sender.
  */
 @Serializable
 data class EmailSettings(
-    val url: String = "old",
-    val fromEmail: String = "",
-    val option: EmailClientOption = EmailClientOption.Console,
-    val smtp: SmtpConfig? = null
+    val url: String = "console",
+    val fromEmail: String? = null,
 ) : () -> EmailClient {
     companion object : Pluggable<EmailSettings, EmailClient>() {
         init {
@@ -36,38 +38,21 @@ data class EmailSettings(
                 val urlHost = urlWithoutProtocol.substringAfterLast('@')
                 val port = urlHost.substringAfter(':', "").toIntOrNull() ?: 22
                 SmtpEmailClient(
-                    it.smtp ?: SmtpConfig(
+                     SmtpConfig(
                         hostName = urlHost.substringBefore(':'),
                         port = port,
                         username = urlAuth.substringBefore(':'),
                         password = urlAuth.substringAfter(':'),
                         useSSL = port != 25,
-                        fromEmail = it.fromEmail
+                        fromEmail = it.fromEmail ?: throw IllegalStateException("SMTP Email requires a fromEmail to be set.")
                     )
                 )
-            }
-            EmailSettings.register("old") {
-                when (it.option) {
-                    EmailClientOption.Console -> ConsoleEmailClient
-                    EmailClientOption.Smtp -> SmtpEmailClient(
-                        it.smtp
-                            ?: throw IllegalArgumentException("Option SMTP was requested, but no additional information was present under the 'smtp' key.")
-                    )
-                }
             }
         }
     }
 
     override fun invoke(): EmailClient = EmailSettings.parse(url.substringBefore("://"), this)
 
-    @Transient
-    var sendEmailDuringTests: Boolean = false
-}
-
-@Serializable
-enum class EmailClientOption {
-    Console,
-    Smtp,
 }
 
 @Serializable

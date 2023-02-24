@@ -105,6 +105,6 @@ open class SmsAuthEndpoints<USER : Any, ID>(
             e.printStackTrace()
             throw e
         }
-        HttpResponse.redirectToGet(base.landingRoute.path.toString() + "?jwt=$basis")
+        base.redirectToLanding(basis)
     }
 }

@@ -7,29 +7,45 @@ export class Aggregate {
         this.name = name;
         this.jsonName = jsonName;
     }
-    
+
     public static Sum = new Aggregate("Sum", "Sum");
-    
+
     public static Average = new Aggregate("Average", "Average");
-    
+
     public static StandardDeviationSample = new Aggregate("StandardDeviationSample", "StandardDeviationSample");
-    
+
     public static StandardDeviationPopulation = new Aggregate("StandardDeviationPopulation", "StandardDeviationPopulation");
-    
+
     private static _values: Array<Aggregate> = [Aggregate.Sum, Aggregate.Average, Aggregate.StandardDeviationSample, Aggregate.StandardDeviationPopulation];
-    public static values(): Array<Aggregate> { return Aggregate._values; }
+
+    public static values(): Array<Aggregate> {
+        return Aggregate._values;
+    }
+
     public readonly name: string;
     public readonly jsonName: string;
-    public static valueOf(name: string): Aggregate { return (Aggregate as any)[name]; }
-    public toString(): string { return this.name }
-    public toJSON(): string { return this.jsonName }
-    public static fromJSON(key: string): Aggregate { return Aggregate._values.find(x => x.jsonName.toLowerCase() === key.toLowerCase())! }
+
+    public static valueOf(name: string): Aggregate {
+        return (Aggregate as any)[name];
+    }
+
+    public toString(): string {
+        return this.name
+    }
+
+    public toJSON(): string {
+        return this.jsonName
+    }
+
+    public static fromJSON(key: string): Aggregate {
+        return Aggregate._values.find(x => x.jsonName.toLowerCase() === key.toLowerCase())!
+    }
 }
 
 //! Declares com.lightningkite.lightningdb.aggregator>com.lightningkite.lightningdb.Aggregate
 export function xAggregateAggregator(this_: Aggregate): Aggregator {
     return ((): Aggregator => {
-        switch(this_) {
+        switch (this_) {
             case Aggregate.Sum: {
                 return new SumAggregator()
             }
@@ -43,15 +59,17 @@ export function xAggregateAggregator(this_: Aggregate): Aggregator {
                 return new StandardDeviationPopulationAggregator()
             }
             default:
-        throw new Error("Exhaustive when turned out to not be so exhaustive.")}
-        
+                throw new Error("Exhaustive when turned out to not be so exhaustive.")
+        }
+
     })();
 }
 
 //! Declares com.lightningkite.lightningdb.Aggregator
 export interface Aggregator {
-    
+
     consume(value: number): void
+
     complete(): (number | null)
 }
 
@@ -59,51 +77,61 @@ export interface Aggregator {
 //! Declares com.lightningkite.lightningdb.SumAggregator
 export class SumAggregator implements Aggregator {
     public static implementsAggregator = true;
+
     public constructor() {
         this.current = 0.0;
         this.anyFound = false;
     }
-    
+
     public current: number;
     public anyFound: boolean;
+
     public consume(value: number): void {
         this.anyFound = true;
         this.current = this.current + value;
     }
+
     public complete(): (number | null) {
         return this.anyFound ? this.current : null;
     }
 }
+
 //! Declares com.lightningkite.lightningdb.AverageAggregator
 export class AverageAggregator implements Aggregator {
     public static implementsAggregator = true;
+
     public constructor() {
         this.count = 0;
         this.current = 0.0;
     }
-    
+
     public count: number;
     public current: number;
+
     public consume(value: number): void {
         this.count = this.count + 1;
         this.current = this.current + (value - this.current) / this.count;
     }
+
     public complete(): (number | null) {
         return this.count === 0 ? null : this.current;
     }
 }
+
 //! Declares com.lightningkite.lightningdb.StandardDeviationSampleAggregator
 export class StandardDeviationSampleAggregator implements Aggregator {
     public static implementsAggregator = true;
+
     public constructor() {
         this.count = 0;
         this.mean = 0.0;
         this.m2 = 0.0;
     }
-    
+
     public count: number;
     public mean: number;
     public m2: number;
+
     public consume(value: number): void {
         this.count = this.count + 1;
         const delta1 = value - this.mean;
@@ -111,22 +139,26 @@ export class StandardDeviationSampleAggregator implements Aggregator {
         const delta2 = value - this.mean;
         this.m2 = this.m2 + delta1 * delta2;
     }
+
     public complete(): (number | null) {
         return this.count < 2 ? null : Math.sqrt(this.m2 / (this.count - 1));
     }
 }
+
 //! Declares com.lightningkite.lightningdb.StandardDeviationPopulationAggregator
 export class StandardDeviationPopulationAggregator implements Aggregator {
     public static implementsAggregator = true;
+
     public constructor() {
         this.count = 0;
         this.mean = 0.0;
         this.m2 = 0.0;
     }
-    
+
     public count: number;
     public mean: number;
     public m2: number;
+
     public consume(value: number): void {
         this.count = this.count + 1;
         const delta1 = value - this.mean;
@@ -134,6 +166,7 @@ export class StandardDeviationPopulationAggregator implements Aggregator {
         const delta2 = value - this.mean;
         this.m2 = this.m2 + delta1 * delta2;
     }
+
     public complete(): (number | null) {
         return this.count === 0 ? null : Math.sqrt(this.m2 / this.count);
     }

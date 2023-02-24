@@ -78,3 +78,42 @@ public final class PhonePinLogin : CustomStringConvertible, Hashable, Codable {
     public func copy(phone: String? = nil, pin: String? = nil) -> PhonePinLogin { return PhonePinLogin(phone: phone ?? self.phone, pin: pin ?? self.pin) }
     
 }
+
+public final class PasswordLogin : CustomStringConvertible, Hashable, Codable {
+    public var username: String
+    public var password: String
+    public init(username: String, password: String) {
+        self.username = username
+        self.password = password
+        //Necessary properties should be initialized now
+    }
+    convenience required public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            username: try values.decode(String.self, forKey: .username),
+            password: try values.decode(String.self, forKey: .password)
+        )
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case username = "username"
+        case password = "password"
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.username, forKey: .username)
+        try container.encode(self.password, forKey: .password)
+    }
+    
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(username)
+        hasher.combine(password)
+        
+    }
+    public static func == (lhs: PasswordLogin, rhs: PasswordLogin) -> Bool { return lhs.username == rhs.username && lhs.password == rhs.password }
+    public var description: String { return "PasswordLogin(username=\(String(kotlin: self.username)), password=\(String(kotlin: self.password)))" }
+    public func copy(username: String? = nil, password: String? = nil) -> PasswordLogin { return PasswordLogin(username: username ?? self.username, password: password ?? self.password) }
+    
+}
+

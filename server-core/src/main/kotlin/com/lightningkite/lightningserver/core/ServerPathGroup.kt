@@ -3,6 +3,9 @@ package com.lightningkite.lightningserver.core
 import com.lightningkite.lightningserver.http.*
 
 abstract class ServerPathGroup(val path: ServerPath) {
+
+    constructor(path:String):this(ServerPath(path))
+
     @LightningServerDsl fun path(string: String) = path.path(string)
     @LightningServerDsl fun get(string: String) = path.get(string)
     @LightningServerDsl fun post(string: String) = path.post(string)

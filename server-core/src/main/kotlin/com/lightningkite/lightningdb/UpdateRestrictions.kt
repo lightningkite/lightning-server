@@ -33,34 +33,22 @@ data class UpdateRestrictions<T>(
         val it = startChain<T>()
         fun KeyPath<T, *>.cannotBeModified() {
             fields.add(Triple(
-                this.let {
-                    @Suppress("UNCHECKED_CAST")
-                    it as KeyPath<T, Any?>
-                }.assign(null), Condition.Never(), Condition.Always()
+                modification { (this@cannotBeModified as PropChain<T, Any?>).assign(null) }, Condition.Never(), Condition.Always()
             ))
         }
         infix fun KeyPath<T, *>.requires(condition: Condition<T>) {
             fields.add(Triple(
-                this.let {
-                    @Suppress("UNCHECKED_CAST")
-                    it as KeyPath<T, Any?>
-                }.assign(null), condition, Condition.Always()
+                modification { (this@requires as PropChain<T, Any?>).assign(null) }, condition, Condition.Always()
             ))
         }
         fun <V> KeyPath<T, V>.restrict(requires: Condition<T>, valueMust: (KeyPath<V, V>)->Condition<V>) {
             fields.add(Triple(
-                this.let {
-                    @Suppress("UNCHECKED_CAST")
-                    it as KeyPath<T, Any?>
-                }.assign(null), requires, this.condition(valueMust)
+                modification { (this@restrict as PropChain<T, Any?>).assign(null) }, requires, this.condition(valueMust)
             ))
         }
         fun <V> KeyPath<T, V>.mustBe(valueMust: (KeyPath<V, V>)->Condition<V>) {
             fields.add(Triple(
-                this.let {
-                    @Suppress("UNCHECKED_CAST")
-                    it as KeyPath<T, Any?>
-                }.assign(null), Condition.Always(), this.condition(valueMust)
+                modification { (this@mustBe as PropChain<T, Any?>).assign(null) }, Condition.Always(), this.condition(valueMust)
             ))
         }
         fun build() = UpdateRestrictions(fields)

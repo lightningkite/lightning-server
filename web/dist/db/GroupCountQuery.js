@@ -12,7 +12,9 @@ class GroupCountQuery {
         this.condition = condition;
         this.groupBy = groupBy;
     }
-    static propertyTypes(Model) { return { condition: [Condition_1.Condition, Model], groupBy: [String, Model] }; }
+    static propertyTypes(Model) {
+        return { condition: [Condition_1.Condition, Model], groupBy: [String, Model] };
+    }
 }
 exports.GroupCountQuery = GroupCountQuery;
 GroupCountQuery.properties = ["condition", "groupBy"];
@@ -24,7 +26,9 @@ class AggregateQuery {
         this.condition = condition;
         this.property = property;
     }
-    static propertyTypes(Model) { return { aggregate: [Aggregate_1.Aggregate], condition: [Condition_1.Condition, Model], property: [String, Model] }; }
+    static propertyTypes(Model) {
+        return { aggregate: [Aggregate_1.Aggregate], condition: [Condition_1.Condition, Model], property: [String, Model] };
+    }
 }
 exports.AggregateQuery = AggregateQuery;
 AggregateQuery.properties = ["aggregate", "condition", "property"];
@@ -37,7 +41,14 @@ class GroupAggregateQuery {
         this.groupBy = groupBy;
         this.property = property;
     }
-    static propertyTypes(Model) { return { aggregate: [Aggregate_1.Aggregate], condition: [Condition_1.Condition, Model], groupBy: [String, Model], property: [String, Model] }; }
+    static propertyTypes(Model) {
+        return {
+            aggregate: [Aggregate_1.Aggregate],
+            condition: [Condition_1.Condition, Model],
+            groupBy: [String, Model],
+            property: [String, Model]
+        };
+    }
 }
 exports.GroupAggregateQuery = GroupAggregateQuery;
 GroupAggregateQuery.properties = ["aggregate", "condition", "groupBy", "property"];

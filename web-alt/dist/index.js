@@ -21,4 +21,5 @@ __exportStar(require("./apiCall"), exports);
 __exportStar(require("./modificationHelpers"), exports);
 __exportStar(require("./mockRestEndpoints"), exports);
 __exportStar(require("./sessionRest"), exports);
+__exportStar(require("./annotateEndpoint"), exports);
 //# sourceMappingURL=index.js.map

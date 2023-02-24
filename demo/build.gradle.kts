@@ -32,7 +32,7 @@ kotlin {
     }
 }
 
-tasks.create("lambda", Copy::class.java) {
+tasks.create("lambda", Sync::class.java) {
     this.destinationDir = project.buildDir.resolve("dist/lambda")
     val jarTask = tasks.getByName("jar")
     dependsOn(jarTask)

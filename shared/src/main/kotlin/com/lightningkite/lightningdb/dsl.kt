@@ -3,7 +3,6 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.*
-import java.lang.IllegalStateException
 import kotlin.reflect.KProperty1
 
 class PropChain<From : IsCodableAndHashable, To : IsCodableAndHashable>(
@@ -250,5 +249,10 @@ inline val <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Lis
 inline val <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.any get() =
     PropChain<K, T>(
         mapCondition = { mapCondition(Condition.SetAnyElements(it)) },
-        mapModification = { mapModification(Modification.SetPerElement(Condition.Always(), it)) }
+        mapModification = { mapModification(Modification.SetPerElement(Condition.Always(), it)) },
+        getProp = { getProp(it).first() },
+        setProp = { from, to -> setProp(from, getProp(from).plus(to)) }
     )
+
+inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.condition(make: (PropChain<T, T>) -> Condition<T>): Condition<K> =
+    mapCondition(make(startChain<T>()))

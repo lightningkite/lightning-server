@@ -4,6 +4,8 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
+import com.lightningkite.lightningserver.humanize
+import com.lightningkite.lightningserver.kabobCase
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.Documentable
@@ -30,6 +32,7 @@ data class LightningServerSchema(
 
 @Serializable
 data class LightningServerSchemaModel(
+    val collectionName: String,
     @SerialName("\$ref") val ref: String? = null,
     val url: String,
     val searchFields: List<String>,
@@ -66,7 +69,8 @@ val lightningServerSchema: LightningServerSchema by lazy {
             )
         }.toList(),
         models = ModelRestEndpoints.all.associate {
-            it.info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.').kabobCase() to LightningServerSchemaModel(
+            it.collectionName.kabobCase() to LightningServerSchemaModel(
+                collectionName = it.collectionName.humanize(),
                 url = it.path.fullUrl(),
                 ref = builder.refString(it.info.serialization.serializer),
                 searchFields = it.info.serialization.serializer.descriptor.annotations
@@ -134,12 +138,7 @@ object JsonType3Serializer: KSerializer<JsonType3> {
     val multi = ArraySerializer(JsonType2.serializer())
     val single = JsonType2.serializer()
     @OptIn(InternalSerializationApi::class)
-    override val descriptor: SerialDescriptor =
-        buildSerialDescriptor("JsonType3", PolymorphicKind.SEALED) {
-            // Resolve cyclic dependency in descriptors by late binding
-            element("JsonType3.MultiType", multi.descriptor)
-            element("JsonType3.SingleType", single.descriptor)
-        }
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("JsonType3", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: JsonType3) {
         if(value.nullable) encoder.encodeSerializableValue(multi, arrayOf(value.inner, JsonType2.NULL))
@@ -147,10 +146,12 @@ object JsonType3Serializer: KSerializer<JsonType3> {
     }
 
     override fun deserialize(decoder: Decoder): JsonType3 {
-        val input = decoder as? JsonDecoder ?: throw IllegalStateException("This serializer can only be used with Json format")
-        val element = input.decodeJsonElement()
-        return if(element is JsonArray) JsonType3(decoder.json.decodeFromJsonElement(single, element[0]), true)
-        else JsonType3(decoder.json.decodeFromJsonElement(single, element))
+        (decoder as? JsonDecoder)?.let { input ->
+            val element = input.decodeJsonElement()
+            return if(element is JsonArray) JsonType3(decoder.json.decodeFromJsonElement(single, element[0]), true)
+            else JsonType3(decoder.json.decodeFromJsonElement(single, element))
+        }
+        return JsonType3(JsonType2.serializer().deserialize(decoder))
     }
 }
 
@@ -189,23 +190,6 @@ data class JsonSchemaTypeLink(
     val href: String,
     val rel: String,
 )
-
-private val camelRegex = "[a-z][A-Z]".toRegex()
-private val snakeRegex = "_[a-zA-Z]".toRegex()
-fun String.humanize(): String = camelRegex.replace(this) {
-    "${it.value[0]} ${it.value[1].uppercase()}"
-}.let {
-    snakeRegex.replace(it) {
-        " " + it.value[1].uppercase()
-    }
-}.replaceFirstChar { it.uppercaseChar() }.trim()
-fun String.kabobCase(): String = camelRegex.replace(this) {
-    "${it.value[0]}-${it.value[1]}"
-}.let {
-    snakeRegex.replace(it) {
-        "-" + it.value[1]
-    }
-}.lowercase().trim()
 
 fun Json.schemaDefinitions(types: Iterable<KSerializer<*>>): Map<String, JsonSchemaType> {
     val b = JsonSchemaBuilder(this)

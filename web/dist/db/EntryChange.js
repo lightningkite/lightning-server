@@ -10,7 +10,9 @@ class EntryChange {
         this.old = old;
         this._new = _new;
     }
-    static propertyTypes(T) { return { old: T, _new: T }; }
+    static propertyTypes(T) {
+        return { old: T, _new: T };
+    }
 }
 exports.EntryChange = EntryChange;
 EntryChange.properties = ["old", "_new"];
@@ -20,13 +22,13 @@ EntryChange.propertiesJsonOverride = { _new: "new" };
 function xEntryChangeMap(this_, mapper) {
     return new EntryChange((() => {
         const temp0 = this_.old;
-        if (temp0 === null) {
+        if (temp0 === null || temp0 === undefined) {
             return null;
         }
         return (mapper)(temp0);
     })(), (() => {
         const temp1 = this_._new;
-        if (temp1 === null) {
+        if (temp1 === null || temp1 === undefined) {
             return null;
         }
         return (mapper)(temp1);

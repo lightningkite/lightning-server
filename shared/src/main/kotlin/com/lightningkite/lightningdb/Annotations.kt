@@ -7,6 +7,10 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialKind
 import kotlin.reflect.KClass
 
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.FUNCTION)
+annotation class CheckReturnValue
+
 /**
  * Which fields are text searched in the admin
  */

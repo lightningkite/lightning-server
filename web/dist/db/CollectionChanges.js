@@ -7,24 +7,22 @@ const EntryChange_1 = require("./EntryChange");
 const khrysalis_runtime_1 = require("@lightningkite/khrysalis-runtime");
 //! Declares com.lightningkite.lightningdb.CollectionChanges
 class CollectionChanges {
-    constructor(changes = [], replace = null) {
+    constructor(changes = []) {
         this.changes = changes;
-        this.replace = replace;
     }
-    static propertyTypes(T) { return { changes: [Array, [EntryChange_1.EntryChange, T]], replace: [Array, T] }; }
+    static propertyTypes(T) {
+        return { changes: [Array, [EntryChange_1.EntryChange, T]] };
+    }
     static pair(old = null, _new = null) {
-        let result = new CollectionChanges(old !== null || _new !== null ? [new EntryChange_1.EntryChange(old, _new)] : [], undefined);
+        let result = new CollectionChanges(old !== null || _new !== null ? [new EntryChange_1.EntryChange(old, _new)] : []);
         return result;
     }
 }
 exports.CollectionChanges = CollectionChanges;
-CollectionChanges.properties = ["changes", "replace"];
+CollectionChanges.properties = ["changes"];
 (0, khrysalis_runtime_1.setUpDataClass)(CollectionChanges);
 //! Declares com.lightningkite.lightningdb.apply>kotlin.collections.Listcom.lightningkite.lightningdb.apply.T
 function xListApply(this_, changes) {
-    if (changes.replace !== null) {
-        return changes.replace;
-    }
     const changeable = Array.from(this_);
     for (const change of changes.changes) {
         const old_0 = change.old;
@@ -41,13 +39,7 @@ function xListApply(this_, changes) {
 exports.xListApply = xListApply;
 //! Declares com.lightningkite.lightningdb.map>com.lightningkite.lightningdb.CollectionChangescom.lightningkite.lightningdb.map.T
 function xCollectionChangesMap(this_, mapper) {
-    return new CollectionChanges(this_.changes.map((it) => ((0, EntryChange_1.xEntryChangeMap)(it, mapper))), (() => {
-        const temp5 = this_.replace;
-        if (temp5 === null) {
-            return null;
-        }
-        return temp5.map(mapper);
-    })());
+    return new CollectionChanges(this_.changes.map((it) => ((0, EntryChange_1.xEntryChangeMap)(it, mapper))));
 }
 exports.xCollectionChangesMap = xCollectionChangesMap;
 //# sourceMappingURL=CollectionChanges.js.map

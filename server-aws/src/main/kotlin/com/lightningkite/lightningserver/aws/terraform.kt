@@ -217,6 +217,7 @@ internal fun handlers() {
                   }
                 }
                 resource "aws_s3_bucket_policy" "$key" {  
+                  count = var.files_expiry == null ? 1 : 0
                   bucket = aws_s3_bucket.$key.id   
                   policy = <<POLICY
                 {    
@@ -1141,7 +1142,7 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
               principal     = "events.amazonaws.com"
               source_arn    = aws_cloudwatch_event_rule.panic.arn
               lifecycle {
-                create_before_destroy = true
+                # create_before_destroy = true
               }
             }
             
@@ -1200,7 +1201,7 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                       principal     = "events.amazonaws.com"
                       source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
                       lifecycle {
-                        create_before_destroy = true
+                        # create_before_destroy = true
                       }
                     }
                 """.trimIndent()
@@ -1231,7 +1232,7 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                       principal     = "events.amazonaws.com"
                       source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
                       lifecycle {
-                        create_before_destroy = true
+                        # create_before_destroy = true
                       }
                     }
                 """.trimIndent()
@@ -1437,12 +1438,20 @@ internal fun awsLambdaHandler(
           # Directories start with "C:..." on Windows; All other OSs use "/" for root.
           is_windows = substr(pathexpand("~"), 0, 1) == "/" ? false : true
         }
-        resource "null_resource" "settings_encrypted" {
+        resource "null_resource" "lambda_jar_source" {
           triggers = {
-            settingsRawHash = local_sensitive_file.settings_raw.content
+            always = timestamp()
           }
           provisioner "local-exec" {
-            command = "openssl enc -aes-256-cbc -md sha256 -in \"${'$'}{local_sensitive_file.settings_raw.filename}\" -out \"${'$'}{path.module}/../../build/dist/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
+            command = local.is_windows ? "if(test-path \"${'$'}{path.module}/build/lambda/\") { rd -Recurse \"${'$'}{path.module}/build/lambda/\" }" : "rm -rf \"${'$'}{path.module}/build/lambda/\""
+            interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
+          }
+          provisioner "local-exec" {
+            command = local.is_windows ? "cp -r -force \"${'$'}{path.module}/../../build/dist/lambda/.\" \"${'$'}{path.module}/build/lambda/\"" : "cp -rf \"${'$'}{path.module}/../../build/dist/lambda/.\" \"${'$'}{path.module}/build/lambda/\""
+            interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
+          }
+          provisioner "local-exec" {
+            command = "openssl enc -aes-256-cbc -md sha256 -in \"${'$'}{local_sensitive_file.settings_raw.filename}\" -out \"${'$'}{path.module}/build/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
             interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
           }
         }
@@ -1450,9 +1459,9 @@ internal fun awsLambdaHandler(
           triggers = {
             settingsRawHash = local_sensitive_file.settings_raw.content
           }
-          depends_on = [null_resource.settings_encrypted]
+          depends_on = [null_resource.lambda_jar_source]
           provisioner "local-exec" {
-            command     = "openssl enc -d -aes-256-cbc -md sha256 -out \"${'$'}{local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \"${'$'}{path.module}/../../build/dist/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
+            command     = "openssl enc -d -aes-256-cbc -md sha256 -out \"${'$'}{local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \"${'$'}{path.module}/build/lambda/settings.enc\" -pass pass:${'$'}{random_password.settings.result}"
             interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
           }
         }
@@ -1464,11 +1473,12 @@ internal fun awsLambdaHandler(
         }
         
         data "archive_file" "lambda" {
-          depends_on  = [null_resource.settings_encrypted, null_resource.settings_reread]
+          depends_on  = [null_resource.lambda_jar_source, null_resource.settings_reread]
           type        = "zip"
-          source_dir = "${'$'}{path.module}/../../build/dist/lambda"
+          source_dir = "${'$'}{path.module}/build/lambda"
           output_path = "${'$'}{path.module}/build/lambda.jar"
         }
+        
         
     """.trimIndent()
         )
@@ -1537,7 +1547,7 @@ internal fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSectio
         
                   source_arn = "${'$'}{aws_apigatewayv2_api.http.execution_arn}/*/*"
                   lifecycle {
-                    create_before_destroy = true
+                    # create_before_destroy = true
                   }
                 }
             """.trimIndent()
@@ -1677,7 +1687,7 @@ internal fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
     
               source_arn = "${'$'}{aws_apigatewayv2_api.ws.execution_arn}/*/*"
               lifecycle {
-                create_before_destroy = true
+                # create_before_destroy = true
               }
             }
             
