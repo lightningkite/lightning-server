@@ -7,16 +7,18 @@ data class UpdateRestrictions<T>(
     /**
      * If the modification matches paths, then the condition is applied to the update
      */
-    val fields: List<Triple<Modification<T>, Condition<T>, Condition<T>>> = listOf()
+    val fields: List<Part<T>> = listOf()
 ) {
+    @Serializable
+    data class Part<T>(val path: KeyPathPartial<T>, val limitedIf: Condition<T>, val limitedTo: Condition<T>)
 
     operator fun invoke(on: Modification<T>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
-        for(pair in fields) {
-            if(on.matchesPath(pair.first)) {
-                totalConditions.add(pair.second)
-                if(pair.third !is Condition.Always) {
-                    if(!pair.third.invoke(on)) return Condition.Never()
+        for(field in fields) {
+            if(on.affects(field.path)) {
+                totalConditions.add(field.limitedIf)
+                if(field.limitedTo !is Condition.Always) {
+                    if(!field.limitedTo.guaranteedAfter(on)) return Condition.Never()
                 }
             }
         }
@@ -28,28 +30,20 @@ data class UpdateRestrictions<T>(
     }
 
     class Builder<T>(
-        val fields: ArrayList<Triple<Modification<T>, Condition<T>, Condition<T>>> = ArrayList()
+        val fields: ArrayList<Part<T>> = ArrayList()
     ) {
         val it = startChain<T>()
         fun KeyPath<T, *>.cannotBeModified() {
-            fields.add(Triple(
-                modification { (this@cannotBeModified as PropChain<T, Any?>).assign(null) }, Condition.Never(), Condition.Always()
-            ))
+            fields.add(Part(this, Condition.Never(), Condition.Always()))
         }
         infix fun KeyPath<T, *>.requires(condition: Condition<T>) {
-            fields.add(Triple(
-                modification { (this@requires as PropChain<T, Any?>).assign(null) }, condition, Condition.Always()
-            ))
+            fields.add(Part(this, condition, Condition.Always()))
         }
         fun <V> KeyPath<T, V>.restrict(requires: Condition<T>, valueMust: (KeyPath<V, V>)->Condition<V>) {
-            fields.add(Triple(
-                modification { (this@restrict as PropChain<T, Any?>).assign(null) }, requires, this.condition(valueMust)
-            ))
+            fields.add(Part(this, requires, this.condition(valueMust)))
         }
         fun <V> KeyPath<T, V>.mustBe(valueMust: (KeyPath<V, V>)->Condition<V>) {
-            fields.add(Triple(
-                modification { (this@mustBe as PropChain<T, Any?>).assign(null) }, Condition.Always(), this.condition(valueMust)
-            ))
+            fields.add(Part(this, Condition.Always(), this.condition(valueMust)))
         }
         fun build() = UpdateRestrictions(fields)
         fun include(mask: UpdateRestrictions<T>) { fields.addAll(mask.fields) }

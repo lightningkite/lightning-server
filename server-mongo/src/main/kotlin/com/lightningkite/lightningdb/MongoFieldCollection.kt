@@ -28,9 +28,9 @@ class MongoFieldCollection<Model : Any>(
 
     private fun sort(orderBy: List<SortPart<Model>>): Bson = Sorts.orderBy(orderBy.map {
         if (it.ascending)
-            Sorts.ascending(it.field.property.name)
+            Sorts.ascending(it.field.mongo)
         else
-            Sorts.descending(it.field.property.name)
+            Sorts.descending(it.field.mongo)
     })
 
     override suspend fun find(
@@ -70,17 +70,17 @@ class MongoFieldCollection<Model : Any>(
 
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
-        groupBy: KProperty1<Model, Key>,
+        groupBy: KeyPath<Model, Key>,
     ): Map<Key, Int> {
         prepare.await()
         return mongo.aggregate<BsonDocument>(
             match(condition.bson()),
-            group("\$" + groupBy.name, Accumulators.sum("count", 1))
+            group("\$" + groupBy.mongo, Accumulators.sum("count", 1))
         )
             .toList()
             .associate {
                 MongoDatabase.bson.load(
-                    KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!),
+                    KeyHolder.serializer(serializer.fieldSerializer(groupBy)),
                     it
                 )._id to it.getNumber("count").intValue()
             }
@@ -96,10 +96,10 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        property: KProperty1<Model, N>,
+        property: KeyPath<Model, N>,
     ): Double? {
         prepare.await()
-        return mongo.aggregate<BsonDocument>(match(condition.bson()), group(null, aggregate.asValueBson(property.name)))
+        return mongo.aggregate<BsonDocument>(match(condition.bson()), group(null, aggregate.asValueBson(property.mongo)))
             .toList()
             .map {
                 if (it.isNull("value")) null
@@ -111,18 +111,18 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        groupBy: KProperty1<Model, Key>,
-        property: KProperty1<Model, N>,
+        groupBy: KeyPath<Model, Key>,
+        property: KeyPath<Model, N>,
     ): Map<Key, Double?> {
         prepare.await()
         return mongo.aggregate<BsonDocument>(
             match(condition.bson()),
-            group("\$" + groupBy.name, aggregate.asValueBson(property.name))
+            group("\$" + groupBy.mongo, aggregate.asValueBson(property.mongo))
         )
             .toList()
             .associate {
                 MongoDatabase.bson.load(
-                    KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!),
+                    KeyHolder.serializer(serializer.fieldSerializer(groupBy)),
                     it
                 )._id to (if (it.isNull("value")) null else it.getNumber("value").doubleValue())
             }

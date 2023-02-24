@@ -2,20 +2,15 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningdb.Condition
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.future.await
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
-import kotlinx.serialization.descriptors.elementDescriptors
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.*
-import kotlin.reflect.KProperty1
 
 class DynamoDbCollection<T : Any>(
     val client: DynamoDbAsyncClient,
@@ -33,7 +28,7 @@ class DynamoDbCollection<T : Any>(
         maxQueryMs: Long = 30_000L,
     ): Flow<Pair<Map<String, AttributeValue>, T>> {
         //TODO: Need to use the serial name
-        val orderKey = orderBy.map { it.field.property.name }
+        val orderKey = orderBy.map { it.field.toString() }
         val index = indices[orderKey]
         val key = if (index != null) orderKey.first() else "_id"
         val c = condition.dynamo(serializer, key)
@@ -260,7 +255,7 @@ class DynamoDbCollection<T : Any>(
         }
     }
 
-    override suspend fun <Key> groupCount(condition: Condition<T>, groupBy: KProperty1<T, Key>): Map<Key, Int> {
+    override suspend fun <Key> groupCount(condition: Condition<T>, groupBy: KeyPath<T, Key>): Map<Key, Int> {
         val map = HashMap<Key, Int>()
         find(condition).collect {
             val key = groupBy.get(it)
@@ -272,7 +267,7 @@ class DynamoDbCollection<T : Any>(
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<T>,
-        property: KProperty1<T, N>,
+        property: KeyPath<T, N>,
     ): Double? {
         val a = aggregate.aggregator()
         find(condition).collect {
@@ -284,8 +279,8 @@ class DynamoDbCollection<T : Any>(
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<T>,
-        groupBy: KProperty1<T, Key>,
-        property: KProperty1<T, N>,
+        groupBy: KeyPath<T, Key>,
+        property: KeyPath<T, N>,
     ): Map<Key, Double?> {
         val map = HashMap<Key, Aggregator>()
         find(condition).collect {

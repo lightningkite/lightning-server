@@ -73,7 +73,7 @@ object Server : ServerPathGroup(ServerPath.root) {
             database().collection<User>()
                 .interceptCreate { it.copy(hashedPassword = it.hashedPassword.secureHash()) }
                 .interceptModification {
-                    it.map(User::hashedPassword) {
+                    it.map(startChain<User>().hashedPassword) {
                         when(it) {
                             is Modification.Assign -> it.copy(it.value.secureHash())
                             else -> throw IllegalStateException()

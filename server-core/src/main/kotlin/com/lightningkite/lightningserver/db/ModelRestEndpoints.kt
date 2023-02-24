@@ -315,7 +315,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         implementation = { user: USER, condition: GroupCountQuery<T> ->
             @Suppress("UNCHECKED_CAST")
             info.collection(user)
-                .groupCount(condition.condition, condition.groupBy.property as KProperty1<T, Any?>)
+                .groupCount(condition.condition, condition.groupBy as KeyPath<T, Any?>)
                 .mapKeys { it.key.toString() }
         }
     )
@@ -333,7 +333,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 .aggregate(
                     condition.aggregate,
                     condition.condition,
-                    condition.property.property as KProperty1<T, Number>
+                    condition.property as KeyPath<T, Number>
                 )
         }
     )
@@ -351,8 +351,8 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 .groupAggregate(
                     condition.aggregate,
                     condition.condition,
-                    condition.groupBy.property as KProperty1<T, Any?>,
-                    condition.property.property as KProperty1<T, Number>
+                    condition.groupBy as KeyPath<T, Any?>,
+                    condition.property as KeyPath<T, Number>
                 )
                 .mapKeys { it.key.toString() }
         }

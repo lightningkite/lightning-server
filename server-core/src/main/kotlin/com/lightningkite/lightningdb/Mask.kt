@@ -1,7 +1,6 @@
 package com.lightningkite.lightningdb
 
 import kotlinx.serialization.Serializable
-import kotlin.reflect.KProperty1
 
 @Serializable
 data class Mask<T>(
@@ -20,7 +19,7 @@ data class Mask<T>(
     fun permitSort(on: List<SortPart<T>>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
         for(pair in pairs) {
-            if(on.any { pair.second.matchesPath(it.field.property) }) totalConditions.add(pair.first)
+            if(on.any { pair.second.affects(it.field) }) totalConditions.add(pair.first)
         }
         return when(totalConditions.size) {
             0 -> Condition.Always()
@@ -28,10 +27,10 @@ data class Mask<T>(
             else -> Condition.And(totalConditions)
         }
     }
-    operator fun invoke(on: KProperty1<T, *>): Condition<T> {
+    operator fun invoke(on: KeyPathPartial<T>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
         for(pair in pairs) {
-            if(pair.second.matchesPath(on)) totalConditions.add(pair.first)
+            if(pair.second.affects(on)) totalConditions.add(pair.first)
         }
         return when(totalConditions.size) {
             0 -> Condition.Always()
@@ -42,7 +41,7 @@ data class Mask<T>(
     operator fun invoke(condition: Condition<T>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
         for(pair in pairs) {
-            if(condition.matchesPath(pair.second)) totalConditions.add(pair.first)
+            if(condition.readsResultOf(pair.second)) totalConditions.add(pair.first)
         }
         return when(totalConditions.size) {
             0 -> Condition.Always()

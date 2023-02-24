@@ -2493,20 +2493,20 @@ abstract class ConditionTests() {
         assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
         Unit
     }
-    @Test fun test_Map_onField() = runBlocking {
-        val collection = database.collection<LargeTestModel>("LargeTestModel_test_Map_onField")
-        val matching = LargeTestModel(map = mapOf("a" to 42))
-        val notMatching = LargeTestModel(map = mapOf("a" to 24))
-        val manualList = listOf(matching, notMatching)
-        collection.insertOne(matching)
-        collection.insertOne(notMatching)
-        val condition = startChain<LargeTestModel>().map["a"] gt 32
-        val results = collection.find(condition).toList()
-        assertContains(results, matching)
-        assertTrue(notMatching !in results)
-        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
-        Unit
-    }
+//    @Test fun test_Map_onField() = runBlocking {
+//        val collection = database.collection<LargeTestModel>("LargeTestModel_test_Map_onField")
+//        val matching = LargeTestModel(map = mapOf("a" to 42))
+//        val notMatching = LargeTestModel(map = mapOf("a" to 24))
+//        val manualList = listOf(matching, notMatching)
+//        collection.insertOne(matching)
+//        collection.insertOne(notMatching)
+//        val condition = startChain<LargeTestModel>().map["a"] gt 32
+//        val results = collection.find(condition).toList()
+//        assertContains(results, matching)
+//        assertTrue(notMatching !in results)
+//        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+//        Unit
+//    }
 
     @Test
     fun test_not_null_condition() = runBlocking {

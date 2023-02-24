@@ -2,7 +2,6 @@ package com.lightningkite.lightningdb
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlin.reflect.KProperty1
 
 open class ModelPermissionsFieldCollection<Model : Any>(
     override val wraps: FieldCollection<Model>,
@@ -38,7 +37,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
 
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
-        groupBy: KProperty1<Model, Key>
+        groupBy: KeyPath<Model, Key>
     ): Map<Key, Int> {
         return wraps.groupCount(
             condition and permissions.read and permissions.readMask(groupBy) and permissions.readMask(condition),
@@ -49,14 +48,14 @@ open class ModelPermissionsFieldCollection<Model : Any>(
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        property: KProperty1<Model, N>
+        property: KeyPath<Model, N>
     ): Double? = wraps.aggregate(aggregate, condition and permissions.read and permissions.readMask(condition), property)
 
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        groupBy: KProperty1<Model, Key>,
-        property: KProperty1<Model, N>
+        groupBy: KeyPath<Model, Key>,
+        property: KeyPath<Model, N>
     ): Map<Key, Double?> = wraps.groupAggregate(
         aggregate,
         condition and permissions.read and permissions.readMask(groupBy) and permissions.readMask(condition),

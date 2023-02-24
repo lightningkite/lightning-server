@@ -197,6 +197,7 @@ private val fromLightningServerPackage = setOf(
 )
 private val skipSet = fromLightningServerPackage + setOf(
     "SortPart",
+    "KeyPath",
     "KProperty1Partial",
 )
 private fun String.groupToInterfaceName(): String = replaceFirstChar { it.uppercase() } + "Api"

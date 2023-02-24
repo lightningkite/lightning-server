@@ -96,12 +96,12 @@ class SerializationTest {
         (startChain<LargeTestModel>().set.any { it eq 2 }).cycle()
         (startChain<LargeTestModel>().set.sizesEquals(2)).cycle()
         (startChain<LargeTestModel>().map.containsKey("asdf")).cycle()
-        startChain<LargeTestModel>().intNullable.toPropChain().notNull.gt(4).cycle()
+        startChain<LargeTestModel>().intNullable.toCMBuilder().notNull.gt(4).cycle()
     }
 
     @Test fun modifications() {
         ((startChain<LargeTestModel>().int assign 2) then (startChain<LargeTestModel>().boolean assign true)).cycle()
-        (startChain<LargeTestModel>().intNullable.toPropChain().notNull + 1).cycle()
+        (startChain<LargeTestModel>().intNullable.toCMBuilder().notNull + 1).cycle()
         (startChain<LargeTestModel>().int assign 2).cycle()
         (startChain<LargeTestModel>().int coerceAtMost 2).cycle()
         (startChain<LargeTestModel>().int coerceAtLeast 2).cycle()

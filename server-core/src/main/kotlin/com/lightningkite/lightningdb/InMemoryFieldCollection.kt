@@ -3,7 +3,6 @@ package com.lightningkite.lightningdb
 import kotlinx.coroutines.flow.*
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-import kotlin.reflect.KProperty1
 
 open class InMemoryFieldCollection<Model : Any>(val data: MutableList<Model> = ArrayList()) :
     AbstractSignalFieldCollection<Model>() {
@@ -39,21 +38,21 @@ open class InMemoryFieldCollection<Model : Any>(val data: MutableList<Model> = A
 
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
-        groupBy: KProperty1<Model, Key>,
+        groupBy: KeyPath<Model, Key>,
     ): Map<Key, Int> = data.groupingBy { groupBy.get(it) }.eachCount()
 
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        property: KProperty1<Model, N>,
+        property: KeyPath<Model, N>,
     ): Double? =
         data.asSequence().filter { condition(it) }.mapNotNull { property.get(it)?.toDouble() }.aggregate(aggregate)
 
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        groupBy: KProperty1<Model, Key>,
-        property: KProperty1<Model, N>,
+        groupBy: KeyPath<Model, Key>,
+        property: KeyPath<Model, N>,
     ): Map<Key, Double?> = data.asSequence().filter { condition(it) }
         .mapNotNull { groupBy.get(it) to (property.get(it)?.toDouble() ?: return@mapNotNull null) }.aggregate(aggregate)
 

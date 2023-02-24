@@ -13,7 +13,6 @@ import org.jetbrains.exposed.sql.SchemaUtils.statementsRequiredToActualizeScheme
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.sql.Connection.TRANSACTION_READ_COMMITTED
 import java.sql.Connection.TRANSACTION_SERIALIZABLE
-import kotlin.reflect.KProperty1
 
 class PostgresCollection<T : Any>(
     val db: Database,
@@ -48,7 +47,7 @@ class PostgresCollection<T : Any>(
         val items = t {
             table
                 .select { condition(condition, serializer, table).asOp() }
-                .orderBy(*orderBy.map { table.col[it.field.property.name]!! to if (it.ascending) SortOrder.ASC else SortOrder.DESC }
+                .orderBy(*orderBy.map { table.col[it.field.colName]!! to if (it.ascending) SortOrder.ASC else SortOrder.DESC }
                     .toTypedArray())
                 .limit(limit, skip.toLong())
 //                .prep
@@ -66,25 +65,25 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun <Key> groupCount(condition: Condition<T>, groupBy: KProperty1<T, Key>): Map<Key, Int> {
+    override suspend fun <Key> groupCount(condition: Condition<T>, groupBy: KeyPath<T, Key>): Map<Key, Int> {
         prepare.await()
         return t {
-            val groupCol = table.col[groupBy.name] as Column<Key>
+            val groupCol = table.col[groupBy.colName] as Column<Key>
             val count = Count(stringLiteral("*"))
             table.slice(groupCol, count)
                 .select { condition(condition, serializer, table).asOp() }
-                .groupBy(table.col[groupBy.name]!!).associate { it[groupCol] to it[count].toInt() }
+                .groupBy(table.col[groupBy.colName]!!).associate { it[groupCol] to it[count].toInt() }
         }
     }
 
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<T>,
-        property: KProperty1<T, N>,
+        property: KeyPath<T, N>,
     ): Double? {
         prepare.await()
         return t {
-            val valueCol = table.col[property.name] as Column<Number>
+            val valueCol = table.col[property.colName] as Column<Number>
             val agg = when(aggregate) {
                 Aggregate.Sum -> Sum(valueCol, DecimalColumnType(Int.MAX_VALUE, 8))
                 Aggregate.Average -> Avg<Double, Double>(valueCol, 8)
@@ -100,13 +99,13 @@ class PostgresCollection<T : Any>(
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<T>,
-        groupBy: KProperty1<T, Key>,
-        property: KProperty1<T, N>,
+        groupBy: KeyPath<T, Key>,
+        property: KeyPath<T, N>,
     ): Map<Key, Double?> {
         prepare.await()
         return t {
-            val groupCol = table.col[groupBy.name] as Column<Key>
-            val valueCol = table.col[property.name] as Column<Number>
+            val groupCol = table.col[groupBy.colName] as Column<Key>
+            val valueCol = table.col[property.colName] as Column<Number>
             val agg = when(aggregate) {
                 Aggregate.Sum -> Sum(valueCol, DoubleColumnType())
                 Aggregate.Average -> Avg<Double, Double>(valueCol, 8)
@@ -115,7 +114,7 @@ class PostgresCollection<T : Any>(
             }
             table.slice(groupCol, agg)
                 .select { condition(condition, serializer, table).asOp() }
-                .groupBy(table.col[groupBy.name]!!).associate { it[groupCol] to it[agg]?.toDouble() }
+                .groupBy(table.col[groupBy.colName]!!).associate { it[groupCol] to it[agg]?.toDouble() }
         }
     }
 
