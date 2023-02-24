@@ -16,6 +16,6 @@ data class ExternalAsyncTaskRequest(
     val createdAt: Instant = Instant.now(),
     val result: String? = null,
     val action: String? = null,
-    val lock: Instant = Instant.EPOCH,
+    val lastAttempt: Instant = Instant.EPOCH,
     val processingError: String? = null,
 ) : HasId<String>

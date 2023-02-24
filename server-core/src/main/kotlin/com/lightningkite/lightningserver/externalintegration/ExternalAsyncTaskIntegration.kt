@@ -21,6 +21,8 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.serializer
 import java.time.Duration
 import java.time.Instant
+import java.util.*
+import kotlin.collections.HashMap
 
 class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESULT>(
     path: ServerPath,
@@ -32,6 +34,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
     val checkFrequency: Duration = Duration.ofMinutes(15),
     val taskTimeout: Duration = Duration.ofMinutes(2),
     val checkChunking: Int = 15,
+    val name: String = path.segments.lastOrNull()?.toString() ?: "Task"
 ) : ServerPathGroup(path) {
     init {
         prepareModels()
@@ -47,7 +50,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
         getCollection = {
             database().collection<ExternalAsyncTaskRequest>(name = "$path/ExternalTaskRequest")
                 .postChange { old, new ->
-                    if ((new.lock < Instant.now().plus(taskTimeout)) && new.result != null) {
+                    if ((new.lastAttempt < Instant.now().plus(taskTimeout)) && new.result != null) {
                         runActionResult(new)
                     }
                 }
@@ -70,17 +73,13 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
                         delete = admin,
                     )
                 )
-        }
+        },
+        modelName = "${name.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }}Request"
     )
     init {
         path.docName = path.toString().replace("/", "_")
     }
-    val rest = ModelRestEndpoints(path("rest"), info).apply {
-        path.docName = this@ExternalAsyncTaskIntegration.path.docName
-    }
-    val admin = ModelAdminEndpoints(path("admin"), info).apply {
-        path.docName = this@ExternalAsyncTaskIntegration.path.docName
-    }
+    val rest = ModelRestEndpoints(path("rest").apply { docName = this@ExternalAsyncTaskIntegration.path.docName }, info)
 
     // Kick it off
     suspend fun <OURDATA> start(request: REQUEST, ourData: OURDATA, action: ResultAction<OURDATA, RESULT>): RESPONSE {
@@ -132,7 +131,10 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
                 info.collection()
                     .updateOneById(
                         sig._id,
-                        modification { it.processingError assign "No such handler '${sig.action}'" })
+                        modification {
+                            it.processingError assign "No such handler '${sig.action}'"
+                            it.lastAttempt assign Instant.now()
+                        })
                 return@task
             }
         } ?: return@task
@@ -150,7 +152,10 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
             }
             info.collection().deleteOneById(sig._id)
         } catch (e: Exception) {
-            info.collection().updateOneById(sig._id, modification { it.processingError assign e.stackTraceToString() })
+            info.collection().updateOneById(sig._id, modification {
+                it.processingError assign e.stackTraceToString()
+                it.lastAttempt assign Instant.now()
+            })
         }
     }
 
@@ -167,12 +172,12 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
 
     val recheck = schedule("$path/recheck", checkFrequency) {
         info.collection().find(condition {
-            (it.result neq null) and (it.expiresAt lt Instant.now())
+            (it.result neq null) and (it.expiresAt lt Instant.now()) and (it.lastAttempt lt Instant.now().plus(taskTimeout))
         }).collect {
             runActionResult(it)
         }
         info.collection().find(condition {
-            val notLocked = it.lock.lte(Instant.now().minus(taskTimeout))
+            val notLocked = it.lastAttempt.lte(Instant.now().minus(taskTimeout))
             val noError = it.processingError eq null
             val hasResult = it.result neq null
             notLocked and noError and hasResult

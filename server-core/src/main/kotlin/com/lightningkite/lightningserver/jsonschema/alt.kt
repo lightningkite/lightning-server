@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.jsonschema
 
-import com.charleskorn.kaml.Yaml
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
@@ -33,6 +32,7 @@ data class LightningServerSchema(
 
 @Serializable
 data class LightningServerSchemaModel(
+    val collectionName: String,
     @SerialName("\$ref") val ref: String? = null,
     val url: String,
     val searchFields: List<String>,
@@ -69,7 +69,8 @@ val lightningServerSchema: LightningServerSchema by lazy {
             )
         }.toList(),
         models = ModelRestEndpoints.all.associate {
-            it.info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.').kabobCase() to LightningServerSchemaModel(
+            it.collectionName.kabobCase() to LightningServerSchemaModel(
+                collectionName = it.collectionName.humanize(),
                 url = it.path.fullUrl(),
                 ref = builder.refString(it.info.serialization.serializer),
                 searchFields = it.info.serialization.serializer.descriptor.annotations

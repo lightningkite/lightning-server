@@ -13,7 +13,9 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> Mo
     crossinline getCollection: () -> FieldCollection<T>,
     crossinline forUser: suspend FieldCollection<T>.(user: USER) -> FieldCollection<T>,
     crossinline defaultItem: suspend (user: USER) -> T,
+    modelName: String = serializer<T>().descriptor.serialName.substringBefore('<').substringAfterLast('.')
 ) = object : ModelInfoWithDefault<USER, T, ID> {
+    override val collectionName: String = modelName
     override suspend fun defaultItem(user: USER): T = defaultItem(user)
     override fun collection(): FieldCollection<T> = getCollection()
     override suspend fun collection(user: USER): FieldCollection<T> =
@@ -26,7 +28,9 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ModelInfoWithDefault(
     getCollection: () -> FieldCollection<T>,
     forUser: suspend FieldCollection<T>.(user: USER) -> FieldCollection<T>,
     defaultItem: suspend (user: USER) -> T,
+    modelName: String = serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
 ) = object : ModelInfoWithDefault<USER, T, ID> {
+    override val collectionName: String = modelName
     override suspend fun defaultItem(user: USER): T = defaultItem(user)
     override fun collection(): FieldCollection<T> = getCollection()
     override suspend fun collection(user: USER): FieldCollection<T> =

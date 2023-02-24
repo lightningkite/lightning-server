@@ -19,7 +19,7 @@ val client = HttpClient(CIO) {
     }
 }
 
-class HttpResponseException(val response: HttpResponse, val body: String): Exception("Got response ${response.status}")
+class HttpResponseException(val response: HttpResponse, val body: String): Exception("Got response ${response.status}: ${body.take(300)}")
 suspend fun HttpResponse.statusFailing(): HttpResponse {
     if (!this.status.isSuccess()) throw HttpResponseException(this, bodyAsText())
     return this
