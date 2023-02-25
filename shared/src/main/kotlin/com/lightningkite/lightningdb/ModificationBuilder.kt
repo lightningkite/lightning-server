@@ -11,8 +11,16 @@ inline fun <T : IsCodableAndHashable> modification(setup: ModificationBuilder<T>
     }.build()
 }
 
+inline fun <T : IsCodableAndHashable> Modification<T>.and(setup: ModificationBuilder<T>.(KeyPath<T, T>) -> Unit): Modification<T> {
+    return ModificationBuilder<T>().apply {
+        modifications.add(this@and)
+        setup(startChain())
+    }.build()
+}
+
 class ModificationBuilder<K : IsCodableAndHashable>() {
     val modifications = ArrayList<Modification<K>>()
+    fun add(modification: Modification<K>) = modifications.add(modification)
     fun build(): Modification<K> = modifications.singleOrNull() ?: Modification.Chain(modifications)
 
     infix fun <T : IsCodableAndHashable> CMBuilder<K, T>.assign(value: T) {

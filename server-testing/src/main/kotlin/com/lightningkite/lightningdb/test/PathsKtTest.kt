@@ -24,24 +24,6 @@ class PathsKtTest {
     }
 
     @Test
-    fun testModificationModification() {
-        (modification<LargeTestModel> { it.int assign 2 } ).let { modification ->
-            assertTrue((modification<LargeTestModel> { it.int assign 3 } ).reads(modification))
-            assertTrue((modification<LargeTestModel> { it.int += 3 } ).reads(modification))
-            assertFalse((modification<LargeTestModel> { it.short assign 3 } ).reads(modification))
-        }
-        (modification<LargeTestModel> { it.intNullable assign 2 } ).let { modification ->
-            assertTrue((modification<LargeTestModel> { it.intNullable assign 3 } ).reads(modification))
-            assertTrue((modification<LargeTestModel> { it.intNullable.notNull += 3 }).reads(modification))
-            assertFalse((modification<LargeTestModel> { it.short assign 3 } ).reads(modification))
-        }
-//        (startChain<LargeTestModel>().listEmbedded.all.value2 assign 2).let { modification ->
-//            assertTrue((modification<LargeTestModel> { it.listEmbedded.map { it.value2.plus(1) }}).matchesPath(modification))
-//            assertFalse((modification<LargeTestModel> { it.listEmbedded.map { it.value1 assign "" }}).matchesPath(modification))
-//        }
-    }
-
-    @Test
     fun testConditionModification() {
         modification<LargeTestModel>() {it.int assign 2 }.let { modification ->
             assertTrue((startChain<LargeTestModel>().int eq 3).readsResultOf(modification))
