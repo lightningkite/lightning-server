@@ -11,12 +11,12 @@ class PathsKtTest {
 
     @Test
     fun testModificationKProperty1() {
-        (startChain<LargeTestModel>().int).let { modification ->
+        (path<LargeTestModel>().int).let { modification ->
             assertTrue(modification<LargeTestModel>{it.int assign 3}.affects(modification))
             assertTrue(modification<LargeTestModel>{it.int += 3}.affects(modification))
             assertFalse(modification<LargeTestModel>{it.short assign 3}.affects(modification))
         }
-        (startChain<LargeTestModel>().intNullable).let { modification ->
+        (path<LargeTestModel>().intNullable).let { modification ->
             assertTrue(modification<LargeTestModel>{it.intNullable assign 3}.affects(modification))
             assertTrue(modification<LargeTestModel>() { it.intNullable.notNull += 3 }.affects(modification))
             assertFalse(modification<LargeTestModel>{it.short assign 3}.affects(modification))
@@ -26,42 +26,42 @@ class PathsKtTest {
     @Test
     fun testConditionModification() {
         modification<LargeTestModel>() {it.int assign 2 }.let { modification ->
-            assertTrue((startChain<LargeTestModel>().int eq 3).readsResultOf(modification))
-            assertTrue((startChain<LargeTestModel>().int gt 3).readsResultOf(modification))
-            assertFalse((startChain<LargeTestModel>().short eq 3).readsResultOf(modification))
-            assertFalse((startChain<LargeTestModel>().always).readsResultOf(modification))
+            assertTrue((path<LargeTestModel>().int eq 3).readsResultOf(modification))
+            assertTrue((path<LargeTestModel>().int gt 3).readsResultOf(modification))
+            assertFalse((path<LargeTestModel>().short eq 3).readsResultOf(modification))
+            assertFalse((path<LargeTestModel>().always).readsResultOf(modification))
         }
         modification<LargeTestModel>() {it.intNullable assign 2 }.let { modification ->
-            assertTrue((startChain<LargeTestModel>().intNullable eq 3).readsResultOf(modification))
-            assertTrue((startChain<LargeTestModel>().intNullable.notNull gt 3).readsResultOf(modification))
-            assertFalse((startChain<LargeTestModel>().short eq 3).readsResultOf(modification))
-            assertFalse((startChain<LargeTestModel>().always).readsResultOf(modification))
+            assertTrue((path<LargeTestModel>().intNullable eq 3).readsResultOf(modification))
+            assertTrue((path<LargeTestModel>().intNullable.notNull gt 3).readsResultOf(modification))
+            assertFalse((path<LargeTestModel>().short eq 3).readsResultOf(modification))
+            assertFalse((path<LargeTestModel>().always).readsResultOf(modification))
         }
     }
 
     @Test
     fun testConditionKProperty1() {
-        (startChain<LargeTestModel>().int).let { modification ->
-            assertTrue((startChain<LargeTestModel>().int eq 3).reads(modification))
-            assertTrue((startChain<LargeTestModel>().int gt 3).reads(modification))
-            assertFalse((startChain<LargeTestModel>().short eq 3).reads(modification))
+        (path<LargeTestModel>().int).let { modification ->
+            assertTrue((path<LargeTestModel>().int eq 3).reads(modification))
+            assertTrue((path<LargeTestModel>().int gt 3).reads(modification))
+            assertFalse((path<LargeTestModel>().short eq 3).reads(modification))
         }
-        (startChain<LargeTestModel>().intNullable).let { modification ->
-            assertTrue((startChain<LargeTestModel>().intNullable eq 3).reads(modification))
-            assertTrue((startChain<LargeTestModel>().intNullable.notNull gt 3).reads(modification))
-            assertFalse((startChain<LargeTestModel>().short eq 3).reads(modification))
+        (path<LargeTestModel>().intNullable).let { modification ->
+            assertTrue((path<LargeTestModel>().intNullable eq 3).reads(modification))
+            assertTrue((path<LargeTestModel>().intNullable.notNull gt 3).reads(modification))
+            assertFalse((path<LargeTestModel>().short eq 3).reads(modification))
         }
     }
 
     @Test
     fun testConditionModificationPasses() {
-        (startChain<LargeTestModel>().int gt 2).let { condition ->
+        (path<LargeTestModel>().int gt 2).let { condition ->
             assertFalse(condition.readsResultOf(modification { it.int assign 2 }))
             assertTrue(condition.readsResultOf(modification { it.int assign 3 }))
             assertFalse(condition.readsResultOf(modification { it.int += 1 }))
             assertTrue(condition.readsResultOf(modification { it.short += 1 }))
         }
-        (startChain<LargeTestModel>().intNullable.notNull gt 2).let { condition ->
+        (path<LargeTestModel>().intNullable.notNull gt 2).let { condition ->
             assertFalse(condition.readsResultOf(modification { it.intNullable assign 2 }))
             assertFalse(condition.readsResultOf(modification { it.intNullable assign null }))
             assertTrue(condition.readsResultOf(modification { it.intNullable assign 3 }))

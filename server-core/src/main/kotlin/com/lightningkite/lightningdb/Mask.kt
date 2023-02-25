@@ -52,7 +52,7 @@ data class Mask<T>(
     class Builder<T>(
         val pairs: ArrayList<Pair<Condition<T>, Modification<T>>> = ArrayList()
     ) {
-        val it = startChain<T>()
+        val it = path<T>()
         infix fun <V> KeyPath<T, V>.maskedTo(value: V) = mapModification(Modification.Assign(value))
         infix fun Modification<T>.unless(condition: Condition<T>) {
             pairs.add(condition to this)

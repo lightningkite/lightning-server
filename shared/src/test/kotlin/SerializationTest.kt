@@ -3,7 +3,6 @@
 package com.lightningkite.lightningdb
 
 import kotlinx.serialization.*
-import kotlinx.serialization.internal.GeneratedSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.properties.Properties
 import kotlinx.serialization.properties.decodeFromStringMap
@@ -36,14 +35,14 @@ class SerializationTest {
 
     @Test fun demoConditions() {
         Condition.Equal(2).cycle()
-        (startChain<User>().email eq "Dan").cycle()
-        (startChain<User>().email eq "Dan").cycle()
-        (startChain<Post>().content eq "Lightning Kite").cycle()
+        (path<User>().email eq "Dan").cycle()
+        (path<User>().email eq "Dan").cycle()
+        (path<Post>().content eq "Lightning Kite").cycle()
     }
     @Test fun demoModifications() {
         Modification.Assign(2).cycle()
-        (startChain<User>().email assign "Dan").cycle()
-        (startChain<Post>().content assign "Lightning Kite").cycle()
+        (path<User>().email assign "Dan").cycle()
+        (path<Post>().content assign "Lightning Kite").cycle()
     }
     @Test fun demoSorts() {
         listOf(SortPart(User::email), SortPart(User::age, ascending = false)).cycle()
@@ -69,7 +68,7 @@ class SerializationTest {
     }
 
     @Test fun conditions() {
-        val sampleCondition = startChain<LargeTestModel>().int eq 2
+        val sampleCondition = path<LargeTestModel>().int eq 2
         val sampleInstance = LargeTestModel()
         Condition.Never<LargeTestModel>().cycle()
         Condition.Always<LargeTestModel>().cycle()
@@ -80,49 +79,49 @@ class SerializationTest {
         Condition.NotEqual(sampleInstance).cycle()
         Condition.Inside(listOf(sampleInstance)).cycle()
         Condition.NotInside(listOf(sampleInstance)).cycle()
-        (startChain<LargeTestModel>().int gt 2).cycle()
-        (startChain<LargeTestModel>().int lt 2).cycle()
-        (startChain<LargeTestModel>().int gte 2).cycle()
-        (startChain<LargeTestModel>().int lte 2).cycle()
-        (startChain<LargeTestModel>().string.contains("asdf", ignoreCase = true)).cycle()
-        (startChain<LargeTestModel>().int.allClear(1)).cycle()
-        (startChain<LargeTestModel>().int.allSet(1)).cycle()
-        (startChain<LargeTestModel>().int.anyClear(1)).cycle()
-        (startChain<LargeTestModel>().int.anySet(1)).cycle()
-        (startChain<LargeTestModel>().list.all { it eq 2 }).cycle()
-        (startChain<LargeTestModel>().list.any { it eq 2 }).cycle()
-        (startChain<LargeTestModel>().list.sizesEquals(2)).cycle()
-        (startChain<LargeTestModel>().set.all { it eq 2 }).cycle()
-        (startChain<LargeTestModel>().set.any { it eq 2 }).cycle()
-        (startChain<LargeTestModel>().set.sizesEquals(2)).cycle()
-        (startChain<LargeTestModel>().map.containsKey("asdf")).cycle()
-        startChain<LargeTestModel>().intNullable.toCMBuilder().notNull.gt(4).cycle()
+        (path<LargeTestModel>().int gt 2).cycle()
+        (path<LargeTestModel>().int lt 2).cycle()
+        (path<LargeTestModel>().int gte 2).cycle()
+        (path<LargeTestModel>().int lte 2).cycle()
+        (path<LargeTestModel>().string.contains("asdf", ignoreCase = true)).cycle()
+        (path<LargeTestModel>().int.allClear(1)).cycle()
+        (path<LargeTestModel>().int.allSet(1)).cycle()
+        (path<LargeTestModel>().int.anyClear(1)).cycle()
+        (path<LargeTestModel>().int.anySet(1)).cycle()
+        (path<LargeTestModel>().list.all { it eq 2 }).cycle()
+        (path<LargeTestModel>().list.any { it eq 2 }).cycle()
+        (path<LargeTestModel>().list.sizesEquals(2)).cycle()
+        (path<LargeTestModel>().set.all { it eq 2 }).cycle()
+        (path<LargeTestModel>().set.any { it eq 2 }).cycle()
+        (path<LargeTestModel>().set.sizesEquals(2)).cycle()
+        (path<LargeTestModel>().map.containsKey("asdf")).cycle()
+        path<LargeTestModel>().intNullable.toCMBuilder().notNull.gt(4).cycle()
     }
 
     @Test fun modifications() {
-        ((startChain<LargeTestModel>().int assign 2) then (startChain<LargeTestModel>().boolean assign true)).cycle()
-        (startChain<LargeTestModel>().intNullable.toCMBuilder().notNull + 1).cycle()
-        (startChain<LargeTestModel>().int assign 2).cycle()
-        (startChain<LargeTestModel>().int coerceAtMost 2).cycle()
-        (startChain<LargeTestModel>().int coerceAtLeast 2).cycle()
-        (startChain<LargeTestModel>().int + 2).cycle()
-        (startChain<LargeTestModel>().int * 2).cycle()
-        (startChain<LargeTestModel>().string + "asdf").cycle()
-        (startChain<LargeTestModel>().list + listOf(1, 2, 3)).cycle()
-        (startChain<LargeTestModel>().list.removeAll { it eq 2 }).cycle()
-        (startChain<LargeTestModel>().list.removeAll(listOf(1, 2))).cycle()
-        (startChain<LargeTestModel>().list.dropFirst()).cycle()
-        (startChain<LargeTestModel>().list.dropLast()).cycle()
-        (startChain<LargeTestModel>().set.removeAll { it eq 2 }).cycle()
-        (startChain<LargeTestModel>().set.removeAll(setOf(1, 2))).cycle()
-        (startChain<LargeTestModel>().set.dropFirst()).cycle()
-        (startChain<LargeTestModel>().set.dropLast()).cycle()
-        (startChain<LargeTestModel>().list.map { it + 2 }).cycle()
-        (startChain<LargeTestModel>().map + mapOf("c" to 3)).cycle()
-        (startChain<LargeTestModel>().map.modifyByKey(mapOf(
+        ((path<LargeTestModel>().int assign 2) then (path<LargeTestModel>().boolean assign true)).cycle()
+        (path<LargeTestModel>().intNullable.toCMBuilder().notNull + 1).cycle()
+        (path<LargeTestModel>().int assign 2).cycle()
+        (path<LargeTestModel>().int coerceAtMost 2).cycle()
+        (path<LargeTestModel>().int coerceAtLeast 2).cycle()
+        (path<LargeTestModel>().int + 2).cycle()
+        (path<LargeTestModel>().int * 2).cycle()
+        (path<LargeTestModel>().string + "asdf").cycle()
+        (path<LargeTestModel>().list + listOf(1, 2, 3)).cycle()
+        (path<LargeTestModel>().list.removeAll { it eq 2 }).cycle()
+        (path<LargeTestModel>().list.removeAll(listOf(1, 2))).cycle()
+        (path<LargeTestModel>().list.dropFirst()).cycle()
+        (path<LargeTestModel>().list.dropLast()).cycle()
+        (path<LargeTestModel>().set.removeAll { it eq 2 }).cycle()
+        (path<LargeTestModel>().set.removeAll(setOf(1, 2))).cycle()
+        (path<LargeTestModel>().set.dropFirst()).cycle()
+        (path<LargeTestModel>().set.dropLast()).cycle()
+        (path<LargeTestModel>().list.map { it + 2 }).cycle()
+        (path<LargeTestModel>().map + mapOf("c" to 3)).cycle()
+        (path<LargeTestModel>().map.modifyByKey(mapOf(
             "c" to { it + 1 }
         ))).cycle()
-        (startChain<LargeTestModel>().map.removeKeys(setOf("a"))).cycle()
+        (path<LargeTestModel>().map.removeKeys(setOf("a"))).cycle()
     }
 
     @Test fun keyPaths() {

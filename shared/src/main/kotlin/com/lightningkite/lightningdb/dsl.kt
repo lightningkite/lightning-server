@@ -15,10 +15,10 @@ fun <From : IsCodableAndHashable, To : IsCodableAndHashable> KeyPath<From, To>.t
     mapModification = { it: Modification<To> -> mapModification(it) },
 )
 
-fun <T : IsCodableAndHashable> startChain(): KeyPath<T, T> = KeyPathSelf()
+fun <T : IsCodableAndHashable> path(): KeyPath<T, T> = KeyPathSelf()
 
 inline fun <T : IsCodableAndHashable> condition(setup: (KeyPath<T, T>) -> Condition<T>): Condition<T> =
-    startChain<T>().let(setup)
+    path<T>().let(setup)
 
 fun <K : IsCodableAndHashable, V : IsCodableAndHashable> KeyPath<K, V>.mapCondition(condition: Condition<V>): Condition<K> {
     @Suppress("UNCHECKED_CAST")
@@ -62,15 +62,15 @@ infix fun <K : IsCodableAndHashable> KeyPath<K, Int>.anySet(mask: Int) = mapCond
 infix fun <K : IsCodableAndHashable> KeyPath<K, String>.contains(value: String) = mapCondition(Condition.StringContains(value, ignoreCase = true))
 @JsName("xKeyPathContainsCased") fun <K : IsCodableAndHashable> KeyPath<K, String>.contains(value: String, ignoreCase: Boolean) = mapCondition(Condition.StringContains(value, ignoreCase = ignoreCase))
 fun <K : IsCodableAndHashable, V : IsCodableAndHashable> KeyPath<K, V>.fullTextSearch(value: String, ignoreCase: Boolean, ) = mapCondition(Condition.FullTextSearch<V>(value, ignoreCase = ignoreCase))
-@JsName("xKeyPathListAll") @JvmName("listAll") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, List<T>>.all(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAllElements(startChain<T>().let(condition)))
-@JsName("xKeyPathListAny") @JvmName("listAny") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, List<T>>.any(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAnyElements(startChain<T>().let(condition)))
+@JsName("xKeyPathListAll") @JvmName("listAll") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, List<T>>.all(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAllElements(path<T>().let(condition)))
+@JsName("xKeyPathListAny") @JvmName("listAny") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, List<T>>.any(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAnyElements(path<T>().let(condition)))
 @JsName("xKeyPathListSizedEqual") @JvmName("listSizedEqual") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, List<T>>.sizesEquals(count: Int) = mapCondition(Condition.ListSizesEquals(count))
-@JsName("xKeyPathSetAll") @JvmName("setAll") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Set<T>>.all(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.SetAllElements(startChain<T>().let(condition)))
-@JsName("xKeyPathSetAny") @JvmName("setAny") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Set<T>>.any(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.SetAnyElements(startChain<T>().let(condition)))
+@JsName("xKeyPathSetAll") @JvmName("setAll") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Set<T>>.all(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.SetAllElements(path<T>().let(condition)))
+@JsName("xKeyPathSetAny") @JvmName("setAny") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Set<T>>.any(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.SetAnyElements(path<T>().let(condition)))
 @JsName("xKeyPathSetSizedEqual") @JvmName("setSizedEqual") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Set<T>>.sizesEquals(count: Int) = mapCondition(Condition.SetSizesEquals(count))
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Map<String, T>>.containsKey(key: String) = mapCondition(Condition.Exists(key))
-inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, T>.condition(make: (KeyPath<T, T>) -> Condition<T>): Condition<K> = mapCondition(make(startChain<T>()))
-inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, T>.modification(make: (KeyPath<T, T>) -> Modification<T>): Modification<K> = mapModification(make(startChain<T>()))
+inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, T>.condition(make: (KeyPath<T, T>) -> Condition<T>): Condition<K> = mapCondition(make(path<T>()))
+inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, T>.modification(make: (KeyPath<T, T>) -> Modification<T>): Modification<K> = mapModification(make(path<T>()))
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, T>.assign(value: T) = mapModification(Modification.Assign(value))
 infix fun <K : IsCodableAndHashable, T : Comparable<T>> KeyPath<K, T>.coerceAtMost(value: T) = mapModification(Modification.CoerceAtMost(value))
 infix fun <K : IsCodableAndHashable, T : Comparable<T>> KeyPath<K, T>.coerceAtLeast(value: T) = mapModification(Modification.CoerceAtLeast(value))
@@ -83,23 +83,23 @@ infix operator fun <K : IsCodableAndHashable, T : Number> KeyPath<K, T>.times(by
 @JsName("xKeyPathPlusItemSet") @JvmName("plusSet") infix operator fun <K : IsCodableAndHashable, T> KeyPath<K, Set<T>>.plus(item: T) = mapModification(Modification.SetAppend(setOf(item)))
 @JsName("xKeyPathListAddAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, List<T>>.addAll(items: List<T>) = mapModification(Modification.ListAppend(items))
 @JsName("xKeyPathSetAddAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Set<T>>.addAll(items: Set<T>) = mapModification(Modification.SetAppend(items))
-@JsName("xKeyPathListRemove") @JvmName("listRemoveAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, List<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) = mapModification(Modification.ListRemove(startChain<T>().let(condition)))
-@JsName("xKeyPathSetRemove") @JvmName("setRemoveAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Set<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) = mapModification(Modification.SetRemove(startChain<T>().let(condition)))
+@JsName("xKeyPathListRemove") @JvmName("listRemoveAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, List<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) = mapModification(Modification.ListRemove(path<T>().let(condition)))
+@JsName("xKeyPathSetRemove") @JvmName("setRemoveAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Set<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) = mapModification(Modification.SetRemove(path<T>().let(condition)))
 @JsName("xKeyPathListRemoveAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, List<T>>.removeAll(items: List<T>) = mapModification(Modification.ListRemoveInstances(items))
 @JsName("xKeyPathSetRemoveAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Set<T>>.removeAll(items: Set<T>) = mapModification(Modification.SetRemoveInstances(items))
 @JsName("xKeyPathListDropLast") @JvmName("listDropLast") fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, List<T>>.dropLast() = mapModification(Modification.ListDropLast())
 @JsName("xKeyPathSetDropLast") @JvmName("setDropLast") fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Set<T>>.dropLast() = mapModification(Modification.SetDropLast())
 @JsName("xKeyPathListDropFirst") @JvmName("listDropFirst") fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, List<T>>.dropFirst() = mapModification(Modification.ListDropFirst())
 @JsName("xKeyPathSetDropFirst") @JvmName("setDropFirst") fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Set<T>>.dropFirst() = mapModification(Modification.SetDropFirst())
-@JsName("xKeyPathListMap") @JvmName("listMap") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, List<T>>.map(modification: (KeyPath<T, T>) -> Modification<T>) = mapModification(Modification.ListPerElement(condition = Condition.Always<T>(), startChain<T>().let(modification)))
-@JsName("xKeyPathSetMap") @JvmName("setMap") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Set<T>>.map(modification: (KeyPath<T, T>) -> Modification<T>) = mapModification(Modification.SetPerElement(condition = Condition.Always<T>(), startChain<T>().let(modification)))
+@JsName("xKeyPathListMap") @JvmName("listMap") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, List<T>>.map(modification: (KeyPath<T, T>) -> Modification<T>) = mapModification(Modification.ListPerElement(condition = Condition.Always<T>(), path<T>().let(modification)))
+@JsName("xKeyPathSetMap") @JvmName("setMap") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Set<T>>.map(modification: (KeyPath<T, T>) -> Modification<T>) = mapModification(Modification.SetPerElement(condition = Condition.Always<T>(), path<T>().let(modification)))
 @JsName("xKeyPathListMapIf") @JvmName("listMapIf") inline fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, List<T>>.mapIf(
     condition: (KeyPath<T, T>) -> Condition<T>,
     modification: (KeyPath<T, T>) -> Modification<T>,
 ) = mapModification(
     Modification.ListPerElement(
-        condition = startChain<T>().let(condition),
-        startChain<T>().let(modification)
+        condition = path<T>().let(condition),
+        path<T>().let(modification)
     )
 )
 
@@ -108,13 +108,13 @@ infix operator fun <K : IsCodableAndHashable, T : Number> KeyPath<K, T>.times(by
     modification: (KeyPath<T, T>) -> Modification<T>,
 ) = mapModification(
     Modification.SetPerElement(
-        condition = startChain<T>().let(condition),
-        startChain<T>().let(modification)
+        condition = path<T>().let(condition),
+        path<T>().let(modification)
     )
 )
 
 @JsName("xKeyPathPlusMap") infix operator fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Map<String, T>>.plus(map: Map<String, T>) = mapModification(Modification.Combine(map))
-infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Map<String, T>>.modifyByKey(map: Map<String, (KeyPath<T, T>) -> Modification<T>>) = mapModification(Modification.ModifyByKey(map.mapValues { startChain<T>().let(it.value) }))
+infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Map<String, T>>.modifyByKey(map: Map<String, (KeyPath<T, T>) -> Modification<T>>) = mapModification(Modification.ModifyByKey(map.mapValues { path<T>().let(it.value) }))
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> KeyPath<K, Map<String, T>>.removeKeys(fields: Set<String>) = mapModification(Modification.RemoveKeys(fields))
 
 
@@ -143,15 +143,15 @@ infix fun <K : IsCodableAndHashable> CMBuilder<K, Int>.anySet(mask: Int) = mapCo
 infix fun <K : IsCodableAndHashable> CMBuilder<K, String>.contains(value: String) = mapCondition(Condition.StringContains(value, ignoreCase = true))
 @JsName("xCMBuilderContainsCased") fun <K : IsCodableAndHashable> CMBuilder<K, String>.contains(value: String, ignoreCase: Boolean) = mapCondition(Condition.StringContains(value, ignoreCase = ignoreCase))
 fun <K : IsCodableAndHashable, V : IsCodableAndHashable> CMBuilder<K, V>.fullTextSearch(value: String, ignoreCase: Boolean, ) = mapCondition(Condition.FullTextSearch<V>(value, ignoreCase = ignoreCase))
-@JsName("xCMBuilderListAll") @JvmName("listAll") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, List<T>>.all(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAllElements(startChain<T>().let(condition)))
-@JsName("xCMBuilderListAny") @JvmName("listAny") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, List<T>>.any(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAnyElements(startChain<T>().let(condition)))
+@JsName("xCMBuilderListAll") @JvmName("listAll") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, List<T>>.all(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAllElements(path<T>().let(condition)))
+@JsName("xCMBuilderListAny") @JvmName("listAny") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, List<T>>.any(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAnyElements(path<T>().let(condition)))
 @JsName("xCMBuilderListSizedEqual") @JvmName("listSizedEqual") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, List<T>>.sizesEquals(count: Int) = mapCondition(Condition.ListSizesEquals(count))
-@JsName("xCMBuilderSetAll") @JvmName("setAll") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Set<T>>.all(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.SetAllElements(startChain<T>().let(condition)))
-@JsName("xCMBuilderSetAny") @JvmName("setAny") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Set<T>>.any(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.SetAnyElements(startChain<T>().let(condition)))
+@JsName("xCMBuilderSetAll") @JvmName("setAll") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Set<T>>.all(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.SetAllElements(path<T>().let(condition)))
+@JsName("xCMBuilderSetAny") @JvmName("setAny") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Set<T>>.any(condition: (KeyPath<T, T>) -> Condition<T>) = mapCondition(Condition.SetAnyElements(path<T>().let(condition)))
 @JsName("xCMBuilderSetSizedEqual") @JvmName("setSizedEqual") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Set<T>>.sizesEquals(count: Int) = mapCondition(Condition.SetSizesEquals(count))
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Map<String, T>>.containsKey(key: String) = mapCondition(Condition.Exists(key))
-inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, T>.condition(make: (KeyPath<T, T>) -> Condition<T>): Condition<K> = mapCondition(make(startChain<T>()))
-inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, T>.modification(make: (KeyPath<T, T>) -> Modification<T>): Modification<K> = mapModification(make(startChain<T>()))
+inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, T>.condition(make: (KeyPath<T, T>) -> Condition<T>): Condition<K> = mapCondition(make(path<T>()))
+inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, T>.modification(make: (KeyPath<T, T>) -> Modification<T>): Modification<K> = mapModification(make(path<T>()))
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, T>.assign(value: T) = mapModification(Modification.Assign(value))
 infix fun <K : IsCodableAndHashable, T : Comparable<T>> CMBuilder<K, T>.coerceAtMost(value: T) = mapModification(Modification.CoerceAtMost(value))
 infix fun <K : IsCodableAndHashable, T : Comparable<T>> CMBuilder<K, T>.coerceAtLeast(value: T) = mapModification(Modification.CoerceAtLeast(value))
@@ -164,23 +164,23 @@ infix operator fun <K : IsCodableAndHashable, T : Number> CMBuilder<K, T>.times(
 @JsName("xCMBuilderPlusItemSet") @JvmName("plusSet") infix operator fun <K : IsCodableAndHashable, T> CMBuilder<K, Set<T>>.plus(item: T) = mapModification(Modification.SetAppend(setOf(item)))
 @JsName("xCMBuilderListAddAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, List<T>>.addAll(items: List<T>) = mapModification(Modification.ListAppend(items))
 @JsName("xCMBuilderSetAddAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Set<T>>.addAll(items: Set<T>) = mapModification(Modification.SetAppend(items))
-@JsName("xCMBuilderListRemove") @JvmName("listRemoveAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, List<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) = mapModification(Modification.ListRemove(startChain<T>().let(condition)))
-@JsName("xCMBuilderSetRemove") @JvmName("setRemoveAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Set<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) = mapModification(Modification.SetRemove(startChain<T>().let(condition)))
+@JsName("xCMBuilderListRemove") @JvmName("listRemoveAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, List<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) = mapModification(Modification.ListRemove(path<T>().let(condition)))
+@JsName("xCMBuilderSetRemove") @JvmName("setRemoveAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Set<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) = mapModification(Modification.SetRemove(path<T>().let(condition)))
 @JsName("xCMBuilderListRemoveAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, List<T>>.removeAll(items: List<T>) = mapModification(Modification.ListRemoveInstances(items))
 @JsName("xCMBuilderSetRemoveAll") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Set<T>>.removeAll(items: Set<T>) = mapModification(Modification.SetRemoveInstances(items))
 @JsName("xCMBuilderListDropLast") @JvmName("listDropLast") fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, List<T>>.dropLast() = mapModification(Modification.ListDropLast())
 @JsName("xCMBuilderSetDropLast") @JvmName("setDropLast") fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Set<T>>.dropLast() = mapModification(Modification.SetDropLast())
 @JsName("xCMBuilderListDropFirst") @JvmName("listDropFirst") fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, List<T>>.dropFirst() = mapModification(Modification.ListDropFirst())
 @JsName("xCMBuilderSetDropFirst") @JvmName("setDropFirst") fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Set<T>>.dropFirst() = mapModification(Modification.SetDropFirst())
-@JsName("xCMBuilderListMap") @JvmName("listMap") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, List<T>>.map(modification: (KeyPath<T, T>) -> Modification<T>) = mapModification(Modification.ListPerElement(condition = Condition.Always<T>(), startChain<T>().let(modification)))
-@JsName("xCMBuilderSetMap") @JvmName("setMap") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Set<T>>.map(modification: (KeyPath<T, T>) -> Modification<T>) = mapModification(Modification.SetPerElement(condition = Condition.Always<T>(), startChain<T>().let(modification)))
+@JsName("xCMBuilderListMap") @JvmName("listMap") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, List<T>>.map(modification: (KeyPath<T, T>) -> Modification<T>) = mapModification(Modification.ListPerElement(condition = Condition.Always<T>(), path<T>().let(modification)))
+@JsName("xCMBuilderSetMap") @JvmName("setMap") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Set<T>>.map(modification: (KeyPath<T, T>) -> Modification<T>) = mapModification(Modification.SetPerElement(condition = Condition.Always<T>(), path<T>().let(modification)))
 @JsName("xCMBuilderListMapIf") @JvmName("listMapIf") inline fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, List<T>>.mapIf(
     condition: (KeyPath<T, T>) -> Condition<T>,
     modification: (KeyPath<T, T>) -> Modification<T>,
 ) = mapModification(
     Modification.ListPerElement(
-        condition = startChain<T>().let(condition),
-        startChain<T>().let(modification)
+        condition = path<T>().let(condition),
+        path<T>().let(modification)
     )
 )
 
@@ -189,13 +189,13 @@ infix operator fun <K : IsCodableAndHashable, T : Number> CMBuilder<K, T>.times(
     modification: (KeyPath<T, T>) -> Modification<T>,
 ) = mapModification(
     Modification.SetPerElement(
-        condition = startChain<T>().let(condition),
-        startChain<T>().let(modification)
+        condition = path<T>().let(condition),
+        path<T>().let(modification)
     )
 )
 
 @JsName("xCMBuilderPlusMap") infix operator fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Map<String, T>>.plus(map: Map<String, T>) = mapModification(Modification.Combine(map))
-infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Map<String, T>>.modifyByKey(map: Map<String, (KeyPath<T, T>) -> Modification<T>>) = mapModification(Modification.ModifyByKey(map.mapValues { startChain<T>().let(it.value) }))
+infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Map<String, T>>.modifyByKey(map: Map<String, (KeyPath<T, T>) -> Modification<T>>) = mapModification(Modification.ModifyByKey(map.mapValues { path<T>().let(it.value) }))
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Map<String, T>>.removeKeys(fields: Set<String>) = mapModification(Modification.RemoveKeys(fields))
 
 

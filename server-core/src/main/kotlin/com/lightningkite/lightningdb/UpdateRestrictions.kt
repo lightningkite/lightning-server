@@ -32,14 +32,14 @@ data class UpdateRestrictions<T>(
     class Builder<T>(
         val fields: ArrayList<Part<T>> = ArrayList()
     ) {
-        val it = startChain<T>()
+        val it = path<T>()
         fun KeyPath<T, *>.cannotBeModified() {
             fields.add(Part(this, Condition.Never(), Condition.Always()))
         }
         infix fun KeyPath<T, *>.requires(condition: Condition<T>) {
             fields.add(Part(this, condition, Condition.Always()))
         }
-        fun <V> KeyPath<T, V>.restrict(requires: Condition<T>, valueMust: (KeyPath<V, V>)->Condition<V>) {
+        fun <V> KeyPath<T, V>.requires(requires: Condition<T>, valueMust: (KeyPath<V, V>)->Condition<V>) {
             fields.add(Part(this, requires, this.condition(valueMust)))
         }
         fun <V> KeyPath<T, V>.mustBe(valueMust: (KeyPath<V, V>)->Condition<V>) {

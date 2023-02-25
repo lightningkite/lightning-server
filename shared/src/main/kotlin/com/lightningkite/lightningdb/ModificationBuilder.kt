@@ -7,14 +7,14 @@ import com.lightningkite.khrysalis.SharedCode
 
 inline fun <T : IsCodableAndHashable> modification(setup: ModificationBuilder<T>.(KeyPath<T, T>) -> Unit): Modification<T> {
     return ModificationBuilder<T>().apply {
-        setup(startChain())
+        setup(path())
     }.build()
 }
 
 inline fun <T : IsCodableAndHashable> Modification<T>.and(setup: ModificationBuilder<T>.(KeyPath<T, T>) -> Unit): Modification<T> {
     return ModificationBuilder<T>().apply {
         modifications.add(this@and)
-        setup(startChain())
+        setup(path())
     }.build()
 }
 
@@ -127,13 +127,13 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
     @JsName("xCMBuilderListRemove")
     @JvmName("listRemoveAll")
     infix fun <T : IsCodableAndHashable> CMBuilder<K, List<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) {
-        modifications.add(mapModification(Modification.ListRemove(startChain<T>().let(condition))))
+        modifications.add(mapModification(Modification.ListRemove(path<T>().let(condition))))
     }
 
     @JsName("xCMBuilderSetRemove")
     @JvmName("setRemoveAll")
     infix fun <T : IsCodableAndHashable> CMBuilder<K, Set<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) {
-        modifications.add(mapModification(Modification.SetRemove(startChain<T>().let(condition))))
+        modifications.add(mapModification(Modification.SetRemove(path<T>().let(condition))))
     }
 
     @JsName("xCMBuilderListRemoveAll")
@@ -178,7 +178,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
                 Modification.ListPerElement(
                     condition = Condition.Always<T>(),
                     ModificationBuilder<T>().apply {
-                        modification(startChain())
+                        modification(path())
                     }.build()
                 )
             )
@@ -193,7 +193,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
                 Modification.SetPerElement(
                     condition = Condition.Always<T>(),
                     ModificationBuilder<T>().apply {
-                        modification(startChain())
+                        modification(path())
                     }.build()
                 )
             )
@@ -209,9 +209,9 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         modifications.add(
             mapModification(
                 Modification.ListPerElement(
-                    condition = startChain<T>().let(condition),
+                    condition = path<T>().let(condition),
                     ModificationBuilder<T>().apply {
-                        modification(startChain())
+                        modification(path())
                     }.build()
                 )
             )
@@ -227,9 +227,9 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         modifications.add(
             mapModification(
                 Modification.SetPerElement(
-                    condition = startChain<T>().let(condition),
+                    condition = path<T>().let(condition),
                     ModificationBuilder<T>().apply {
-                        modification(startChain())
+                        modification(path())
                     }.build()
                 )
             )
@@ -353,13 +353,13 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
     @JsName("xKeyPathListRemove")
     @JvmName("listRemoveAll")
     infix fun <T : IsCodableAndHashable> KeyPath<K, List<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) {
-        modifications.add(mapModification(Modification.ListRemove(startChain<T>().let(condition))))
+        modifications.add(mapModification(Modification.ListRemove(path<T>().let(condition))))
     }
 
     @JsName("xKeyPathSetRemove")
     @JvmName("setRemoveAll")
     infix fun <T : IsCodableAndHashable> KeyPath<K, Set<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) {
-        modifications.add(mapModification(Modification.SetRemove(startChain<T>().let(condition))))
+        modifications.add(mapModification(Modification.SetRemove(path<T>().let(condition))))
     }
 
     @JsName("xKeyPathListRemoveAll")
@@ -404,7 +404,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
                 Modification.ListPerElement(
                     condition = Condition.Always<T>(),
                     ModificationBuilder<T>().apply {
-                        modification(startChain())
+                        modification(path())
                     }.build()
                 )
             )
@@ -419,7 +419,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
                 Modification.SetPerElement(
                     condition = Condition.Always<T>(),
                     ModificationBuilder<T>().apply {
-                        modification(startChain())
+                        modification(path())
                     }.build()
                 )
             )
@@ -435,9 +435,9 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         modifications.add(
             mapModification(
                 Modification.ListPerElement(
-                    condition = startChain<T>().let(condition),
+                    condition = path<T>().let(condition),
                     ModificationBuilder<T>().apply {
-                        modification(startChain())
+                        modification(path())
                     }.build()
                 )
             )
@@ -453,9 +453,9 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         modifications.add(
             mapModification(
                 Modification.SetPerElement(
-                    condition = startChain<T>().let(condition),
+                    condition = path<T>().let(condition),
                     ModificationBuilder<T>().apply {
-                        modification(startChain())
+                        modification(path())
                     }.build()
                 )
             )

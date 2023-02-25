@@ -90,6 +90,7 @@ data class MongoFields(
             for (field in fields) {
                 appendLine("val <K> KeyPath<K, $typeReference>.${field.name}: KeyPath<K, ${field.kotlinType.toKotlin()}> get() = this[${classReference}::${field.name}]")
             }
+            appendLine("inline val $typeReference.Companion.path: KeyPath<$typeReference, $typeReference> get() = path<$typeReference>()")
         } else {
             appendLine("fun prepare${simpleName}Fields() {")
             tab {

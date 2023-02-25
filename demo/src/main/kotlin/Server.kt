@@ -27,10 +27,8 @@ import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.tasks.startupOnce
 import com.lightningkite.lightningserver.tasks.task
-import com.lightningkite.lightningserver.typed.apiHelp
 import com.lightningkite.lightningserver.typed.typed
 import com.lightningkite.lightningserver.websocket.websocket
-import io.ktor.client.*
 import io.ktor.client.request.*
 import kotlinx.coroutines.delay
 import java.lang.IllegalStateException
@@ -73,7 +71,7 @@ object Server : ServerPathGroup(ServerPath.root) {
             database().collection<User>()
                 .interceptCreate { it.copy(hashedPassword = it.hashedPassword.secureHash()) }
                 .interceptModification {
-                    it.map(startChain<User>().hashedPassword) {
+                    it.map(path<User>().hashedPassword) {
                         when(it) {
                             is Modification.Assign -> it.copy(it.value.secureHash())
                             else -> throw IllegalStateException()

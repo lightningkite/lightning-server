@@ -8,7 +8,6 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningdb.test.prepareModels
 
 abstract class ConditionTests() {
 
@@ -50,7 +49,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().boolean eq true
+        val condition = path<LargeTestModel>().boolean eq true
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -65,7 +64,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().boolean ne true
+        val condition = path<LargeTestModel>().boolean ne true
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -80,7 +79,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().booleanNullable.notNull eq true
+        val condition = path<LargeTestModel>().booleanNullable.notNull eq true
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -95,7 +94,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().booleanNullable eq null
+        val condition = path<LargeTestModel>().booleanNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -109,7 +108,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().list eq listOf(7, 8, 9)
+        val condition = path<LargeTestModel>().list eq listOf(7, 8, 9)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -124,7 +123,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().list ne listOf(7, 8, 9)
+        val condition = path<LargeTestModel>().list ne listOf(7, 8, 9)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -139,7 +138,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().listNullable.notNull eq listOf(7, 8, 9)
+        val condition = path<LargeTestModel>().listNullable.notNull eq listOf(7, 8, 9)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -154,7 +153,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().listNullable eq null
+        val condition = path<LargeTestModel>().listNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -168,7 +167,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().map eq mapOf("c" to 3)
+        val condition = path<LargeTestModel>().map eq mapOf("c" to 3)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -183,7 +182,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().map ne mapOf("c" to 3)
+        val condition = path<LargeTestModel>().map ne mapOf("c" to 3)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -198,7 +197,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().mapNullable.notNull eq mapOf("c" to 3)
+        val condition = path<LargeTestModel>().mapNullable.notNull eq mapOf("c" to 3)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -213,7 +212,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().mapNullable eq null
+        val condition = path<LargeTestModel>().mapNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -227,7 +226,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().byte eq 3.toByte()
+        val condition = path<LargeTestModel>().byte eq 3.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -242,7 +241,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().byte ne 3.toByte()
+        val condition = path<LargeTestModel>().byte ne 3.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -257,7 +256,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().byteNullable.notNull eq 3.toByte()
+        val condition = path<LargeTestModel>().byteNullable.notNull eq 3.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -272,7 +271,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().byteNullable eq null
+        val condition = path<LargeTestModel>().byteNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -286,7 +285,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().short eq 3.toShort()
+        val condition = path<LargeTestModel>().short eq 3.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -301,7 +300,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().short ne 3.toShort()
+        val condition = path<LargeTestModel>().short ne 3.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -316,7 +315,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().shortNullable.notNull eq 3.toShort()
+        val condition = path<LargeTestModel>().shortNullable.notNull eq 3.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -331,7 +330,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().shortNullable eq null
+        val condition = path<LargeTestModel>().shortNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -345,7 +344,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().int eq 3
+        val condition = path<LargeTestModel>().int eq 3
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -360,7 +359,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().int ne 3
+        val condition = path<LargeTestModel>().int ne 3
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -375,7 +374,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().intNullable.notNull eq 3
+        val condition = path<LargeTestModel>().intNullable.notNull eq 3
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -390,7 +389,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().intNullable eq null
+        val condition = path<LargeTestModel>().intNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -404,7 +403,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().long eq 3L
+        val condition = path<LargeTestModel>().long eq 3L
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -419,7 +418,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().long ne 3L
+        val condition = path<LargeTestModel>().long ne 3L
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -434,7 +433,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().longNullable.notNull eq 3L
+        val condition = path<LargeTestModel>().longNullable.notNull eq 3L
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -449,7 +448,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().longNullable eq null
+        val condition = path<LargeTestModel>().longNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -463,7 +462,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().float eq 3f
+        val condition = path<LargeTestModel>().float eq 3f
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -478,7 +477,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().float ne 3f
+        val condition = path<LargeTestModel>().float ne 3f
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -493,7 +492,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().floatNullable.notNull eq 3f
+        val condition = path<LargeTestModel>().floatNullable.notNull eq 3f
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -508,7 +507,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().floatNullable eq null
+        val condition = path<LargeTestModel>().floatNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -522,7 +521,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().double eq 3.0
+        val condition = path<LargeTestModel>().double eq 3.0
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -537,7 +536,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().double ne 3.0
+        val condition = path<LargeTestModel>().double ne 3.0
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -552,7 +551,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().doubleNullable.notNull eq 3.0
+        val condition = path<LargeTestModel>().doubleNullable.notNull eq 3.0
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -567,7 +566,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().doubleNullable eq null
+        val condition = path<LargeTestModel>().doubleNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -581,7 +580,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().string eq "aca"
+        val condition = path<LargeTestModel>().string eq "aca"
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -596,7 +595,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().string ne "aca"
+        val condition = path<LargeTestModel>().string ne "aca"
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -611,7 +610,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().stringNullable.notNull eq "aca"
+        val condition = path<LargeTestModel>().stringNullable.notNull eq "aca"
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -626,7 +625,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().stringNullable eq null
+        val condition = path<LargeTestModel>().stringNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -640,7 +639,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().instant eq Instant.ofEpochMilli(15000L)
+        val condition = path<LargeTestModel>().instant eq Instant.ofEpochMilli(15000L)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -655,7 +654,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().instant ne Instant.ofEpochMilli(15000L)
+        val condition = path<LargeTestModel>().instant ne Instant.ofEpochMilli(15000L)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -670,7 +669,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().instantNullable.notNull eq Instant.ofEpochMilli(15000L)
+        val condition = path<LargeTestModel>().instantNullable.notNull eq Instant.ofEpochMilli(15000L)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -685,7 +684,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().instantNullable eq null
+        val condition = path<LargeTestModel>().instantNullable eq null
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -699,7 +698,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().boolean inside listOf<Boolean>(true)
+        val condition = path<LargeTestModel>().boolean inside listOf<Boolean>(true)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -714,7 +713,7 @@ abstract class ConditionTests() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().booleanNullable.notNull inside listOf<Boolean>(true)
+        val condition = path<LargeTestModel>().booleanNullable.notNull inside listOf<Boolean>(true)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -729,7 +728,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().boolean notIn listOf<Boolean>(true)
+        val condition = path<LargeTestModel>().boolean notIn listOf<Boolean>(true)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -743,7 +742,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().byte inside listOf<Byte>(3.toByte())
+        val condition = path<LargeTestModel>().byte inside listOf<Byte>(3.toByte())
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -758,7 +757,7 @@ abstract class ConditionTests() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().byteNullable.notNull inside listOf<Byte>(3.toByte())
+        val condition = path<LargeTestModel>().byteNullable.notNull inside listOf<Byte>(3.toByte())
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -773,7 +772,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().byte notIn listOf<Byte>(3.toByte())
+        val condition = path<LargeTestModel>().byte notIn listOf<Byte>(3.toByte())
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -787,7 +786,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().short inside listOf<Short>(3.toShort())
+        val condition = path<LargeTestModel>().short inside listOf<Short>(3.toShort())
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -802,7 +801,7 @@ abstract class ConditionTests() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().shortNullable.notNull inside listOf<Short>(3.toShort())
+        val condition = path<LargeTestModel>().shortNullable.notNull inside listOf<Short>(3.toShort())
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -817,7 +816,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().short notIn listOf<Short>(3.toShort())
+        val condition = path<LargeTestModel>().short notIn listOf<Short>(3.toShort())
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -831,7 +830,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().int inside listOf<Int>(3)
+        val condition = path<LargeTestModel>().int inside listOf<Int>(3)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -846,7 +845,7 @@ abstract class ConditionTests() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().intNullable.notNull inside listOf<Int>(3)
+        val condition = path<LargeTestModel>().intNullable.notNull inside listOf<Int>(3)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -861,7 +860,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().int notIn listOf<Int>(3)
+        val condition = path<LargeTestModel>().int notIn listOf<Int>(3)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -875,7 +874,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().long inside listOf<Long>(3L)
+        val condition = path<LargeTestModel>().long inside listOf<Long>(3L)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -890,7 +889,7 @@ abstract class ConditionTests() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().longNullable.notNull inside listOf<Long>(3L)
+        val condition = path<LargeTestModel>().longNullable.notNull inside listOf<Long>(3L)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -905,7 +904,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().long notIn listOf<Long>(3L)
+        val condition = path<LargeTestModel>().long notIn listOf<Long>(3L)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -919,7 +918,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().float inside listOf<Float>(3f)
+        val condition = path<LargeTestModel>().float inside listOf<Float>(3f)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -934,7 +933,7 @@ abstract class ConditionTests() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().floatNullable.notNull inside listOf<Float>(3f)
+        val condition = path<LargeTestModel>().floatNullable.notNull inside listOf<Float>(3f)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -949,7 +948,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().float notIn listOf<Float>(3f)
+        val condition = path<LargeTestModel>().float notIn listOf<Float>(3f)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -963,7 +962,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().double inside listOf<Double>(3.0)
+        val condition = path<LargeTestModel>().double inside listOf<Double>(3.0)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -978,7 +977,7 @@ abstract class ConditionTests() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().doubleNullable.notNull inside listOf<Double>(3.0)
+        val condition = path<LargeTestModel>().doubleNullable.notNull inside listOf<Double>(3.0)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -993,7 +992,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().double notIn listOf<Double>(3.0)
+        val condition = path<LargeTestModel>().double notIn listOf<Double>(3.0)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1007,7 +1006,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().string inside listOf<String>("aca")
+        val condition = path<LargeTestModel>().string inside listOf<String>("aca")
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1022,7 +1021,7 @@ abstract class ConditionTests() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().stringNullable.notNull inside listOf<String>("aca")
+        val condition = path<LargeTestModel>().stringNullable.notNull inside listOf<String>("aca")
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -1037,7 +1036,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().string notIn listOf<String>("aca")
+        val condition = path<LargeTestModel>().string notIn listOf<String>("aca")
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1051,7 +1050,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().instant inside listOf<Instant>(Instant.ofEpochMilli(15000L))
+        val condition = path<LargeTestModel>().instant inside listOf<Instant>(Instant.ofEpochMilli(15000L))
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1066,7 +1065,7 @@ abstract class ConditionTests() {
         val manualList = listOf(isNull, higher)
         collection.insertOne(isNull)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().instantNullable.notNull inside listOf<Instant>(Instant.ofEpochMilli(15000L))
+        val condition = path<LargeTestModel>().instantNullable.notNull inside listOf<Instant>(Instant.ofEpochMilli(15000L))
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(isNull !in results)
@@ -1081,7 +1080,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = startChain<LargeTestModel>().instant notIn listOf<Instant>(Instant.ofEpochMilli(15000L))
+        val condition = path<LargeTestModel>().instant notIn listOf<Instant>(Instant.ofEpochMilli(15000L))
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1097,7 +1096,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().byte gt 2.toByte()
+        val condition = path<LargeTestModel>().byte gt 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1115,7 +1114,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().byte lt 2.toByte()
+        val condition = path<LargeTestModel>().byte lt 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1133,7 +1132,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().byte gte 2.toByte()
+        val condition = path<LargeTestModel>().byte gte 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1151,7 +1150,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().byte lte 2.toByte()
+        val condition = path<LargeTestModel>().byte lte 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1171,7 +1170,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().byteNullable.notNull gt 2.toByte()
+        val condition = path<LargeTestModel>().byteNullable.notNull gt 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1192,7 +1191,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().byteNullable.notNull lt 2.toByte()
+        val condition = path<LargeTestModel>().byteNullable.notNull lt 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1213,7 +1212,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().byteNullable.notNull gte 2.toByte()
+        val condition = path<LargeTestModel>().byteNullable.notNull gte 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1234,7 +1233,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().byteNullable.notNull lte 2.toByte()
+        val condition = path<LargeTestModel>().byteNullable.notNull lte 2.toByte()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1252,7 +1251,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().short gt 2.toShort()
+        val condition = path<LargeTestModel>().short gt 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1270,7 +1269,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().short lt 2.toShort()
+        val condition = path<LargeTestModel>().short lt 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1288,7 +1287,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().short gte 2.toShort()
+        val condition = path<LargeTestModel>().short gte 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1306,7 +1305,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().short lte 2.toShort()
+        val condition = path<LargeTestModel>().short lte 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1326,7 +1325,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().shortNullable.notNull gt 2.toShort()
+        val condition = path<LargeTestModel>().shortNullable.notNull gt 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1347,7 +1346,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().shortNullable.notNull lt 2.toShort()
+        val condition = path<LargeTestModel>().shortNullable.notNull lt 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1368,7 +1367,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().shortNullable.notNull gte 2.toShort()
+        val condition = path<LargeTestModel>().shortNullable.notNull gte 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1389,7 +1388,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().shortNullable.notNull lte 2.toShort()
+        val condition = path<LargeTestModel>().shortNullable.notNull lte 2.toShort()
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1407,7 +1406,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().int gt 2
+        val condition = path<LargeTestModel>().int gt 2
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1425,7 +1424,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().int lt 2
+        val condition = path<LargeTestModel>().int lt 2
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1443,7 +1442,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().int gte 2
+        val condition = path<LargeTestModel>().int gte 2
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1461,7 +1460,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().int lte 2
+        val condition = path<LargeTestModel>().int lte 2
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1481,7 +1480,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().intNullable.notNull gt 2
+        val condition = path<LargeTestModel>().intNullable.notNull gt 2
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1502,7 +1501,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().intNullable.notNull lt 2
+        val condition = path<LargeTestModel>().intNullable.notNull lt 2
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1523,7 +1522,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().intNullable.notNull gte 2
+        val condition = path<LargeTestModel>().intNullable.notNull gte 2
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1544,7 +1543,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().intNullable.notNull lte 2
+        val condition = path<LargeTestModel>().intNullable.notNull lte 2
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1562,7 +1561,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().long gt 2L
+        val condition = path<LargeTestModel>().long gt 2L
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1580,7 +1579,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().long lt 2L
+        val condition = path<LargeTestModel>().long lt 2L
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1598,7 +1597,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().long gte 2L
+        val condition = path<LargeTestModel>().long gte 2L
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1616,7 +1615,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().long lte 2L
+        val condition = path<LargeTestModel>().long lte 2L
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1636,7 +1635,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().longNullable.notNull gt 2L
+        val condition = path<LargeTestModel>().longNullable.notNull gt 2L
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1657,7 +1656,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().longNullable.notNull lt 2L
+        val condition = path<LargeTestModel>().longNullable.notNull lt 2L
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1678,7 +1677,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().longNullable.notNull gte 2L
+        val condition = path<LargeTestModel>().longNullable.notNull gte 2L
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1699,7 +1698,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().longNullable.notNull lte 2L
+        val condition = path<LargeTestModel>().longNullable.notNull lte 2L
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1717,7 +1716,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().float gt 2f
+        val condition = path<LargeTestModel>().float gt 2f
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1735,7 +1734,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().float lt 2f
+        val condition = path<LargeTestModel>().float lt 2f
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1753,7 +1752,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().float gte 2f
+        val condition = path<LargeTestModel>().float gte 2f
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1771,7 +1770,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().float lte 2f
+        val condition = path<LargeTestModel>().float lte 2f
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1791,7 +1790,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().floatNullable.notNull gt 2f
+        val condition = path<LargeTestModel>().floatNullable.notNull gt 2f
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1812,7 +1811,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().floatNullable.notNull lt 2f
+        val condition = path<LargeTestModel>().floatNullable.notNull lt 2f
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1833,7 +1832,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().floatNullable.notNull gte 2f
+        val condition = path<LargeTestModel>().floatNullable.notNull gte 2f
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1854,7 +1853,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().floatNullable.notNull lte 2f
+        val condition = path<LargeTestModel>().floatNullable.notNull lte 2f
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1872,7 +1871,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().double gt 2.0
+        val condition = path<LargeTestModel>().double gt 2.0
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1890,7 +1889,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().double lt 2.0
+        val condition = path<LargeTestModel>().double lt 2.0
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1908,7 +1907,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().double gte 2.0
+        val condition = path<LargeTestModel>().double gte 2.0
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -1926,7 +1925,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().double lte 2.0
+        val condition = path<LargeTestModel>().double lte 2.0
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -1946,7 +1945,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().doubleNullable.notNull gt 2.0
+        val condition = path<LargeTestModel>().doubleNullable.notNull gt 2.0
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -1967,7 +1966,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().doubleNullable.notNull lt 2.0
+        val condition = path<LargeTestModel>().doubleNullable.notNull lt 2.0
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -1988,7 +1987,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().doubleNullable.notNull gte 2.0
+        val condition = path<LargeTestModel>().doubleNullable.notNull gte 2.0
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -2009,7 +2008,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().doubleNullable.notNull lte 2.0
+        val condition = path<LargeTestModel>().doubleNullable.notNull lte 2.0
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -2027,7 +2026,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().string gt "aba"
+        val condition = path<LargeTestModel>().string gt "aba"
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -2045,7 +2044,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().string lt "aba"
+        val condition = path<LargeTestModel>().string lt "aba"
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -2063,7 +2062,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().string gte "aba"
+        val condition = path<LargeTestModel>().string gte "aba"
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -2081,7 +2080,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().string lte "aba"
+        val condition = path<LargeTestModel>().string lte "aba"
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -2101,7 +2100,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().stringNullable.notNull gt "aba"
+        val condition = path<LargeTestModel>().stringNullable.notNull gt "aba"
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -2122,7 +2121,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().stringNullable.notNull lt "aba"
+        val condition = path<LargeTestModel>().stringNullable.notNull lt "aba"
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -2143,7 +2142,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().stringNullable.notNull gte "aba"
+        val condition = path<LargeTestModel>().stringNullable.notNull gte "aba"
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -2164,7 +2163,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().stringNullable.notNull lte "aba"
+        val condition = path<LargeTestModel>().stringNullable.notNull lte "aba"
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -2182,7 +2181,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().instant gt Instant.ofEpochMilli(10000L)
+        val condition = path<LargeTestModel>().instant gt Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -2200,7 +2199,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().instant lt Instant.ofEpochMilli(10000L)
+        val condition = path<LargeTestModel>().instant lt Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -2218,7 +2217,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().instant gte Instant.ofEpochMilli(10000L)
+        val condition = path<LargeTestModel>().instant gte Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -2236,7 +2235,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(middle)
-        val condition = startChain<LargeTestModel>().instant lte Instant.ofEpochMilli(10000L)
+        val condition = path<LargeTestModel>().instant lte Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -2256,7 +2255,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().instantNullable.notNull gt Instant.ofEpochMilli(10000L)
+        val condition = path<LargeTestModel>().instantNullable.notNull gt Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, higher)
         assertTrue(lower !in results)
@@ -2277,7 +2276,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().instantNullable.notNull lt Instant.ofEpochMilli(10000L)
+        val condition = path<LargeTestModel>().instantNullable.notNull lt Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(higher !in results)
@@ -2298,7 +2297,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().instantNullable.notNull gte Instant.ofEpochMilli(10000L)
+        val condition = path<LargeTestModel>().instantNullable.notNull gte Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, higher)
@@ -2319,7 +2318,7 @@ abstract class ConditionTests() {
         collection.insertOne(higher)
         collection.insertOne(middle)
         collection.insertOne(isNull)
-        val condition = startChain<LargeTestModel>().instantNullable.notNull lte Instant.ofEpochMilli(10000L)
+        val condition = path<LargeTestModel>().instantNullable.notNull lte Instant.ofEpochMilli(10000L)
         val results = collection.find(condition).toList()
         assertContains(results, middle)
         assertContains(results, lower)
@@ -2338,7 +2337,7 @@ abstract class ConditionTests() {
         val manualList = listOf(matching, default)
         collection.insertOne(matching)
         collection.insertOne(default)
-        val condition = startChain<LargeTestModel>().embedded.value1 eq "asdf"
+        val condition = path<LargeTestModel>().embedded.value1 eq "asdf"
         val results = collection.find(condition).toList()
         assertContains(results, matching)
         assertTrue(default !in results)
@@ -2355,7 +2354,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(allOut)
-        val condition = startChain<LargeTestModel>().list.all { it lt 4 }
+        val condition = path<LargeTestModel>().list.all { it lt 4 }
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(allOut !in results)
@@ -2372,7 +2371,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(allOut)
-        val condition = startChain<LargeTestModel>().list.any { it lt 4 }
+        val condition = path<LargeTestModel>().list.any { it lt 4 }
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertContains(results, higher)
@@ -2385,12 +2384,12 @@ abstract class ConditionTests() {
         val item1 = LargeTestModel(listEmbedded = listOf(ClassUsedForEmbedding(value2 = 1), ClassUsedForEmbedding(value1 = "Other String", value2 = 3)))
         val item2 = LargeTestModel(listEmbedded = listOf(ClassUsedForEmbedding(value2 = 2), ClassUsedForEmbedding(value1 = "five", value2 = 3)))
         collection.insertMany(listOf(item1, item2))
-        var condition = startChain<LargeTestModel>().listEmbedded.any { it.value1 eq "five" }
+        var condition = path<LargeTestModel>().listEmbedded.any { it.value1 eq "five" }
         var results = collection.find(condition).toList()
         assertEquals(1, results.size)
         assertEquals(item2, results.first())
 
-        condition = startChain<LargeTestModel>().listEmbedded.any { it.value2 lt 2 }
+        condition = path<LargeTestModel>().listEmbedded.any { it.value2 lt 2 }
         results = collection.find(condition).toList()
         assertEquals(1, results.size)
         assertEquals(item1, results.first())
@@ -2403,7 +2402,7 @@ abstract class ConditionTests() {
         val manualList = listOf(matchingSize, notMatchingSize)
         collection.insertOne(matchingSize)
         collection.insertOne(notMatchingSize)
-        val condition = startChain<LargeTestModel>().list.sizesEquals(3)
+        val condition = path<LargeTestModel>().list.sizesEquals(3)
         val results = collection.find(condition).toList()
         assertContains(results, matchingSize)
         assertTrue(notMatchingSize !in results)
@@ -2420,7 +2419,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(allOut)
-        val condition = startChain<LargeTestModel>().set.all { it lt 4 }
+        val condition = path<LargeTestModel>().set.all { it lt 4 }
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertTrue(allOut !in results)
@@ -2437,7 +2436,7 @@ abstract class ConditionTests() {
         collection.insertOne(lower)
         collection.insertOne(higher)
         collection.insertOne(allOut)
-        val condition = startChain<LargeTestModel>().set.any { it lt 4 }
+        val condition = path<LargeTestModel>().set.any { it lt 4 }
         val results = collection.find(condition).toList()
         assertContains(results, lower)
         assertContains(results, higher)
@@ -2450,12 +2449,12 @@ abstract class ConditionTests() {
         val item1 = LargeTestModel(setEmbedded = setOf(ClassUsedForEmbedding(value2 = 1), ClassUsedForEmbedding(value1 = "Other String", value2 = 3)))
         val item2 = LargeTestModel(setEmbedded = setOf(ClassUsedForEmbedding(value2 = 2), ClassUsedForEmbedding(value1 = "five", value2 = 3)))
         collection.insertMany(listOf(item1, item2))
-        var condition = startChain<LargeTestModel>().setEmbedded.any { it.value1 eq "five" }
+        var condition = path<LargeTestModel>().setEmbedded.any { it.value1 eq "five" }
         var results = collection.find(condition).toList()
         assertEquals(1, results.size)
         assertEquals(item2, results.first())
 
-        condition = startChain<LargeTestModel>().setEmbedded.any { it.value2 lt 2 }
+        condition = path<LargeTestModel>().setEmbedded.any { it.value2 lt 2 }
         results = collection.find(condition).toList()
         assertEquals(1, results.size)
         assertEquals(item1, results.first())
@@ -2468,7 +2467,7 @@ abstract class ConditionTests() {
         val manualSet = listOf(matchingSize, notMatchingSize)
         collection.insertOne(matchingSize)
         collection.insertOne(notMatchingSize)
-        val condition = startChain<LargeTestModel>().set.sizesEquals(3)
+        val condition = path<LargeTestModel>().set.sizesEquals(3)
         val results = collection.find(condition).toList()
         assertContains(results, matchingSize)
         assertTrue(notMatchingSize !in results)
@@ -2485,7 +2484,7 @@ abstract class ConditionTests() {
         val manualList = listOf(matching, notMatching)
         collection.insertOne(matching)
         collection.insertOne(notMatching)
-        val condition = startChain<LargeTestModel>().map.containsKey("a")
+        val condition = path<LargeTestModel>().map.containsKey("a")
         val results = collection.find(condition).toList()
         println(results.joinToString("\n"))
         assertContains(results, matching)
@@ -2516,12 +2515,12 @@ abstract class ConditionTests() {
         val nullItem = LargeTestModel(stringNullable = null)
         collection.insertMany(listOf(notNullItem, nullItem))
 
-        var condition = startChain<LargeTestModel>().stringNullable ne null
+        var condition = path<LargeTestModel>().stringNullable ne null
         var result = collection.find(condition).toList()
         assertEquals(1, result.size)
         assertEquals(notNullItem, result.first())
 
-        condition = startChain<LargeTestModel>().stringNullable eq null
+        condition = path<LargeTestModel>().stringNullable eq null
         result = collection.find(condition).toList()
         assertEquals(1, result.size)
         assertEquals(nullItem, result.first())

@@ -25,7 +25,7 @@ class MaskTest {
     @Test
     fun complexModification() {
         val mask = updateRestrictions<LargeTestModel> {
-            it.embedded.value2.restrict<Int>(
+            it.embedded.value2.requires<Int>(
                 requires = it.always,
                 valueMust = { it gt 4 }
             )

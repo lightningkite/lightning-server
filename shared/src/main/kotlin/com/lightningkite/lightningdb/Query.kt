@@ -17,5 +17,5 @@ data class Query<T: IsCodableAndHashable>(
         skip: Int = 0,
         limit: Int = 100,
         makeCondition: (KeyPath<T, T>)->Condition<T>,
-    ):this(makeCondition(startChain()), orderBy, skip, limit)
+    ):this(makeCondition(path()), orderBy, skip, limit)
 }
