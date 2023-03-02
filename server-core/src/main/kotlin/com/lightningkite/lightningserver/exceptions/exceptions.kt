@@ -56,3 +56,8 @@ class ForbiddenException(detail: String = "", message: String = "", data: String
 fun ForbiddenException(message: String): ForbiddenException = ForbiddenException(message = message, detail = "")
 class NotFoundException(detail: String = "", message: String = "", data: String = "", cause: Throwable? = null, headers: HttpHeaders = HttpHeaders.EMPTY): HttpStatusException(HttpStatus.NotFound, detail, message, data, headers, cause)
 fun NotFoundException(message: String): NotFoundException = NotFoundException(message = message, detail = "")
+class InternalServerError(detail: String = "", message: String = "", data: String = "", cause: Throwable? = null, headers: HttpHeaders = HttpHeaders.EMPTY): HttpStatusException(HttpStatus.InternalServerError, detail, message, data, headers, cause)
+suspend fun InternalServerError(details: String = "", cause: Throwable): InternalServerError {
+    exceptionSettings().report(cause)
+    return InternalServerError(message = "Whoops, Something went wrong.", detail = details)
+}
