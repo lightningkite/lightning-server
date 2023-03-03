@@ -95,6 +95,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
         info.collection().insertOne(
             ExternalAsyncTaskRequest(
                 _id = response._id,
+                response = Serialization.Internal.json.encodeToString(responseSerializer, response),
                 ourData = ourDataString,
                 expiresAt = Instant.now().plus(action.expiration),
                 action = action.key

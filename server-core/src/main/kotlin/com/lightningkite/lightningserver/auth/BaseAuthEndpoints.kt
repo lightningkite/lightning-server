@@ -26,7 +26,7 @@ open class BaseAuthEndpoints<USER : Any, ID>(
         HttpResponse.redirectToGet(
             to = queryParameter("destination") ?: landing,
             headers = {
-                setCookie(HttpHeader.Authorization, token)
+                setCookie(HttpHeader.Authorization, token, maxAge = 31536000)
             }
         )
     }
