@@ -15,17 +15,7 @@ class MultiplexMessage {
         this.data = data;
         this.error = error;
     }
-    static propertyTypes() {
-        return {
-            channel: [String],
-            path: [String],
-            queryParams: [Map, [String], [Array, [String]]],
-            start: [Boolean],
-            end: [Boolean],
-            data: [String],
-            error: [String]
-        };
-    }
+    static propertyTypes() { return { channel: [String], path: [String], queryParams: [Map, [String], [Array, [String]]], start: [Boolean], end: [Boolean], data: [String], error: [String] }; }
 }
 exports.MultiplexMessage = MultiplexMessage;
 MultiplexMessage.properties = ["channel", "path", "queryParams", "start", "end", "data", "error"];

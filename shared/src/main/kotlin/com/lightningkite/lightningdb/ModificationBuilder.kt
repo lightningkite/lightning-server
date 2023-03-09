@@ -7,7 +7,7 @@ import com.lightningkite.khrysalis.SharedCode
 
 inline fun <T : IsCodableAndHashable> modification(setup: ModificationBuilder<T>.(PropChain<T, T>) -> Unit): Modification<T> {
     return ModificationBuilder<T>().apply {
-        setup(startChain())
+        setup(this, startChain())
     }.build()
 }
 
@@ -170,7 +170,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
                 Modification.ListPerElement(
                     condition = Condition.Always<T>(),
                     ModificationBuilder<T>().apply {
-                        modification(startChain())
+                        modification(this, startChain())
                     }.build()
                 )
             )
@@ -185,7 +185,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
                 Modification.SetPerElement(
                     condition = Condition.Always<T>(),
                     ModificationBuilder<T>().apply {
-                        modification(startChain())
+                        modification(this, startChain())
                     }.build()
                 )
             )
@@ -203,7 +203,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
                 Modification.ListPerElement(
                     condition = startChain<T>().let(condition),
                     ModificationBuilder<T>().apply {
-                        modification(startChain())
+                        modification(this, startChain())
                     }.build()
                 )
             )
@@ -221,7 +221,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
                 Modification.SetPerElement(
                     condition = startChain<T>().let(condition),
                     ModificationBuilder<T>().apply {
-                        modification(startChain())
+                        modification(this, startChain())
                     }.build()
                 )
             )
@@ -233,8 +233,8 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         modifications.add(mapModification(Modification.Combine(map)))
     }
 
-    infix fun <T : IsCodableAndHashable> PropChain<K, Map<String, T>>.modifyByKey(map: Map<String, ModificationBuilder<T>.(PropChain<T, T>) -> Unit>) {
-        modifications.add(mapModification(Modification.ModifyByKey(map.mapValues { modification(it.value) })))
+    infix fun <T : IsCodableAndHashable> PropChain<K, Map<String, T>>.modifyByKey(modifications: Map<String, ModificationBuilder<T>.(PropChain<T, T>) -> Unit>) {
+        this@ModificationBuilder.modifications.add(mapModification(Modification.ModifyByKey(modifications.mapValues { modification(it.value) })))
     }
 
     infix fun <T : IsCodableAndHashable> PropChain<K, Map<String, T>>.removeKeys(fields: Set<String>) {

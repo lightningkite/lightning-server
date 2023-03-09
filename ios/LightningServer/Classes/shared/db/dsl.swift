@@ -40,10 +40,6 @@ public func condition<T : Codable & Hashable>(setup: @escaping (PropChain<T, T>)
     return (setup)((startChain() as PropChain<T, T>));
 }
 
-public func modification<T : Codable & Hashable>(setup: @escaping (PropChain<T, T>) -> Modification<T>) -> Modification<T> {
-    return (setup)((startChain() as PropChain<T, T>));
-}
-
 public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
     var always: Condition<To> {
         get { return ConditionAlways() }
@@ -236,12 +232,6 @@ public extension PropChain where From : Codable & Hashable, To : Codable & Hasha
 }
 
 public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
-    func modification(make: @escaping (PropChain<To, To>) -> Modification<To>) -> Modification<From> {
-        return self.mapModification(make((startChain() as PropChain<To, To>)));
-    }
-}
-
-public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
     func assign(_ value: To) -> Modification<From> {
         return self.mapModification(ModificationAssign(value));
     }
@@ -365,3 +355,8 @@ public func xPropChainRemoveKeys<K : Codable & Hashable, T : Codable & Hashable>
     return this.mapModification(ModificationRemoveKeys(fields: fields));
 }
 
+public extension Void {
+    func then(ignored: Void) -> Void {
+        return ();
+    }
+}
