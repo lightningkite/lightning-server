@@ -80,7 +80,7 @@ fun Condition<*>.dump(into: Document = Document(), key: String?): Document {
         is Condition.OnKey<*> -> condition.dump(into, if (key == null) this.key else "$key.${this.key}")
         is Condition.StringContains -> {
             into.sub(key).also {
-                it["\$regex"] = Regex.fromLiteral(this.value).pattern
+                it["\$regex"] = Regex.escape(this.value)
                 it["\$options"] = if(this.ignoreCase) "i" else ""
             }
         }
