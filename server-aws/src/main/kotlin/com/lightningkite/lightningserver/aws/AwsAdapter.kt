@@ -211,6 +211,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         runBlocking { Tasks.onSettingsReady() }
         println("Tasks.onSettingsReady() complete.")
         configureEngine
+        httpMatcher
         Core.getGlobalContext().register(this)
     }
 

@@ -25,11 +25,19 @@ internal data class TerraformProjectInfo(
     val bucket: String,
     val bucketPathOverride: String? = null,
     val vpc: Boolean = true,
+    val existingVpc: Boolean = false,
     val domain: Boolean = true,
     val profile: String,
     val handlers: Map<String, String> = mapOf(),
 ) {
 }
+
+internal val TerraformProjectInfo.privateSubnets get() = if(existingVpc) "[for s in data.aws_subnet.private : s.id]" else "module.vpc.private_subnets"
+internal val TerraformProjectInfo.subnet_cidr_blocks get() = if(existingVpc) "[for s in data.aws_subnet.private : s.cidr_block]" else "concat(module.vpc.private_subnets_cidr_blocks, module.vpc.private_subnets_cidr_blocks, [])"
+internal val TerraformProjectInfo.vpc_id get() = if(existingVpc) "data.aws_vpc.main.id" else "module.vpc.vpc_id"
+internal val TerraformProjectInfo.vpc_cidr_block get() = if(existingVpc) "data.aws_vpc.main.cidr_block" else "module.vpc.vpc_cidr_block"
+internal val TerraformProjectInfo.public_route_table_ids get() = if(existingVpc) "toset([data.aws_vpc.main.main_route_table_id])" else "module.vpc.public_route_table_ids"
+internal val TerraformProjectInfo.natGatewayIp get() = if(existingVpc) "[for s in data.aws_nat_gateway.main : s.public_ip]" else "module.vpc.nat_public_ips"
 
 internal val TerraformProjectInfo.projectNameSafe: String
     get() = projectName.filter {
@@ -146,6 +154,7 @@ internal data class TerraformHandler(
 
 internal data class TerraformInput(val name: String, val type: String, val default: String?) {
     companion object {
+        fun stringList(name: String, default: List<String>?) = TerraformInput(name, "list(string)", default?.joinToString { "\"$it\"" })
         fun string(name: String, default: String?) = TerraformInput(name, "string", default?.let { "\"$it\"" })
         fun boolean(name: String, default: Boolean?) = TerraformInput(name, "bool", default?.toString())
         fun number(name: String, default: Number?) = TerraformInput(name, "number", default?.toString())
@@ -294,7 +303,7 @@ internal fun handlers() {
                 }
                 resource "aws_docdb_subnet_group" "${key}" {
                   name       = "$namePrefix-${key}"
-                  subnet_ids = module.vpc.private_subnets
+                  subnet_ids = ${project.privateSubnets}
                 }
                 resource "aws_docdb_cluster_parameter_group" "${key}" {
                   family = "docdb4.0"
@@ -356,7 +365,7 @@ internal fun handlers() {
                 }
                 resource "aws_db_subnet_group" "${key}" {
                   name       = "$namePrefix-${key}"
-                  subnet_ids = module.vpc.private_subnets
+                  subnet_ids = ${project.privateSubnets}
                 }
                 resource "aws_rds_cluster" "$key" {
                   cluster_identifier = "$namePrefix-${key}"
@@ -407,7 +416,7 @@ internal fun handlers() {
                     """
                     resource "aws_db_subnet_group" "${key}" {
                       name       = "$namePrefix-${key}"
-                      subnet_ids = var.lambda_in_vpc ? module.vpc.private_subnets : module.vpc.public_subnets 
+                      subnet_ids = ${project.privateSubnets} 
                     }
                 """.trimIndent()
                 )
@@ -481,11 +490,6 @@ internal fun handlers() {
                   is_realtime_performance_panel_enabled            = true
                   is_schema_advisor_enabled                        = true
                 }
-                resource "mongodbatlas_project_ip_access_list" "$key" {
-                  project_id   = mongodbatlas_project.$key.id
-                  cidr_block = "0.0.0.0/0"
-                  comment    = "Anywhere"
-                }
                 resource "random_password" "${key}" {
                   length           = 32
                   special          = true
@@ -518,6 +522,24 @@ internal fun handlers() {
                 }
             """.trimIndent()
             )
+            if(project.vpc) {
+                appendLine("""
+                resource "mongodbatlas_project_ip_access_list" "$key" {
+                  for_each = toset(${project.natGatewayIp})
+                  project_id   = mongodbatlas_project.$key.id
+                  cidr_block = "${'$'}{each.value}/32"
+                  comment    = "NAT Gateway"
+                }
+                """.trimIndent())
+            } else {
+                appendLine("""
+                resource "mongodbatlas_project_ip_access_list" "$key" {
+                  project_id   = mongodbatlas_project.$key.id
+                  cidr_block = "0.0.0.0/0"
+                  comment    = "Anywhere"
+                }
+                """.trimIndent())
+            }
         },
         settingOutput = { key ->
             """
@@ -550,11 +572,6 @@ internal fun handlers() {
                   is_performance_advisor_enabled                   = true
                   is_realtime_performance_panel_enabled            = true
                   is_schema_advisor_enabled                        = true
-                }
-                resource "mongodbatlas_project_ip_access_list" "$key" {
-                  project_id   = mongodbatlas_project.$key.id
-                  cidr_block = "0.0.0.0/0"
-                  comment    = "Anywhere"
                 }
                 resource "random_password" "${key}" {
                   length           = 32
@@ -608,6 +625,24 @@ internal fun handlers() {
                 }
             """.trimIndent()
             )
+            if(project.vpc) {
+                appendLine("""
+                resource "mongodbatlas_project_ip_access_list" "$key" {
+                  for_each = toset(${project.natGatewayIp})
+                  project_id   = mongodbatlas_project.$key.id
+                  cidr_block = "${'$'}{each.value}/32"
+                  comment    = "NAT Gateway"
+                }
+                """.trimIndent())
+            } else {
+                appendLine("""
+                resource "mongodbatlas_project_ip_access_list" "$key" {
+                  project_id   = mongodbatlas_project.$key.id
+                  cidr_block = "0.0.0.0/0"
+                  comment    = "Anywhere"
+                }
+                """.trimIndent())
+            }
         },
         settingOutput = { key ->
             """
@@ -640,7 +675,7 @@ internal fun handlers() {
                 }
                 resource "aws_elasticache_subnet_group" "${key}" {
                   name       = "$namePrefix-${key}"
-                  subnet_ids = module.vpc.private_subnets
+                  subnet_ids = ${project.privateSubnets}
                 }
             """.trimIndent()
             )
@@ -742,17 +777,17 @@ internal fun handlers() {
                     """
                     resource "aws_security_group" "${key}" {
                       name   = "${namePrefix}-${key}"
-                      vpc_id = module.vpc.vpc_id
+                      vpc_id = ${project.vpc_id}
                     
                       ingress {
                         from_port   = 587
                         to_port     = 587
                         protocol    = "tcp"
-                        cidr_blocks = [module.vpc.vpc_cidr_block]
+                        cidr_blocks = [${project.vpc_cidr_block}]
                       }
                     }
                     resource "aws_vpc_endpoint" "${key}" {
-                      vpc_id = module.vpc.vpc_id
+                      vpc_id = ${project.vpc_id}
                       service_name = "com.amazonaws.${'$'}{var.deployment_location}.email-smtp"
                       security_group_ids = [aws_security_group.${key}.id]
                       vpc_endpoint_type = "Interface"
@@ -848,7 +883,7 @@ internal fun handlers() {
     )
 }
 
-internal fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(projectInfo) {
+internal fun defaultAwsHandler(project: TerraformProjectInfo) = with(project) {
     TerraformSection(
         name = "cloud",
         inputs = listOf(
@@ -858,11 +893,29 @@ internal fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(project
         ) + (if (domain) listOf(
             TerraformInput.string("domain_name_zone", null),
             TerraformInput.string("domain_name", null)
+        ) else listOf()) + (if(vpc && existingVpc) listOf(
+            TerraformInput.string("vpc_id", null),
+            TerraformInput.stringList("vpc_private_subnets", null),
+            TerraformInput.stringList("vpc_nat_gateways", null),
         ) else listOf()),
         emit = {
             if (vpc) {
-                appendLine(
-                    """
+                if(existingVpc) {
+                    appendLine("""   
+                    data "aws_vpc" "main" {
+                      id = var.vpc_id
+                    }
+                    data "aws_subnet" "private" {
+                      for_each = toset(var.vpc_private_subnets)
+                      id       = each.value
+                    }
+                    data "aws_nat_gateway" "main" {
+                      for_each = toset(var.vpc_nat_gateways)
+                      id       = each.value
+                    }
+                    """.trimIndent())
+                } else {
+                    appendLine("""   
                     module "vpc" {
                       source = "terraform-aws-modules/vpc/aws"
                     
@@ -879,20 +932,24 @@ internal fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(project
                       enable_dns_hostnames = false
                       enable_dns_support   = true
                     }
+                    """.trimIndent())
+                }
+                appendLine(
+                    """
                     
                     resource "aws_vpc_endpoint" "s3" {
-                      vpc_id = module.vpc.vpc_id
+                      vpc_id = ${project.vpc_id}
                       service_name = "com.amazonaws.${'$'}{var.deployment_location}.s3"
-                      route_table_ids = module.vpc.public_route_table_ids
+                      route_table_ids = ${project.public_route_table_ids}
                     }
                     resource "aws_vpc_endpoint" "executeapi" {
-                      vpc_id = module.vpc.vpc_id
+                      vpc_id = ${project.vpc_id}
                       service_name = "com.amazonaws.${'$'}{var.deployment_location}.execute-api"
                       security_group_ids = [aws_security_group.executeapi.id]
                       vpc_endpoint_type = "Interface"
                     }
                     resource "aws_vpc_endpoint" "lambdainvoke" {
-                      vpc_id = module.vpc.vpc_id
+                      vpc_id = ${project.vpc_id}
                       service_name = "com.amazonaws.${'$'}{var.deployment_location}.lambda"
                       security_group_ids = [aws_security_group.lambdainvoke.id]
                       vpc_endpoint_type = "Interface"
@@ -900,26 +957,26 @@ internal fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(project
         
                     resource "aws_security_group" "internal" {
                       name   = "$namePrefix-private"
-                      vpc_id = "${'$'}{module.vpc.vpc_id}"
+                      vpc_id = ${project.vpc_id}
                     
                       ingress {
                         from_port   = 0
                         to_port     = 0
                         protocol    = "-1"
-                        cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, [])
+                        cidr_blocks = ${project.subnet_cidr_blocks}
                       }
                     
                       egress {
                         from_port   = 0
                         to_port     = 0
                         protocol    = "-1"
-                        cidr_blocks = concat(module.vpc.private_subnets_cidr_blocks, module.vpc.public_subnets_cidr_blocks, [])
+                        cidr_blocks = ${project.subnet_cidr_blocks}
                       }
                     }
             
                     resource "aws_security_group" "access_outside" {
                       name   = "$namePrefix-access-outside"
-                      vpc_id = "${'$'}{module.vpc.vpc_id}"
+                      vpc_id = ${project.vpc_id}
                     
                       egress {
                         from_port   = 0
@@ -931,25 +988,25 @@ internal fun defaultAwsHandler(projectInfo: TerraformProjectInfo) = with(project
             
                     resource "aws_security_group" "executeapi" {
                       name   = "$namePrefix-execute-api"
-                      vpc_id = "${'$'}{module.vpc.vpc_id}"
+                      vpc_id = ${project.vpc_id}
                     
                       ingress {
                         from_port   = 443
                         to_port     = 443
                         protocol    = "tcp"
-                        cidr_blocks = [module.vpc.vpc_cidr_block]
+                        cidr_blocks = [${project.vpc_cidr_block}]
                       }
                     }
             
                     resource "aws_security_group" "lambdainvoke" {
                       name   = "$namePrefix-lambda-invoke"
-                      vpc_id = "${'$'}{module.vpc.vpc_id}"
+                      vpc_id = ${project.vpc_id}
                     
                       ingress {
                         from_port   = 443
                         to_port     = 443
                         protocol    = "tcp"
-                        cidr_blocks = [module.vpc.vpc_cidr_block]
+                        cidr_blocks = [${project.vpc_cidr_block}]
                       }
                     }
                 """.trimIndent()
@@ -1245,7 +1302,7 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
 }
 
 internal fun awsLambdaHandler(
-    projectInfo: TerraformProjectInfo,
+    project: TerraformProjectInfo,
     handlerFqn: String,
     otherSections: List<TerraformSection>,
 ) = TerraformSection(
@@ -1258,7 +1315,7 @@ internal fun awsLambdaHandler(
     emit = {
         appendLine("""
         resource "aws_s3_bucket" "lambda_bucket" {
-          bucket_prefix = "${projectInfo.namePrefixPathSegment}-lambda-bucket"
+          bucket_prefix = "${project.namePrefixPathSegment}-lambda-bucket"
           force_destroy = true
         }
         resource "aws_s3_bucket_acl" "lambda_bucket" {
@@ -1266,9 +1323,9 @@ internal fun awsLambdaHandler(
           acl    = "private"
         }
         resource "aws_iam_policy" "lambda_bucket" {
-          name        = "${projectInfo.namePrefix}-lambda_bucket"
-          path = "/${projectInfo.namePrefixPath}/lambda_bucket/"
-          description = "Access to the ${projectInfo.namePrefix}_lambda_bucket bucket"
+          name        = "${project.namePrefix}-lambda_bucket"
+          path = "/${project.namePrefixPath}/lambda_bucket/"
+          description = "Access to the ${project.namePrefix}_lambda_bucket bucket"
           policy = jsonencode({
             Version = "2012-10-17"
             Statement = [
@@ -1291,7 +1348,7 @@ internal fun awsLambdaHandler(
         }
         
         resource "aws_iam_role" "main_exec" {
-          name = "${projectInfo.namePrefix}-main-exec"
+          name = "${project.namePrefix}-main-exec"
 
           assume_role_policy = jsonencode({
             Version = "2012-10-17"
@@ -1321,9 +1378,9 @@ internal fun awsLambdaHandler(
         }
         
         resource "aws_iam_policy" "dynamo" {
-          name        = "${projectInfo.namePrefix}-dynamo"
-          path = "/${projectInfo.namePrefixPath}/dynamo/"
-          description = "Access to the ${projectInfo.namePrefix}_dynamo tables in DynamoDB"
+          name        = "${project.namePrefix}-dynamo"
+          path = "/${project.namePrefixPath}/dynamo/"
+          description = "Access to the ${project.namePrefix}_dynamo tables in DynamoDB"
           policy = jsonencode({
             Version = "2012-10-17"
             Statement = [
@@ -1338,9 +1395,9 @@ internal fun awsLambdaHandler(
           })
         }
         resource "aws_iam_policy" "lambdainvoke" {
-          name        = "${projectInfo.namePrefix}-lambdainvoke"
-          path = "/${projectInfo.namePrefixPath}/lambdainvoke/"
-          description = "Access to the ${projectInfo.namePrefix}_lambdainvoke bucket"
+          name        = "${project.namePrefix}-lambdainvoke"
+          path = "/${project.namePrefixPath}/lambdainvoke/"
+          description = "Access to the ${project.namePrefix}_lambdainvoke bucket"
           policy = jsonencode({
             Version = "2012-10-17"
             Statement = [
@@ -1371,7 +1428,7 @@ internal fun awsLambdaHandler(
         }
         
         resource "aws_lambda_function" "main" {
-          function_name = "${projectInfo.namePrefix}-main"
+          function_name = "${project.namePrefix}-main"
           publish = var.lambda_snapstart
 
           s3_bucket = aws_s3_bucket.lambda_bucket.id
@@ -1393,10 +1450,10 @@ internal fun awsLambdaHandler(
           }
           
           ${
-              if(projectInfo.vpc)
+              if(project.vpc)
               """
               |  vpc_config {
-              |    subnet_ids = module.vpc.private_subnets
+              |    subnet_ids = ${project.privateSubnets}
               |    security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
               |  }
               """.trimMargin()
@@ -1421,7 +1478,7 @@ internal fun awsLambdaHandler(
         }
         
         resource "aws_cloudwatch_log_group" "main" {
-          name = "${projectInfo.namePrefix}-main-log"
+          name = "${project.namePrefix}-main-log"
           retention_in_days = 30
         }
         

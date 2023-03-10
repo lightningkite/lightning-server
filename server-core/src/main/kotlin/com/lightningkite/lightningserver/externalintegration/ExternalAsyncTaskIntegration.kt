@@ -27,6 +27,7 @@ import kotlin.collections.HashMap
 class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESULT>(
     path: ServerPath,
     val authInfo: AuthInfo<USER>,
+    val responseSerializer: KSerializer<RESPONSE>,
     val resultSerializer: KSerializer<RESULT>,
     val isAdmin: (user: USER) -> Boolean,
     val database: () -> Database,
@@ -34,7 +35,8 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
     val checkFrequency: Duration = Duration.ofMinutes(15),
     val taskTimeout: Duration = Duration.ofMinutes(2),
     val checkChunking: Int = 15,
-    val name: String = path.segments.lastOrNull()?.toString() ?: "Task"
+    val name: String = path.segments.lastOrNull()?.toString() ?: "Task",
+    val idempotentBasedOnOurData: Boolean = false,
 ) : ServerPathGroup(path) {
     init {
         prepareModels()
@@ -83,11 +85,18 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
 
     // Kick it off
     suspend fun <OURDATA> start(request: REQUEST, ourData: OURDATA, action: ResultAction<OURDATA, RESULT>): RESPONSE {
+        val ourDataString = Serialization.Internal.json.encodeToString(action.ourDataSerialization, ourData)
+        if(idempotentBasedOnOurData) {
+            info.collection().findOne(condition { it.ourData.eq(ourDataString) })?.response?.let {
+                return Serialization.Internal.json.decodeFromString(responseSerializer, it)
+            }
+        }
         val response = api().begin(request)
         info.collection().insertOne(
             ExternalAsyncTaskRequest(
                 _id = response._id,
-                ourData = Serialization.Internal.json.encodeToString(action.ourDataSerialization, ourData),
+                response = Serialization.Internal.json.encodeToString(responseSerializer, response),
+                ourData = ourDataString,
                 expiresAt = Instant.now().plus(action.expiration),
                 action = action.key
             )
