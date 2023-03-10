@@ -10,9 +10,15 @@ inline fun <T : IsCodableAndHashable> modification(setup: ModificationBuilder<T>
         setup(this, startChain())
     }.build()
 }
-
+inline fun <T : IsCodableAndHashable> Modification<T>.and(setup: ModificationBuilder<T>.(PropChain<T, T>) -> Unit): Modification<T> {
+    return ModificationBuilder<T>().apply {
+        modifications.add(this@and)
+        setup(startChain())
+    }.build()
+}
 class ModificationBuilder<K : IsCodableAndHashable>() {
     val modifications = ArrayList<Modification<K>>()
+    fun add(modification: Modification<K>) = modifications.add(modification)
     fun build(): Modification<K> {
         if(modifications.size == 1)
             return modifications[0]
