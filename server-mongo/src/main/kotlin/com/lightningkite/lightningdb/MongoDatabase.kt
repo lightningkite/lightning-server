@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
 import com.github.jershell.kbson.*
+import com.lightningkite.kotlinercli.cli
 import com.lightningkite.lightningserver.core.Disconnectable
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -8,6 +9,7 @@ import com.lightningkite.lightningserver.settings.Settings
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.reactivestreams.client.MongoClient
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.overwriteWith
@@ -18,6 +20,7 @@ import org.bson.types.Binary
 import org.bson.types.ObjectId
 import org.litote.kmongo.coroutine.CoroutineCollection
 import org.litote.kmongo.coroutine.coroutine
+import org.litote.kmongo.coroutine.toList
 import org.litote.kmongo.reactivestreams.KMongo
 import org.litote.kmongo.serialization.*
 import org.litote.kmongo.serialization.InstantSerializer
@@ -44,11 +47,16 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
     val database get() = databaseLazy.value
     private var coroutineCollections = ConcurrentHashMap<String, Lazy<CoroutineCollection<*>>>()
     override fun disconnect() {
-        if(client.isInitialized()) client.value.close()
+        if (client.isInitialized()) client.value.close()
         client.value.close()
         client = lazy { makeClient() }
         databaseLazy = lazy { client.value.coroutine.getDatabase(databaseName) }
         coroutineCollections = ConcurrentHashMap<String, Lazy<CoroutineCollection<*>>>()
+    }
+
+    override fun connect() {
+        if (databaseLazy.isInitialized()) return
+        println(runBlocking { databaseLazy.value.database.listCollectionNames().toList() })
     }
 
     companion object {
@@ -114,6 +122,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
     }
 
     private val collections = ConcurrentHashMap<String, Lazy<MongoFieldCollection<*>>>()
+
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any> collection(type: KType, name: String): MongoFieldCollection<T> =
         (collections.getOrPut(name) {

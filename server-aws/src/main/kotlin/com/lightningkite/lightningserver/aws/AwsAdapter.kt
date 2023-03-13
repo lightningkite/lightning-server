@@ -212,6 +212,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         println("Tasks.onSettingsReady() complete.")
         configureEngine
         httpMatcher
+        wsMatcher
         Core.getGlobalContext().register(this)
     }
 
@@ -227,7 +228,14 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
     }
 
     override fun afterRestore(context: org.crac.Context<out Resource>?) {
-        println("afterRestore()")
+        println("afterRestore() - opening all connections")
+        Settings.requirements.forEach { (key, value) ->
+            (value() as? Disconnectable)?.let {
+                println("Connecting $key...")
+                it.connect()
+            }
+        }
+        println("Connections Complete")
     }
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context) {
