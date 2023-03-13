@@ -3,31 +3,49 @@ package com.lightningkite.lightningdb
 import com.lightningkite.khrysalis.IsCodableAndHashable
 import kotlin.reflect.KProperty1
 
-fun <K, V: IsCodableAndHashable> Modification<K>.valueSetForKeyPath(path: KeyPath<K, V>): V? = (forKeyPath<V>(path.properties) as? Modification.Assign<V>)?.value
-fun <K, V: IsCodableAndHashable> Modification<K>.forKeyPath(path: KeyPath<K, V>): Modification<V>? = forKeyPath<V>(path.properties)
+fun <K, V : IsCodableAndHashable> Modification<K>.valueSetForKeyPath(path: KeyPath<K, V>): V? =
+    (forKeyPath<V>(path.properties) as? Modification.Assign<V>)?.value
+
+fun <K, V : IsCodableAndHashable> Modification<K>.forKeyPath(path: KeyPath<K, V>): Modification<V>? =
+    forKeyPath<V>(path.properties)
+
 @Suppress("UNCHECKED_CAST")
-private fun <V: IsCodableAndHashable> Modification<*>.forKeyPath(list: List<KProperty1<*, *>>): Modification<V>? {
-    return when(this) {
-        is Modification.OnField<*, *> -> if(list.first() == this.key) {
-            if(list.size == 1) modification as Modification<V>
+private fun <V : IsCodableAndHashable> Modification<*>.forKeyPath(list: List<KProperty1<*, *>>): Modification<V>? {
+    return when (this) {
+        is Modification.OnField<*, *> -> if (list.first() == this.key) {
+            if (list.size == 1) modification as Modification<V>
             else this.modification.forKeyPath(list.drop(1))
         } else null
+
         is Modification.SetPerElement<*> -> this.modification.forKeyPath(list)
         is Modification.ListPerElement<*> -> this.modification.forKeyPath(list)
-        is Modification.Chain -> this.modifications.mapNotNull { it.forKeyPath<V>(list) }.let { if(it.size == 1) it.first() else Modification.Chain(it) }
+        is Modification.Chain -> this.modifications.mapNotNull { it.forKeyPath<V>(list) }.let {
+            when (it.size) {
+                0 -> null
+                1 -> it.first()
+                else -> Modification.Chain(it)
+            }
+        }
+
         is Modification.IfNotNull -> this.modification.forKeyPath(list)
-        is Modification.Assign -> Modification.Assign(list.fold(value) { value, prop -> (prop as KProperty1<Any?, Any?>).get(value) } as V)
+        is Modification.Assign -> Modification.Assign(list.fold(value) { value, prop ->
+            (prop as KProperty1<Any?, Any?>).get(
+                value
+            )
+        } as V)
+
         else -> throw Exception("We have no idea what the partial effect is!")
     }
 }
 
 fun Modification<*>.affects(path: KeyPathPartial<*>): Boolean = affects(path.properties)
 private fun Modification<*>.affects(list: List<KProperty1<*, *>>): Boolean {
-    return when(this) {
-        is Modification.OnField<*, *> -> if(list.first() == this.key) {
-            if(list.size == 1) true
+    return when (this) {
+        is Modification.OnField<*, *> -> if (list.first() == this.key) {
+            if (list.size == 1) true
             else this.modification.affects(list.drop(1))
         } else false
+
         is Modification.SetPerElement<*> -> this.modification.affects(list)
         is Modification.ListPerElement<*> -> this.modification.affects(list)
         is Modification.Chain -> this.modifications.any { it.affects(list) }
@@ -38,11 +56,12 @@ private fun Modification<*>.affects(list: List<KProperty1<*, *>>): Boolean {
 
 fun Condition<*>.reads(path: KeyPathPartial<*>): Boolean = reads(path.properties)
 private fun Condition<*>.reads(list: List<KProperty1<*, *>>): Boolean {
-    return when(this) {
-        is Condition.OnField<*, *> -> if(list.first() == this.key) {
-            if(list.size == 1) true
+    return when (this) {
+        is Condition.OnField<*, *> -> if (list.first() == this.key) {
+            if (list.size == 1) true
             else this.condition.reads(list.drop(1))
         } else false
+
         is Condition.ListAllElements<*> -> this.condition.reads(list)
         is Condition.ListAnyElements<*> -> this.condition.reads(list)
         is Condition.SetAllElements<*> -> this.condition.reads(list)
@@ -55,7 +74,7 @@ private fun Condition<*>.reads(list: List<KProperty1<*, *>>): Boolean {
 }
 
 fun <T> Condition<T>.readsResultOf(modification: Modification<T>): Boolean {
-    return when(this) {
+    return when (this) {
         is Condition.Always -> false
         is Condition.Never -> false
         is Condition.OnField<*, *> -> {
@@ -63,45 +82,68 @@ fun <T> Condition<T>.readsResultOf(modification: Modification<T>): Boolean {
             @Suppress("UNCHECKED_CAST")
             field.key == this.key && (this.condition as Condition<Any?>).readsResultOf(field.modification as Modification<Any?>)
         }
-        is Condition.ListAllElements<*> -> @Suppress("UNCHECKED_CAST") (this.condition as Condition<Any?>).readsResultOf((modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false)
-        is Condition.ListAnyElements<*> -> @Suppress("UNCHECKED_CAST") (this.condition as Condition<Any?>).readsResultOf((modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false)
-        is Condition.SetAllElements<*> -> @Suppress("UNCHECKED_CAST") (this.condition as Condition<Any?>).readsResultOf((modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false)
-        is Condition.SetAnyElements<*> -> @Suppress("UNCHECKED_CAST") (this.condition as Condition<Any?>).readsResultOf((modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false)
+
+        is Condition.ListAllElements<*> -> @Suppress("UNCHECKED_CAST") (this.condition as Condition<Any?>).readsResultOf(
+            (modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false
+        )
+
+        is Condition.ListAnyElements<*> -> @Suppress("UNCHECKED_CAST") (this.condition as Condition<Any?>).readsResultOf(
+            (modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false
+        )
+
+        is Condition.SetAllElements<*> -> @Suppress("UNCHECKED_CAST") (this.condition as Condition<Any?>).readsResultOf(
+            (modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false
+        )
+
+        is Condition.SetAnyElements<*> -> @Suppress("UNCHECKED_CAST") (this.condition as Condition<Any?>).readsResultOf(
+            (modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false
+        )
+
         is Condition.And -> this.conditions.any { it.readsResultOf(modification) }
         is Condition.Or -> this.conditions.any { it.readsResultOf(modification) }
         is Condition.IfNotNull<*> -> {
             @Suppress("UNCHECKED_CAST")
-            (this.condition as Condition<Any?>).readsResultOf((modification as? Modification.IfNotNull<Any?>)?.modification ?: modification as Modification<Any?>)
+            (this.condition as Condition<Any?>).readsResultOf(
+                (modification as? Modification.IfNotNull<Any?>)?.modification ?: modification as Modification<Any?>
+            )
         }
+
         else -> true
     }
 }
+
 @Suppress("UNCHECKED_CAST")
 fun <T> Condition<T>.guaranteedAfter(modification: Modification<T>): Boolean {
-    return when(modification) {
+    return when (modification) {
         is Modification.Assign -> this(modification.value)
         is Modification.OnField<*, *> -> {
             val field = this as? Condition.OnField<*, *> ?: return true
             @Suppress("UNCHECKED_CAST")
             field.key != modification.key || (field.condition as Condition<Any?>).guaranteedAfter<Any?>(modification.modification as Modification<Any?>)
         }
+
         is Modification.SetPerElement<*> -> {
             @Suppress("UNCHECKED_CAST")
-            ((this as? Condition.SetAllElements<Any?>)?.condition ?: (this as? Condition.SetAnyElements<Any?>)?.condition)?.let {
+            ((this as? Condition.SetAllElements<Any?>)?.condition
+                ?: (this as? Condition.SetAnyElements<Any?>)?.condition)?.let {
                 (it as Condition<Any?>).guaranteedAfter<Any?>(modification.modification as Modification<Any?>)
             } ?: false
         }
+
         is Modification.ListPerElement<*> -> {
             @Suppress("UNCHECKED_CAST")
-            ((this as? Condition.ListAllElements<Any?>)?.condition ?: (this as? Condition.ListAnyElements<Any?>)?.condition)?.let {
+            ((this as? Condition.ListAllElements<Any?>)?.condition
+                ?: (this as? Condition.ListAnyElements<Any?>)?.condition)?.let {
                 (it as Condition<Any?>).guaranteedAfter<Any?>(modification.modification as Modification<Any?>)
             } ?: false
         }
+
         is Modification.Chain -> modification.modifications.all { guaranteedAfter(it) }
         is Modification.IfNotNull<*> -> {
             @Suppress("UNCHECKED_CAST")
             (this as Condition<Any?>).guaranteedAfter<Any?>(modification.modification as Modification<Any?>)
         }
+
         else -> false
     }
 }
@@ -111,17 +153,24 @@ fun <T, V> Modification<T>.map(
     path: KeyPath<T, V>,
     onModification: (Modification<V>) -> Modification<V>,
 ): Modification<T> = (this as Modification<Any?>).map<V>(path.properties, onModification) as Modification<T>
+
 @Suppress("UNCHECKED_CAST")
 private fun <V> Modification<*>.map(
     list: List<KProperty1<*, *>>,
     onModification: (Modification<V>) -> Modification<V>,
 ): Modification<*> {
     return when (this) {
-        is Modification.Chain -> modifications.map { it.map(list, onModification) as Modification<Any?> }.let { Modification.Chain(it) }
-        is Modification.OnField<*, *> -> if(list.first() == this.key) {
-            if(list.size == 1) Modification.OnField(key = this.key as KProperty1<Any?, Any?>, modification = onModification(modification as Modification<V>) as Modification<Any?>) as Modification<Any?>
+        is Modification.Chain -> modifications.map { it.map(list, onModification) as Modification<Any?> }
+            .let { Modification.Chain(it) }
+
+        is Modification.OnField<*, *> -> if (list.first() == this.key) {
+            if (list.size == 1) Modification.OnField(
+                key = this.key as KProperty1<Any?, Any?>,
+                modification = onModification(modification as Modification<V>) as Modification<Any?>
+            ) as Modification<Any?>
             else this.modification.map(list.drop(1), onModification)
         } else this
+
         is Modification.SetPerElement<*> -> (this.modification as Modification<Any?>).map(list, onModification)
         is Modification.ListPerElement<*> -> (this.modification as Modification<Any?>).map(list, onModification)
         is Modification.IfNotNull -> (this.modification as Modification<Any?>).map(list, onModification)
@@ -131,14 +180,15 @@ private fun <V> Modification<*>.map(
                 list: List<KProperty1<Any?, Any?>>,
                 onValue: (V) -> V,
             ): Any? {
-                if(value == null) return null
-                if(list.isEmpty()) return onValue(value as V)
+                if (value == null) return null
+                if (list.isEmpty()) return onValue(value as V)
                 return list.first().setCopy(value, mapValue(list.first().get(value), list.drop(1), onValue))
             }
             Modification.Assign(mapValue(value, list as List<KProperty1<Any?, Any?>>) {
                 (onModification(Modification.Assign(it)) as Modification.Assign).value
             })
         }
+
         else -> throw Exception("We have no idea what the partial effect is!")
     }
 }
