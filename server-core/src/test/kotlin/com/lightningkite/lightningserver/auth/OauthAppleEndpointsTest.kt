@@ -11,7 +11,6 @@ class OauthAppleEndpointsTest {
     @Test
     fun testAppleLengthFail() {
         val s = OauthAppleEndpoints.OauthAppleSettings(
-            appId = "appId",
             serviceId = "serviceId",
             teamId = "teamId",
             keyId = "keyId",
