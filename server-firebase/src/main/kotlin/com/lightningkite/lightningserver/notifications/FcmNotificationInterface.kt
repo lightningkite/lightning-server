@@ -61,7 +61,7 @@ object FcmNotificationInterface : NotificationInterface {
                         )
                     }
                     setAps(with(Aps.builder()) {
-                        if (ios != null)
+                        if (ios != null) {
                             if (ios.critical && ios.sound != null)
                                 setSound(
                                     CriticalSound.builder()
@@ -73,6 +73,9 @@ object FcmNotificationInterface : NotificationInterface {
                             else {
                                 setSound(ios.sound)
                             }
+                        } else {
+                            setSound("default")
+                        }
                         build()
                     })
                     build()
@@ -121,7 +124,6 @@ object FcmNotificationInterface : NotificationInterface {
             }
             this
         }
-
 
         targets
             .chunked(500)

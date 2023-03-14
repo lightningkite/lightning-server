@@ -82,6 +82,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                                 if (Settings.isServerless) {
                                     it.maxSize(4)
                                     it.maxConnectionIdleTime(15, TimeUnit.SECONDS)
+                                    it.maxConnectionLifeTime(1L, TimeUnit.MINUTES)
                                 }
                             }
                             .build()
@@ -98,6 +99,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                                 if (Settings.isServerless) {
                                     it.maxSize(4)
                                     it.maxConnectionIdleTime(15, TimeUnit.SECONDS)
+                                    it.maxConnectionLifeTime(1L, TimeUnit.MINUTES)
                                 }
                             }
                             .build()

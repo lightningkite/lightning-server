@@ -179,7 +179,7 @@ fun <T> Condition<T>.simplify(): Condition<T> {
                 it !is Condition.Never
             }.let {
                 when(it.size) {
-                    0 -> Condition.Always()
+                    0 -> Condition.Never()
                     1 -> it.first().simplify()
                     else -> Condition.Or(it)
                 }

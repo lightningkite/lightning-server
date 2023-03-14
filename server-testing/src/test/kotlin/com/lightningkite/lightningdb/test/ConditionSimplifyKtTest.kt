@@ -14,7 +14,10 @@ class ConditionSimplifyKtTest {
     }
     @Test
     fun test() {
+        condition<LargeTestModel> { Condition.Never<LargeTestModel>() or Condition.Never() }.simplifyOk()
         condition<LargeTestModel> { it.boolean eq false }.simplifyOk()
+        condition<LargeTestModel> { it.boolean.eq(false) and Condition.Always() }.simplifyOk()
+        condition<LargeTestModel> { Condition.Always<LargeTestModel>() and it.boolean.eq(false) }.simplifyOk()
         condition<LargeTestModel> { it.boolean.eq(false) and it.byte.eq(0) }.simplifyOk()
         condition<LargeTestModel> { it.boolean.eq(false) and it.boolean.eq(true) }.simplifyOk()
         condition<LargeTestModel> { it.boolean.eq(false) and it.boolean.inside(listOf(true, false)) }.simplifyOk()

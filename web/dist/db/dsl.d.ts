@@ -13,7 +13,6 @@ export declare class PropChain<From extends any, To extends any> {
     toString(): string;
 }
 export declare function condition<T extends any>(setup: ((a: PropChain<T, T>) => Condition<T>)): Condition<T>;
-export declare function modification<T extends any>(setup: ((a: PropChain<T, T>) => Modification<T>)): Modification<T>;
 export declare function xPropChainAlwaysGet<K extends any>(this_: PropChain<K, K>): Condition<K>;
 export declare function xPropChainNeverGet<K extends any>(this_: PropChain<K, K>): Condition<K>;
 export declare function xPropChainEq<K extends any, T extends any>(this_: PropChain<K, T>, value: T): Condition<K>;
@@ -50,7 +49,6 @@ export declare function xPropChainSetAllGet<K extends any, T extends any>(this_:
 export declare function xPropChainListAnyGet<K extends any, T extends any>(this_: PropChain<K, Array<T>>): PropChain<K, T>;
 export declare function xPropChainSetAnyGet<K extends any, T extends any>(this_: PropChain<K, Set<T>>): PropChain<K, T>;
 export declare function xPropChainCondition<K extends any, T extends any>(this_: PropChain<K, T>, make: ((a: PropChain<T, T>) => Condition<T>)): Condition<K>;
-export declare function xPropChainModification<K extends any, T extends any>(this_: PropChain<K, T>, make: ((a: PropChain<T, T>) => Modification<T>)): Modification<K>;
 export declare function xPropChainAssign<K extends any, T extends any>(this_: PropChain<K, T>, value: T): Modification<K>;
 export declare function xPropChainCoerceAtMost<K extends any, T extends Comparable<T>>(this_: PropChain<K, T>, value: T): Modification<K>;
 export declare function xPropChainCoerceAtLeast<K extends any, T extends Comparable<T>>(this_: PropChain<K, T>, value: T): Modification<K>;
@@ -78,3 +76,4 @@ export declare function xPropChainSetMapIf<K extends any, T extends any>(this_: 
 export declare function xPropChainPlusMap<K extends any, T extends any>(this_: PropChain<K, Map<string, T>>, map: Map<string, T>): Modification<K>;
 export declare function xPropChainModifyByKey<K extends any, T extends any>(this_: PropChain<K, Map<string, T>>, map: Map<string, ((a: PropChain<T, T>) => Modification<T>)>): Modification<K>;
 export declare function xPropChainRemoveKeys<K extends any, T extends any>(this_: PropChain<K, Map<string, T>>, fields: Set<string>): Modification<K>;
+export declare function xUnitThen(this_: void, ignored: void): void;

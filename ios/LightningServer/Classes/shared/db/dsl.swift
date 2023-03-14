@@ -40,10 +40,6 @@ public func condition<T : Codable & Hashable>(setup: @escaping (PropChain<T, T>)
     return (setup)((startChain() as PropChain<T, T>));
 }
 
-public func modification<T : Codable & Hashable>(setup: @escaping (PropChain<T, T>) -> Modification<T>) -> Modification<T> {
-    return (setup)((startChain() as PropChain<T, T>));
-}
-
 public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
     var always: Condition<To> {
         get { return ConditionAlways() }
@@ -232,12 +228,6 @@ public func getPropChainAny<K : Codable & Hashable, T : Codable & Hashable>(_ th
 public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
     func condition(make: @escaping (PropChain<To, To>) -> Condition<To>) -> Condition<From> {
         return self.mapCondition(make((startChain() as PropChain<To, To>)));
-    }
-}
-
-public extension PropChain where From : Codable & Hashable, To : Codable & Hashable {
-    func modification(make: @escaping (PropChain<To, To>) -> Modification<To>) -> Modification<From> {
-        return self.mapModification(make((startChain() as PropChain<To, To>)));
     }
 }
 

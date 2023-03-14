@@ -15,9 +15,7 @@ class Query {
         this.skip = skip;
         this.limit = limit;
     }
-    static propertyTypes(T) {
-        return { condition: [Condition_1.Condition, T], orderBy: [Array, [SortPart_1.SortPart, T]], skip: [Number], limit: [Number] };
-    }
+    static propertyTypes(T) { return { condition: [Condition_1.Condition, T], orderBy: [Array, [SortPart_1.SortPart, T]], skip: [Number], limit: [Number] }; }
     static constructorListcomSortPartcomQueryTIntIntFunction1comPropChaincomQueryTQueryTConditioncomQueryT(orderBy = [], skip = 0, limit = 100, makeCondition) {
         let result = new Query(makeCondition((0, dsl_1.startChain)()), orderBy, skip, limit);
         return result;
