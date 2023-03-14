@@ -13,7 +13,12 @@ inline fun <T : IsCodableAndHashable> modification(setup: ModificationBuilder<T>
 
 class ModificationBuilder<K : IsCodableAndHashable>() {
     val modifications = ArrayList<Modification<K>>()
-    fun build(): Modification<K> = modifications.singleOrNull() ?: Modification.Chain(modifications)
+    fun build(): Modification<K> {
+        if(modifications.size == 1)
+            return modifications[0]
+        else
+            return Modification.Chain(modifications)
+    }
 
     infix fun <T : IsCodableAndHashable> PropChain<K, T>.assign(value: T) {
         modifications.add(mapModification(Modification.Assign(value)))

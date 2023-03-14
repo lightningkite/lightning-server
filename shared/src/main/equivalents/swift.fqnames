@@ -200,7 +200,6 @@ com.lightningkite.lightningdb.dropFirst
 com.lightningkite.lightningdb.mapIf
 com.lightningkite.lightningdb.modifyByKey
 com.lightningkite.lightningdb.removeKeys
-com.lightningkite.lightningdb.then
 com.lightningkite.lightningserver.LSError
 com.lightningkite.lightningserver
 com.lightningkite.lightningserver.auth.EmailPinLogin

@@ -355,8 +355,3 @@ public func xPropChainRemoveKeys<K : Codable & Hashable, T : Codable & Hashable>
     return this.mapModification(ModificationRemoveKeys(fields: fields));
 }
 
-public extension Void {
-    func then(ignored: Void) -> Void {
-        return ();
-    }
-}

@@ -15,28 +15,26 @@ public final class ModificationBuilder<K : Codable & Hashable> {
     
     public var modifications: Array<Modification<K>>
     public func build() -> Modification<K> {
-        return run {var temp104 = self.modifications
-            (temp104.count == 1 ? temp104[0] : nil)self.modifications = temp104
-        } ?? ModificationChain(modifications: self.modifications);
+        if self.modifications.count == 1 { return self.modifications[0] } else { return ModificationChain(modifications: self.modifications) }
     }
     
-    public func xPropChainAssign(_ this: PropChain<K, T>, _ value: T) -> Void {
+    public func xPropChainAssign<T : Codable & Hashable>(_ this: PropChain<K, T>, _ value: T) -> Void {
         self.modifications.append(this.mapModification(ModificationAssign(value)))
     }
     
-    public func xPropChainCoerceAtMost(_ this: PropChain<K, T>, _ value: T) -> Void {
+    public func xPropChainCoerceAtMost<T : Comparable>(_ this: PropChain<K, T>, _ value: T) -> Void {
         self.modifications.append(this.mapModification(ModificationCoerceAtMost(value)))
     }
     
-    public func xPropChainCoerceAtLeast(_ this: PropChain<K, T>, _ value: T) -> Void {
+    public func xPropChainCoerceAtLeast<T : Comparable>(_ this: PropChain<K, T>, _ value: T) -> Void {
         self.modifications.append(this.mapModification(ModificationCoerceAtLeast(value)))
     }
     
-    public func xPropChainPlus(_ this: PropChain<K, T>, by: T) -> Void {
+    public func xPropChainPlus<T : Number>(_ this: PropChain<K, T>, by: T) -> Void {
         self.modifications.append(this.mapModification(ModificationIncrement(by: by)))
     }
     
-    public func xPropChainTimes(_ this: PropChain<K, T>, by: T) -> Void {
+    public func xPropChainTimes<T : Number>(_ this: PropChain<K, T>, by: T) -> Void {
         self.modifications.append(this.mapModification(ModificationMultiply(by: by)))
     }
     
@@ -60,11 +58,11 @@ public final class ModificationBuilder<K : Codable & Hashable> {
         self.modifications.append(this.mapModification(ModificationSetAppend(items: ([item] as Set<T>))))
     }
     
-    public func xPropChainPlusAssign(_ this: PropChain<K, T>, by: T) -> Void {
+    public func xPropChainPlusAssign<T : Number>(_ this: PropChain<K, T>, by: T) -> Void {
         self.modifications.append(this.mapModification(ModificationIncrement(by: by)))
     }
     
-    public func xPropChainTimesAssign(_ this: PropChain<K, T>, by: T) -> Void {
+    public func xPropChainTimesAssign<T : Number>(_ this: PropChain<K, T>, by: T) -> Void {
         self.modifications.append(this.mapModification(ModificationMultiply(by: by)))
     }
     

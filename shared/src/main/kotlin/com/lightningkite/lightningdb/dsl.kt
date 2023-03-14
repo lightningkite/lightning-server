@@ -373,7 +373,3 @@ infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Map<
 @Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Map<String, T>>.removeKeys(fields: Set<String>) =
     mapModification(Modification.RemoveKeys(fields))
-
-@CheckReturnValue
-@Deprecated("This is a no-op now.  Just use the parts.", ReplaceWith("this\nignored"))
-infix fun Unit.then(ignored: Unit): Unit = Unit

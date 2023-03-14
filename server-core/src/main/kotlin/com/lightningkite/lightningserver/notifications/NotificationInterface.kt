@@ -59,7 +59,7 @@ interface NotificationInterface {
             notification = Notification(title, body, imageUrl),
             data = data,
             android = androidChannel?.let { NotificationAndroid(it, priority = if(critical) NotificationPriority.HIGH else NotificationPriority.NORMAL) },
-            ios = NotificationIos(critical = critical)
+            ios = NotificationIos(critical = critical, sound = "default")
         )
     )
 
