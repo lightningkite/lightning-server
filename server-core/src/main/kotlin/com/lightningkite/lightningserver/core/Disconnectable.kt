@@ -6,4 +6,5 @@ package com.lightningkite.lightningserver.core
  */
 interface Disconnectable {
     fun disconnect()
+    fun connect()
 }
