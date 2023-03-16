@@ -30,7 +30,9 @@ class ChangeSocketTest {
         ))
         runBlocking {
             ws.test {
+                println("Test started")
                 this.send(Query())
+                println("Query sent, waiting for item")
                 assertEquals(withTimeout(1000L) { println("Waiting for item"); incoming.receive().also { println("Got $it") } }, ListChange(wholeList = listOf()))
                 val newThing = TestThing()
                 println("Sending update")

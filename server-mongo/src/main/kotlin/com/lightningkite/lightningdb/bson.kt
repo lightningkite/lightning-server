@@ -168,7 +168,7 @@ data class UpdateWithOptions(
 )
 
 fun Condition<*>.bson() = Document().also { simplify().dump(it, null) }
-fun Modification<*>.bson(): UpdateWithOptions = UpdateWithOptions().also { dump(it, null) }
+fun Modification<*>.bson(): UpdateWithOptions = UpdateWithOptions().also { simplify().dump(it, null) }
 
 @OptIn(ExperimentalSerializationApi::class)
 fun SerialDescriptor.bsonType(): BsonType = when(kind) {

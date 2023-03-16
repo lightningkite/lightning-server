@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.demo.Server
 import com.lightningkite.lightningserver.demo.TestModel
 import com.lightningkite.lightningserver.engine.Engine
+import com.lightningkite.lightningserver.engine.UnitTestEngine
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.jsonschema.lightningServerSchema
 import com.lightningkite.lightningserver.pubsub.LocalPubSub
@@ -43,29 +44,7 @@ object TestSettings {
             )
         ))
         Server.files()
-        engine = object: Engine {
-            val cache = LocalCache
-            val pubSub = LocalPubSub
-            val logger = LoggerFactory.getLogger(this::class.java)
-            override suspend fun sendWebSocketMessage(id: String, content: String): Boolean {
-                logger.debug("Sending $content to $id")
-                pubSub.string("ws-$id").emit(content)
-                return cache.get<Boolean>("ws-$id-connected") ?: false
-            }
-
-            override suspend fun listenForWebSocketMessage(id: String): Flow<String> {
-                logger.debug("Listener for $id made")
-                return pubSub.string("ws-$id").map { println("Send intercept $id $it"); it }
-                    .onStart { cache.set("ws-$id-connected", true, timeToLive = Duration.ofDays(1)) }
-                    .onCompletion { cache.set("ws-$id-connected", false) }
-            }
-
-            override suspend fun launchTask(task: Task<Any?>, input: Any?) {
-                coroutineScope {
-                    task.implementation(this, input)
-                }
-            }
-        }
+        engine = UnitTestEngine(LocalPubSub, LocalCache)
     }
 }
 

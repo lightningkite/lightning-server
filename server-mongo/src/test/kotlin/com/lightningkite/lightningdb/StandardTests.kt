@@ -78,6 +78,30 @@ class MongoModificationTests : ModificationTests() {
     override val database: Database = Companion.defaultMongo
 }
 
+class MongoOperationsTests : OperationsTests() {
+
+    companion object {
+        var mongoClient: MongoClient? = null
+        lateinit var defaultMongo: MongoDatabase
+
+        @BeforeClass
+        @JvmStatic
+        fun start() {
+            mongoClient = testMongo()
+            defaultMongo = MongoDatabase("default") { mongoClient!! }
+            prepareModels()
+        }
+
+        @AfterClass
+        @JvmStatic
+        fun after() {
+            mongoClient?.close()
+        }
+    }
+
+    override val database: Database = Companion.defaultMongo
+}
+
 class MongoSortTest : SortTest() {
 
     companion object {

@@ -177,6 +177,60 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     }
                 }
 
+                override suspend fun closeWebSocket(id: String): Boolean {
+                    try {
+                        if (id.contains('/')) {
+                            //Multiplex
+                            val wsId = id.substringBefore('/')
+                            val channelId = id.substringAfter('/')
+                            val result = apiGatewayManagement.postToConnection {
+                                it.connectionId(wsId)
+                                it.data(
+                                    SdkBytes.fromUtf8String(
+                                        Serialization.json.encodeToString(
+                                            MultiplexMessage(
+                                                channel = channelId,
+                                                end = true,
+                                            )
+                                        )
+                                    )
+                                )
+                            }.await()
+                            val r = result.sdkHttpResponse()
+                            if (!r.isSuccessful) {
+                                throw Exception(
+                                    "Failed to send socket message to $id: ${r.statusCode()} - ${
+                                        try {
+                                            r.statusText().get()
+                                        } catch (e: Exception) {
+                                            "?"
+                                        }
+                                    } - ${(r as? SdkHttpFullResponse)?.content()?.get()?.use { it.reader().readText() }}"
+                                )
+                            }
+                        } else {
+                            val result = apiGatewayManagement.deleteConnection {
+                                it.connectionId(id)
+                            }.await()
+                            val r = result.sdkHttpResponse()
+                            if (!r.isSuccessful) {
+                                throw Exception(
+                                    "Failed to send socket message to $id: ${r.statusCode()} - ${
+                                        try {
+                                            r.statusText().get()
+                                        } catch (e: Exception) {
+                                            "?"
+                                        }
+                                    } - ${(r as? SdkHttpFullResponse)?.content()?.get()?.use { it.reader().readText() }}"
+                                )
+                            }
+                        }
+                        return true
+                    } catch (e: GoneException) {
+                        return false
+                    }
+                }
+
                 val lambdaClient = LambdaAsyncClient.builder()
                     .region(region)
                     .build()

@@ -62,3 +62,4 @@ class ConditionSimplifyKtTest {
             assertEquals(this(data), simplify()(data))
     }
 }
+
