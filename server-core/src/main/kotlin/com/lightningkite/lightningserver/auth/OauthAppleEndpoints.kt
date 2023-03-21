@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.encodeToFormData
 import com.lightningkite.lightningserver.serialization.parse
+import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.statusFailing
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -19,6 +20,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.Instant
 import java.util.*
@@ -49,8 +51,11 @@ class OauthAppleEndpoints<USER: Any, ID>(
     val setting: ()->OauthAppleSettings,
 ): ServerPathGroup(base.path.path("oauth/apple")) {
 
+    companion object {
+        val logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.auth.OauthAppleEndpoints")
+    }
+
     @Serializable data class OauthAppleSettings(
-        val appId: String,
         val serviceId: String,
         val teamId: String,
         val keyId: String,
@@ -65,7 +70,7 @@ class OauthAppleEndpoints<USER: Any, ID>(
                     put("alg", "ES256")
                 }).toByteArray()))
                 append('.')
-                val issuedAt = Instant.now()
+                val issuedAt = Instant.now().minus(Duration.ofDays(1))
                 append(
                     Base64.getUrlEncoder().withoutPadding().encodeToString(
                         withDefaults.encodeToString(
@@ -74,7 +79,7 @@ class OauthAppleEndpoints<USER: Any, ID>(
                                 put("iat", issuedAt.toEpochMilli().div(1000))
                                 put("exp", issuedAt.plus(Duration.ofDays(5)).toEpochMilli().div(1000))
                                 put("aud", "https://appleid.apple.com")
-                                put("sub", appId)
+                                put("sub", serviceId)
                             }
                         ).toByteArray()
                     )
@@ -128,14 +133,14 @@ class OauthAppleEndpoints<USER: Any, ID>(
             return client.post(getTokenUrl) {
                 setBody(Serialization.properties.encodeToFormData(OauthTokenRequest(
                     code = code,
-                    client_id = setting().appId,
+                    client_id = setting().serviceId,
                     client_secret = setting().generateJwt(),
                     redirect_uri = callback.path.fullUrl(),
                     grant_type = "authorization_code",
-                )))
+                )).also { if(generalSettings().debug) logger.info("$getTokenUrl <- $it") })
                 contentType(ContentType.Application.FormUrlEncoded)
                 accept(ContentType.Application.Json)
-            }.statusFailing().body<OauthResponse>()
+            }.also { if(generalSettings().debug) logger.info("$getTokenUrl result ${it.status}") }.statusFailing().body<OauthResponse>()
         }
         throw BadRequestException("Code is empty")
     }

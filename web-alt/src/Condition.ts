@@ -41,7 +41,7 @@ type ArrayCondition<T, E> =
         : never
 
 type SetCondition<T, E> = 
-T extends Set<E> ? ({ SetAllElements: Condition<E> }
+T extends Array<E> ? ({ SetAllElements: Condition<E> }
     | { SetAnyElements: Condition<E> })
     | { SetSizesEquals: number }
 : never   

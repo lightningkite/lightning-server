@@ -14,17 +14,17 @@ export function startChain<T extends any>(): KeyPath<T, T> {
 export class KeyPath<From extends any, To extends any> {
     public constructor(public readonly mapCondition: ((a: Condition<To>) => Condition<From>), public readonly mapModification: ((a: Modification<To>) => Modification<From>), public readonly getProp: ((a: From) => To), public readonly setProp: ((a: From, b: To) => From)) {
     }
-    
+
     public get<V extends any>(prop: TProperty1<To, V>): KeyPath<From, V> {
         return new KeyPath<From, V>((it: Condition<V>): Condition<From> => (this.mapCondition(new Condition.OnField<To, V>(prop, it))), (it: Modification<V>): Modification<From> => (this.mapModification(new Modification.OnField<To, V>(prop, it))), (it: From): V => (reflectiveGet(this.getProp(it), prop)), (from: From, to: V): From => (this.setProp(from, keySet(this.getProp(from), prop, to))));
     }
-    
+
     //    override fun hashCode(): Int = mapCondition(Condition.Always()).hashCode()
-    
+
     public toString(): string {
         return `KeyPath(${this.mapCondition(new Condition.Always<To>())})`;
     }
-    
+
     //    @Suppress("UNCHECKED_CAST")
     //    override fun equals(other: Any?): Boolean = other is KeyPath<*, *> && mapCondition(Condition.Always()) == (other as KeyPath<Any?, Any?>).mapCondition(Condition.Always())
 }
@@ -335,4 +335,9 @@ export function xKeyPathModifyByKey<K extends any, T extends any>(this_: KeyPath
 //! Declares com.lightningkite.lightningdb.removeKeys>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.removeKeys.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.removeKeys.T
 export function xKeyPathRemoveKeys<K extends any, T extends any>(this_: KeyPath<K, Map<string, T>>, fields: Set<string>): Modification<K> {
     return this_.mapModification(new Modification.RemoveKeys<T>(fields));
+}
+
+//! Declares com.lightningkite.lightningdb.then>kotlin.Unit
+export function xUnitThen(this_: void, ignored: void): void {
+    return undefined;
 }

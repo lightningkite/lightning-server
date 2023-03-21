@@ -146,10 +146,13 @@ suspend fun <USER, INPUT, OUTPUT> ApiWebsocket<USER, INPUT, OUTPUT>.test(
                         channel.send(Serialization.json.decodeFromString(outputType, it))
                     }
                 }
-                test(TypedVirtualSocket<INPUT, OUTPUT>(
-                    incoming = channel,
-                    send = { send(Serialization.json.encodeToString(inputType, it)) }
-                ))
+                val job2 = launch {
+                    test(TypedVirtualSocket<INPUT, OUTPUT>(
+                        incoming = channel,
+                        send = { send(Serialization.json.encodeToString(inputType, it)) }
+                    ))
+                }
+                job2.join()
                 job.cancelAndJoin()
             }
         },

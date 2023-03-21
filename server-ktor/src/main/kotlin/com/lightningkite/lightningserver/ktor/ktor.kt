@@ -110,6 +110,7 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
                                 myEngine.listenForWebSocketMessage(id).collect {
                                     send(it)
                                 }
+                                close(CloseReason(CloseReason.Codes.NORMAL, "Server has shut down the connection."))
                             }
                             Metrics.handlerPerformance(
                                 WebSockets.HandlerSection(

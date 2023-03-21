@@ -28,11 +28,11 @@ dependencies {
     api("org.jetbrains.exposed:exposed-core:0.39.2")
     api("org.jetbrains.exposed:exposed-java-time:0.39.2")
     api("org.jetbrains.exposed:exposed-jdbc:0.39.2")
-    api("org.postgresql:postgresql:42.5.0")
+    api("org.postgresql:postgresql:42.5.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.6.4")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation(project(":server-testing"))
-    testImplementation("io.zonky.test:embedded-postgres:2.0.1")
+    testImplementation("io.zonky.test:embedded-postgres:2.0.3")
     ksp(project(":processor"))
     kspTest(project(":processor"))
 }

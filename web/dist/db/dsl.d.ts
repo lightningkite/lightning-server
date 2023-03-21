@@ -74,3 +74,4 @@ export declare function xKeyPathSetMapIf<K extends any, T extends any>(this_: Ke
 export declare function xKeyPathPlusMap<K extends any, T extends any>(this_: KeyPath<K, Map<string, T>>, map: Map<string, T>): Modification<K>;
 export declare function xKeyPathModifyByKey<K extends any, T extends any>(this_: KeyPath<K, Map<string, T>>, map: Map<string, ((a: KeyPath<T, T>) => Modification<T>)>): Modification<K>;
 export declare function xKeyPathRemoveKeys<K extends any, T extends any>(this_: KeyPath<K, Map<string, T>>, fields: Set<string>): Modification<K>;
+export declare function xUnitThen(this_: void, ignored: void): void;

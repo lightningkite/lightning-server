@@ -16,6 +16,7 @@ import java.time.Duration
 
 interface Engine {
     suspend fun sendWebSocketMessage(id: String, content: String): Boolean
+    suspend fun closeWebSocket(id: String): Boolean
     suspend fun listenForWebSocketMessage(id: String): Flow<String> = throw UnsupportedOperationException()
     suspend fun launchTask(task: Task<Any?>, input: Any?)
 }
@@ -26,9 +27,17 @@ class LocalEngine(val pubSub: PubSubInterface, val cache: CacheInterface) : Engi
         cache.set("ws-$id-connected", true, timeToLive = Duration.ofDays(1))
     }
 
+    val closeMessage = "___close____"
+
     override suspend fun sendWebSocketMessage(id: String, content: String): Boolean {
         pubSub.string("ws-$id").emit(content)
         return cache.get<Boolean>("ws-$id-connected") ?: false
+    }
+
+    override suspend fun closeWebSocket(id: String): Boolean {
+        cache.remove("ws-$id-connected")
+        pubSub.string("ws-$id").emit(closeMessage)
+        return true
     }
 
     override suspend fun listenForWebSocketMessage(id: String): Flow<String> {
@@ -38,6 +47,7 @@ class LocalEngine(val pubSub: PubSubInterface, val cache: CacheInterface) : Engi
                     logger.trace("Sending $it to $id")
                 }
             }
+            .takeWhile { it != closeMessage }
             .onStart {
                 cache.set("ws-$id-connected", true, timeToLive = Duration.ofDays(1))
                 logger.debug("Ready for outgoing messages to $id")
@@ -65,9 +75,17 @@ class UnitTestEngine(val pubSub: PubSubInterface, val cache: CacheInterface) : E
         cache.set("ws-$id-connected", true, timeToLive = Duration.ofDays(1))
     }
 
+    val closeMessage = "___close____"
+
     override suspend fun sendWebSocketMessage(id: String, content: String): Boolean {
         pubSub.string("ws-$id").emit(content)
         return cache.get<Boolean>("ws-$id-connected") ?: false
+    }
+
+    override suspend fun closeWebSocket(id: String): Boolean {
+        cache.remove("ws-$id-connected")
+        pubSub.string("ws-$id").emit(closeMessage)
+        return true
     }
 
     override suspend fun listenForWebSocketMessage(id: String): Flow<String> {
@@ -77,6 +95,7 @@ class UnitTestEngine(val pubSub: PubSubInterface, val cache: CacheInterface) : E
                     logger.trace("Sending $it to $id")
                 }
             }
+            .takeWhile { it != closeMessage }
             .onStart {
                 cache.set("ws-$id-connected", true, timeToLive = Duration.ofDays(1))
                 logger.debug("Ready for outgoing messages to $id")

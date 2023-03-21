@@ -72,9 +72,7 @@ exports.Condition = Condition;
             super();
             this.conditions = conditions;
         }
-        static propertyTypes(T) {
-            return { conditions: [Array, [Condition, T]] };
-        }
+        static propertyTypes(T) { return { conditions: [Array, [Condition, T]] }; }
         invoke(on) {
             return this.conditions.every((it) => (it.invoke(on)));
         }
@@ -90,9 +88,7 @@ exports.Condition = Condition;
             super();
             this.conditions = conditions;
         }
-        static propertyTypes(T) {
-            return { conditions: [Array, [Condition, T]] };
-        }
+        static propertyTypes(T) { return { conditions: [Array, [Condition, T]] }; }
         invoke(on) {
             return this.conditions.some((it) => (it.invoke(on)));
         }
@@ -108,9 +104,7 @@ exports.Condition = Condition;
             super();
             this.condition = condition;
         }
-        static propertyTypes(T) {
-            return { condition: [Condition, T] };
-        }
+        static propertyTypes(T) { return { condition: [Condition, T] }; }
         invoke(on) {
             return (!this.condition.invoke(on));
         }
@@ -126,9 +120,7 @@ exports.Condition = Condition;
             super();
             this.value = value;
         }
-        static propertyTypes(T) {
-            return { value: T };
-        }
+        static propertyTypes(T) { return { value: T }; }
         invoke(on) {
             return (0, khrysalis_runtime_1.safeEq)(on, this.value);
         }
@@ -144,9 +136,7 @@ exports.Condition = Condition;
             super();
             this.value = value;
         }
-        static propertyTypes(T) {
-            return { value: T };
-        }
+        static propertyTypes(T) { return { value: T }; }
         invoke(on) {
             return !(0, khrysalis_runtime_1.safeEq)(on, this.value);
         }
@@ -162,9 +152,7 @@ exports.Condition = Condition;
             super();
             this.values = values;
         }
-        static propertyTypes(T) {
-            return { values: [Array, T] };
-        }
+        static propertyTypes(T) { return { values: [Array, T] }; }
         invoke(on) {
             return this.values.some((x) => (0, khrysalis_runtime_1.safeEq)(on, x));
         }
@@ -180,9 +168,7 @@ exports.Condition = Condition;
             super();
             this.values = values;
         }
-        static propertyTypes(T) {
-            return { values: [Array, T] };
-        }
+        static propertyTypes(T) { return { values: [Array, T] }; }
         invoke(on) {
             return (!this.values.some((x) => (0, khrysalis_runtime_1.safeEq)(on, x)));
         }
@@ -198,9 +184,7 @@ exports.Condition = Condition;
             super();
             this.value = value;
         }
-        static propertyTypes(T) {
-            return { value: T };
-        }
+        static propertyTypes(T) { return { value: T }; }
         invoke(on) {
             return (0, khrysalis_runtime_1.safeCompare)(on, this.value) > 0;
         }
@@ -216,9 +200,7 @@ exports.Condition = Condition;
             super();
             this.value = value;
         }
-        static propertyTypes(T) {
-            return { value: T };
-        }
+        static propertyTypes(T) { return { value: T }; }
         invoke(on) {
             return (0, khrysalis_runtime_1.safeCompare)(on, this.value) < 0;
         }
@@ -234,9 +216,7 @@ exports.Condition = Condition;
             super();
             this.value = value;
         }
-        static propertyTypes(T) {
-            return { value: T };
-        }
+        static propertyTypes(T) { return { value: T }; }
         invoke(on) {
             return (0, khrysalis_runtime_1.safeCompare)(on, this.value) >= 0;
         }
@@ -252,9 +232,7 @@ exports.Condition = Condition;
             super();
             this.value = value;
         }
-        static propertyTypes(T) {
-            return { value: T };
-        }
+        static propertyTypes(T) { return { value: T }; }
         invoke(on) {
             return (0, khrysalis_runtime_1.safeCompare)(on, this.value) <= 0;
         }
@@ -271,9 +249,7 @@ exports.Condition = Condition;
             this.value = value;
             this.ignoreCase = ignoreCase;
         }
-        static propertyTypes() {
-            return { value: [String], ignoreCase: [Boolean] };
-        }
+        static propertyTypes() { return { value: [String], ignoreCase: [Boolean] }; }
         invoke(on) {
             return (on.toLowerCase().indexOf(this.value.toLowerCase()) != -1);
         }
@@ -290,9 +266,7 @@ exports.Condition = Condition;
             this.value = value;
             this.ignoreCase = ignoreCase;
         }
-        static propertyTypes(T) {
-            return { value: [String], ignoreCase: [Boolean] };
-        }
+        static propertyTypes(T) { return { value: [String], ignoreCase: [Boolean] }; }
         invoke(on) {
             throw "Not Implemented locally";
         }
@@ -310,9 +284,7 @@ exports.Condition = Condition;
             this.ignoreCase = ignoreCase;
             this.regex = new RegExp(this.pattern);
         }
-        static propertyTypes() {
-            return { pattern: [String], ignoreCase: [Boolean] };
-        }
+        static propertyTypes() { return { pattern: [String], ignoreCase: [Boolean] }; }
         invoke(on) {
             return this.regex.test(on);
         }
@@ -328,9 +300,7 @@ exports.Condition = Condition;
             super();
             this.mask = mask;
         }
-        static propertyTypes() {
-            return { mask: [Number] };
-        }
+        static propertyTypes() { return { mask: [Number] }; }
         invoke(on) {
             return (on & this.mask) === 0;
         }
@@ -346,9 +316,7 @@ exports.Condition = Condition;
             super();
             this.mask = mask;
         }
-        static propertyTypes() {
-            return { mask: [Number] };
-        }
+        static propertyTypes() { return { mask: [Number] }; }
         invoke(on) {
             return (on & this.mask) === this.mask;
         }
@@ -364,9 +332,7 @@ exports.Condition = Condition;
             super();
             this.mask = mask;
         }
-        static propertyTypes() {
-            return { mask: [Number] };
-        }
+        static propertyTypes() { return { mask: [Number] }; }
         invoke(on) {
             return (on & this.mask) < this.mask;
         }
@@ -382,9 +348,7 @@ exports.Condition = Condition;
             super();
             this.mask = mask;
         }
-        static propertyTypes() {
-            return { mask: [Number] };
-        }
+        static propertyTypes() { return { mask: [Number] }; }
         invoke(on) {
             return (on & this.mask) > 0;
         }
@@ -400,9 +364,7 @@ exports.Condition = Condition;
             super();
             this.condition = condition;
         }
-        static propertyTypes(E) {
-            return { condition: [Condition, E] };
-        }
+        static propertyTypes(E) { return { condition: [Condition, E] }; }
         invoke(on) {
             return on.every((it) => (this.condition.invoke(it)));
         }
@@ -418,9 +380,7 @@ exports.Condition = Condition;
             super();
             this.condition = condition;
         }
-        static propertyTypes(E) {
-            return { condition: [Condition, E] };
-        }
+        static propertyTypes(E) { return { condition: [Condition, E] }; }
         invoke(on) {
             return on.some((it) => (this.condition.invoke(it)));
         }
@@ -436,9 +396,7 @@ exports.Condition = Condition;
             super();
             this.count = count;
         }
-        static propertyTypes(E) {
-            return { count: [Number] };
-        }
+        static propertyTypes(E) { return { count: [Number] }; }
         invoke(on) {
             return on.length === this.count;
         }
@@ -454,9 +412,7 @@ exports.Condition = Condition;
             super();
             this.condition = condition;
         }
-        static propertyTypes(E) {
-            return { condition: [Condition, E] };
-        }
+        static propertyTypes(E) { return { condition: [Condition, E] }; }
         invoke(on) {
             return (0, iter_tools_es_1.every)((it) => (this.condition.invoke(it)), on);
         }
@@ -472,9 +428,7 @@ exports.Condition = Condition;
             super();
             this.condition = condition;
         }
-        static propertyTypes(E) {
-            return { condition: [Condition, E] };
-        }
+        static propertyTypes(E) { return { condition: [Condition, E] }; }
         invoke(on) {
             return (0, iter_tools_es_1.some)((it) => (this.condition.invoke(it)), on);
         }
@@ -490,9 +444,7 @@ exports.Condition = Condition;
             super();
             this.count = count;
         }
-        static propertyTypes(E) {
-            return { count: [Number] };
-        }
+        static propertyTypes(E) { return { count: [Number] }; }
         invoke(on) {
             return on.size === this.count;
         }
@@ -508,9 +460,7 @@ exports.Condition = Condition;
             super();
             this.key = key;
         }
-        static propertyTypes(V) {
-            return { key: [String] };
-        }
+        static propertyTypes(V) { return { key: [String] }; }
         invoke(on) {
             return on.has(this.key);
         }
@@ -527,9 +477,7 @@ exports.Condition = Condition;
             this.key = key;
             this.condition = condition;
         }
-        static propertyTypes(V) {
-            return { key: [String], condition: [Condition, V] };
-        }
+        static propertyTypes(V) { return { key: [String], condition: [Condition, V] }; }
         invoke(on) {
             var _a;
             return on.has(this.key) && this.condition.invoke(((_a = on.get(this.key)) !== null && _a !== void 0 ? _a : null));
@@ -547,9 +495,7 @@ exports.Condition = Condition;
             this.key = key;
             this.condition = condition;
         }
-        static propertyTypes(K, V) {
-            return { key: [String, K, V], condition: [Condition, V] };
-        }
+        static propertyTypes(K, V) { return { key: [String, K, V], condition: [Condition, V] }; }
         invoke(on) {
             return this.condition.invoke((0, khrysalis_runtime_1.reflectiveGet)(on, this.key));
         }
@@ -565,9 +511,7 @@ exports.Condition = Condition;
             super();
             this.condition = condition;
         }
-        static propertyTypes(T) {
-            return { condition: [Condition, T] };
-        }
+        static propertyTypes(T) { return { condition: [Condition, T] }; }
         invoke(on) {
             return on !== null && this.condition.invoke(on);
         }

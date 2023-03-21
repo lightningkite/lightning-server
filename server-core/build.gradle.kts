@@ -45,12 +45,12 @@ dependencies {
     api("io.ktor:ktor-serialization-kotlinx-cbor:$ktorVersion")
     api("com.lightningkite:kotlinx-serialization-csv:2.0.4-SNAPSHOT")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
-    api("io.github.pdvrieze.xmlutil:serialization-jvm:0.84.3")
+    api("io.github.pdvrieze.xmlutil:serialization-jvm:0.85.0")
     api("com.github.jershell:kbson:0.4.5")
     api("com.charleskorn.kaml:kaml:0.49.0")
 
     implementation("org.bouncycastle:bcprov-jdk18on:1.71.1")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.71.1")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.72")
 
     api("org.apache.commons:commons-email:1.5")
 

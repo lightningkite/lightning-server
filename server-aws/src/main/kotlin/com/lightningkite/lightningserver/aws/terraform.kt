@@ -881,6 +881,78 @@ internal fun handlers() {
             """.trimIndent()
         }
     )
+    TerraformHandler.handler<EmailSettings>(
+        name = "SMTP through SES with Existing Identity",
+        inputs = { key ->
+            listOf(
+                TerraformInput.string("${key}_sender", null)
+            )
+        },
+        emit = {
+            appendLine(
+                """
+                resource "aws_iam_user" "${key}" {
+                  name = "${namePrefix}-${key}-user"
+                }
+
+                resource "aws_iam_access_key" "${key}" {
+                  user = aws_iam_user.${key}.name
+                }
+
+                data "aws_iam_policy_document" "${key}" {
+                  statement {
+                    actions   = ["ses:SendRawEmail"]
+                    resources = ["*"]
+                  }
+                }
+
+                resource "aws_iam_policy" "${key}" {
+                  name = "${namePrefix}-${key}-policy"
+                  description = "Allows sending of e-mails via Simple Email Service"
+                  policy      = data.aws_iam_policy_document.${key}.json
+                }
+
+                resource "aws_iam_user_policy_attachment" "${key}" {
+                  user       = aws_iam_user.${key}.name
+                  policy_arn = aws_iam_policy.${key}.arn
+                }
+                
+            """.trimIndent()
+            )
+
+            if (project.vpc) {
+                appendLine(
+                    """
+                    resource "aws_security_group" "${key}" {
+                      name   = "${namePrefix}-${key}"
+                      vpc_id = ${project.vpc_id}
+                    
+                      ingress {
+                        from_port   = 587
+                        to_port     = 587
+                        protocol    = "tcp"
+                        cidr_blocks = [${project.vpc_cidr_block}]
+                      }
+                    }
+                    resource "aws_vpc_endpoint" "${key}" {
+                      vpc_id = ${project.vpc_id}
+                      service_name = "com.amazonaws.${'$'}{var.deployment_location}.email-smtp"
+                      security_group_ids = [aws_security_group.${key}.id]
+                      vpc_endpoint_type = "Interface"
+                    }
+                """.trimIndent()
+                )
+            }
+        },
+        settingOutput = { key ->
+            """
+                {
+                    url = "smtp://${'$'}{aws_iam_access_key.${key}.id}:${'$'}{aws_iam_access_key.${key}.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
+                    fromEmail = var.${key}_sender
+                }
+            """.trimIndent()
+        }
+    )
 }
 
 internal fun defaultAwsHandler(project: TerraformProjectInfo) = with(project) {

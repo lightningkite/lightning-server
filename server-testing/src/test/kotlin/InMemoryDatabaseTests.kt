@@ -48,6 +48,9 @@ class RamConditionTests: ConditionTests() {
 class RamModificationTests: ModificationTests() {
     override val database: Database = InMemoryDatabase()
 }
+class RamOperationsTests: OperationsTests() {
+    override val database: Database = InMemoryDatabase()
+}
 class RamSortTest: SortTest() {
     override val database: Database = InMemoryDatabase()
 }
