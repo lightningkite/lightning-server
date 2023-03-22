@@ -47,9 +47,9 @@ class S3FileSystem(
     companion object {
         init {
             FilesSettings.register("s3") {
-                Regex("""s3://(?<user>[^:]+):(?<password>[^@]+)@(?<bucket>[^.]+)\.(?<region>[^.]+)\.amazonaws.com/?""").matchEntire(it.storageUrl)?.let { match ->
-                    val user = match.groups["user"]!!.value
-                    val password = match.groups["password"]!!.value
+                Regex("""s3://(?:(?<user>[^:]+):(?<password>[^@]+)@)?(?<bucket>[^.]+)\.(?:s3-)?(?<region>[^.]+)\.amazonaws.com/?""").matchEntire(it.storageUrl)?.let { match ->
+                    val user = match.groups["user"]?.value ?: ""
+                    val password = match.groups["password"]?.value ?: ""
                     S3FileSystem(
                         Region.of(match.groups["region"]!!.value),
                         if (user.isNotBlank() && password.isNotBlank()) {
