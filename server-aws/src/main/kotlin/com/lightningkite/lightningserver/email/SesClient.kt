@@ -44,7 +44,7 @@ class SesClient(
                         fromEmail = params["fromEmail"]?.first() ?: it.fromEmail ?: throw IllegalStateException("SES Email requires a fromEmail to be set.")
                     )
                 }
-                    ?: throw IllegalStateException("Invalid Mailgun URL. The URL should match the pattern: ses://[accessKey]:[secreteAccessKey]@[region]?[params]\nAvailable params are: fromEmail")
+                    ?: throw IllegalStateException("Invalid SES URL. The URL should match the pattern: ses://[accessKey]:[secreteAccessKey]@[region]?[params]\nAvailable params are: fromEmail")
             }
         }
     }

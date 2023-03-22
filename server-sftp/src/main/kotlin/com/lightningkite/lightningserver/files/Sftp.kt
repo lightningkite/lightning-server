@@ -42,7 +42,7 @@ class Sftp(
                         }
                     }
                 }
-                    ?: throw IllegalStateException("Invalid S3 storageUrl. The URL should match the pattern: sftp://[user]@[host]:[port]/[path]?[params]\nParams available are: host, identity.")
+                    ?: throw IllegalStateException("Invalid sftp storageUrl. The URL should match the pattern: sftp://[user]@[host]:[port]/[path]?[params]\nParams available are: host, identity.")
             }
         }
     }
