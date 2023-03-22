@@ -1271,7 +1271,7 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
               principal     = "events.amazonaws.com"
               source_arn    = aws_cloudwatch_event_rule.panic.arn
               lifecycle {
-                create_before_destroy = var.lambda_permission_create_before_destroy
+                # create_before_destroy = true
               }
             }
             
@@ -1330,7 +1330,7 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                       principal     = "events.amazonaws.com"
                       source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
                       lifecycle {
-                        create_before_destroy = var.lambda_permission_create_before_destroy
+                        # create_before_destroy = true
                       }
                     }
                 """.trimIndent()
@@ -1361,7 +1361,7 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                       principal     = "events.amazonaws.com"
                       source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
                       lifecycle {
-                        create_before_destroy = var.lambda_permission_create_before_destroy
+                        # create_before_destroy = true
                       }
                     }
                 """.trimIndent()
@@ -1382,7 +1382,6 @@ internal fun awsLambdaHandler(
     inputs = listOf(
         TerraformInput.number("lambda_memory_size", 1024),
         TerraformInput.number("lambda_timeout", 30),
-        TerraformInput.boolean("lambda_permission_create_before_destroy", false),
         TerraformInput.boolean("lambda_snapstart", false),
     ),
     emit = {
@@ -1677,7 +1676,7 @@ internal fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSectio
         
                   source_arn = "${'$'}{aws_apigatewayv2_api.http.execution_arn}/*/*"
                   lifecycle {
-                    create_before_destroy = var.lambda_permission_create_before_destroy
+                    # create_before_destroy = true
                   }
                 }
             """.trimIndent()
@@ -1817,7 +1816,7 @@ internal fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
     
               source_arn = "${'$'}{aws_apigatewayv2_api.ws.execution_arn}/*/*"
               lifecycle {
-                create_before_destroy = var.lambda_permission_create_before_destroy
+                # create_before_destroy = true
               }
             }
             
