@@ -47,18 +47,18 @@ class S3FileSystem(
     companion object {
         init {
             FilesSettings.register("s3") {
-                Regex("""s3://([^:]+)([^@]+)@([^.]+)\.([^.]+)\.amazonaws.com/""").matchEntire(it.storageUrl)?.let { match ->
-                    val user = match.groupValues[1]
-                    val password = match.groupValues[2]
+                Regex("""s3://(?<user>[^:]+):(?<password>[^@]+)@(?<bucket>[^.]+)\.(?<region>[^.]+)\.amazonaws.com/?""").matchEntire(it.storageUrl)?.let { match ->
+                    val user = match.groups["user"]!!.value
+                    val password = match.groups["password"]!!.value
                     S3FileSystem(
-                        Region.of(match.groupValues[4]),
+                        Region.of(match.groups["region"]!!.value),
                         if (user.isNotBlank() && password.isNotBlank()) {
                             StaticCredentialsProvider.create(object : AwsCredentials {
                                 override fun accessKeyId(): String = user
                                 override fun secretAccessKey(): String = password
                             })
                         } else DefaultCredentialsProvider.create(),
-                        match.groupValues[3],
+                        match.groups["bucket"]!!.value,
                         it.signedUrlExpiration?.toSeconds()?.toInt()
                     )
                 }

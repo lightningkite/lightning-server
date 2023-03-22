@@ -20,9 +20,9 @@ class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: St
     companion object {
         init {
             CacheSettings.register("dynamodb") {
-                Regex("""dynamodb://([^:]+)([^@]+)@([^.]+)/([^.]+)""").matchEntire(it.url)?.let { match ->
-                    val user = match.groupValues[1]
-                    val password = match.groupValues[2]
+                Regex("""dynamodb://(?<access>[^:]+):(?<secret>[^@]+)@(?<region>[^/]+)/(?<tableName>.+)""").matchEntire(it.url)?.let { match ->
+                    val user = match.groups["access"]!!.value
+                    val password = match.groups["secret"]!!.value
                     DynamoDbCache(
                         {
                             DynamoDbAsyncClient.builder()
@@ -34,10 +34,10 @@ class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: St
                                         })
                                     } else DefaultCredentialsProvider.create()
                                 )
-                                .region(Region.of(match.groupValues[3]))
+                                .region(Region.of(match.groups["region"]!!.value))
                                 .build()
                         },
-                        match.groupValues[4]
+                        match.groups["tableName"]!!.value
                     )
                 }
                     ?: throw IllegalStateException("Invalid S3 storageUrl. The URL should match the pattern: dynamodb://[access]:[secret]@[region]/[tableName]")

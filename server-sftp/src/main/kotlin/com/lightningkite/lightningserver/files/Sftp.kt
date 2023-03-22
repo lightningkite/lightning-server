@@ -6,20 +6,12 @@ import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.schmizz.sshj.SSHClient
-import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
-import net.schmizz.sshj.userauth.keyprovider.KeyProvider
 import java.io.File
 import java.io.InputStream
-import java.security.KeyFactory
-import java.security.PrivateKey
-import java.security.PublicKey
-import java.security.spec.PKCS8EncodedKeySpec
 import java.time.Duration
 import java.time.Instant
-import java.util.Base64
-import java.util.concurrent.ConcurrentHashMap
 
 class Sftp(
     val host: String,
@@ -31,12 +23,12 @@ class Sftp(
     companion object {
         init {
             FilesSettings.register("sftp") { settings ->
-                Regex("""sftp://([^@]+)@([^:]+):([0-9]+)(?:/([^?]*))?(?:\?(.*))?""").matchEntire(settings.storageUrl)?.let { match ->
-                    val host = match.groupValues[2]
-                    val port = match.groupValues[3].toInt()
-                    val params: Map<String, List<String>> = FilesSettings.parseParameterString(match.groupValues[5])
+                Regex("""sftp://(?<user>[^@]+)@(?<host>[^:]+):(?<port>[0-9]+)/(?<path>[^?]*)\?(?<params>.*)""").matchEntire(settings.storageUrl)?.let { match ->
+                    val host = match.groups["host"]!!.value
+                    val port = match.groups["port"]!!.value.toInt()
+                    val params: Map<String, List<String>> = FilesSettings.parseParameterString(match.groups["params"]!!.value)
 
-                    Sftp(host, port, match.groupValues[4]) {
+                    Sftp(host, port, match.groups["path"]!!.value) {
                         SSHClient().apply {
                             params["host"]?.let { addHostKeyVerifier(it.first()) } ?: addHostKeyVerifier(PromiscuousVerifier())
                             connect(host, port)
@@ -46,7 +38,7 @@ class Sftp(
                                 id.chunked(70).forEach { l -> appendLine(l) }
                                 appendLine("-----END OPENSSH PRIVATE KEY-----")
                             }
-                            authPublickey(match.groupValues[1], loadKeys(pk, null, null))
+                            authPublickey(match.groups["user"]!!.value, loadKeys(pk, null, null))
                         }
                     }
                 }

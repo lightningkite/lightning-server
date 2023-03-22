@@ -14,11 +14,11 @@ data class SMSSettings(
             SMSSettings.register("console") { ConsoleSMSClient }
             SMSSettings.register("twilio") {
 
-                Regex("""mailgun://([^:]+)([^@]+)@(.+)""").matchEntire(it.url)?.let { match ->
+                Regex("""twilio://(?<user>[^:]+):(?<password>[^@]+)(?:@(?<phoneNumber>.+))?""").matchEntire(it.url)?.let { match ->
                     TwilioSMSClient(
-                        match.groupValues[1],
-                        match.groupValues[2],
-                        (it.from ?: match.groupValues[3])
+                        match.groups["user"]!!.value,
+                        match.groups["password"]!!.value,
+                        (it.from ?: match.groups["phoneNumber"]?.value ?: throw IllegalStateException("Twilio Phone Number not provided."))
                     )
                 }
                     ?: throw IllegalStateException("Invalid Twilio Url. The URL should match the pattern: twilio://[user]:[password]@[phoneNumber]")

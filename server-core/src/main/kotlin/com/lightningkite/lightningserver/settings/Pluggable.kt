@@ -21,7 +21,7 @@ abstract class Pluggable<S, T> {
             val split = it.split('=')
             split[0] to split[1]
         }
-        ?.groupBy { it.first.lowercase() }
+        ?.groupBy { it.first }
         ?.mapValues { it.value.map { it.second } }
         ?: emptyMap()
 }

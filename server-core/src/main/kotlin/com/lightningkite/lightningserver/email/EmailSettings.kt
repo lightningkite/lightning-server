@@ -24,29 +24,29 @@ data class EmailSettings(
         init {
             EmailSettings.register("console") { ConsoleEmailClient }
             EmailSettings.register("mailgun") {
-                Regex("""mailgun://([^@]+)@(.+)""").matchEntire(it.url)?.let { match ->
+                Regex("""mailgun://(?<key>[^@]+)@(?<domain>.+)""").matchEntire(it.url)?.let { match ->
                     MailgunEmailClient(
-                        match.groupValues[1],
-                        match.groupValues[2]
+                        match.groups["key"]!!.value,
+                        match.groups["domain"]!!.value
                     )
                 }
                     ?: throw IllegalStateException("Invalid Mailgun URL. The URL should match the pattern: mailgun://[key]@[domain]")
             }
             EmailSettings.register("smtp") {
-                Regex("""smtp://([^:]+):([^@]+)@(.+)""").matchEntire(it.url)?.let { match ->
-                    val port = match.groupValues[4].takeIf { it.isNotBlank() }?.toIntOrNull() ?: 22
+                Regex("""smtp://(?<username>[^:]+):(?<password>[^@]+)@(?<host>[^:]+):(?<port>[0-9]+)""").matchEntire(it.url)?.let { match ->
+                    val port = match.groups["port"]!!.value.toInt()
                     SmtpEmailClient(
                         SmtpConfig(
-                            hostName = match.groupValues[3],
+                            hostName = match.groups["host"]!!.value,
                             port = port,
-                            username = match.groupValues[1],
-                            password = match.groupValues[2],
+                            username = match.groups["username"]!!.value,
+                            password = match.groups["password"]!!.value,
                             useSSL = port != 25,
                             fromEmail = it.fromEmail ?: throw IllegalStateException("SMTP Email requires a fromEmail to be set.")
                         )
                     )
                 }
-                    ?: throw IllegalStateException("Invalid SMTP URL. The URL should match the pattern: smtp://[username]:[password]@[host]:[port(Optional)]")
+                    ?: throw IllegalStateException("Invalid SMTP URL. The URL should match the pattern: smtp://[username]:[password]@[host]:[port]")
             }
         }
     }

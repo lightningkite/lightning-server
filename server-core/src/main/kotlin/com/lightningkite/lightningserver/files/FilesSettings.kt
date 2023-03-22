@@ -1,4 +1,5 @@
 @file:UseContextualSerialization(Duration::class)
+
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.auth.JwtSigner
@@ -27,15 +28,15 @@ data class FilesSettings(
     companion object : Pluggable<FilesSettings, FileSystem>() {
         init {
             register("file") {
-                val regex = Regex("""file://([^|]+)(?:\|(.+))?""")
-                regex.matchEntire(it.storageUrl)?.let { match ->
+                Regex("""file://(?<folderPath>[^|]+)(?:\|(?<servePath>.+))?""").matchEntire(it.storageUrl)?.let { match ->
                     LocalFileSystem(
-                        rootFile = File(match.groupValues[1]),
-                        serveDirectory = match.groupValues[2].takeUnless { it.isEmpty() } ?: "uploaded-files",
+                        rootFile = File(match.groups["folderPath"]!!.value),
+                        serveDirectory = match.groups["servePath"]?.value?.takeUnless { it.isEmpty() } ?: "uploaded-files",
                         signedUrlExpiration = it.signedUrlExpiration,
                         signer = it.jwtSigner
                     )
-                } ?: throw IllegalStateException("Invalid Local File storageUrl. It must follow the pattern: file:://[Path To Folder](|[Serve Directory] Optional)")
+                }
+                    ?: throw IllegalStateException("Invalid Local File storageUrl. It must follow the pattern: file:://[folderPath]|[servePath]\nServe Directory is Optional and will default to \"uploaded-files\"")
             }
         }
     }

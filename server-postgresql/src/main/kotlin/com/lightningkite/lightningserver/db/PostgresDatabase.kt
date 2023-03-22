@@ -11,13 +11,14 @@ class PostgresDatabase(val db: Database) : com.lightningkite.lightningdb.Databas
         init {
             // postgresql://user:password@endpoint/database
             DatabaseSettings.register("postgresql") {
-                Regex("""postgresql://([^:]*)([^@]*)@(.+)""").matchEntire(it.url)?.let { match ->
-                    val user = match.groupValues[1]
-                    val password = match.groupValues[2]
+                Regex("""postgresql://(?<user>[^:]*)(?<password>[^@]*)@(?<destination>.+)""").matchEntire(it.url)?.let { match ->
+                    val user = match.groups["user"]!!.value
+                    val password = match.groups["password"]!!.value
+                    val destination = match.groups["destination"]!!.value
                     if (user.isNotBlank() && password.isNotBlank())
                         PostgresDatabase(
                             Database.connect(
-                                "jdbc:postgresql://${match.groupValues[3]}",
+                                "jdbc:postgresql://$destination",
                                 "org.postgresql.Driver",
                                 user,
                                 password
@@ -26,7 +27,7 @@ class PostgresDatabase(val db: Database) : com.lightningkite.lightningdb.Databas
                     else
                         PostgresDatabase(
                             Database.connect(
-                                "jdbc:postgresql://${match.groupValues[3]}",
+                                "jdbc:postgresql://$destination",
                                 "org.postgresql.Driver"
                             )
                         )
