@@ -14,28 +14,33 @@ import software.amazon.awssdk.services.dynamodb.model.*
 import java.time.Duration
 import java.time.Instant
 
-class DynamoDbCache(val makeClient: ()->DynamoDbAsyncClient, val tableName: String = "cache") : CacheInterface {
+class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: String = "cache") : CacheInterface {
     val client by lazy(LazyThreadSafetyMode.SYNCHRONIZED, makeClient)
+
     companion object {
         init {
             CacheSettings.register("dynamodb") {
-                //dynamodb://[access:secret@]us-west-2/tableName
-                val withoutScheme = it.url.substringAfter("://")
-                val credentials = withoutScheme.substringBefore('@', "").split(':').filter { it.isNotBlank() }
-                val endpoint = withoutScheme.substringAfter('@')
-                val region = endpoint.substringBefore('/')
-                val name = endpoint.substringAfter('/')
-                DynamoDbCache({ DynamoDbAsyncClient.builder()
-                    .credentialsProvider(
-                        if (credentials.isNotEmpty()) {
-                            StaticCredentialsProvider.create(object : AwsCredentials {
-                                override fun accessKeyId(): String = credentials[0]
-                                override fun secretAccessKey(): String = credentials[1]
-                            })
-                        } else DefaultCredentialsProvider.create()
+                Regex("""dynamodb://([^:]+)([^@]+)@([^.]+)/([^.]+)""").matchEntire(it.url)?.let { match ->
+                    val user = match.groupValues[1]
+                    val password = match.groupValues[2]
+                    DynamoDbCache(
+                        {
+                            DynamoDbAsyncClient.builder()
+                                .credentialsProvider(
+                                    if (user.isNotBlank() && password.isNotBlank()) {
+                                        StaticCredentialsProvider.create(object : AwsCredentials {
+                                            override fun accessKeyId(): String = user
+                                            override fun secretAccessKey(): String = password
+                                        })
+                                    } else DefaultCredentialsProvider.create()
+                                )
+                                .region(Region.of(match.groupValues[3]))
+                                .build()
+                        },
+                        match.groupValues[4]
                     )
-                    .region(Region.of(region))
-                    .build() }, name)
+                }
+                    ?: throw IllegalStateException("Invalid S3 storageUrl. The URL should match the pattern: dynamodb://[access]:[secret]@[region]/[tableName]")
             }
         }
     }
@@ -157,7 +162,8 @@ class DynamoDbCache(val makeClient: ()->DynamoDbAsyncClient, val tableName: Stri
             it.expressionAttributeValues(
                 mapOf(
                     ":v" to AttributeValue.fromN(value.toString()),
-                    ":exp" to (timeToLive?.let { AttributeValue.fromN(Instant.now().plus(it).epochSecond.toString()) } ?: AttributeValue.fromNul(true))
+                    ":exp" to (timeToLive?.let { AttributeValue.fromN(Instant.now().plus(it).epochSecond.toString()) }
+                        ?: AttributeValue.fromNul(true))
                 )
             )
         }.await()

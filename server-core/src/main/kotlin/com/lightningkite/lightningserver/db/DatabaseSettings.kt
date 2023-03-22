@@ -35,11 +35,8 @@ data class DatabaseSettings(
             register("ram-preload") {
                 InMemoryDatabase(
                     Serialization.Internal.json.parseToJsonElement(
-                        File(
-                            it.url.substringAfter(
-                                "://"
-                            )
-                        ).readText()
+                        File(it.url.substringAfter("://"))
+                            .readText()
                     ) as? JsonObject
                 )
             }

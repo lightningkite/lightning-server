@@ -27,13 +27,15 @@ data class FilesSettings(
     companion object : Pluggable<FilesSettings, FileSystem>() {
         init {
             register("file") {
-                val root = File(it.storageUrl.substringAfter("file://").substringBefore('|'))
-                LocalFileSystem(
-                    rootFile = root,
-                    serveDirectory = it.storageUrl.substringAfter('|', "").takeUnless { it.isEmpty() } ?: "uploaded-files",
-                    signedUrlExpiration = it.signedUrlExpiration,
-                    signer = it.jwtSigner
-                )
+                val regex = Regex("""file://([^|]+)(?:\|(.+))?""")
+                regex.matchEntire(it.storageUrl)?.let { match ->
+                    LocalFileSystem(
+                        rootFile = File(match.groupValues[1]),
+                        serveDirectory = match.groupValues[2].takeUnless { it.isEmpty() } ?: "uploaded-files",
+                        signedUrlExpiration = it.signedUrlExpiration,
+                        signer = it.jwtSigner
+                    )
+                } ?: throw IllegalStateException("Invalid Local File storageUrl. It must follow the pattern: file:://[Path To Folder](|[Serve Directory] Optional)")
             }
         }
     }

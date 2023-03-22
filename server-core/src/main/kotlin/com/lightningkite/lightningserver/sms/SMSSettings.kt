@@ -6,21 +6,22 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SMSSettings(
     val url: String = "console",
-    val from:String? = null,
+    val from: String? = null,
 ) : () -> SMSClient {
 
     companion object : Pluggable<SMSSettings, SMSClient>() {
         init {
             SMSSettings.register("console") { ConsoleSMSClient }
             SMSSettings.register("twilio") {
-                val urlWithoutProtocol = it.url.substringAfter("://")
-                val auth = urlWithoutProtocol.substringBefore("@")
-                val from = urlWithoutProtocol.substringAfter("@")
-                TwilioSMSClient(
-                    auth.substringBefore(':'),
-                    auth.substringAfter(':'),
-                    it.from ?: from
-                )
+
+                Regex("""mailgun://([^:]+)([^@]+)@(.+)""").matchEntire(it.url)?.let { match ->
+                    TwilioSMSClient(
+                        match.groupValues[1],
+                        match.groupValues[2],
+                        (it.from ?: match.groupValues[3])
+                    )
+                }
+                    ?: throw IllegalStateException("Invalid Twilio Url. The URL should match the pattern: twilio://[user]:[password]@[phoneNumber]")
             }
         }
     }

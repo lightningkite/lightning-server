@@ -10,7 +10,7 @@ import java.lang.IllegalStateException
  * There are two options currently with email. You can send it to the console, or you can use SMTP to send real emails.
  *
  * @param url A string containing everything needed to connect to an email server. The format is defined by the EmailClient that will consume it.
- *  For SMTP: smtp://username:password@host:port
+ *  For SMTP: smtp://username:password@host:port*|fromEmail*    *:Optional items
  *  For mailgun: mailgun://key@domain
  *  For Console: console
  * @param fromEmail Required by at least the SMTP option. This will be the email that recipients see as the sender.
@@ -24,29 +24,29 @@ data class EmailSettings(
         init {
             EmailSettings.register("console") { ConsoleEmailClient }
             EmailSettings.register("mailgun") {
-                val urlWithoutProtocol = it.url.substringAfter("://")
-                val key = urlWithoutProtocol.substringBefore('@')
-                val domain = urlWithoutProtocol.substringAfter('@')
-                MailgunEmailClient(
-                    key,
-                    domain
-                )
+                Regex("""mailgun://([^@]+)@(.+)""").matchEntire(it.url)?.let { match ->
+                    MailgunEmailClient(
+                        match.groupValues[1],
+                        match.groupValues[2]
+                    )
+                }
+                    ?: throw IllegalStateException("Invalid Mailgun URL. The URL should match the pattern: mailgun://[key]@[domain]")
             }
             EmailSettings.register("smtp") {
-                val urlWithoutProtocol = it.url.substringAfter("://")
-                val urlAuth = urlWithoutProtocol.substringBeforeLast('@')
-                val urlHost = urlWithoutProtocol.substringAfterLast('@')
-                val port = urlHost.substringAfter(':', "").toIntOrNull() ?: 22
-                SmtpEmailClient(
-                     SmtpConfig(
-                        hostName = urlHost.substringBefore(':'),
-                        port = port,
-                        username = urlAuth.substringBefore(':'),
-                        password = urlAuth.substringAfter(':'),
-                        useSSL = port != 25,
-                        fromEmail = it.fromEmail ?: throw IllegalStateException("SMTP Email requires a fromEmail to be set.")
+                Regex("""smtp://([^:]+):([^@]+)@(.+)""").matchEntire(it.url)?.let { match ->
+                    val port = match.groupValues[4].takeIf { it.isNotBlank() }?.toIntOrNull() ?: 22
+                    SmtpEmailClient(
+                        SmtpConfig(
+                            hostName = match.groupValues[3],
+                            port = port,
+                            username = match.groupValues[1],
+                            password = match.groupValues[2],
+                            useSSL = port != 25,
+                            fromEmail = it.fromEmail ?: throw IllegalStateException("SMTP Email requires a fromEmail to be set.")
+                        )
                     )
-                )
+                }
+                    ?: throw IllegalStateException("Invalid SMTP URL. The URL should match the pattern: smtp://[username]:[password]@[host]:[port(Optional)]")
             }
         }
     }

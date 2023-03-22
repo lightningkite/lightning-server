@@ -29,19 +29,22 @@ class SesClient(
     companion object {
         init {
             EmailSettings.register("ses") {
-                val withoutScheme = it.url.substringAfter("://")
-                val credentials = withoutScheme.substringBefore('@', "").split(':').filter { it.isNotBlank() }
-                val region = withoutScheme.substringAfter('@')
-                SesClient(
-                    region = Region.of(region),
-                    credentialProvider = if (credentials.isNotEmpty()) {
-                        StaticCredentialsProvider.create(object : AwsCredentials {
-                            override fun accessKeyId(): String = credentials[0]
-                            override fun secretAccessKey(): String = credentials[1]
-                        })
-                    } else DefaultCredentialsProvider.create(),
-                    fromEmail = it.fromEmail ?: throw IllegalStateException("SES Email requires a fromEmail to be set.")
-                )
+                Regex("""ses://([^:]*):([^@]*)@(.+)""").matchEntire(it.url)?.let { match ->
+                    val accessKey = match.groupValues[1]
+                    val secretAccessKey = match.groupValues[2]
+                    val region = match.groupValues[3]
+                    SesClient(
+                        region = Region.of(region),
+                        credentialProvider = if (accessKey.isNotBlank() && secretAccessKey.isNotBlank()) {
+                            StaticCredentialsProvider.create(object : AwsCredentials {
+                                override fun accessKeyId(): String = accessKey
+                                override fun secretAccessKey(): String = secretAccessKey
+                            })
+                        } else DefaultCredentialsProvider.create(),
+                        fromEmail = it.fromEmail ?: throw IllegalStateException("SES Email requires a fromEmail to be set.")
+                    )
+                }
+                    ?: throw IllegalStateException("Invalid Mailgun URL. The URL should match the pattern: mailgun://[key]@[domain]")
             }
         }
     }

@@ -11,15 +11,27 @@ class PostgresDatabase(val db: Database) : com.lightningkite.lightningdb.Databas
         init {
             // postgresql://user:password@endpoint/database
             DatabaseSettings.register("postgresql") {
-                val withoutScheme = it.url.substringAfter("://")
-                val auth = withoutScheme.substringBefore('@', "")
-                val user = auth.substringBefore(':').takeUnless { it.isEmpty() }
-                val password = auth.substringAfter(':').takeUnless { it.isEmpty() }
-                val destination = withoutScheme.substringAfter('@')
-                if(user != null && password != null)
-                    PostgresDatabase(Database.connect("jdbc:postgresql://$destination", "org.postgresql.Driver", user, password))
-                else
-                    PostgresDatabase(Database.connect("jdbc:postgresql://$destination", "org.postgresql.Driver"))
+                Regex("""postgresql://([^:]*)([^@]*)@(.+)""").matchEntire(it.url)?.let { match ->
+                    val user = match.groupValues[1]
+                    val password = match.groupValues[2]
+                    if (user.isNotBlank() && password.isNotBlank())
+                        PostgresDatabase(
+                            Database.connect(
+                                "jdbc:postgresql://${match.groupValues[3]}",
+                                "org.postgresql.Driver",
+                                user,
+                                password
+                            )
+                        )
+                    else
+                        PostgresDatabase(
+                            Database.connect(
+                                "jdbc:postgresql://${match.groupValues[3]}",
+                                "org.postgresql.Driver"
+                            )
+                        )
+                }
+                    ?: throw IllegalStateException("Invalid Postgres Url. The URL should match the pattern: postgresql://[user]:[password]@[destination]")
             }
         }
     }
