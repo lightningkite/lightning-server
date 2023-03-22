@@ -33,8 +33,9 @@ data class EmailSettings(
                     ?: throw IllegalStateException("Invalid Mailgun URL. The URL should match the pattern: mailgun://[key]@[domain]")
             }
             EmailSettings.register("smtp") {
-                Regex("""smtp://(?<username>[^:]+):(?<password>[^@]+)@(?<host>[^:]+):(?<port>[0-9]+)""").matchEntire(it.url)?.let { match ->
+                Regex("""smtp://(?<username>[^:]+):(?<password>[^@]+)@(?<host>[^:]+):(?<port>[0-9]+)(?:\?(?<params>.*))?""").matchEntire(it.url)?.let { match ->
                     val port = match.groups["port"]!!.value.toInt()
+                    val params = EmailSettings.parseParameterString(match.groups["params"]?.value ?: "")
                     SmtpEmailClient(
                         SmtpConfig(
                             hostName = match.groups["host"]!!.value,
@@ -42,11 +43,11 @@ data class EmailSettings(
                             username = match.groups["username"]!!.value,
                             password = match.groups["password"]!!.value,
                             useSSL = port != 25,
-                            fromEmail = it.fromEmail ?: throw IllegalStateException("SMTP Email requires a fromEmail to be set.")
+                            fromEmail = params["fromEmail"]?.first() ?: it.fromEmail ?: throw IllegalStateException("SMTP Email requires a fromEmail to be set.")
                         )
                     )
                 }
-                    ?: throw IllegalStateException("Invalid SMTP URL. The URL should match the pattern: smtp://[username]:[password]@[host]:[port]")
+                    ?: throw IllegalStateException("Invalid SMTP URL. The URL should match the pattern: smtp://[username]:[password]@[host]:[port]?[params]\nAvailable params are: fromEmail")
             }
         }
     }
