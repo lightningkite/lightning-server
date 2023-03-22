@@ -58,6 +58,25 @@ class RamMetaTest: MetaTest() {
     override val database: Database = InMemoryDatabase()
 }
 
+class DelayRamAggregationsTest: AggregationsTest() {
+    override val database: Database = InMemoryDatabase().delayed(5L)
+}
+class DelayRamConditionTests: ConditionTests() {
+    override val database: Database = InMemoryDatabase().delayed(5L)
+}
+class DelayRamModificationTests: ModificationTests() {
+    override val database: Database = InMemoryDatabase().delayed(5L)
+}
+class DelayRamOperationsTests: OperationsTests() {
+    override val database: Database = InMemoryDatabase().delayed(5L)
+}
+class DelayRamSortTest: SortTest() {
+    override val database: Database = InMemoryDatabase().delayed(5L)
+}
+class DelayRamMetaTest: MetaTest() {
+    override val database: Database = InMemoryDatabase().delayed(5L)
+}
+
 class LocalCacheTest: CacheTest() {
     override val cache: CacheInterface = LocalCache
 }

@@ -41,6 +41,12 @@ data class DatabaseSettings(
                 )
             }
             register("ram-unsafe-persist") { InMemoryUnsafePersistenceDatabase(File(it.url.substringAfter("://"))) }
+            register("delay") {
+                val x = it.url.substringAfter("://")
+                val delay = x.substringBefore("/").toLong()
+                val wraps = x.substringAfter("/")
+                parse(wraps, DatabaseSettings(wraps, it.databaseName)).delayed(delay)
+            }
         }
     }
 
