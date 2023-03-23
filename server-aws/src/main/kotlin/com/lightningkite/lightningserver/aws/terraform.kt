@@ -19,6 +19,13 @@ import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.util.Properties
 
+internal enum class PublishState {
+    Off,
+    SnapStart,
+    Provisioning,
+    Publish,
+}
+
 @Serializable
 internal data class TerraformProjectInfo(
     val projectName: String,
@@ -29,16 +36,17 @@ internal data class TerraformProjectInfo(
     val domain: Boolean = true,
     val profile: String,
     val createBeforeDestroy: Boolean = false,
+    val publishState: PublishState = PublishState.Off,
     val handlers: Map<String, String> = mapOf(),
 ) {
 }
 
-internal val TerraformProjectInfo.privateSubnets get() = if(existingVpc) "[for s in data.aws_subnet.private : s.id]" else "module.vpc.private_subnets"
-internal val TerraformProjectInfo.subnet_cidr_blocks get() = if(existingVpc) "[for s in data.aws_subnet.private : s.cidr_block]" else "concat(module.vpc.private_subnets_cidr_blocks, module.vpc.private_subnets_cidr_blocks, [])"
-internal val TerraformProjectInfo.vpc_id get() = if(existingVpc) "data.aws_vpc.main.id" else "module.vpc.vpc_id"
-internal val TerraformProjectInfo.vpc_cidr_block get() = if(existingVpc) "data.aws_vpc.main.cidr_block" else "module.vpc.vpc_cidr_block"
-internal val TerraformProjectInfo.public_route_table_ids get() = if(existingVpc) "toset([data.aws_vpc.main.main_route_table_id])" else "module.vpc.public_route_table_ids"
-internal val TerraformProjectInfo.natGatewayIp get() = if(existingVpc) "[for s in data.aws_nat_gateway.main : s.public_ip]" else "module.vpc.nat_public_ips"
+internal val TerraformProjectInfo.privateSubnets get() = if (existingVpc) "[for s in data.aws_subnet.private : s.id]" else "module.vpc.private_subnets"
+internal val TerraformProjectInfo.subnet_cidr_blocks get() = if (existingVpc) "[for s in data.aws_subnet.private : s.cidr_block]" else "concat(module.vpc.private_subnets_cidr_blocks, module.vpc.private_subnets_cidr_blocks, [])"
+internal val TerraformProjectInfo.vpc_id get() = if (existingVpc) "data.aws_vpc.main.id" else "module.vpc.vpc_id"
+internal val TerraformProjectInfo.vpc_cidr_block get() = if (existingVpc) "data.aws_vpc.main.cidr_block" else "module.vpc.vpc_cidr_block"
+internal val TerraformProjectInfo.public_route_table_ids get() = if (existingVpc) "toset([data.aws_vpc.main.main_route_table_id])" else "module.vpc.public_route_table_ids"
+internal val TerraformProjectInfo.natGatewayIp get() = if (existingVpc) "[for s in data.aws_nat_gateway.main : s.public_ip]" else "module.vpc.nat_public_ips"
 
 internal val TerraformProjectInfo.projectNameSafe: String
     get() = projectName.filter {
@@ -51,7 +59,8 @@ internal val TerraformProjectInfo.namePrefix: String get() = projectNameSafe
 internal val TerraformProjectInfo.namePrefixLower: String get() = projectNameSafe.lowercase()
 internal val TerraformProjectInfo.namePrefixUnderscores: String get() = projectNameSafe.replace("-", "_")
 internal val TerraformProjectInfo.namePrefixSafe: String get() = projectNameSafe.filter { it.isLetterOrDigit() }
-internal val TerraformProjectInfo.namePrefixPath: String get() = projectNameSafe.lowercase().replace("-", "/").replace("_", "")
+internal val TerraformProjectInfo.namePrefixPath: String
+    get() = projectNameSafe.lowercase().replace("-", "/").replace("_", "")
 internal val TerraformProjectInfo.namePrefixPathSegment: String get() = projectNameSafe.lowercase().replace("_", "")
 
 internal data class TerraformRequirementBuildInfo(
@@ -155,7 +164,9 @@ internal data class TerraformHandler(
 
 internal data class TerraformInput(val name: String, val type: String, val default: String?) {
     companion object {
-        fun stringList(name: String, default: List<String>?) = TerraformInput(name, "list(string)", default?.joinToString { "\"$it\"" })
+        fun stringList(name: String, default: List<String>?) =
+            TerraformInput(name, "list(string)", default?.joinToString { "\"$it\"" })
+
         fun string(name: String, default: String?) = TerraformInput(name, "string", default?.let { "\"$it\"" })
         fun boolean(name: String, default: Boolean?) = TerraformInput(name, "bool", default?.toString())
         fun number(name: String, default: Number?) = TerraformInput(name, "number", default?.toString())
@@ -523,23 +534,27 @@ internal fun handlers() {
                 }
             """.trimIndent()
             )
-            if(project.vpc) {
-                appendLine("""
+            if (project.vpc) {
+                appendLine(
+                    """
                 resource "mongodbatlas_project_ip_access_list" "$key" {
                   for_each = toset(${project.natGatewayIp})
                   project_id   = mongodbatlas_project.$key.id
                   cidr_block = "${'$'}{each.value}/32"
                   comment    = "NAT Gateway"
                 }
-                """.trimIndent())
+                """.trimIndent()
+                )
             } else {
-                appendLine("""
+                appendLine(
+                    """
                 resource "mongodbatlas_project_ip_access_list" "$key" {
                   project_id   = mongodbatlas_project.$key.id
                   cidr_block = "0.0.0.0/0"
                   comment    = "Anywhere"
                 }
-                """.trimIndent())
+                """.trimIndent()
+                )
             }
         },
         settingOutput = { key ->
@@ -626,23 +641,27 @@ internal fun handlers() {
                 }
             """.trimIndent()
             )
-            if(project.vpc) {
-                appendLine("""
+            if (project.vpc) {
+                appendLine(
+                    """
                 resource "mongodbatlas_project_ip_access_list" "$key" {
                   for_each = toset(${project.natGatewayIp})
                   project_id   = mongodbatlas_project.$key.id
                   cidr_block = "${'$'}{each.value}/32"
                   comment    = "NAT Gateway"
                 }
-                """.trimIndent())
+                """.trimIndent()
+                )
             } else {
-                appendLine("""
+                appendLine(
+                    """
                 resource "mongodbatlas_project_ip_access_list" "$key" {
                   project_id   = mongodbatlas_project.$key.id
                   cidr_block = "0.0.0.0/0"
                   comment    = "Anywhere"
                 }
-                """.trimIndent())
+                """.trimIndent()
+                )
             }
         },
         settingOutput = { key ->
@@ -966,15 +985,16 @@ internal fun defaultAwsHandler(project: TerraformProjectInfo) = with(project) {
         ) + (if (domain) listOf(
             TerraformInput.string("domain_name_zone", null),
             TerraformInput.string("domain_name", null)
-        ) else listOf()) + (if(vpc && existingVpc) listOf(
+        ) else listOf()) + (if (vpc && existingVpc) listOf(
             TerraformInput.string("vpc_id", null),
             TerraformInput.stringList("vpc_private_subnets", null),
             TerraformInput.stringList("vpc_nat_gateways", null),
         ) else listOf()),
         emit = {
             if (vpc) {
-                if(existingVpc) {
-                    appendLine("""   
+                if (existingVpc) {
+                    appendLine(
+                        """   
                     data "aws_vpc" "main" {
                       id = var.vpc_id
                     }
@@ -986,9 +1006,11 @@ internal fun defaultAwsHandler(project: TerraformProjectInfo) = with(project) {
                       for_each = toset(var.vpc_nat_gateways)
                       id       = each.value
                     }
-                    """.trimIndent())
+                    """.trimIndent()
+                    )
                 } else {
-                    appendLine("""   
+                    appendLine(
+                        """   
                     module "vpc" {
                       source = "terraform-aws-modules/vpc/aws"
                     
@@ -1005,7 +1027,8 @@ internal fun defaultAwsHandler(project: TerraformProjectInfo) = with(project) {
                       enable_dns_hostnames = false
                       enable_dns_support   = true
                     }
-                    """.trimIndent())
+                    """.trimIndent()
+                    )
                 }
                 appendLine(
                     """
@@ -1383,10 +1406,12 @@ internal fun awsLambdaHandler(
     inputs = listOf(
         TerraformInput.number("lambda_memory_size", 1024),
         TerraformInput.number("lambda_timeout", 30),
-        TerraformInput.boolean("lambda_snapstart", false),
+        TerraformInput.number("provisioned_concurrency_max", 20),
+        TerraformInput.number("provisioned_concurrency_min", 1),
     ),
     emit = {
-        appendLine("""
+        appendLine(
+            """
         resource "aws_s3_bucket" "lambda_bucket" {
           bucket_prefix = "${project.namePrefixPathSegment}-lambda-bucket"
           force_destroy = true
@@ -1502,7 +1527,7 @@ internal fun awsLambdaHandler(
         
         resource "aws_lambda_function" "main" {
           function_name = "${project.namePrefix}-main"
-          publish = var.lambda_snapstart
+          publish = ${project.publishState != PublishState.Off}
 
           s3_bucket = aws_s3_bucket.lambda_bucket.id
           s3_key    = aws_s3_object.app_storage.key
@@ -1518,25 +1543,43 @@ internal fun awsLambdaHandler(
         
           role = aws_iam_role.main_exec.arn
           
+          """.trimIndent()
+        )
+
+        if (project.publishState == PublishState.SnapStart) {
+            appendLine(
+                """
           snap_start {
             apply_on = "PublishedVersions"
           }
+          
+            """.trimIndent()
+            )
+        }
+
+        appendLine(
+            """
           layers = [
             "arn:aws:lambda:us-west-2:580247275435:layer:LambdaInsightsExtension:21"
           ]
-  
-          ${
-              if(project.vpc)
-              """
-              |  vpc_config {
-              |    subnet_ids = ${project.privateSubnets}
-              |    security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
-              |  }
-              """.trimMargin()
-              else
-              ""
-          }
           
+            """.trimIndent()
+        )
+
+        if (project.vpc) {
+            appendLine(
+                """
+          vpc_config {
+            subnet_ids = ${project.privateSubnets}
+            security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
+          }   
+          
+                """.trimIndent()
+            )
+        }
+
+        appendLine(
+            """
           environment {
             variables = {
               LIGHTNING_SERVER_SETTINGS_DECRYPTION = random_password.settings.result
@@ -1545,6 +1588,7 @@ internal fun awsLambdaHandler(
           
           depends_on = [aws_s3_object.app_storage]
         }
+        
         resource "aws_iam_role_policy_attachment" "insights_policy" {
           role       = aws_iam_role.main_exec.id
           policy_arn = "arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy"
@@ -1554,9 +1598,53 @@ internal fun awsLambdaHandler(
           name             = "prod"
           description      = "The current production version of the lambda."
           function_name    = aws_lambda_function.main.arn
-          function_version = var.lambda_snapstart ? aws_lambda_function.main.version : "${'$'}LATEST"
+          function_version = ${if (project.publishState != PublishState.Off) "aws_lambda_function.main.version" else "\"\$LATEST\""}
         }
         
+        """.trimIndent()
+        )
+
+        if (project.publishState == PublishState.Provisioning) {
+            appendLine(
+                """
+        resource "aws_lambda_provisioned_concurrency_config" "main" {
+          function_name                     = aws_lambda_function.main.function_name
+          provisioned_concurrent_executions = var.provisioned_concurrency_max
+          qualifier                         = aws_lambda_alias.main.name
+        }
+        
+        resource "aws_appautoscaling_target" "autoscaling_main" {
+          max_capacity       = var.provisioned_concurrency_max
+          min_capacity       = var.provisioned_concurrency_min
+          resource_id        = "function:${'$'}{aws_lambda_function.main.function_name}:${'$'}{aws_lambda_function.main.version}"
+          scalable_dimension = "lambda:function:ProvisionedConcurrency"
+          service_namespace  = "lambda"
+        }
+        
+        resource "aws_appautoscaling_policy" "autoscaling_main" {
+          name               = "LambdaProvisonedConcurrency:${'$'}{aws_lambda_function.main.function_name}"
+          service_namespace  = aws_appautoscaling_target.autoscaling_main.service_namespace
+          scalable_dimension = aws_appautoscaling_target.autoscaling_main.scalable_dimension
+          resource_id        = aws_appautoscaling_target.autoscaling_main.resource_id
+          policy_type        = "TargetTrackingScaling"
+        
+          target_tracking_scaling_policy_configuration {
+            target_value = 0.7
+            scale_in_cooldown = 60
+            scale_out_cooldown = 60
+        
+            predefined_metric_specification {
+              predefined_metric_type = "LambdaProvisionedConcurrencyUtilization"
+            }
+          }
+        }
+        
+        """.trimIndent()
+            )
+        }
+
+        appendLine(
+            """
         resource "aws_cloudwatch_log_group" "main" {
           name = "${project.namePrefix}-main-log"
           retention_in_days = 30
@@ -1565,9 +1653,10 @@ internal fun awsLambdaHandler(
         resource "local_sensitive_file" "settings_raw" {
           content = jsonencode({
             ${
-            otherSections.mapNotNull { it.toLightningServer }.flatMap { it.entries }.map { "${it.key} = ${it.value}" }
-                .map { it.replace("\n", "\n            ") }.joinToString("\n            ")
-        }})
+                otherSections.mapNotNull { it.toLightningServer }.flatMap { it.entries }
+                    .map { "${it.key} = ${it.value}" }
+                    .map { it.replace("\n", "\n            ") }.joinToString("\n            ")
+            }})
           filename = "${'$'}{path.module}/build/raw-settings.json"
         }
         
@@ -1615,7 +1704,6 @@ internal fun awsLambdaHandler(
           source_dir = "${'$'}{path.module}/build/lambda"
           output_path = "${'$'}{path.module}/build/lambda.jar"
         }
-        
         
     """.trimIndent()
         )
@@ -1689,8 +1777,9 @@ internal fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSectio
                 }
             """.trimIndent()
         )
-        if(projectInfo.domain) {
-            appendLine("""
+        if (projectInfo.domain) {
+            appendLine(
+                """
                 resource "aws_acm_certificate" "http" {
                   domain_name   = var.domain_name
                   validation_method = "DNS"
@@ -1730,7 +1819,8 @@ internal fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSectio
                       zone_id                = aws_apigatewayv2_domain_name.http.domain_name_configuration[0].hosted_zone_id
                     }
                 }
-            """.trimIndent())
+            """.trimIndent()
+            )
         }
     },
     outputs = listOf(
@@ -1752,7 +1842,8 @@ internal fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSectio
 internal fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
     name = "websockets",
     emit = {
-        appendLine("""
+        appendLine(
+            """
             resource "aws_apigatewayv2_api" "ws" {
               name = "${projectInfo.namePrefix}-gateway"
               protocol_type = "WEBSOCKET"
@@ -1849,9 +1940,11 @@ internal fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
               role       = aws_iam_role.main_exec.name
               policy_arn = aws_iam_policy.api_gateway_ws.arn
             }
-        """.trimIndent())
-        if(projectInfo.domain) {
-            appendLine("""
+        """.trimIndent()
+        )
+        if (projectInfo.domain) {
+            appendLine(
+                """
                 resource "aws_acm_certificate" "ws" {
                   domain_name   = "ws.${'$'}{var.domain_name}"
                   validation_method = "DNS"
@@ -1891,7 +1984,8 @@ internal fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
                       zone_id                = aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].hosted_zone_id
                     }
                 }
-            """.trimIndent())
+            """.trimIndent()
+            )
         }
     },
     outputs = listOf(
@@ -1989,14 +2083,14 @@ fun terraformMigrate(handlerFqn: String, folder: File) {
             println(" - Clean up terraform.tfvars")
             println(" - Run `./tf init && ./tf state push newstate.json` to import a migrated state")
         }
-    } catch(e: Exception) {
+    } catch (e: Exception) {
         newFolder.deleteRecursively()
         oldFolder.renameTo(newFolder)
     }
 }
 
 fun terraformAws(handlerFqn: String, projectName: String = "project", root: File) {
-    if(root.resolve("base").exists()) {
+    if (root.resolve("base").exists()) {
         println("Base folder detected; need to migrate to new Terraform format.")
         println("***WARNING***")
         println("You *MUST* rebuild your program to use the new terraform due to a new settings parser!")
@@ -2007,9 +2101,11 @@ fun terraformAws(handlerFqn: String, projectName: String = "project", root: File
         return
     }
     root.mkdirs()
-    root.listFiles()!!.filter { it.isDirectory }.plus(
-        root.resolve("example")
-    ).distinct().forEach { terraformEnvironmentAws(handlerFqn, it, projectName) }
+    root.listFiles()!!
+        .filter { it.isDirectory }
+        .plus(root.resolve("example"))
+        .distinct()
+        .forEach { terraformEnvironmentAws(handlerFqn, it, projectName) }
 }
 
 fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: String = "project") {
@@ -2058,14 +2154,14 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
     ).flatten()
     val allSections = sections + awsLambdaHandler(info, handlerFqn, sections)
 
-    val sectionToFile = allSections.associateWith { section ->
+    val sectionToFile: Map<TerraformSection, File> = allSections.associateWith { section ->
         folder.resolve(section.name.filter { it.isLetterOrDigit() } + ".tf")
     }
     val warning = "# Generated via Lightning Server.  This file will be overwritten or deleted when regenerating."
-    folder.listFiles()!!.filter {
-        it.extension == "tf" && it.readText().contains(warning)
-    }.forEach { it.delete() }
-    for((section, file) in sectionToFile) {
+    folder.listFiles()!!
+        .filter { it.extension == "tf" && it.readText().contains(warning) }
+        .forEach { it.delete() }
+    for ((section, file) in sectionToFile) {
 //        if(!file.readText().contains(warning)) continue
         file.printWriter().use { it ->
             it.appendLine(warning)
@@ -2102,26 +2198,31 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
     }
 
     val usingMongo = allSections.any { it.providers.any { it.name == "mongodbatlas" } }
-    if(usingMongo){
+    if (usingMongo) {
         fun get(name: String): String {
             println("$name for profile ${info.profile}:")
             return readln()
         }
+
         val mongoCredsFile = File(System.getProperty("user.home")).resolve(".mongo/profiles/${info.profile}.env")
         val mongoCredsFile2 = File(System.getProperty("user.home")).resolve(".mongo/profiles/${info.profile}.ps1")
         mongoCredsFile.parentFile.mkdirs()
-        if(!mongoCredsFile.exists()) {
-            val mongoPublic = if(usingMongo) get("MongoDB Public Key") else null
-            val mongoPrivate = if(usingMongo) get("MongoDB Private Key") else null
-            mongoCredsFile.writeText("""
+        if (!mongoCredsFile.exists()) {
+            val mongoPublic = if (usingMongo) get("MongoDB Public Key") else null
+            val mongoPrivate = if (usingMongo) get("MongoDB Private Key") else null
+            mongoCredsFile.writeText(
+                """
                     MONGODB_ATLAS_PUBLIC_KEY="$mongoPublic"
                     MONGODB_ATLAS_PRIVATE_KEY="$mongoPrivate"
-                """.trimIndent() + "\n")
+                """.trimIndent() + "\n"
+            )
             mongoCredsFile.setExecutable(true)
-            mongoCredsFile2.writeText("""
+            mongoCredsFile2.writeText(
+                """
                     ${'$'}env:MONGODB_ATLAS_PUBLIC_KEY = "$mongoPublic"
                     ${'$'}env:MONGODB_ATLAS_PRIVATE_KEY = "$mongoPrivate"
-                """.trimIndent() + "\n")
+                """.trimIndent() + "\n"
+            )
             mongoCredsFile2.setExecutable(true)
         }
     }
@@ -2129,10 +2230,12 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
     folder.resolve("tf").printWriter().use {
         it.appendLine("#!/bin/bash")
         it.appendLine("export AWS_PROFILE=${info.profile}")
-        if(usingMongo){
-            it.appendLine("""
+        if (usingMongo) {
+            it.appendLine(
+                """
                   export ${'$'}(cat ~/.mongo/profiles/${info.profile}.env | xargs)
-            """.trimIndent())
+            """.trimIndent()
+            )
         }
         it.appendLine("terraform \"$@\"")
     }
@@ -2140,10 +2243,12 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
 
     folder.resolve("tf.ps1").printWriter().use {
         it.appendLine("\$env:AWS_PROFILE = \"${info.profile}\"")
-        if(usingMongo){
-            it.appendLine("""
+        if (usingMongo) {
+            it.appendLine(
+                """
                   . ~/.mongo/profiles/${info.profile}.ps1
-            """.trimIndent())
+            """.trimIndent()
+            )
         }
         it.appendLine("terraform \$args")
     }
@@ -2176,11 +2281,13 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
         it.appendLine("""  alias = "acm"""")
         it.appendLine("""  region = "us-east-1"""")
         it.appendLine("""}""")
-        if(usingMongo) {
-            it.appendLine("""   
+        if (usingMongo) {
+            it.appendLine(
+                """   
                 provider "mongodbatlas" {
                 }
-            """.trimIndent())
+            """.trimIndent()
+            )
         }
     }
 

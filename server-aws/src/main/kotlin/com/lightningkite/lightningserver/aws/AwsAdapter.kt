@@ -149,6 +149,14 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         Http.matcher
         WebSockets.matcher
         Core.getGlobalContext().register(this)
+        Settings.requirements.forEach { (key, value) ->
+            (value() as? Disconnectable)?.let {
+                runBlocking {
+                    println("Connecting $key")
+                    it.connect()
+                }
+            }
+        }
     }
 
     override fun beforeCheckpoint(context: org.crac.Context<out Resource>?) {
@@ -156,9 +164,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         Settings.requirements.forEach { (key, value) ->
             (value() as? Disconnectable)?.let {
                 runBlocking {
-                    it.connect()
-                    println("Making InitialConnection to: $key")
-                    println("Now Disconnecting $key...")
+                    println("Disconnecting $key...")
                     it.disconnect()
                 }
             }
