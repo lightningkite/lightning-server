@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.metrics
 
 import com.lightningkite.lightningserver.core.serverEntryPoint
+import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
@@ -17,6 +18,7 @@ import kotlin.math.min
 
 interface Metrics {
     suspend fun report(events: List<MetricEvent>)
+    suspend fun clean() {}
 
     companion object {
         val main get() = metricsSettings
@@ -58,6 +60,9 @@ interface Metrics {
 }
 
 val metricsSettings = setting("metrics", MetricSettings())
+val metricsCleanSchedule = schedule("clearOldMetrics", Duration.ofHours(1)) {
+    metricsSettings().clean()
+}
 
 @OptIn(DelicateCoroutinesApi::class)
 inline fun regularlyAndOnShutdown(frequency: Duration, crossinline action: suspend () -> Unit) {
