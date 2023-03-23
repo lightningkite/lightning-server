@@ -5,6 +5,6 @@ package com.lightningkite.lightningserver.core
  * Need for save/restore on AWS.
  */
 interface Disconnectable {
-    fun disconnect()
-    fun connect()
+    suspend fun disconnect()
+    suspend fun connect()
 }

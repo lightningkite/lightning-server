@@ -152,11 +152,15 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
     }
 
     override fun beforeCheckpoint(context: org.crac.Context<out Resource>?) {
-        println("beforeCheckpoint() - shutting down all connections...")
+        println("beforeCheckpoint() - Preparing all connections...")
         Settings.requirements.forEach { (key, value) ->
             (value() as? Disconnectable)?.let {
-                println("Disconnecting $key...")
-                it.disconnect()
+                runBlocking {
+                    it.connect()
+                    println("Making InitialConnection to: $key")
+                    println("Now Disconnecting $key...")
+                    it.disconnect()
+                }
             }
         }
         println("Disconnections complete.")
@@ -167,7 +171,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         Settings.requirements.forEach { (key, value) ->
             (value() as? Disconnectable)?.let {
                 println("Connecting $key...")
-                it.connect()
+                runBlocking { it.connect() }
             }
         }
         println("Connections Complete")
@@ -274,6 +278,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
     }
 
     val wsType = "aws"
+
     init {
         WebSocketIdentifier.register(
             type = wsType,
@@ -369,7 +374,8 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             else -> if (body == null || body.length == 0L)
                 APIGatewayV2HTTPResponse(200)
             else {
-                val lkEvent = WebSockets.MessageEvent(WebSocketIdentifier(wsType, event.requestContext.connectionId), event.body)
+                val lkEvent =
+                    WebSockets.MessageEvent(WebSocketIdentifier(wsType, event.requestContext.connectionId), event.body)
                 try {
                     rootWs.message(lkEvent)
                     APIGatewayV2HTTPResponse(200)
