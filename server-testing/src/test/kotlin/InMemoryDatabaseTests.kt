@@ -2,11 +2,10 @@ package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.cache.CacheInterface
+import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.CacheTest
 import com.lightningkite.lightningserver.cache.LocalCache
-import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.DatabaseSettings
@@ -15,24 +14,17 @@ import com.lightningkite.lightningserver.db.ModelInfo
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.engine.LocalEngine
 import com.lightningkite.lightningserver.engine.engine
-import com.lightningkite.lightningserver.files.FileSystem
 import com.lightningkite.lightningserver.files.FileSystemTests
 import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.files.LocalFileSystem
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.test
-import com.lightningkite.lightningserver.pubsub.LocalPubSub
-import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.sms.SMSSettings
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.http.content.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.encodeToString
 import org.junit.Test
 import java.io.File
 import java.time.Duration
@@ -78,7 +70,7 @@ class DelayRamMetaTest: MetaTest() {
 }
 
 class LocalCacheTest: CacheTest() {
-    override val cache: CacheInterface = LocalCache
+    override val cache: Cache = LocalCache
 }
 
 class LocalFilesTest: FileSystemTests() {

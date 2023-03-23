@@ -5,10 +5,9 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.settings.generalSettings
-import java.util.*
 
 
-fun HttpResponse.addCors(request: HttpRequest): HttpResponse {
+fun HttpResponse.extensionForEngineAddCors(request: HttpRequest): HttpResponse {
     val cors = generalSettings().cors ?: run {
         return this
     }

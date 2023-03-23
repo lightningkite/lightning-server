@@ -2,10 +2,9 @@ package com.lightningkite.lightningserver.websocket
 
 import com.lightningkite.lightningdb.MultiplexMessage
 import com.lightningkite.lightningserver.cache.CacheHandle
-import com.lightningkite.lightningserver.cache.CacheInterface
+import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.core.ServerPathMatcher
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -16,7 +15,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import java.time.Duration
 
-class MultiplexWebSocketHandler(val cache: () -> CacheInterface) : WebSockets.Handler {
+class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
     val type = "multiplex"
     private fun id(underlying: WebSocketIdentifier, channel: String): WebSocketIdentifier {
         return WebSocketIdentifier(type, "$channel/$underlying")

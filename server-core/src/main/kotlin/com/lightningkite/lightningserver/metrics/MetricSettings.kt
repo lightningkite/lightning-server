@@ -15,8 +15,9 @@ data class MetricSettings(
     val trackingByEntryPoint: Set<String> = setOf("executionTime"),
     val trackingTotalsOnly: Set<String> = setOf(),
     val keepFor: Map<Duration, Duration> = mapOf(
-        Duration.ofHours(1) to Duration.ofDays(1),
-        Duration.ofMinutes(1) to Duration.ofHours(2),
+        Duration.ofDays(1) to Duration.ofDays(7),
+        Duration.ofHours(2) to Duration.ofDays(1),
+        Duration.ofMinutes(10) to Duration.ofHours(2),
     )
 ) : () -> Metrics {
     companion object : Pluggable<MetricSettings, Metrics>() {

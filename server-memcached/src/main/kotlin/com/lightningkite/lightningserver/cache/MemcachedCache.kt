@@ -12,7 +12,7 @@ import java.net.InetSocketAddress
 import java.time.Duration
 
 
-class MemcachedCache(val client: MemcachedClient) : CacheInterface, HealthCheckable {
+class MemcachedCache(val client: MemcachedClient) : Cache, HealthCheckable {
     companion object {
         init {
             CacheSettings.register("memcached-test") {

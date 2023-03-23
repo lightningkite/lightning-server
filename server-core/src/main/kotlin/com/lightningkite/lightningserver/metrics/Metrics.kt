@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.metrics
 
 import com.lightningkite.lightningserver.core.serverEntryPoint
+import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.schedule.schedule
-import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentLinkedQueue
-import kotlin.math.min
 
 interface Metrics {
     suspend fun report(events: List<MetricEvent>)
@@ -24,6 +23,7 @@ interface Metrics {
         val main get() = metricsSettings
         val logger = LoggerFactory.getLogger(Metrics::class.java)
         val toReport = ConcurrentLinkedQueue<MetricEvent>()
+        var shouldAllowAccess: suspend (HttpRequest)->Boolean = { false }
 
         init {
             Tasks.onEngineReady {

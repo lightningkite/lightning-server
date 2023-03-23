@@ -1,25 +1,19 @@
 package com.lightningkite.lightningserver.ktor
 
-import com.lightningkite.lightningdb.MultiplexMessage
 import com.lightningkite.lightningserver.cache.*
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.core.ServerPathMatcher
 import com.lightningkite.lightningserver.engine.LocalEngine
 import com.lightningkite.lightningserver.engine.engine
-import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.metrics.Metrics
-import com.lightningkite.lightningserver.pubsub.PubSubInterface
-import com.lightningkite.lightningserver.pubsub.get
+import com.lightningkite.lightningserver.pubsub.PubSub
 import com.lightningkite.lightningserver.schedule.Schedule
 import com.lightningkite.lightningserver.schedule.Scheduler
-import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.websocket.QueryParamWebSocketHandler
-import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifierPubSub
 import com.lightningkite.lightningserver.websocket.WebSockets
 import io.ktor.http.*
@@ -37,22 +31,18 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.util.*
-import io.ktor.utils.io.CancellationException
 import io.ktor.utils.io.jvm.javaio.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.time.*
 import java.util.*
 import kotlin.collections.HashMap
 import com.lightningkite.lightningserver.core.ContentType as HttpContentType
 
-fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) {
+fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
     val logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.ktor.lightningServer")
     val myEngine = LocalEngine
     engine = myEngine
@@ -259,7 +249,7 @@ fun Application.lightningServer(pubSub: PubSubInterface, cache: CacheInterface) 
 /**
  * A helper function to start a Ktor server using GeneralServerSettings and the provided Module.
  */
-fun runServer(pubSub: PubSubInterface, cache: CacheInterface) = embeddedServer(
+fun runServer(pubSub: PubSub, cache: Cache) = embeddedServer(
     factory = CIO,
     port = generalSettings().port,
     host = generalSettings().host,
@@ -267,7 +257,7 @@ fun runServer(pubSub: PubSubInterface, cache: CacheInterface) = embeddedServer(
     watchPaths = listOf()
 ).start(wait = true)
 
-fun runServerNetty(pubSub: PubSubInterface, cache: CacheInterface) = embeddedServer(
+fun runServerNetty(pubSub: PubSub, cache: Cache) = embeddedServer(
     factory = Netty,
     port = generalSettings().port,
     host = generalSettings().host,

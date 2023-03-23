@@ -1,14 +1,14 @@
 package com.lightningkite.lightningserver.websocket
 
-import com.lightningkite.lightningserver.cache.CacheInterface
+import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.set
-import com.lightningkite.lightningserver.pubsub.PubSubInterface
+import com.lightningkite.lightningserver.pubsub.PubSub
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.takeWhile
 import java.util.*
 
-class WebSocketIdentifierPubSub(val type: String = "ws-pubsub", val pubSub: PubSubInterface, val cache: CacheInterface) {
+class WebSocketIdentifierPubSub(val type: String = "ws-pubsub", val pubSub: PubSub, val cache: Cache) {
     val closeMessage = "___close____"
     init {
         WebSocketIdentifier.register(

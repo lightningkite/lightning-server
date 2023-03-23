@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 abstract class CacheTest {
-    abstract val cache: CacheInterface?
+    abstract val cache: Cache?
 
     @Test
     fun test() {

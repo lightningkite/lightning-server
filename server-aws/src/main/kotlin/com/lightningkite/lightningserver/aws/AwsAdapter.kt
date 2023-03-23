@@ -2,16 +2,11 @@ package com.lightningkite.lightningserver.aws
 
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler
-import com.lightningkite.lightningdb.MultiplexMessage
-import com.lightningkite.lightningserver.cache.get
-import com.lightningkite.lightningserver.cache.modify
-import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.cache.setIfNotExists
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.Disconnectable
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.core.ServerPathMatcher
-import com.lightningkite.lightningserver.cors.addCors
+import com.lightningkite.lightningserver.cors.extensionForEngineAddCors
 import com.lightningkite.lightningserver.db.DynamoDbCache
 import com.lightningkite.lightningserver.encryption.OpenSsl
 import com.lightningkite.lightningserver.engine.Engine
@@ -339,7 +334,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 HttpContent.Text(raw, headers.contentType ?: ContentType.Text.Plain)
         }
         val queryParams =
-            (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v } }
+            (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
 
         return when (event.requestContext.routeKey) {
             "\$connect" -> {
@@ -408,7 +403,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 HttpContent.Text(raw, headers.contentType ?: ContentType.Text.Plain)
         }
         val queryParams =
-            (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v } }
+            (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
 
         val match = Http.matcher.match(path, method) ?: run {
             if (method == HttpMethod.OPTIONS) {
@@ -455,7 +450,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             protocol = "https",
             sourceIp = event.requestContext.identity.sourceIp
         )
-        val result = Http.execute(request).addCors(request)
+        val result = Http.execute(request).extensionForEngineAddCors(request)
         val outHeaders = HashMap<String, String>()
         result.headers.entries.forEach { outHeaders.put(it.first, it.second) }
         val b = result.body

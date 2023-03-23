@@ -16,10 +16,10 @@ import kotlin.math.min
 @Serializable
 data class MetricSpanStats(
     override val _id: String,
-    val endpoint: String,
-    val type: String,
+    @Index val endpoint: String,
+    @Index val type: String,
     val timeStamp: Instant = Instant.EPOCH,
-    val timeSpan: Duration = Duration.ofMinutes(1),
+    @Index val timeSpan: Duration = Duration.ofMinutes(1),
     val min: Double,
     val max: Double,
     val sum: Double,

@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningserver.cache.CacheInterface
+import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.CacheSettings
 import kotlinx.coroutines.*
 import kotlinx.coroutines.future.await
@@ -14,7 +14,7 @@ import software.amazon.awssdk.services.dynamodb.model.*
 import java.time.Duration
 import java.time.Instant
 
-class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: String = "cache") : CacheInterface {
+class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: String = "cache") : Cache {
     val client by lazy(LazyThreadSafetyMode.SYNCHRONIZED, makeClient)
 
     companion object {

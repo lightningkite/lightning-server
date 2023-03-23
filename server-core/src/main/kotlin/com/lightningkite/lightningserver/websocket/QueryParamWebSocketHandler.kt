@@ -1,15 +1,14 @@
 package com.lightningkite.lightningserver.websocket
 
-import com.lightningkite.lightningserver.cache.CacheInterface
+import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.core.ServerPathMatcher
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
 
-class QueryParamWebSocketHandler(val cache: () -> CacheInterface) : WebSockets.Handler {
+class QueryParamWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
     override suspend fun connect(event: WebSockets.ConnectEvent) {
         val other = event.headers["x-path"] ?: event.queryParameter("path")?.substringBefore('?') ?: "/"
         val match =

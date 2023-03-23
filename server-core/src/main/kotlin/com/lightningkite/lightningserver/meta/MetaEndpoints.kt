@@ -9,10 +9,10 @@ import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.adminIndex
-import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.jsonschema.*
+import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -34,6 +34,11 @@ class MetaEndpoints<USER>(
     packageName: String = "com.mypackage",
     isAdmin: suspend (USER) -> Boolean,
 ) : ServerPathGroup(path) {
+    init {
+        Metrics.shouldAllowAccess = {
+            isAdmin(authInfo.tryCast(it.rawUser()) as USER)
+        }
+    }
     val root = get.handler {
         HttpResponse(body = HttpContent.Html {
             head { title("${generalSettings().projectName} - Meta Information") }
