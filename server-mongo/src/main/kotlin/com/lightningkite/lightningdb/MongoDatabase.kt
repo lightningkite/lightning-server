@@ -40,28 +40,21 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
     // You might be asking, "WHY?  WHY IS THIS SO COMPLICATED?"
     // Well, we have to be able to fully disconnect and reconnect exising Mongo databases in order to support AWS's
     // SnapStart feature effectively.  As such, we have to destroy and reproduce all the connections on demand.
-    private var client = lazy { makeClient() }
+    private var client = lazy(makeClient)
     private var databaseLazy = lazy { client.value.coroutine.getDatabase(databaseName) }
     val database get() = databaseLazy.value
     private var coroutineCollections = ConcurrentHashMap<String, Lazy<CoroutineCollection<*>>>()
-    override fun disconnect() {
-
-        // KEEP THIS AROUND.
-        // This initializes a database connection during snapStart configuring which GREATLY reduces cold start times.
-        runBlocking { healthCheck() }
-
-        client.value.close()
-        client = lazy { makeClient() }
+    override suspend fun disconnect() {
+        if (client.isInitialized()) client.value.close()
+        client = lazy(makeClient)
         databaseLazy = lazy { client.value.coroutine.getDatabase(databaseName) }
         coroutineCollections = ConcurrentHashMap<String, Lazy<CoroutineCollection<*>>>()
     }
 
-    override fun connect() {
-        if (databaseLazy.isInitialized()) return
-
+    override suspend fun connect() {
         // KEEP THIS AROUND.
         // This initializes the database call at startup.
-        runBlocking { healthCheck() }
+        healthCheck()
     }
 
     companion object {
