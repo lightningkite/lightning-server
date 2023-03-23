@@ -61,6 +61,15 @@ class DatabaseMetrics(val settings: MetricSettings, val database: () -> Database
         Unit
     }
 
+    override suspend fun clean() {
+        settings.keepFor.entries.forEach { entry ->
+            collection.deleteManyIgnoringOld(condition {
+                (it.timeSpan eq entry.key) and
+                        (it.timeStamp lt Instant.now().minus(entry.value))
+            })
+        }
+    }
+
     val reportEndpoint = get.typed(
         summary = "Get Metrics",
         description = "Get the metrics for various statistics",
@@ -69,27 +78,4 @@ class DatabaseMetrics(val settings: MetricSettings, val database: () -> Database
             return@typed collection.query(input).toList()
         }
     )
-
-    val clearOldEndpoint = path("clear").get.typed(
-        summary = "Clear Metrics",
-        description = "Clear the metrics for various statistics",
-        errorCases = listOf(),
-        implementation = { anon: Unit, input: Unit ->
-            settings.keepFor.entries.forEach { entry ->
-                collection.deleteManyIgnoringOld(condition {
-                    (it.timeSpan eq entry.key) and
-                            (it.timeStamp lt Instant.now().minus(entry.value))
-                })
-            }
-            "Cleared as requested"
-        }
-    )
-    val clearOld = schedule("com.lightningkite.lightningserver.metrics.DatabaseMetrics.clearOld", Duration.ofHours(1)) {
-        settings.keepFor.entries.forEach { entry ->
-            collection.deleteManyIgnoringOld(condition {
-                (it.timeSpan eq entry.key) and
-                        (it.timeStamp lt Instant.now().minus(entry.value))
-            })
-        }
-    }
 }
