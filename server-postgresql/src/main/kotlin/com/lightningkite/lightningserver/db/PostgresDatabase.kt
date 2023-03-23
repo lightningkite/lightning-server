@@ -9,12 +9,16 @@ import org.jetbrains.exposed.sql.transactions.TransactionManager
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KType
 
+// This being a lambda to return a Database rather than the database itself is
+// to support the Disconnectable interface.
 class PostgresDatabase(private val makeDb: () -> Database) : com.lightningkite.lightningdb.Database, Disconnectable {
-    var db = lazy(makeDb)
+    private var _db = lazy(makeDb)
+
+    val db: Database get() = _db.value
 
     override suspend fun disconnect() {
-        if(db.isInitialized()) TransactionManager.closeAndUnregister(db.value)
-        db = lazy(makeDb)
+        if(_db.isInitialized()) TransactionManager.closeAndUnregister(_db.value)
+        _db = lazy(makeDb)
     }
 
     override suspend fun connect() {
@@ -60,7 +64,7 @@ class PostgresDatabase(private val makeDb: () -> Database) : com.lightningkite.l
         (collections.getOrPut(name) {
             lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
                 PostgresCollection(
-                    db.value,
+                    db,
                     name,
                     PostgresCollection.format.serializersModule.serializer(type) as KSerializer<T>
                 )
