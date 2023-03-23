@@ -28,6 +28,7 @@ internal data class TerraformProjectInfo(
     val existingVpc: Boolean = false,
     val domain: Boolean = true,
     val profile: String,
+    val createBeforeDestroy: Boolean = false,
     val handlers: Map<String, String> = mapOf(),
 ) {
 }
@@ -187,7 +188,7 @@ internal fun handlers() {
             {
                 projectName = var.display_name
                 publicUrl = ${if (domain) "\"https://${'$'}{var.domain_name}\"" else "aws_apigatewayv2_stage.http.invoke_url"}
-                wsUrl = ${if (domain) "\"wss://ws.${'$'}{var.domain_name}\"" else "aws_apigatewayv2_stage.ws.invoke_url"}
+                wsUrl = ${if (domain) "\"wss://ws.${'$'}{var.domain_name}?path=\"" else "\"\${aws_apigatewayv2_stage.ws.invoke_url}?path=\""}
                 debug = var.debug
                 cors = var.cors
             }
@@ -1271,7 +1272,7 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
               principal     = "events.amazonaws.com"
               source_arn    = aws_cloudwatch_event_rule.panic.arn
               lifecycle {
-                # create_before_destroy = true
+                create_before_destroy = $createBeforeDestroy
               }
             }
             
@@ -1330,7 +1331,7 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                       principal     = "events.amazonaws.com"
                       source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
                       lifecycle {
-                        # create_before_destroy = true
+                        create_before_destroy = $createBeforeDestroy
                       }
                     }
                 """.trimIndent()
@@ -1361,7 +1362,7 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                       principal     = "events.amazonaws.com"
                       source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
                       lifecycle {
-                        # create_before_destroy = true
+                        create_before_destroy = $createBeforeDestroy
                       }
                     }
                 """.trimIndent()
@@ -1520,7 +1521,10 @@ internal fun awsLambdaHandler(
           snap_start {
             apply_on = "PublishedVersions"
           }
-          
+          layers = [
+            "arn:aws:lambda:us-west-2:580247275435:layer:LambdaInsightsExtension:21"
+          ]
+  
           ${
               if(project.vpc)
               """
@@ -1541,7 +1545,11 @@ internal fun awsLambdaHandler(
           
           depends_on = [aws_s3_object.app_storage]
         }
-        
+        resource "aws_iam_role_policy_attachment" "insights_policy" {
+          role       = aws_iam_role.main_exec.id
+          policy_arn = "arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy"
+        }
+
         resource "aws_lambda_alias" "main" {
           name             = "prod"
           description      = "The current production version of the lambda."
@@ -1676,7 +1684,7 @@ internal fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSectio
         
                   source_arn = "${'$'}{aws_apigatewayv2_api.http.execution_arn}/*/*"
                   lifecycle {
-                    # create_before_destroy = true
+                    create_before_destroy = ${projectInfo.createBeforeDestroy}
                   }
                 }
             """.trimIndent()
@@ -1816,7 +1824,7 @@ internal fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
     
               source_arn = "${'$'}{aws_apigatewayv2_api.ws.execution_arn}/*/*"
               lifecycle {
-                # create_before_destroy = true
+                create_before_destroy = ${projectInfo.createBeforeDestroy}
               }
             }
             

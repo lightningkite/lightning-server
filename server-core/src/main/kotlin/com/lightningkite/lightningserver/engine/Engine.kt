@@ -15,48 +15,11 @@ import org.slf4j.LoggerFactory
 import java.time.Duration
 
 interface Engine {
-    suspend fun sendWebSocketMessage(id: String, content: String): Boolean
-    suspend fun closeWebSocket(id: String): Boolean
-    suspend fun listenForWebSocketMessage(id: String): Flow<String> = throw UnsupportedOperationException()
     suspend fun launchTask(task: Task<Any?>, input: Any?)
 }
 
-class LocalEngine(val pubSub: PubSubInterface, val cache: CacheInterface) : Engine {
+object LocalEngine : Engine {
     val logger = LoggerFactory.getLogger(this::class.java)
-    suspend fun webSocketConnected(id: String) {
-        cache.set("ws-$id-connected", true, timeToLive = Duration.ofDays(1))
-    }
-
-    val closeMessage = "___close____"
-
-    override suspend fun sendWebSocketMessage(id: String, content: String): Boolean {
-        pubSub.string("ws-$id").emit(content)
-        return cache.get<Boolean>("ws-$id-connected") ?: false
-    }
-
-    override suspend fun closeWebSocket(id: String): Boolean {
-        cache.remove("ws-$id-connected")
-        pubSub.string("ws-$id").emit(closeMessage)
-        return true
-    }
-
-    override suspend fun listenForWebSocketMessage(id: String): Flow<String> {
-        return pubSub.string("ws-$id")
-            .onEach {
-                if (generalSettings().debug) {
-                    logger.trace("Sending $it to $id")
-                }
-            }
-            .takeWhile { it != closeMessage }
-            .onStart {
-                cache.set("ws-$id-connected", true, timeToLive = Duration.ofDays(1))
-                logger.debug("Ready for outgoing messages to $id")
-            }
-            .onCompletion {
-                cache.set("ws-$id-connected", false)
-                logger.debug("Done watching for outgoing messages $id")
-            }
-    }
 
     override suspend fun launchTask(task: Task<Any?>, input: Any?) {
         GlobalScope.launch {
@@ -69,42 +32,8 @@ class LocalEngine(val pubSub: PubSubInterface, val cache: CacheInterface) : Engi
 
 // The purpose of this engine is to be used in Unit tests, and the difference is all tasks are run inline,
 // and not launched on a new scope.
-class UnitTestEngine(val pubSub: PubSubInterface, val cache: CacheInterface) : Engine {
+object UnitTestEngine : Engine {
     val logger = LoggerFactory.getLogger(this::class.java)
-    suspend fun webSocketConnected(id: String) {
-        cache.set("ws-$id-connected", true, timeToLive = Duration.ofDays(1))
-    }
-
-    val closeMessage = "___close____"
-
-    override suspend fun sendWebSocketMessage(id: String, content: String): Boolean {
-        pubSub.string("ws-$id").emit(content)
-        return cache.get<Boolean>("ws-$id-connected") ?: false
-    }
-
-    override suspend fun closeWebSocket(id: String): Boolean {
-        cache.remove("ws-$id-connected")
-        pubSub.string("ws-$id").emit(closeMessage)
-        return true
-    }
-
-    override suspend fun listenForWebSocketMessage(id: String): Flow<String> {
-        return pubSub.string("ws-$id")
-            .onEach {
-                if (generalSettings().debug) {
-                    logger.trace("Sending $it to $id")
-                }
-            }
-            .takeWhile { it != closeMessage }
-            .onStart {
-                cache.set("ws-$id-connected", true, timeToLive = Duration.ofDays(1))
-                logger.debug("Ready for outgoing messages to $id")
-            }
-            .onCompletion {
-                cache.set("ws-$id-connected", false)
-                logger.debug("Done watching for outgoing messages $id")
-            }
-    }
 
     override suspend fun launchTask(task: Task<Any?>, input: Any?) {
         coroutineScope {

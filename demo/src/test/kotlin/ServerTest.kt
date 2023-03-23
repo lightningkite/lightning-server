@@ -44,7 +44,7 @@ object TestSettings {
             )
         ))
         Server.files()
-        engine = UnitTestEngine(LocalPubSub, LocalCache)
+        engine = UnitTestEngine
     }
 }
 

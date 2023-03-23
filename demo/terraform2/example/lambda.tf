@@ -1,3 +1,4 @@
+# Generated via Lightning Server.  This file will be overwritten or deleted when regenerating.
 ##########
 # Inputs
 ##########
@@ -158,7 +159,10 @@ resource "aws_lambda_function" "main" {
   snap_start {
     apply_on = "PublishedVersions"
   }
-  
+  layers = [
+    "arn:aws:lambda:us-west-2:580247275435:layer:LambdaInsightsExtension:21"
+  ]
+
   
   
   environment {
@@ -168,6 +172,10 @@ resource "aws_lambda_function" "main" {
   }
   
   depends_on = [aws_s3_object.app_storage]
+}
+resource "aws_iam_role_policy_attachment" "insights_policy" {
+  role       = aws_iam_role.main_exec.id
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy"
 }
 
 resource "aws_lambda_alias" "main" {
@@ -184,16 +192,6 @@ resource "aws_cloudwatch_log_group" "main" {
 
 resource "local_sensitive_file" "settings_raw" {
   content = jsonencode({
-    general = {
-        projectName = var.display_name
-        publicUrl = "https://${var.domain_name}"
-        wsUrl = "wss://ws.${var.domain_name}"
-        debug = var.debug
-        cors = var.cors
-    }
-    database = {
-      url = "mongodb+srv://demoexampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_serverless_instance.database.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
-    }
     cache = {
         url = "dynamodb://${var.deployment_location}/demo_example"
     }
@@ -203,28 +201,62 @@ resource "local_sensitive_file" "settings_raw" {
         secret = random_password.jwt.result
     }
     oauth_github = var.oauth_github
+    exceptions = var.exceptions
+    oauth_apple = var.oauth_apple
+    general = {
+        projectName = var.display_name
+        publicUrl = "https://${var.domain_name}"
+        wsUrl = "wss://ws.${var.domain_name}?path="
+        debug = var.debug
+        cors = var.cors
+    }
+    database = {
+      url = "mongodb+srv://demoexampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_serverless_instance.database.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
+    }
     logging = var.logging
     files = {
         storageUrl = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
         signedUrlExpiration = var.files_expiry
     }
     metrics = var.metrics
-    exceptions = var.exceptions
     email = {
         url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
         fromEmail = "noreply@${var.domain_name}"
     }
     oauth_google = var.oauth_google
-    oauth_apple = var.oauth_apple})
+    oauth_microsoft = var.oauth_microsoft})
   filename = "${path.module}/build/raw-settings.json"
 }
 
-resource "null_resource" "settings_encrypted" {
+locals {
+  # Directories start with "C:..." on Windows; All other OSs use "/" for root.
+  is_windows = substr(pathexpand("~"), 0, 1) == "/" ? false : true
+}
+resource "null_resource" "lambda_jar_source" {
+  triggers = {
+    always = timestamp()
+  }
+  provisioner "local-exec" {
+    command = local.is_windows ? "if(test-path \"${path.module}/build/lambda/\") { rd -Recurse \"${path.module}/build/lambda/\" }" : "rm -rf \"${path.module}/build/lambda/\""
+    interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
+  }
+  provisioner "local-exec" {
+    command = local.is_windows ? "cp -r -force \"${path.module}/../../build/dist/lambda/.\" \"${path.module}/build/lambda/\"" : "cp -rf \"${path.module}/../../build/dist/lambda/.\" \"${path.module}/build/lambda/\""
+    interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
+  }
+  provisioner "local-exec" {
+    command = "openssl enc -aes-256-cbc -md sha256 -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/build/lambda/settings.enc\" -pass pass:${random_password.settings.result}"
+    interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
+  }
+}
+resource "null_resource" "settings_reread" {
   triggers = {
     settingsRawHash = local_sensitive_file.settings_raw.content
   }
+  depends_on = [null_resource.lambda_jar_source]
   provisioner "local-exec" {
-    command = "openssl enc -aes-256-cbc -in \"${local_sensitive_file.settings_raw.filename}\" -out \"${path.module}/../../build/dist/lambda/settings.enc\" -pass pass:${random_password.settings.result}"
+    command     = "openssl enc -d -aes-256-cbc -md sha256 -out \"${local_sensitive_file.settings_raw.filename}.decrypted.json\" -in \"${path.module}/build/lambda/settings.enc\" -pass pass:${random_password.settings.result}"
+    interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
   }
 }
 
@@ -235,10 +267,11 @@ resource "random_password" "settings" {
 }
 
 data "archive_file" "lambda" {
-  depends_on = [null_resource.settings_encrypted]
+  depends_on  = [null_resource.lambda_jar_source, null_resource.settings_reread]
   type        = "zip"
-  source_dir = "${path.module}/../../build/dist/lambda"
+  source_dir = "${path.module}/build/lambda"
   output_path = "${path.module}/build/lambda.jar"
 }
+
 
 

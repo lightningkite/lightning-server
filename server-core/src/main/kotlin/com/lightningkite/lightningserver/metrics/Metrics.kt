@@ -17,23 +17,46 @@ import kotlin.math.min
 
 interface Metrics {
     suspend fun report(events: List<MetricEvent>)
+
     companion object {
         val main get() = metricsSettings
         val logger = LoggerFactory.getLogger(Metrics::class.java)
-        suspend fun report(type: String, value: Double) = main().report(listOf(MetricEvent(type, serverEntryPoint()?.toString() ?: "Unknown", Instant.now(), value)))
-        suspend fun <T> performance(type: String, action: suspend() -> T): T {
+        val toReport = ConcurrentLinkedQueue<MetricEvent>()
+
+        init {
+            Tasks.onEngineReady {
+                regularlyAndOnShutdown(Duration.ofMinutes(1)) {
+                    logger.info("Assembling metrics to report...")
+                    val assembledData = ArrayList<MetricEvent>(toReport.size)
+                    while (true) {
+                        val item = toReport.poll() ?: break
+                        assembledData.add(item)
+                    }
+                    logger.info("Reporting ${assembledData.size} metric events to ${main()}...")
+                    main().report(assembledData)
+                    logger.info("Report complete.")
+                }
+            }
+        }
+
+        suspend fun report(type: String, value: Double) =
+            toReport.add(MetricEvent(type, serverEntryPoint()?.toString() ?: "Unknown", Instant.now(), value))
+
+        suspend fun <T> performance(type: String, action: suspend () -> T): T {
             val start = System.nanoTime()
             val result = action()
             report(type, (System.nanoTime() - start) / 1000000.0)
             return result
         }
-        suspend fun <T> handlerPerformance(handler: Any, action: suspend ()->T): T {
+
+        suspend fun <T> handlerPerformance(handler: Any, action: suspend () -> T): T {
             return serverEntryPoint(handler) {
                 performance("executionTime", action)
             }
         }
     }
 }
+
 val metricsSettings = setting("metrics", MetricSettings())
 
 @OptIn(DelicateCoroutinesApi::class)
@@ -45,6 +68,7 @@ inline fun regularlyAndOnShutdown(frequency: Duration, crossinline action: suspe
         }
     }
     Runtime.getRuntime().addShutdownHook(Thread {
+        Metrics.logger.info("Shutdown hook running...")
         runBlocking {
             action()
         }

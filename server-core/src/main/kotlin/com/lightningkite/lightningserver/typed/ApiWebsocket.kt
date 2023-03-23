@@ -12,10 +12,7 @@ import com.lightningkite.lightningserver.serialization.parse
 
 import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.settings.generalSettings
-import com.lightningkite.lightningserver.websocket.VirtualSocket
-import com.lightningkite.lightningserver.websocket.WebSocketClose
-import com.lightningkite.lightningserver.websocket.WebSockets
-import com.lightningkite.lightningserver.websocket.test
+import com.lightningkite.lightningserver.websocket.*
 import io.ktor.util.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
@@ -51,8 +48,8 @@ data class ApiWebsocket<USER, INPUT, OUTPUT>(
     val disconnect: suspend ApiWebsocket<USER, INPUT, OUTPUT>.(WebSockets.DisconnectEvent) -> Unit,
 ) : Documentable, WebSockets.Handler {
 
-    data class TypedConnectEvent<USER>(val user: USER, val id: String)
-    data class TypedMessageEvent<INPUT>(val id: String, val content: INPUT)
+    data class TypedConnectEvent<USER>(val user: USER, val id: WebSocketIdentifier)
+    data class TypedMessageEvent<INPUT>(val id: WebSocketIdentifier, val content: INPUT)
 
     override suspend fun connect(event: WebSockets.ConnectEvent) {
         this.connect.invoke(this, TypedConnectEvent(authInfo.cast(event.rawUser()), event.id))
@@ -67,7 +64,7 @@ data class ApiWebsocket<USER, INPUT, OUTPUT>(
         this.disconnect.invoke(this, event)
     }
 
-    suspend fun send(id: String, content: OUTPUT) = WebSockets.send(id, Serialization.json.encodeToString(outputType, content))
+    suspend fun send(id: WebSocketIdentifier, content: OUTPUT) = id.send(Serialization.json.encodeToString(outputType, content))
 
 }
 

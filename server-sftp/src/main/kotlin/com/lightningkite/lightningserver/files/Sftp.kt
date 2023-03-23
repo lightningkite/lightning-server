@@ -27,18 +27,24 @@ class Sftp(
                     val host = match.groups["host"]!!.value
                     val port = match.groups["port"]!!.value.toInt()
                     val params: Map<String, List<String>> = FilesSettings.parseParameterString(match.groups["params"]!!.value)
-
-                    Sftp(host, port, match.groups["path"]!!.value) {
+                    val rootPath = match.groups["path"]!!.value
+                    val user = match.groups["user"]!!.value
+                    println("host: $host")
+                    println("port: $port")
+                    println("params: $params")
+                    println("rootPath: $rootPath")
+                    println("user: $user")
+                    Sftp(host, port, rootPath) {
                         SSHClient().apply {
                             params["host"]?.let { addHostKeyVerifier(it.first()) } ?: addHostKeyVerifier(PromiscuousVerifier())
                             connect(host, port)
-                            val id = params["identity"]!!
+                            val id = params["identity"]!!.first()
                             val pk = buildString {
                                 appendLine("-----BEGIN OPENSSH PRIVATE KEY-----")
                                 id.chunked(70).forEach { l -> appendLine(l) }
                                 appendLine("-----END OPENSSH PRIVATE KEY-----")
                             }
-                            authPublickey(match.groups["user"]!!.value, loadKeys(pk, null, null))
+                            authPublickey(user, loadKeys(pk, null, null))
                         }
                     }
                 }

@@ -1,17 +1,34 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.HtmlDefaults
+import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.core.ServerPathMatcher
 import com.lightningkite.lightningserver.core.serverEntryPoint
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
+import com.lightningkite.lightningserver.utils.MutableMapWithChangeHandler
+import com.lightningkite.lightningserver.websocket.WebSockets
 
 object Http {
     init { Metrics }
     var fixEndingSlash: Boolean = true
-    val endpoints = mutableMapOf<HttpEndpoint, suspend (HttpRequest) -> HttpResponse>()
+
+    val endpoints: MutableMap<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> = MutableMapWithChangeHandler<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> {
+        _matcher = null
+    }
+    private var _matcher: HttpEndpointMatcher? = null
+    val matcher: HttpEndpointMatcher
+        get() {
+        return _matcher ?: run {
+            val created = HttpEndpointMatcher(endpoints.keys.asSequence())
+            _matcher = created
+            created
+        }
+    }
+
     var exception: suspend (HttpRequest, Exception) -> HttpResponse =
         { request, exception ->
             if (exception is HttpStatusException) {

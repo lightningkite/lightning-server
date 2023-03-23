@@ -1,27 +1,34 @@
 package com.lightningkite.lightningserver.websocket
 
-import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.engine.LocalEngine
-import com.lightningkite.lightningserver.engine.engine
-import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.pubsub.LocalPubSub
+import com.lightningkite.lightningserver.core.ServerPathMatcher
+import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.settings.generalSettings
-import com.lightningkite.lightningserver.tasks.Tasks
-import kotlinx.coroutines.*
+import com.lightningkite.lightningserver.utils.MutableMapWithChangeHandler
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.coroutineScope
 import java.util.*
 
 object WebSockets {
-    val handlers = mutableMapOf<ServerPath, Handler>()
+    val handlers: MutableMap<ServerPath, Handler> = MutableMapWithChangeHandler<ServerPath, Handler> {
+        _matcher = null
+    }
+    private var _matcher: ServerPathMatcher? = null
+    val matcher: ServerPathMatcher get() {
+        return _matcher ?: run {
+            val created = ServerPathMatcher(handlers.keys.asSequence())
+            _matcher = created
+            created
+        }
+    }
 
     data class ConnectEvent(
         val path: ServerPath,
         val parts: Map<String, String>,
         val wildcard: String? = null,
         val queryParameters: List<Pair<String, String>>,
-        val id: String,
+        val id: WebSocketIdentifier,
         val headers: HttpHeaders,
         val domain: String,
         val protocol: String,
@@ -30,19 +37,15 @@ object WebSockets {
         fun queryParameter(key: String): String? = queryParameters.find { it.first == key }?.second
     }
 
+    data class MessageEvent(val id: WebSocketIdentifier, val content: String)
+    data class DisconnectEvent(val id: WebSocketIdentifier)
+
     enum class WsHandlerType {
         CONNECT, MESSAGE, DISCONNECT
     }
 
     data class HandlerSection(val path: ServerPath, val type: WsHandlerType) {
         override fun toString(): String = "$type $path"
-    }
-
-    data class MessageEvent(val id: String, val content: String)
-    data class DisconnectEvent(val id: String)
-
-    suspend fun send(id: String, content: String): Boolean {
-        return engine.sendWebSocketMessage(id, content)
     }
 
     interface Handler {
@@ -64,10 +67,7 @@ suspend fun ServerPath.test(
     sourceIp: String = "0.0.0.0",
     test: suspend VirtualSocket.() -> Unit,
 ) {
-    Tasks.onSettingsReady()
-    engine = LocalEngine(LocalPubSub, LocalCache)
-    Tasks.onEngineReady()
-    val id = "TEST-${UUID.randomUUID()}"
+    val id = WebSocketIdentifier(UUID.randomUUID().toString(), "TEST")
     val req = WebSockets.ConnectEvent(
         path = this,
         parts = parts,
@@ -80,33 +80,48 @@ suspend fun ServerPath.test(
         id = id
     )
     val h = WebSockets.handlers[this]!!
-
     val channel = Channel<String>(20)
-    coroutineScope {
-        val job = launch {
-            engine.listenForWebSocketMessage(id).collect { content ->
-                println("$id <-- $content")
-                channel.send(content)
-            }
+
+    WebSocketIdentifier.register(
+        type = id.type,
+        send = { _, value ->
+            println("$id <-- $value")
+            channel.send(value)
+            true
+        },
+        close = {
+            channel.close()
+            true
         }
+    )
 
-        println("Connecting $id...")
-        h.connect(req)
-        println("Connected $id.")
+    try {
+        coroutineScope {
+            println("$id Connecting...")
+            h.connect(req)
+            println("$id Connected.")
 
-        test(
-            VirtualSocket(
-                incoming = channel,
-                send = {
-                    println("$id --> $it")
-                    h.message(WebSockets.MessageEvent(id, it))
-                }
-            )
-        )
-        println("Disconnecting $id...")
-        h.disconnect(WebSockets.DisconnectEvent(id))
-        println("Disconnected $id.")
+            var error: Exception? = null
+            try {
+                test(
+                    VirtualSocket(
+                        incoming = channel,
+                        send = {
+                            println("$id --> $it")
+                            h.message(WebSockets.MessageEvent(id, it))
+                        }
+                    )
+                )
+            } catch(e: Exception) {
+                error = e
+            }
+            println("$id Disconnecting...")
+            h.disconnect(WebSockets.DisconnectEvent(id))
+            println("$id Disconnected.")
 
-        job.cancelAndJoin()
+            error?.let { throw it }
+        }
+    } finally {
+        WebSocketIdentifier.unregister(id.type)
     }
 }

@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.tasks.startup
 import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.ApiWebsocket
 import com.lightningkite.lightningserver.typed.typedWebsocket
+import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -96,10 +97,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
                             new = entry.new?.takeIf { c.condition(it) }?.let { m(it) },
                         )
                         if(change.new == null && change.old == null) continue
-                        if (!send(it._id, change)) {
-                            subscriptionDb().deleteOneById(it._id)
-                            break
-                        }
+                        send(it._id, change)
                     }
                 }
             }
@@ -107,7 +105,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
         }
         startup {
             info.collection().registerRawSignal { changes ->
-                changes.changes.chunked(20).forEach {
+                changes.changes.chunked(5000).forEach {
                     sendWsChanges(CollectionChanges(changes = it))
                 }
             }
@@ -119,10 +117,10 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
 @DatabaseModel
 @Suppress("ClassName")
 data class __WebSocketDatabaseChangeSubscription(
-    override val _id: String,
+    override val _id: WebSocketIdentifier,
     @Index val databaseId: String,
     val user: String?, //USER
     val condition: String, //Condition<T>
     val mask: String, //Mask<T>
     val establishedAt: Instant,
-) : HasId<String>
+) : HasId<WebSocketIdentifier>

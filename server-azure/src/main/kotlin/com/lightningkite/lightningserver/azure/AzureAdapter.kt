@@ -17,7 +17,6 @@ import com.lightningkite.lightningserver.http.HttpStatus as HttpStatus1
 abstract class AzureAdapter {
     companion object {
         val logger: Logger = LoggerFactory.getLogger(AzureAdapter::class.java)
-        val httpMatcher by lazy { HttpEndpointMatcher(Http.endpoints.keys.asSequence()) }
     }
 
     fun processCors(request: HttpRequestMessage<Optional<String>>, responseBuilder: HttpResponseMessage.Builder) {
@@ -54,7 +53,7 @@ abstract class AzureAdapter {
             val response = try {
                 runBlocking {
                     val lookup = request.uri.path.removePrefix("/api")
-                    val match = httpMatcher.match(
+                    val match = Http.matcher.match(
                         lookup,
                         HttpMethod(request.httpMethod.name.uppercase())
                     ) ?: run {

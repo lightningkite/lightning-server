@@ -174,6 +174,6 @@ object TestSettings {
         Settings.populateDefaults(mapOf(
             "database" to DatabaseSettings("ram")
         ))
-        engine = LocalEngine(LocalPubSub, LocalCache)
+        engine = LocalEngine
     }
 }
