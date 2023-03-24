@@ -169,6 +169,11 @@ data class UpdateWithOptions(
 
 fun Condition<*>.bson() = Document().also { simplify().dump(it, null) }
 fun Modification<*>.bson(): UpdateWithOptions = UpdateWithOptions().also { simplify().dump(it, null) }
+fun UpdateWithOptions.upsert(model: Any?): UpdateWithOptions {
+    options = options.upsert(true)
+    document["\$setOnInsert"] = model
+    return this
+}
 
 @OptIn(ExperimentalSerializationApi::class)
 fun SerialDescriptor.bsonType(): BsonType = when(kind) {

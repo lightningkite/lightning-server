@@ -100,6 +100,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             DynamoDbCache(
                 { DynamoDbAsyncClient.builder().region(region).build() },
                 generalSettings().wsUrl.substringAfter("://")
+                    .substringBefore('?')
                     .filter { it.isLetterOrDigit() || it == '_' || it == '.' || it == '-' }
             )
         }
