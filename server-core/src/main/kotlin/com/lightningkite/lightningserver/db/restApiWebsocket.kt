@@ -18,6 +18,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.serialization.*
 import java.time.Instant
 
@@ -64,7 +65,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
                 (Authorization.handler as Authorization.Handler<USER>).idStringToUser(it)
             }
             val p = info.collection(info.serialization.authInfo.cast(user))
-            val q = event.content.copy(condition = p.fullCondition(event.content.condition))
+            val q = event.content.copy(condition = p.fullCondition(event.content.condition).simplify())
             val c = Serialization.json.encodeToString(Query.serializer(info.serialization.serializer), q)
             subscriptionDb().updateOne(
                 condition = condition { it._id eq event.id },
@@ -82,9 +83,8 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             "$modelIdentifier.sendWsChanges",
             CollectionChanges.serializer(info.serialization.serializer)
         ) { changes: CollectionChanges<T> ->
-            val asyncs = ArrayList<Deferred<Unit>>()
-            subscriptionDb().find(condition { it.databaseId eq modelIdentifier }).collect {
-                asyncs += async {
+            val asyncs = subscriptionDb().find(condition { it.databaseId eq modelIdentifier }).toList().map {
+                launch {
                     val m =
                         Serialization.json.decodeFromString(Mask.serializer(info.serialization.serializer), it.mask)
                     val c = Serialization.json.decodeFromString(
@@ -97,15 +97,18 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
                             new = entry.new?.takeIf { c.condition(it) }?.let { m(it) },
                         )
                         if(change.new == null && change.old == null) continue
-                        send(it._id, change)
+                        if (!send(it._id, change)) {
+                            subscriptionDb().deleteOneById(it._id)
+                            break
+                        }
                     }
                 }
             }
-            asyncs.awaitAll()
+            asyncs.forEach { it.join() }
         }
         startup {
             info.collection().registerRawSignal { changes ->
-                changes.changes.chunked(5000).forEach {
+                changes.changes.chunked(500).forEach {
                     sendWsChanges(CollectionChanges(changes = it))
                 }
             }
