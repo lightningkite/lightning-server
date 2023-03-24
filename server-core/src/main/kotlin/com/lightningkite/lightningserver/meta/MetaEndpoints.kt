@@ -162,7 +162,7 @@ class MetaEndpoints<USER>(
             head { title("${generalSettings().projectName} - Path List") }
             body {
                 ul {
-                    for (endpoint in Http.endpoints.keys) {
+                    for (endpoint in Http.endpoints.keys.sortedBy { it.path.toString() }) {
                         li { a(href = endpoint.path.fullUrl()) { +endpoint.toString() } }
                     }
                     for (path in WebSockets.handlers.keys) {

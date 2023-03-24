@@ -29,11 +29,6 @@ class Sftp(
                     val params: Map<String, List<String>> = FilesSettings.parseParameterString(match.groups["params"]!!.value)
                     val rootPath = match.groups["path"]!!.value
                     val user = match.groups["user"]!!.value
-                    println("host: $host")
-                    println("port: $port")
-                    println("params: $params")
-                    println("rootPath: $rootPath")
-                    println("user: $user")
                     Sftp(host, port, rootPath) {
                         SSHClient().apply {
                             params["host"]?.let { addHostKeyVerifier(it.first()) } ?: addHostKeyVerifier(PromiscuousVerifier())

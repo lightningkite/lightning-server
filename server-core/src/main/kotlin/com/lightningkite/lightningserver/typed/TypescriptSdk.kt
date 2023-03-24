@@ -71,8 +71,14 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     appendLine()
 
     val byGroup = safeDocumentables.groupBy { it.docGroup }
-    val groups = byGroup.keys.filterNotNull()
+    val groups = byGroup.keys.filterNotNull().sortedBy { it.groupToPartName() }
     appendLine("export interface Api {")
+    for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
+        append("    ")
+        append(entry.functionName)
+        this.functionHeader(entry)
+        appendLine()
+    }
     for (group in groups) {
         appendLine("    readonly ${group.groupToPartName()}: {")
         for (entry in byGroup[group]!!) {
@@ -82,12 +88,6 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
             appendLine()
         }
         appendLine("    }")
-    }
-    for (entry in byGroup[null] ?: listOf()) {
-        append("    ")
-        append(entry.functionName)
-        this.functionHeader(entry)
-        appendLine()
     }
     appendLine("}")
 
@@ -99,11 +99,11 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     val userTypes = byUserType.keys.filterNotNull()
     userTypes.forEach { userType ->
         @Suppress("NAME_SHADOWING") val byGroup = ((byUserType[userType] ?: listOf()) + (byUserType[null] ?: listOf())).groupBy { it.docGroup }
-        @Suppress("NAME_SHADOWING") val groups = byGroup.keys.filterNotNull()
+        @Suppress("NAME_SHADOWING") val groups = byGroup.keys.filterNotNull().sortedBy { it.groupToPartName() }
         val sessionClassName = "${userType.substringAfterLast('.')}Session"
         appendLine("export class $sessionClassName {")
         appendLine("    constructor(public api: Api, public ${userType.userTypeTokenName()}: string) {}")
-        for (entry in byGroup[null] ?: listOf()) {
+        for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
             append("    ")
             append(entry.functionName)
             this.functionHeader(entry, skipAuth = true)
@@ -136,7 +136,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
 
     appendLine("export class LiveApi implements Api {")
     appendLine("    public constructor(public httpUrl: string, public socketUrl: string = httpUrl, public extraHeaders: Record<string, string> = {}) {}")
-    for (entry in byGroup[null] ?: listOf()) {
+    for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
         append("    ")
         append(entry.functionName)
         this.functionHeader(entry, skipAuth = false)
@@ -155,7 +155,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         }
         appendLine("    }")
     }
-    for (group in groups) {
+    for (group in groups.sortedBy { it.groupToPartName() }) {
         appendLine("    readonly ${group.groupToPartName()} = {")
         for (entry in byGroup[group]!!) {
             append("        ")

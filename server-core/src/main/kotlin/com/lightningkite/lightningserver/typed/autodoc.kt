@@ -63,7 +63,7 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                     }
                 }
                 h2 { +"Endpoints" }
-                for (api in Documentable.endpoints) {
+                for (api in Documentable.endpoints.sortedBy { it.path.toString() }) {
                     h3 {
                         +(api.route.method.toString())
                         +" "
