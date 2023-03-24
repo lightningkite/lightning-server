@@ -25,11 +25,11 @@ value class WebSocketIdentifier(val string: String): Comparable<WebSocketIdentif
         }
         private val senders = HashMap<String, suspend (id: String, value: String) -> Boolean>()
         suspend fun send(type: String, id: String, value: String): Boolean {
-            return senders[type]!!(id, value)
+            return senders[type]?.invoke(id, value) ?: false
         }
         private val closers = HashMap<String, suspend (id: String) -> Boolean>()
         suspend fun close(type: String, id: String): Boolean {
-            return closers[type]!!(id)
+            return closers[type]?.invoke(id) ?: false
         }
     }
     override fun toString(): String = string

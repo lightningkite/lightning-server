@@ -77,7 +77,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
     }
 
     override suspend fun message(event: WebSockets.MessageEvent) {
-        if(event.content.isEmpty()) {
+        if(event.content.isBlank()) {
             event.id.send("")
             return
         }
