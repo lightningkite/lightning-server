@@ -1,19 +1,16 @@
 package com.lightningkite.lightningdb
 
-import com.github.jershell.kbson.UUIDSerializer
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.reactivestreams.client.MongoClient
 import kotlinx.coroutines.runBlocking
 import org.bson.Document
 import org.bson.UuidRepresentation
-import org.litote.kmongo.coroutine.CoroutineClient
-import org.litote.kmongo.coroutine.coroutine
 import org.litote.kmongo.coroutine.toList
 import org.litote.kmongo.reactivestreams.KMongo
 import org.slf4j.LoggerFactory
 import java.io.File
-import de.flapdoodle.embed.mongo.Command
+import de.flapdoodle.embed.mongo.packageresolver.Command
 import de.flapdoodle.embed.mongo.MongodStarter
 import de.flapdoodle.embed.mongo.config.*
 import de.flapdoodle.embed.mongo.distribution.Version
@@ -36,7 +33,7 @@ private fun embeddedMongo(deleteAfter: Boolean, replFile: File, port: Int): Mong
     val replFileExisted = replFile.exists() && replFile.list()?.isEmpty() == false
     replFile.mkdirs()
     val mongodConfig: MongodConfig = MongodConfig.builder()
-        .version(Version.Main.PRODUCTION)
+        .version(Version.Main.V6_0)
         .replication(Storage(replFile.toString(), "rs0", 128))
         .cmdOptions(
             MongoCmdOptions.builder()
