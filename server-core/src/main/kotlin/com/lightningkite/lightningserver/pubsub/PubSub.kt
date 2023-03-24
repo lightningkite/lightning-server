@@ -7,7 +7,9 @@ import kotlinx.coroutines.flow.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 
-interface PubSubInterface: HealthCheckable {
+@Deprecated("Renamed to just 'PubSub'", ReplaceWith("PubSub", "com.lightningkite.lightningserver.pubsub.PubSub"))
+typealias PubSubInterface = PubSub
+interface PubSub: HealthCheckable {
     fun <T> get(key: String, serializer: KSerializer<T>): PubSubChannel<T>
     fun string(key: String): PubSubChannel<String>
     override suspend fun healthCheck(): HealthStatus {
@@ -19,7 +21,7 @@ interface PubSubInterface: HealthCheckable {
         }
     }
 }
-inline operator fun <reified T: Any> PubSubInterface.get(key: String): PubSubChannel<T> {
+inline operator fun <reified T: Any> PubSub.get(key: String): PubSubChannel<T> {
     return get(key, Serialization.Internal.json.serializersModule.serializer<T>())
 }
 

@@ -1,3 +1,4 @@
+# Generated via Lightning Server.  This file will be overwritten or deleted when regenerating.
 ##########
 # Inputs
 ##########
@@ -24,11 +25,6 @@ resource "mongodbatlas_project" "database" {
   is_performance_advisor_enabled                   = true
   is_realtime_performance_panel_enabled            = true
   is_schema_advisor_enabled                        = true
-}
-resource "mongodbatlas_project_ip_access_list" "database" {
-  project_id   = mongodbatlas_project.database.id
-  cidr_block = "0.0.0.0/0"
-  comment    = "Anywhere"
 }
 resource "random_password" "database" {
   length           = 32
@@ -59,5 +55,10 @@ resource "mongodbatlas_database_user" "database" {
     database_name = "admin"
   }
 
+}
+resource "mongodbatlas_project_ip_access_list" "database" {
+  project_id   = mongodbatlas_project.database.id
+  cidr_block = "0.0.0.0/0"
+  comment    = "Anywhere"
 }
 

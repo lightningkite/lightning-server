@@ -5,9 +5,8 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.serializer
 
-object LocalPubSub: PubSubInterface {
+object LocalPubSub: PubSub {
     val known = HashMap<String, PubSubChannel<*>>()
     @Suppress("UNCHECKED_CAST")
     override fun <T> get(key: String, serializer: KSerializer<T>): PubSubChannel<T> = known.getOrPut(key) {

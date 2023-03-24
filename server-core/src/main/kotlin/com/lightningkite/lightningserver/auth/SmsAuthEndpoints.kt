@@ -1,25 +1,19 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.HtmlDefaults
-import com.lightningkite.lightningserver.cache.CacheInterface
-import com.lightningkite.lightningserver.cache.get
-import com.lightningkite.lightningserver.cache.set
+import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.exceptions.BadRequestException
-import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.sms.SMSClient
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
-import java.security.SecureRandom
-import java.time.Duration
 
 open class SmsAuthEndpoints<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val phoneAccess: UserPhoneAccess<USER, ID>,
-    private val cache: () -> CacheInterface,
+    private val cache: () -> Cache,
     private val sms: () -> SMSClient,
     private val template: suspend (code: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." }
 ) : ServerPathGroup(base.path) {

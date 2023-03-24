@@ -7,7 +7,9 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 import java.time.Duration
 
-interface CacheInterface : HealthCheckable {
+@Deprecated("Renamed to just 'cache'", ReplaceWith("Cache", "com.lightningkite.lightningserver.cache.Cache"))
+typealias CacheInterface = Cache
+interface Cache : HealthCheckable {
     suspend fun <T> get(key: String, serializer: KSerializer<T>): T?
     suspend fun <T> set(key: String, value: T, serializer: KSerializer<T>, timeToLive: Duration? = null)
     suspend fun <T> setIfNotExists(key: String, value: T, serializer: KSerializer<T>, timeToLive: Duration? = null): Boolean
@@ -49,20 +51,20 @@ interface CacheInterface : HealthCheckable {
     }
 }
 
-suspend inline fun <reified T : Any> CacheInterface.get(key: String): T? {
+suspend inline fun <reified T : Any> Cache.get(key: String): T? {
     return get(key, Serialization.Internal.json.serializersModule.serializer<T>())
 }
 
-suspend inline fun <reified T : Any> CacheInterface.set(key: String, value: T, timeToLive: Duration? = null) {
+suspend inline fun <reified T : Any> Cache.set(key: String, value: T, timeToLive: Duration? = null) {
     return set(key, value, Serialization.Internal.json.serializersModule.serializer<T>(), timeToLive)
 }
 
-suspend inline fun <reified T : Any> CacheInterface.setIfNotExists(key: String, value: T, timeToLive: Duration? = null): Boolean {
+suspend inline fun <reified T : Any> Cache.setIfNotExists(key: String, value: T, timeToLive: Duration? = null): Boolean {
     return setIfNotExists(key, value, Serialization.Internal.json.serializersModule.serializer<T>(), timeToLive)
 }
 
 
-suspend inline fun <reified T : Any> CacheInterface.modify(
+suspend inline fun <reified T : Any> Cache.modify(
     key: String,
     maxTries: Int = 1,
     timeToLive: Duration? = null,

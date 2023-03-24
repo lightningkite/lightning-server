@@ -5,7 +5,7 @@ import kotlinx.serialization.KSerializer
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
-object LocalCache: CacheInterface {
+object LocalCache: Cache {
     data class Entry(val value: Any?, val expires: Long? = null)
     val entries by lazy {
         logger.warn("WARNING: Using local cache.  You should NEVER see this in production or serverless.")

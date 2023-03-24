@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.meta
 
+import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.auth.AuthInfo
 import com.lightningkite.lightningserver.auth.jwt
 import com.lightningkite.lightningserver.auth.rawUser
@@ -8,10 +9,10 @@ import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.adminIndex
-import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.jsonschema.*
+import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -33,6 +34,11 @@ class MetaEndpoints<USER>(
     packageName: String = "com.mypackage",
     isAdmin: suspend (USER) -> Boolean,
 ) : ServerPathGroup(path) {
+    init {
+        Metrics.shouldAllowAccess = {
+            isAdmin(authInfo.tryCast(it.rawUser()) as USER)
+        }
+    }
     val root = get.handler {
         HttpResponse(body = HttpContent.Html {
             head { title("${generalSettings().projectName} - Meta Information") }
@@ -160,7 +166,7 @@ class MetaEndpoints<USER>(
                         li { a(href = endpoint.path.fullUrl()) { +endpoint.toString() } }
                     }
                     for (path in WebSockets.handlers.keys) {
-                        li { a(href = path.fullUrl()) { +"WS $path" } }
+                        li { a(href = wsTester.path.toString() + "?path=${path}") { +"WS $path" } }
                     }
                     for (schedule in Scheduler.schedules) {
                         li { +"SCHEDULE ${schedule.key}: ${schedule.value.schedule}" }
@@ -172,6 +178,76 @@ class MetaEndpoints<USER>(
             }
         })
     }
+    val wsTester = get("ws-tester").handler {
+        //language=HTML
+        HttpResponse.html(content = HtmlDefaults.basePage("""
+            <script>
+            /** @type {WebSocket | null} **/
+            let ws = null
+            function getCookie(name) {
+              var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+              if (match) return match[2];
+            }
+            function connectClick() {
+                /** @type {HTMLInputElement} **/
+                const pathElement = document.getElementById("path") 
+                const messagesElement = document.getElementById("messages")
+                const token = getCookie("Authorization")
+                ws = new WebSocket("${generalSettings().wsUrl}" + pathElement.value + (token ? "?jwt=" + token : ""), "wss")
+                ws.addEventListener('open', ev => {
+                    const newElement = document.createElement('p')
+                    newElement.innerText = 'WS Opened.'
+                    messagesElement.appendChild(newElement)
+                })
+                ws.addEventListener('error', ev => {
+                    const newElement = document.createElement('p')
+                    newElement.innerText = 'WS Error!'
+                    messagesElement.appendChild(newElement)
+                })
+                ws.addEventListener('message', ev => {
+                    const newElement = document.createElement('p')
+                    newElement.innerText = 'IN: ' + ev.data
+                    messagesElement.appendChild(newElement)
+                })
+                ws.addEventListener('close', ev => {
+                    const newElement = document.createElement('p')
+                    newElement.innerText = 'WS Closed.'
+                    messagesElement.appendChild(newElement)
+                })
+            }
+            function sendClick() {
+                if(ws === null) return
+                /** @type {HTMLTextAreaElement} **/
+                const msgElement = document.getElementById("msg") 
+                ws.send(msgElement.value)
+                const messagesElement = document.getElementById("messages") 
+                const newElement = document.createElement('p')
+                newElement.innerText = 'OUT: ' + msgElement.value
+                messagesElement.appendChild(newElement)
+                msgElement.value = ""
+            }
+            function closeClick() {
+                if(ws === null) return
+                ws.close()
+            }
+            function clearClick() {
+                const messagesElement = document.getElementById("messages") 
+                messages.innerHTML = ''
+            }
+            </script>
+            <div>
+                <label>Path <input id='path' value='${it.queryParameter("path") ?: "/"}'/></label>
+                <button type='button' onclick='connectClick()'>Connect</button>
+                <button type='button' onclick='closeClick()'>Close</button>
+            </div>
+            <div>
+                <label>Message <textarea id='msg'></textarea></label>
+                <button type='button' onclick='sendClick()'>Send</button>
+            </div>
+            <button type='button' onclick='clearClick()'>clear</button>
+            <div id='messages'></div>
+        """.trimIndent()))
+    }
     val endpoints = listOf<HttpEndpoint>(
         docs,
         health.route,
@@ -182,6 +258,7 @@ class MetaEndpoints<USER>(
         openApiJson,
         schema,
         paths,
+        wsTester
     )
 }
 

@@ -10,13 +10,13 @@ data class CacheSettings(
     @SerialName("uri") val legacyUri: String? = null,
     val connectionString: String? = null,
     val databaseNumber: Int? = null
-): ()->CacheInterface {
+): ()->Cache {
 
-    companion object: Pluggable<CacheSettings, CacheInterface>() {
+    companion object: Pluggable<CacheSettings, Cache>() {
         init {
             register("local") { LocalCache }
         }
     }
-    val cache: CacheInterface by lazy { parse((legacyUri ?: url).substringBefore("://"), this.copy(url = legacyUri ?: url)) }
-    override fun invoke(): CacheInterface = cache
+    val cache: Cache by lazy { parse((legacyUri ?: url).substringBefore("://"), this.copy(url = legacyUri ?: url)) }
+    override fun invoke(): Cache = cache
 }

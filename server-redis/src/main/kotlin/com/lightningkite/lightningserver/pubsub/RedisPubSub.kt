@@ -1,25 +1,17 @@
 package com.lightningkite.lightningserver.pubsub
 
-import com.lightningkite.lightningserver.cache.CacheSettings
-import com.lightningkite.lightningserver.cache.RedisCache
 import com.lightningkite.lightningserver.serialization.Serialization
 import io.lettuce.core.RedisClient
-import io.lettuce.core.pubsub.RedisPubSubListener
-import io.lettuce.core.pubsub.StatefulRedisPubSubConnection
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.reactive.awaitFirst
 import kotlinx.coroutines.reactive.collect
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.decodeFromString
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import redis.embedded.RedisServer
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
 
-class RedisPubSub(val client: RedisClient): PubSubInterface {
+class RedisPubSub(val client: RedisClient): PubSub {
     companion object {
         init {
             PubSubSettings.register("redis-test") {

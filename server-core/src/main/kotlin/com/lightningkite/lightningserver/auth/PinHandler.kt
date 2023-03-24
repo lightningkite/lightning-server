@@ -1,16 +1,15 @@
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningserver.cache.CacheInterface
+import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import java.security.SecureRandom
 import java.time.Duration
-import java.util.*
 
 open class PinHandler(
-    private val cache: () -> CacheInterface,
+    private val cache: () -> Cache,
     val keyPrefix: String,
     val expiration: Duration = Duration.ofMinutes(15),
     val maxAttempts: Int = 5

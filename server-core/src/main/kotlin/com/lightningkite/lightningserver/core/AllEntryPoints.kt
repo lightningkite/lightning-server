@@ -33,7 +33,7 @@ class ServerEntryPointElement(val entryPoint: Any) : AbstractCoroutineContextEle
 
 val serverLogger = LoggerFactory.getLogger("LightningServer")
 suspend fun <T> serverEntryPoint(entryPoint: Any, action: suspend CoroutineScope.() -> T): T {
-    serverLogger.debug("Handling $entryPoint")
+    serverLogger.info("Handling $entryPoint")
     return withContext(ServerEntryPointElement(entryPoint), action)
 }
 

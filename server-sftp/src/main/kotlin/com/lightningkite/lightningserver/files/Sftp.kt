@@ -6,20 +6,12 @@ import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.schmizz.sshj.SSHClient
-import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
-import net.schmizz.sshj.userauth.keyprovider.KeyProvider
 import java.io.File
 import java.io.InputStream
-import java.security.KeyFactory
-import java.security.PrivateKey
-import java.security.PublicKey
-import java.security.spec.PKCS8EncodedKeySpec
 import java.time.Duration
 import java.time.Instant
-import java.util.Base64
-import java.util.concurrent.ConcurrentHashMap
 
 class Sftp(
     val host: String,
@@ -31,28 +23,32 @@ class Sftp(
     companion object {
         init {
             FilesSettings.register("sftp") { settings ->
-                val postScheme = settings.storageUrl.substringAfter("://")
-                val userAndHost = postScheme.substringBefore("/")
-                val user = userAndHost.substringBefore('@', "ubuntu")
-                val hostWithPort = userAndHost.substringAfter('@')
-                val host = hostWithPort.substringBefore(':')
-                val port = hostWithPort.substringAfter(':', "22").toInt()
-                val rootPath = postScheme.substringAfter('/').substringBefore('?')
-                val params = postScheme.substringAfter('/').substringAfter('?').split('&')
-                    .associate { it.substringBefore('=') to it.substringAfter('=', "true") }
-                Sftp(host, port, rootPath) {
-                    SSHClient().apply {
-                        params["host"]?.let { addHostKeyVerifier(it) } ?: addHostKeyVerifier(PromiscuousVerifier())
-                        connect(host, port)
-                        val id = params["identity"]!!
-                        val pk = buildString {
-                            appendLine("-----BEGIN OPENSSH PRIVATE KEY-----")
-                            id.chunked(70).forEach { l -> appendLine(l) }
-                            appendLine("-----END OPENSSH PRIVATE KEY-----")
+                Regex("""sftp://(?<user>[^@]+)@(?<host>[^:]+):(?<port>[0-9]+)/(?<path>[^?]*)\?(?<params>.*)""").matchEntire(settings.storageUrl)?.let { match ->
+                    val host = match.groups["host"]!!.value
+                    val port = match.groups["port"]!!.value.toInt()
+                    val params: Map<String, List<String>> = FilesSettings.parseParameterString(match.groups["params"]!!.value)
+                    val rootPath = match.groups["path"]!!.value
+                    val user = match.groups["user"]!!.value
+                    println("host: $host")
+                    println("port: $port")
+                    println("params: $params")
+                    println("rootPath: $rootPath")
+                    println("user: $user")
+                    Sftp(host, port, rootPath) {
+                        SSHClient().apply {
+                            params["host"]?.let { addHostKeyVerifier(it.first()) } ?: addHostKeyVerifier(PromiscuousVerifier())
+                            connect(host, port)
+                            val id = params["identity"]!!.first()
+                            val pk = buildString {
+                                appendLine("-----BEGIN OPENSSH PRIVATE KEY-----")
+                                id.chunked(70).forEach { l -> appendLine(l) }
+                                appendLine("-----END OPENSSH PRIVATE KEY-----")
+                            }
+                            authPublickey(user, loadKeys(pk, null, null))
                         }
-                        authPublickey(user, loadKeys(pk, null, null))
                     }
                 }
+                    ?: throw IllegalStateException("Invalid sftp storageUrl. The URL should match the pattern: sftp://[user]@[host]:[port]/[path]?[params]\nParams available are: host, identity.")
             }
         }
     }

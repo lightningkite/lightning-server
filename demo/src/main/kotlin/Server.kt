@@ -28,6 +28,7 @@ import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.tasks.startupOnce
 import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.typed
+import com.lightningkite.lightningserver.websocket.MultiplexWebSocketHandler
 import com.lightningkite.lightningserver.websocket.websocket
 import io.ktor.client.request.*
 import kotlinx.coroutines.delay
@@ -59,10 +60,12 @@ object Server : ServerPathGroup(ServerPath.root) {
         }
         Serialization.handler(FileRedirectHandler)
         startupOnce("adminUser", database) {
-            database().collection<User>().insertOne(User(
-                email = "joseph+admin@lightningkite.com",
-                isSuperUser = true
-            ))
+            database().collection<User>().insertOne(
+                User(
+                    email = "joseph+admin@lightningkite.com",
+                    isSuperUser = true
+                )
+            )
         }
     }
 
@@ -79,35 +82,38 @@ object Server : ServerPathGroup(ServerPath.root) {
                     }
                 }
         },
-        forUser = {  user ->
+        forUser = { user ->
             val everyone: Condition<User> = Condition.Always()
             val self: Condition<User> = condition { it._id eq user._id }
-            val admin: Condition<User> = if(user.isSuperUser) Condition.Always() else Condition.Never()
-            withPermissions(ModelPermissions(
-                create = everyone,
-                read = self or admin,
-                readMask = mask {
-                    it.hashedPassword.maskedTo("MASKED").unless(admin)
-                },
-                update = self or admin,
-                updateRestrictions = updateRestrictions {
-                    it.isSuperUser.requires(admin)
-                },
-                delete = self or admin
-            ))
+            val admin: Condition<User> = if (user.isSuperUser) Condition.Always() else Condition.Never()
+            withPermissions(
+                ModelPermissions(
+                    create = everyone,
+                    read = self or admin,
+                    readMask = mask {
+                        it.hashedPassword.maskedTo("MASKED").unless(admin)
+                    },
+                    update = self or admin,
+                    updateRestrictions = updateRestrictions {
+                        it.isSuperUser.requires(admin)
+                    },
+                    delete = self or admin
+                )
+            )
         }
     )
-    val user = object: ServerPathGroup(path("user")) {
+    val user = object : ServerPathGroup(path("user")) {
         val rest = ModelRestEndpoints(path("rest"), userInfo)
     }
-    val auth = object: ServerPathGroup(path("auth")) {
+    val auth = object : ServerPathGroup(path("auth")) {
         val emailAccess = userInfo.userEmailAccess { User(email = it) }
-        val passAccess = userInfo.userPasswordAccess { username, hashed -> User(email = username, hashedPassword = hashed)}
+        val passAccess =
+            userInfo.userPasswordAccess { username, hashed -> User(email = username, hashedPassword = hashed) }
         val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner)
         val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
         val passAuth = PasswordAuthEndpoints(baseAuth, passAccess)
     }
-    val auth2 = object: ServerPathGroup(path("auth2")) {
+    val auth2 = object : ServerPathGroup(path("auth2")) {
         val info = ModelInfo<UserAlt, UserAlt, UUID>(
             getCollection = { database().collection<UserAlt>() },
             forUser = { this }
@@ -115,7 +121,10 @@ object Server : ServerPathGroup(ServerPath.root) {
         val emailAccess = info.userEmailAccess { UserAlt(email = it) }
         val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner)
         val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
-        init { path.docName = "auth2" }
+
+        init {
+            path.docName = "auth2"
+        }
     }
     val uploadEarly = UploadEarlyEndpoint(path("upload"), files, database, jwtSigner)
     val testModel = TestModelEndpoints(path("test-model"))
@@ -125,8 +134,14 @@ object Server : ServerPathGroup(ServerPath.root) {
     }
 
     val socket = path("socket").websocket(
-        connect = { println("Connected $it") },
-        message = { println("Message $it") },
+        connect = { println("Connected $it - you are ${it.rawUser()}") },
+        message = {
+            println("Message $it")
+            it.id.send(it.content)
+            if(it.content == "die") {
+                throw Exception("You asked me to die!")
+            }
+        },
         disconnect = { println("Disconnect $it") }
     )
 
@@ -166,6 +181,8 @@ object Server : ServerPathGroup(ServerPath.root) {
         val response = client.get("https://lightningkite.com")
         HttpResponse.plainText("Got status ${response.status}")
     }
+
+    val multiplex = path("multiplex").websocket(MultiplexWebSocketHandler(cache))
 
     val meta = path("meta").metaEndpoints<Unit> { true }
 }

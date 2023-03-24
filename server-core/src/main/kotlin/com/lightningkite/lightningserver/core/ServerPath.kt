@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.core
 
+import io.ktor.http.*
+
 data class ServerPath(val segments: List<Segment>, val after: Afterwards = Afterwards.None) {
     companion object {
         val root = ServerPath(listOf())
@@ -74,7 +76,7 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
     fun toString(parts: Map<String, String> = mapOf(), wildcard: String = ""): String = "/" + segments.joinToString("/") {
         when(it) {
             is Segment.Constant -> it.value
-            is Segment.Wildcard -> parts[it.name] ?: ""
+            is Segment.Wildcard -> parts[it.name]?.encodeURLPathPart() ?: ""
         }
     } + when(after) {
         Afterwards.None -> ""
@@ -101,7 +103,7 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
             .forEach {
                 when(val s = it.first) {
                     is Segment.Constant -> if(s.value != it.second) return null
-                    is Segment.Wildcard -> parts[s.name] = it.second
+                    is Segment.Wildcard -> parts[s.name] = it.second.decodeURLPart()
                 }
             }
         return Match(

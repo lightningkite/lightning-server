@@ -1,27 +1,21 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.HtmlDefaults
-import com.lightningkite.lightningserver.cache.CacheInterface
-import com.lightningkite.lightningserver.cache.get
-import com.lightningkite.lightningserver.cache.set
+import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.email.EmailClient
-import com.lightningkite.lightningserver.exceptions.BadRequestException
-import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
-import java.security.SecureRandom
-import java.time.Duration
 
 open class EmailAuthEndpoints<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val emailAccess: UserEmailAccess<USER, ID>,
-    private val cache: () -> CacheInterface,
+    private val cache: () -> Cache,
     private val email: () -> EmailClient,
     private val emailSubject: () -> String = { "${generalSettings().projectName} Log In" },
     private val template: (suspend (email: String, link: String, pin: String) -> String) = { email, link, pin ->

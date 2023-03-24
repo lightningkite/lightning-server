@@ -13,6 +13,8 @@ import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.pubsub.PubSubSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.GeneralServerSettings
+import com.lightningkite.lightningserver.websocket.MultiplexWebSocketHandler
+import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import com.lightningkite.lightningserver.websocket.websocket
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.websocket.*
@@ -33,14 +35,14 @@ class KtorKtTest {
     @Test
     fun socketTest() {
         TestSettings
-        var socketId: String? = null
+        var socketId: WebSocketIdentifier? = null
         val socket = ServerPath("socket-test").websocket(
             connect = {
                 println("connect $it")
                 socketId = it.id
                 GlobalScope.launch {
                     delay(200L)
-                    MyWebSockets.send(socketId!!, "Test")
+                    socketId!!.send("Test")
                 }
             },
             message = { println("message $it") },
@@ -73,14 +75,14 @@ class KtorKtTest {
     @Test
     fun socketPathTest() {
         TestSettings
-        var socketId: String? = null
+        var socketId: WebSocketIdentifier? = null
         val socket = ServerPath("socket-test").websocket(
             connect = {
                 println("connect $it")
                 socketId = it.id
                 GlobalScope.launch {
                     delay(200L)
-                    MyWebSockets.send(socketId!!, "Test")
+                    socketId!!.send("Test")
                 }
             },
             message = { println("message $it") },
@@ -113,14 +115,15 @@ class KtorKtTest {
     @Test
     fun multiplexSocketTest() {
         TestSettings
-        var socketId: String? = null
+        var socketId: WebSocketIdentifier? = null
+        val multiplexSocket = ServerPath("multiplex").websocket(MultiplexWebSocketHandler { LocalCache })
         val socket = ServerPath("socket-test").websocket(
             connect = {
                 println("connect $it")
                 socketId = it.id
                 GlobalScope.launch {
                     delay(200L)
-                    MyWebSockets.send(socketId!!, "Test")
+                    socketId!!.send("Test")
                 }
             },
             message = { println("message $it") },
@@ -141,7 +144,7 @@ class KtorKtTest {
                 }
             }
             val channel = UUID.randomUUID().toString()
-            client.webSocket("") {
+            client.webSocket(multiplexSocket.toString()) {
                 send(
                     Serialization.json.encodeToString(
                         MultiplexMessage(

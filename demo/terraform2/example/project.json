@@ -3,20 +3,23 @@
     "bucket": "ivieleague-deployment-states",
     "bucketPathOverride": "demo/example",
     "vpc": false,
+    "existingVpc": false,
     "domain": true,
     "profile": "default",
+    "createBeforeDestroy": false,
     "handlers": {
-        "general": "Standard",
-        "database": "MongoDB Serverless",
         "cache": "DynamoDB",
         "jwt": "Standard",
         "oauth_github": "Direct",
+        "exceptions": "Direct",
+        "oauth_apple": "Direct",
+        "general": "Standard",
+        "database": "MongoDB Serverless",
         "logging": "Direct",
         "files": "S3",
         "metrics": "Direct",
-        "exceptions": "Direct",
         "email": "SMTP through SES",
         "oauth_google": "Direct",
-        "oauth_apple": "Direct"
+        "oauth_microsoft": "Direct"
     }
 }

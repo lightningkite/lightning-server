@@ -172,14 +172,14 @@ class PostgresAggregationsTest : AggregationsTest() {
     companion object {
         @ClassRule @JvmField val postgres = EmbeddedPostgresRules.singleInstance()
     }
-    override val database: com.lightningkite.lightningdb.Database by lazy { PostgresDatabase(Database.connect(postgres.embeddedPostgres.postgresDatabase)) }
+    override val database: com.lightningkite.lightningdb.Database by lazy { PostgresDatabase{Database.connect(postgres.embeddedPostgres.postgresDatabase)} }
 }
 
 class PostgresConditionTests : ConditionTests() {
     companion object {
         @ClassRule @JvmField val postgres = EmbeddedPostgresRules.singleInstance()
     }
-    override val database: com.lightningkite.lightningdb.Database by lazy { PostgresDatabase(Database.connect(postgres.embeddedPostgres.postgresDatabase)) }
+    override val database: com.lightningkite.lightningdb.Database by lazy { PostgresDatabase{Database.connect(postgres.embeddedPostgres.postgresDatabase)} }
 }
 
 //class PostgresModificationTests : ModificationTests() {
@@ -193,5 +193,5 @@ class PostgresSortTest : SortTest() {
     companion object {
         @ClassRule @JvmField val postgres = EmbeddedPostgresRules.singleInstance()
     }
-    override val database: com.lightningkite.lightningdb.Database by lazy { PostgresDatabase(Database.connect(postgres.embeddedPostgres.postgresDatabase)) }
+    override val database: com.lightningkite.lightningdb.Database by lazy { PostgresDatabase{Database.connect(postgres.embeddedPostgres.postgresDatabase)} }
 }

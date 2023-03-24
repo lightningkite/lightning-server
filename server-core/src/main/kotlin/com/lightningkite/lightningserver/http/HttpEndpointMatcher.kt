@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathMatcher
+import io.ktor.http.*
 
 class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
     data class Node(
@@ -95,7 +96,7 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
                     Match(
                         endpoint = it,
                         parts = it.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(wildcards)
-                            .associate { it.first.name to it.second },
+                            .associate { it.first.name to it.second.decodeURLPart() },
                         wildcard = pathParts.drop(it.path.segments.size).joinToString("/") + (if (endingSlash) "/" else "")
                     )
                 }
@@ -106,7 +107,7 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
                 Match(
                     endpoint = it,
                     parts = it.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(wildcards)
-                        .associate { it.first.name to it.second },
+                        .associate { it.first.name to it.second.decodeURLPart() },
                     wildcard = null
                 )
             }
@@ -116,7 +117,7 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
                 Match(
                     endpoint = it,
                     parts = it.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(wildcards)
-                        .associate { it.first.name to it.second },
+                        .associate { it.first.name to it.second.decodeURLPart() },
                     wildcard = null
                 )
             }
@@ -127,7 +128,7 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
                     Match(
                         endpoint = it,
                         parts = it.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(wildcards)
-                            .associate { it.first.name to it.second },
+                            .associate { it.first.name to it.second.decodeURLPart() },
                         wildcard = pathParts.drop(it.path.segments.size).joinToString("/") + (if (endingSlash) "/" else "")
                     )
                 }

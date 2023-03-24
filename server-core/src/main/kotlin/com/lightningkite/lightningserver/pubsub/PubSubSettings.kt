@@ -8,12 +8,12 @@ import kotlinx.serialization.Serializable
 data class PubSubSettings(
     val url: String = "local",
     @SerialName("uri") val legacyUri: String? = null,
-): ()->PubSubInterface {
-    companion object: Pluggable<PubSubSettings, PubSubInterface>() {
+): ()->PubSub {
+    companion object: Pluggable<PubSubSettings, PubSub>() {
         init {
             register("local") { LocalPubSub }
         }
     }
 
-    override fun invoke(): PubSubInterface = parse((legacyUri ?: url).substringBefore("://"), this.copy(url = legacyUri ?: url))
+    override fun invoke(): PubSub = parse((legacyUri ?: url).substringBefore("://"), this.copy(url = legacyUri ?: url))
 }

@@ -1,3 +1,4 @@
+# Generated via Lightning Server.  This file will be overwritten or deleted when regenerating.
 ##########
 # Inputs
 ##########
@@ -89,12 +90,14 @@ resource "aws_apigatewayv2_route" "ws_disconnect" {
 }
 
 resource "aws_lambda_permission" "api_gateway_ws" {
-  statement_id  = "AllowExecutionFromAPIGatewayWS"
   action        = "lambda:InvokeFunction"
   function_name = "${aws_lambda_alias.main.function_name}:${aws_lambda_alias.main.name}"
   principal     = "apigateway.amazonaws.com"
 
   source_arn = "${aws_apigatewayv2_api.ws.execution_arn}/*/*"
+  lifecycle {
+    create_before_destroy = false
+  }
 }
 
 resource "aws_iam_policy" "api_gateway_ws" {

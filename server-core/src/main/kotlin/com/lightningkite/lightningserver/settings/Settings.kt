@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.settings
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.logging.loggingSettings
 import com.lightningkite.lightningserver.metrics.Metrics
+import com.lightningkite.lightningserver.metrics.metricsCleanSchedule
 import com.lightningkite.lightningserver.metrics.metricsSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 
@@ -39,6 +40,7 @@ object Settings {
         loggingSettings
         exceptionSettings
         metricsSettings
+        metricsCleanSchedule
     }
 
     fun populateDefaults(map: Map<String, Any?> = mapOf()) {
