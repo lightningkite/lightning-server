@@ -100,4 +100,17 @@ abstract class OperationsTests() {
         m = collection.get(m._id)!!
         assertEquals(m, updated.new)
     }
+
+    @Test fun test_upsertOneById(): Unit = runBlocking {
+        val collection = database.collection<LargeTestModel>("test_upsertOneById")
+        var m = LargeTestModel(int = 2, boolean = true)
+        var updated = collection.upsertOneById(m._id, m)
+        assertEquals(null, updated.old)
+        m = collection.get(m._id)!!
+        assertEquals(m, updated.new)
+        updated = collection.upsertOneById(m._id, m)
+        assertEquals(m, updated.old)
+        m = collection.get(m._id)!!
+        assertEquals(m, updated.new)
+    }
 }

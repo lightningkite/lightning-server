@@ -47,7 +47,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
                 __WebSocketDatabaseChangeSubscription(
                     _id = event.id,
                     databaseId = modelIdentifier,
-                    condition = "{\"Never\":true}",
+                    condition = "",
                     user = user,
                     mask = Serialization.json.encodeToString(
                         Mask.serializer(info.serialization.serializer),
@@ -84,6 +84,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
         ) { changes: CollectionChanges<T> ->
             val jobs = ArrayList<Job>()
             subscriptionDb().find(condition { it.databaseId eq modelIdentifier }).collect {
+                if(it.condition.isEmpty()) return@collect
                 val m =
                     try {
                         Serialization.json.decodeFromString(Mask.serializer(info.serialization.serializer), it.mask)

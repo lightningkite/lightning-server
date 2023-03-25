@@ -36,6 +36,7 @@ abstract class AbstractSignalFieldCollection<Model: Any>: FieldCollection<Model>
     final override suspend fun replaceOne(condition: Condition<Model>, model: Model, orderBy: List<SortPart<Model>>): EntryChange<Model> =
         replaceOneImpl(condition, model, orderBy).also {
             if(it.new == null) return@also
+            if(it.new == it.old) return@also
             val change = CollectionChanges(it.old, it.new)
             signal(change)
         }
@@ -47,6 +48,7 @@ abstract class AbstractSignalFieldCollection<Model: Any>: FieldCollection<Model>
     ): EntryChange<Model>  =
         updateOneImpl(condition, modification, orderBy).also {
             if(it.new == null) return@also
+            if(it.new == it.old) return@also
             val change = CollectionChanges(it.old, it.new)
             signal(change)
         }
@@ -57,6 +59,7 @@ abstract class AbstractSignalFieldCollection<Model: Any>: FieldCollection<Model>
         model: Model
     ): EntryChange<Model> = upsertOneImpl(condition, modification, model).also {
         val change = CollectionChanges(it.old, it.new)
+        if(it.new == it.old) return@also
         signal(change)
     }
 
@@ -64,7 +67,7 @@ abstract class AbstractSignalFieldCollection<Model: Any>: FieldCollection<Model>
         condition: Condition<Model>,
         modification: Modification<Model>
     ): CollectionChanges<Model> = updateManyImpl(condition, modification).also { changes ->
-        signal(changes)
+        signal(CollectionChanges(changes.changes.filter { it.old != it.new }))
     }
 
 

@@ -166,7 +166,8 @@ fun <T> Condition<T>.simplify(): Condition<T> {
                     false
                 } else true
             }.let {
-                when(it.size) {
+                if(it.any { it is Condition.Never }) Condition.Never()
+                else when(it.size) {
                     0 -> if(foundAlways) Condition.Always() else Condition.Never()
                     1 -> it.first().simplifyWithoutMerge()
                     else -> Condition.And(it.map { it.simplifyWithoutMerge() })
@@ -178,7 +179,8 @@ fun <T> Condition<T>.simplify(): Condition<T> {
             this.conditions.distinct().map { it.simplify() }.filter {
                 it !is Condition.Never
             }.let {
-                when(it.size) {
+                if(it.any { it is Condition.Always }) Condition.Always()
+                else when(it.size) {
                     0 -> Condition.Never()
                     1 -> it.first().simplify()
                     else -> Condition.Or(it)

@@ -168,7 +168,7 @@ data class UpdateWithOptions(
 fun Condition<*>.bson() = Document().also { simplify().dump(it, null) }
 fun Modification<*>.bson(): UpdateWithOptions = UpdateWithOptions().also { simplify().dump(it, null) }
 fun <T> UpdateWithOptions.upsert(model: T, serializer: KSerializer<T>): Boolean {
-    val set = (document["\$set"] as? Document)
+    val set = (document["\$set"] as? Document) ?: document["\$set"]?.let { MongoDatabase.bson.stringify(serializer, it as T) }?.toDocument()
     val inc = (document["\$inc"] as? Document)
     val restrict = document.entries.asSequence()
         .filter { it.key != "\$set" && it.key != "\$inc" }
