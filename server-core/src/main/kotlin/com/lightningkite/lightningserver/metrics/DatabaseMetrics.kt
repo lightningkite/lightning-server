@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import java.time.Instant
 
-class DatabaseMetrics(val settings: MetricSettings, val database: () -> Database) :
+class DatabaseMetrics(override val settings: MetricSettings, val database: () -> Database) :
     ServerPathGroup(ServerPath.root.path("meta/metrics")), Metrics {
     init {
         prepareModels()

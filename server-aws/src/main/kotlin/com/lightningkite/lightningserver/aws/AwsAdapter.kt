@@ -279,6 +279,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         WebSocketIdentifier.register(
             type = wsType,
             send = { id, value ->
+                Metrics.report("webSocketMessages", 1.0)
                 try {
                     val result = apiGatewayManagement.postToConnection {
                         it.connectionId(id)
@@ -303,6 +304,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 }
             },
             close = { id ->
+                Metrics.report("webSocketCloses", 1.0)
                 try {
                     val result = apiGatewayManagement.deleteConnection {
                         it.connectionId(id)
@@ -376,7 +378,8 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     rootWs.message(lkEvent)
                     APIGatewayV2HTTPResponse(200)
                 } catch (e: Exception) {
-                    lkEvent.id.close()
+                    try { lkEvent.id.close() } catch(e: Exception) { /*squish*/ }
+                    handleWsDisconnect(event.requestContext.connectionId)
                     APIGatewayV2HTTPResponse(500, body = Serialization.json.encodeToString(e.message ?: ""))
                 }
             }

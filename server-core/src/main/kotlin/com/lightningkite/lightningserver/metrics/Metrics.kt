@@ -16,6 +16,7 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentLinkedQueue
 
 interface Metrics {
+    val settings: MetricSettings
     suspend fun report(events: List<MetricEvent>)
     suspend fun clean() {}
 
@@ -41,8 +42,10 @@ interface Metrics {
             }
         }
 
-        suspend fun report(type: String, value: Double) =
-            toReport.add(MetricEvent(type, serverEntryPoint()?.toString() ?: "Unknown", Instant.now(), value))
+        suspend fun report(type: String, value: Double) {
+            if(type in metricsSettings().settings.tracked)
+                toReport.add(MetricEvent(type, serverEntryPoint()?.toString() ?: "Unknown", Instant.now(), value))
+        }
 
         suspend fun <T> performance(type: String, action: suspend () -> T): T {
             val start = System.nanoTime()
