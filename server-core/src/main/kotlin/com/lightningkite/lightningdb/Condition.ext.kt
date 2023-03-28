@@ -4,6 +4,10 @@ import com.lightningkite.khrysalis.IsCodableAndHashable
 import kotlin.reflect.KProperty1
 
 
+/**
+ * @param field A KProperty1 of the model for the condition.
+ * @return Returns whether the condition uses the provided field.
+ */
 fun Condition<*>.referencesField(field: KProperty1<*, *>): Boolean = when (this) {
     is Condition.OnField<*, *> -> this.key.name == field.name || this.condition.referencesField(field)
     is Condition.And -> conditions.any { it.referencesField(field) }
@@ -17,6 +21,11 @@ fun Condition<*>.referencesField(field: KProperty1<*, *>): Boolean = when (this)
     is Condition.IfNotNull<*> -> condition.referencesField(field)
     else -> false
 }
+
+/**
+ * @param field A KProperty1 of the model for the condition.
+ * @return Returns whether the modification will touch the provided field.
+ */
 fun Modification<*>.referencesField(field: KProperty1<*, *>): Boolean = when (this) {
     is Modification.Chain -> modifications.any { it.referencesField(field) }
     is Modification.IfNotNull -> modification.referencesField(field)

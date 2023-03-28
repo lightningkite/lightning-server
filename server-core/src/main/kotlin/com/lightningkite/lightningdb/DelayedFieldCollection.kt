@@ -8,6 +8,11 @@ import kotlinx.coroutines.flow.onStart
 import kotlin.reflect.KProperty1
 import kotlin.reflect.KType
 
+/**
+ * Wraps a FieldCollection with the sole purpose of adding a delay in the response to every call.
+ * @param wraps The actual underlying FieldCollection to retrieve data from.
+ * @param milliseconds The amount of delay that will be added to every call.
+ */
 open class DelayedFieldCollection<Model : Any>(
     override val wraps: FieldCollection<Model>,
     val milliseconds: Long

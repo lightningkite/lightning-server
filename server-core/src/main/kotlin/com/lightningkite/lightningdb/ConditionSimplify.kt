@@ -156,6 +156,13 @@ private fun <T> Condition<T>.simplifyWithoutMerge(): Condition<T> {
         else -> this
     }
 }
+
+/**
+ * Will reduce a condition into it's smallest relevant parts.
+ * Ex: Or[Never, Always] -> Always
+ * Ex: And[Never, Always] -> Never
+ * Ex: And[Equal, Always] -> Equal
+ */
 fun <T> Condition<T>.simplify(): Condition<T> {
     return when(this) {
         is Condition.And -> {
