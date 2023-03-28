@@ -6,6 +6,10 @@ import kotlinx.serialization.Serializable
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
+/**
+ * An abstracted model for communicating with a Database.
+ * Every implementation will handle how to return a FieldCollection to perform actions on a collection/table.
+ */
 interface Database: HealthCheckable {
     fun <T: Any> collection(type: KType, name: String): FieldCollection<T>
     override suspend fun healthCheck(): HealthStatus {

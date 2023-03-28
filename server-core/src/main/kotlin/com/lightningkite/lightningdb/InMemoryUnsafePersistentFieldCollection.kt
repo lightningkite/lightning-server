@@ -1,18 +1,16 @@
 package com.lightningkite.lightningdb
 
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.StringFormat
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.encodeToString
 import java.io.Closeable
 import java.io.File
 import java.util.*
 
-@OptIn(DelicateCoroutinesApi::class)
+/**
+ * An InMemoryFieldCollection with the added feature of loading data from a file at creation
+ * and writing the collection data into a file when closing.
+ */
 class InMemoryUnsafePersistentFieldCollection<Model : Any>(
     val encoding: StringFormat,
     val serializer: KSerializer<Model>,
@@ -35,7 +33,7 @@ class InMemoryUnsafePersistentFieldCollection<Model : Any>(
         val temp = file.parentFile!!.resolve(file.name + ".saving")
         temp.writeText(encoding.encodeToString(ListSerializer(serializer), data.toList()))
         temp.renameTo(file)
-        println("Saved $file")
+        logger.debug("Saved $file")
     }
 }
 

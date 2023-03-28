@@ -20,7 +20,7 @@ import kotlin.reflect.KTypeProjection
 /**
  * Settings that define what database to use and how to connect to it.
  *
- * @param url Defines the type and connection to the database. examples are ram, ram-preload, ram-unsafe-persist, mongodb-test, mongodb-file, mongodb
+ * @param url Defines the type and connection to the database. Examples are ram, ram-preload, ram-unsafe-persist
  * @param databaseName The name of the database to connect to.
  */
 @Serializable
@@ -52,29 +52,15 @@ data class DatabaseSettings(
 
     override fun invoke(): Database = parse(url.substringBefore("://"), this)
 
-//    override fun invoke(): Database = when {
-//        url == "ram" -> InMemoryDatabase()
-//        url == "ram-preload" -> InMemoryDatabase(Serialization.json.parseToJsonElement(File(url.substringAfter("://")).readText()) as? JsonObject)
-//        url == "ram-unsafe-persist" -> InMemoryUnsafePersistenceDatabase(File(url.substringAfter("://")))
-//        url == "mongodb-test" -> testMongo().database(databaseName)
-//        url.startsWith("mongodb-file:") -> embeddedMongo(File(url.removePrefix("mongodb-file://"))).database(databaseName)
-//        url.startsWith("mongodb:") -> KMongo.createClient(
-//            MongoClientSettings.builder()
-//                .applyConnectionString(ConnectionString(url))
-//                .uuidRepresentation(UuidRepresentation.STANDARD)
-//                .build()
-//        ).database(databaseName)
-//        else -> throw IllegalArgumentException("MongoDB connection style not recognized: got $url but only understand: " +
-//                "ram\n" +
-//                "ram-preload\n" +
-//                "ram-unsafe-persist\n" +
-//                "mongodb-test\n" +
-//                "mongodb-file:\n" +
-//                "mongodb:"
-//        )
-//    }
 }
 
+/**
+ * A Database the exists entirely in the applications Heap. There are no external connections.
+ * It uses InMemoryFieldCollections in its implementation. This is NOT meant for persistent or long term storage.
+ * This is useful in places that persistent data is not needed and speed is desired.
+ *
+ * @param premadeData A JsonObject that contains data you wish to populate the database with on creation.
+ */
 class InMemoryDatabase(val premadeData: JsonObject? = null) : Database {
     val collections = HashMap<String, FieldCollection<*>>()
 
@@ -99,6 +85,16 @@ class InMemoryDatabase(val premadeData: JsonObject? = null) : Database {
     }
 }
 
+
+/**
+ * A Database whose data manipulation is entirely in the application Heap, but it will attempt to store the data into a Folder on the system before shutdown.
+ * On startup it will load in the Folder contents and populate the database.
+ * It uses InMemoryUnsafePersistentFieldCollection in its implementation. This is NOT meant for long term storage.
+ * It is NOT guaranteed that it will store the data before the application is shut down. There is a HIGH chance that the changes will not persist between runs.
+ * This is useful in places that persistent data is not important and speed is desired.
+ *
+ * @param folder The File references a directory where you wish the data to be stored.
+ */
 class InMemoryUnsafePersistenceDatabase(val folder: File) : Database {
     init {
         folder.mkdirs()
