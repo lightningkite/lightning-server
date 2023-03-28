@@ -9,6 +9,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.encodeToString
 import org.junit.Assert.*
 import org.junit.Test
@@ -18,6 +19,17 @@ import kotlin.test.assertContains
 
 abstract class FileSystemTests {
     abstract val system: FileSystem?
+
+    @Test
+    fun testHealth() {
+        val system = system ?: run {
+            println("Could not test because the cache is not supported on this system.")
+            return
+        }
+        runBlocking {
+            system.healthCheck()
+        }
+    }
 
     @Test
     fun testWriteAndRead() {
@@ -59,10 +71,15 @@ abstract class FileSystemTests {
             return
         }
         runBlocking {
-            val testFile = system.root.resolve("test.txt")
-            val message = "Hello world!"
-            testFile.write(HttpContent.Text(message, ContentType.Text.Plain))
-            assertContains(testFile.parent!!.list()!!.also { println(it) }, testFile)
+            withTimeout(10_000L) {
+                val testFile = system.root.resolve("test.txt")
+                val message = "Hello world!"
+                testFile.write(HttpContent.Text(message, ContentType.Text.Plain))
+                val testFileNotIncluded = system.root.resolve("doNotInclude/test.txt")
+                testFileNotIncluded.write(HttpContent.Text(message, ContentType.Text.Plain))
+                assertContains(testFile.parent!!.list()!!.also { println(it) }, testFile)
+                assertFalse(testFileNotIncluded in testFile.parent!!.list()!!)
+            }
         }
     }
 

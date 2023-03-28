@@ -31,6 +31,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
                 val r = system.s3Async.listObjectsV2 {
                     it.bucket(system.bucket)
                     it.prefix(path.unixPath)
+                    it.delimiter("/")
                     token?.let { t -> it.continuationToken(t) }
                 }.await()
                 results += r.contents().filter { !it.key().substringAfter(path.toString()).contains('/') }
