@@ -27,7 +27,7 @@ suspend fun HttpResponse.statusFailing(): HttpResponse {
 
 suspend inline fun <reified T> HttpResponse.debugJsonBody(): T {
     val text = bodyAsText()
-    println("Got response ${status} with data $text")
+    logger.debug("Got response ${status} with data $text")
     return Serialization.json.decodeFromString(text)
 }
 

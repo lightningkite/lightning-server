@@ -86,7 +86,7 @@ class Sftp(
             system.withClient {
                 this.stat(path.path)?.let {
                     FileInfo(
-                        type = path.extension.let { println("Extension is $it"); ContentType.fromExtension(it).also { println(it) } },
+                        type = path.extension.let { ContentType.fromExtension(it) },
                         size = it.size,
                         lastModified = Instant.ofEpochSecond(it.mtime)
                     )

@@ -62,9 +62,9 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
                 }
             }
         }
-        Metrics.logger.info("Sending reports...")
+        Metrics.logger.debug("Sending reports...")
         jobs.forEach { it.join() }
-        Metrics.logger.info("Reports sent.")
+        Metrics.logger.debug("Reports sent.")
         Unit
     }
 

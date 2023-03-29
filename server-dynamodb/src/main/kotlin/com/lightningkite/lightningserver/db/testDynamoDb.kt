@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.db
 
+import com.lightningkite.lightningserver.logger
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.regions.Region
@@ -17,7 +18,7 @@ fun embeddedDynamo(port: Int = 7999): DynamoDbAsyncClient {
     existingDynamo?.let { return it }
     if(!localFolder.exists()) {
         localFolder.mkdirs()
-        println("Downloading local DynamoDB...")
+        logger.info("Downloading local DynamoDB...")
         ZipInputStream(url.openStream()).use {
             while(true) {
                 val next = it.nextEntry ?: break
@@ -33,7 +34,7 @@ fun embeddedDynamo(port: Int = 7999): DynamoDbAsyncClient {
                 it.closeEntry()
             }
         }
-        println("Download complete.")
+        logger.info("Download complete.")
     }
     val server = ProcessBuilder()
         .directory(localFolder)

@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
+import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.logging.loggingSettings
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.metrics.metricsCleanSchedule
@@ -27,7 +28,7 @@ object Settings {
         }
         if(!lazyLoadResources)
             requirements.values.forEach {
-                println("Loading setting ${it.name}...")
+                logger.debug("Loading setting ${it.name}...")
                 it()
             }
     }

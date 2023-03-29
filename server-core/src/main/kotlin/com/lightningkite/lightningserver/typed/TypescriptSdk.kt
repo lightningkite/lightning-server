@@ -1,5 +1,3 @@
-@file:OptIn(InternalSerializationApi::class)
-
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.*
@@ -20,6 +18,7 @@ import java.io.File
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
+@OptIn(InternalSerializationApi::class)
 fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     val safeDocumentables = endpoints.filter { it.inputType == Unit.serializer() || it.route.method != HttpMethod.GET }.toList()
     appendLine("import { ${fromLightningServerPackage.joinToString()}, apiCall, Path } from '@lightningkite/lightning-server-simplified'")
