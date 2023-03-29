@@ -12,7 +12,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import java.time.Duration
 
-object FileRedirectHandler: Serialization.HttpContentHandler {
+object FileRedirectHandler : Serialization.HttpContentHandler {
     override val contentType: ContentType = ContentType.Text.UriList
 
     override suspend fun <T> invoke(content: HttpContent, serializer: KSerializer<T>): T {
@@ -28,7 +28,10 @@ object FileRedirectHandler: Serialization.HttpContentHandler {
     override suspend fun <T> invoke(contentType: ContentType, serializer: KSerializer<T>, value: T): HttpContent {
         val subtype = contentType.parameters["subtype"]?.let { ContentType(it) } ?: ContentType.Application.Json
         val basis = Serialization.emitters[subtype] ?: throw BadRequestException("No parser found for type ${subtype}.")
-        val file = ExternalServerFileSerializer.fileSystem().root.resolveRandom("temp-download/", basis.contentType.extension ?: "")
+        val file = ExternalServerFileSerializer.fileSystem().root.resolveRandom(
+            "temp-download/",
+            basis.contentType.extension ?: ""
+        )
         file.write(basis.invoke(subtype, serializer, value))
         return HttpContent.Text(file.signedUrl + "\r\n", contentType)
     }

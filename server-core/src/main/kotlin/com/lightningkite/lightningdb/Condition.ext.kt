@@ -1,6 +1,5 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.khrysalis.IsCodableAndHashable
 import kotlin.reflect.KProperty1
 
 
@@ -31,7 +30,7 @@ fun Modification<*>.referencesField(field: KProperty1<*, *>): Boolean = when (th
     is Modification.IfNotNull -> modification.referencesField(field)
     is Modification.SetPerElement<*> -> condition.referencesField(field)
     is Modification.ListPerElement<*> -> condition.referencesField(field)
-    is Modification.ModifyByKey<*> -> map.values.any {it.referencesField(field)}
+    is Modification.ModifyByKey<*> -> map.values.any { it.referencesField(field) }
     is Modification.OnField<*, *> -> this.key.name == field.name || modification.referencesField(field)
     else -> false
 }
@@ -54,8 +53,10 @@ fun <T, V> Condition<T>.forFieldOrNull(field: KProperty1<T, V>): Condition<V>? {
     return when (this) {
         is Condition.And -> conditions.mapNotNull { it.forFieldOrNull(field) }.takeUnless { it.isEmpty() }
             ?.let { Condition.And(it) }
+
         is Condition.Or -> conditions.mapNotNull { it.forFieldOrNull(field) }.takeUnless { it.isEmpty() }
             ?.let { Condition.Or(it) }
+
         is Condition.Not -> condition.forFieldOrNull(field)?.let { Condition.Not(it) }
         is Condition.OnField<*, *> -> if (this.key == field) this.condition as Condition<V> else null
         else -> null
@@ -82,6 +83,7 @@ fun <T> Condition<T>.probablySingleResult(): Boolean = when (this) {
         is Condition.Inside -> c.values.size <= 1
         else -> false
     }
+
     is Condition.Or -> conditions.all { it.probablySingleResult() }
     is Condition.And -> conditions.any { it.probablySingleResult() }
     else -> false

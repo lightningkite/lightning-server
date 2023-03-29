@@ -17,9 +17,9 @@ import kotlinx.serialization.Serializable
 data class NotificationSettings(
     val implementation: String = "console",
     val credentials: String? = null
-): ()->NotificationInterface {
+) : () -> NotificationInterface {
 
-    companion object: Pluggable<NotificationSettings, NotificationInterface>() {
+    companion object : Pluggable<NotificationSettings, NotificationInterface>() {
         init {
             register("console") { ConsoleNotificationInterface }
         }

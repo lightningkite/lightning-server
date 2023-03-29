@@ -15,13 +15,14 @@ object WebSockets {
         _matcher = null
     }
     private var _matcher: ServerPathMatcher? = null
-    val matcher: ServerPathMatcher get() {
-        return _matcher ?: run {
-            val created = ServerPathMatcher(handlers.keys.asSequence())
-            _matcher = created
-            created
+    val matcher: ServerPathMatcher
+        get() {
+            return _matcher ?: run {
+                val created = ServerPathMatcher(handlers.keys.asSequence())
+                _matcher = created
+                created
+            }
         }
-    }
 
     data class ConnectEvent(
         val path: ServerPath,
@@ -112,7 +113,7 @@ suspend fun ServerPath.test(
                         }
                     )
                 )
-            } catch(e: Exception) {
+            } catch (e: Exception) {
                 error = e
             }
             println("$id Disconnecting...")

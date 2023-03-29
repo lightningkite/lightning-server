@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningserver.bytes.toHexString
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.serialization.KSerializer
@@ -56,7 +55,10 @@ interface SecureHasher {
     }
 
     class HS256(val secret: ByteArray) : SecureHasher {
-        init { SecureHasher }
+        init {
+            SecureHasher
+        }
+
         override val name: String = "HS256"
         override fun sign(bytes: ByteArray): ByteArray {
             return Mac.getInstance("HmacSHA256").apply {
@@ -66,7 +68,10 @@ interface SecureHasher {
     }
 
     class ECDSA256(privateKey: String) : SecureHasher {
-        init { SecureHasher }
+        init {
+            SecureHasher
+        }
+
         override val name: String = "ECDSA256"
         private val factory = KeyFactory.getInstance("ECDSA", "BC")
         val pk = factory.generatePrivate(
@@ -119,10 +124,12 @@ fun <T> Json.encodeJwt(
     issuer: String = generalSettings().publicUrl,
     audience: String? = generalSettings().publicUrl,
     issuedAt: Instant = Instant.now(),
-): String = encodeJwt(hasher, if (serializer.isPrimitive())
-    (encodeToJsonElement(serializer, subject) as JsonPrimitive).content
-else
-    encodeToString(serializer, subject), expire, issuer, audience, issuedAt)
+): String = encodeJwt(
+    hasher, if (serializer.isPrimitive())
+        (encodeToJsonElement(serializer, subject) as JsonPrimitive).content
+    else
+        encodeToString(serializer, subject), expire, issuer, audience, issuedAt
+)
 
 fun <T> Json.decodeJwt(
     hasher: SecureHasher,
@@ -148,7 +155,9 @@ fun Json.encodeJwt(
     issuedAt: Instant = Instant.now(),
 ): String = buildString {
     val withDefaults = Json(this@encodeJwt) { encodeDefaults = true; explicitNulls = false }
-    append(Base64.getUrlEncoder().withoutPadding().encodeToString(withDefaults.encodeToString(JwtHeader()).toByteArray()))
+    append(
+        Base64.getUrlEncoder().withoutPadding().encodeToString(withDefaults.encodeToString(JwtHeader()).toByteArray())
+    )
     append('.')
     append(
         Base64.getUrlEncoder().withoutPadding().encodeToString(
@@ -208,8 +217,8 @@ private fun KSerializer<*>.isPrimitive(): Boolean {
 }
 
 internal fun BigInteger.signed32(): ByteArray {
-    return if(this >= BigInteger.ONE.shiftLeft(32*8-1)) {
-        (this - BigInteger.ONE.shiftLeft(32*8)).toByteArray().let {
+    return if (this >= BigInteger.ONE.shiftLeft(32 * 8 - 1)) {
+        (this - BigInteger.ONE.shiftLeft(32 * 8)).toByteArray().let {
             ByteArray(32 - it.size) { 0xFF.toByte() } + it
         }
     } else {
@@ -218,10 +227,11 @@ internal fun BigInteger.signed32(): ByteArray {
         }
     }
 }
+
 internal fun fromSigned32(array: ByteArray): BigInteger {
     var raw = BigInteger(array)
-    if(raw < BigInteger.ZERO) {
-        raw += BigInteger.ONE.shiftLeft(32*8)
+    if (raw < BigInteger.ZERO) {
+        raw += BigInteger.ONE.shiftLeft(32 * 8)
     }
     return raw
 }

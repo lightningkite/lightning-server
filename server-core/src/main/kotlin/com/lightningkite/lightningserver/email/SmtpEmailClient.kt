@@ -2,12 +2,10 @@ package com.lightningkite.lightningserver.email
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.apache.commons.mail.DefaultAuthenticator
 import org.apache.commons.mail.EmailAttachment
 import org.apache.commons.mail.HtmlEmail
 import org.apache.commons.mail.MultiPartEmail
 import org.apache.commons.mail.SimpleEmail
-import javax.mail.Authenticator
 
 /**
  * An email client that will send real emails through SMTP.
@@ -28,13 +26,14 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
                 multiPart.setMsg(message)
                 attachments.forEach {
                     val attachment = EmailAttachment()
-                    attachment.disposition = if(it.inline) EmailAttachment.INLINE else EmailAttachment.ATTACHMENT
+                    attachment.disposition = if (it.inline) EmailAttachment.INLINE else EmailAttachment.ATTACHMENT
                     attachment.description = it.description
                     attachment.name = it.name
                     when (it) {
                         is Attachment.Remote -> {
                             attachment.url = it.url
                         }
+
                         is Attachment.Local -> {
                             attachment.path = it.file.absolutePath
                         }
@@ -43,18 +42,19 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
                 }
                 multiPart
             }
-        } else{
+        } else {
             val email = HtmlEmail()
             email.setHtmlMsg(htmlMessage)
             attachments.forEach {
                 val attachment = EmailAttachment()
-                attachment.disposition = if(it.inline) EmailAttachment.INLINE else EmailAttachment.ATTACHMENT
+                attachment.disposition = if (it.inline) EmailAttachment.INLINE else EmailAttachment.ATTACHMENT
                 attachment.description = it.description
                 attachment.name = it.name
                 when (it) {
                     is Attachment.Remote -> {
                         attachment.url = it.url
                     }
+
                     is Attachment.Local -> {
                         attachment.path = it.file.absolutePath
                     }

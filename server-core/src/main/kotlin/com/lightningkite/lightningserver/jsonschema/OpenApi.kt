@@ -14,7 +14,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 data class OpenApiRoot(
@@ -215,9 +214,10 @@ val openApiDescription: OpenApiRoot by lazy {
             mapOf("param" to listOf()),
             mapOf("cookie" to listOf()),
         ),
-        paths = Documentable.endpoints.filter { it.route.method != HttpMethod.GET || it.inputType == Unit.serializer() }.groupBy {
-            it.path.toString()
-        }.mapValues {
+        paths = Documentable.endpoints.filter { it.route.method != HttpMethod.GET || it.inputType == Unit.serializer() }
+            .groupBy {
+                it.path.toString()
+            }.mapValues {
             OpenApiPath(
                 parameters = it.value.first().routeTypes.map {
                     OpenApiParameter(

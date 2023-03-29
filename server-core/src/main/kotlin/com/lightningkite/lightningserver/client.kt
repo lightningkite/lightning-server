@@ -10,6 +10,11 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.decodeFromString
 
+
+/**
+ * This is an HttpClient. There are many times when the server will need to make an external call
+ * and this is the provided default option to do so.
+ */
 val client = HttpClient(CIO) {
     install(ContentNegotiation) {
         json(Serialization.jsonWithoutDefaults)
@@ -19,12 +24,23 @@ val client = HttpClient(CIO) {
     }
 }
 
-class HttpResponseException(val response: HttpResponse, val body: String): Exception("Got response ${response.status}: ${body.take(300)}")
+/**
+ * HttpResponseException is an exception that handles external request error messages.
+ */
+class HttpResponseException(val response: HttpResponse, val body: String) :
+    Exception("Got response ${response.status}: ${body.take(300)}")
+
+/**
+ * Checks the HttpResponse code and if it is not a success code it will throw an HttpResponseException
+ */
 suspend fun HttpResponse.statusFailing(): HttpResponse {
     if (!this.status.isSuccess()) throw HttpResponseException(this, bodyAsText())
     return this
 }
 
+/**
+ * Returns T from the HttpResponse body, but will also print the body before deserializing it into T.
+ */
 suspend inline fun <reified T> HttpResponse.debugJsonBody(): T {
     val text = bodyAsText()
     logger.debug("Got response ${status} with data $text")

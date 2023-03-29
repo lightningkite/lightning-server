@@ -1,6 +1,9 @@
 package com.lightningkite.lightningserver.utils
 
-internal class MutableMapWithChangeHandler<K, V>(val wraps: MutableMap<K, V> = mutableMapOf(), val onChange: ()->Unit): MutableMap<K, V> {
+internal class MutableMapWithChangeHandler<K, V>(
+    val wraps: MutableMap<K, V> = mutableMapOf(),
+    val onChange: () -> Unit
+) : MutableMap<K, V> {
     override val entries: MutableSet<MutableMap.MutableEntry<K, V>> get() = wraps.entries  // TODO: Handle mutation at this level
     override val keys: MutableSet<K> get() = wraps.keys  // TODO: Handle mutation at this level
     override val values: MutableCollection<V> get() = wraps.values  // TODO: Handle mutation at this level

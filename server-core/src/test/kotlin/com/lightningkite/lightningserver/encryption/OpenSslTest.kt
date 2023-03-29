@@ -1,11 +1,10 @@
 package com.lightningkite.lightningserver.encryption
 
-import org.junit.Assert.*
 import org.junit.Test
-import java.io.File
 
 class OpenSslTest {
-    @Test fun test() {
+    @Test
+    fun test() {
         // This freaking test won't do it's job.
         // It's the command that it runs.  Tested manually, it works great.
 //        val testFile = File("build/test.txt")

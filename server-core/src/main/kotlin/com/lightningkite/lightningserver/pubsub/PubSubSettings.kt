@@ -8,8 +8,8 @@ import kotlinx.serialization.Serializable
 data class PubSubSettings(
     val url: String = "local",
     @SerialName("uri") val legacyUri: String? = null,
-): ()->PubSub {
-    companion object: Pluggable<PubSubSettings, PubSub>() {
+) : () -> PubSub {
+    companion object : Pluggable<PubSubSettings, PubSub>() {
         init {
             register("local") { LocalPubSub }
         }

@@ -15,6 +15,7 @@ fun ByteArray.decryptAesCbcPkcs5(key: ByteArray, iv: ByteArray): ByteArray {
     )
     return cipher.doFinal(this)
 }
+
 fun ByteArray.encryptAesCbcPkcs5(key: ByteArray, iv: ByteArray): ByteArray {
     val cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING")
     cipher.init(
@@ -26,9 +27,13 @@ fun ByteArray.encryptAesCbcPkcs5(key: ByteArray, iv: ByteArray): ByteArray {
 }
 
 object OpenSsl {
-    @Deprecated("Deprecated due to bad naming, use new location", ReplaceWith("OpenSsl.decryptAesCbcPkcs5Sha256(bytes, secretKeyClear)"))
-    fun decrypt(secretKeyClear: ByteArray, bytes: ByteArray): ByteArray
-        = decryptAesCbcPkcs5Sha256(bytes, secretKeyClear)
+    @Deprecated(
+        "Deprecated due to bad naming, use new location",
+        ReplaceWith("OpenSsl.decryptAesCbcPkcs5Sha256(bytes, secretKeyClear)")
+    )
+    fun decrypt(secretKeyClear: ByteArray, bytes: ByteArray): ByteArray =
+        decryptAesCbcPkcs5Sha256(bytes, secretKeyClear)
+
     fun decryptAesCbcPkcs5Sha256(bytes: ByteArray, password: ByteArray): ByteArray {
         var cipherBytes: ByteArray = bytes
         val salt = cipherBytes.copyOfRange(8, 16)
@@ -42,6 +47,7 @@ object OpenSsl {
         ) // Decrypt
         return cipherBytes.decryptAesCbcPkcs5(key, iv)
     }
+
     fun decryptAesCbcPkcs5md5(bytes: ByteArray, password: ByteArray): ByteArray {
         var cipherBytes: ByteArray = bytes
         val salt = cipherBytes.copyOfRange(8, 16)

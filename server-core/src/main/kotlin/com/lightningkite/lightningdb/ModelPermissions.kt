@@ -12,22 +12,25 @@ data class ModelPermissions<Model>(
     val maxQueryTimeMs: Long = 1_000L
 ) {
     companion object {
-        fun <Model> allowAll():ModelPermissions<Model> = ModelPermissions(
+        fun <Model> allowAll(): ModelPermissions<Model> = ModelPermissions(
             create = Condition.Always(),
             read = Condition.Always(),
             update = Condition.Always(),
             delete = Condition.Always(),
         )
     }
+
     data class Read<Model, Field>(
         val property: KProperty1<Model, Field>,
         val condition: Condition<Model>,
         val mask: Field
     )
+
     data class Update<Model, Field>(
         val property: KProperty1<Model, Field>,
         val condition: Condition<Model>
     )
+
     constructor(
         create: Condition<Model>,
         read: Condition<Model>,
@@ -35,15 +38,21 @@ data class ModelPermissions<Model>(
         update: Condition<Model>,
         delete: Condition<Model>,
         maxQueryTimeMs: Long = 1_000L
-    ):this(
+    ) : this(
         create = create,
         read = read,
-        readMask = Mask(readFields.values.map { it.condition to Modification.OnField(it.property, Modification.Assign(it.mask)) }),
+        readMask = Mask(readFields.values.map {
+            it.condition to Modification.OnField(
+                it.property,
+                Modification.Assign(it.mask)
+            )
+        }),
         update = update,
         updateRestrictions = UpdateRestrictions(listOf()),
         delete = delete,
         maxQueryTimeMs = maxQueryTimeMs,
     )
+
     constructor(
         create: Condition<Model>,
         read: Condition<Model>,
@@ -52,12 +61,24 @@ data class ModelPermissions<Model>(
         updateFields: Map<KProperty1<Model, *>, Update<Model, *>>,
         delete: Condition<Model>,
         maxQueryTimeMs: Long = 1_000L
-    ):this(
+    ) : this(
         create = create,
         read = read,
-        readMask = Mask(readFields.values.map { it.condition to Modification.OnField(it.property, Modification.Assign(it.mask)) }),
+        readMask = Mask(readFields.values.map {
+            it.condition to Modification.OnField(
+                it.property,
+                Modification.Assign(it.mask)
+            )
+        }),
         update = update,
-        updateRestrictions = UpdateRestrictions(updateFields.values.map { Triple(Modification.OnField(it.property, Modification.Assign(null)), it.condition, Condition.Always()) }),
+        updateRestrictions = UpdateRestrictions(updateFields.values.map {
+            Triple(
+                Modification.OnField(
+                    it.property,
+                    Modification.Assign(null)
+                ), it.condition, Condition.Always()
+            )
+        }),
         delete = delete,
         maxQueryTimeMs = maxQueryTimeMs,
     )

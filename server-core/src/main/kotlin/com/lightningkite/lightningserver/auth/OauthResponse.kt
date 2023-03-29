@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningserver.routes.fullUrl
 import kotlinx.serialization.Serializable
 import java.util.*
 

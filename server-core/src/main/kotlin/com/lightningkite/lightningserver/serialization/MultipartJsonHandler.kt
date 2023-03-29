@@ -14,8 +14,9 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.json.*
 
-class MultipartJsonHandler(val json: ()-> Json): Serialization.HttpContentParser {
+class MultipartJsonHandler(val json: () -> Json) : Serialization.HttpContentParser {
     override val contentType: ContentType = ContentType.MultiPart.FormData
+
     companion object {
         private const val multipartJsonKey = "__json"
     }
@@ -32,6 +33,7 @@ class MultipartJsonHandler(val json: ()-> Json): Serialization.HttpContentParser
                         baselineJson = json().parseToJsonElement(part.value)
                     }
                 }
+
                 is HttpContent.Multipart.Part.DataItem -> {
                     if (part.filename.isBlank()) return@collect
                     val path = part.key.split('.')

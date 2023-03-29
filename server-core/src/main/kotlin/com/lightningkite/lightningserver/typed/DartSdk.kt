@@ -2,17 +2,17 @@
 
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningdb.MySealedClassSerializerInterface
+import com.lightningkite.lightningdb.listElement
+import com.lightningkite.lightningdb.mapValueElement
 import com.lightningkite.lightningserver.camelCase
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.HttpMethod
-import io.ktor.http.*
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.internal.GeneratedSerializer
-import java.util.*
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
@@ -403,7 +403,7 @@ private fun KSerializer<*>.write(): String = if (this == Unit.serializer()) "voi
 }.toString()
 
 private fun KSerializer<*>.writeSerialize(on: String): String = StringBuilder().also { out ->
-    if(this.descriptor.simpleSerialName in skipSet) {
+    if (this.descriptor.simpleSerialName in skipSet) {
         out.append(on)
         return@also
     }
@@ -420,13 +420,13 @@ private fun KSerializer<*>.writeSerialize(on: String): String = StringBuilder().
 
         StructureKind.LIST -> {
             out.append(on)
-            if(descriptor.isNullable) out.append("?.") else out.append(".")
+            if (descriptor.isNullable) out.append("?.") else out.append(".")
             out.append("map((e) => ${this.listElement()!!.writeSerialize("e")}).toList()")
         }
 
         StructureKind.MAP -> {
             out.append(on)
-            if(descriptor.isNullable) out.append("?.") else out.append(".")
+            if (descriptor.isNullable) out.append("?.") else out.append(".")
             out.append("map((k, v) => MapEntry(k, ${this.mapValueElement()!!.writeSerialize("e")}))")
         }
 
@@ -445,7 +445,7 @@ private fun KSerializer<*>.writeSerialize(on: String): String = StringBuilder().
 }.toString()
 
 private fun KSerializer<*>.writeParse(on: String): String = StringBuilder().also { out ->
-    if(this.descriptor.simpleSerialName in skipSet) {
+    if (this.descriptor.simpleSerialName in skipSet) {
         out.append("($on as ${write()})")
         return@also
     }
@@ -473,12 +473,12 @@ private fun KSerializer<*>.writeParse(on: String): String = StringBuilder().also
         }
 
         StructureKind.LIST -> {
-            if(descriptor.isNullable) out.append("($on as List<dynamic>?)?.") else out.append("($on as List<dynamic>).")
+            if (descriptor.isNullable) out.append("($on as List<dynamic>?)?.") else out.append("($on as List<dynamic>).")
             out.append("map((e) => ${this.listElement()!!.writeParse("e")}).toList()")
         }
 
         StructureKind.MAP -> {
-            if(descriptor.isNullable) out.append("($on as Map<String, dynamic>?)?.") else out.append("($on as Map<String, dynamic>).")
+            if (descriptor.isNullable) out.append("($on as Map<String, dynamic>?)?.") else out.append("($on as Map<String, dynamic>).")
             out.append("map((k, v) => MapEntry(k, ${this.mapValueElement()!!.writeParse("v")}))")
         }
 

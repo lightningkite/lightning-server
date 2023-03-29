@@ -1,9 +1,8 @@
 package com.lightningkite.lightningdb
 
-import kotlinx.coroutines.InternalCoroutinesApi
+import com.lightningkite.khrysalis.IsCodableAndHashableNotNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
-import com.lightningkite.khrysalis.IsCodableAndHashableNotNull
 import kotlin.reflect.KProperty1
 
 data class QuerySet<Model : Any>(

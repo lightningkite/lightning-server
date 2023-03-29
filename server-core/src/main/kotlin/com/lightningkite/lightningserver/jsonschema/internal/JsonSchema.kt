@@ -1,9 +1,9 @@
 package com.lightningkite.lightningserver.jsonschema.internal
 
+import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.jsonschema.JsonType
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningdb.*
-import kotlinx.serialization.*
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.json.*
 import java.time.Instant
@@ -23,9 +23,10 @@ internal val SerialDescriptor.jsonType: JsonType
         PolymorphicKind.SEALED -> JsonType.OBJECT_SEALED
         PrimitiveKind.BYTE, PrimitiveKind.SHORT, PrimitiveKind.INT, PrimitiveKind.LONG,
         PrimitiveKind.FLOAT, PrimitiveKind.DOUBLE -> JsonType.NUMBER
+
         PrimitiveKind.STRING, PrimitiveKind.CHAR, SerialKind.ENUM -> JsonType.STRING
         PrimitiveKind.BOOLEAN -> JsonType.BOOLEAN
-        SerialKind.CONTEXTUAL -> Serialization.module.getContextualDescriptor(if(this is LazyRenamedSerialDescriptor) this.getter() else this)!!.jsonType
+        SerialKind.CONTEXTUAL -> Serialization.module.getContextualDescriptor(if (this is LazyRenamedSerialDescriptor) this.getter() else this)!!.jsonType
         else -> JsonType.OBJECT
     }
 
@@ -162,7 +163,7 @@ internal fun SerialDescriptor.jsonSchemaString(
         val pattern = annotations.lastOfInstance<ExpectedPattern>()?.pattern ?: ""
         val format = annotations.lastOfInstance<JsonSchemaFormat>()?.format
 
-        when(this.capturedKClass) {
+        when (this.capturedKClass) {
             Instant::class -> {
                 return jsonSchemaElement(annotations) {
                     it["format"] = "datetime-local"
@@ -201,11 +202,13 @@ internal fun SerialDescriptor.jsonSchemaString(
                     }
                 }
             }
+
             LocalDate::class -> {
                 return jsonSchemaElement(annotations) {
                     it["format"] = "date"
                 }
             }
+
             LocalTime::class -> {
                 return jsonSchemaElement(annotations) {
                     it["format"] = "time"
@@ -231,9 +234,11 @@ internal fun SerialDescriptor.jsonSchemaNumber(
             PrimitiveKind.FLOAT, PrimitiveKind.DOUBLE -> annotations
                 .lastOfInstance<FloatRange>()
                 ?.let { it.min as Number to it.max as Number }
+
             PrimitiveKind.BYTE, PrimitiveKind.SHORT, PrimitiveKind.INT, PrimitiveKind.LONG -> annotations
                 .lastOfInstance<IntegerRange>()
                 ?.let { it.min as Number to it.max as Number }
+
             else -> error("$kind is not a Number")
         }
 
@@ -282,9 +287,11 @@ internal fun SerialDescriptor.createJsonSchema(
     annotations: List<Annotation>,
     definitions: JsonSchemaDefinitions
 ): JsonObject {
-    if(this.kind == SerialKind.CONTEXTUAL) {
-        val contextual = (Serialization.module.getContextualDescriptor(if(this is LazyRenamedSerialDescriptor) this.getter() else this) ?: throw IllegalStateException("Contextual missing for $this"))
-        if(this.isNullable)
+    if (this.kind == SerialKind.CONTEXTUAL) {
+        val contextual =
+            (Serialization.module.getContextualDescriptor(if (this is LazyRenamedSerialDescriptor) this.getter() else this)
+                ?: throw IllegalStateException("Contextual missing for $this"))
+        if (this.isNullable)
             SerialDescriptorForNullable(contextual).createJsonSchema(annotations, definitions)
         else
             contextual.createJsonSchema(annotations, definitions)
@@ -326,7 +333,7 @@ internal fun JsonObjectBuilder.applyJsonSchemaDefaults(
     if (annotations.isNotEmpty()) {
         val description = annotations
             .filterIsInstance<Description>()
-            .joinToString("\n") {it.text}
+            .joinToString("\n") { it.text }
 
         if (description.isNotEmpty()) {
             this["description"] = description
@@ -376,7 +383,8 @@ internal class JsonSchemaDefinitions(private val isEnabled: Boolean = true) {
         return annotations
             .lastOfInstance<JsonSchemaDefinition>()?.id
             ?.takeIf(String::isNotEmpty)
-            ?: (descriptor.serialName.filter { it.isLetterOrDigit() } + (descriptor.hashCode().toLong() xor annotations.hashCode().toLong())
+            ?: (descriptor.serialName.filter { it.isLetterOrDigit() } + (descriptor.hashCode()
+                .toLong() xor annotations.hashCode().toLong())
                 .absoluteValue
                 .toString(36)
                 .take(3))

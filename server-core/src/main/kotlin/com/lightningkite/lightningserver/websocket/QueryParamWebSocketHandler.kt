@@ -17,9 +17,10 @@ class QueryParamWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
             WebSockets.handlers[match.path] ?: throw NotFoundException("No web socket handler found for '$other'")
         cache().set("${event.id}-path", match.path.toString())
         val fixedQueryParameters = event.queryParameters.mapNotNull {
-            if(it.first == "path") {
-                if(it.second.contains('?'))
-                    it.second.substringAfter('?').substringBefore('=') to it.second.substringAfter('?').substringAfter('=')
+            if (it.first == "path") {
+                if (it.second.contains('?'))
+                    it.second.substringAfter('?').substringBefore('=') to it.second.substringAfter('?')
+                        .substringAfter('=')
                 else
                     null
             } else it

@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.websocket
 
 import com.lightningkite.lightningdb.MultiplexMessage
-import com.lightningkite.lightningserver.cache.CacheHandle
 import com.lightningkite.lightningserver.cache.Cache
+import com.lightningkite.lightningserver.cache.CacheHandle
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.NotFoundException
@@ -71,13 +71,14 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                 domain = event.domain,
                 protocol = event.protocol,
                 sourceIp = event.sourceIp,
-                headers = event.headers.entries + (event.queryParameter("jwt")?.let { listOf("Authorization" to it) } ?: listOf())
+                headers = event.headers.entries + (event.queryParameter("jwt")?.let { listOf("Authorization" to it) }
+                    ?: listOf())
             )
         )
     }
 
     override suspend fun message(event: WebSockets.MessageEvent) {
-        if(event.content.isBlank()) {
+        if (event.content.isBlank()) {
             event.id.send("")
             return
         }
@@ -98,7 +99,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                 }
                 val match = message.path?.let { WebSockets.matcher.match(it) }
                 val otherHandler = match?.path?.let { WebSockets.handlers[it] }
-                if(match == null || otherHandler == null) {
+                if (match == null || otherHandler == null) {
                     event.id.send(
                         Serialization.json.encodeToString(
                             MultiplexMessage(
@@ -160,7 +161,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
             message.end -> {
                 val path = path(event.id, message.channel).get()?.let(::ServerPath)
                 val otherHandler = WebSockets.handlers[path]
-                if(path == null || otherHandler == null) {
+                if (path == null || otherHandler == null) {
                     event.id.send(
                         Serialization.json.encodeToString(
                             MultiplexMessage(
@@ -209,7 +210,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
             message.data != null -> {
                 val path = path(event.id, message.channel).get()?.let(::ServerPath)
                 val otherHandler = WebSockets.handlers[path]
-                if(path == null || otherHandler == null) {
+                if (path == null || otherHandler == null) {
                     event.id.send(
                         Serialization.json.encodeToString(
                             MultiplexMessage(

@@ -1,21 +1,14 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.client
-import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.encodeToFormData
 import com.lightningkite.lightningserver.serialization.parse
-import com.lightningkite.lightningserver.serialization.queryParameters
-import com.lightningkite.lightningserver.statusFailing
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
-import io.ktor.util.*
 import kotlinx.serialization.Serializable
-import java.util.*
 
 /**
  * A shortcut function that sets up OAuth for Google accounts specifically.
@@ -27,10 +20,10 @@ import java.util.*
  * 'Authorized redirect URIs' are your auth url + /oauth/google/callback
  *
  */
-class OauthGoogleEndpoints<USER: Any, ID>(
+class OauthGoogleEndpoints<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val access: UserExternalServiceAccess<USER, ID>,
-    val setting: ()->OauthProviderCredentials,
+    val setting: () -> OauthProviderCredentials,
     override val scope: String = "https://www.googleapis.com/auth/userinfo.email"
 ) : ServerPathGroup(base.path.path("oauth/google")), OauthMixin {
     override val niceName = "Google"
@@ -53,7 +46,7 @@ class OauthGoogleEndpoints<USER: Any, ID>(
         }.body()
         val idResults = ExternalServiceLogin(
             service = niceName,
-            email = if(response2.verified_email) response2.email else null,
+            email = if (response2.verified_email) response2.email else null,
         )
         base.redirectToLanding(access.byExternalService(idResults))
     }

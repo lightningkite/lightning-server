@@ -24,7 +24,7 @@ interface Metrics {
         val main get() = metricsSettings
         val logger = LoggerFactory.getLogger(Metrics::class.java)
         val toReport = ConcurrentLinkedQueue<MetricEvent>()
-        var shouldAllowAccess: suspend (HttpRequest)->Boolean = { false }
+        var shouldAllowAccess: suspend (HttpRequest) -> Boolean = { false }
 
         init {
             Tasks.onEngineReady {
@@ -43,7 +43,7 @@ interface Metrics {
         }
 
         suspend fun report(type: String, value: Double) {
-            if(type in metricsSettings().settings.tracked)
+            if (type in metricsSettings().settings.tracked)
                 toReport.add(MetricEvent(type, serverEntryPoint()?.toString() ?: "Unknown", Instant.now(), value))
         }
 

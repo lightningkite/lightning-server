@@ -12,6 +12,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> Mo
     override fun collection(): FieldCollection<T> = getCollection()
     override suspend fun collection(principal: USER): FieldCollection<T> =
         this.collection().forUser(principal)
+
     override val serialization: ModelSerializationInfo<USER, T, ID> = ModelSerializationInfo()
     override val collectionName: String = modelName
 }
@@ -32,7 +33,9 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ModelInfo(
 
 interface ModelInfo<USER, T : HasId<ID>, ID : Comparable<ID>> {
     val serialization: ModelSerializationInfo<USER, T, ID>
-    val collectionName: String get() = serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
+    val collectionName: String
+        get() = serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
+
     fun collection(): FieldCollection<T>
     suspend fun collection(principal: USER): FieldCollection<T>
 }

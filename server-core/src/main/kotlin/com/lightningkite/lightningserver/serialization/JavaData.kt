@@ -1,18 +1,18 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.lightningserver.logger
-import kotlinx.serialization.*
-import kotlinx.serialization.descriptors.*
-import kotlinx.serialization.encoding.*
-import kotlinx.serialization.modules.*
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.io.DataInput
-import java.io.DataInputStream
-import java.io.DataOutput
-import java.io.DataOutputStream
+import kotlinx.serialization.BinaryFormat
+import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.SerializationStrategy
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.AbstractDecoder
+import kotlinx.serialization.encoding.AbstractEncoder
+import kotlinx.serialization.encoding.CompositeDecoder
+import kotlinx.serialization.encoding.CompositeEncoder
+import kotlinx.serialization.modules.SerializersModule
+import java.io.*
 
-class JavaData(override val serializersModule: SerializersModule): BinaryFormat {
+class JavaData(override val serializersModule: SerializersModule) : BinaryFormat {
     override fun <T> decodeFromByteArray(deserializer: DeserializationStrategy<T>, bytes: ByteArray): T {
         logger.debug("Decoding $deserializer from ${bytes.contentToString()}")
         return DataInputDecoder(DataInputStream(ByteArrayInputStream(bytes))).decodeSerializableValue(deserializer)
@@ -38,6 +38,7 @@ class JavaData(override val serializersModule: SerializersModule): BinaryFormat 
             output.writeShort(value.length)
             output.write(value.toByteArray(Charsets.UTF_8))
         }
+
         override fun encodeEnum(enumDescriptor: SerialDescriptor, index: Int) = output.writeInt(index)
 
         override fun beginCollection(descriptor: SerialDescriptor, collectionSize: Int): CompositeEncoder {
@@ -48,6 +49,7 @@ class JavaData(override val serializersModule: SerializersModule): BinaryFormat 
         override fun encodeNull() = encodeBoolean(false)
         override fun encodeNotNullMark() = encodeBoolean(true)
     }
+
     private inner class DataInputDecoder(val input: DataInput, var elementsCount: Int = 0) : AbstractDecoder() {
         private var elementIndex = 0
         override val serializersModule: SerializersModule get() = this@JavaData.serializersModule
@@ -62,10 +64,11 @@ class JavaData(override val serializersModule: SerializersModule): BinaryFormat 
         override fun decodeString(): String {
             val size = input.readUnsignedShort()
             val bytes = ByteArray(size)
-            for(i in 0 until size)
+            for (i in 0 until size)
                 bytes[i] = input.readByte()
             return bytes.toString(Charsets.UTF_8)
         }
+
         override fun decodeEnum(enumDescriptor: SerialDescriptor): Int = input.readInt()
 
         override fun decodeElementIndex(descriptor: SerialDescriptor): Int {

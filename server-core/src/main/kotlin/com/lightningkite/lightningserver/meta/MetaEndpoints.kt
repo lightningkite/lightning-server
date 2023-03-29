@@ -11,7 +11,8 @@ import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.adminIndex
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpResponse
-import com.lightningkite.lightningserver.jsonschema.*
+import com.lightningkite.lightningserver.jsonschema.lightningServerSchema
+import com.lightningkite.lightningserver.jsonschema.openApiDescription
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.schedule.Scheduler
@@ -19,7 +20,7 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serverhealth.healthCheck
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
-import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.typed.apiDocs
 import com.lightningkite.lightningserver.websocket.WebSockets
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -39,6 +40,7 @@ class MetaEndpoints<USER>(
             isAdmin(authInfo.tryCast(it.rawUser()) as USER)
         }
     }
+
     val root = get.handler {
         HttpResponse(body = HttpContent.Html {
             head { title("${generalSettings().projectName} - Meta Information") }
@@ -180,7 +182,9 @@ class MetaEndpoints<USER>(
     }
     val wsTester = get("ws-tester").handler {
         //language=HTML
-        HttpResponse.html(content = HtmlDefaults.basePage("""
+        HttpResponse.html(
+            content = HtmlDefaults.basePage(
+                """
             <script>
             /** @type {WebSocket | null} **/
             let ws = null
@@ -246,7 +250,9 @@ class MetaEndpoints<USER>(
             </div>
             <button type='button' onclick='clearClick()'>clear</button>
             <div id='messages'></div>
-        """.trimIndent()))
+        """.trimIndent()
+            )
+        )
     }
     val endpoints = listOf<HttpEndpoint>(
         docs,

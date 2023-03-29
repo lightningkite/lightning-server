@@ -6,7 +6,6 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
-import kotlinx.serialization.properties.decodeFromStringMap
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -36,7 +35,8 @@ fun loadSettings(settingsFile: File): Settings {
             encodeDefaults = true
             serializersModule = Serialization.module
         }
-        val suggested = settingsFile.absoluteFile.parentFile.resolve(settingsFile.nameWithoutExtension + ".suggested.json")
+        val suggested =
+            settingsFile.absoluteFile.parentFile.resolve(settingsFile.nameWithoutExtension + ".suggested.json")
         logger.error("Settings were incorrect.  Suggested updates are inside ${suggested.absolutePath}.")
         Settings.populateDefaults()
         suggested.writeText(json.encodeToString(Settings))

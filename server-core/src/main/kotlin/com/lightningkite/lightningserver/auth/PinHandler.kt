@@ -22,17 +22,21 @@ open class PinHandler(
         cache().set(attemptCacheKey(uniqueIdentifier), 0, expiration)
         return pin
     }
+
     suspend fun assert(uniqueIdentifier: String, pin: String) {
         val hashedPin = cache().get<String>(cacheKey(uniqueIdentifier))
             ?: throw NotFoundException(detail = "pin-expired", message = "PIN has expired.")
         val attempts = (cache().get<Int>(attemptCacheKey(uniqueIdentifier)) ?: 0) + 1
-        if(attempts >= maxAttempts) {
+        if (attempts >= maxAttempts) {
             cache().remove(cacheKey(uniqueIdentifier))
             cache().remove(attemptCacheKey(uniqueIdentifier))
             throw NotFoundException(detail = "pin-expired", message = "PIN has expired.")
         }
         cache().add(attemptCacheKey(uniqueIdentifier), 1)
-        if (!pin.checkHash(hashedPin)) throw BadRequestException(detail = "pin-incorrect", message ="Incorrect PIN.  ${maxAttempts - attempts} attempts remain.")
+        if (!pin.checkHash(hashedPin)) throw BadRequestException(
+            detail = "pin-incorrect",
+            message = "Incorrect PIN.  ${maxAttempts - attempts} attempts remain."
+        )
         cache().remove(cacheKey(uniqueIdentifier))
         cache().remove(attemptCacheKey(uniqueIdentifier))
     }

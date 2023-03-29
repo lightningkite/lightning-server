@@ -1,18 +1,30 @@
 package com.lightningkite.lightningserver.core
 
-import java.util.*
 
+/**
+ * Holds the content type for both an HttpRequest and an HttpResponse.
+ * To learn more about the content type standard: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
+ *
+ * All the common ContentTypes are already provided.
+ */
 class ContentType(val type: String, val subtype: String, val parameters: Map<String, String> = mapOf()) {
     constructor(string: String) : this(
         string.substringBefore('/'),
         string.substringAfter('/').takeWhile { !it.isWhitespace() && it != ';' },
-        string.substringAfter(';', "").split(";").associate { it.substringBefore('=').trim() to it.substringAfter('=').trim() }
+        string.substringAfter(';', "").split(";")
+            .associate { it.substringBefore('=').trim() to it.substringAfter('=').trim() }
     )
 
     override fun equals(other: Any?): Boolean {
         return other is ContentType && type == other.type && subtype == other.subtype
     }
-    override fun toString(): String = "$type/$subtype" + if(parameters.isEmpty()) "" else parameters.entries.joinToString(";", ";") { it.key + "=" + it.value }
+
+    override fun toString(): String =
+        "$type/$subtype" + if (parameters.isEmpty()) "" else parameters.entries.joinToString(
+            ";",
+            ";"
+        ) { it.key + "=" + it.value }
+
     override fun hashCode(): Int {
         return 48192 + (type.hashCode() shl 16) + subtype.hashCode()
     }
@@ -183,13 +195,15 @@ class ContentType(val type: String, val subtype: String, val parameters: Map<Str
         private val toFileExtension by lazy { fromFileExtension.entries.associate { it.value to it.key } }
         fun fromExtension(extension: String) = fromFileExtension[extension.lowercase()] ?: Application.OctetStream
     }
+
     val extension: String? get() = toFileExtension[this]
-    val isText: Boolean get() = when(this) {
-        Application.Json -> true
-        Application.Xml -> true
-        Application.JavaScript -> true
-        Application.ProblemJson -> true
-        Application.ProblemXml -> true
-        else -> this.type == "text"
-    }
+    val isText: Boolean
+        get() = when (this) {
+            Application.Json -> true
+            Application.Xml -> true
+            Application.JavaScript -> true
+            Application.ProblemJson -> true
+            Application.ProblemXml -> true
+            else -> this.type == "text"
+        }
 }

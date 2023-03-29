@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.auth
 
-import org.junit.Assert.*
 import org.junit.Test
 
 class SecureHasherTest {

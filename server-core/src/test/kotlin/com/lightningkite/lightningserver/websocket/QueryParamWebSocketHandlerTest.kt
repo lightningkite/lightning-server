@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.websocket
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.*
 import org.junit.Test
 
 class QueryParamWebSocketHandlerTest {
@@ -31,6 +30,7 @@ class QueryParamWebSocketHandlerTest {
             }
         }
     }
+
     @Test
     fun testAdditionalParams() {
         val first = ServerPath.root.path("first").websocket(

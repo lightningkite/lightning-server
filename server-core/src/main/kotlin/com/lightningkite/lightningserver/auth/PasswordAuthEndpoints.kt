@@ -18,8 +18,11 @@ open class PasswordAuthEndpoints<USER : Any, ID>(
         errorCases = listOf(),
         implementation = { anon: Unit, input: PasswordLogin ->
             val user = info.byUsername(input.username, input.password)
-            if(!input.password.checkHash(info.hashedPassword(user)))
-                throw BadRequestException(detail = "password-incorrect", message = "Password does not match the account.")
+            if (!input.password.checkHash(info.hashedPassword(user)))
+                throw BadRequestException(
+                    detail = "password-incorrect",
+                    message = "Password does not match the account."
+                )
             base.token(user, base.jwtSigner().expiration)
         }
     )
@@ -53,6 +56,7 @@ open class PasswordAuthEndpoints<USER : Any, ID>(
         }
         base.redirectToLanding(basis)
     }
+
     fun hash(password: String): String = password.secureHash()
 }
 

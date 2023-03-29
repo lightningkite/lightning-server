@@ -5,16 +5,7 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.http.content.*
 import io.ktor.util.cio.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.apache.commons.mail.DefaultAuthenticator
-import org.apache.commons.mail.EmailAttachment
-import org.apache.commons.mail.HtmlEmail
-import org.apache.commons.mail.MultiPartEmail
-import org.apache.commons.mail.SimpleEmail
-import javax.mail.Authenticator
 
 /**
  * An email client that will send real emails through SMTP.
@@ -31,16 +22,16 @@ class MailgunEmailClient(
         attachments: List<Attachment>
     ) {
         val parts = attachments.map {
-            when(it) {
-                is Attachment.Local -> FormPart(if(it.inline) "inline" else "attachment", ChannelProvider(
+            when (it) {
+                is Attachment.Local -> FormPart(if (it.inline) "inline" else "attachment", ChannelProvider(
                     size = it.file.length(),
-                    block = {it.file.readChannel()}
+                    block = { it.file.readChannel() }
                 ))
 
                 is Attachment.Remote -> {
                     val result = client.get(it.url)
                     val content = result.bodyAsChannel().toByteArray()
-                    FormPart(if(it.inline) "inline" else "attachment", content)
+                    FormPart(if (it.inline) "inline" else "attachment", content)
                 }
             }
         }
@@ -63,7 +54,7 @@ class MailgunEmailClient(
                 basicAuth("api", key)
             }
         )
-        if(!result.status.isSuccess())
+        if (!result.status.isSuccess())
             throw Exception("Got status ${result.status}: ${result.bodyAsText()}")
     }
 }

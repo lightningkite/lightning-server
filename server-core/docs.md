@@ -1,5 +1,7 @@
 # Ktor Batteries Server Feature Docs
-Ktor Batteries Server has a lot of nifty features. Here is a list of things to get you started, or to be used as a reference.
+
+Ktor Batteries Server has a lot of nifty features. Here is a list of things to get you started, or to be used as a
+reference.
 
 ## Server Setup
 
@@ -12,6 +14,7 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 ## Database
 
 ## FieldCollection
+
 `FieldCollection` is an abstract class for interacting with a database, and on a specific collection/table.
 
 - `FieldCollection.withPermissions()` creates a `FieldCollection` with access permissions
@@ -61,6 +64,7 @@ Ktor Batteries Server has a lot of nifty features. Here is a list of things to g
 - `postCreate()` executes code after an element is added to the collection
 
 ## Condition
+
 To test against existing data in the database, you can use a `condition`.
 
 ### Members
@@ -98,6 +102,7 @@ To test against existing data in the database, you can use a `condition`.
 - `IfNotNull()` returns true if the given value is not null
 
 ## Modification
+
 To modify existing data in the database, you can use a `modification`.
 
 ### Members
@@ -124,18 +129,21 @@ To modify existing data in the database, you can use a `modification`.
 - `DropLast()` removes the last element from a given list
 
 ## Models
+
 Models are used to access data from the `database` as well as from the body of http calls.
 
 - `@Serializable` makes a data class serializable
 - `@DatabaseModel` makes a model interchangeable with data in the database
 
 ### Interfaces
+
 You can inherit functionality from multiple pre-defined interfaces.
 
 - `HasId` provides an id
 - `HasEmail` provides an email address
 
 ## Tokens
+
 Tokens can be used to authenticate http calls across the server.
 
 - `makeToken()` creates a token
@@ -146,6 +154,7 @@ Tokens can be used to authenticate http calls across the server.
 - `getSubject()` gets a claim with the key "subject" from a validated token
 
 ## Exceptions
+
 Lightning-server provides exceptions you can use.
 
 - `ForbiddenException()` responds with an http status code of forbidden

@@ -16,7 +16,7 @@ object ConsoleNotificationInterface : NotificationInterface {
             for (target in targets) {
                 appendLine(target)
             }
-            data.notification?.let {notification ->
+            data.notification?.let { notification ->
                 appendLine("Title: ${notification.title}")
                 appendLine("Body: ${notification.body}")
                 appendLine("Image URL: ${notification.imageUrl}")

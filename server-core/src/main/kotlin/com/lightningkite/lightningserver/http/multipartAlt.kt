@@ -1,8 +1,6 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.core.ContentType
-import com.lightningkite.lightningserver.http.HttpContent
-import com.lightningkite.lightningserver.http.HttpHeaders
 import io.ktor.http.*
 import io.ktor.http.cio.*
 import io.ktor.http.cio.internals.*
@@ -12,19 +10,19 @@ import io.ktor.util.*
 import io.ktor.utils.io.*
 import io.ktor.utils.io.core.*
 import io.ktor.utils.io.jvm.javaio.*
-import io.ktor.utils.io.pool.*
 import io.ktor.utils.io.streams.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.*
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.produce
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
-import kotlinx.coroutines.flow.flow
 import java.io.*
-import java.io.EOFException
-import java.nio.*
+import java.nio.ByteBuffer
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
-import kotlin.math.min
 
 /**
  * Parse a multipart preamble
@@ -44,8 +42,8 @@ private suspend fun parsePreambleImpl(
             buffer.clear()
             val rc = input.readUntilDelimiter(CrLf, buffer)
             buffer.flip()
-            if(input.isClosedForRead) throw IOException("eh?")
-            if(buffer.startsWith(dashDash)) {
+            if (input.isClosedForRead) throw IOException("eh?")
+            if (buffer.startsWith(dashDash)) {
                 // we found the delimiter!
                 return ByteBuffer.wrap("\r\n".toByteArray() + buffer.moveToByteArray())
             } else {
@@ -435,14 +433,22 @@ public class CIOMultipartDataBase2(
 }
 
 suspend fun InputStream.toMultipartContent(type: com.lightningkite.lightningserver.core.ContentType): HttpContent.Multipart {
-    return CIOMultipartDataBase2(coroutineContext, this@toMultipartContent.toByteReadChannel(coroutineContext)).adapt(type)
+    return CIOMultipartDataBase2(coroutineContext, this@toMultipartContent.toByteReadChannel(coroutineContext)).adapt(
+        type
+    )
 }
 
 private fun io.ktor.http.ContentType.adapt(): ContentType =
-    ContentType(type = contentType, subtype = contentSubtype, parameters = this.parameters.associate { it.name to it.value })
+    ContentType(
+        type = contentType,
+        subtype = contentSubtype,
+        parameters = this.parameters.associate { it.name to it.value })
 
 private fun ContentType.adapt(): io.ktor.http.ContentType =
-    ContentType(contentType = type, contentSubtype = subtype, parameters = parameters.map { HeaderValueParam(it.key, it.value) })
+    ContentType(
+        contentType = type,
+        contentSubtype = subtype,
+        parameters = parameters.map { HeaderValueParam(it.key, it.value) })
 
 internal fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
 
@@ -456,6 +462,7 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
                             it.name ?: "",
                             it.value
                         )
+
                         is PartData.FileItem -> {
                             val h = it.headers.adapt()
                             HttpContent.Multipart.Part.DataItem(
@@ -469,6 +476,7 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
                                 )
                             )
                         }
+
                         is PartData.BinaryItem -> {
                             val h = it.headers.adapt()
                             HttpContent.Multipart.Part.DataItem(
@@ -482,6 +490,7 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
                                 )
                             )
                         }
+
                         is PartData.BinaryChannelItem -> TODO()
                     }
                 )

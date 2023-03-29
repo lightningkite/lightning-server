@@ -17,7 +17,8 @@ suspend fun <Model : Any>
  * @return The first instance of *Model* that matches the provided condition or null if nothing in the collection matches the condition.
  */
 suspend fun <Model : Any>
-        FieldCollection<Model>.findOne(condition: Condition<Model>): Model? = find(condition = condition, limit = 1).firstOrNull()
+        FieldCollection<Model>.findOne(condition: Condition<Model>): Model? =
+    find(condition = condition, limit = 1).firstOrNull()
 
 /**
  * Inserts and then returns a single instance of *Model* into the database.

@@ -1,4 +1,5 @@
 @file:UseContextualSerialization(Duration::class)
+
 package com.lightningkite.lightningserver.metrics
 
 import com.lightningkite.lightningdb.Database
@@ -21,7 +22,9 @@ data class MetricSettings(
         Duration.ofMinutes(10) to Duration.ofHours(2),
     )
 ) : () -> Metrics {
-    @Transient val tracked = trackingTotalsOnly + trackingByEntryPoint
+    @Transient
+    val tracked = trackingTotalsOnly + trackingByEntryPoint
+
     companion object : Pluggable<MetricSettings, Metrics>() {
         init {
             register("none") {
