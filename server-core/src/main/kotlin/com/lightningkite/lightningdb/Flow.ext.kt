@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
  * @param chunkSize The size of list you wish to operate on in the action.
  * @param action The action you wish to perform on a list of *Model* with size chunkSize
  */
-suspend inline fun <Model> Flow<Model>.collectChunked(chunkSize: Int, crossinline action: (List<Model>) -> Unit) {
+suspend inline fun <Model> Flow<Model>.collectChunked(chunkSize: Int, crossinline action: suspend (List<Model>) -> Unit) {
     val list = ArrayList<Model>()
     this.collect {
         list.add(it)
