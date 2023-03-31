@@ -8,15 +8,18 @@ fun <T> Modification<T>.simplify(): Modification<T> {
             (it as? Modification.Chain)?.modifications ?: listOf(it)
         }
         val lastAssignment = flattened.indexOfLast { it is Modification.Assign }
-        if(lastAssignment == -1) Modification.Chain(flattened)
+        if (lastAssignment == -1) Modification.Chain(flattened)
         else {
             var value = (flattened[lastAssignment] as Modification.Assign<T>).value
-            for(mod in flattened.subList(lastAssignment + 1, flattened.size)) {
+            for (mod in flattened.subList(lastAssignment + 1, flattened.size)) {
                 value = mod(value)
             }
             Modification.Assign(value)
         }
     } else if (this is Modification.OnField<*, *>) {
-        Modification.OnField<T, Any?>(key as KProperty1<T, Any?>, modification.simplify() as Modification<Any?>) as Modification<T>
+        Modification.OnField<T, Any?>(
+            key as KProperty1<T, Any?>,
+            modification.simplify() as Modification<Any?>
+        ) as Modification<T>
     } else this
 }

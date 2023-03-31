@@ -15,15 +15,15 @@ class TwilioSMSClient(
     override suspend fun send(to: String, message: String) {
         with(
             client.submitForm(
-            url = "https://api.twilio.com/2010-04-01/Accounts/${account}/Messages.json",
-            formParameters = Parameters.build {
-                append("From", from)
-                append("To", to)
-                append("Body", message)
-            },
-        ) {
-            basicAuth(account, key)
-        }) {
+                url = "https://api.twilio.com/2010-04-01/Accounts/${account}/Messages.json",
+                formParameters = Parameters.build {
+                    append("From", from)
+                    append("To", to)
+                    append("Body", message)
+                },
+            ) {
+                basicAuth(account, key)
+            }) {
             if (status != HttpStatusCode.Created) {
                 val result = bodyAsText()
                 logger.error(result)

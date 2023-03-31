@@ -84,12 +84,14 @@ sealed class HttpContent {
             type = ContentType.Text.Html,
             length = null
         )
+
         inline fun <reified T> Json(
             value: T
         ): Text = HttpContent.Text(
             string = Serialization.json.encodeToString(value),
             type = ContentType.Application.Json
         )
+
         fun file(file: File, type: ContentType = ContentType.fromExtension(file.extension)): Stream {
             return Stream(
                 getStream = { file.inputStream() },
@@ -97,6 +99,7 @@ sealed class HttpContent {
                 type = type
             )
         }
+
         @OptIn(DelicateCoroutinesApi::class)
         suspend fun file(file: FileObject): Stream {
             val info = GlobalScope.async(start = CoroutineStart.LAZY) { file.info()!! }

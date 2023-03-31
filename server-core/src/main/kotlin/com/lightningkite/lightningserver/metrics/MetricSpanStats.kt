@@ -1,4 +1,5 @@
 @file:UseContextualSerialization(Instant::class, Duration::class)
+
 package com.lightningkite.lightningserver.metrics
 
 import com.lightningkite.lightningdb.*
@@ -24,7 +25,7 @@ data class MetricSpanStats(
     val max: Double,
     val sum: Double,
     val count: Int,
-): HasId<String> {
+) : HasId<String> {
     val average: Double get() = sum / count.toDouble()
 }
 
@@ -66,4 +67,5 @@ fun List<MetricEvent>.stats(
     )
 }
 
-fun Instant.roundTo(span: Duration): Instant = Instant.ofEpochMilli(this.toEpochMilli() / span.toMillis() * span.toMillis())
+fun Instant.roundTo(span: Duration): Instant =
+    Instant.ofEpochMilli(this.toEpochMilli() / span.toMillis() * span.toMillis())

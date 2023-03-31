@@ -37,16 +37,14 @@ class RedisPubSub(val client: RedisClient): PubSub {
     private fun key(key: String) = observables.getOrPut(key) {
         val reactive = subscribeConnection
         Flux.usingWhen(
-            reactive.subscribe(key).then(Mono.just(reactive)).doOnSuccess { println("Subscribed") },
+            reactive.subscribe(key).then(Mono.just(reactive)),
             {
                 it.observeChannels()
-                    .doOnNext { println("Got $it") }
                     .filter { it.channel == key }
             },
-            { it.unsubscribe(key).doOnSuccess { println("Unsubscribed") } }
+            { it.unsubscribe(key) }
         ).map { it.message }
             .doOnError { it.printStackTrace() }
-            .doOnComplete { println("Completed") }
             .share()
     }
     override fun <T> get(key: String, serializer: KSerializer<T>): PubSubChannel<T> {

@@ -1,21 +1,15 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningserver.SetOnce
-import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Pluggable
-import com.lightningkite.lightningserver.settings.setting
-import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
 import java.io.File
-import kotlin.reflect.KClass
-import kotlin.reflect.KClassifier
 import kotlin.reflect.KType
-import kotlin.reflect.KTypeProjection
 
 /**
  * Settings that define what database to use and how to connect to it.
@@ -55,9 +49,10 @@ data class DatabaseSettings(
 }
 
 /**
- * A Database the exists entirely in the applications Heap. There are no external connections.
+ * A Database implementation that exists entirely in the applications Heap. There are no external connections.
  * It uses InMemoryFieldCollections in its implementation. This is NOT meant for persistent or long term storage.
- * This is useful in places that persistent data is not needed and speed is desired.
+ * This database will be completely erased everytime the application is stopped.
+ * This is useful in places that persistent data is not needed and speed is desired such as Unit Tests.
  *
  * @param premadeData A JsonObject that contains data you wish to populate the database with on creation.
  */
@@ -87,7 +82,7 @@ class InMemoryDatabase(val premadeData: JsonObject? = null) : Database {
 
 
 /**
- * A Database whose data manipulation is entirely in the application Heap, but it will attempt to store the data into a Folder on the system before shutdown.
+ * A Database implementation whose data manipulation is entirely in the application Heap, but it will attempt to store the data into a Folder on the system before shutdown.
  * On startup it will load in the Folder contents and populate the database.
  * It uses InMemoryUnsafePersistentFieldCollection in its implementation. This is NOT meant for long term storage.
  * It is NOT guaranteed that it will store the data before the application is shut down. There is a HIGH chance that the changes will not persist between runs.

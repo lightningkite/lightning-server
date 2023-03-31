@@ -51,7 +51,7 @@ fun HttpEndpoint.handler(handler: suspend (HttpRequest) -> HttpResponse): HttpEn
 @LightningServerDsl
 fun HttpEndpoint.fixEnding(): HttpEndpoint {
     fun lastSeg(req: HttpRequest) = path.segments.lastOrNull()?.let {
-        when(it) {
+        when (it) {
             is ServerPath.Segment.Constant -> it.value
             is ServerPath.Segment.Wildcard -> req.parts[it.name]!!
         }
@@ -61,10 +61,12 @@ fun HttpEndpoint.fixEnding(): HttpEndpoint {
             Http.endpoints[this.copy(path = path.copy(after = ServerPath.Afterwards.None))] = { req ->
                 HttpResponse.pathMoved(lastSeg(req) + "/")
             }
+
         ServerPath.Afterwards.None ->
             Http.endpoints[this.copy(path = path.copy(after = ServerPath.Afterwards.TrailingSlash))] = { req ->
                 HttpResponse.pathMoved("../" + lastSeg(req))
             }
+
         ServerPath.Afterwards.ChainedWildcard -> throw IllegalArgumentException()
     }
     return this

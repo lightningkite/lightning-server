@@ -7,10 +7,19 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 
+/**
+ * An abstraction layer meant to make async tasks in each environment configurable.
+ * Each implementation will use the underlying environment for launching an async task.
+ */
 interface Engine {
     suspend fun launchTask(task: Task<Any?>, input: Any?)
 }
 
+/**
+ * An Engine implementation that launches a new CoroutineScope and runs the task inside that new scope.
+ * This will run asynchronously with no regard for whether the task finishes or fails. This is useful
+ * during local development, as well deployment in non-serverless environments when you can.
+ */
 object LocalEngine : Engine {
     val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -23,8 +32,12 @@ object LocalEngine : Engine {
     }
 }
 
-// The purpose of this engine is to be used in Unit tests, and the difference is all tasks are run inline,
-// and not launched on a new scope.
+/**
+ * An Engine implementation that runs each task immediately and synchronously.
+ * It guarantees that the task will have finished or failed by the time this function returns.
+ * This is useful when you do not want tasks to run asynchronously such as Unit Tests,
+ * hence the name UnitTestEngine.
+ */
 object UnitTestEngine : Engine {
     val logger = LoggerFactory.getLogger(this::class.java)
 

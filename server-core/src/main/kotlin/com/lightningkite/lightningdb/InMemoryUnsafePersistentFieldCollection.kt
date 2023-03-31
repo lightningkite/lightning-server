@@ -18,7 +18,12 @@ class InMemoryUnsafePersistentFieldCollection<Model : Any>(
 ) : InMemoryFieldCollection<Model>(data = Collections.synchronizedList(ArrayList())), Closeable {
     init {
         var closing = false
-        data.addAll(encoding.decodeFromString(ListSerializer(serializer), file.takeIf { it.exists() }?.readText() ?: "[]"))
+        data.addAll(
+            encoding.decodeFromString(
+                ListSerializer(serializer),
+                file.takeIf { it.exists() }?.readText() ?: "[]"
+            )
+        )
         val shutdownHook = Thread {
             closing = true
             this.close()

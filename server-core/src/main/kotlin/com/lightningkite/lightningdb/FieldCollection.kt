@@ -8,7 +8,7 @@ import kotlin.reflect.KProperty1
  * using conditions and modifications. The underlying database is irrelevant and
  * will have it's own implementation of this interface.
  */
-interface FieldCollection<Model: Any> {
+interface FieldCollection<Model : Any> {
     val wraps: FieldCollection<Model>? get() = null
     suspend fun fullCondition(condition: Condition<Model>): Condition<Model> = condition
     suspend fun mask(): Mask<Model> = Mask()
@@ -30,13 +30,13 @@ interface FieldCollection<Model: Any> {
         groupBy: KProperty1<Model, Key>
     ): Map<Key, Int>
 
-    suspend fun <N: Number?> aggregate(
+    suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model> = Condition.Always(),
         property: KProperty1<Model, N>
     ): Double?
 
-    suspend fun <N: Number?, Key> groupAggregate(
+    suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model> = Condition.Always(),
         groupBy: KProperty1<Model, Key>,
@@ -135,5 +135,5 @@ interface FieldCollection<Model: Any> {
         condition: Condition<Model>
     ): Int
 
-    fun registerRawSignal(callback: suspend (CollectionChanges<Model>)->Unit)
+    fun registerRawSignal(callback: suspend (CollectionChanges<Model>) -> Unit)
 }

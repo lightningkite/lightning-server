@@ -1,12 +1,9 @@
 package com.lightningkite.lightningserver.serialization
 
-import com.lightningkite.lightningserver.SetOnce
 import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -18,7 +15,9 @@ class CorrectErrorTest {
     data class TestModel(
         val number: Int = 0
     )
-    @Test fun testBadRequest() {
+
+    @Test
+    fun testBadRequest() {
         TestSettings
         val t = ServerPath("test").post.typed(
             summary = "Test endpoint",

@@ -10,6 +10,7 @@ import java.util.*
 
 class WebSocketIdentifierPubSub(val type: String = "ws-pubsub", val pubSub: PubSub, val cache: Cache) {
     val closeMessage = "___close____"
+
     init {
         WebSocketIdentifier.register(
             type = type,
@@ -34,6 +35,7 @@ class WebSocketIdentifierPubSub(val type: String = "ws-pubsub", val pubSub: PubS
         cache.set<Boolean>("$sid-connected", true)
         return sid
     }
+
     suspend fun markDisconnect(sid: WebSocketIdentifier) {
         cache.remove("${sid}-connected")
     }

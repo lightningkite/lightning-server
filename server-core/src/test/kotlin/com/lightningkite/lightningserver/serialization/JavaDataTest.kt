@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.serialization
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.encodeToHexString
 import org.junit.Test
@@ -20,12 +19,15 @@ class JavaDataTest {
         val seen: List<Tag>
     ) {
         companion object
+
         @Serializable
         data class Tag(
             val rssi: Byte,
             val major: Short,
             val minor: Short,
-        ) { companion object }
+        ) {
+            companion object
+        }
     }
 
     @Test

@@ -12,7 +12,8 @@ import java.time.Instant
 import java.util.*
 
 class JwtKtTest {
-    @Test fun test() {
+    @Test
+    fun test() {
         TestSettings
         val secret = "THIS is My SECRET"
         val subject = "subby"
@@ -31,7 +32,8 @@ class JwtKtTest {
             .sign(Algorithm.HMAC256(secret))
         println(auth0Made)
         val hasher = SecureHasher.HS256(secret.toByteArray())
-        val myToken = Serialization.json.encodeJwt(hasher, String.serializer(), subject, Duration.ofSeconds(60), issuedAt = time)
+        val myToken =
+            Serialization.json.encodeJwt(hasher, String.serializer(), subject, Duration.ofSeconds(60), issuedAt = time)
         println(myToken)
         Serialization.json.decodeJwt(hasher, String.serializer(), auth0Made)
         auth0Checker.verify(myToken)

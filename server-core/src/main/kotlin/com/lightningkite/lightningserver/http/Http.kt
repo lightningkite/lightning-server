@@ -1,33 +1,33 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.HtmlDefaults
-import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.core.ServerPathMatcher
-import com.lightningkite.lightningserver.core.serverEntryPoint
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.utils.MutableMapWithChangeHandler
-import com.lightningkite.lightningserver.websocket.WebSockets
 
 object Http {
-    init { Metrics }
+    init {
+        Metrics
+    }
+
     var fixEndingSlash: Boolean = true
 
-    val endpoints: MutableMap<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> = MutableMapWithChangeHandler<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> {
-        _matcher = null
-    }
+    val endpoints: MutableMap<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> =
+        MutableMapWithChangeHandler<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> {
+            _matcher = null
+        }
     private var _matcher: HttpEndpointMatcher? = null
     val matcher: HttpEndpointMatcher
         get() {
-        return _matcher ?: run {
-            val created = HttpEndpointMatcher(endpoints.keys.asSequence())
-            _matcher = created
-            created
+            return _matcher ?: run {
+                val created = HttpEndpointMatcher(endpoints.keys.asSequence())
+                _matcher = created
+                created
+            }
         }
-    }
 
     var exception: suspend (HttpRequest, Exception) -> HttpResponse =
         { request, exception ->
@@ -39,14 +39,21 @@ object Http {
             }
         }
     var notFound: suspend (HttpEndpoint, HttpRequest) -> HttpResponse = { path, request ->
-        HttpResponse.html(HttpStatus.NotFound, content = HtmlDefaults.basePage("""
+        HttpResponse.html(
+            HttpStatus.NotFound, content = HtmlDefaults.basePage(
+                """
             <h1>Not Found</h1>
             <p>Sorry, the page you're looking for isn't here.</p>
-            ${if(generalSettings().debug) {
-                "<p>Your path is $path.</p>"
-            } else ""}
-        """.trimIndent()))
+            ${
+                    if (generalSettings().debug) {
+                        "<p>Your path is $path.</p>"
+                    } else ""
+                }
+        """.trimIndent()
+            )
+        )
     }
+
     suspend fun execute(request: HttpRequest): HttpResponse {
         return Metrics.handlerPerformance(request.endpoint) {
             endpoints[request.endpoint]?.let { handler ->
@@ -85,7 +92,7 @@ suspend fun HttpEndpoint.test(
     )
     return try {
         Http.endpoints[this]!!.invoke(req)
-    } catch(e: HttpStatusException) {
+    } catch (e: HttpStatusException) {
         e.toResponse(req)
     }
 }

@@ -67,8 +67,10 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
     data class Scheduled(val scheduled: String)
 
     companion object {
+        val logger: Logger = LoggerFactory.getLogger(AwsAdapter::class.java)
+
         fun loadSettings(jclass: Class<*>) {
-            println("Loading settings...")
+            logger.debug("Loading settings...")
             val root = File(System.getenv("LAMBDA_TASK_ROOT"))
             root.resolve("settings.json").takeIf { it.exists() }?.let {
                 it.readBytes().let { loadSettings(it) }
@@ -94,7 +96,6 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             Serialization.Internal.json.decodeFromString<Settings>(decryptedBytes.toString(Charsets.UTF_8))
         }
 
-        val logger: Logger = LoggerFactory.getLogger(AwsAdapter::class.java)
         val region by lazy { Region.of(System.getenv("AWS_REGION")) }
         private val wsCache by lazy {
             DynamoDbCache(
@@ -130,17 +131,17 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     }
                 }
             }
-            println("Running Tasks.onEngineReady()...")
+            logger.debug("Running Tasks.onEngineReady()...")
             runBlocking { Tasks.onEngineReady() }
-            println("Tasks.onEngineReady() complete.")
+            logger.debug("Tasks.onEngineReady() complete.")
             Unit
         }
     }
 
     init {
-        println("Running Tasks.onSettingsReady()...")
+        logger.debug("Running Tasks.onSettingsReady()...")
         runBlocking { Tasks.onSettingsReady() }
-        println("Tasks.onSettingsReady() complete.")
+        logger.debug("Tasks.onSettingsReady() complete.")
         configureEngine
         Http.matcher
         WebSockets.matcher
@@ -148,29 +149,29 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
     }
 
     override fun beforeCheckpoint(context: org.crac.Context<out Resource>?) {
-        println("beforeCheckpoint() - Preparing all connections...")
+        logger.debug("beforeCheckpoint() - Preparing all connections...")
         Settings.requirements.forEach { (key, value) ->
             (value() as? Disconnectable)?.let {
                 runBlocking {
+                    logger.debug("Making InitialConnection to: $key")
                     it.connect()
-                    println("Making InitialConnection to: $key")
-                    println("Now Disconnecting $key...")
+                    logger.debug("Now Disconnecting $key...")
                     it.disconnect()
                 }
             }
         }
-        println("Disconnections complete.")
+        logger.debug("Disconnections complete.")
     }
 
     override fun afterRestore(context: org.crac.Context<out Resource>?) {
-        println("afterRestore() - opening all connections")
+        logger.debug("afterRestore() - opening all connections")
         Settings.requirements.forEach { (key, value) ->
             (value() as? Disconnectable)?.let {
-                println("Connecting $key...")
+                logger.debug("Connecting $key...")
                 runBlocking { it.connect() }
             }
         }
-        println("Connections Complete")
+        logger.debug("Connections Complete")
     }
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context) {
@@ -220,12 +221,12 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     // The suicide function.  Exists to handle the panic handler to prevent cost issues.
                     asJson.containsKey("panic") -> {
                         try {
-                            println("Activating the panic shutdown...")
+                            logger.info("Activating the panic shutdown...")
                             val result = LambdaAsyncClient.builder().region(region).build().putFunctionConcurrency {
                                 it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
                                 it.reservedConcurrentExecutions(0)
                             }.await()
-                            println("Panic got code ${result.sdkHttpResponse().statusCode()}")
+                            logger.info("Panic got code ${result.sdkHttpResponse().statusCode()}")
                             assert(result.sdkHttpResponse().isSuccessful)
                             APIGatewayV2HTTPResponse(statusCode = 200)
                         } catch (e: Exception) {
@@ -235,12 +236,10 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     }
 
                     else -> {
-                        println("Input is $asJson")
                         asJson.jankMeADataClass("Something")
                     }
                 }
             } catch (e: Exception) {
-                println("Input $asJson had trouble")
                 e.printStackTrace()
                 e.report(asJson)
             }

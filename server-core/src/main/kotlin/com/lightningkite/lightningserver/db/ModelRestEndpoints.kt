@@ -28,7 +28,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     val collectionName get() = info.collectionName
 
     init {
-        if(path.docName == null) path.docName = collectionName
+        if (path.docName == null) path.docName = collectionName
         all.add(this)
     }
 

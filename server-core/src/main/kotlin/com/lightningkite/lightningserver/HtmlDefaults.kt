@@ -1,8 +1,12 @@
 package com.lightningkite.lightningserver
 
-import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.settings.generalSettings
 
+
+/**
+ * HtmlDefaults Is a place to hold html templates. You can set certain styling and headers here as a template, then call it with content
+ * all throughout the server.
+ */
 object HtmlDefaults {
     var logo: String? = null
     var primaryColor: String = "red"
@@ -52,11 +56,13 @@ object HtmlDefaults {
     var defaultLoginEmailTemplate: (suspend (email: String, link: String) -> String) = { email: String, link: String ->
         baseEmail("""
         <table role="presentation" style="width:100%;border-collapse:collapse;border:0;border-spacing:0;">
-            ${logo?.let {
+            ${
+            logo?.let {
                 """
                     <tr><td align="center" style="padding:16px;"><img src="$it" alt="${generalSettings().projectName}"/></td></tr>
                 """.trimIndent()
-        } ?: ""}
+            } ?: ""
+        }
             <tr><td align="center" style="padding:0px;"><h1>Log In to ${generalSettings().projectName}</h1></td></tr>
             <tr><td align="center" style="padding:0px;"><p>We received a request for a login email for ${email}. To log in, please click the link below.</p></td></tr>
             <tr><td align="center" style="padding:0px;">

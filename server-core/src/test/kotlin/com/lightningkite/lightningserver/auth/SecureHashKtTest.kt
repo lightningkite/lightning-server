@@ -1,12 +1,13 @@
 package com.lightningkite.lightningserver.auth
 
-import org.junit.Assert.*
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.system.measureTimeMillis
-import kotlin.time.measureTime
 
 class SecureHashKtTest {
-    @Test fun realTest() {
+    @Test
+    fun realTest() {
         val hash = "asdf".secureHash()
         println("Hash is $hash")
         measureTimeMillis {

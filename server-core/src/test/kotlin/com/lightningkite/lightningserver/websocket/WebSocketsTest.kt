@@ -2,11 +2,11 @@ package com.lightningkite.lightningserver.websocket
 
 import com.lightningkite.lightningserver.core.ServerPath
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class WebSocketsTest {
-    open class TestMirrorSocket(): WebSockets.Handler {
+    open class TestMirrorSocket() : WebSockets.Handler {
         var connects = 0
         var messages = 0
         var disconnects = 0
@@ -15,6 +15,7 @@ class WebSocketsTest {
             messages = 0
             disconnects = 0
         }
+
         fun assertCounts(connects: Int, messages: Int, disconnects: Int) {
             assertEquals(connects, this.connects)
             assertEquals(messages, this.messages)
@@ -45,14 +46,15 @@ class WebSocketsTest {
                     this.send("test")
                     this.incoming.receive()
                 }
-            } catch(e: Exception) { /*squish*/ }
+            } catch (e: Exception) { /*squish*/
+            }
             mirror.assertCounts(1, 1, 1)
         }
     }
 
     @Test
     fun testerExceptionCausesDisconnect() {
-        val mirror = object: TestMirrorSocket() {
+        val mirror = object : TestMirrorSocket() {
             override suspend fun message(event: WebSockets.MessageEvent) {
                 super.message(event)
                 throw Exception()
@@ -64,7 +66,8 @@ class WebSocketsTest {
                 ws.test {
                     this.send("will fail")
                 }
-            } catch(e: Exception) { /*squish*/ }
+            } catch (e: Exception) { /*squish*/
+            }
             mirror.assertCounts(1, 1, 1)
         }
     }

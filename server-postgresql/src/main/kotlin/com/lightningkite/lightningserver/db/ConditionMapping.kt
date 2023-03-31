@@ -119,7 +119,7 @@ private fun <T> ISqlExpressionBuilder.condition(
                                 }
                             }
                         }
-                ).also { println(it) }
+                )
             )
         }
 //        is Condition.FullTextSearch -> throw IllegalArgumentException()

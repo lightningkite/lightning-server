@@ -2,8 +2,6 @@ package com.lightningkite.lightningdb
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlin.reflect.KProperty1
 import kotlin.reflect.KType
@@ -26,6 +24,7 @@ open class DelayedFieldCollection<Model : Any>(
         limit: Int,
         maxQueryMs: Long,
     ): Flow<Model> = wraps.find(condition, orderBy, skip, limit, maxQueryMs).onStart { delay(milliseconds) }
+
     override suspend fun count(condition: Condition<Model>): Int {
         delay(milliseconds)
         return wraps.count(condition)
@@ -155,7 +154,7 @@ open class DelayedFieldCollection<Model : Any>(
 fun <Model : Any> FieldCollection<Model>.delayed(milliseconds: Long): FieldCollection<Model> =
     DelayedFieldCollection(this, milliseconds)
 
-fun Database.delayed(milliseconds: Long): Database = object: Database by this {
+fun Database.delayed(milliseconds: Long): Database = object : Database by this {
     override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> {
         return this@delayed.collection<T>(type, name).delayed(milliseconds)
     }

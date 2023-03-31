@@ -24,26 +24,26 @@ interface Metrics {
         val main get() = metricsSettings
         val logger = LoggerFactory.getLogger(Metrics::class.java)
         val toReport = ConcurrentLinkedQueue<MetricEvent>()
-        var shouldAllowAccess: suspend (HttpRequest)->Boolean = { false }
+        var shouldAllowAccess: suspend (HttpRequest) -> Boolean = { false }
 
         init {
             Tasks.onEngineReady {
                 regularlyAndOnShutdown(Duration.ofMinutes(1)) {
-                    logger.info("Assembling metrics to report...")
+                    logger.debug("Assembling metrics to report...")
                     val assembledData = ArrayList<MetricEvent>(toReport.size)
                     while (true) {
                         val item = toReport.poll() ?: break
                         assembledData.add(item)
                     }
-                    logger.info("Reporting ${assembledData.size} metric events to ${main()}...")
+                    logger.debug("Reporting ${assembledData.size} metric events to ${main()}...")
                     main().report(assembledData)
-                    logger.info("Report complete.")
+                    logger.debug("Report complete.")
                 }
             }
         }
 
         suspend fun report(type: String, value: Double) {
-            if(type in metricsSettings().settings.tracked)
+            if (type in metricsSettings().settings.tracked)
                 toReport.add(MetricEvent(type, serverEntryPoint()?.toString() ?: "Unknown", Instant.now(), value))
         }
 

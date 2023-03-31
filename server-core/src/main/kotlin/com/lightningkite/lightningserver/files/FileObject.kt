@@ -8,6 +8,9 @@ import kotlinx.coroutines.runBlocking
 import java.io.InputStream
 import java.time.Duration
 
+/**
+ * An abstraction that allows FileSystem implementations to access and manipulate the underlying files.
+ */
 interface FileObject {
     fun resolve(path: String): FileObject
     val parent: FileObject?
@@ -24,6 +27,7 @@ interface FileObject {
             response.status.isSuccess()
         }
     }
+
     val url: String
     val signedUrl: String
     fun uploadUrl(timeout: Duration): String

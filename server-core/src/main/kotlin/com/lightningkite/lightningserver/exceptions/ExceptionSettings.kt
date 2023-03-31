@@ -5,14 +5,15 @@ import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.Serializable
 
 /**
- * ExceptionSettings is used to configure reporting unhandled exceptions to a Sentry server.
+ * Settings that define what ExceptionReporter to use and how to connect to it.
+ * Any unhandled exceptions during a request or task will be reported to ExceptionReporter.
  */
 @Serializable
 data class ExceptionSettings(
     val url: String = "none",
     val sentryDsn: String? = null
-) : ()-> ExceptionReporter {
-    companion object: Pluggable<ExceptionSettings, ExceptionReporter>() {
+) : () -> ExceptionReporter {
+    companion object : Pluggable<ExceptionSettings, ExceptionReporter>() {
         init {
             ExceptionSettings.register("debug") { DebugExceptionReporter }
             ExceptionSettings.register("none") { NoExceptionReporter }

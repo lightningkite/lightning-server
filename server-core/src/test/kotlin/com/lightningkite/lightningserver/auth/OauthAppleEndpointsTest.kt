@@ -1,7 +1,8 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.bytes.toHexString
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigInteger
 import kotlin.random.Random

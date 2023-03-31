@@ -1,16 +1,14 @@
 @file:UseContextualSerialization(Duration::class)
+
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.serialization.Serialization
-
 import com.lightningkite.lightningserver.settings.generalSettings
-import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.getContextualDescriptor
-import kotlinx.serialization.json.JsonPrimitive
 import java.security.SecureRandom
 import java.time.Duration
 import java.util.*
@@ -48,7 +46,13 @@ data class JwtSigner(
      * @return A JWT with the [subject], expiring in [expireDuration].
      */
     fun token(subject: String, expireDuration: Duration = expiration): String =
-        Serialization.json.encodeJwt(hasher, subject, expireDuration, issuer ?: generalSettings().publicUrl, audience ?: generalSettings().publicUrl)
+        Serialization.json.encodeJwt(
+            hasher,
+            subject,
+            expireDuration,
+            issuer ?: generalSettings().publicUrl,
+            audience ?: generalSettings().publicUrl
+        )
 
     /**
      * Returns the subject if the token was valid.
@@ -66,7 +70,7 @@ data class JwtSigner(
                 message = "Invalid token",
                 cause = e
             )
-        } catch (e: Exception){
+        } catch (e: Exception) {
             throw UnauthorizedException(
                 message = "Invalid token",
                 cause = e
@@ -75,17 +79,32 @@ data class JwtSigner(
     }
 
 
-    @Deprecated("Use the version with duration instead", ReplaceWith("token(subject, Duration.ofMillis(expireDuration))", "java.time.Duration"))
+    @Deprecated(
+        "Use the version with duration instead",
+        ReplaceWith("token(subject, Duration.ofMillis(expireDuration))", "java.time.Duration")
+    )
     inline fun <reified T> token(subject: T, expireDuration: Long): String =
         token(Serialization.module.serializer(), subject, Duration.ofMillis(expireDuration))
-    @Deprecated("Use the version with duration instead", ReplaceWith("token(serializer, subject, Duration.ofMillis(expireDuration))", "java.time.Duration"))
+
+    @Deprecated(
+        "Use the version with duration instead",
+        ReplaceWith("token(serializer, subject, Duration.ofMillis(expireDuration))", "java.time.Duration")
+    )
     fun <T> token(serializer: KSerializer<T>, subject: T, expireDuration: Long): String =
         token(serializer, subject, Duration.ofMillis(expireDuration))
 
     inline fun <reified T> token(subject: T, expireDuration: Duration = expiration): String =
         token(Serialization.module.serializer(), subject, expireDuration)
+
     fun <T> token(serializer: KSerializer<T>, subject: T, expireDuration: Duration = expiration): String =
-        Serialization.json.encodeJwt(hasher, serializer, subject, expireDuration, issuer ?: generalSettings().publicUrl, audience ?: generalSettings().publicUrl)
+        Serialization.json.encodeJwt(
+            hasher,
+            serializer,
+            subject,
+            expireDuration,
+            issuer ?: generalSettings().publicUrl,
+            audience ?: generalSettings().publicUrl
+        )
 
     inline fun <reified T> verify(token: String): T = verify(Serialization.module.serializer(), token)
     fun <T> verify(serializer: KSerializer<T>, token: String): T {
@@ -101,7 +120,7 @@ data class JwtSigner(
                 message = "Invalid token",
                 cause = e
             )
-        } catch (e: Exception){
+        } catch (e: Exception) {
             throw UnauthorizedException(
                 message = "Invalid token",
                 cause = e
@@ -116,6 +135,7 @@ data class JwtSigner(
                 is PrimitiveKind -> return true
                 SerialKind.CONTEXTUAL -> current =
                     Serialization.json.serializersModule.getContextualDescriptor(current)!!
+
                 else -> return false
             }
         }

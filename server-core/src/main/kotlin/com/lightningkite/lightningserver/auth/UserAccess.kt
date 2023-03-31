@@ -13,21 +13,28 @@ interface UserAccess<USER : Any, ID> {
     suspend fun anonymous(): USER = throw ForbiddenException("Anonymous users not permitted.")
 }
 
-interface UserEmailAccess<USER: Any, ID>: UserAccess<USER, ID> {
+interface UserEmailAccess<USER : Any, ID> : UserAccess<USER, ID> {
     suspend fun byEmail(email: String): USER
 }
-interface UserPhoneAccess<USER: Any, ID>: UserAccess<USER, ID> {
+
+interface UserPhoneAccess<USER : Any, ID> : UserAccess<USER, ID> {
     suspend fun byPhone(phone: String): USER
 }
-interface UserPasswordAccess<USER: Any, ID>: UserAccess<USER, ID> {
+
+interface UserPasswordAccess<USER : Any, ID> : UserAccess<USER, ID> {
     suspend fun byUsername(username: String, password: String): USER
     fun hashedPassword(user: USER): String
 }
-interface UserExternalServiceAccess<USER: Any, ID>: UserAccess<USER, ID> {
+
+interface UserExternalServiceAccess<USER : Any, ID> : UserAccess<USER, ID> {
     suspend fun byExternalService(oauth: ExternalServiceLogin): USER
 }
-fun <USER: Any, ID> UserEmailAccess<USER, ID>.asExternal(): UserExternalServiceAccess<USER, ID> = object: UserExternalServiceAccess<USER, ID>, UserAccess<USER, ID> by this {
-    override suspend fun byExternalService(oauth: ExternalServiceLogin): USER {
-        return this@asExternal.byEmail(oauth.email ?: throw BadRequestException("No verified email found in external service"))
+
+fun <USER : Any, ID> UserEmailAccess<USER, ID>.asExternal(): UserExternalServiceAccess<USER, ID> =
+    object : UserExternalServiceAccess<USER, ID>, UserAccess<USER, ID> by this {
+        override suspend fun byExternalService(oauth: ExternalServiceLogin): USER {
+            return this@asExternal.byEmail(
+                oauth.email ?: throw BadRequestException("No verified email found in external service")
+            )
+        }
     }
-}

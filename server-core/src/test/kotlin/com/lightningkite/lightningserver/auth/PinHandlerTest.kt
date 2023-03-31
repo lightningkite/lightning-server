@@ -4,17 +4,18 @@ import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.*
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import kotlin.test.assertIs
 
 class PinHandlerTest {
 
-    private inline fun <reified T: Exception> assertException(action: ()->Unit, verify: (T)->Boolean = { true }) {
+    private inline fun <reified T : Exception> assertException(action: () -> Unit, verify: (T) -> Boolean = { true }) {
         try {
             action()
             fail()
-        } catch(e: Exception) {
+        } catch (e: Exception) {
             assertIs<T>(e)
             assertTrue(verify(e))
         }

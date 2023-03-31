@@ -9,16 +9,16 @@ import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.serialization.Serialization
-
 import com.lightningkite.lightningserver.tasks.startup
 import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.ApiWebsocket
 import com.lightningkite.lightningserver.typed.typedWebsocket
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.forEach
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.toList
-import kotlinx.serialization.*
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseContextualSerialization
 import java.time.Instant
 
 @LightningServerDsl
@@ -84,7 +84,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
         ) { changes: CollectionChanges<T> ->
             val jobs = ArrayList<Job>()
             subscriptionDb().find(condition { it.databaseId eq modelIdentifier }).collect {
-                if(it.condition.isEmpty()) return@collect
+                if (it.condition.isEmpty()) return@collect
                 val m =
                     try {
                         Serialization.json.decodeFromString(Mask.serializer(info.serialization.serializer), it.mask)
@@ -107,7 +107,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
                 }.filter { it.old != null || it.new != null }
 
                 jobs.add(launch {
-                    if(toSend.size > 10) {
+                    if (toSend.size > 10) {
                         send(it._id, ListChange(wholeList = info.collection().query(c).toList()))
                     } else {
                         toSend.forEach { c ->

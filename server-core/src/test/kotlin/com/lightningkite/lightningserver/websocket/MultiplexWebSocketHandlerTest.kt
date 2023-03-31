@@ -7,7 +7,8 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 class MultiplexWebSocketHandlerTest {
@@ -20,7 +21,15 @@ class MultiplexWebSocketHandlerTest {
         val target = ServerPath.root.path("mp").websocket(MultiplexWebSocketHandler { LocalCache })
         runBlocking {
             target.test {
-                this.send(Serialization.json.encodeToString(MultiplexMessage(channel = "first", path = first.toString(), start = true)))
+                this.send(
+                    Serialization.json.encodeToString(
+                        MultiplexMessage(
+                            channel = "first",
+                            path = first.toString(),
+                            start = true
+                        )
+                    )
+                )
                 Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
                     assertEquals("first", channel)
                     assertEquals(true, start)
@@ -28,7 +37,15 @@ class MultiplexWebSocketHandlerTest {
                     assertEquals(null, data)
                     assertEquals(false, end)
                 }
-                this.send(Serialization.json.encodeToString(MultiplexMessage(channel = "second", path = second.toString(mapOf("part" to "test")), start = true)))
+                this.send(
+                    Serialization.json.encodeToString(
+                        MultiplexMessage(
+                            channel = "second",
+                            path = second.toString(mapOf("part" to "test")),
+                            start = true
+                        )
+                    )
+                )
                 Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
                     assertEquals("second", channel)
                     assertEquals(true, start)
@@ -37,7 +54,14 @@ class MultiplexWebSocketHandlerTest {
                     assertEquals(false, end)
                 }
 
-                this.send(Serialization.json.encodeToString(MultiplexMessage(channel = "first", data = "Sending first")))
+                this.send(
+                    Serialization.json.encodeToString(
+                        MultiplexMessage(
+                            channel = "first",
+                            data = "Sending first"
+                        )
+                    )
+                )
                 Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
                     assertEquals("first", channel)
                     assertEquals("Sending first", data)
@@ -45,7 +69,14 @@ class MultiplexWebSocketHandlerTest {
                     assertEquals(false, start)
                     assertEquals(false, end)
                 }
-                this.send(Serialization.json.encodeToString(MultiplexMessage(channel = "second", data = "Sending second")))
+                this.send(
+                    Serialization.json.encodeToString(
+                        MultiplexMessage(
+                            channel = "second",
+                            data = "Sending second"
+                        )
+                    )
+                )
                 Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
                     assertEquals("second", channel)
                     assertEquals("Sending second", data)
@@ -76,10 +107,11 @@ class MultiplexWebSocketHandlerTest {
         }
     }
 
-    @Test fun testMessageError() {
+    @Test
+    fun testMessageError() {
         val firstMirror = WebSocketsTest.TestMirrorSocket()
         val first = ServerPath.root.path("first").websocket(firstMirror)
-        val secondMirror = object: WebSocketsTest.TestMirrorSocket() {
+        val secondMirror = object : WebSocketsTest.TestMirrorSocket() {
             override suspend fun message(event: WebSockets.MessageEvent) {
                 super.message(event)
                 throw Exception("oops")
@@ -89,7 +121,15 @@ class MultiplexWebSocketHandlerTest {
         val target = ServerPath.root.path("mp").websocket(MultiplexWebSocketHandler { LocalCache })
         runBlocking {
             target.test {
-                this.send(Serialization.json.encodeToString(MultiplexMessage(channel = "first", path = first.toString(), start = true)))
+                this.send(
+                    Serialization.json.encodeToString(
+                        MultiplexMessage(
+                            channel = "first",
+                            path = first.toString(),
+                            start = true
+                        )
+                    )
+                )
                 Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
                     assertEquals("first", channel)
                     assertEquals(true, start)
@@ -97,7 +137,15 @@ class MultiplexWebSocketHandlerTest {
                     assertEquals(null, data)
                     assertEquals(false, end)
                 }
-                this.send(Serialization.json.encodeToString(MultiplexMessage(channel = "second", path = second.toString(mapOf("part" to "test")), start = true)))
+                this.send(
+                    Serialization.json.encodeToString(
+                        MultiplexMessage(
+                            channel = "second",
+                            path = second.toString(mapOf("part" to "test")),
+                            start = true
+                        )
+                    )
+                )
                 Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
                     assertEquals("second", channel)
                     assertEquals(true, start)
@@ -106,7 +154,14 @@ class MultiplexWebSocketHandlerTest {
                     assertEquals(false, end)
                 }
 
-                this.send(Serialization.json.encodeToString(MultiplexMessage(channel = "first", data = "Sending first")))
+                this.send(
+                    Serialization.json.encodeToString(
+                        MultiplexMessage(
+                            channel = "first",
+                            data = "Sending first"
+                        )
+                    )
+                )
                 Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
                     assertEquals("first", channel)
                     assertEquals("Sending first", data)
@@ -114,7 +169,14 @@ class MultiplexWebSocketHandlerTest {
                     assertEquals(false, start)
                     assertEquals(false, end)
                 }
-                this.send(Serialization.json.encodeToString(MultiplexMessage(channel = "second", data = "Sending second")))
+                this.send(
+                    Serialization.json.encodeToString(
+                        MultiplexMessage(
+                            channel = "second",
+                            data = "Sending second"
+                        )
+                    )
+                )
                 Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
                     assertEquals("second", channel)
                     assertEquals("Sending second", data)
@@ -130,7 +192,14 @@ class MultiplexWebSocketHandlerTest {
                     assertEquals(true, end)
                 }
 
-                this.send(Serialization.json.encodeToString(MultiplexMessage(channel = "second", data = "Sending second")))
+                this.send(
+                    Serialization.json.encodeToString(
+                        MultiplexMessage(
+                            channel = "second",
+                            data = "Sending second"
+                        )
+                    )
+                )
                 Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
                     assertEquals("second", channel)
                     assertNotNull(error)

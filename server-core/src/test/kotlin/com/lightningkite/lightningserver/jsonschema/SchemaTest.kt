@@ -1,28 +1,19 @@
 @file:UseContextualSerialization(LocalDate::class, Instant::class, UUID::class, ServerFile::class)
+
 package com.lightningkite.lightningserver.jsonschema
 
-import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.settings.GeneralServerSettings
-import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningdb.*
-import kotlinx.html.body
-import kotlinx.html.form
-import kotlinx.html.head
-import kotlinx.html.html
+import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.typed.*
+import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.properties.Properties
-import org.junit.Test
-import java.io.File
-import kotlinx.html.stream.appendHTML
-import kotlinx.serialization.*
-import kotlinx.serialization.descriptors.capturedKClass
-import kotlinx.serialization.descriptors.getContextualDescriptor
 import kotlinx.serialization.properties.encodeToStringMap
+import org.junit.Test
 import java.net.URLEncoder
 import java.time.Instant
 import java.time.LocalDate
 import java.util.*
-import kotlin.reflect.typeOf
 import kotlin.test.assertTrue
 
 class SchemaTest {

@@ -1,20 +1,14 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.client
-import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.debugJsonBody
-import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.encodeToFormData
 import com.lightningkite.lightningserver.serialization.parse
-import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
-import io.ktor.util.*
 import kotlinx.serialization.Serializable
-import java.util.*
 
 
 /**
@@ -26,10 +20,10 @@ import java.util.*
  * In the Certificates & secrets section, create a new client secret.  Copy out the value and put it into [setting] as the [OauthProviderCredentials.secret].
  *
  */
-class OauthMicrosoftEndpoints<USER: Any, ID>(
+class OauthMicrosoftEndpoints<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val access: UserExternalServiceAccess<USER, ID>,
-    val setting: ()->OauthProviderCredentials,
+    val setting: () -> OauthProviderCredentials,
     override val scope: String = "openid email profile"
 ) : ServerPathGroup(base.path.path("oauth/microsoft")), OauthMixin {
     override val niceName = "Microsoft"
@@ -50,11 +44,15 @@ class OauthMicrosoftEndpoints<USER: Any, ID>(
                 append("Authorization", "${response.token_type} ${response.access_token}")
             }
         }.debugJsonBody()
-        base.redirectToLanding(access.byExternalService(ExternalServiceLogin(
-            service = niceName,
-            email = response2.email,
-            avatar = response2.picture
-        )))
+        base.redirectToLanding(
+            access.byExternalService(
+                ExternalServiceLogin(
+                    service = niceName,
+                    email = response2.email,
+                    avatar = response2.picture
+                )
+            )
+        )
     }
 
     @Serializable

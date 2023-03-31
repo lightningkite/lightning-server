@@ -3,15 +3,21 @@ package com.lightningkite.lightningserver.files
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 
-interface FileSystem: HealthCheckable {
+/**
+ * An abstracted model for reading and writing files in a storage solution.
+ * Every implementation will handle how to resolve FileObjects in their own system.
+ */
+interface FileSystem : HealthCheckable {
     val root: FileObject
     val rootUrls: List<String> get() = listOf(root.url)
+
     companion object {
         fun register(system: FileSystem) {
             system.rootUrls.forEach {
                 roots.add(it to system)
             }
         }
+
         val urlRoots get() = roots.map { it.first }
         private val roots = ArrayList<Pair<String, FileSystem>>()
         fun resolve(url: String): FileObject? {
@@ -24,7 +30,7 @@ interface FileSystem: HealthCheckable {
         try {
             root.list()
             return HealthStatus(HealthStatus.Level.OK)
-        } catch(e: Exception) {
+        } catch (e: Exception) {
             return HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
         }
     }

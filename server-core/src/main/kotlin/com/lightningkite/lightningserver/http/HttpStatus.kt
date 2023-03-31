@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.http
 @JvmInline
 value class HttpStatus(val code: Int) {
     val success: Boolean get() = code / 100 == 2
+
     companion object {
         val Continue = HttpStatus(100)
         val SwitchingProtocols = HttpStatus(101)

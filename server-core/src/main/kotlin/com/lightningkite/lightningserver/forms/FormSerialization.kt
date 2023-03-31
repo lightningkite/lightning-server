@@ -2,19 +2,14 @@ package com.lightningkite.lightningserver.forms
 
 
 import com.lightningkite.lightningserver.serialization.Serialization
-
-import kotlinx.html.*
-import kotlinx.html.dom.HTMLDOMBuilder
-import kotlinx.html.dom.createHTMLDocument
-import kotlinx.html.input
-import kotlinx.html.stream.appendHTML
-import kotlinx.serialization.*
-import kotlinx.serialization.descriptors.*
-import kotlinx.serialization.encoding.*
+import kotlinx.html.FlowContent
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.SerializationStrategy
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.AbstractEncoder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
-import java.lang.IllegalArgumentException
-import kotlin.reflect.KClass
+import kotlinx.serialization.serializer
 
 typealias HtmlRenderer<T> = FlowContent.(inputKey: String, value: T) -> Unit
 
@@ -28,7 +23,7 @@ class HtmlSerializer(val serializersModule: SerializersModule = EmptySerializers
         val renderers: Map<SerialDescriptor, HtmlRenderer<*>>
     )
 
-    inner class HtmlEncoder(val flow: FlowContent): AbstractEncoder() {
+    inner class HtmlEncoder(val flow: FlowContent) : AbstractEncoder() {
         override val serializersModule: SerializersModule
             get() = this@HtmlSerializer.serializersModule
 

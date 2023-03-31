@@ -4,14 +4,15 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.db.ModelInfo
 import kotlinx.serialization.KSerializer
 
-fun <T, USER, ID: Comparable<ID>> T.userPasswordAccess(
+fun <T, USER, ID : Comparable<ID>> T.userPasswordAccess(
     newUser: suspend (email: String, hashedPassword: String) -> USER
-): UserPasswordAccess<USER, ID> where USER : HasId<ID>, USER: HasPassword, T: ModelInfo<USER, USER, ID>, USER: HasEmail {
+): UserPasswordAccess<USER, ID> where USER : HasId<ID>, USER : HasPassword, T : ModelInfo<USER, USER, ID>, USER : HasEmail {
     val info = this
-    return object: UserPasswordAccess<USER, ID> {
+    return object : UserPasswordAccess<USER, ID> {
         override suspend fun byUsername(username: String, password: String): USER {
             val lowercased = username.lowercase()
-            return info.collection().findOne(Condition.OnField(HasEmailFields.email(), Condition.Equal(lowercased))) ?: newUser(lowercased, password.secureHash()).let { info.collection().insertOne(it)!! }
+            return info.collection().findOne(Condition.OnField(HasEmailFields.email(), Condition.Equal(lowercased)))
+                ?: newUser(lowercased, password.secureHash()).let { info.collection().insertOne(it)!! }
         }
 
         override fun hashedPassword(user: USER): String = user.hashedPassword
@@ -29,14 +30,15 @@ fun <T, USER, ID: Comparable<ID>> T.userPasswordAccess(
     }
 }
 
-fun <T, USER, ID: Comparable<ID>> T.userEmailAccess(
+fun <T, USER, ID : Comparable<ID>> T.userEmailAccess(
     newUser: suspend (email: String) -> USER
-): UserEmailAccess<USER, ID> where USER : HasId<ID>, T: ModelInfo<USER, USER, ID>, USER: HasEmail {
+): UserEmailAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, USER, ID>, USER : HasEmail {
     val info = this
-    return object: UserEmailAccess<USER, ID>{
+    return object : UserEmailAccess<USER, ID> {
         override suspend fun byEmail(email: String): USER {
             val lowercased = email.lowercase()
-            return info.collection().findOne(Condition.OnField(HasEmailFields.email(), Condition.Equal(lowercased))) ?: newUser(lowercased).let { info.collection().insertOne(it)!! }
+            return info.collection().findOne(Condition.OnField(HasEmailFields.email(), Condition.Equal(lowercased)))
+                ?: newUser(lowercased).let { info.collection().insertOne(it)!! }
         }
 
         override val serializer: KSerializer<USER>
@@ -52,14 +54,17 @@ fun <T, USER, ID: Comparable<ID>> T.userEmailAccess(
     }
 }
 
-fun <T, USER, ID: Comparable<ID>> T.userPhoneAccess(
+fun <T, USER, ID : Comparable<ID>> T.userPhoneAccess(
     newUser: suspend (phone: String) -> USER
-): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T: ModelInfo<USER, USER, ID>, USER: HasPhoneNumber {
+): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, USER, ID>, USER : HasPhoneNumber {
     val info = this
-    return object: UserPhoneAccess<USER, ID>{
+    return object : UserPhoneAccess<USER, ID> {
         override suspend fun byPhone(phone: String): USER {
             val cleaned = phone.filter { it.isDigit() }
-            return info.collection().findOne(Condition.OnField(HasPhoneNumberFields.phoneNumber(), Condition.Equal(cleaned))) ?: newUser(cleaned).let { info.collection().insertOne(it)!! }
+            return info.collection()
+                .findOne(Condition.OnField(HasPhoneNumberFields.phoneNumber(), Condition.Equal(cleaned))) ?: newUser(
+                cleaned
+            ).let { info.collection().insertOne(it)!! }
         }
 
         override val serializer: KSerializer<USER>
@@ -75,20 +80,23 @@ fun <T, USER, ID: Comparable<ID>> T.userPhoneAccess(
     }
 }
 
-fun <T, USER, ID: Comparable<ID>> T.userEmailPhoneAccess(
+fun <T, USER, ID : Comparable<ID>> T.userEmailPhoneAccess(
     newEmailUser: suspend (email: String) -> USER,
     newPhoneUser: suspend (phone: String) -> USER,
-): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T: ModelInfo<USER, USER, ID>, USER: HasPhoneNumber, USER: HasEmail {
+): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, USER, ID>, USER : HasPhoneNumber, USER : HasEmail {
     val info = this
-    return object: UserPhoneAccess<USER, ID>, UserEmailAccess<USER, ID>{
+    return object : UserPhoneAccess<USER, ID>, UserEmailAccess<USER, ID> {
         override suspend fun byEmail(email: String): USER {
             val lowercased = email.lowercase()
-            return info.collection().findOne(Condition.OnField(HasEmailFields.email(), Condition.Equal(lowercased))) ?: newEmailUser(lowercased).let { info.collection().insertOne(it)!! }
+            return info.collection().findOne(Condition.OnField(HasEmailFields.email(), Condition.Equal(lowercased)))
+                ?: newEmailUser(lowercased).let { info.collection().insertOne(it)!! }
         }
 
         override suspend fun byPhone(phone: String): USER {
             val cleaned = phone.filter { it.isDigit() }
-            return info.collection().findOne(Condition.OnField(HasPhoneNumberFields.phoneNumber(), Condition.Equal(cleaned))) ?: newPhoneUser(cleaned).let { info.collection().insertOne(it)!! }
+            return info.collection()
+                .findOne(Condition.OnField(HasPhoneNumberFields.phoneNumber(), Condition.Equal(cleaned)))
+                ?: newPhoneUser(cleaned).let { info.collection().insertOne(it)!! }
         }
 
         override val serializer: KSerializer<USER>
@@ -105,15 +113,18 @@ fun <T, USER, ID: Comparable<ID>> T.userEmailPhoneAccess(
 }
 
 @JvmName("userEmailAccessMaybe")
-fun <T, USER, ID: Comparable<ID>> T.userEmailAccess(
+fun <T, USER, ID : Comparable<ID>> T.userEmailAccess(
     anonymous: suspend () -> USER,
     newUser: suspend (email: String) -> USER
-): UserEmailAccess<USER, ID> where USER : HasId<ID>, T: ModelInfo<USER, USER, ID>, USER: HasMaybeEmail {
+): UserEmailAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, USER, ID>, USER : HasMaybeEmail {
     val info = this
-    return object: UserEmailAccess<USER, ID>{
+    return object : UserEmailAccess<USER, ID> {
         override suspend fun byEmail(email: String): USER {
             val lowercased = email.lowercase()
-            return info.collection().findOne(Condition.OnField(HasMaybeEmailFields.email(), Condition.Equal(lowercased))) ?: newUser(lowercased).let { info.collection().insertOne(it)!! }
+            return info.collection()
+                .findOne(Condition.OnField(HasMaybeEmailFields.email(), Condition.Equal(lowercased))) ?: newUser(
+                lowercased
+            ).let { info.collection().insertOne(it)!! }
         }
 
         override val serializer: KSerializer<USER>
@@ -132,15 +143,17 @@ fun <T, USER, ID: Comparable<ID>> T.userEmailAccess(
 }
 
 @JvmName("userPhoneAccessMaybe")
-fun <T, USER, ID: Comparable<ID>> T.userPhoneAccess(
+fun <T, USER, ID : Comparable<ID>> T.userPhoneAccess(
     anonymous: suspend () -> USER,
     newUser: suspend (phone: String) -> USER
-): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T: ModelInfo<USER, USER, ID>, USER: HasMaybePhoneNumber {
+): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, USER, ID>, USER : HasMaybePhoneNumber {
     val info = this
-    return object: UserPhoneAccess<USER, ID>{
+    return object : UserPhoneAccess<USER, ID> {
         override suspend fun byPhone(phone: String): USER {
             val cleaned = phone.filter { it.isDigit() }
-            return info.collection().findOne(Condition.OnField(HasMaybePhoneNumberFields.phoneNumber(), Condition.Equal(cleaned))) ?: newUser(cleaned).let { info.collection().insertOne(it)!! }
+            return info.collection()
+                .findOne(Condition.OnField(HasMaybePhoneNumberFields.phoneNumber(), Condition.Equal(cleaned)))
+                ?: newUser(cleaned).let { info.collection().insertOne(it)!! }
         }
 
         override val serializer: KSerializer<USER>
@@ -159,21 +172,26 @@ fun <T, USER, ID: Comparable<ID>> T.userPhoneAccess(
 }
 
 @JvmName("userEmailPhoneAccessMaybe")
-fun <T, USER, ID: Comparable<ID>> T.userEmailPhoneAccess(
+fun <T, USER, ID : Comparable<ID>> T.userEmailPhoneAccess(
     anonymous: suspend () -> USER,
     newEmailUser: suspend (email: String) -> USER,
     newPhoneUser: suspend (phone: String) -> USER,
-): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T: ModelInfo<USER, USER, ID>, USER: HasMaybePhoneNumber, USER: HasMaybeEmail {
+): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, USER, ID>, USER : HasMaybePhoneNumber, USER : HasMaybeEmail {
     val info = this
-    return object: UserPhoneAccess<USER, ID>, UserEmailAccess<USER, ID>{
+    return object : UserPhoneAccess<USER, ID>, UserEmailAccess<USER, ID> {
         override suspend fun byEmail(email: String): USER {
             val lowercased = email.lowercase()
-            return info.collection().findOne(Condition.OnField(HasMaybeEmailFields.email(), Condition.Equal(lowercased))) ?: newEmailUser(lowercased).let { info.collection().insertOne(it)!! }
+            return info.collection()
+                .findOne(Condition.OnField(HasMaybeEmailFields.email(), Condition.Equal(lowercased))) ?: newEmailUser(
+                lowercased
+            ).let { info.collection().insertOne(it)!! }
         }
 
         override suspend fun byPhone(phone: String): USER {
             val cleaned = phone.filter { it.isDigit() }
-            return info.collection().findOne(Condition.OnField(HasMaybePhoneNumberFields.phoneNumber(), Condition.Equal(cleaned))) ?: newPhoneUser(cleaned).let { info.collection().insertOne(it)!! }
+            return info.collection()
+                .findOne(Condition.OnField(HasMaybePhoneNumberFields.phoneNumber(), Condition.Equal(cleaned)))
+                ?: newPhoneUser(cleaned).let { info.collection().insertOne(it)!! }
         }
 
         override val serializer: KSerializer<USER>

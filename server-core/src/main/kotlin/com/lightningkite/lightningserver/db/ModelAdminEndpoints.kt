@@ -5,7 +5,6 @@ import com.lightningkite.lightningserver.auth.cast
 import com.lightningkite.lightningserver.auth.rawUser
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.handler
@@ -16,9 +15,7 @@ import com.lightningkite.lightningserver.typed.insideHtmlForm
 import com.lightningkite.lightningserver.typed.parseUrlPartOrBadRequest
 import kotlinx.coroutines.flow.toList
 import kotlinx.html.*
-import kotlinx.serialization.properties.decodeFromStringMap
 import java.net.URLEncoder
-import java.nio.charset.Charset
 
 open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     path: ServerPath,
@@ -117,7 +114,9 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     }
     val list = get("/").handler {
         val secured = info.collection(info.serialization.authInfo.cast(it.rawUser()))
-        val query = Serialization.properties.decodeFromStringMap<Query<T>>(Query.serializer(info.serialization.serializer), it.queryParameters.associate { it })
+        val query = Serialization.properties.decodeFromStringMap<Query<T>>(
+            Query.serializer(info.serialization.serializer),
+            it.queryParameters.associate { it })
         val items = secured.query(query).toList()
         val propItems = items.map { Serialization.properties.encodeToStringMap(info.serialization.serializer, it) }
         val keys = propItems.flatMap { it.keys }.distinct()
@@ -154,7 +153,7 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                                         a(href = item["_id"]!! + "/") {
                                             +(item[key] ?: "-")
                                         }
-                                    } else if(item[key]?.let { it.startsWith("https://") || it.startsWith("http://") } == true) {
+                                    } else if (item[key]?.let { it.startsWith("https://") || it.startsWith("http://") } == true) {
                                         a(href = item[key]!!, target = "_blank") {
                                             +(item[key] ?: "-")
                                         }
@@ -185,7 +184,7 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                             }"
                         ) { +"Previous Page " }
                     }
-                    if(items.size == query.limit) {
+                    if (items.size == query.limit) {
                         a(
                             href = "?${
                                 it.queryParameters.associate { it.first.lowercase() to it.second }.toMutableMap()
@@ -193,13 +192,13 @@ open class ModelAdminEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                                         this["skip"] = (query.skip + query.limit).toString()
                                         this["limit"] = (query.limit).toString()
                                     }.entries.joinToString("&") {
-                                    "${it.key}=${
-                                        URLEncoder.encode(
-                                            it.value,
-                                            Charsets.UTF_8
-                                        )
-                                    }"
-                                }
+                                        "${it.key}=${
+                                            URLEncoder.encode(
+                                                it.value,
+                                                Charsets.UTF_8
+                                            )
+                                        }"
+                                    }
                             }"
                         ) { +"Next Page " }
                     }
