@@ -118,3 +118,63 @@ fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.postChange(
 
     override suspend fun updateManyIgnoringResult(condition: Condition<Model>, modification: Modification<Model>): Int = updateMany(condition, modification).changes.size
 }
+
+fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.postNewValue(
+    changed: suspend (Model)->Unit
+): FieldCollection<Model> = object: FieldCollection<Model> by this@postNewValue {
+    override val wraps = this@postNewValue
+
+    override suspend fun insert(models: Iterable<Model>): List<Model> {
+        return wraps.insert(models).onEach { changed(it) }
+    }
+
+    override suspend fun replaceOne(condition: Condition<Model>, model: Model, orderBy: List<SortPart<Model>>): EntryChange<Model> =
+        wraps.replaceOne(condition, model, orderBy).also { if(it.old != null && it.new != null) changed(it.new!!) }
+
+    override suspend fun upsertOne(
+        condition: Condition<Model>,
+        modification: Modification<Model>,
+        model: Model
+    ): EntryChange<Model>  =
+        wraps.upsertOne(condition, modification, model).also { if(it.old != null && it.new != null) changed(it.new!!) }
+
+    override suspend fun updateOne(
+        condition: Condition<Model>,
+        modification: Modification<Model>,
+        orderBy: List<SortPart<Model>>
+    ): EntryChange<Model>  =
+        wraps.updateOne(condition, modification, orderBy).also { if(it.old != null && it.new != null) changed(it.new!!) }
+
+    override suspend fun updateMany(
+        condition: Condition<Model>,
+        modification: Modification<Model>
+    ): CollectionChanges<Model> = wraps.updateMany(condition, modification).also { changes ->
+        changes.changes.forEach {
+            if(it.old != null && it.new != null)
+                changed(it.new!!)
+        }
+    }
+
+    override suspend fun replaceOneIgnoringResult(
+        condition: Condition<Model>,
+        model: Model,
+        orderBy: List<SortPart<Model>>
+    ): Boolean = replaceOne(
+        condition,
+        model
+    ).new != null
+
+    override suspend fun upsertOneIgnoringResult(
+        condition: Condition<Model>,
+        modification: Modification<Model>,
+        model: Model
+    ): Boolean = upsertOne(condition, modification, model).old != null
+
+    override suspend fun updateOneIgnoringResult(
+        condition: Condition<Model>,
+        modification: Modification<Model>,
+        orderBy: List<SortPart<Model>>
+    ): Boolean = updateOne(condition, modification).new != null
+
+    override suspend fun updateManyIgnoringResult(condition: Condition<Model>, modification: Modification<Model>): Int = updateMany(condition, modification).changes.size
+}

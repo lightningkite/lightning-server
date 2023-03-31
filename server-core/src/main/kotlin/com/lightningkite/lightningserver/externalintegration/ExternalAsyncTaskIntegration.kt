@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.tasks.task
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.serializer
 import java.time.Duration
@@ -194,7 +195,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
             recheckSet(it)
         }
     }
-    val recheckSet = task("$path/recheckSet") { ids: List<ExternalAsyncTaskRequest> ->
+    val recheckSet = task("$path/recheckSet", ListSerializer(ExternalAsyncTaskRequest.serializer())) { ids: List<ExternalAsyncTaskRequest> ->
         api().check(ids.map { it._id }).forEach { result -> handleResult(result.key, result.value) }
     }
 
