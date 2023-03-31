@@ -7,7 +7,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-object WebSocketIdentifierSerializer: KSerializer<WebSocketIdentifier> {
+object WebSocketIdentifierSerializer : KSerializer<WebSocketIdentifier> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("WebSocketIdentifier", PrimitiveKind.STRING)
     override fun deserialize(decoder: Decoder): WebSocketIdentifier = WebSocketIdentifier(decoder.decodeString())
     override fun serialize(encoder: Encoder, value: WebSocketIdentifier) {

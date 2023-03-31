@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import java.time.Instant
 
-class DatabaseMetrics(val settings: MetricSettings, val database: () -> Database) :
+class DatabaseMetrics(override val settings: MetricSettings, val database: () -> Database) :
     ServerPathGroup(ServerPath.root.path("meta/metrics")), Metrics {
     init {
         prepareModels()
@@ -62,9 +62,9 @@ class DatabaseMetrics(val settings: MetricSettings, val database: () -> Database
                 }
             }
         }
-        Metrics.logger.info("Sending reports...")
+        Metrics.logger.debug("Sending reports...")
         jobs.forEach { it.join() }
-        Metrics.logger.info("Reports sent.")
+        Metrics.logger.debug("Reports sent.")
         Unit
     }
 

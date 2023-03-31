@@ -10,18 +10,15 @@ import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseContextualSerialization
 import java.time.Duration
 import java.time.Instant
-import java.util.*
 
 class UploadEarlyEndpoint(
     path: ServerPath,
     val files: () -> FileSystem,
     val database: () -> Database,
     val signer: () -> JwtSigner,
-    val filePath:String = ExternalServerFileSerializer.uploadPath
+    val filePath: String = ExternalServerFileSerializer.uploadPath
 ) : ServerPathGroup(path) {
 
     companion object {

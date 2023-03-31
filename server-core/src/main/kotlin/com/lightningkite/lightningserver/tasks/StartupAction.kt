@@ -5,5 +5,5 @@ data class StartupAction(
      * Higher priorities occur first
      */
     val priority: Double,
-    val action: suspend ()->Unit
+    val action: suspend () -> Unit
 )

@@ -9,7 +9,6 @@ import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.websocket.WebSockets
-import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -27,7 +26,8 @@ interface Documentable {
         val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *>>()
         val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *, *>>()
         val all get() = endpoints + websockets
-        val usedTypes: Collection<KSerializer<*>> get() {
+        val usedTypes: Collection<KSerializer<*>>
+            get() {
                 val seen: HashSet<SerialDescriptor> = HashSet()
                 fun onAllTypes(at: KSerializer<*>, action: (KSerializer<*>) -> Unit) {
                     val real = (at.nullElement() ?: at).uncontextualize()
@@ -35,6 +35,7 @@ interface Documentable {
                     action(real)
                     real.subAndChildSerializers().forEach { onAllTypes(it, action) }
                 }
+
                 val types = HashMap<String, KSerializer<*>>()
                 endpoints.flatMap {
                     sequenceOf(it.inputType, it.outputType)
@@ -43,11 +44,14 @@ interface Documentable {
                 })
                     .forEach { onAllTypes(it) { types[it.descriptor.serialName.substringBefore('<')] = it } }
                 return types.values
-        }
+            }
     }
 }
+
 val Documentable.docGroup: String? get() = generateSequence(path) { it.parent }.mapNotNull { it.docName }.firstOrNull()
-val Documentable.functionName: String get() = summary.split(' ').joinToString("") { it.replaceFirstChar { it.uppercase() } }.replaceFirstChar { it.lowercase() }
+val Documentable.functionName: String
+    get() = summary.split(' ').joinToString("") { it.replaceFirstChar { it.uppercase() } }
+        .replaceFirstChar { it.lowercase() }
 
 internal fun KSerializer<*>.subSerializers(): Array<KSerializer<*>> = listElement()?.let { arrayOf(it) }
     ?: mapValueElement()?.let { arrayOf(it) }
@@ -55,16 +59,19 @@ internal fun KSerializer<*>.subSerializers(): Array<KSerializer<*>> = listElemen
     ?: (this as? ConditionSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: (this as? ModificationSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: arrayOf()
+
 internal fun KSerializer<*>.subAndChildSerializers(): Array<KSerializer<*>> = listElement()?.let { arrayOf(it) }
     ?: mapValueElement()?.let { arrayOf(it) }
     ?: (this as? GeneratedSerializer<*>)?.run { childSerializers() + typeParametersSerializers() }
     ?: (this as? ConditionSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: (this as? ModificationSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: arrayOf()
+
 internal fun KSerializer<*>.uncontextualize(): KSerializer<*> {
     return if (this.descriptor.kind == SerialKind.CONTEXTUAL) {
-        Serialization.json.serializersModule.getContextual(descriptor.capturedKClass ?: throw IllegalStateException("No captured KClass found for $descriptor"))
+        Serialization.json.serializersModule.getContextual(
+            descriptor.capturedKClass ?: throw IllegalStateException("No captured KClass found for $descriptor")
+        )
             ?: throw IllegalStateException("No contextual serializer found for ${descriptor.capturedKClass!!.qualifiedName}")
-    }
-    else this
+    } else this
 }

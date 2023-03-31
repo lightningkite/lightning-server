@@ -1,24 +1,18 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.client
-import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.exceptions.NotFoundException
-import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.routes.fullUrl
+import com.lightningkite.lightningserver.http.HttpEndpoint
+import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.get
+import com.lightningkite.lightningserver.http.handler
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.encodeToFormData
-import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.serialization.queryParameters
-import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.statusFailing
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
-import io.ktor.http.*
-import io.ktor.util.*
 import kotlinx.serialization.Serializable
-import java.util.*
 
 
 /**
@@ -28,10 +22,10 @@ import java.util.*
  * Get the client ID and a client secret to put into your [setting] parameter.
  * Return URLs are your auth url + /oauth/github/callback
  */
-class OauthGitHubEndpoints<USER: Any, ID>(
+class OauthGitHubEndpoints<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val access: UserExternalServiceAccess<USER, ID>,
-    val setting: ()->OauthProviderCredentials,
+    val setting: () -> OauthProviderCredentials,
     override val scope: String = "user:email"
 ) : ServerPathGroup(base.path.path("oauth/github")), OauthMixin {
     override val niceName = "GitHub"
@@ -79,7 +73,7 @@ class OauthGitHubEndpoints<USER: Any, ID>(
             val primary = response2.firstOrNull { it.primary }
                 ?: response2.firstOrNull()
                 ?: return@run null
-            if(primary.verified) primary.email else null
+            if (primary.verified) primary.email else null
         }
         val idResults = ExternalServiceLogin(
             service = niceName,

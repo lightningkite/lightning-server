@@ -1,8 +1,7 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.core.ServerPathMatcher
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class HttpEndpointMatcherTest {
@@ -36,11 +35,26 @@ class HttpEndpointMatcherTest {
         assertEquals(HttpEndpointMatcher.Match(testSlash, mapOf(), null), matcher.match("test/", HttpMethod.GET))
         assertEquals(HttpEndpointMatcher.Match(testA, mapOf(), null), matcher.match("test/a", HttpMethod.GET))
         assertEquals(HttpEndpointMatcher.Match(testAB, mapOf(), null), matcher.match("test/a/b", HttpMethod.GET))
-        assertEquals(HttpEndpointMatcher.Match(testXB, mapOf("first" to "c"), null), matcher.match("test/c/b", HttpMethod.GET))
-        assertEquals(HttpEndpointMatcher.Match(testXC, mapOf("otherName" to "c"), null), matcher.match("test/c/c", HttpMethod.GET))
-        assertEquals(HttpEndpointMatcher.Match(testAX, mapOf("second" to "x"), null), matcher.match("test/a/x", HttpMethod.GET))
-        assertEquals(HttpEndpointMatcher.Match(testXXX, mapOf(), "asdf/fdsa"), matcher.match("test/asdf/fdsa", HttpMethod.GET))
-        assertEquals(HttpEndpointMatcher.Match(testXXX, mapOf(), "asdf/fdsa/"), matcher.match("test/asdf/fdsa/", HttpMethod.GET))
+        assertEquals(
+            HttpEndpointMatcher.Match(testXB, mapOf("first" to "c"), null),
+            matcher.match("test/c/b", HttpMethod.GET)
+        )
+        assertEquals(
+            HttpEndpointMatcher.Match(testXC, mapOf("otherName" to "c"), null),
+            matcher.match("test/c/c", HttpMethod.GET)
+        )
+        assertEquals(
+            HttpEndpointMatcher.Match(testAX, mapOf("second" to "x"), null),
+            matcher.match("test/a/x", HttpMethod.GET)
+        )
+        assertEquals(
+            HttpEndpointMatcher.Match(testXXX, mapOf(), "asdf/fdsa"),
+            matcher.match("test/asdf/fdsa", HttpMethod.GET)
+        )
+        assertEquals(
+            HttpEndpointMatcher.Match(testXXX, mapOf(), "asdf/fdsa/"),
+            matcher.match("test/asdf/fdsa/", HttpMethod.GET)
+        )
         assertEquals(HttpEndpointMatcher.Match(testXXX, mapOf(), "a/"), matcher.match("test/a/", HttpMethod.GET))
     }
 }

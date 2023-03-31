@@ -1,9 +1,14 @@
 package com.lightningkite.lightningdb
 
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
+/**
+ * A FieldCollection who's underlying implementation is actually manipulating a MutableList.
+ * This is useful for times that an actual database is not needed, and you need to move fast, such as during Unit Tests.
+ */
 open class InMemoryFieldCollection<Model : Any>(val data: MutableList<Model> = ArrayList()) :
     AbstractSignalFieldCollection<Model>() {
 

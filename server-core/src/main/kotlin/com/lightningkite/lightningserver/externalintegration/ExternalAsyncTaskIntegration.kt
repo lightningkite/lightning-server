@@ -4,7 +4,6 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.AuthInfo
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.db.ModelAdminEndpoints
 import com.lightningkite.lightningserver.db.ModelInfoWithDefault
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
@@ -17,12 +16,12 @@ import com.lightningkite.lightningserver.tasks.task
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.serializer
 import java.time.Duration
 import java.time.Instant
 import java.util.*
-import kotlin.collections.HashMap
 
 class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESULT>(
     path: ServerPath,
@@ -65,7 +64,8 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
             )
         },
         forUser = { user ->
-            val admin: Condition<ExternalAsyncTaskRequest> = if (isAdmin(user)) Condition.Always() else Condition.Never()
+            val admin: Condition<ExternalAsyncTaskRequest> =
+                if (isAdmin(user)) Condition.Always() else Condition.Never()
             this
                 .withPermissions(
                     ModelPermissions(
@@ -78,15 +78,17 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
         },
         modelName = "${name.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }}Request"
     )
+
     init {
         path.docName = path.toString().replace("/", "_")
     }
+
     val rest = ModelRestEndpoints(path("rest").apply { docName = this@ExternalAsyncTaskIntegration.path.docName }, info)
 
     // Kick it off
     suspend fun <OURDATA> start(request: REQUEST, ourData: OURDATA, action: ResultAction<OURDATA, RESULT>): RESPONSE {
         val ourDataString = Serialization.Internal.json.encodeToString(action.ourDataSerialization, ourData)
-        if(idempotentBasedOnOurData) {
+        if (idempotentBasedOnOurData) {
             info.collection().findOne(condition { it.ourData.eq(ourDataString) })?.response?.let {
                 return Serialization.Internal.json.decodeFromString(responseSerializer, it)
             }
@@ -131,42 +133,44 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
         expiration: Duration = Duration.ofDays(1),
         noinline expired: suspend (OURDATA) -> Unit = {},
         noinline action: suspend (OURDATA, RESULT) -> Unit,
-    ): ResultAction<OURDATA, RESULT> = resultAction(key, Serialization.Internal.module.serializer(), expiration, expired, action)
+    ): ResultAction<OURDATA, RESULT> =
+        resultAction(key, Serialization.Internal.module.serializer(), expiration, expired, action)
 
-    val runActionResult: Task<ExternalAsyncTaskRequest> = task("$path/runActionResult") { sig: ExternalAsyncTaskRequest ->
-        @Suppress("UNCHECKED_CAST")
-        val task = sig.action?.let {
-            (resultActions[it] as? ResultAction<Any?, RESULT>) ?: run {
-                info.collection()
-                    .updateOneById(
-                        sig._id,
-                        modification {
-                            it.processingError assign "No such handler '${sig.action}'"
-                            it.lastAttempt assign Instant.now()
-                        })
-                return@task
+    val runActionResult: Task<ExternalAsyncTaskRequest> =
+        task("$path/runActionResult") { sig: ExternalAsyncTaskRequest ->
+            @Suppress("UNCHECKED_CAST")
+            val task = sig.action?.let {
+                (resultActions[it] as? ResultAction<Any?, RESULT>) ?: run {
+                    info.collection()
+                        .updateOneById(
+                            sig._id,
+                            modification {
+                                it.processingError assign "No such handler '${sig.action}'"
+                                it.lastAttempt assign Instant.now()
+                            })
+                    return@task
+                }
+            } ?: return@task
+            try {
+                val result = sig.result?.let { Serialization.Internal.json.decodeFromString(resultSerializer, it) }
+                val ourData = Serialization.Internal.json.decodeFromString(task.ourDataSerialization, sig.ourData)
+                if (result == null) {
+                    //expired
+                    task.expired(ourData)
+                } else {
+                    task.action(
+                        ourData,
+                        result
+                    )
+                }
+                info.collection().deleteOneById(sig._id)
+            } catch (e: Exception) {
+                info.collection().updateOneById(sig._id, modification {
+                    it.processingError assign e.stackTraceToString()
+                    it.lastAttempt assign Instant.now()
+                })
             }
-        } ?: return@task
-        try {
-            val result = sig.result?.let { Serialization.Internal.json.decodeFromString(resultSerializer, it) }
-            val ourData = Serialization.Internal.json.decodeFromString(task.ourDataSerialization, sig.ourData)
-            if (result == null) {
-                //expired
-                task.expired(ourData)
-            } else {
-                task.action(
-                    ourData,
-                    result
-                )
-            }
-            info.collection().deleteOneById(sig._id)
-        } catch (e: Exception) {
-            info.collection().updateOneById(sig._id, modification {
-                it.processingError assign e.stackTraceToString()
-                it.lastAttempt assign Instant.now()
-            })
         }
-    }
 
     // Regular re-check test
     suspend fun check(id: String) {
@@ -174,14 +178,16 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
     }
 
     suspend fun check(ids: List<String>) = coroutineScope {
-        recheckSet.implementation(this, info.collection().find(
-            condition { it._id inside ids }).toList()
+        recheckSet.implementation(
+            this, info.collection().find(
+                condition { it._id inside ids }).toList()
         )
     }
 
     val recheck = schedule("$path/recheck", checkFrequency) {
         info.collection().find(condition {
-            (it.result neq null) and (it.expiresAt lt Instant.now()) and (it.lastAttempt lt Instant.now().plus(taskTimeout))
+            (it.result neq null) and (it.expiresAt lt Instant.now()) and (it.lastAttempt lt Instant.now()
+                .plus(taskTimeout))
         }).collect {
             runActionResult(it)
         }
@@ -194,7 +200,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
             recheckSet(it)
         }
     }
-    val recheckSet = task("$path/recheckSet") { ids: List<ExternalAsyncTaskRequest> ->
+    val recheckSet = task("$path/recheckSet", ListSerializer(ExternalAsyncTaskRequest.serializer())) { ids: List<ExternalAsyncTaskRequest> ->
         api().check(ids.map { it._id }).forEach { result -> handleResult(result.key, result.value) }
     }
 

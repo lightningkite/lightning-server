@@ -6,6 +6,11 @@ import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.typed.typed
 import java.time.Instant
 
+/**
+ * An ExceptionReporter implementation that logs all reports out to a logger using debug and stores the most recent 100 exceptions.
+ * An endpoint is added for retrieving the recent exceptions.
+ * This is useful in a local development environment.
+ */
 object DebugExceptionReporter : ExceptionReporter {
     val previousErrors = ArrayList<Triple<Instant, Throwable, Any?>>()
     override suspend fun report(t: Throwable, context: Any?): Boolean {

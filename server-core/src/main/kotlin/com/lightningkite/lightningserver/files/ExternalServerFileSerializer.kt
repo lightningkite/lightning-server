@@ -14,20 +14,20 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import org.slf4j.LoggerFactory
 import java.net.URLDecoder
-import java.util.Base64
+import java.util.*
 
 /**
  * Used to serialize and deserialize a ServerFile as a String. This will also handle security for ServerFiles.
  * If security is required it will serialize as a pre-signed URL. It will also check deserializing of url to confirm it is valid.
  */
-object ExternalServerFileSerializer: KSerializer<ServerFile> {
+object ExternalServerFileSerializer : KSerializer<ServerFile> {
 
-    var fileValidators: List<(url:String, param: Map<String, String>) -> Boolean> = listOf()
+    var fileValidators: List<(url: String, param: Map<String, String>) -> Boolean> = listOf()
     lateinit var fileSystem: () -> FileSystem
-    var uploadPath:String = "uploaded"
+    var uploadPath: String = "uploaded"
 
     @OptIn(ExperimentalSerializationApi::class)
-    override val descriptor: SerialDescriptor = object: SerialDescriptor {
+    override val descriptor: SerialDescriptor = object : SerialDescriptor {
         override val kind: SerialKind = PrimitiveKind.STRING
         override val serialName: String = "ServerFile"
         override val elementsCount: Int get() = 0
@@ -43,8 +43,9 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
 
     override fun serialize(encoder: Encoder, value: ServerFile) {
         val file = FileSystem.resolve(value.location)
-        if(file == null) {
-            LoggerFactory.getLogger("com.lightningkite.lightningserver.files").warn("The given url (${value.location}) does not start with any files root. Known roots: ${FileSystem.urlRoots}")
+        if (file == null) {
+            LoggerFactory.getLogger("com.lightningkite.lightningserver.files")
+                .warn("The given url (${value.location}) does not start with any files root. Known roots: ${FileSystem.urlRoots}")
             encoder.encodeString(value.location)
         } else {
             encoder.encodeString(file.signedUrl)
@@ -53,7 +54,7 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
 
     override fun deserialize(decoder: Decoder): ServerFile {
         val raw = decoder.decodeString()
-        if(raw.startsWith("data:")) {
+        if (raw.startsWith("data:")) {
             val type = ContentType(raw.removePrefix("data:").substringBefore(';'))
             val base64 = raw.substringAfter("base64,")
             val data = Base64.getDecoder().decode(base64)
@@ -66,7 +67,8 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
             }
             return ServerFile(file.url)
         } else {
-            val file = FileSystem.resolve(raw.substringBefore('?')) ?: throw BadRequestException("The given url ($raw) does not start with any files root.  Known roots: ${FileSystem.urlRoots}")
+            val file = FileSystem.resolve(raw.substringBefore('?'))
+                ?: throw BadRequestException("The given url ($raw) does not start with any files root.  Known roots: ${FileSystem.urlRoots}")
             val paramString = raw.substringAfter('?')
             val paramMap = paramString.split('&').associate {
                 URLDecoder.decode(it.substringBefore('='), Charsets.UTF_8) to URLDecoder.decode(
@@ -76,7 +78,7 @@ object ExternalServerFileSerializer: KSerializer<ServerFile> {
                     ), Charsets.UTF_8
                 )
             }
-            if(fileValidators.any { it(file.url, paramMap) } || file.checkSignature(paramString))
+            if (fileValidators.any { it(file.url, paramMap) } || file.checkSignature(paramString))
                 return ServerFile(file.url)
             else
                 throw BadRequestException("URL does not appear to be signed properly")

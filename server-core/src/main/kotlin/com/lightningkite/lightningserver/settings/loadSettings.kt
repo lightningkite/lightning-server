@@ -1,11 +1,11 @@
 package com.lightningkite.lightningserver.settings
 
+import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
-import kotlinx.serialization.properties.decodeFromStringMap
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -25,7 +25,7 @@ fun loadSettings(settingsFile: File): Settings {
         Settings.populateDefaults()
         settingsFile.writeText(json.encodeToString(Settings))
 
-        println("Need a settings file - example generated at ${settingsFile.absolutePath}.")
+        logger.error("Need a settings file - example generated at ${settingsFile.absolutePath}.")
         exitProcess(1)
     }
     try {
@@ -35,8 +35,9 @@ fun loadSettings(settingsFile: File): Settings {
             encodeDefaults = true
             serializersModule = Serialization.module
         }
-        val suggested = settingsFile.absoluteFile.parentFile.resolve(settingsFile.nameWithoutExtension + ".suggested.json")
-        println("Settings were incorrect.  Suggested updates are inside ${suggested.absolutePath}.")
+        val suggested =
+            settingsFile.absoluteFile.parentFile.resolve(settingsFile.nameWithoutExtension + ".suggested.json")
+        logger.error("Settings were incorrect.  Suggested updates are inside ${suggested.absolutePath}.")
         Settings.populateDefaults()
         suggested.writeText(json.encodeToString(Settings))
         e.printStackTrace()

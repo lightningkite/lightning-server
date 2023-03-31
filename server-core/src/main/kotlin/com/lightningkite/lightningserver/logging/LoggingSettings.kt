@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.logging
 
 import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.Logger as LogbackLogger
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder
 import ch.qos.logback.classic.spi.ILoggingEvent
@@ -12,6 +11,7 @@ import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.Serializable
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import ch.qos.logback.classic.Logger as LogbackLogger
 
 /**
  * LoggingSettings configures what the logging of the server should look like.

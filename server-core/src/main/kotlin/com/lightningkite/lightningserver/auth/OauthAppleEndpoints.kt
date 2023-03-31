@@ -1,10 +1,8 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.client
-import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.exceptions.BadRequestException
-import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -15,9 +13,7 @@ import com.lightningkite.lightningserver.statusFailing
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import io.ktor.util.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.slf4j.LoggerFactory
@@ -45,17 +41,18 @@ import java.util.*
  *     keyId: Your key's ID
  *     keyString: the contents of the P8 without the begin/end private key annotations
  */
-class OauthAppleEndpoints<USER: Any, ID>(
+class OauthAppleEndpoints<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val access: UserExternalServiceAccess<USER, ID>,
-    val setting: ()->OauthAppleSettings,
-): ServerPathGroup(base.path.path("oauth/apple")) {
+    val setting: () -> OauthAppleSettings,
+) : ServerPathGroup(base.path.path("oauth/apple")) {
 
     companion object {
         val logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.auth.OauthAppleEndpoints")
     }
 
-    @Serializable data class OauthAppleSettings(
+    @Serializable
+    data class OauthAppleSettings(
         val serviceId: String,
         val teamId: String,
         val keyId: String,
@@ -64,11 +61,13 @@ class OauthAppleEndpoints<USER: Any, ID>(
         fun generateJwt(): String {
             return buildString {
                 val withDefaults = Json { encodeDefaults = true; explicitNulls = false }
-                append(Base64.getUrlEncoder().withoutPadding().encodeToString(withDefaults.encodeToString(buildJsonObject {
+                append(
+                    Base64.getUrlEncoder().withoutPadding().encodeToString(withDefaults.encodeToString(buildJsonObject {
 //                    put("typ", "JWT")
-                    put("kid", keyId)
-                    put("alg", "ES256")
-                }).toByteArray()))
+                        put("kid", keyId)
+                        put("alg", "ES256")
+                    }).toByteArray())
+                )
                 append('.')
                 val issuedAt = Instant.now().minus(Duration.ofDays(1))
                 append(
@@ -87,7 +86,8 @@ class OauthAppleEndpoints<USER: Any, ID>(
                 val soFar = this.toString()
                 append('.')
                 append(
-                    Base64.getUrlEncoder().withoutPadding().encodeToString(SecureHasher.ECDSA256(keyString).sign(soFar.toByteArray()))
+                    Base64.getUrlEncoder().withoutPadding()
+                        .encodeToString(SecureHasher.ECDSA256(keyString).sign(soFar.toByteArray()))
                 )
             }
         }
@@ -131,16 +131,19 @@ class OauthAppleEndpoints<USER: Any, ID>(
             throw BadRequestException("Got error code '${it}' from $niceName.")
         } ?: oauth.code?.let { code ->
             return client.post(getTokenUrl) {
-                setBody(Serialization.properties.encodeToFormData(OauthTokenRequest(
-                    code = code,
-                    client_id = setting().serviceId,
-                    client_secret = setting().generateJwt(),
-                    redirect_uri = callback.path.fullUrl(),
-                    grant_type = "authorization_code",
-                )).also { if(generalSettings().debug) logger.info("$getTokenUrl <- $it") })
+                setBody(Serialization.properties.encodeToFormData(
+                    OauthTokenRequest(
+                        code = code,
+                        client_id = setting().serviceId,
+                        client_secret = setting().generateJwt(),
+                        redirect_uri = callback.path.fullUrl(),
+                        grant_type = "authorization_code",
+                    )
+                ).also { if (generalSettings().debug) logger.info("$getTokenUrl <- $it") })
                 contentType(ContentType.Application.FormUrlEncoded)
                 accept(ContentType.Application.Json)
-            }.also { if(generalSettings().debug) logger.info("$getTokenUrl result ${it.status}") }.statusFailing().body<OauthResponse>()
+            }.also { if (generalSettings().debug) logger.info("$getTokenUrl result ${it.status}") }.statusFailing()
+                .body<OauthResponse>()
         }
         throw BadRequestException("Code is empty")
     }

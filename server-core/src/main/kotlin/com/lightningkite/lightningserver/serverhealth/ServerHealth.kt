@@ -15,12 +15,15 @@ data class ServerHealth(
     constructor(
         features: Map<String, HealthStatus>,
     ) : this(
-        serverId = System.getenv("AWS_LAMBDA_LOG_STREAM_NAME")?.takeUnless { it.isEmpty() } ?: NetworkInterface.getNetworkInterfaces().toList().sortedBy { it.name } .firstOrNull()?.hardwareAddress?.sumOf { it.hashCode() }?.toString(16) ?: "?",
+        serverId = System.getenv("AWS_LAMBDA_LOG_STREAM_NAME")?.takeUnless { it.isEmpty() }
+            ?: NetworkInterface.getNetworkInterfaces().toList().sortedBy { it.name }
+                .firstOrNull()?.hardwareAddress?.sumOf { it.hashCode() }?.toString(16) ?: "?",
         version = System.getenv("AWS_LAMBDA_FUNCTION_VERSION")?.takeUnless { it.isEmpty() } ?: "Unknown",
         memory = Memory(),
         features = features,
         loadAverageCpu = ManagementFactory.getOperatingSystemMXBean().systemLoadAverage,
     )
+
     companion object {
         val healthCache = HashMap<HealthCheckable, HealthStatus>()
     }

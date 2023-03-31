@@ -8,7 +8,6 @@ import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.*
 import kotlinx.serialization.json.JsonObject
 import java.io.File
-import java.util.concurrent.ConcurrentHashMap
 
 object SettingsSerializer : KSerializer<Settings> {
     val parts = Settings.requirements.values.sortedBy { it.name }
@@ -27,14 +26,15 @@ object SettingsSerializer : KSerializer<Settings> {
                 val index = decodeElementIndex(descriptor)
                 if (index == CompositeDecoder.DECODE_DONE) break
                 if (index == CompositeDecoder.UNKNOWN_NAME) continue
-                if(index == parts.size) {
+                if (index == parts.size) {
                     val f = File(decodeStringElement(descriptor, index).replace("~", System.getProperty("user.home")))
-                    when(f.extension) {
+                    when (f.extension) {
                         "json" -> Serialization.Internal.json.parseToJsonElement(f.readText())
                             .let { it as JsonObject }
                             .entries.forEach { entry ->
                                 val setting = parts.find { it.name == entry.key } ?: return@forEach
-                                lowPriorityMap[setting.name] = Serialization.json.decodeFromJsonElement(setting.serializer, entry.value)
+                                lowPriorityMap[setting.name] =
+                                    Serialization.json.decodeFromJsonElement(setting.serializer, entry.value)
                             }
                     }
                 } else {

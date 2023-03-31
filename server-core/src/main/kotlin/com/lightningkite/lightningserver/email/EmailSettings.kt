@@ -2,8 +2,6 @@ package com.lightningkite.lightningserver.email
 
 import com.lightningkite.lightningserver.settings.Pluggable
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
-import java.lang.IllegalStateException
 
 /**
  * EmailSettings defines where to send emails, and any credentials that may be required to do so.
@@ -33,7 +31,9 @@ data class EmailSettings(
                     ?: throw IllegalStateException("Invalid Mailgun URL. The URL should match the pattern: mailgun://[key]@[domain]")
             }
             EmailSettings.register("smtp") {
-                Regex("""smtp://(?<username>[^:]+):(?<password>[^@]+)@(?<host>[^:]+):(?<port>[0-9]+)(?:\?(?<params>.*))?""").matchEntire(it.url)?.let { match ->
+                Regex("""smtp://(?<username>[^:]+):(?<password>[^@]+)@(?<host>[^:]+):(?<port>[0-9]+)(?:\?(?<params>.*))?""").matchEntire(
+                    it.url
+                )?.let { match ->
                     val port = match.groups["port"]!!.value.toInt()
                     val params = EmailSettings.parseParameterString(match.groups["params"]?.value ?: "")
                     SmtpEmailClient(
@@ -43,7 +43,8 @@ data class EmailSettings(
                             username = match.groups["username"]!!.value,
                             password = match.groups["password"]!!.value,
                             useSSL = port != 25,
-                            fromEmail = params["fromEmail"]?.first() ?: it.fromEmail ?: throw IllegalStateException("SMTP Email requires a fromEmail to be set.")
+                            fromEmail = params["fromEmail"]?.first() ?: it.fromEmail
+                            ?: throw IllegalStateException("SMTP Email requires a fromEmail to be set.")
                         )
                     )
                 }

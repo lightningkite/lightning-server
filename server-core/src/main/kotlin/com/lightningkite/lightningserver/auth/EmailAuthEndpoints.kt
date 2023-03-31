@@ -90,6 +90,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
     private val oauthMicrosoft: OauthMicrosoftEndpoints<USER, ID>? by lazy {
         oauthMicrosoftSettings()?.let { OauthMicrosoftEndpoints(base, emailAccess.asExternal(), { it }) }
     }
+
     init {
         Tasks.onSettingsReady {
             oauthGoogle

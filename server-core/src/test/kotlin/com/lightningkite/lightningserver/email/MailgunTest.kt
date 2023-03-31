@@ -5,9 +5,10 @@ import org.junit.Test
 import java.io.File
 
 class MailgunTest {
-    @Test fun testMailgun() {
+    @Test
+    fun testMailgun() {
         val credentials = File("local/test-mailgun.txt")
-        if(!credentials.exists()) {
+        if (!credentials.exists()) {
             println("No credentials to test with at ${credentials.absolutePath}")
             return
         }

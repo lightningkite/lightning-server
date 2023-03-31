@@ -2,12 +2,15 @@ package com.lightningkite.lightningdb
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlin.reflect.KProperty1
 import kotlin.reflect.KType
 
+/**
+ * Wraps a FieldCollection with the sole purpose of adding a delay in the response to every call.
+ * @param wraps The actual underlying FieldCollection to retrieve data from.
+ * @param milliseconds The amount of delay that will be added to every call.
+ */
 open class DelayedFieldCollection<Model : Any>(
     override val wraps: FieldCollection<Model>,
     val milliseconds: Long
@@ -21,6 +24,7 @@ open class DelayedFieldCollection<Model : Any>(
         limit: Int,
         maxQueryMs: Long,
     ): Flow<Model> = wraps.find(condition, orderBy, skip, limit, maxQueryMs).onStart { delay(milliseconds) }
+
     override suspend fun count(condition: Condition<Model>): Int {
         delay(milliseconds)
         return wraps.count(condition)
@@ -150,7 +154,7 @@ open class DelayedFieldCollection<Model : Any>(
 fun <Model : Any> FieldCollection<Model>.delayed(milliseconds: Long): FieldCollection<Model> =
     DelayedFieldCollection(this, milliseconds)
 
-fun Database.delayed(milliseconds: Long): Database = object: Database by this {
+fun Database.delayed(milliseconds: Long): Database = object : Database by this {
     override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> {
         return this@delayed.collection<T>(type, name).delayed(milliseconds)
     }

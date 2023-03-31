@@ -1,12 +1,10 @@
 package com.lightningkite.lightningdb
 
-import com.github.jershell.kbson.BigDecimalSerializer
-import com.github.jershell.kbson.ByteArraySerializer
-import com.github.jershell.kbson.DateSerializer
-import com.github.jershell.kbson.ObjectIdSerializer
+import com.github.jershell.kbson.*
 import com.lightningkite.lightningdb.*
 import com.mongodb.client.model.UpdateOptions
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.*
 import org.bson.BsonDocument
 import org.bson.BsonTimestamp
@@ -169,10 +167,34 @@ data class UpdateWithOptions(
 
 fun Condition<*>.bson() = Document().also { simplify().dump(it, null) }
 fun Modification<*>.bson(): UpdateWithOptions = UpdateWithOptions().also { simplify().dump(it, null) }
-fun UpdateWithOptions.upsert(model: Any?): UpdateWithOptions {
+fun <T> UpdateWithOptions.upsert(model: T, serializer: KSerializer<T>): Boolean {
+    val set = (document["\$set"] as? Document) ?: document["\$set"]?.let { MongoDatabase.bson.stringify(serializer, it as T) }?.toDocument()
+    val inc = (document["\$inc"] as? Document)
+    val restrict = document.entries.asSequence()
+        .filter { it.key != "\$set" && it.key != "\$inc" }
+        .map { it.value }
+        .filterIsInstance<Document>()
+        .flatMap { it.keys }
+        .toSet()
+    document["\$setOnInsert"] = MongoDatabase.bson.stringify(serializer, model).toDocument().also {
+        set?.keys?.forEach { k ->
+            if(it[k] == set[k]) it.remove(k)
+            else {
+                return false
+            }
+        }
+        inc?.keys?.forEach { k ->
+            if((it[k] as Number).toDouble() == (inc[k] as Number).toDouble()) it.remove(k)
+            else {
+                return false
+            }
+        }
+        restrict.forEach { k ->
+            if(it.containsKey(k)) return false
+        }
+    }
     options = options.upsert(true)
-    document["\$setOnInsert"] = model
-    return this
+    return true
 }
 
 @OptIn(ExperimentalSerializationApi::class)

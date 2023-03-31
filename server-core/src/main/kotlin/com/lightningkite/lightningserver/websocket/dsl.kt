@@ -9,7 +9,7 @@ fun ServerPath.websocket(
     message: suspend (WebSockets.MessageEvent) -> Unit = { },
     disconnect: suspend (WebSockets.DisconnectEvent) -> Unit = {}
 ): ServerPath {
-    WebSockets.handlers[this] = object: WebSockets.Handler {
+    WebSockets.handlers[this] = object : WebSockets.Handler {
         override suspend fun connect(event: WebSockets.ConnectEvent) = connect(event)
         override suspend fun message(event: WebSockets.MessageEvent) = message(event)
         override suspend fun disconnect(event: WebSockets.DisconnectEvent) = disconnect(event)

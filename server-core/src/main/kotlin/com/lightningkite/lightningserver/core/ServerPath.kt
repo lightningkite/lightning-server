@@ -14,9 +14,9 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
 
         companion object {
             fun fromString(string: String): Afterwards {
-                if(string.endsWith("/{...}"))
+                if (string.endsWith("/{...}"))
                     return ChainedWildcard
-                else if(string.endsWith("/"))
+                else if (string.endsWith("/"))
                     return TrailingSlash
                 else return None
             }
@@ -47,18 +47,19 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
         }
     }
 
-    val parent: ServerPath? get() {
-        return when {
-            after == Afterwards.ChainedWildcard -> ServerPath(segments, Afterwards.TrailingSlash)
-            after == Afterwards.TrailingSlash -> ServerPath(segments, Afterwards.None)
-            segments.isEmpty() -> null
-            else -> ServerPath(segments.dropLast(1))
+    val parent: ServerPath?
+        get() {
+            return when {
+                after == Afterwards.ChainedWildcard -> ServerPath(segments, Afterwards.TrailingSlash)
+                after == Afterwards.TrailingSlash -> ServerPath(segments, Afterwards.None)
+                segments.isEmpty() -> null
+                else -> ServerPath(segments.dropLast(1))
+            }
         }
-    }
 
     constructor(string: String) : this(
         segments = Segment.fromString(string),
-        after = if(string.trim() == "/") Afterwards.None else Afterwards.fromString(string)
+        after = if (string.trim() == "/") Afterwards.None else Afterwards.fromString(string)
     )
 
     @LightningServerDsl
@@ -68,21 +69,23 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
     )
         .apply(configure)
 
-    override fun toString(): String = "/" + segments.joinToString("/") + when(after) {
+    override fun toString(): String = "/" + segments.joinToString("/") + when (after) {
         Afterwards.None -> ""
         Afterwards.TrailingSlash -> "/"
         Afterwards.ChainedWildcard -> "/{...}"
     }
-    fun toString(parts: Map<String, String> = mapOf(), wildcard: String = ""): String = "/" + segments.joinToString("/") {
-        when(it) {
-            is Segment.Constant -> it.value
-            is Segment.Wildcard -> parts[it.name]?.encodeURLPathPart() ?: ""
+
+    fun toString(parts: Map<String, String> = mapOf(), wildcard: String = ""): String =
+        "/" + segments.joinToString("/") {
+            when (it) {
+                is Segment.Constant -> it.value
+                is Segment.Wildcard -> parts[it.name]?.encodeURLPathPart() ?: ""
+            }
+        } + when (after) {
+            Afterwards.None -> ""
+            Afterwards.TrailingSlash -> "/"
+            Afterwards.ChainedWildcard -> "/$wildcard"
         }
-    } + when(after) {
-        Afterwards.None -> ""
-        Afterwards.TrailingSlash -> "/"
-        Afterwards.ChainedWildcard -> "/$wildcard"
-    }
 
     data class Match(
         val path: ServerPath,
@@ -91,31 +94,34 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
     )
 
     fun match(pathParts: List<String>, endingSlash: Boolean): Match? {
-        if(segments.size > pathParts.size) return null
-        if(after != Afterwards.ChainedWildcard && pathParts.size != segments.size) return null
-        when(after) {
-            Afterwards.None -> if(endingSlash) return null
-            Afterwards.TrailingSlash -> if(!endingSlash) return null
+        if (segments.size > pathParts.size) return null
+        if (after != Afterwards.ChainedWildcard && pathParts.size != segments.size) return null
+        when (after) {
+            Afterwards.None -> if (endingSlash) return null
+            Afterwards.TrailingSlash -> if (!endingSlash) return null
             Afterwards.ChainedWildcard -> {}
         }
         val parts = HashMap<String, String>()
         segments.asSequence().zip(pathParts.asSequence())
             .forEach {
-                when(val s = it.first) {
-                    is Segment.Constant -> if(s.value != it.second) return null
+                when (val s = it.first) {
+                    is Segment.Constant -> if (s.value != it.second) return null
                     is Segment.Wildcard -> parts[s.name] = it.second.decodeURLPart()
                 }
             }
         return Match(
             path = this,
             parts = parts,
-            wildcard = if(after == Afterwards.ChainedWildcard) pathParts.drop(segments.size).joinToString("/") + (if(endingSlash) "/" else "") else null
+            wildcard = if (after == Afterwards.ChainedWildcard) pathParts.drop(segments.size)
+                .joinToString("/") + (if (endingSlash) "/" else "") else null
         )
     }
 
-    fun toggleEndingSlash() = copy(after = when(after) {
-        ServerPath.Afterwards.TrailingSlash -> ServerPath.Afterwards.None
-        ServerPath.Afterwards.None -> ServerPath.Afterwards.TrailingSlash
-        ServerPath.Afterwards.ChainedWildcard -> throw IllegalArgumentException()
-    })
+    fun toggleEndingSlash() = copy(
+        after = when (after) {
+            ServerPath.Afterwards.TrailingSlash -> ServerPath.Afterwards.None
+            ServerPath.Afterwards.None -> ServerPath.Afterwards.TrailingSlash
+            ServerPath.Afterwards.ChainedWildcard -> throw IllegalArgumentException()
+        }
+    )
 }
