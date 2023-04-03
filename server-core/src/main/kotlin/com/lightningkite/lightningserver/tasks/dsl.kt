@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.tasks
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
+import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -13,7 +14,7 @@ import java.time.Instant
 
 @LightningServerDsl
 inline fun <reified INPUT> task(name: String, noinline implementation: suspend CoroutineScope.(INPUT) -> Unit) =
-    task(name, serializer<INPUT>(), implementation)
+    task(name, Serialization.module.serializer<INPUT>(), implementation)
 
 @LightningServerDsl
 fun <INPUT> task(name: String, serializer: KSerializer<INPUT>, implementation: suspend CoroutineScope.(INPUT) -> Unit) =
