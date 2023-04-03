@@ -46,6 +46,9 @@ fun Modification<*>.referencesFieldRead(field: KProperty1<*, *>): Boolean = when
     else -> false
 }
 
+/**
+ * Returns the condition on the given child field.
+ */
 fun <T, V> Condition<T>.forField(field: KProperty1<T, V>): Condition<V> =
     forFieldOrNull(field) ?: Condition.Always()
 

@@ -2,6 +2,10 @@ package com.lightningkite.lightningdb
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
+/**
+ * Used as the root for handling raw signals.
+ * Raw signals are used primarily to handle websockets.
+ */
 abstract class AbstractSignalFieldCollection<Model : Any> : FieldCollection<Model> {
 
     val signals = ConcurrentLinkedQueue<suspend (CollectionChanges<Model>) -> Unit>()
