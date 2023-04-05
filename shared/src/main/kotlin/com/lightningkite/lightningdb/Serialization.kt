@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -13,19 +14,23 @@ import java.time.format.DateTimeParseException
 import java.util.*
 
 
-object UUIDSerializer: KSerializer<UUID> {
+object UUIDSerializer : KSerializer<UUID> {
     override fun deserialize(decoder: Decoder): UUID = UUID.fromString(decoder.decodeString())
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.util.UUID", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: UUID) = encoder.encodeString(value.toString())
 }
 
-object InstantSerializer: KSerializer<Instant> {
+object InstantSerializer : KSerializer<Instant> {
     override fun deserialize(decoder: Decoder): Instant {
         val text = decoder.decodeString()
-        return try {
-            Instant.parse(text)
+        try {
+            return try {
+                Instant.parse(text)
+            } catch (e: DateTimeParseException) {
+                Instant.parse(text + "z")
+            }
         } catch (e: DateTimeParseException) {
-            Instant.parse(text + "z")
+            throw SerializationException(e.message)
         }
     }
 
@@ -33,43 +38,64 @@ object InstantSerializer: KSerializer<Instant> {
     override fun serialize(encoder: Encoder, value: Instant) = encoder.encodeString(value.toString())
 }
 
-object ZonedDateTimeSerializer: KSerializer<ZonedDateTime> {
-    override fun deserialize(decoder: Decoder): ZonedDateTime = ZonedDateTime.parse(decoder.decodeString())
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.time.ZonedDateTime", PrimitiveKind.STRING)
+object ZonedDateTimeSerializer : KSerializer<ZonedDateTime> {
+    override fun deserialize(decoder: Decoder): ZonedDateTime = try {
+        ZonedDateTime.parse(decoder.decodeString())
+    } catch (e: DateTimeParseException) {
+        throw SerializationException(e.message)
+    }
+
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("java.time.ZonedDateTime", PrimitiveKind.STRING)
+
     override fun serialize(encoder: Encoder, value: ZonedDateTime) = encoder.encodeString(value.toString())
 }
 
-object LocalDateSerializer: KSerializer<LocalDate> {
-    override fun deserialize(decoder: Decoder): LocalDate = LocalDate.parse(decoder.decodeString().trim('z', 'Z'))
+object LocalDateSerializer : KSerializer<LocalDate> {
+    override fun deserialize(decoder: Decoder): LocalDate = try {
+        LocalDate.parse(decoder.decodeString().trim('z', 'Z'))
+    } catch (e: DateTimeParseException) {
+        throw SerializationException(e.message)
+    }
+
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.time.LocalDate", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: LocalDate) = encoder.encodeString(value.toString())
 }
 
-object LocalTimeSerializer: KSerializer<LocalTime> {
-    override fun deserialize(decoder: Decoder): LocalTime = LocalTime.parse(decoder.decodeString().trim('z', 'Z'))
+object LocalTimeSerializer : KSerializer<LocalTime> {
+    override fun deserialize(decoder: Decoder): LocalTime = try {
+        LocalTime.parse(decoder.decodeString().trim('z', 'Z'))
+    } catch (e: DateTimeParseException) {
+        throw SerializationException(e.message)
+    }
+
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.time.LocalTime", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: LocalTime) = encoder.encodeString(value.toString())
 }
 
-object OffsetDateTimeSerializer: KSerializer<OffsetDateTime> {
-    override fun deserialize(decoder: Decoder): OffsetDateTime = OffsetDateTime.parse(decoder.decodeString())
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.time.OffsetDateTime", PrimitiveKind.STRING)
+object OffsetDateTimeSerializer : KSerializer<OffsetDateTime> {
+    override fun deserialize(decoder: Decoder): OffsetDateTime = try{ OffsetDateTime.parse(decoder.decodeString()) } catch (e:DateTimeParseException){ throw SerializationException(e.message)}
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("java.time.OffsetDateTime", PrimitiveKind.STRING)
+
     override fun serialize(encoder: Encoder, value: OffsetDateTime) = encoder.encodeString(value.toString())
 }
 
-object DurationSerializer: KSerializer<Duration> {
+object DurationSerializer : KSerializer<Duration> {
     override fun deserialize(decoder: Decoder): Duration {
         val raw = decoder.decodeString()
-        return raw.toLongOrNull()?.let { Duration.ofMillis(it) } ?: Duration.parse(raw)
+        return raw.toLongOrNull()?.let { Duration.ofMillis(it) } ?: try{ Duration.parse(raw) } catch (e:DateTimeParseException){ throw SerializationException(e.message)}
     }
+
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.time.Duration", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: Duration) = encoder.encodeString(value.toString())
 }
 
-object DurationMsSerializer: KSerializer<Duration> {
+object DurationMsSerializer : KSerializer<Duration> {
     override fun deserialize(decoder: Decoder): Duration {
         return Duration.ofMillis(decoder.decodeLong())
     }
+
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.time.Duration", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: Duration) = encoder.encodeLong(value.toMillis())
 }
@@ -88,13 +114,15 @@ val ClientModule = SerializersModule {
         OptionalSerializer(list[0] as KSerializer<Any>)
     }
 }
+
 @Suppress("OPT_IN_USAGE")
-class OptionalSerializer<T: Any>(val inner: KSerializer<T>): KSerializer<Optional<T>> {
+class OptionalSerializer<T : Any>(val inner: KSerializer<T>) : KSerializer<Optional<T>> {
     val nullable = inner.nullable
     override val descriptor: SerialDescriptor
         get() = SerialDescriptor("Optional<${inner.descriptor.serialName}>", nullable.descriptor)
+
     override fun deserialize(decoder: Decoder): Optional<T> = Optional.ofNullable(nullable.deserialize(decoder))
     override fun serialize(encoder: Encoder, value: Optional<T>) {
-        nullable.serialize(encoder, if(value.isPresent) value.get() else null)
+        nullable.serialize(encoder, if (value.isPresent) value.get() else null)
     }
 }
