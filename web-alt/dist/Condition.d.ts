@@ -56,7 +56,7 @@ declare type ArrayCondition<T, E> = T extends Array<E> ? ({
 }) | {
     ListSizesEquals: number;
 } : never;
-declare type SetCondition<T, E> = T extends Set<E> ? ({
+declare type SetCondition<T, E> = T extends Array<E> ? ({
     SetAllElements: Condition<E>;
 } | {
     SetAnyElements: Condition<E>;

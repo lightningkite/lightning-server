@@ -77,7 +77,7 @@ fun SerialDescriptor.indexes(): Set<NeededIndex> {
         }
         (0 until descriptor.elementsCount).forEach { index ->
             val sub = descriptor.getElementDescriptor(index)
-            if (sub.kind == StructureKind.CLASS) handleDescriptor(sub, descriptor.getElementName(index) + ".")
+//            if (sub.kind == StructureKind.CLASS) handleDescriptor(sub, descriptor.getElementName(index) + ".")
             descriptor.getElementAnnotations(index).forEach {
                 when (it) {
                     is NamedIndex -> out.add(

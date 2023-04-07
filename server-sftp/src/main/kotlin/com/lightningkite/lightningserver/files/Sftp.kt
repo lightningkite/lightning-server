@@ -5,6 +5,8 @@ import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import net.schmizz.sshj.Config
+import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
@@ -30,7 +32,10 @@ class Sftp(
                     val rootPath = match.groups["path"]!!.value
                     val user = match.groups["user"]!!.value
                     Sftp(host, port, rootPath) {
-                        SSHClient().apply {
+                        SSHClient(DefaultConfig().apply {
+                            if(params["algorithm"]?.firstOrNull() == "ssh-rsa")
+                                prioritizeSshRsaKeyAlgorithm()
+                        }).apply {
                             params["host"]?.let { addHostKeyVerifier(it.first()) } ?: addHostKeyVerifier(PromiscuousVerifier())
                             connect(host, port)
                             val id = params["identity"]!!.first()
