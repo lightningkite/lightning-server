@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.db.ModelInfo
+import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import kotlinx.serialization.KSerializer
 
 fun <T, USER, ID : Comparable<ID>> T.userPasswordAccess(
@@ -24,7 +25,7 @@ fun <T, USER, ID : Comparable<ID>> T.userPasswordAccess(
         override val authInfo: AuthInfo<USER>
             get() = info.serialization.authInfo
 
-        override suspend fun byId(id: ID): USER = info.collection().get(id)!!
+        override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
         override fun id(user: USER): ID = user._id
     }
@@ -48,7 +49,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailAccess(
         override val authInfo: AuthInfo<USER>
             get() = info.serialization.authInfo
 
-        override suspend fun byId(id: ID): USER = info.collection().get(id)!!
+        override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
         override fun id(user: USER): ID = user._id
     }
@@ -74,7 +75,7 @@ fun <T, USER, ID : Comparable<ID>> T.userPhoneAccess(
         override val authInfo: AuthInfo<USER>
             get() = info.serialization.authInfo
 
-        override suspend fun byId(id: ID): USER = info.collection().get(id)!!
+        override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
         override fun id(user: USER): ID = user._id
     }
@@ -106,7 +107,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailPhoneAccess(
         override val authInfo: AuthInfo<USER>
             get() = info.serialization.authInfo
 
-        override suspend fun byId(id: ID): USER = info.collection().get(id)!!
+        override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
         override fun id(user: USER): ID = user._id
     }
@@ -134,7 +135,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailAccess(
         override val authInfo: AuthInfo<USER>
             get() = info.serialization.authInfo
 
-        override suspend fun byId(id: ID): USER = info.collection().get(id)!!
+        override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
         override fun id(user: USER): ID = user._id
 
@@ -163,7 +164,7 @@ fun <T, USER, ID : Comparable<ID>> T.userPhoneAccess(
         override val authInfo: AuthInfo<USER>
             get() = info.serialization.authInfo
 
-        override suspend fun byId(id: ID): USER = info.collection().get(id)!!
+        override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
         override fun id(user: USER): ID = user._id
 
@@ -201,7 +202,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailPhoneAccess(
         override val authInfo: AuthInfo<USER>
             get() = info.serialization.authInfo
 
-        override suspend fun byId(id: ID): USER = info.collection().get(id)!!
+        override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
         override fun id(user: USER): ID = user._id
 
