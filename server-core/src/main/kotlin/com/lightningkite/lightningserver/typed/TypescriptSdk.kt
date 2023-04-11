@@ -134,7 +134,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     appendLine()
 
     appendLine("export class LiveApi implements Api {")
-    appendLine("    public constructor(public httpUrl: string, public socketUrl: string = httpUrl, public extraHeaders: Record<string, string> = {}, public errorHandlers?: Array<(x: Response)=>void>) {}")
+    appendLine("    public constructor(public httpUrl: string, public socketUrl: string = httpUrl, public extraHeaders: Record<string, string> = {}, public responseInterceptors?: (x: Response)=>Response) {}")
     for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
         append("    ")
         append(entry.functionName)
@@ -150,7 +150,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
             appendLine("                headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
         }
         appendLine("            }, ")
-        appendLine("            this.errorHandlers, ")
+        appendLine("            this.responseInterceptors, ")
         entry.outputType.takeUnless { it == Unit.serializer() }?.let {
             appendLine("        ).then(x => x.json())")
         } ?: run {
@@ -177,7 +177,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
             }
             appendLine("                }, ")
             appendLine("                undefined,")
-            appendLine("                this.errorHandlers, ")
+            appendLine("                this.responseInterceptors, ")
             entry.outputType.takeUnless { it == Unit.serializer() }?.let {
                 appendLine("            ).then(x => x.json())")
             } ?: run {
