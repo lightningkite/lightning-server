@@ -15,7 +15,11 @@ import java.util.*
 
 
 object UUIDSerializer : KSerializer<UUID> {
-    override fun deserialize(decoder: Decoder): UUID = UUID.fromString(decoder.decodeString())
+    override fun deserialize(decoder: Decoder): UUID = try {
+        UUID.fromString(decoder.decodeString())
+    } catch (e: java.lang.IllegalArgumentException) {
+        throw SerializationException(e.message)
+    }
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.util.UUID", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: UUID) = encoder.encodeString(value.toString())
 }
@@ -119,7 +123,7 @@ val ClientModule = SerializersModule {
 class OptionalSerializer<T : Any>(val inner: KSerializer<T>) : KSerializer<Optional<T>> {
     val nullable = inner.nullable
     override val descriptor: SerialDescriptor
-        get() = SerialDescriptor("Optional<${inner.descriptor.serialName}>", nullable.descriptor)
+        get() = if(inner.descriptor.kind is PrimitiveKind) PrimitiveSerialDescriptor("Optional<${inner.descriptor.serialName}>", nullable.descriptor.kind as PrimitiveKind) else SerialDescriptor("Optional<${inner.descriptor.serialName}>", nullable.descriptor)
 
     override fun deserialize(decoder: Decoder): Optional<T> = Optional.ofNullable(nullable.deserialize(decoder))
     override fun serialize(encoder: Encoder, value: Optional<T>) {

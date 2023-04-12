@@ -134,19 +134,23 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     appendLine()
 
     appendLine("export class LiveApi implements Api {")
-    appendLine("    public constructor(public httpUrl: string, public socketUrl: string = httpUrl, public extraHeaders: Record<string, string> = {}) {}")
+    appendLine("    public constructor(public httpUrl: string, public socketUrl: string = httpUrl, public extraHeaders: Record<string, string> = {}, public responseInterceptors?: (x: Response)=>Response) {}")
     for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
         append("    ")
         append(entry.functionName)
         this.functionHeader(entry, skipAuth = false)
         appendLine(" {")
         val hasInput = entry.inputType != Unit.serializer()
-        appendLine("        return apiCall(`\${this.httpUrl}${entry.route.path.escaped}`, ${if (hasInput) "input" else "undefined"}, {")
-        appendLine("            method: \"${entry.route.method}\",")
+        appendLine("        return apiCall(")
+        appendLine("            `\${this.httpUrl}${entry.route.path.escaped}`,")
+        appendLine("            ${if (hasInput) "input" else "undefined"},")
+        appendLine("            {")
+        appendLine("                method: \"${entry.route.method}\",")
         entry.authInfo.type?.let {
-            appendLine("            headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
+            appendLine("                headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
         }
         appendLine("            }, ")
+        appendLine("            this.responseInterceptors, ")
         entry.outputType.takeUnless { it == Unit.serializer() }?.let {
             appendLine("        ).then(x => x.json())")
         } ?: run {
@@ -163,12 +167,17 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
             this.functionHeader(entry, skipAuth = false)
             appendLine(" => {")
             val hasInput = entry.inputType != Unit.serializer()
-            appendLine("            return apiCall(`\${this.httpUrl}${entry.route.path.escaped}`, ${if (hasInput) "input" else "undefined"}, {")
-            appendLine("                method: \"${entry.route.method}\",")
+            appendLine("            return apiCall(")
+            appendLine("                `\${this.httpUrl}${entry.route.path.escaped}`,")
+            appendLine("                ${if (hasInput) "input" else "undefined"},")
+            appendLine("                {")
+            appendLine("                    method: \"${entry.route.method}\",")
             entry.authInfo.type?.let {
-                appendLine("                headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
+                appendLine("                    headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
             }
-            appendLine("            }, ")
+            appendLine("                }, ")
+            appendLine("                undefined,")
+            appendLine("                this.responseInterceptors, ")
             entry.outputType.takeUnless { it == Unit.serializer() }?.let {
                 appendLine("            ).then(x => x.json())")
             } ?: run {
