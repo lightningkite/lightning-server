@@ -10,9 +10,7 @@ class EntryChange {
         this.old = old;
         this._new = _new;
     }
-    static propertyTypes(T) {
-        return { old: T, _new: T };
-    }
+    static propertyTypes(T) { return { old: T, _new: T }; }
 }
 exports.EntryChange = EntryChange;
 EntryChange.properties = ["old", "_new"];

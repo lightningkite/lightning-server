@@ -1,26 +1,20 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningserver.SetOnce
-import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Pluggable
-import com.lightningkite.lightningserver.settings.setting
-import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
 import java.io.File
-import kotlin.reflect.KClass
-import kotlin.reflect.KClassifier
 import kotlin.reflect.KType
-import kotlin.reflect.KTypeProjection
 
 /**
  * Settings that define what database to use and how to connect to it.
  *
- * @param url Defines the type and connection to the database. examples are ram, ram-preload, ram-unsafe-persist, mongodb-test, mongodb-file, mongodb
+ * @param url Defines the type and connection to the database. Examples are ram, ram-preload, ram-unsafe-persist
  * @param databaseName The name of the database to connect to.
  */
 @Serializable
@@ -35,43 +29,33 @@ data class DatabaseSettings(
             register("ram-preload") {
                 InMemoryDatabase(
                     Serialization.Internal.json.parseToJsonElement(
-                        File(
-                            it.url.substringAfter(
-                                "://"
-                            )
-                        ).readText()
+                        File(it.url.substringAfter("://"))
+                            .readText()
                     ) as? JsonObject
                 )
             }
             register("ram-unsafe-persist") { InMemoryUnsafePersistenceDatabase(File(it.url.substringAfter("://"))) }
+            register("delay") {
+                val x = it.url.substringAfter("://")
+                val delay = x.substringBefore("/").toLong()
+                val wraps = x.substringAfter("/")
+                parse(wraps, DatabaseSettings(wraps, it.databaseName)).delayed(delay)
+            }
         }
     }
 
     override fun invoke(): Database = parse(url.substringBefore("://"), this)
 
-//    override fun invoke(): Database = when {
-//        url == "ram" -> InMemoryDatabase()
-//        url == "ram-preload" -> InMemoryDatabase(Serialization.json.parseToJsonElement(File(url.substringAfter("://")).readText()) as? JsonObject)
-//        url == "ram-unsafe-persist" -> InMemoryUnsafePersistenceDatabase(File(url.substringAfter("://")))
-//        url == "mongodb-test" -> testMongo().database(databaseName)
-//        url.startsWith("mongodb-file:") -> embeddedMongo(File(url.removePrefix("mongodb-file://"))).database(databaseName)
-//        url.startsWith("mongodb:") -> KMongo.createClient(
-//            MongoClientSettings.builder()
-//                .applyConnectionString(ConnectionString(url))
-//                .uuidRepresentation(UuidRepresentation.STANDARD)
-//                .build()
-//        ).database(databaseName)
-//        else -> throw IllegalArgumentException("MongoDB connection style not recognized: got $url but only understand: " +
-//                "ram\n" +
-//                "ram-preload\n" +
-//                "ram-unsafe-persist\n" +
-//                "mongodb-test\n" +
-//                "mongodb-file:\n" +
-//                "mongodb:"
-//        )
-//    }
 }
 
+/**
+ * A Database implementation that exists entirely in the applications Heap. There are no external connections.
+ * It uses InMemoryFieldCollections in its implementation. This is NOT meant for persistent or long term storage.
+ * This database will be completely erased everytime the application is stopped.
+ * This is useful in places that persistent data is not needed and speed is desired such as Unit Tests.
+ *
+ * @param premadeData A JsonObject that contains data you wish to populate the database with on creation.
+ */
 class InMemoryDatabase(val premadeData: JsonObject? = null) : Database {
     val collections = HashMap<String, FieldCollection<*>>()
 
@@ -96,6 +80,16 @@ class InMemoryDatabase(val premadeData: JsonObject? = null) : Database {
     }
 }
 
+
+/**
+ * A Database implementation whose data manipulation is entirely in the application Heap, but it will attempt to store the data into a Folder on the system before shutdown.
+ * On startup it will load in the Folder contents and populate the database.
+ * It uses InMemoryUnsafePersistentFieldCollection in its implementation. This is NOT meant for long term storage.
+ * It is NOT guaranteed that it will store the data before the application is shut down. There is a HIGH chance that the changes will not persist between runs.
+ * This is useful in places that persistent data is not important and speed is desired.
+ *
+ * @param folder The File references a directory where you wish the data to be stored.
+ */
 class InMemoryUnsafePersistenceDatabase(val folder: File) : Database {
     init {
         folder.mkdirs()
@@ -106,8 +100,9 @@ class InMemoryUnsafePersistenceDatabase(val folder: File) : Database {
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> = synchronized(collections) {
         collections.getOrPut(name) {
-            val oldStyle = folder.resolve(name)
-            val storage = folder.resolve("$name.json")
+            val fileName = name.filter { it.isLetterOrDigit() }
+            val oldStyle = folder.resolve(fileName)
+            val storage = folder.resolve("$fileName.json")
             if (oldStyle.exists() && !storage.exists())
                 oldStyle.copyTo(storage, overwrite = true)
             InMemoryUnsafePersistentFieldCollection(

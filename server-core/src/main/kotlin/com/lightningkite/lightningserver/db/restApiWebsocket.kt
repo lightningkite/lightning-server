@@ -7,17 +7,18 @@ import com.lightningkite.lightningserver.auth.Authorization
 import com.lightningkite.lightningserver.auth.cast
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.serialization.Serialization
-
 import com.lightningkite.lightningserver.tasks.startup
 import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.ApiWebsocket
 import com.lightningkite.lightningserver.typed.typedWebsocket
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.toList
-import kotlinx.serialization.*
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseContextualSerialization
 import java.time.Instant
 
 @LightningServerDsl
@@ -46,7 +47,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
                 __WebSocketDatabaseChangeSubscription(
                     _id = event.id,
                     databaseId = modelIdentifier,
-                    condition = "{\"Never\":true}",
+                    condition = "",
                     user = user,
                     mask = Serialization.json.encodeToString(
                         Mask.serializer(info.serialization.serializer),
@@ -57,13 +58,13 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             )
         },
         message = { event ->
-            val existing = subscriptionDb().get(event.id) ?: return@typedWebsocket
+            val existing = subscriptionDb().get(event.id) ?: throw NotFoundException()
             val user = existing.user?.let {
                 @Suppress("UNCHECKED_CAST")
                 (Authorization.handler as Authorization.Handler<USER>).idStringToUser(it)
             }
             val p = info.collection(info.serialization.authInfo.cast(user))
-            val q = event.content.copy(condition = p.fullCondition(event.content.condition))
+            val q = event.content.copy(condition = p.fullCondition(event.content.condition).simplify())
             val c = Serialization.json.encodeToString(Query.serializer(info.serialization.serializer), q)
             subscriptionDb().updateOne(
                 condition = condition { it._id eq event.id },
@@ -81,33 +82,45 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             "$modelIdentifier.sendWsChanges",
             CollectionChanges.serializer(info.serialization.serializer)
         ) { changes: CollectionChanges<T> ->
-            val asyncs = ArrayList<Deferred<Unit>>()
+            val jobs = ArrayList<Job>()
             subscriptionDb().find(condition { it.databaseId eq modelIdentifier }).collect {
-                asyncs += async {
-                    val m =
+                if (it.condition.isEmpty()) return@collect
+                val m =
+                    try {
                         Serialization.json.decodeFromString(Mask.serializer(info.serialization.serializer), it.mask)
-                    val c = Serialization.json.decodeFromString(
+                    } catch (e: Exception) {
+                        return@collect
+                    }
+                val c = try {
+                    Serialization.json.decodeFromString(
                         Query.serializer(info.serialization.serializer),
                         it.condition
                     )
-                    for (entry in changes.changes) {
-                        val change = ListChange(
-                            old = entry.old?.takeIf { c.condition(it) }?.let { m(it) },
-                            new = entry.new?.takeIf { c.condition(it) }?.let { m(it) },
-                        )
-                        if(change.new == null && change.old == null) continue
-                        if (!send(it._id, change)) {
-                            subscriptionDb().deleteOneById(it._id)
-                            break
+                } catch (e: Exception) {
+                    return@collect
+                }
+                val toSend = changes.changes.map { entry ->
+                    ListChange(
+                        old = entry.old?.takeIf { c.condition(it) }?.let { m(it) },
+                        new = entry.new?.takeIf { c.condition(it) }?.let { m(it) },
+                    )
+                }.filter { it.old != null || it.new != null }
+
+                jobs.add(launch {
+                    if (toSend.size > 10) {
+                        send(it._id, ListChange(wholeList = info.collection().query(c).toList()))
+                    } else {
+                        toSend.forEach { c ->
+                            send(it._id, c)
                         }
                     }
-                }
+                })
             }
-            asyncs.awaitAll()
+            jobs.forEach { it.join() }
         }
         startup {
             info.collection().registerRawSignal { changes ->
-                changes.changes.chunked(20).forEach {
+                changes.changes.chunked(500).forEach {
                     sendWsChanges(CollectionChanges(changes = it))
                 }
             }
@@ -119,10 +132,10 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
 @DatabaseModel
 @Suppress("ClassName")
 data class __WebSocketDatabaseChangeSubscription(
-    override val _id: String,
+    override val _id: WebSocketIdentifier,
     @Index val databaseId: String,
     val user: String?, //USER
-    val condition: String, //Condition<T>
+    val condition: String, //Query<T>
     val mask: String, //Mask<T>
     val establishedAt: Instant,
-) : HasId<String>
+) : HasId<WebSocketIdentifier>

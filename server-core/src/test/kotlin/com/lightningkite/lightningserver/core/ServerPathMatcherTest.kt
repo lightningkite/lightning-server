@@ -1,11 +1,11 @@
 package com.lightningkite.lightningserver.core
 
-import com.lightningkite.lightningserver.http.HttpMethod
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ServerPathMatcherTest {
-    @Test fun test() {
+    @Test
+    fun test() {
         val root = ServerPath.root
         val test = ServerPath("test")
         val testSlash = ServerPath("test/")

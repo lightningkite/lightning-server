@@ -1,4 +1,5 @@
 @file:UseContextualSerialization(Duration::class)
+
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.auth.JwtSigner
@@ -10,14 +11,8 @@ import java.io.File
 import java.time.Duration
 
 /**
- * FileSettings defines where server files and user content is stored. This used ApacheVFS which allows the filesystem to be
- * a variety of sources. For now this is set up to handle a local file system, a s3 bucket, or an azure blob container.
- *
- * @param storageUrl Defines where the file system is. This follows ApacheVFS standards.
- * @param userContentPath A path you wish all file paths to be prefixed with.
- * @param signedUrlExpirationSeconds When dealing with secured filesystems that require url signing this will determine how long pre-signed URLs will be valid for.
+ * Settings that define what file storage solution to use and how to connect to it.
  */
-
 @Serializable
 data class FilesSettings(
     val storageUrl: String = "file://${File("./local/files/").absolutePath}",
@@ -27,12 +22,17 @@ data class FilesSettings(
     companion object : Pluggable<FilesSettings, FileSystem>() {
         init {
             register("file") {
-                val root = File(it.storageUrl.substringAfter("file://").substringBefore('|'))
-                LocalFileSystem(
-                    rootFile = root,
-                    serveDirectory = it.storageUrl.substringAfter('|', "").takeUnless { it.isEmpty() } ?: "uploaded-files",
-                    signer = it.jwtSigner
-                )
+                Regex("""file://(?<folderPath>[^|]+)(?:\|(?<servePath>.+))?""").matchEntire(it.storageUrl)
+                    ?.let { match ->
+                        LocalFileSystem(
+                            rootFile = File(match.groups["folderPath"]!!.value),
+                            serveDirectory = match.groups["servePath"]?.value?.takeUnless { it.isEmpty() }
+                                ?: "uploaded-files",
+                            signedUrlExpiration = it.signedUrlExpiration,
+                            signer = it.jwtSigner
+                        )
+                    }
+                    ?: throw IllegalStateException("Invalid Local File storageUrl. It must follow the pattern: file:://[folderPath]|[servePath]\nServe Directory is Optional and will default to \"uploaded-files\"")
             }
         }
     }

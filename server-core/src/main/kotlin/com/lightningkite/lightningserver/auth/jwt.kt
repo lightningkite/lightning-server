@@ -11,24 +11,18 @@ import kotlinx.serialization.descriptors.getContextualDescriptor
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
-import org.bouncycastle.asn1.ASN1InputStream
-import org.bouncycastle.asn1.ASN1Integer
-import org.bouncycastle.asn1.ASN1OutputStream
-import org.bouncycastle.asn1.ASN1Sequence
-import org.bouncycastle.asn1.DERSequence
-import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
-import org.bouncycastle.openssl.PEMParser
-import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
+import org.bouncycastle.asn1.*
+import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPrivateKey
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.io.ByteArrayOutputStream
-import java.io.StringReader
 import java.math.BigInteger
 import java.security.KeyFactory
+import java.security.Security
 import java.security.Signature
-import java.security.interfaces.ECPrivateKey
 import java.security.spec.PKCS8EncodedKeySpec
 import java.time.Duration
 import java.time.Instant
-import java.util.Base64
+import java.util.*
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
@@ -54,7 +48,17 @@ interface SecureHasher {
         return signature.contentEquals(sign(bytes))
     }
 
+    companion object {
+        init {
+            Security.addProvider(BouncyCastleProvider())
+        }
+    }
+
     class HS256(val secret: ByteArray) : SecureHasher {
+        init {
+            SecureHasher
+        }
+
         override val name: String = "HS256"
         override fun sign(bytes: ByteArray): ByteArray {
             return Mac.getInstance("HmacSHA256").apply {
@@ -64,23 +68,21 @@ interface SecureHasher {
     }
 
     class ECDSA256(privateKey: String) : SecureHasher {
+        init {
+            SecureHasher
+        }
+
         override val name: String = "ECDSA256"
-        val pk = KeyFactory.getInstance("EC").generatePrivate(
+        private val factory = KeyFactory.getInstance("ECDSA", "BC")
+        val pk = factory.generatePrivate(
             PKCS8EncodedKeySpec(Base64.getDecoder().decode(privateKey.filter { !it.isWhitespace() }))
         )
+        val public = run {
+            val s = (pk as BCECPrivateKey).parameters
+            val q = s.g.multiply((pk as BCECPrivateKey).d)
+            factory.generatePublic(org.bouncycastle.jce.spec.ECPublicKeySpec(q, s))
+        }
 
-//        override fun sign(bytes: ByteArray): ByteArray {
-//            return Signature.getInstance("NONEwithECDSA").apply {
-//                initSign(pk)
-//                update(bytes)
-//            }.sign()
-//        }
-//
-//        override fun verify(bytes: ByteArray, signature: ByteArray): Boolean {
-//            return Signature.getInstance("NONEwithECDSA").apply {
-//                update(bytes)
-//            }.verify(signature)
-//        }
         override fun sign(bytes: ByteArray): ByteArray {
             return Signature.getInstance("SHA256withECDSA").apply {
                 initSign(pk)
@@ -89,25 +91,27 @@ interface SecureHasher {
                 val seq = ASN1InputStream(it).use {
                     (it.readObject() as ASN1Sequence).toArray()
                 }
-                (seq[0] as ASN1Integer).positiveValue.toByteArray() + (seq[1] as ASN1Integer).positiveValue.toByteArray()
+                (seq[0] as ASN1Integer).value.signed32() + (seq[1] as ASN1Integer).value.signed32()
             }
         }
 
         override fun verify(bytes: ByteArray, signature: ByteArray): Boolean {
             return Signature.getInstance("SHA256withECDSA").apply {
-                initSign(pk)
+                initVerify(public)
+                update(bytes)
+            }.verify(run {
                 val b = ByteArrayOutputStream()
                 val o = ASN1OutputStream.create(b)
                 try {
-                    o.writeObject(DERSequence(arrayOf(
-                        ASN1Integer(BigInteger(1, bytes.copyOfRange(0, 32))),
-                        ASN1Integer(BigInteger(1, bytes.copyOfRange(32, 64))),
-                    )))
+                    o.writeObject(DERSequence(ASN1EncodableVector().apply {
+                        add(ASN1Integer(fromSigned32(signature.copyOfRange(0, 32))))
+                        add(ASN1Integer(fromSigned32(signature.copyOfRange(32, 64))))
+                    }))
                 } finally {
                     o.close()
                 }
-                update(b.toByteArray())
-            }.verify(signature)
+                b.toByteArray()
+            })
         }
     }
 }
@@ -120,10 +124,12 @@ fun <T> Json.encodeJwt(
     issuer: String = generalSettings().publicUrl,
     audience: String? = generalSettings().publicUrl,
     issuedAt: Instant = Instant.now(),
-): String = encodeJwt(hasher, if (serializer.isPrimitive())
-    (encodeToJsonElement(serializer, subject) as JsonPrimitive).content
-else
-    encodeToString(serializer, subject), expire, issuer, audience, issuedAt)
+): String = encodeJwt(
+    hasher, if (serializer.isPrimitive())
+        (encodeToJsonElement(serializer, subject) as JsonPrimitive).content
+    else
+        encodeToString(serializer, subject), expire, issuer, audience, issuedAt
+)
 
 fun <T> Json.decodeJwt(
     hasher: SecureHasher,
@@ -149,7 +155,9 @@ fun Json.encodeJwt(
     issuedAt: Instant = Instant.now(),
 ): String = buildString {
     val withDefaults = Json(this@encodeJwt) { encodeDefaults = true; explicitNulls = false }
-    append(Base64.getUrlEncoder().withoutPadding().encodeToString(withDefaults.encodeToString(JwtHeader()).toByteArray()))
+    append(
+        Base64.getUrlEncoder().withoutPadding().encodeToString(withDefaults.encodeToString(JwtHeader()).toByteArray())
+    )
     append('.')
     append(
         Base64.getUrlEncoder().withoutPadding().encodeToString(
@@ -206,4 +214,24 @@ private fun KSerializer<*>.isPrimitive(): Boolean {
             else -> return false
         }
     }
+}
+
+internal fun BigInteger.signed32(): ByteArray {
+    return if (this >= BigInteger.ONE.shiftLeft(32 * 8 - 1)) {
+        (this - BigInteger.ONE.shiftLeft(32 * 8)).toByteArray().let {
+            ByteArray(32 - it.size) { 0xFF.toByte() } + it
+        }
+    } else {
+        this.toByteArray().let {
+            ByteArray(32 - it.size) { 0 } + it
+        }
+    }
+}
+
+internal fun fromSigned32(array: ByteArray): BigInteger {
+    var raw = BigInteger(array)
+    if (raw < BigInteger.ZERO) {
+        raw += BigInteger.ONE.shiftLeft(32 * 8)
+    }
+    return raw
 }

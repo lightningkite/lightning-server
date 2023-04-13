@@ -1,6 +1,5 @@
 package com.lightningkite.lightningdb
 
-import kotlinx.coroutines.launch
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
 
@@ -26,6 +25,7 @@ fun SerialDescriptor.indexes(): Set<NeededIndex> {
                         name = it.indexName
                     )
                 )
+
                 is NamedIndexSet -> out.add(
                     NeededIndex(
                         fields = it.fields.map { prefix + it },
@@ -33,15 +33,51 @@ fun SerialDescriptor.indexes(): Set<NeededIndex> {
                         name = it.indexName
                     )
                 )
-                is UniqueSetJankPatch -> it.fields.joinToString(",").split(",:,").forEach { out.add(NeededIndex(fields = it.split(',').map { prefix + it }, unique = true, name = null)) }
-                is IndexSetJankPatch -> it.fields.joinToString(",").split(",:,").forEach { out.add(NeededIndex(fields = it.split(',').map { prefix + it }, unique = false, name = null)) }
-                is NamedUniqueSetJankPatch -> it.fields.joinToString(",").split(",:,").forEachIndexed { index, part -> out.add(NeededIndex(fields = part.split(',').map { prefix + it }, unique = true, name = it.indexNames.split(':')[index])) }
-                is NamedIndexSetJankPatch -> it.fields.joinToString(",").split(",:,").forEachIndexed { index, part -> out.add(NeededIndex(fields = part.split(',').map { prefix + it },unique = false,name = it.indexNames.split(':')[index])) }
+
+                is UniqueSetJankPatch -> it.fields.joinToString(",").split(",:,").forEach {
+                    out.add(
+                        NeededIndex(
+                            fields = it.split(',').map { prefix + it },
+                            unique = true,
+                            name = null
+                        )
+                    )
+                }
+
+                is IndexSetJankPatch -> it.fields.joinToString(",").split(",:,").forEach {
+                    out.add(
+                        NeededIndex(
+                            fields = it.split(',').map { prefix + it },
+                            unique = false,
+                            name = null
+                        )
+                    )
+                }
+
+                is NamedUniqueSetJankPatch -> it.fields.joinToString(",").split(",:,").forEachIndexed { index, part ->
+                    out.add(
+                        NeededIndex(
+                            fields = part.split(',').map { prefix + it },
+                            unique = true,
+                            name = it.indexNames.split(':')[index]
+                        )
+                    )
+                }
+
+                is NamedIndexSetJankPatch -> it.fields.joinToString(",").split(",:,").forEachIndexed { index, part ->
+                    out.add(
+                        NeededIndex(
+                            fields = part.split(',').map { prefix + it },
+                            unique = false,
+                            name = it.indexNames.split(':')[index]
+                        )
+                    )
+                }
             }
         }
         (0 until descriptor.elementsCount).forEach { index ->
             val sub = descriptor.getElementDescriptor(index)
-            if (sub.kind == StructureKind.CLASS) handleDescriptor(sub, descriptor.getElementName(index) + ".")
+//            if (sub.kind == StructureKind.CLASS) handleDescriptor(sub, descriptor.getElementName(index) + ".")
             descriptor.getElementAnnotations(index).forEach {
                 when (it) {
                     is NamedIndex -> out.add(

@@ -1,3 +1,4 @@
+# Generated via Lightning Server.  This file will be overwritten or deleted when regenerating.
 ##########
 # Inputs
 ##########
@@ -37,7 +38,7 @@ resource "aws_s3_bucket_cors_configuration" "files" {
     allowed_origins = ["*"]
   }
 }
-resource "aws_s3_bucket_policy" "files" {
+resource "aws_s3_bucket_policy" "files" {  
   count = var.files_expiry == null ? 1 : 0
   bucket = aws_s3_bucket.files.id   
   policy = <<POLICY

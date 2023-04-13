@@ -3,7 +3,6 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.*
-import java.lang.IllegalStateException
 import kotlin.reflect.KProperty1
 
 fun <T : IsCodableAndHashable> startChain(): PropChain<T, T> = PropChain({ it }, { it }, { it }, { _, it -> it })
@@ -35,9 +34,6 @@ class PropChain<From : IsCodableAndHashable, To : IsCodableAndHashable>(
 }
 
 inline fun <T : IsCodableAndHashable> condition(setup: (PropChain<T, T>) -> Condition<T>): Condition<T> =
-    startChain<T>().let(setup)
-
-inline fun <T : IsCodableAndHashable> modification(setup: (PropChain<T, T>) -> Modification<T>): Modification<T> =
     startChain<T>().let(setup)
 
 val <K : IsCodableAndHashable> PropChain<K, K>.always: Condition<K> get() = Condition.Always<K>()
@@ -196,103 +192,146 @@ inline val <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set
 inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.condition(make: (PropChain<T, T>) -> Condition<T>): Condition<K> =
     mapCondition(make(startChain<T>()))
 
-inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.modification(make: (PropChain<T, T>) -> Modification<T>): Modification<K> =
-    mapModification(make(startChain<T>()))
-
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, T>.assign(value: T) =
     mapModification(Modification.Assign(value))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 infix fun <K : IsCodableAndHashable, T : Comparable<T>> PropChain<K, T>.coerceAtMost(value: T) =
     mapModification(Modification.CoerceAtMost(value))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 infix fun <K : IsCodableAndHashable, T : Comparable<T>> PropChain<K, T>.coerceAtLeast(value: T) =
     mapModification(Modification.CoerceAtLeast(value))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainPlusNumber")
 infix operator fun <K : IsCodableAndHashable, T : Number> PropChain<K, T>.plus(by: T) =
     mapModification(Modification.Increment(by))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 infix operator fun <K : IsCodableAndHashable, T : Number> PropChain<K, T>.times(by: T) =
     mapModification(Modification.Multiply(by))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainPlusString")
 infix operator fun <K : IsCodableAndHashable> PropChain<K, String>.plus(value: String) =
     mapModification(Modification.AppendString(value))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainPlusItemsList")
 infix operator fun <K : IsCodableAndHashable, T> PropChain<K, List<T>>.plus(items: List<T>) =
     mapModification(Modification.ListAppend(items))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainPlusItemsSet")
 infix operator fun <K : IsCodableAndHashable, T> PropChain<K, Set<T>>.plus(items: Set<T>) =
     mapModification(Modification.SetAppend(items))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainPlusItemList")
 @JvmName("plusList")
 infix operator fun <K : IsCodableAndHashable, T> PropChain<K, List<T>>.plus(item: T) =
     mapModification(Modification.ListAppend(listOf(item)))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainPlusItemSet")
 @JvmName("plusSet")
 infix operator fun <K : IsCodableAndHashable, T> PropChain<K, Set<T>>.plus(item: T) =
     mapModification(Modification.SetAppend(setOf(item)))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainListAddAll")
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, List<T>>.addAll(items: List<T>) =
     mapModification(Modification.ListAppend(items))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainSetAddAll")
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.addAll(items: Set<T>) =
     mapModification(Modification.SetAppend(items))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainListRemove")
 @JvmName("listRemoveAll")
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, List<T>>.removeAll(condition: (PropChain<T, T>) -> Condition<T>) =
     mapModification(Modification.ListRemove(startChain<T>().let(condition)))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainSetRemove")
 @JvmName("setRemoveAll")
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.removeAll(condition: (PropChain<T, T>) -> Condition<T>) =
     mapModification(Modification.SetRemove(startChain<T>().let(condition)))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainListRemoveAll")
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, List<T>>.removeAll(items: List<T>) =
     mapModification(Modification.ListRemoveInstances(items))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainSetRemoveAll")
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.removeAll(items: Set<T>) =
     mapModification(Modification.SetRemoveInstances(items))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainListDropLast")
 @JvmName("listDropLast")
 fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, List<T>>.dropLast() =
     mapModification(Modification.ListDropLast())
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainSetDropLast")
 @JvmName("setDropLast")
 fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.dropLast() =
     mapModification(Modification.SetDropLast())
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainListDropFirst")
 @JvmName("listDropFirst")
 fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, List<T>>.dropFirst() =
     mapModification(Modification.ListDropFirst())
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainSetDropFirst")
 @JvmName("setDropFirst")
 fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.dropFirst() =
     mapModification(Modification.SetDropFirst())
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainListMap")
 @JvmName("listMap")
 inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, List<T>>.map(modification: (PropChain<T, T>) -> Modification<T>) =
     mapModification(Modification.ListPerElement(condition = Condition.Always<T>(), startChain<T>().let(modification)))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainSetMap")
 @JvmName("setMap")
 inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.map(modification: (PropChain<T, T>) -> Modification<T>) =
     mapModification(Modification.SetPerElement(condition = Condition.Always<T>(), startChain<T>().let(modification)))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainListMapIf")
 @JvmName("listMapIf")
 inline fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, List<T>>.mapIf(
@@ -305,6 +344,8 @@ inline fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Lis
     )
 )
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainSetMapIf")
 @JvmName("setMapIf")
 inline fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set<T>>.mapIf(
@@ -317,12 +358,18 @@ inline fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Set
     )
 )
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 @JsName("xPropChainPlusMap")
 infix operator fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Map<String, T>>.plus(map: Map<String, T>) =
     mapModification(Modification.Combine(map))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Map<String, T>>.modifyByKey(map: Map<String, (PropChain<T, T>) -> Modification<T>>) =
     mapModification(Modification.ModifyByKey(map.mapValues { startChain<T>().let(it.value) }))
 
+@CheckReturnValue
+@Deprecated("Using this method to create modifications is no longer recommended.  We recommend using the new modification{} builder instead.")
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> PropChain<K, Map<String, T>>.removeKeys(fields: Set<String>) =
     mapModification(Modification.RemoveKeys(fields))

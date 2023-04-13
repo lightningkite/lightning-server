@@ -17,6 +17,7 @@ import software.amazon.awssdk.services.ses.SesAsyncClient
 import software.amazon.awssdk.services.ses.SesClient
 import software.amazon.awssdk.services.ses.model.RawMessage
 import java.io.ByteArrayOutputStream
+import java.lang.IllegalStateException
 import java.util.*
 import javax.mail.Session
 
@@ -28,19 +29,22 @@ class SesClient(
     companion object {
         init {
             EmailSettings.register("ses") {
-                val withoutScheme = it.url.substringAfter("://")
-                val credentials = withoutScheme.substringBefore('@', "").split(':').filter { it.isNotBlank() }
-                val region = withoutScheme.substringAfter('@')
-                SesClient(
-                    region = Region.of(region),
-                    credentialProvider = if (credentials.isNotEmpty()) {
-                        StaticCredentialsProvider.create(object : AwsCredentials {
-                            override fun accessKeyId(): String = credentials[0]
-                            override fun secretAccessKey(): String = credentials[1]
-                        })
-                    } else DefaultCredentialsProvider.create(),
-                    fromEmail = it.fromEmail
-                )
+                Regex("""ses://(?<accessKey>[^:]*):(?<secretAccessKey>[^@]*)@(?<region>.+)(?:\?(?<params>.*))?""").matchEntire(it.url)?.let { match ->
+                    val accessKey = match.groups["accessKey"]!!.value
+                    val secretAccessKey = match.groups["secretAccessKey"]!!.value
+                    val params = EmailSettings.parseParameterString(match.groups["params"]?.value ?: "")
+                    SesClient(
+                        region = Region.of(match.groups["region"]!!.value),
+                        credentialProvider = if (accessKey.isNotBlank() && secretAccessKey.isNotBlank()) {
+                            StaticCredentialsProvider.create(object : AwsCredentials {
+                                override fun accessKeyId(): String = accessKey
+                                override fun secretAccessKey(): String = secretAccessKey
+                            })
+                        } else DefaultCredentialsProvider.create(),
+                        fromEmail = params["fromEmail"]?.first() ?: it.fromEmail ?: throw IllegalStateException("SES Email requires a fromEmail to be set.")
+                    )
+                }
+                    ?: throw IllegalStateException("Invalid SES URL. The URL should match the pattern: ses://[accessKey]:[secreteAccessKey]@[region]?[params]\nAvailable params are: fromEmail")
             }
         }
     }

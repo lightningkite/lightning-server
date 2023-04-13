@@ -1,26 +1,27 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.HtmlDefaults
-import com.lightningkite.lightningserver.cache.CacheInterface
-import com.lightningkite.lightningserver.cache.get
-import com.lightningkite.lightningserver.cache.set
+import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.email.EmailClient
-import com.lightningkite.lightningserver.exceptions.BadRequestException
-import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.settings.generalSettings
+import com.lightningkite.lightningserver.settings.setting
+import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
-import java.security.SecureRandom
 import java.time.Duration
 
 open class EmailAuthEndpoints<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val emailAccess: UserEmailAccess<USER, ID>,
-    private val cache: () -> CacheInterface,
+    private val cache: () -> Cache,
     private val email: () -> EmailClient,
+    val pinAvailableCharacters: List<Char> = ('0'..'9').toList(),
+    val pinLength: Int = 6,
+    val pinExpiration: Duration = Duration.ofMinutes(15),
+    val pinMaxAttempts: Int = 5,
     private val emailSubject: () -> String = { "${generalSettings().projectName} Log In" },
     private val template: (suspend (email: String, link: String, pin: String) -> String) = { email, link, pin ->
         HtmlDefaults.baseEmail("""
@@ -46,7 +47,14 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         """.trimIndent())
     },
 ) : ServerPathGroup(base.path) {
-    val pin = PinHandler(cache, "email")
+    val pin = PinHandler(
+        cache,
+        "email",
+        availableCharacters = pinAvailableCharacters,
+        length = pinLength,
+        expiration = pinExpiration,
+        maxAttempts = pinMaxAttempts,
+    )
     val loginEmail = path("login-email").post.typed(
         summary = "Email Login Link",
         description = "Sends a login email to the given address",
@@ -77,17 +85,32 @@ open class EmailAuthEndpoints<USER : Any, ID>(
             base.token(emailAccess.byEmail(email))
         }
     )
-    val oauthGoogle = OauthGoogleEndpoints(path = path("oauth/google"), jwtSigner = base.jwtSigner, landing = base.landingRoute) {
-        emailAccess.byEmail(it).let(emailAccess::id).toString()
+    val oauthGoogleSettings = setting<OauthProviderCredentials?>("oauth_google", null, optional = true)
+    val oauthGithubSettings = setting<OauthProviderCredentials?>("oauth_github", null, optional = true)
+    val oauthAppleSettings = setting<OauthAppleEndpoints.OauthAppleSettings?>("oauth_apple", null, optional = true)
+    val oauthMicrosoftSettings = setting<OauthProviderCredentials?>("oauth_microsoft", null, optional = true)
+
+    private val oauthGoogle: OauthGoogleEndpoints<USER, ID>? by lazy {
+        oauthGoogleSettings()?.let { OauthGoogleEndpoints(base, emailAccess.asExternal(), { it }) }
     }
-    val oauthGithub = OauthGitHubEndpoints(path = path("oauth/github"), jwtSigner = base.jwtSigner, landing = base.landingRoute) {
-        emailAccess.byEmail(it).let(emailAccess::id).toString()
+    private val oauthGithub: OauthGitHubEndpoints<USER, ID>? by lazy {
+        oauthGithubSettings()?.let { OauthGitHubEndpoints(base, emailAccess.asExternal(), { it }) }
     }
-    val oauthApple = OauthAppleEndpoints(
-        path = path("oauth/apple"),
-        jwtSigner = base.jwtSigner,
-        landing = base.landingRoute
-    ) { emailAccess.byEmail(it).let(emailAccess::id).toString() }
+    private val oauthApple: OauthAppleEndpoints<USER, ID>? by lazy {
+        oauthAppleSettings()?.let { OauthAppleEndpoints(base, emailAccess.asExternal(), { it }) }
+    }
+    private val oauthMicrosoft: OauthMicrosoftEndpoints<USER, ID>? by lazy {
+        oauthMicrosoftSettings()?.let { OauthMicrosoftEndpoints(base, emailAccess.asExternal(), { it }) }
+    }
+
+    init {
+        Tasks.onSettingsReady {
+            oauthGoogle
+            oauthGithub
+            oauthApple
+            oauthMicrosoft
+        }
+    }
 
     val loginEmailHtml = path("login-email/").get.handler {
         HttpResponse(
@@ -143,7 +166,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
             e.printStackTrace()
             throw e
         }
-        HttpResponse.redirectToGet(base.landingRoute.path.toString() + "?jwt=$basis")
+        base.redirectToLanding(basis)
     }
 }
 

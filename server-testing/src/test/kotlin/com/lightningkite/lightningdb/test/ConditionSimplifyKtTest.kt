@@ -14,7 +14,13 @@ class ConditionSimplifyKtTest {
     }
     @Test
     fun test() {
+        condition<LargeTestModel> { Condition.Never<LargeTestModel>() or Condition.Never() }.simplifyOk()
         condition<LargeTestModel> { it.boolean eq false }.simplifyOk()
+        condition<LargeTestModel> { it.boolean.eq(false) and Condition.Always() }.simplifyOk()
+        condition<LargeTestModel> { it.boolean.eq(false) and Condition.Never() }.simplifyOk()
+        condition<LargeTestModel> { it.boolean.eq(false) or Condition.Always() }.simplifyOk()
+        condition<LargeTestModel> { it.boolean.eq(false) or Condition.Never() }.simplifyOk()
+        condition<LargeTestModel> { Condition.Always<LargeTestModel>() and it.boolean.eq(false) }.simplifyOk()
         condition<LargeTestModel> { it.boolean.eq(false) and it.byte.eq(0) }.simplifyOk()
         condition<LargeTestModel> { it.boolean.eq(false) and it.boolean.eq(true) }.simplifyOk()
         condition<LargeTestModel> { it.boolean.eq(false) and it.boolean.inside(listOf(true, false)) }.simplifyOk()
@@ -22,22 +28,35 @@ class ConditionSimplifyKtTest {
             Condition.Always(),
             Condition.Never(),
             condition { it.int eq 1 },
+            condition { it.int ne 1 },
             condition { it.int gt 1 },
             condition { it.int lt 1 },
+            condition { it.int eq 0 },
+            condition { it.int ne 0 },
             condition { it.int gt 0 },
             condition { it.int lt 0 },
             condition { it.int gte 1 },
             condition { it.int lte 1 },
             condition { it.int gte 0 },
             condition { it.int lte 0 },
+            condition { it.int inside listOf() },
             condition { it.int inside listOf(1) },
             condition { it.int inside listOf(0, 1) },
+            condition { it.int notIn listOf() },
             condition { it.int notIn listOf(1) },
             condition { it.int notIn listOf(0, 1) },
         )
+        conditions.forEach { b ->
+            b.simplifyOk()
+        }
         conditions.forEach { a ->
             conditions.forEach { b ->
                 (a and b).simplifyOk()
+            }
+        }
+        conditions.forEach { a ->
+            conditions.forEach { b ->
+                (a or b).simplifyOk()
             }
         }
     }
@@ -59,3 +78,4 @@ class ConditionSimplifyKtTest {
             assertEquals(this(data), simplify()(data))
     }
 }
+

@@ -1,7 +1,5 @@
 package com.lightningkite.lightningserver.core
 
-import com.lightningkite.lightningserver.http.HttpEndpointMatcher
-
 class ServerPathMatcher(paths: Sequence<ServerPath>) {
     data class Node(
         val path: ServerPath?,
@@ -56,9 +54,9 @@ class ServerPathMatcher(paths: Sequence<ServerPath>) {
 
     fun match(string: String): Match? = match(string.split('/').filter { it.isNotEmpty() }, string.endsWith('/'))
     fun match(pathParts: List<String>, endingSlash: Boolean): Match? {
-        if(pathParts.isEmpty())
+        if (pathParts.isEmpty())
             return (root.path ?: root.trailingSlash ?: root.chainedWildcard)?.let {
-                Match(ServerPath.root, mapOf(), if(it.after == ServerPath.Afterwards.ChainedWildcard) "" else null)
+                Match(ServerPath.root, mapOf(), if (it.after == ServerPath.Afterwards.ChainedWildcard) "" else null)
             }
 
 //        println("Navigating $pathParts with ending slash $endingSlash")
@@ -87,7 +85,7 @@ class ServerPathMatcher(paths: Sequence<ServerPath>) {
             break
         }
 //        println("Stopped at $current")
-        return if(beyond) {
+        return if (beyond) {
 //            println("Searching for wildcard ending")
             soFar.asReversed().asSequence().mapNotNull {
                 it.chainedWildcard?.let {

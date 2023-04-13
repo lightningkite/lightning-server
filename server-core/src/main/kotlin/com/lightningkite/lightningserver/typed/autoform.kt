@@ -1,12 +1,10 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningserver.jsonschema.encodeToSchema
-import com.lightningkite.lightningserver.jsonschema.internal.createJsonSchema
-import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
+import com.lightningkite.lightningserver.jsonschema.encodeToSchema
 import com.lightningkite.lightningserver.routes.fullUrl
-
+import com.lightningkite.lightningserver.serialization.Serialization
 import io.ktor.util.*
 import kotlinx.html.*
 import kotlinx.serialization.KSerializer
@@ -15,9 +13,6 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.getContextualDescriptor
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
-import java.time.Instant
-import kotlin.reflect.KType
-import kotlin.reflect.typeOf
 
 
 fun HEAD.includeFormScript() {

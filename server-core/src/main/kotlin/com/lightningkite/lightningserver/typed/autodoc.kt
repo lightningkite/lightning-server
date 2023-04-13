@@ -2,31 +2,47 @@
 
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningdb.Description
+import com.lightningkite.lightningdb.nullElement
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.html.*
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.StructureKind
+import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.internal.GeneratedSerializer
 import kotlinx.serialization.serializer
 import kotlin.reflect.KType
 
-@Deprecated("Use apiDocs instead", ReplaceWith("this.apiDocs(packageName)", "com.lightningkite.lightningserver.typed.apiDocs"))
+@Deprecated(
+    "Use apiDocs instead",
+    ReplaceWith("this.apiDocs(packageName)", "com.lightningkite.lightningserver.typed.apiDocs")
+)
 @LightningServerDsl
 fun ServerPath.apiHelp(packageName: String = "com.mypackage"): HttpEndpoint = apiDocs(packageName)
+
 @LightningServerDsl
 fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
     get("sdk.ts").handler {
         HttpResponse(
             HttpContent.Text(
                 string = buildString { Documentable.typescriptSdk(this) },
+                type = ContentType.Text.Plain
+            )
+        )
+    }
+    get("sdk.dart").handler {
+        HttpResponse(
+            HttpContent.Text(
+                string = buildString { Documentable.dartSdk("sdk.dart", this) },
                 type = ContentType.Text.Plain
             )
         )
@@ -48,12 +64,14 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                 div {
                     h2 { +"Links" }
                     ol {
-                        li { a(href = "sdk.ts") { +"Typescript SDK" }}
-                        li { a(href = "sdk.zip") { +"Kotlin SDK" }}
+                        li { a(href = "sdk.ts") { +"Typescript SDK" } }
+                        li { a(href = "sdk.zip") { +"Kotlin SDK" } }
+                        li { a(href = "sdk.dart") { +"Dart SDK" } }
+                        li { a(href = "#types") { +"Types" } }
                     }
                 }
                 h2 { +"Endpoints" }
-                for (api in Documentable.endpoints) {
+                for (api in Documentable.endpoints.sortedBy { it.path.toString() }) {
                     h3 {
                         +(api.route.method.toString())
                         +" "
@@ -95,7 +113,59 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                     }
                 }
 
-                h2 { +"Types" }
+                h2 {
+                    id = "types"
+                    +"Types"
+                }
+
+                h3 { +"Types stored directly in the database" }
+
+                ul {
+                    Documentable.usedTypes
+                        .sortedBy { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') }
+                        .forEach { serializer ->
+                            val desc = serializer.descriptor
+                            when (desc.kind) {
+                                StructureKind.CLASS -> {
+                                    if (desc.elementNames.none { it == "_id" }) return@forEach
+                                    val baseName = desc.serialName.substringBefore('<').substringAfterLast('.')
+                                    li { a(href = "#$baseName") { +baseName } }
+                                }
+
+                                else -> {}
+                            }
+                        }
+                }
+
+                h3 { +"Index" }
+
+                ul {
+                    Documentable.usedTypes
+                        .sortedBy { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') }
+                        .forEach { serializer ->
+                            val desc = serializer.descriptor
+                            when (desc.kind) {
+                                StructureKind.CLASS,
+                                SerialKind.ENUM,
+                                PrimitiveKind.BOOLEAN,
+                                PrimitiveKind.STRING,
+                                PrimitiveKind.BYTE,
+                                PrimitiveKind.CHAR,
+                                PrimitiveKind.SHORT,
+                                PrimitiveKind.INT,
+                                PrimitiveKind.LONG,
+                                PrimitiveKind.FLOAT,
+                                PrimitiveKind.DOUBLE,
+                                StructureKind.LIST,
+                                StructureKind.MAP -> {
+                                    val baseName = desc.serialName.substringBefore('<').substringAfterLast('.')
+                                    li { a(href = "#$baseName") { +baseName } }
+                                }
+
+                                else -> {}
+                            }
+                        }
+                }
 
                 Documentable.usedTypes
                     .sortedBy { it.descriptor.serialName.substringBefore('<').substringAfterLast('.') }
@@ -114,6 +184,7 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                                     }
                                 }
                             }
+
                             SerialKind.ENUM -> {
                                 documentType(serializer) {
                                     p {
@@ -128,16 +199,19 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                                     }
                                 }
                             }
+
                             PrimitiveKind.BOOLEAN -> {
                                 documentType(serializer) {
                                     +"A JSON boolean, either true or false."
                                 }
                             }
+
                             PrimitiveKind.STRING -> {
                                 documentType(serializer) {
                                     +"A JSON string."
                                 }
                             }
+
                             PrimitiveKind.BYTE,
                             PrimitiveKind.CHAR,
                             PrimitiveKind.SHORT,
@@ -149,16 +223,19 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                                     +"A JSON number."
                                 }
                             }
+
                             StructureKind.LIST -> {
                                 documentType(serializer) {
                                     +"A JSON array."
                                 }
                             }
+
                             StructureKind.MAP -> {
                                 documentType(serializer) {
                                     +"A JSON object, also known as a map or dictionary."
                                 }
                             }
+
                             else -> {}
                         }
                     }
@@ -167,7 +244,7 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
     }
 }
 
-fun FlowContent.documentType(serializer: KSerializer<*>, body: FlowContent.()->Unit) {
+fun FlowContent.documentType(serializer: KSerializer<*>, body: FlowContent.() -> Unit) {
     val desc = serializer.descriptor
     val name = desc.serialName.substringBefore('<').substringAfterLast('.')
     h3 {

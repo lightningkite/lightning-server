@@ -1,7 +1,5 @@
 package com.lightningkite.lightningserver.http
 
-import io.ktor.http.*
-
 object HttpHeader {
     // Permanently registered standard HTTP headers
     // The list is taken from http://www.iana.org/assignments/message-headers/message-headers.xml#perm-headers

@@ -8,7 +8,6 @@ import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.routes.docName
-import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.builtins.ListSerializer
@@ -26,10 +25,10 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         val all = HashSet<ModelRestEndpoints<*, *, *>>()
     }
 
-    val modelName = info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
+    val collectionName get() = info.collectionName
 
     init {
-        path.docName = modelName
+        if (path.docName == null) path.docName = collectionName
         all.add(this)
     }
 
@@ -39,7 +38,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
             inputType = Unit.serializer(),
             outputType = info.serialization.serializer,
             summary = "Default",
-            description = "Gets the default ${modelName}.",
+            description = "Gets the default ${collectionName}.",
             errorCases = listOf(),
             implementation = { user: USER, input: Unit ->
                 info.defaultItem(user)
@@ -52,7 +51,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
         summary = "List",
-        description = "Gets a list of ${modelName}s.",
+        description = "Gets a list of ${collectionName}s.",
         errorCases = listOf(),
         implementation = { user: USER, input: Query<T> ->
             info.collection(user)
@@ -68,7 +67,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
         summary = "Query",
-        description = "Gets a list of ${modelName}s that match the given query.",
+        description = "Gets a list of ${collectionName}s that match the given query.",
         errorCases = listOf(),
         implementation = { user: USER, input: Query<T> ->
             info.collection(user)
@@ -84,7 +83,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         outputType = info.serialization.serializer,
         pathType = info.serialization.idSerializer,
         summary = "Detail",
-        description = "Gets a single ${modelName} by ID.",
+        description = "Gets a single ${collectionName} by ID.",
         errorCases = listOf(
             LSError(
                 http = HttpStatus.NotFound.code,
@@ -105,7 +104,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         inputType = ListSerializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
         summary = "Insert Bulk",
-        description = "Creates multiple ${modelName}s at the same time.",
+        description = "Creates multiple ${collectionName}s at the same time.",
         errorCases = listOf(),
         successCode = HttpStatus.Created,
         implementation = { user: USER, values: List<T> ->
@@ -119,7 +118,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
         summary = "Insert",
-        description = "Creates a new ${modelName}",
+        description = "Creates a new ${collectionName}",
         errorCases = listOf(),
         successCode = HttpStatus.Created,
         implementation = { user: USER, value: T ->
@@ -135,7 +134,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         outputType = info.serialization.serializer,
         pathType = info.serialization.idSerializer,
         summary = "Upsert",
-        description = "Creates or updates a ${modelName}",
+        description = "Creates or updates a ${collectionName}",
         errorCases = listOf(),
         successCode = HttpStatus.Created,
         implementation = { user: USER, id: ID, value: T ->
@@ -152,7 +151,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         inputType = ListSerializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
         summary = "Bulk Replace",
-        description = "Modifies many ${modelName}s at the same time by ID.",
+        description = "Modifies many ${collectionName}s at the same time by ID.",
         errorCases = listOf(),
         implementation = { user: USER, values: List<T> ->
             val db = info.collection(user)
@@ -166,7 +165,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         outputType = info.serialization.serializer,
         pathType = info.serialization.idSerializer,
         summary = "Replace",
-        description = "Replaces a single ${modelName} by ID.",
+        description = "Replaces a single ${collectionName} by ID.",
         errorCases = listOf(
             LSError(
                 http = HttpStatus.NotFound.code,
@@ -188,7 +187,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         inputType = MassModification.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
         summary = "Bulk Modify",
-        description = "Modifies many ${modelName}s at the same time.  Returns the number of changed items.",
+        description = "Modifies many ${collectionName}s at the same time.  Returns the number of changed items.",
         errorCases = listOf(),
         implementation = { user: USER, input: MassModification<T> ->
             info.collection(user)
@@ -202,7 +201,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         outputType = EntryChange.serializer(info.serialization.serializer),
         pathType = info.serialization.idSerializer,
         summary = "Modify with Diff",
-        description = "Modifies a ${modelName} by ID, returning both the previous value and new value.",
+        description = "Modifies a ${collectionName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
             LSError(
                 http = HttpStatus.NotFound.code,
@@ -224,7 +223,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         outputType = info.serialization.serializer,
         pathType = info.serialization.idSerializer,
         summary = "Modify",
-        description = "Modifies a ${modelName} by ID, returning both the previous value and new value.",
+        description = "Modifies a ${collectionName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
             LSError(
                 http = HttpStatus.NotFound.code,
@@ -246,7 +245,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
         summary = "Bulk Delete",
-        description = "Deletes all matching ${modelName}s, returning the number of deleted items.",
+        description = "Deletes all matching ${collectionName}s, returning the number of deleted items.",
         errorCases = listOf(),
         implementation = { user: USER, filter: Condition<T> ->
             info.collection(user)
@@ -260,7 +259,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         outputType = Unit.serializer(),
         pathType = info.serialization.idSerializer,
         summary = "Delete",
-        description = "Deletes a ${modelName} by id.",
+        description = "Deletes a ${collectionName} by id.",
         errorCases = listOf(
             LSError(
                 http = HttpStatus.NotFound.code,
@@ -284,7 +283,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
         summary = "Count",
-        description = "Gets the total number of ${modelName}s matching the given condition.",
+        description = "Gets the total number of ${collectionName}s matching the given condition.",
         errorCases = listOf(),
         implementation = { user: USER, condition: Condition<T> ->
             info.collection(user)
@@ -297,7 +296,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
         summary = "Count",
-        description = "Gets the total number of ${modelName}s matching the given condition.",
+        description = "Gets the total number of ${collectionName}s matching the given condition.",
         errorCases = listOf(),
         implementation =
         { user: USER, condition: Condition<T> ->
@@ -311,7 +310,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         inputType = GroupCountQuery.serializer(info.serialization.serializer),
         outputType = MapSerializer(String.serializer(), Int.serializer()),
         summary = "Group Count",
-        description = "Gets the total number of ${modelName}s matching the given condition divided by group.",
+        description = "Gets the total number of ${collectionName}s matching the given condition divided by group.",
         errorCases = listOf(),
         implementation = { user: USER, condition: GroupCountQuery<T> ->
             @Suppress("UNCHECKED_CAST")
@@ -326,7 +325,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         inputType = AggregateQuery.serializer(info.serialization.serializer),
         outputType = Double.serializer().nullable,
         summary = "Aggregate",
-        description = "Aggregates a property of ${modelName}s matching the given condition.",
+        description = "Aggregates a property of ${collectionName}s matching the given condition.",
         errorCases = listOf(),
         implementation = { user: USER, condition: AggregateQuery<T> ->
             @Suppress("UNCHECKED_CAST")
@@ -344,7 +343,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         inputType = GroupAggregateQuery.serializer(info.serialization.serializer),
         outputType = MapSerializer(String.serializer(), Double.serializer().nullable),
         summary = "Group Aggregate",
-        description = "Aggregates a property of ${modelName}s matching the given condition divided by group.",
+        description = "Aggregates a property of ${collectionName}s matching the given condition divided by group.",
         errorCases = listOf(),
         implementation = { user: USER, condition: GroupAggregateQuery<T> ->
             @Suppress("UNCHECKED_CAST")

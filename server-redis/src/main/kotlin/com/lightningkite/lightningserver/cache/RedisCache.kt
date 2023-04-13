@@ -3,23 +3,15 @@ package com.lightningkite.lightningserver.cache
 import com.lightningkite.lightningserver.serialization.Serialization
 import io.lettuce.core.GetExArgs
 import io.lettuce.core.RedisClient
-import io.lettuce.core.ScriptOutputType
 import io.lettuce.core.SetArgs
-import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.reactive.awaitFirst
 import kotlinx.coroutines.reactive.awaitFirstOrNull
-import kotlinx.coroutines.reactive.awaitSingle
 import kotlinx.coroutines.reactive.collect
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
 import redis.embedded.RedisServer
 import java.time.Duration
-import java.util.concurrent.ConcurrentHashMap
 
-class RedisCache(val client: RedisClient) : CacheInterface {
+class RedisCache(val client: RedisClient) : Cache {
     companion object {
         init {
             CacheSettings.register("redis-test") {

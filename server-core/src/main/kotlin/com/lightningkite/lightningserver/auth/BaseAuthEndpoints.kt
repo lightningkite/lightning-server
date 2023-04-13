@@ -1,21 +1,13 @@
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.exceptions.BadRequestException
-import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.typed.parseUrlPartOrBadRequest
 import com.lightningkite.lightningserver.typed.typed
-import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.builtins.serializer
-import java.lang.Exception
-import java.security.SecureRandom
 import java.time.Duration
-import java.util.*
 
 open class BaseAuthEndpoints<USER : Any, ID>(
     path: ServerPath,
@@ -26,29 +18,40 @@ open class BaseAuthEndpoints<USER : Any, ID>(
         HttpResponse.redirectToGet(
             to = queryParameter("destination") ?: landing,
             headers = {
-                setCookie(HttpHeader.Authorization, token)
+                setCookie(HttpHeader.Authorization, token, maxAge = 31536000)
             }
         )
     }
 ) : ServerPathGroup(path) {
-    val authType = object: JwtTypedAuthorizationHandler.AuthType<USER> {
+    val authType = object : JwtTypedAuthorizationHandler.AuthType<USER> {
         override val name: String
             get() = userAccess.authInfo.type!!
 
         @Suppress("UNCHECKED_CAST")
         override fun tryCast(item: Any): USER? = userAccess.authInfo.tryCast(item)
-        override suspend fun retrieve(reference: String): USER = userAccess.byId(Serialization.fromString(reference, userAccess.idSerializer))
-        override fun serializeReference(item: USER): String = Serialization.toString(userAccess.id(item), userAccess.idSerializer)
+        override suspend fun retrieve(reference: String): USER =
+            userAccess.byId(Serialization.fromString(reference, userAccess.idSerializer))
+
+        override fun serializeReference(item: USER): String =
+            Serialization.toString(userAccess.id(item), userAccess.idSerializer)
     }
 
     val typedHandler = JwtTypedAuthorizationHandler.current(jwtSigner)
+
     init {
         typedHandler.types.add(authType)
         typedHandler.defaultType = authType
         path.docName = "Auth"
     }
 
-    fun token(user: USER, expireDuration: Duration = jwtSigner().expiration): String = typedHandler.token(user, expireDuration)
+    fun token(user: USER, expireDuration: Duration = jwtSigner().expiration): String =
+        typedHandler.token(user, expireDuration)
+
+    fun redirectToLanding(token: String): HttpResponse =
+        HttpResponse.redirectToGet(landingRoute.path.toString() + "?jwt=${token}")
+
+    fun redirectToLanding(user: USER): HttpResponse =
+        HttpResponse.redirectToGet(landingRoute.path.toString() + "?jwt=${token(user, Duration.ofMinutes(5))}")
 
     val landingRoute: HttpEndpoint = path("login-landing").get.handler {
         val subject = jwtSigner().verify(it.queryParameter("jwt")!!)

@@ -16,6 +16,9 @@ val KSClassDeclaration.usesSub: Boolean
                     this.simpleName.asString() == "Condition" ||
                     this.simpleName.asString() == "Modification"
             ) -> false
+            packageName == "com.lightningkite.lightningserver.websocket" && (
+                    this.simpleName.asString() == "WebSocketIdentifier"
+            ) -> false
 //            packageName.startsWith("kotlin.Byte") ||
 //            packageName.startsWith("kotlin.Short") ||
 //            packageName.startsWith("kotlin.Int") ||

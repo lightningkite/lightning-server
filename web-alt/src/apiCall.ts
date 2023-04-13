@@ -10,7 +10,7 @@ type PathImpl<T, K extends keyof T> =
 
 export type Path<T> = PathImpl<T, keyof T> | (keyof T & string);
 
-export function apiCall<T>(url: string, body: T, request: RequestInit, fileUploads?: Record<Path<T>, File>): Promise<Response> {
+export function apiCall<T>(url: string, body: T, request: RequestInit, fileUploads?: Record<Path<T>, File>, responseInterceptors?: (x: Response)=>Response): Promise<Response> {
     let f: Promise<Response>
     if(fileUploads === undefined || Object.keys(fileUploads).length === 0) {
         f = fetch(url, {
@@ -38,7 +38,10 @@ export function apiCall<T>(url: string, body: T, request: RequestInit, fileUploa
         })
     }
     return f.then(x => {
-        if(!x.ok) throw x
-        else return x
+        let response = responseInterceptors?.call(x) ?? x
+        if(!response.ok) {
+            throw response
+        }
+        else return response
     })
 }

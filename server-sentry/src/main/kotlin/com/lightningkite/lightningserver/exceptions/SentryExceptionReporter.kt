@@ -15,7 +15,11 @@ import io.sentry.SentryOptions
 import io.sentry.event.User
 import io.sentry.event.interfaces.HttpInterface
 
-
+/**
+ * An ExceptionReporter implementation that sends all reports to an external Sentry service.
+ *
+ * @param dsn The connection string used to connect to the Sentry Server.
+ */
 class SentryExceptionReporter(val dsn: String): ExceptionReporter {
     companion object {
         init {

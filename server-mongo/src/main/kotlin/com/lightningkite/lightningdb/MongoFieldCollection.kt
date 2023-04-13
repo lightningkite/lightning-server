@@ -1,9 +1,15 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.lightningserver.exceptions.BadRequestException
+import com.mongodb.ErrorCategory
+import com.mongodb.MongoBulkWriteException
 import com.mongodb.MongoCommandException
+import com.mongodb.MongoQueryException
 import com.mongodb.client.model.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -33,6 +39,53 @@ class MongoFieldCollection<Model : Any>(
             Sorts.descending(it.field.property.name)
     })
 
+    private inline fun <T> exceptionWrap(operation: () -> T): T {
+        try {
+            return operation()
+        } catch (e: MongoBulkWriteException) {
+            throw BadRequestException(
+                "Request had the following issues: ${
+                    e.writeErrors.map {
+                        ErrorCategory.fromErrorCode(
+                            it.code
+                        )
+                    }.joinToString { it.name }
+                }"
+            )
+
+        } catch (e: MongoCommandException) {
+            throw BadRequestException("Request had the following issue: ${ErrorCategory.fromErrorCode(e.code)}")
+        } catch (e: MongoQueryException) {
+            throw BadRequestException("The request had an issue: ${e.errorMessage}")
+        }
+    }
+
+    private fun handleException(e: Throwable) {
+        when (e) {
+            is MongoBulkWriteException -> throw BadRequestException(
+                "Request had the following issues: ${
+                    e.writeErrors.map {
+                        ErrorCategory.fromErrorCode(
+                            it.code
+                        )
+                    }.joinToString { it.name }
+                }"
+            )
+
+            is MongoCommandException -> throw BadRequestException(
+                "Request had the following issue: ${
+                    ErrorCategory.fromErrorCode(
+                        e.code
+                    )
+                }"
+            )
+
+            is MongoQueryException -> throw BadRequestException("The request had an issue: ${e.errorMessage}")
+            else -> throw e
+        }
+    }
+
+
     override suspend fun find(
         condition: Condition<Model>,
         orderBy: List<SortPart<Model>>,
@@ -40,6 +93,7 @@ class MongoFieldCollection<Model : Any>(
         limit: Int,
         maxQueryMs: Long,
     ): Flow<Model> {
+        if (condition.simplify() is Condition.Never) return emptyFlow()
         prepare.await()
         return mongo.find(condition.bson())
             .let {
@@ -58,32 +112,37 @@ class MongoFieldCollection<Model : Any>(
                     it.sort(sort(orderBy))
             }
             .toFlow()
+            .catch { handleException(it) }
     }
 
     @Serializable
     data class KeyHolder<Key>(val _id: Key)
 
     override suspend fun count(condition: Condition<Model>): Int {
+        if (condition.simplify() is Condition.Never) return 0
         prepare.await()
-        return mongo.countDocuments(condition.bson()).toInt()
+        return exceptionWrap { mongo.countDocuments(condition.bson()).toInt() }
     }
 
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
         groupBy: KProperty1<Model, Key>,
     ): Map<Key, Int> {
+        if (condition.simplify() is Condition.Never) return mapOf()
         prepare.await()
-        return mongo.aggregate<BsonDocument>(
-            match(condition.bson()),
-            group("\$" + groupBy.name, Accumulators.sum("count", 1))
-        )
-            .toList()
-            .associate {
-                MongoDatabase.bson.load(
-                    KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!),
-                    it
-                )._id to it.getNumber("count").intValue()
-            }
+        return exceptionWrap {
+            mongo.aggregate<BsonDocument>(
+                match(condition.bson()),
+                group("\$" + groupBy.name, Accumulators.sum("count", 1))
+            )
+                .toList()
+                .associate {
+                    MongoDatabase.bson.load(
+                        KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!),
+                        it
+                    )._id to it.getNumber("count").intValue()
+                }
+        }
     }
 
     private fun Aggregate.asValueBson(propertyName: String) = when (this) {
@@ -98,14 +157,17 @@ class MongoFieldCollection<Model : Any>(
         condition: Condition<Model>,
         property: KProperty1<Model, N>,
     ): Double? {
+        if (condition.simplify() is Condition.Never) return null
         prepare.await()
-        return mongo.aggregate<BsonDocument>(match(condition.bson()), group(null, aggregate.asValueBson(property.name)))
-            .toList()
-            .map {
-                if (it.isNull("value")) null
-                else it.getNumber("value").doubleValue()
-            }
-            .firstOrNull()
+        return exceptionWrap {
+            mongo.aggregate<BsonDocument>(match(condition.bson()), group(null, aggregate.asValueBson(property.name)))
+                .toList()
+                .map {
+                    if (it.isNull("value")) null
+                    else it.getNumber("value").doubleValue()
+                }
+                .firstOrNull()
+        }
     }
 
     override suspend fun <N : Number?, Key> groupAggregate(
@@ -114,18 +176,21 @@ class MongoFieldCollection<Model : Any>(
         groupBy: KProperty1<Model, Key>,
         property: KProperty1<Model, N>,
     ): Map<Key, Double?> {
+        if (condition.simplify() is Condition.Never) return mapOf()
         prepare.await()
-        return mongo.aggregate<BsonDocument>(
-            match(condition.bson()),
-            group("\$" + groupBy.name, aggregate.asValueBson(property.name))
-        )
-            .toList()
-            .associate {
-                MongoDatabase.bson.load(
-                    KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!),
-                    it
-                )._id to (if (it.isNull("value")) null else it.getNumber("value").doubleValue())
-            }
+        return exceptionWrap {
+            mongo.aggregate<BsonDocument>(
+                match(condition.bson()),
+                group("\$" + groupBy.name, aggregate.asValueBson(property.name))
+            )
+                .toList()
+                .associate {
+                    MongoDatabase.bson.load(
+                        KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!),
+                        it
+                    )._id to (if (it.isNull("value")) null else it.getNumber("value").doubleValue())
+                }
+        }
     }
 
     override suspend fun insertImpl(
@@ -134,15 +199,16 @@ class MongoFieldCollection<Model : Any>(
         prepare.await()
         if (models.count() == 0) return emptyList()
         val asList = models.toList()
-        mongo.insertMany(asList)
+        exceptionWrap { mongo.insertMany(asList) }
         return asList
     }
 
     override suspend fun replaceOneImpl(
         condition: Condition<Model>,
         model: Model,
-        orderBy: List<SortPart<Model>>
+        orderBy: List<SortPart<Model>>,
     ): EntryChange<Model> {
+        if (condition.simplify() is Condition.Never) return EntryChange(null, null)
         prepare.await()
         return updateOne(condition, Modification.Assign(model), orderBy)
     }
@@ -152,9 +218,10 @@ class MongoFieldCollection<Model : Any>(
         model: Model,
         orderBy: List<SortPart<Model>>,
     ): Boolean {
+        if (condition.simplify() is Condition.Never) return false
         prepare.await()
         if (orderBy.isNotEmpty()) return updateOneIgnoringResultImpl(condition, Modification.Assign(model), orderBy)
-        return mongo.replaceOne(condition.bson(), model).matchedCount != 0L
+        return exceptionWrap { mongo.replaceOne(condition.bson(), model).matchedCount != 0L }
     }
 
     override suspend fun upsertOneImpl(
@@ -162,20 +229,39 @@ class MongoFieldCollection<Model : Any>(
         modification: Modification<Model>,
         model: Model,
     ): EntryChange<Model> {
+        if (condition.simplify() is Condition.Never) return EntryChange(null, null)
+        if (modification is Modification.Chain && modification.modifications.isEmpty()) return EntryChange(null, null)
         prepare.await()
         val m = modification.bson()
-        return mongo.findOneAndUpdate(
-            condition.bson(),
-            m.document,
-            FindOneAndUpdateOptions()
-                .returnDocument(ReturnDocument.BEFORE)
-                .upsert(m.options.isUpsert)
-                .bypassDocumentValidation(m.options.bypassDocumentValidation)
-                .collation(m.options.collation)
-                .arrayFilters(m.options.arrayFilters)
-                .hint(m.options.hint)
-                .hintString(m.options.hintString)
-        )?.let { EntryChange(it, modification(it)) } ?: run { mongo.insertOne(model); EntryChange(null, model) }
+        return exceptionWrap {
+            if (m.upsert(model, serializer)) {
+                mongo.findOneAndUpdate(
+                    condition.bson(),
+                    m.document,
+                    FindOneAndUpdateOptions()
+                        .returnDocument(ReturnDocument.BEFORE)
+                        .upsert(m.options.isUpsert)
+                        .bypassDocumentValidation(m.options.bypassDocumentValidation)
+                        .collation(m.options.collation)
+                        .arrayFilters(m.options.arrayFilters)
+                        .hint(m.options.hint)
+                        .hintString(m.options.hintString)
+                )?.let { EntryChange(it, modification(it)) } ?: EntryChange(null, model)
+            } else {
+                mongo.findOneAndUpdate(
+                    condition.bson(),
+                    m.document,
+                    FindOneAndUpdateOptions()
+                        .returnDocument(ReturnDocument.BEFORE)
+                        .upsert(m.options.isUpsert)
+                        .bypassDocumentValidation(m.options.bypassDocumentValidation)
+                        .collation(m.options.collation)
+                        .arrayFilters(m.options.arrayFilters)
+                        .hint(m.options.hint)
+                        .hintString(m.options.hintString)
+                )?.let { EntryChange(it, modification(it)) } ?: run { mongo.insertOne(model); EntryChange(null, model) }
+            }
+        }
     }
 
     override suspend fun upsertOneIgnoringResultImpl(
@@ -183,16 +269,20 @@ class MongoFieldCollection<Model : Any>(
         modification: Modification<Model>,
         model: Model,
     ): Boolean {
+        if (condition.simplify() is Condition.Never) return false
+        if (modification is Modification.Chain && modification.modifications.isEmpty()) return false
         prepare.await()
-        if (modification is Modification.Assign && modification.value == model) {
-            return mongo.replaceOne(condition.bson(), model, ReplaceOptions().upsert(true)).matchedCount != 0L
-        } else {
+        return exceptionWrap {
             val m = modification.bson()
-            if (mongo.updateOne(condition.bson(), m.document, m.options).matchedCount != 0L)
-                return true
-            else {
-                mongo.insertOne(model)
-                return false
+            if (m.upsert(model, serializer)) {
+                mongo.updateOne(condition.bson(), m.document, m.options).matchedCount > 0
+            } else {
+                if (mongo.updateOne(condition.bson(), m.document, m.options).matchedCount != 0L)
+                    true
+                else {
+                    mongo.insertOne(model)
+                    false
+                }
             }
         }
     }
@@ -202,21 +292,25 @@ class MongoFieldCollection<Model : Any>(
         modification: Modification<Model>,
         orderBy: List<SortPart<Model>>,
     ): EntryChange<Model> {
+        if (condition.simplify() is Condition.Never) return EntryChange(null, null)
+        if (modification is Modification.Chain && modification.modifications.isEmpty()) return EntryChange(null, null)
         prepare.await()
         val m = modification.bson()
-        val before = mongo.findOneAndUpdate(
-            condition.bson(),
-            m.document,
-            FindOneAndUpdateOptions()
-                .returnDocument(ReturnDocument.BEFORE)
-                .let { if (orderBy.isEmpty()) it else it.sort(sort(orderBy)) }
-                .upsert(m.options.isUpsert)
-                .bypassDocumentValidation(m.options.bypassDocumentValidation)
-                .collation(m.options.collation)
-                .arrayFilters(m.options.arrayFilters)
-                .hint(m.options.hint)
-                .hintString(m.options.hintString)
-        ) ?: return EntryChange(null, null)
+        val before = exceptionWrap {
+            mongo.findOneAndUpdate(
+                condition.bson(),
+                m.document,
+                FindOneAndUpdateOptions()
+                    .returnDocument(ReturnDocument.BEFORE)
+                    .let { if (orderBy.isEmpty()) it else it.sort(sort(orderBy)) }
+                    .upsert(m.options.isUpsert)
+                    .bypassDocumentValidation(m.options.bypassDocumentValidation)
+                    .collation(m.options.collation)
+                    .arrayFilters(m.options.arrayFilters)
+                    .hint(m.options.hint)
+                    .hintString(m.options.hintString)
+            ) ?: return EntryChange(null, null)
+        }
         val after = modification(before)
         return EntryChange(before, after)
     }
@@ -226,24 +320,30 @@ class MongoFieldCollection<Model : Any>(
         modification: Modification<Model>,
         orderBy: List<SortPart<Model>>,
     ): Boolean {
+        if (condition.simplify() is Condition.Never) return false
+        if (modification is Modification.Chain && modification.modifications.isEmpty()) return false
         prepare.await()
         val m = modification.bson()
-        return mongo.updateOne(condition.bson(), m.document, m.options).matchedCount != 0L
+        return exceptionWrap { mongo.updateOne(condition.bson(), m.document, m.options).matchedCount != 0L }
     }
 
     override suspend fun updateManyImpl(
         condition: Condition<Model>,
         modification: Modification<Model>,
     ): CollectionChanges<Model> {
+        if (condition.simplify() is Condition.Never) return CollectionChanges()
+        if (modification is Modification.Chain && modification.modifications.isEmpty()) return CollectionChanges()
         prepare.await()
         val m = modification.bson()
         val changes = ArrayList<EntryChange<Model>>()
-        mongo.withDocumentClass<BsonDocument>().find(condition.bson()).toFlow().collectChunked(1000) { list ->
-            mongo.updateMany(Filters.`in`("_id", list.map { it["_id"] }), m.document, m.options)
-            list.asSequence().map { MongoDatabase.bson.load(serializer, it) }
-                .forEach {
-                    changes.add(EntryChange(it, modification(it)))
-                }
+        exceptionWrap {
+            mongo.withDocumentClass<BsonDocument>().find(condition.bson()).toFlow().collectChunked(1000) { list ->
+                mongo.updateMany(Filters.`in`("_id", list.map { it["_id"] }), m.document, m.options)
+                list.asSequence().map { MongoDatabase.bson.load(serializer, it) }
+                    .forEach {
+                        changes.add(EntryChange(it, modification(it)))
+                    }
+            }
         }
         return CollectionChanges(changes = changes)
     }
@@ -252,44 +352,55 @@ class MongoFieldCollection<Model : Any>(
         condition: Condition<Model>,
         modification: Modification<Model>,
     ): Int {
+        if (condition.simplify() is Condition.Never) return 0
+        if (modification is Modification.Chain && modification.modifications.isEmpty()) return 0
         prepare.await()
         val m = modification.bson()
-        return mongo.updateMany(
-            condition.bson(),
-            m.document,
-            m.options
-        ).matchedCount.toInt()
+        return exceptionWrap {
+            mongo.updateMany(
+                condition.bson(),
+                m.document,
+                m.options
+            ).matchedCount.toInt()
+        }
     }
 
     override suspend fun deleteOneImpl(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? {
+        if (condition.simplify() is Condition.Never) return null
         prepare.await()
-        return mongo.withDocumentClass<BsonDocument>().find(condition.bson())
-            .let { if (orderBy.isEmpty()) it else it.sort(sort(orderBy)) }
-            .limit(1).toFlow().firstOrNull()?.let {
-                val id = it["_id"]
-                mongo.deleteOne(Filters.eq("_id", id))
-                MongoDatabase.bson.load(serializer, it)
-            }
+        return exceptionWrap {
+            mongo.withDocumentClass<BsonDocument>().find(condition.bson())
+                .let { if (orderBy.isEmpty()) it else it.sort(sort(orderBy)) }
+                .limit(1).toFlow().firstOrNull()?.let {
+                    val id = it["_id"]
+                    mongo.deleteOne(Filters.eq("_id", id))
+                    MongoDatabase.bson.load(serializer, it)
+                }
+        }
     }
 
     override suspend fun deleteOneIgnoringOldImpl(
         condition: Condition<Model>,
         orderBy: List<SortPart<Model>>,
     ): Boolean {
+        if (condition.simplify() is Condition.Never) return false
         if (orderBy.isNotEmpty()) return deleteOneImpl(condition, orderBy) != null
         prepare.await()
-        return mongo.deleteOne(condition.bson()).deletedCount > 0
+        return exceptionWrap { mongo.deleteOne(condition.bson()).deletedCount > 0 }
     }
 
     override suspend fun deleteManyImpl(condition: Condition<Model>): List<Model> {
+        if (condition.simplify() is Condition.Never) return listOf()
         prepare.await()
         val remove = ArrayList<Model>()
-        mongo.withDocumentClass<BsonDocument>().find(condition.bson()).toFlow().collectChunked(1000) { list ->
-            mongo.deleteMany(Filters.`in`("_id", list.map { it["_id"] }))
-            list.asSequence().map { MongoDatabase.bson.load(serializer, it) }
-                .forEach {
-                    remove.add(it)
-                }
+        exceptionWrap {
+            mongo.withDocumentClass<BsonDocument>().find(condition.bson()).toFlow().collectChunked(1000) { list ->
+                mongo.deleteMany(Filters.`in`("_id", list.map { it["_id"] }))
+                list.asSequence().map { MongoDatabase.bson.load(serializer, it) }
+                    .forEach {
+                        remove.add(it)
+                    }
+            }
         }
         return remove
     }
@@ -297,8 +408,9 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun deleteManyIgnoringOldImpl(
         condition: Condition<Model>,
     ): Int {
+        if (condition.simplify() is Condition.Never) return 0
         prepare.await()
-        return mongo.deleteMany(condition.bson()).deletedCount.toInt()
+        return exceptionWrap { mongo.deleteMany(condition.bson()).deletedCount.toInt() }
     }
 
 
@@ -355,16 +467,4 @@ class MongoFieldCollection<Model : Any>(
         }
         requireCompletion.forEach { it.join() }
     }
-}
-
-private suspend fun <Model> Flow<Model>.collectChunked(chunkSize: Int, action: suspend (List<Model>) -> Unit) {
-    val list = ArrayList<Model>()
-    this.collect {
-        list.add(it)
-        if (list.size >= chunkSize) {
-            action(list)
-            list.clear()
-        }
-    }
-    action(list)
 }

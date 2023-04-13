@@ -5,21 +5,19 @@ import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import net.schmizz.sshj.Config
+import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
-import net.schmizz.sshj.common.KeyType
+import net.schmizz.sshj.sftp.OpenMode
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
-import net.schmizz.sshj.userauth.keyprovider.KeyProvider
+import net.schmizz.sshj.xfer.FileSystemFile
+import net.schmizz.sshj.xfer.LocalDestFile
 import java.io.File
 import java.io.InputStream
-import java.security.KeyFactory
-import java.security.PrivateKey
-import java.security.PublicKey
-import java.security.spec.PKCS8EncodedKeySpec
 import java.time.Duration
 import java.time.Instant
-import java.util.Base64
-import java.util.concurrent.ConcurrentHashMap
+import java.util.*
 
 class Sftp(
     val host: String,
@@ -31,28 +29,38 @@ class Sftp(
     companion object {
         init {
             FilesSettings.register("sftp") { settings ->
-                val postScheme = settings.storageUrl.substringAfter("://")
-                val userAndHost = postScheme.substringBefore("/")
-                val user = userAndHost.substringBefore('@', "ubuntu")
-                val hostWithPort = userAndHost.substringAfter('@')
-                val host = hostWithPort.substringBefore(':')
-                val port = hostWithPort.substringAfter(':', "22").toInt()
-                val rootPath = postScheme.substringAfter('/').substringBefore('?')
-                val params = postScheme.substringAfter('/').substringAfter('?').split('&')
-                    .associate { it.substringBefore('=') to it.substringAfter('=', "true") }
-                Sftp(host, port, rootPath) {
-                    SSHClient().apply {
-                        params["host"]?.let { addHostKeyVerifier(it) } ?: addHostKeyVerifier(PromiscuousVerifier())
-                        connect(host, port)
-                        val id = params["identity"]!!
-                        val pk = buildString {
-                            appendLine("-----BEGIN OPENSSH PRIVATE KEY-----")
-                            id.chunked(70).forEach { l -> appendLine(l) }
-                            appendLine("-----END OPENSSH PRIVATE KEY-----")
+                Regex("""sftp://(?<user>[^@]+)@(?<host>[^:]+):(?<port>[0-9]+)/(?<path>[^?]*)\?(?<params>.*)""").matchEntire(
+                    settings.storageUrl
+                )?.let { match ->
+                    val host = match.groups["host"]!!.value
+                    val port = match.groups["port"]!!.value.toInt()
+                    val params: Map<String, List<String>> =
+                        FilesSettings.parseParameterString(match.groups["params"]!!.value)
+                    val rootPath = match.groups["path"]!!.value
+                    val user = match.groups["user"]!!.value
+                    Sftp(host, port, rootPath) {
+                        SSHClient(DefaultConfig().apply {
+                            if (params["algorithm"]?.firstOrNull() == "ssh-rsa")
+                                prioritizeSshRsaKeyAlgorithm()
+                        }).apply {
+                            params["host"]?.let { addHostKeyVerifier(it.first()) } ?: addHostKeyVerifier(
+                                PromiscuousVerifier()
+                            )
+                            connect(host, port)
+                            params["identity"]?.firstOrNull()?.let { id ->
+                                val pk = buildString {
+                                    appendLine("-----BEGIN OPENSSH PRIVATE KEY-----")
+                                    id.chunked(70).forEach { l -> appendLine(l) }
+                                    appendLine("-----END OPENSSH PRIVATE KEY-----")
+                                }
+                                authPublickey(user, loadKeys(pk, null, null))
+                            } ?: params["password"]?.firstOrNull()?.let {
+                                authPassword(user, it)
+                            }
                         }
-                        authPublickey(user, loadKeys(pk, null, null))
                     }
                 }
+                    ?: throw IllegalStateException("Invalid sftp storageUrl. The URL should match the pattern: sftp://[user]@[host]:[port]/[path]?[params]\nParams available are: host, identity.")
             }
         }
     }
@@ -76,16 +84,18 @@ class Sftp(
     data class SftpFile(val system: Sftp, val path: File) : FileObject {
         override fun resolve(path: String): FileObject = SftpFile(system, this.path.resolve(path))
 
+        val sftpPath = if (path.path.startsWith('/')) path.path else "./${path.path}"
+
         override val parent: FileObject?
             get() = path.parentFile?.let { SftpFile(system, it) }
-                ?: if (path.unixPath.isNotEmpty()) system.root else null
+                ?: system.root
 
         override suspend fun list(): List<FileObject>? = withContext(Dispatchers.IO) {
             system.withClient {
                 try {
-                    ls(path.path)?.map { SftpFile(system, path.resolve(it.path)) }
-                } catch(e: net.schmizz.sshj.sftp.SFTPException) {
-                    if(e.message == "No such file") null
+                    ls(sftpPath)?.map { SftpFile(system, path.resolve(it.path).relativeTo(File(system.rootPath))) }
+                } catch (e: net.schmizz.sshj.sftp.SFTPException) {
+                    if (e.message == "No such file") null
                     else throw e
                 }
             }
@@ -93,40 +103,54 @@ class Sftp(
 
         override suspend fun info(): FileInfo? = withContext(Dispatchers.IO) {
             system.withClient {
-                this.stat(path.path)?.let {
-                    FileInfo(
-                        type = path.extension.let { println("Extension is $it"); ContentType.fromExtension(it).also { println(it) } },
-                        size = it.size,
-                        lastModified = Instant.ofEpochSecond(it.mtime)
-                    )
+                try {
+                    this.stat(sftpPath)?.let {
+                        FileInfo(
+                            type = path.extension.let { ContentType.fromExtension(it) },
+                            size = it.size,
+                            lastModified = Instant.ofEpochSecond(it.mtime)
+                        )
+                    }
+                } catch (e: net.schmizz.sshj.sftp.SFTPException) {
+                    if (e.message == "No such file") null
+                    else throw e
                 }
             }
         }
 
         override suspend fun write(content: HttpContent) = withContext(Dispatchers.IO) {
+            val stream = content.stream()
             system.withClient {
-                val file = File.createTempFile("temp", ".file")
-                content.stream().use {
-                    file.outputStream().use { o ->
-                        it.copyTo(o)
+                path.parent?.let { this.mkdirs(it) }
+                stream.use { input ->
+                    open(sftpPath, setOf(OpenMode.WRITE, OpenMode.CREAT, OpenMode.TRUNC)).use {
+                        it.RemoteFileOutputStream().use { output ->
+                            input.copyTo(output)
+                        }
                     }
                 }
-                this.mkdirs(path.parent)
-                this.put(file.path, path.path)
             }
+            Unit
         }
 
         override suspend fun read(): InputStream = withContext(Dispatchers.IO) {
             val file = File.createTempFile("temp", ".file")
             system.withClient {
-                this.get(path.path, file.path)
+                println("$sftpPath -> ${file.path}")
+                file.outputStream().use { out ->
+                    open(sftpPath, setOf(OpenMode.READ)).use {
+                        it.RemoteFileInputStream().use {
+                            it.copyTo(out)
+                        }
+                    }
+                }
             }
             file.inputStream()
         }
 
         override suspend fun delete() = withContext(Dispatchers.IO) {
             system.withClient {
-                this.rm(path.path)
+                this.rm(sftpPath)
             }
         }
 

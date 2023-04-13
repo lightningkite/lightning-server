@@ -1,41 +1,25 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.LSError
-import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.auth.AuthInfo
+import com.lightningkite.lightningserver.auth.cast
+import com.lightningkite.lightningserver.auth.rawUser
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.serialization.parse
-
-import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.settings.generalSettings
-import com.lightningkite.lightningserver.websocket.VirtualSocket
-import com.lightningkite.lightningserver.websocket.WebSocketClose
+import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import com.lightningkite.lightningserver.websocket.WebSockets
 import com.lightningkite.lightningserver.websocket.test
-import io.ktor.util.*
-import io.ktor.websocket.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.ChannelIterator
-import kotlinx.coroutines.channels.ChannelResult
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.consumeAsFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
-import kotlinx.coroutines.selects.SelectClause1
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.html.INPUT
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.serializer
-import java.util.*
-import kotlin.reflect.KType
-import kotlin.reflect.typeOf
 
 data class ApiWebsocket<USER, INPUT, OUTPUT>(
     override val path: ServerPath,
@@ -51,8 +35,8 @@ data class ApiWebsocket<USER, INPUT, OUTPUT>(
     val disconnect: suspend ApiWebsocket<USER, INPUT, OUTPUT>.(WebSockets.DisconnectEvent) -> Unit,
 ) : Documentable, WebSockets.Handler {
 
-    data class TypedConnectEvent<USER>(val user: USER, val id: String)
-    data class TypedMessageEvent<INPUT>(val id: String, val content: INPUT)
+    data class TypedConnectEvent<USER>(val user: USER, val id: WebSocketIdentifier)
+    data class TypedMessageEvent<INPUT>(val id: WebSocketIdentifier, val content: INPUT)
 
     override suspend fun connect(event: WebSockets.ConnectEvent) {
         this.connect.invoke(this, TypedConnectEvent(authInfo.cast(event.rawUser()), event.id))
@@ -67,7 +51,8 @@ data class ApiWebsocket<USER, INPUT, OUTPUT>(
         this.disconnect.invoke(this, event)
     }
 
-    suspend fun send(id: String, content: OUTPUT) = WebSockets.send(id, Serialization.json.encodeToString(outputType, content))
+    suspend fun send(id: WebSocketIdentifier, content: OUTPUT) =
+        id.send(Serialization.json.encodeToString(outputType, content))
 
 }
 
@@ -119,7 +104,8 @@ fun <USER, INPUT, OUTPUT> ServerPath.typedWebsocket(
     return ws
 }
 
-data class TypedVirtualSocket<INPUT, OUTPUT>(val incoming: ReceiveChannel<OUTPUT>, val send: suspend (INPUT)->Unit)
+data class TypedVirtualSocket<INPUT, OUTPUT>(val incoming: ReceiveChannel<OUTPUT>, val send: suspend (INPUT) -> Unit)
+
 suspend fun <USER, INPUT, OUTPUT> ApiWebsocket<USER, INPUT, OUTPUT>.test(
     parts: Map<String, String> = mapOf(),
     wildcard: String? = null,
@@ -128,7 +114,7 @@ suspend fun <USER, INPUT, OUTPUT> ApiWebsocket<USER, INPUT, OUTPUT>.test(
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
     sourceIp: String = "0.0.0.0",
-    test: suspend TypedVirtualSocket<INPUT, OUTPUT>.()->Unit
+    test: suspend TypedVirtualSocket<INPUT, OUTPUT>.() -> Unit
 ) {
     this.path.test(
         parts = parts,
@@ -142,14 +128,17 @@ suspend fun <USER, INPUT, OUTPUT> ApiWebsocket<USER, INPUT, OUTPUT>.test(
             val channel = Channel<OUTPUT>(20)
             coroutineScope {
                 val job = launch {
-                    for(it in incoming) {
+                    for (it in incoming) {
                         channel.send(Serialization.json.decodeFromString(outputType, it))
                     }
                 }
-                test(TypedVirtualSocket<INPUT, OUTPUT>(
-                    incoming = channel,
-                    send = { send(Serialization.json.encodeToString(inputType, it)) }
-                ))
+                val job2 = launch {
+                    test(TypedVirtualSocket<INPUT, OUTPUT>(
+                        incoming = channel,
+                        send = { send(Serialization.json.encodeToString(inputType, it)) }
+                    ))
+                }
+                job2.join()
                 job.cancelAndJoin()
             }
         },

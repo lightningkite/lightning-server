@@ -14,6 +14,7 @@ com.lightningkite.lightningdb.StandardDeviationSampleAggregator
 com.lightningkite.lightningdb.StandardDeviationPopulationAggregator
 com.lightningkite.lightningdb.aggregate
 com.lightningkite.lightningdb
+com.lightningkite.lightningdb.CheckReturnValue
 com.lightningkite.lightningdb.AdminSearchFields
 com.lightningkite.lightningdb.AdminTableColumns
 com.lightningkite.lightningdb.AdminTitleFields
@@ -108,6 +109,8 @@ com.lightningkite.lightningdb.clazz
 com.lightningkite.lightningdb.ListChange
 com.lightningkite.lightningdb.MassModification
 com.lightningkite.lightningdb.Modification
+com.lightningkite.lightningdb.modification
+com.lightningkite.lightningdb.ModificationBuilder
 com.lightningkite.lightningdb.getMod
 com.lightningkite.lightningdb.ModificationSerializer
 com.lightningkite.lightningdb.OnFieldSerializer2
@@ -161,7 +164,6 @@ com.lightningkite.lightningdb.UUIDFor
 com.lightningkite.lightningdb.startChain
 com.lightningkite.lightningdb.PropChain
 com.lightningkite.lightningdb.condition
-com.lightningkite.lightningdb.modification
 com.lightningkite.lightningdb.always
 com.lightningkite.lightningdb.never
 com.lightningkite.lightningdb.eq

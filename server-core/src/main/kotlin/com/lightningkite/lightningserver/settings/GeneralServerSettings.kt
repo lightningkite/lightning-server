@@ -28,12 +28,15 @@ data class GeneralServerSettings(
     val publicUrl: String = "http://$host:$port",
     val wsUrl: String = publicUrl,
     val debug: Boolean = false,
-    val cors: CorsSettings? = if(debug) CorsSettings(allowedDomains = listOf("*"), allowedHeaders = listOf("*", HttpHeader.Authorization)) else null
+    val cors: CorsSettings? = if (debug) CorsSettings(
+        allowedDomains = listOf("*"),
+        allowedHeaders = listOf("*", HttpHeader.Authorization)
+    ) else null
 ) {
     fun absolutePathAdjustment(string: String): String {
-        return if(string.startsWith("/")) {
+        return if (string.startsWith("/")) {
             val inbetween = publicUrl.substringAfter("://").substringAfter("/", "")
-            if(inbetween.isEmpty()) string
+            if (inbetween.isEmpty()) string
             else "/$inbetween$string"
         } else string
     }

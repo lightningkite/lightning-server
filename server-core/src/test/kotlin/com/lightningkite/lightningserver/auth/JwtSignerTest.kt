@@ -4,7 +4,7 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.settings.generalSettings
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class JwtSignerTest {

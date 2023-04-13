@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.model.*
@@ -30,6 +31,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
                 val r = system.s3Async.listObjectsV2 {
                     it.bucket(system.bucket)
                     it.prefix(path.unixPath)
+                    it.delimiter("/")
                     token?.let { t -> it.continuationToken(t) }
                 }.await()
                 results += r.contents().filter { !it.key().substringAfter(path.toString()).contains('/') }
@@ -65,9 +67,9 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
                 it.key(path.unixPath)
             }.build(), content.length?.let {
                 RequestBody.fromContentProvider(
-                    { content.stream() }, it, content.type.toString()
+                    { runBlocking { content.stream() } }, it, content.type.toString()
                 )
-            } ?: RequestBody.fromContentProvider({ content.stream() }, content.type.toString())
+            } ?: RequestBody.fromContentProvider({ runBlocking { content.stream() } }, content.type.toString())
             )
         }
     }

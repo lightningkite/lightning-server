@@ -1,12 +1,10 @@
 package com.lightningkite.lightningdb
 
-import com.github.jershell.kbson.BigDecimalSerializer
-import com.github.jershell.kbson.ByteArraySerializer
-import com.github.jershell.kbson.DateSerializer
-import com.github.jershell.kbson.ObjectIdSerializer
+import com.github.jershell.kbson.*
 import com.lightningkite.lightningdb.*
 import com.mongodb.client.model.UpdateOptions
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.*
 import org.bson.BsonDocument
 import org.bson.BsonTimestamp
@@ -49,13 +47,7 @@ fun Condition<*>.dump(into: Document = Document(), key: String?): Document {
         is Condition.Always -> {}
         is Condition.Never -> into["thisFieldWillNeverExist"] = "no never"
         is Condition.And -> {
-            if(conditions.any { it is Condition.Or }) {
-                into["\$and"] = conditions.map { it.dump(key = key)  }
-            } else {
-                conditions.forEach {
-                    it.dump(into, key)
-                }
-            }
+            into["\$and"] = conditions.map { it.dump(key = key)  }
         }
         is Condition.Or -> if(conditions.isEmpty()) into["thisFieldWillNeverExist"] = "no never" else into["\$or"] = conditions.map { it.dump(key = key)  }
         is Condition.Equal -> into.sub(key)["\$eq"] = value
@@ -80,7 +72,7 @@ fun Condition<*>.dump(into: Document = Document(), key: String?): Document {
         is Condition.OnKey<*> -> condition.dump(into, if (key == null) this.key else "$key.${this.key}")
         is Condition.StringContains -> {
             into.sub(key).also {
-                it["\$regex"] = Regex.fromLiteral(this.value).pattern
+                it["\$regex"] = Regex.escape(this.value)
                 it["\$options"] = if(this.ignoreCase) "i" else ""
             }
         }
@@ -168,7 +160,36 @@ data class UpdateWithOptions(
 )
 
 fun Condition<*>.bson() = Document().also { simplify().dump(it, null) }
-fun Modification<*>.bson(): UpdateWithOptions = UpdateWithOptions().also { dump(it, null) }
+fun Modification<*>.bson(): UpdateWithOptions = UpdateWithOptions().also { simplify().dump(it, null) }
+fun <T> UpdateWithOptions.upsert(model: T, serializer: KSerializer<T>): Boolean {
+    val set = (document["\$set"] as? Document) ?: document["\$set"]?.let { MongoDatabase.bson.stringify(serializer, it as T) }?.toDocument()
+    val inc = (document["\$inc"] as? Document)
+    val restrict = document.entries.asSequence()
+        .filter { it.key != "\$set" && it.key != "\$inc" }
+        .map { it.value }
+        .filterIsInstance<Document>()
+        .flatMap { it.keys }
+        .toSet()
+    document["\$setOnInsert"] = MongoDatabase.bson.stringify(serializer, model).toDocument().also {
+        set?.keys?.forEach { k ->
+            if(it[k] == set[k]) it.remove(k)
+            else {
+                return false
+            }
+        }
+        inc?.keys?.forEach { k ->
+            if((it[k] as Number).toDouble() == (inc[k] as Number).toDouble()) it.remove(k)
+            else {
+                return false
+            }
+        }
+        restrict.forEach { k ->
+            if(it.containsKey(k)) return false
+        }
+    }
+    options = options.upsert(true)
+    return true
+}
 
 @OptIn(ExperimentalSerializationApi::class)
 fun SerialDescriptor.bsonType(): BsonType = when(kind) {

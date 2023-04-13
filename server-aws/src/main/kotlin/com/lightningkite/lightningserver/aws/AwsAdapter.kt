@@ -2,18 +2,13 @@ package com.lightningkite.lightningserver.aws
 
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler
-import com.lightningkite.lightningdb.MultiplexMessage
-import com.lightningkite.lightningserver.bytes.hexToByteArray
-import com.lightningkite.lightningserver.cache.get
-import com.lightningkite.lightningserver.cache.modify
-import com.lightningkite.lightningserver.cache.set
+import com.lightningkite.lightningserver.cache.setIfNotExists
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.Disconnectable
-import com.lightningkite.lightningserver.core.ServerPathMatcher
-import com.lightningkite.lightningserver.cors.addCors
+import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.cors.extensionForEngineAddCors
 import com.lightningkite.lightningserver.db.DynamoDbCache
 import com.lightningkite.lightningserver.encryption.OpenSsl
-import com.lightningkite.lightningserver.encryption.decryptAesCbcPkcs5
 import com.lightningkite.lightningserver.engine.Engine
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.exceptions.report
@@ -29,6 +24,8 @@ import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Task
 import com.lightningkite.lightningserver.tasks.Tasks
+import com.lightningkite.lightningserver.websocket.QueryParamWebSocketHandler
+import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import com.lightningkite.lightningserver.websocket.WebSockets
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -57,16 +54,9 @@ import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.URI
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.time.Duration
 import java.util.*
 import org.crac.Resource
-import java.math.BigInteger
-import java.security.MessageDigest
-import javax.crypto.Cipher
-import javax.crypto.spec.IvParameterSpec
-import javax.crypto.spec.SecretKeySpec
 
 
 abstract class AwsAdapter : RequestStreamHandler, Resource {
@@ -77,8 +67,10 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
     data class Scheduled(val scheduled: String)
 
     companion object {
+        val logger: Logger = LoggerFactory.getLogger(AwsAdapter::class.java)
+
         fun loadSettings(jclass: Class<*>) {
-            println("Loading settings...")
+            logger.debug("Loading settings...")
             val root = File(System.getenv("LAMBDA_TASK_ROOT"))
             root.resolve("settings.json").takeIf { it.exists() }?.let {
                 it.readBytes().let { loadSettings(it) }
@@ -93,6 +85,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 }
             }
         }
+
         fun loadSettings(bytes: ByteArray) {
             val decryptedBytes = System.getenv("LIGHTNING_SERVER_SETTINGS_DECRYPTION")
                 ?.takeIf { it.isNotBlank() }
@@ -103,80 +96,19 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             Serialization.Internal.json.decodeFromString<Settings>(decryptedBytes.toString(Charsets.UTF_8))
         }
 
-        val logger: Logger = LoggerFactory.getLogger(AwsAdapter::class.java)
         val region by lazy { Region.of(System.getenv("AWS_REGION")) }
-        val httpMatcher by lazy { HttpEndpointMatcher(Http.endpoints.keys.asSequence()) }
-        val wsMatcher by lazy { ServerPathMatcher(WebSockets.handlers.keys.asSequence()) }
         private val wsCache by lazy {
             DynamoDbCache(
                 { DynamoDbAsyncClient.builder().region(region).build() },
-                generalSettings().wsUrl.substringAfter("://").filter { it.isLetterOrDigit() || it == '_' || it == '.' || it == '-' }
+                generalSettings().wsUrl.substringAfter("://")
+                    .substringBefore('?')
+                    .filter { it.isLetterOrDigit() || it == '_' || it == '.' || it == '-' }
             )
         }
 
         fun cache() = wsCache
         val configureEngine by lazy {
             engine = object : Engine {
-                val apiGatewayManagement = ApiGatewayManagementApiAsyncClient.builder()
-                    .region(region)
-                    .endpointOverride(URI.create("https://" + generalSettings().wsUrl.removePrefix("wss://")))
-                    .build()
-
-                override suspend fun sendWebSocketMessage(id: String, content: String): Boolean {
-                    try {
-                        if (id.contains('/')) {
-                            //Multiplex
-                            val wsId = id.substringBefore('/')
-                            val channelId = id.substringAfter('/')
-                            val result = apiGatewayManagement.postToConnection {
-                                it.connectionId(wsId)
-                                it.data(
-                                    SdkBytes.fromUtf8String(
-                                        Serialization.json.encodeToString(
-                                            MultiplexMessage(
-                                                channel = channelId,
-                                                data = content
-                                            )
-                                        )
-                                    )
-                                )
-                            }.await()
-                            val r = result.sdkHttpResponse()
-                            if (!r.isSuccessful) {
-                                throw Exception(
-                                    "Failed to send socket message to $id: ${r.statusCode()} - ${
-                                        try {
-                                            r.statusText().get()
-                                        } catch (e: Exception) {
-                                            "?"
-                                        }
-                                    } - ${(r as? SdkHttpFullResponse)?.content()?.get()?.use { it.reader().readText() }}"
-                                )
-                            }
-                        } else {
-                            val result = apiGatewayManagement.postToConnection {
-                                it.connectionId(id)
-                                it.data(SdkBytes.fromUtf8String(content))
-                            }.await()
-                            val r = result.sdkHttpResponse()
-                            if (!r.isSuccessful) {
-                                throw Exception(
-                                    "Failed to send socket message to $id: ${r.statusCode()} - ${
-                                        try {
-                                            r.statusText().get()
-                                        } catch (e: Exception) {
-                                            "?"
-                                        }
-                                    } - ${(r as? SdkHttpFullResponse)?.content()?.get()?.use { it.reader().readText() }}"
-                                )
-                            }
-                        }
-                        return true
-                    } catch (e: GoneException) {
-                        return false
-                    }
-                }
-
                 val lambdaClient = LambdaAsyncClient.builder()
                     .region(region)
                     .build()
@@ -199,34 +131,47 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     }
                 }
             }
-            println("Running Tasks.onEngineReady()...")
+            logger.debug("Running Tasks.onEngineReady()...")
             runBlocking { Tasks.onEngineReady() }
-            println("Tasks.onEngineReady() complete.")
+            logger.debug("Tasks.onEngineReady() complete.")
             Unit
         }
     }
 
     init {
-        println("Running Tasks.onSettingsReady()...")
+        logger.debug("Running Tasks.onSettingsReady()...")
         runBlocking { Tasks.onSettingsReady() }
-        println("Tasks.onSettingsReady() complete.")
+        logger.debug("Tasks.onSettingsReady() complete.")
         configureEngine
+        Http.matcher
+        WebSockets.matcher
         Core.getGlobalContext().register(this)
     }
 
     override fun beforeCheckpoint(context: org.crac.Context<out Resource>?) {
-        println("beforeCheckpoint() - shutting down all connections...")
+        logger.debug("beforeCheckpoint() - Preparing all connections...")
         Settings.requirements.forEach { (key, value) ->
             (value() as? Disconnectable)?.let {
-                println("Disconnecting $key...")
-                it.disconnect()
+                runBlocking {
+                    logger.debug("Making InitialConnection to: $key")
+                    it.connect()
+                    logger.debug("Now Disconnecting $key...")
+                    it.disconnect()
+                }
             }
         }
-        println("Disconnections complete.")
+        logger.debug("Disconnections complete.")
     }
 
     override fun afterRestore(context: org.crac.Context<out Resource>?) {
-        println("afterRestore()")
+        logger.debug("afterRestore() - opening all connections")
+        Settings.requirements.forEach { (key, value) ->
+            (value() as? Disconnectable)?.let {
+                logger.debug("Connecting $key...")
+                runBlocking { it.connect() }
+            }
+        }
+        logger.debug("Connections Complete")
     }
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context) {
@@ -276,12 +221,12 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     // The suicide function.  Exists to handle the panic handler to prevent cost issues.
                     asJson.containsKey("panic") -> {
                         try {
-                            println("Activating the panic shutdown...")
+                            logger.info("Activating the panic shutdown...")
                             val result = LambdaAsyncClient.builder().region(region).build().putFunctionConcurrency {
                                 it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
                                 it.reservedConcurrentExecutions(0)
                             }.await()
-                            println("Panic got code ${result.sdkHttpResponse().statusCode()}")
+                            logger.info("Panic got code ${result.sdkHttpResponse().statusCode()}")
                             assert(result.sdkHttpResponse().isSuccessful)
                             APIGatewayV2HTTPResponse(statusCode = 200)
                         } catch (e: Exception) {
@@ -291,12 +236,10 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     }
 
                     else -> {
-                        println("Input is $asJson")
                         asJson.jankMeADataClass("Something")
                     }
                 }
             } catch (e: Exception) {
-                println("Input $asJson had trouble")
                 e.printStackTrace()
                 e.report(asJson)
             }
@@ -321,7 +264,70 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         }
     }
 
-    //    @Suppress("UNREACHABLE_CODE")
+    val rootWs by lazy { QueryParamWebSocketHandler { cache() } }
+    val apiGatewayManagement by lazy {
+        ApiGatewayManagementApiAsyncClient.builder()
+            .region(region)
+            .endpointOverride(URI.create("https://" + generalSettings().wsUrl.removePrefix("wss://")))
+            .build()
+    }
+
+    val wsType = "aws"
+
+    init {
+        WebSocketIdentifier.register(
+            type = wsType,
+            send = { id, value ->
+                Metrics.report("webSocketMessages", 1.0)
+                try {
+                    val result = apiGatewayManagement.postToConnection {
+                        it.connectionId(id)
+                        it.data(SdkBytes.fromUtf8String(value))
+                    }.await()
+                    val r = result.sdkHttpResponse()
+                    if (!r.isSuccessful) {
+                        throw Exception(
+                            "Failed to send socket message to $id: ${r.statusCode()} - ${
+                                try {
+                                    r.statusText().get()
+                                } catch (e: Exception) {
+                                    "?"
+                                }
+                            } - ${(r as? SdkHttpFullResponse)?.content()?.get()?.use { it.reader().readText() }}"
+                        )
+                    }
+                    true
+                } catch (e: GoneException) {
+                    handleWsDisconnect(id)
+                    false
+                }
+            },
+            close = { id ->
+                Metrics.report("webSocketCloses", 1.0)
+                try {
+                    val result = apiGatewayManagement.deleteConnection {
+                        it.connectionId(id)
+                    }.await()
+                    val r = result.sdkHttpResponse()
+                    if (!r.isSuccessful) {
+                        throw Exception(
+                            "Failed to send socket message to $id: ${r.statusCode()} - ${
+                                try {
+                                    r.statusText().get()
+                                } catch (e: Exception) {
+                                    "?"
+                                }
+                            } - ${(r as? SdkHttpFullResponse)?.content()?.get()?.use { it.reader().readText() }}"
+                        )
+                    }
+                    true
+                } catch (e: GoneException) {
+                    false
+                }
+            }
+        )
+    }
+
     suspend fun handleWebsocket(event: APIGatewayV2WebsocketRequest): APIGatewayV2HTTPResponse {
         val headers =
             HttpHeaders(event.multiValueHeaders?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf())
@@ -335,207 +341,60 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 HttpContent.Text(raw, headers.contentType ?: ContentType.Text.Plain)
         }
         val queryParams =
-            (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v } }
+            (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
 
-        suspend fun isMultiplex() = cache().get<Boolean>("${event.requestContext.connectionId}-isMultiplex") == true
-        val multiplexSetId = event.requestContext.connectionId + "-channels"
         return when (event.requestContext.routeKey) {
             "\$connect" -> {
-                val path = headers["x-path"] ?: queryParams.find { it.first == "path" }?.second ?: ""
-                val isMultiplex = path.isEmpty() || path.trim('/') == "multiplex"
-                cache().set("${event.requestContext.connectionId}-isMultiplex", isMultiplex, Duration.ofHours(8))
-                if (isMultiplex) {
-                    queryParams.find { it.first == "jwt" }?.second?.let { jwt ->
-                        cache().set("${event.requestContext.connectionId}-auth", jwt, Duration.ofHours(8))
-                    }
-                    APIGatewayV2HTTPResponse(200)
-                } else handleWebsocketConnect(
-                    event,
-                    event.requestContext.connectionId,
-                    path,
-                    event.multiValueQueryStringParameters ?: mapOf()
+                val lkEvent = WebSockets.ConnectEvent(
+                    path = ServerPath.root,
+                    parts = mapOf(),
+                    wildcard = null,
+                    id = WebSocketIdentifier(wsType, event.requestContext.connectionId),
+                    queryParameters = queryParams,
+                    headers = headers,
+                    domain = event.requestContext.domainName,
+                    protocol = "https",
+                    sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0"
                 )
+                try {
+                    rootWs.connect(lkEvent)
+                    APIGatewayV2HTTPResponse(200)
+                } catch (e: Exception) {
+                    APIGatewayV2HTTPResponse(500, body = Serialization.json.encodeToString(e.message ?: ""))
+                }
             }
 
             "\$disconnect" -> {
-                val isMultiplex = isMultiplex()
-                cache().remove("${event.requestContext.connectionId}-isMultiplex")
-                if (isMultiplex) {
-                    cache().get<Set<String>>(multiplexSetId)?.forEach {
-                        handleWebsocketDisconnect(event.requestContext.connectionId + "/" + it)
-                    }
-                    cache().remove(multiplexSetId)
-                    APIGatewayV2HTTPResponse(200)
-                } else handleWebsocketDisconnect(event.requestContext.connectionId)
+                handleWsDisconnect(event.requestContext.connectionId)
             }
 
             else -> if (body == null || body.length == 0L)
-                return APIGatewayV2HTTPResponse(200)
-            else if (isMultiplex()) {
-                if (event.body.isBlank()) {
-                    WebSockets.send(event.requestContext.connectionId, "")
-                    return APIGatewayV2HTTPResponse(200)
+                APIGatewayV2HTTPResponse(200)
+            else {
+                val lkEvent =
+                    WebSockets.MessageEvent(WebSocketIdentifier(wsType, event.requestContext.connectionId), event.body)
+                try {
+                    rootWs.message(lkEvent)
+                    APIGatewayV2HTTPResponse(200)
+                } catch (e: Exception) {
+                    try { lkEvent.id.close() } catch(e: Exception) { /*squish*/ }
+                    handleWsDisconnect(event.requestContext.connectionId)
+                    APIGatewayV2HTTPResponse(500, body = Serialization.json.encodeToString(e.message ?: ""))
                 }
-                val message = Serialization.json.decodeFromString<MultiplexMessage>(event.body)
-                val cacheId = event.requestContext.connectionId + "/" + message.channel
-                when {
-                    message.start -> {
-                        try {
-                            val jwt = cache().get<String>("${event.requestContext.connectionId}-auth")
-                            val result = handleWebsocketConnect(
-                                event,
-                                cacheId,
-                                message.path!!,
-                                (message.queryParams ?: mapOf()),
-                                jwt
-                            ).also {
-                                if (it.statusCode == 200) {
-                                    cache().modify<Set<String>>(multiplexSetId, 40, timeToLive = Duration.ofHours(8)) {
-                                        it?.plus(message.channel) ?: setOf(message.channel)
-                                    }
-                                }
-                            }
-                            WebSockets.send(
-                                event.requestContext.connectionId, Serialization.json.encodeToString(
-                                    MultiplexMessage(
-                                        channel = message.channel,
-                                        start = true
-                                    )
-                                )
-                            )
-                            result
-                        } catch(e: Exception) {
-                            WebSockets.send(
-                                event.requestContext.connectionId, Serialization.json.encodeToString(
-                                    MultiplexMessage(
-                                        channel = message.channel,
-                                        error = e.message
-                                    )
-                                )
-                            )
-                            throw e
-                        }
-                    }
-
-                    message.end -> {
-                        cache().modify<Set<String>>(multiplexSetId, 40, timeToLive = Duration.ofHours(8)) {
-                            it?.minus(message.channel) ?: setOf(message.channel)
-                        }
-                        handleWebsocketDisconnect(cacheId)
-                    }
-
-                    message.data != null -> handleWebsocketMessage(cacheId, message.data!!)
-                    else -> APIGatewayV2HTTPResponse(200)
-                }
-            } else
-                handleWebsocketMessage(event.requestContext.connectionId, event.body)
+            }
         }
     }
 
-    suspend fun handleWebsocketConnect(
-        event: APIGatewayV2WebsocketRequest,
-        cacheId: String,
-        path: String,
-        queryParams: Map<String, List<String>>,
-        jwt: String? = null,
-    ): APIGatewayV2HTTPResponse {
-        logger.debug("Connecting $cacheId")
-        val match = wsMatcher.match(path)
-        if (match == null) {
-            logger.warn("match is null!"); return APIGatewayV2HTTPResponse(404)
-        }
-        val handler = WebSockets.handlers[match.path]
-        if (handler == null) {
-            logger.warn("handler is null!"); return APIGatewayV2HTTPResponse(400)
-        }
-        cache().set(cacheId, path, Duration.ofHours(1))
-        val lkEvent = WebSockets.ConnectEvent(
-            path = match.path,
-            parts = match.parts,
-            wildcard = match.wildcard,
-            id = cacheId,
-            queryParameters = queryParams.flatMap { it.value.map { v -> it.key to v } },
-            headers = HttpHeaders(
-                (event.multiValueHeaders?.flatMap { it.value.map { v -> it.key to v } } ?: listOf()).plus(
-                    jwt?.let { listOf("jwt" to it) } ?: listOf()
-                )
-            ),
-            domain = event.requestContext.domainName,
-            protocol = "https",
-            sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0"
-        )
-        try {
-            Metrics.handlerPerformance(WebSockets.HandlerSection(match.path, WebSockets.WsHandlerType.CONNECT)) {
-                handler.connect(lkEvent)
+    private suspend fun handleWsDisconnect(id: String): APIGatewayV2HTTPResponse {
+        val lkEvent = WebSockets.DisconnectEvent(WebSocketIdentifier(wsType, id))
+        return try {
+            // Ensure it only runs once
+            if (cache().setIfNotExists("${lkEvent.id}-closed", true, timeToLive = Duration.ofHours(1))) {
+                rootWs.disconnect(lkEvent)
             }
-            return APIGatewayV2HTTPResponse(200)
+            APIGatewayV2HTTPResponse(200)
         } catch (e: Exception) {
-            e.report(lkEvent)
-            return APIGatewayV2HTTPResponse(500, body = Serialization.json.encodeToString(e.message ?: ""))
-        }
-    }
-
-    suspend fun handleWebsocketMessage(cacheId: String, content: String): APIGatewayV2HTTPResponse {
-        logger.debug("Handling message $content to $cacheId")
-        val path = cache().get<String>(cacheId) ?: run {
-            delay(1000)
-            logger.warn("checking cache for $cacheId after 1 sec")
-            cache().get<String>(cacheId)
-        } ?: run {
-            logger.warn("cache has no id $cacheId")
-            return APIGatewayV2HTTPResponse(400)
-        }
-        // Reset the cache so it endures longer
-        cache().set(cacheId, path, Duration.ofHours(1))
-        val match = wsMatcher.match(path)
-        if (match == null) {
-            logger.warn("match is null!"); return APIGatewayV2HTTPResponse(400)
-        }
-        val handler = WebSockets.handlers[match.path]
-        if (handler == null) {
-            logger.warn("handler is null!"); return APIGatewayV2HTTPResponse(400)
-        }
-        val event = WebSockets.MessageEvent(cacheId, content)
-        try {
-            Metrics.handlerPerformance(WebSockets.HandlerSection(match.path, WebSockets.WsHandlerType.MESSAGE)) {
-                handler.message(event)
-            }
-            return APIGatewayV2HTTPResponse(200)
-        } catch (e: Exception) {
-            e.report(event)
-            return APIGatewayV2HTTPResponse(500, body = Serialization.json.encodeToString(e.message ?: ""))
-        }
-    }
-
-    suspend fun handleWebsocketDisconnect(cacheId: String): APIGatewayV2HTTPResponse {
-        logger.debug("Disconnecting $cacheId")
-        val path = cache().get<String>(cacheId) ?: run {
-            delay(1000)
-             logger.warn("checking cache for $cacheId after 1 sec")
-            cache().get<String>(cacheId)
-        } ?: run {
-            logger.warn("cache has no id $cacheId")
-            return APIGatewayV2HTTPResponse(400)
-        }
-        // Reset the cache so it endures longer
-        cache().set(cacheId, path, Duration.ofHours(1))
-        val match = wsMatcher.match(path)
-        if (match == null) {
-            logger.warn("match is null!"); return APIGatewayV2HTTPResponse(400)
-        }
-        val handler = WebSockets.handlers[match.path]
-        if (handler == null) {
-            logger.warn("handler is null!"); return APIGatewayV2HTTPResponse(400)
-        }
-        val event = WebSockets.DisconnectEvent(cacheId)
-        try {
-            Metrics.handlerPerformance(WebSockets.HandlerSection(match.path, WebSockets.WsHandlerType.DISCONNECT)) {
-                handler.disconnect(event)
-            }
-            return APIGatewayV2HTTPResponse(200)
-        } catch (e: Exception) {
-            e.report(event)
-            return APIGatewayV2HTTPResponse(500, body = Serialization.json.encodeToString(e.message ?: ""))
+            APIGatewayV2HTTPResponse(500, body = Serialization.json.encodeToString(e.message ?: ""))
         }
     }
 
@@ -553,9 +412,9 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 HttpContent.Text(raw, headers.contentType ?: ContentType.Text.Plain)
         }
         val queryParams =
-            (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v } }
+            (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
 
-        val match = httpMatcher.match(path, method) ?: run {
+        val match = Http.matcher.match(path, method) ?: run {
             if (method == HttpMethod.OPTIONS) {
                 val origin = headers[HttpHeader.Origin] ?: return APIGatewayV2HTTPResponse(
                     statusCode = 404,
@@ -600,7 +459,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             protocol = "https",
             sourceIp = event.requestContext.identity.sourceIp
         )
-        val result = Http.execute(request).addCors(request)
+        val result = Http.execute(request).extensionForEngineAddCors(request)
         val outHeaders = HashMap<String, String>()
         result.headers.entries.forEach { outHeaders.put(it.first, it.second) }
         val b = result.body

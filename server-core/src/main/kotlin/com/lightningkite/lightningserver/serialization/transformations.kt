@@ -1,20 +1,14 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.khrysalis.fatalError
-import com.lightningkite.lightningdb.LazyRenamedSerialDescriptor
-import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
-import com.lightningkite.lightningserver.files.*
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.http.toMultipartContent
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.*
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.encoding.CompositeDecoder
-import kotlinx.serialization.json.*
+import kotlinx.serialization.serializer
 
 inline fun <reified T> HttpRequest.queryParameters(): T =
     queryParameters(Serialization.properties.serializersModule.serializer())
@@ -25,10 +19,14 @@ fun <T> HttpRequest.queryParameters(serializer: KSerializer<T>): T {
         if (serializer == Unit.serializer()) return Unit as T
         return Serialization.properties.decodeFromStringMap<T>(
             serializer,
-            queryParameters.groupBy { it.first }.mapValues { it.value.joinToString(","){ it.second } }
+            queryParameters.groupBy { it.first }.mapValues { it.value.joinToString(",") { it.second } }
         )
     } catch (e: SerializationException) {
-        throw BadRequestException(detail = "serialization", message = e.message ?: "Unknown serialization error", cause = e.cause)
+        throw BadRequestException(
+            detail = "serialization",
+            message = e.message ?: "Unknown serialization error",
+            cause = e.cause
+        )
     }
 }
 
@@ -39,7 +37,11 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
             ?: throw BadRequestException("Content type $type not accepted; available types are ${Serialization.parsers.keys.joinToString()}")
         return parser(this, serializer)
     } catch (e: SerializationException) {
-        throw BadRequestException(detail = "serialization", message = e.message ?: "Unknown serialization error", cause = e.cause)
+        throw BadRequestException(
+            detail = "serialization",
+            message = e.message ?: "Unknown serialization error",
+            cause = e.cause
+        )
     }
 }
 

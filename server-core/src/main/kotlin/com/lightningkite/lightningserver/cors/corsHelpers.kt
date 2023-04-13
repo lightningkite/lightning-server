@@ -5,10 +5,9 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.settings.generalSettings
-import java.util.*
 
 
-fun HttpResponse.addCors(request: HttpRequest): HttpResponse {
+fun HttpResponse.extensionForEngineAddCors(request: HttpRequest): HttpResponse {
     val cors = generalSettings().cors ?: run {
         return this
     }
@@ -18,15 +17,18 @@ fun HttpResponse.addCors(request: HttpRequest): HttpResponse {
     val matches = cors.allowedDomains.any {
         it == "*" || it == origin || origin.endsWith(it.removePrefix("*"))
     }
-    if(!matches) {
+    if (!matches) {
         return this
     }
     return this.copy(
-        headers = HttpHeaders(this.headers.entries + listOf(
-            HttpHeader.AccessControlAllowOrigin to origin,
-            HttpHeader.AccessControlAllowMethods to (request.headers[HttpHeader.AccessControlRequestMethod] ?: "GET"),
-            HttpHeader.AccessControlAllowHeaders to cors.allowedHeaders.joinToString(", "),
-            HttpHeader.AccessControlAllowCredentials to "true",
-        ))
+        headers = HttpHeaders(
+            this.headers.entries + listOf(
+                HttpHeader.AccessControlAllowOrigin to origin,
+                HttpHeader.AccessControlAllowMethods to (request.headers[HttpHeader.AccessControlRequestMethod]
+                    ?: "GET"),
+                HttpHeader.AccessControlAllowHeaders to cors.allowedHeaders.joinToString(", "),
+                HttpHeader.AccessControlAllowCredentials to "true",
+            )
+        )
     )
 }

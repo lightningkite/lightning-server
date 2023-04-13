@@ -1,4 +1,5 @@
 @file:UseContextualSerialization(Instant::class, Duration::class)
+
 package com.lightningkite.lightningserver.metrics
 
 import com.lightningkite.lightningdb.*
@@ -16,15 +17,15 @@ import kotlin.math.min
 @Serializable
 data class MetricSpanStats(
     override val _id: String,
-    val endpoint: String,
-    val type: String,
+    @Index val endpoint: String,
+    @Index val type: String,
     val timeStamp: Instant = Instant.EPOCH,
-    val timeSpan: Duration = Duration.ofMinutes(1),
+    @Index val timeSpan: Duration = Duration.ofMinutes(1),
     val min: Double,
     val max: Double,
     val sum: Double,
     val count: Int,
-): HasId<String> {
+) : HasId<String> {
     val average: Double get() = sum / count.toDouble()
 }
 
@@ -39,12 +40,10 @@ operator fun MetricSpanStats.plus(other: MetricSpanStats): MetricSpanStats {
 
 fun MetricSpanStats.asModification(): Modification<MetricSpanStats> {
     return modification {
-        Modification.Chain(listOf(
-            it.min coerceAtMost this.min,
-            it.max coerceAtLeast this.max,
-            it.sum + this.sum,
-            it.count + this.count
-        ))
+        it.min coerceAtMost this@asModification.min
+        it.max coerceAtLeast this@asModification.max
+        it.sum + this@asModification.sum
+        it.count + this@asModification.count
     }
 }
 
@@ -68,4 +67,5 @@ fun List<MetricEvent>.stats(
     )
 }
 
-fun Instant.roundTo(span: Duration): Instant = Instant.ofEpochMilli(this.toEpochMilli() / span.toMillis() * span.toMillis())
+fun Instant.roundTo(span: Duration): Instant =
+    Instant.ofEpochMilli(this.toEpochMilli() / span.toMillis() * span.toMillis())

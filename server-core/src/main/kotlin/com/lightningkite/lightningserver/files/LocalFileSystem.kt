@@ -1,16 +1,30 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.auth.JwtSigner
-import com.lightningkite.lightningserver.core.*
+import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.*
 import java.io.File
 import java.io.RandomAccessFile
+import java.time.Duration
 
-
-class LocalFileSystem(rootFile: File, val serveDirectory: String, val signer: JwtSigner) : FileSystem {
+/**
+ * A FileSystem implementation that uses the environments local file system as it's storage solution.
+ *
+ * @param rootFile The File pointing to the folder in the file system where all files should be stored and retrieved.
+ * @param serveDirectory The url path for retrieving publicly available files.
+ * @param signedUrlExpiration (Optional) An expiration for signed urls. If the url signature has expired any requests for a file will fail.
+ * @param signer A JwtSigner used to sign a url being served up by the LocalFileSystem. These signatures are then validated before providing the file in a response.
+ */
+class LocalFileSystem(
+    rootFile: File,
+    val serveDirectory: String,
+    val signedUrlExpiration: Duration?,
+    val signer: JwtSigner
+) : FileSystem {
     val rootFile: File = rootFile.absoluteFile
     override val root: FileObject = LocalFile(this, rootFile)
 
@@ -19,13 +33,15 @@ class LocalFileSystem(rootFile: File, val serveDirectory: String, val signer: Jw
     }
 
     val fetch = ServerPath("$serveDirectory/{...}").get.handler {
-        val location = signer.verify(
-            it.queryParameter("token") ?: throw BadRequestException("No token provided")
-        ).removePrefix("/")
-        if (it.wildcard == null) throw BadRequestException("No file to look up")
-        val wildcard = it.wildcard.removePrefix("/")
-        if (location != wildcard) throw BadRequestException("Token does not match file - token had ${location}, path had ${it.wildcard}")
+        val wildcard = it.wildcard?.removePrefix("/") ?: throw BadRequestException("No file to look up")
         if (wildcard.contains("..")) throw IllegalStateException()
+
+        signedUrlExpiration?.let { duration ->
+            val location = signer.verify(
+                it.queryParameter("token") ?: throw BadRequestException("No token provided")
+            ).removePrefix("/")
+            if (location != wildcard) throw BadRequestException("Token does not match file - token had ${location}, path had ${it.wildcard}")
+        }
         val file = rootFile.resolve(wildcard)
         if (!file.exists()) throw NotFoundException("No file ${wildcard} found")
         val fileObject = LocalFile(this, file)

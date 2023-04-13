@@ -47,26 +47,22 @@ class S3FileSystem(
     companion object {
         init {
             FilesSettings.register("s3") {
-                val beforeOptions = it.storageUrl.substringBefore('?')
-                val withoutScheme = beforeOptions.substringAfter("://")
-                val credentials = withoutScheme.substringBefore('@', "").split(':').filter { it.isNotBlank() }
-                val endpoint = withoutScheme.substringAfter('@').substringBefore('/')
-                val bucket = endpoint.substringBefore('.')
-                val region = endpoint.substringAfter('.').substringBefore('.').substringAfter('-')
-                val options = it.storageUrl.substringAfter('?', "").split("&").filter { it.isNotBlank() }.associate {
-                    it.substringBefore('=') to it.substringAfter('=', "true")
+                Regex("""s3://(?:(?<user>[^:]+):(?<password>[^@]+)@)?(?<bucket>[^.]+)\.(?:s3-)?(?<region>[^.]+)\.amazonaws.com/?""").matchEntire(it.storageUrl)?.let { match ->
+                    val user = match.groups["user"]?.value ?: ""
+                    val password = match.groups["password"]?.value ?: ""
+                    S3FileSystem(
+                        Region.of(match.groups["region"]!!.value),
+                        if (user.isNotBlank() && password.isNotBlank()) {
+                            StaticCredentialsProvider.create(object : AwsCredentials {
+                                override fun accessKeyId(): String = user
+                                override fun secretAccessKey(): String = password
+                            })
+                        } else DefaultCredentialsProvider.create(),
+                        match.groups["bucket"]!!.value,
+                        it.signedUrlExpiration?.toSeconds()?.toInt()
+                    )
                 }
-                S3FileSystem(
-                    Region.of(region),
-                    if (credentials.isNotEmpty()) {
-                        StaticCredentialsProvider.create(object : AwsCredentials {
-                            override fun accessKeyId(): String = credentials[0]
-                            override fun secretAccessKey(): String = credentials[1]
-                        })
-                    } else DefaultCredentialsProvider.create(),
-                    bucket,
-                    it.signedUrlExpiration?.toSeconds()?.toInt()
-                )
+                    ?: throw IllegalStateException("Invalid S3 storageUrl. The URL should match the pattern: s3://[user]:[password]@[bucket].[region].amazonaws.com/")
             }
         }
     }

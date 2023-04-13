@@ -1,8 +1,10 @@
 @file:UseContextualSerialization(Instant::class)
+
 package com.lightningkite.lightningserver.tasks
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
+import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -11,25 +13,37 @@ import kotlinx.serialization.serializer
 import java.time.Instant
 
 @LightningServerDsl
-inline fun <reified INPUT> task(name: String, noinline implementation: suspend CoroutineScope.(INPUT)->Unit) = task(name, serializer<INPUT>(), implementation)
+inline fun <reified INPUT> task(name: String, noinline implementation: suspend CoroutineScope.(INPUT) -> Unit) =
+    task(name, Serialization.module.serializer<INPUT>(), implementation)
 
 @LightningServerDsl
-fun <INPUT> task(name: String, serializer: KSerializer<INPUT>, implementation: suspend CoroutineScope.(INPUT)->Unit) = Task(name, serializer, implementation)
+fun <INPUT> task(name: String, serializer: KSerializer<INPUT>, implementation: suspend CoroutineScope.(INPUT) -> Unit) =
+    Task(name, serializer, implementation)
 
 @LightningServerDsl
-fun startup(priority: Double = 0.0, action: suspend ()->Unit) = Tasks.onEngineReady(priority, action)
+fun startup(priority: Double = 0.0, action: suspend () -> Unit) = Tasks.onEngineReady(priority, action)
 
 @LightningServerDsl
-fun defineAfterSettings(priority: Double = 0.0, action: suspend ()->Unit) = Tasks.onSettingsReady(priority, action)
-
+fun defineAfterSettings(priority: Double = 0.0, action: suspend () -> Unit) = Tasks.onSettingsReady(priority, action)
 
 
 @DatabaseModel
 @Serializable
-data class ActionHasOccurred(override val _id: String, val started: Instant? = null, val completed: Instant? = null, val errorMessage: String? = null): HasId<String>
+data class ActionHasOccurred(
+    override val _id: String,
+    val started: Instant? = null,
+    val completed: Instant? = null,
+    val errorMessage: String? = null
+) : HasId<String>
 
 @LightningServerDsl
-fun startupOnce(name: String, database: ()-> Database, maxDuration: Long = 60_000, priority: Double = 0.0, action: suspend ()->Unit): StartupAction {
+fun startupOnce(
+    name: String,
+    database: () -> Database,
+    maxDuration: Long = 60_000,
+    priority: Double = 0.0,
+    action: suspend () -> Unit
+): StartupAction {
     prepareModels()
     return startup(priority) {
         doOnce(name, database, maxDuration, priority, action)
@@ -37,31 +51,43 @@ fun startupOnce(name: String, database: ()-> Database, maxDuration: Long = 60_00
 }
 
 @LightningServerDsl
-suspend fun doOnce(name: String, database: ()-> Database, maxDuration: Long = 60_000, priority: Double = 0.0, action: suspend ()->Unit) {
+suspend fun doOnce(
+    name: String,
+    database: () -> Database,
+    maxDuration: Long = 60_000,
+    priority: Double = 0.0,
+    action: suspend () -> Unit
+) {
     prepareModels()
     val a = database().collection<ActionHasOccurred>()
     val existing = a.get(name)
-    if(existing == null) {
+    if (existing == null) {
         a.insertOne(ActionHasOccurred(_id = name, started = Instant.now()))
     } else {
         val lock = a.updateOne(
-            condition { it._id eq name and (it.completed eq null) and (it.started eq null or (it.started.notNull lt Instant.now().minusSeconds(maxDuration))) },
+            condition {
+                it._id eq name and (it.completed eq null) and (it.started eq null or (it.started.notNull lt Instant.now()
+                    .minusSeconds(maxDuration)))
+            },
             modification { it.started assign Instant.now() }
         )
-        if(lock.new == null) return
+        if (lock.new == null) return
     }
     try {
         action()
         a.updateOneById(
             name,
-            modification { (it.completed assign Instant.now()) then (it.errorMessage assign null)}
+            modification {
+                it.completed assign Instant.now()
+                it.errorMessage assign null
+            }
         )
-    } catch(e: Exception) {
+    } catch (e: Exception) {
         a.updateOneById(
             name,
             modification {
-                (it.errorMessage assign e.message) then
-                    (it.started assign null)
+                (it.errorMessage assign e.message)
+                (it.started assign null)
             }
         )
     }

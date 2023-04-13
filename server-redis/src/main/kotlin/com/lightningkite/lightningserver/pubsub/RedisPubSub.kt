@@ -1,25 +1,17 @@
 package com.lightningkite.lightningserver.pubsub
 
-import com.lightningkite.lightningserver.cache.CacheSettings
-import com.lightningkite.lightningserver.cache.RedisCache
 import com.lightningkite.lightningserver.serialization.Serialization
 import io.lettuce.core.RedisClient
-import io.lettuce.core.pubsub.RedisPubSubListener
-import io.lettuce.core.pubsub.StatefulRedisPubSubConnection
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.reactive.awaitFirst
 import kotlinx.coroutines.reactive.collect
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.decodeFromString
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import redis.embedded.RedisServer
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
 
-class RedisPubSub(val client: RedisClient): PubSubInterface {
+class RedisPubSub(val client: RedisClient): PubSub {
     companion object {
         init {
             PubSubSettings.register("redis-test") {
@@ -45,16 +37,14 @@ class RedisPubSub(val client: RedisClient): PubSubInterface {
     private fun key(key: String) = observables.getOrPut(key) {
         val reactive = subscribeConnection
         Flux.usingWhen(
-            reactive.subscribe(key).then(Mono.just(reactive)).doOnSuccess { println("Subscribed") },
+            reactive.subscribe(key).then(Mono.just(reactive)),
             {
                 it.observeChannels()
-                    .doOnNext { println("Got $it") }
                     .filter { it.channel == key }
             },
-            { it.unsubscribe(key).doOnSuccess { println("Unsubscribed") } }
+            { it.unsubscribe(key) }
         ).map { it.message }
             .doOnError { it.printStackTrace() }
-            .doOnComplete { println("Completed") }
             .share()
     }
     override fun <T> get(key: String, serializer: KSerializer<T>): PubSubChannel<T> {

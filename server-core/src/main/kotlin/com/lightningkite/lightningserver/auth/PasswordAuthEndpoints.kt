@@ -1,20 +1,12 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.HtmlDefaults
-import com.lightningkite.lightningserver.cache.CacheInterface
-import com.lightningkite.lightningserver.cache.get
-import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.email.EmailClient
 import com.lightningkite.lightningserver.exceptions.BadRequestException
-import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.*
-import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
-import java.security.SecureRandom
-import java.time.Duration
 
 open class PasswordAuthEndpoints<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
@@ -26,8 +18,11 @@ open class PasswordAuthEndpoints<USER : Any, ID>(
         errorCases = listOf(),
         implementation = { anon: Unit, input: PasswordLogin ->
             val user = info.byUsername(input.username, input.password)
-            if(!input.password.checkHash(info.hashedPassword(user)))
-                throw BadRequestException(detail = "password-incorrect", message = "Password does not match the account.")
+            if (!input.password.checkHash(info.hashedPassword(user)))
+                throw BadRequestException(
+                    detail = "password-incorrect",
+                    message = "Password does not match the account."
+                )
             base.token(user, base.jwtSigner().expiration)
         }
     )
@@ -59,8 +54,9 @@ open class PasswordAuthEndpoints<USER : Any, ID>(
             e.printStackTrace()
             throw e
         }
-        HttpResponse.redirectToGet(base.landingRoute.path.toString() + "?jwt=$basis")
+        base.redirectToLanding(basis)
     }
+
     fun hash(password: String): String = password.secureHash()
 }
 

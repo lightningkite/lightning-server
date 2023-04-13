@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.core.ServerPathMatcher
+import io.ktor.http.*
 
 class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
     data class Node(
@@ -34,9 +34,12 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
                     .all { it.first.s() == it.second } && it.segments.size > soFar.size
             }
             return Node(
-                path = paths.filter { it.path.segments.map { it.s() } == soFar && it.path.after == ServerPath.Afterwards.None }.associateBy { it.method },
-                trailingSlash = paths.filter { it.path.segments.map { it.s() } == soFar && it.path.after == ServerPath.Afterwards.TrailingSlash }.associateBy { it.method },
-                chainedWildcard = paths.filter { it.path.segments.map { it.s() } == soFar && it.path.after == ServerPath.Afterwards.ChainedWildcard }.associateBy { it.method },
+                path = paths.filter { it.path.segments.map { it.s() } == soFar && it.path.after == ServerPath.Afterwards.None }
+                    .associateBy { it.method },
+                trailingSlash = paths.filter { it.path.segments.map { it.s() } == soFar && it.path.after == ServerPath.Afterwards.TrailingSlash }
+                    .associateBy { it.method },
+                chainedWildcard = paths.filter { it.path.segments.map { it.s() } == soFar && it.path.after == ServerPath.Afterwards.ChainedWildcard }
+                    .associateBy { it.method },
                 thenConstant = future
                     .mapNotNull { (it.segments[soFar.size] as? ServerPath.Segment.Constant)?.value }
                     .distinct()
@@ -55,9 +58,11 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
         val wildcard: String?
     )
 
-    fun match(string: String, method: HttpMethod): Match? = match(string.split('/').filter { it.isNotEmpty() }, string.endsWith('/'), method)
+    fun match(string: String, method: HttpMethod): Match? =
+        match(string.split('/').filter { it.isNotEmpty() }, string.endsWith('/'), method)
+
     fun match(pathParts: List<String>, endingSlash: Boolean, method: HttpMethod): Match? {
-        if(pathParts.isEmpty())
+        if (pathParts.isEmpty())
             return (root.path[method] ?: root.trailingSlash[method] ?: root.chainedWildcard[method])?.let {
                 Match(
                     it,
@@ -88,15 +93,16 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
             break
         }
 //        println("Stopped at $current")
-        return if(beyond) {
+        return if (beyond) {
 //            println("Searching for wildcard ending")
             soFar.asReversed().asSequence().mapNotNull {
                 it.chainedWildcard[method]?.let {
                     Match(
                         endpoint = it,
                         parts = it.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(wildcards)
-                            .associate { it.first.name to it.second },
-                        wildcard = pathParts.drop(it.path.segments.size).joinToString("/") + (if (endingSlash) "/" else "")
+                            .associate { it.first.name to it.second.decodeURLPart() },
+                        wildcard = pathParts.drop(it.path.segments.size)
+                            .joinToString("/") + (if (endingSlash) "/" else "")
                     )
                 }
             }.firstOrNull()
@@ -106,7 +112,7 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
                 Match(
                     endpoint = it,
                     parts = it.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(wildcards)
-                        .associate { it.first.name to it.second },
+                        .associate { it.first.name to it.second.decodeURLPart() },
                     wildcard = null
                 )
             }
@@ -116,7 +122,7 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
                 Match(
                     endpoint = it,
                     parts = it.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(wildcards)
-                        .associate { it.first.name to it.second },
+                        .associate { it.first.name to it.second.decodeURLPart() },
                     wildcard = null
                 )
             }
@@ -127,8 +133,9 @@ class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
                     Match(
                         endpoint = it,
                         parts = it.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(wildcards)
-                            .associate { it.first.name to it.second },
-                        wildcard = pathParts.drop(it.path.segments.size).joinToString("/") + (if (endingSlash) "/" else "")
+                            .associate { it.first.name to it.second.decodeURLPart() },
+                        wildcard = pathParts.drop(it.path.segments.size)
+                            .joinToString("/") + (if (endingSlash) "/" else "")
                     )
                 }
             }.firstOrNull()

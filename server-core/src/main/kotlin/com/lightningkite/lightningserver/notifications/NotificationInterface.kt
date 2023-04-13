@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.notifications
 
 @Deprecated("Use the new name", ReplaceWith("NotificationPriority", "com.lightningkite.lightningserver.notifications"))
 typealias Priority = NotificationPriority
+
 enum class NotificationPriority {
     HIGH,
     NORMAL
@@ -10,10 +11,11 @@ enum class NotificationPriority {
 
 @Deprecated("Use the new name", ReplaceWith("NotificationAndroid", "com.lightningkite.lightningserver.notifications"))
 typealias Android = NotificationAndroid
+
 data class NotificationAndroid(
     val channel: String? = null,
     val priority: NotificationPriority = NotificationPriority.NORMAL,
-    val sound:String? = null,
+    val sound: String? = null,
 )
 
 data class Notification(
@@ -24,6 +26,7 @@ data class Notification(
 
 @Deprecated("Use the new name", ReplaceWith("NotificationIos", "com.lightningkite.lightningserver.notifications"))
 typealias iOS = NotificationIos
+
 data class NotificationIos(
     val critical: Boolean = false,
     val sound: String? = null
@@ -31,6 +34,7 @@ data class NotificationIos(
 
 @Deprecated("Use the new name", ReplaceWith("NotificationWeb", "com.lightningkite.lightningserver.notifications"))
 typealias Web = NotificationWeb
+
 data class NotificationWeb(
     val data: Map<String, String> = mapOf(),
 )
@@ -58,8 +62,13 @@ interface NotificationInterface {
         data = NotificationData(
             notification = Notification(title, body, imageUrl),
             data = data,
-            android = androidChannel?.let { NotificationAndroid(it, priority = if(critical) NotificationPriority.HIGH else NotificationPriority.NORMAL) },
-            ios = NotificationIos(critical = critical)
+            android = androidChannel?.let {
+                NotificationAndroid(
+                    it,
+                    priority = if (critical) NotificationPriority.HIGH else NotificationPriority.NORMAL
+                )
+            },
+            ios = NotificationIos(critical = critical, sound = "default")
         )
     )
 

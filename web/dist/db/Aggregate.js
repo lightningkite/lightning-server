@@ -9,21 +9,11 @@ class Aggregate {
         this.name = name;
         this.jsonName = jsonName;
     }
-    static values() {
-        return Aggregate._values;
-    }
-    static valueOf(name) {
-        return Aggregate[name];
-    }
-    toString() {
-        return this.name;
-    }
-    toJSON() {
-        return this.jsonName;
-    }
-    static fromJSON(key) {
-        return Aggregate._values.find(x => x.jsonName.toLowerCase() === key.toLowerCase());
-    }
+    static values() { return Aggregate._values; }
+    static valueOf(name) { return Aggregate[name]; }
+    toString() { return this.name; }
+    toJSON() { return this.jsonName; }
+    static fromJSON(key) { return Aggregate._values.find(x => x.jsonName.toLowerCase() === key.toLowerCase()); }
 }
 exports.Aggregate = Aggregate;
 Aggregate.Sum = new Aggregate("Sum", "Sum");

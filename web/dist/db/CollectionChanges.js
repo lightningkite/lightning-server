@@ -10,9 +10,7 @@ class CollectionChanges {
     constructor(changes = []) {
         this.changes = changes;
     }
-    static propertyTypes(T) {
-        return { changes: [Array, [EntryChange_1.EntryChange, T]] };
-    }
+    static propertyTypes(T) { return { changes: [Array, [EntryChange_1.EntryChange, T]] }; }
     static pair(old = null, _new = null) {
         let result = new CollectionChanges(old !== null || _new !== null ? [new EntryChange_1.EntryChange(old, _new)] : []);
         return result;
