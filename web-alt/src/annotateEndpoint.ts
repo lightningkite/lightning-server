@@ -4,9 +4,21 @@ import { HasId, SessionRestEndpoint } from "sessionRest";
 
 export type WithAnnotations<T, A> = T & { _annotations: A };
 
+export type ReadonlyEndpointKeys =
+  | "query"
+  | "detail"
+  | "bulkDelete"
+  | "delete"
+  | "count";
+
 export type AnnotateEndpointReturn<T extends HasId, Annotation> = Pick<
   SessionRestEndpoint<WithAnnotations<T, Annotation>>,
-  "query" | "detail" | "bulkDelete" | "delete" | "count"
+  ReadonlyEndpointKeys
+>;
+
+export type ReadonlySessionRestEndpoint<T extends HasId> = Pick<
+  SessionRestEndpoint<T>,
+  ReadonlyEndpointKeys
 >;
 
 /**
