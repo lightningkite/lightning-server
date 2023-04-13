@@ -79,6 +79,7 @@ abstract class FileSystemTests {
                 testFileNotIncluded.write(HttpContent.Text(message, ContentType.Text.Plain))
                 assertContains(testFile.parent!!.list()!!.also { println(it) }, testFile)
                 assertFalse(testFileNotIncluded in testFile.parent!!.list()!!)
+                testFile.read().readAllBytes()
             }
         }
     }

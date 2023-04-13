@@ -40,4 +40,44 @@ class PinHandlerTest {
             pin.assert("test", expected)
         }
     }
+
+    @Test
+    fun testChar() {
+        runBlocking {
+            val pin = PinHandler({ LocalCache }, "test", availableCharacters = ('A' .. 'Z').toList())
+            pin.generate("test")
+            repeat(pin.maxAttempts - 1) {
+                assertException<BadRequestException>(
+                    action = { pin.assert("test", "wrong") },
+                    verify = { it.detail == "pin-incorrect" }
+                )
+            }
+            assertException<NotFoundException>(
+                action = { pin.assert("test", "wrong") },
+                verify = { it.detail == "pin-expired" }
+            )
+            val expected = pin.generate("test")
+            pin.assert("test", expected)
+        }
+    }
+
+    @Test
+    fun testMixed() {
+        runBlocking {
+            val pin = PinHandler({ LocalCache }, "test", availableCharacters = ('a' .. 'z').toList() + ('A' .. 'Z').toList())
+            pin.generate("test")
+            repeat(pin.maxAttempts - 1) {
+                assertException<BadRequestException>(
+                    action = { pin.assert("test", "wrong") },
+                    verify = { it.detail == "pin-incorrect" }
+                )
+            }
+            assertException<NotFoundException>(
+                action = { pin.assert("test", "wrong") },
+                verify = { it.detail == "pin-expired" }
+            )
+            val expected = pin.generate("test")
+            pin.assert("test", expected)
+        }
+    }
 }

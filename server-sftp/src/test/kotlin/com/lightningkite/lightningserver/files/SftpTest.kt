@@ -1,6 +1,9 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.http.HttpContent
 import io.ktor.client.request.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
@@ -28,7 +31,18 @@ class SftpTest2() {
             if(!it.exists()) return
         }.readText().let { FilesSettings(storageUrl = it) }.invoke()
         runBlocking {
-            fs.root.list()?.forEach { println(it) }
+            while(true) {
+                val items = fs.root.list() ?: listOf()
+                if(items.isNotEmpty()) println(items)
+                val oldItem = items.find { !it.url.contains("-ais") }
+                if (oldItem != null) {
+                    println("!! OLD ITEM FOUND !!")
+                    println(oldItem)
+                    oldItem.local(File("local/sample-data").also { it.mkdirs() }.resolve(oldItem.url.substringAfterLast('/')))
+                    return@runBlocking
+                }
+                delay(60_000L * 5)
+            }
         }
     }
 }
