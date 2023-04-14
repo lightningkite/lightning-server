@@ -38,7 +38,7 @@ export function apiCall<T>(url: string, body: T, request: RequestInit, fileUploa
         })
     }
     return f.then(x => {
-        let response = responseInterceptors?.call(x) ?? x
+        let response = responseInterceptors?.(x) ?? x
         if(!response.ok) {
             throw response
         }
