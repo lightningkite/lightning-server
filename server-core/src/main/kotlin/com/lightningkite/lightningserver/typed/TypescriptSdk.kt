@@ -150,6 +150,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
             appendLine("                headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
         }
         appendLine("            }, ")
+        appendLine("            undefined,")
         appendLine("            this.responseInterceptors, ")
         entry.outputType.takeUnless { it == Unit.serializer() }?.let {
             appendLine("        ).then(x => x.json())")

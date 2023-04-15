@@ -15,16 +15,18 @@ val kotlinVersion: String by project
 val khrysalisVersion: String by project
 val kotlinXSerialization:String by project
 dependencies {
-    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
-    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
-
-    equivalents("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion:equivalents")
 
     api("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinXSerialization")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
     api("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
+
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
+
+    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
+    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
+
+    equivalents("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion:equivalents")
 
     ksp(project(":processor"))
     kspTest(project(":processor"))
