@@ -54,10 +54,13 @@ object Http {
         )
     }
 
+    val onRequest = ArrayList<suspend (HttpRequest)->Unit>()
+
     suspend fun execute(request: HttpRequest): HttpResponse {
         return Metrics.handlerPerformance(request.endpoint) {
             endpoints[request.endpoint]?.let { handler ->
                 try {
+                    onRequest.forEach { it(request) }
                     handler(request)
                 } catch (e: Exception) {
                     exception(request, e)
@@ -91,7 +94,7 @@ suspend fun HttpEndpoint.test(
         sourceIp = sourceIp,
     )
     return try {
-        Http.endpoints[this]!!.invoke(req)
+        Http.execute(req)
     } catch (e: HttpStatusException) {
         e.toResponse(req)
     }

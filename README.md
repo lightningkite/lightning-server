@@ -48,9 +48,11 @@ Built to work for all common serverless platforms.
 
 ## Documentation
 
-- [Documentation](documentation.md)
-- [Quick Function List](docs-feature-list.md)
-- [Demo Project](demo/src/main/kotlin)
+- [Set Up](docs/setup.md)
+- [Client Documentation](docs/use-as-client.md)
+- [Documentation (old)](documentation.md)
+- [Quick Function List (old)](docs-feature-list.md)
+- [Demo Project (old)](demo/src/main/kotlin)
 
 ## Road Map
 

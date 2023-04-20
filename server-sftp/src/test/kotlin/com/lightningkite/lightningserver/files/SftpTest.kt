@@ -23,26 +23,3 @@ class SftpTest: FileSystemTests() {
     override fun uploadHeaders(builder: HttpRequestBuilder) = Unit
     override fun testSignedUpload() = Unit
 }
-
-class SftpTest2() {
-    init { Sftp }
-    @Test fun test(){
-        val fs = File("./local/url2.txt").also{
-            if(!it.exists()) return
-        }.readText().let { FilesSettings(storageUrl = it) }.invoke()
-        runBlocking {
-            while(true) {
-                val items = fs.root.list() ?: listOf()
-                if(items.isNotEmpty()) println(items)
-                val oldItem = items.find { !it.url.contains("-ais") }
-                if (oldItem != null) {
-                    println("!! OLD ITEM FOUND !!")
-                    println(oldItem)
-                    oldItem.local(File("local/sample-data").also { it.mkdirs() }.resolve(oldItem.url.substringAfterLast('/')))
-                    return@runBlocking
-                }
-                delay(60_000L * 5)
-            }
-        }
-    }
-}
