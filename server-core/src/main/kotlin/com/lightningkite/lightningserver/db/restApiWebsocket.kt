@@ -20,11 +20,13 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import java.time.Instant
+import kotlin.reflect.KProperty1
 
 @LightningServerDsl
 fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
     database: () -> Database,
     info: ModelInfo<USER, T, ID>,
+    key: KProperty1<T, *>? = null,
 ): ApiWebsocket<USER, Query<T>, ListChange<T>> {
     prepareModels()
     val modelName = info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
@@ -53,6 +55,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
                         Mask.serializer(info.serialization.serializer),
                         collection.mask()
                     ),
+                    relevant = setOf(),
                     establishedAt = Instant.now()
                 )
             )
@@ -70,6 +73,10 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
                 condition = condition { it._id eq event.id },
                 modification = modification {
                     it.condition assign c
+                    if(key != null)
+                        it.relevant assign q.condition.relevantHashCodesForKey(key)
+                    else
+                        it.relevant assign null
                 },
             )
             send(event.id, ListChange(wholeList = p.query(q).toList()))
@@ -83,7 +90,17 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             CollectionChanges.serializer(info.serialization.serializer)
         ) { changes: CollectionChanges<T> ->
             val jobs = ArrayList<Job>()
-            subscriptionDb().find(condition { it.databaseId eq modelIdentifier }).collect {
+            val targets = if(key != null) {
+                val relevantValues = changes.changes.asSequence().flatMap { listOfNotNull(it.old, it.new) }
+                    .map { key.get(it).hashCode() }
+                    .toSet()
+                subscriptionDb().find(condition {
+                    (it.databaseId eq modelIdentifier) and ((it.relevant eq null) or (it.relevant.notNull.any { it inside relevantValues }))
+                })
+            } else {
+                subscriptionDb().find(condition { it.databaseId eq modelIdentifier })
+            }
+            targets.collect {
                 if (it.condition.isEmpty()) return@collect
                 val m =
                     try {
@@ -138,4 +155,31 @@ data class __WebSocketDatabaseChangeSubscription(
     val condition: String, //Query<T>
     val mask: String, //Mask<T>
     val establishedAt: Instant,
+    @Index val relevant: Set<Int>? = null,
 ) : HasId<WebSocketIdentifier>
+
+fun <T, V> Condition<T>.relevantHashCodesForKey(key: KProperty1<T, V>): Set<Int>? = when(this) {
+    is Condition.And<T> -> conditions
+        .asSequence()
+        .mapNotNull { it.relevantHashCodesForKey(key) }
+        .reduceOrNull { a, b -> a.intersect(b) }
+    is Condition.Or<T> -> conditions
+        .asSequence()
+        .map { it.relevantHashCodesForKey(key) }
+        .reduceOrNull { a, b -> if(a == null || b == null) null else a.union(b) }
+    is Condition.OnField<*, *> -> if(this.key == key) condition.relevantHashCodes() else null
+    else -> null
+}
+fun <T> Condition<T>.relevantHashCodes(): Set<Int>? = when(this) {
+    is Condition.And<T> -> conditions
+        .asSequence()
+        .mapNotNull { it.relevantHashCodes() }
+        .reduceOrNull { a, b -> a.intersect(b) }
+    is Condition.Or<T> -> conditions
+        .asSequence()
+        .map { it.relevantHashCodes() }
+        .reduceOrNull { a, b -> if(a == null || b == null) null else a.union(b) }
+    is Condition.Equal -> setOf(value.hashCode())
+    is Condition.Inside -> values.map { it.hashCode() }.toSet()
+    else -> null
+}

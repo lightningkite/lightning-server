@@ -30,6 +30,10 @@ object TestSettings {
         getCollection = { database().collection() },
         forUser = { this }
     ))
+    val ws2 = ServerPath("test2").restApiWebsocket<Unit, ChangeSocketTest.TestThing, UUID>(database, ModelInfo(
+        getCollection = { database().collection() },
+        forUser = { this }
+    ), ChangeSocketTest.TestThing::_id)
 
     init {
         Settings.populateDefaults(
