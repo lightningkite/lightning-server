@@ -4,6 +4,12 @@
 
 IntelliJ has a quick option for this under "New Project".  Make sure you select Kotlin, Gradle, and Kotlin as your DSL language.
 
+If your project's `build.gradle.kts` was generated with this line, comment it out.
+
+```kotlin
+//    jvmToolchain(8)
+```
+
 ## Add Gradle Plugins
 
 ```kotlin
@@ -23,6 +29,12 @@ plugins {
     //...
     id("com.google.devtools.ksp")
     kotlin("plugin.serialization")
+    //...
+}
+
+repositories {
+    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
+    maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
     //...
 }
 ```
@@ -135,6 +147,9 @@ import kotlin.test.assertEquals
 
 object TestSettings {
     init {
+        // Load the full server definition.
+        Server
+
         // Set up our settings for the test environment
         Settings.populateDefaults(mapOf())
 
@@ -154,3 +169,5 @@ class ServerTest {
     }
 }
 ```
+
+NEXT: [Settings](settings.md)

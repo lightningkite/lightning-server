@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.metrics.metricsCleanSchedule
 import com.lightningkite.lightningserver.metrics.metricsSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.serializer
 import java.util.concurrent.ConcurrentHashMap
 
@@ -21,7 +22,7 @@ object Settings {
         values.putAll(map.mapValues { Box(it.value) })
         val missing = requirements.keys - values.keys
         if (requirements.filter { it.key in missing }.any { !it.value.optional }) {
-            throw IllegalStateException("Settings for ${missing.joinToString()} are missing.")
+            throw SerializationException("Settings for ${missing.joinToString()} are missing.")
         }
         if (!lazyLoadResources)
             requirements.values.forEach {
