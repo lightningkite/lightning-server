@@ -3,7 +3,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.Authorization
+import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.cast
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
@@ -42,7 +42,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
         connect = { event ->
             val user = event.user?.takeUnless { it == Unit }?.let {
                 @Suppress("UNCHECKED_CAST")
-                (Authorization.handler as Authorization.Handler<USER>).userToIdString(it)
+                (Authentication.handler as Authentication.Handler<USER>).userToIdString(it)
             }
             val collection = info.collection(event.user)
             subscriptionDb().insertOne(
@@ -64,7 +64,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             val existing = subscriptionDb().get(event.id) ?: throw NotFoundException()
             val user = existing.user?.let {
                 @Suppress("UNCHECKED_CAST")
-                (Authorization.handler as Authorization.Handler<USER>).idStringToUser(it)
+                (Authentication.handler as Authentication.Handler<USER>).idStringToUser(it)
             }
             val p = info.collection(info.serialization.authInfo.cast(user))
             val q = event.content.copy(condition = p.fullCondition(event.content.condition).simplify())

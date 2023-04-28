@@ -27,7 +27,7 @@ class AzureFileSystem(
     companion object {
         init {
             FilesSettings.register("azbs") {
-                val withoutScheme = it.storageUrl.substringAfter("://")
+                val withoutScheme = it.url.substringAfter("://")
                 val key = withoutScheme.substringBefore('@')
                 val accountAndContainer = withoutScheme.substringAfter('@')
                 val account = accountAndContainer.substringBefore('/')

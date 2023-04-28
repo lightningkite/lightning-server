@@ -193,3 +193,79 @@ HttpHeaders {
     setCookie("cookie", "value")
 }
 ```
+
+## Defining Groups of Endpoints
+
+The recommended format for defining groups of endpoints is this:
+
+```kotlin
+object Server {
+    val group = EndpointGroup(path("group"))
+}
+
+class EndpointGroup(path: ServerPath): ServerPathGroup(path) {
+    // GET group/example
+    val endpoint = path("example").get.handler { 
+        HttpResponse.plainText("example")
+    }
+}
+```
+
+This format allows you to group and separate your endpoints effectively while still making routing centralized and clear, as well as ensuring testing is still easy.
+
+## Handling HTML
+
+While Lightning Server is mostly focused on creating API backends, you can also serve HTML out of it.  For your convenience, `HtmlDefaults` is available for you to use in defining commonalities between pages and emails.  It is used for automatically generated pages to keep a style between them.
+
+```kotlin
+HtmlDefaults.basePage = { content ->
+    """
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <title>${generalSettings().projectName}</title>
+          </head>
+          <body>
+            $content
+          </body>
+        </html>
+    """.trimIndent()
+}
+val endpoint = path("example").get.handler { 
+    HttpResponse.html(content = HtmlDefaults.basePage("""
+    <h1> Hello world! </h1>
+    """))
+}
+
+HtmlDefaults.baseEmail = { content ->
+    """
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <meta name="x-apple-disable-message-reformatting">
+            <title></title>
+            <!--[if mso]>
+            <noscript>
+                <xml>
+                    <o:OfficeDocumentSettings>
+                        <o:PixelsPerInch>96</o:PixelsPerInch>
+                    </o:OfficeDocumentSettings>
+                </xml>
+            </noscript>
+            <![endif]-->
+            <style>
+                h1, h2, h3, h4, h5, h6, p { font-family: sans-serif }
+                table, td {border:0px solid #000000 !important;}
+            </style>
+          </head>
+          <body>
+            $content
+          </body>
+        </html>
+    """.trimIndent()
+}
+
+```

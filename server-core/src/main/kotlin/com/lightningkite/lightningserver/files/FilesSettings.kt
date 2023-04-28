@@ -3,10 +3,10 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.auth.JwtSigner
-import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.settings.Pluggable
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
+import kotlinx.serialization.json.JsonNames
 import java.io.File
 import java.time.Duration
 
@@ -15,14 +15,14 @@ import java.time.Duration
  */
 @Serializable
 data class FilesSettings(
-    val storageUrl: String = "file://${File("./local/files/").absolutePath}",
+    @JsonNames("storageUrl") val url: String = "file://${File("./local/files/").absolutePath}",
     val signedUrlExpiration: Duration? = null,
-    val jwtSigner: JwtSigner = JwtSigner()
+    val jwtSigner: JwtSigner = JwtSigner(),
 ) : () -> FileSystem {
     companion object : Pluggable<FilesSettings, FileSystem>() {
         init {
             register("file") {
-                Regex("""file://(?<folderPath>[^|]+)(?:\|(?<servePath>.+))?""").matchEntire(it.storageUrl)
+                Regex("""file://(?<folderPath>[^|]+)(?:\|(?<servePath>.+))?""").matchEntire(it.url)
                     ?.let { match ->
                         LocalFileSystem(
                             rootFile = File(match.groups["folderPath"]!!.value),
@@ -37,7 +37,7 @@ data class FilesSettings(
         }
     }
 
-    override fun invoke(): FileSystem = parse(storageUrl.substringBefore("://"), this)
+    override fun invoke(): FileSystem = parse(url.substringBefore("://"), this)
 
 //    init {
 //        if(storageUrl.startsWith("az")) {

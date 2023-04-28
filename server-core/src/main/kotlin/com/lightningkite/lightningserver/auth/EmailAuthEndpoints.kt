@@ -13,6 +13,11 @@ import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
 import java.time.Duration
 
+/**
+ * Endpoints for authenticating via email magic link / sent PINs.
+ * Also allows for OAuth based login, as most OAuth systems share email as a common identifier.
+ * For information on setting up OAuth, see the respective classes, [OauthAppleEndpoints], [OauthGitHubEndpoints], [OauthGoogleEndpoints], [OauthMicrosoftEndpoints].
+ */
 open class EmailAuthEndpoints<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val emailAccess: UserEmailAccess<USER, ID>,

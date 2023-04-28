@@ -51,7 +51,7 @@ class MultipartJsonHandler(val json: () -> Json) : Serialization.HttpContentPars
                         "uploaded/${part.filename.substringBeforeLast(".")}",
                         contentType.extension ?: part.filename.substringAfterLast(".")
                     )
-                    file.write(part.content)
+                    file.put(part.content)
                     var current: MutableMap<String, Any?> = overrideData
                     for (pathPart in path.dropLast(1)) {
                         @Suppress("UNCHECKED_CAST")

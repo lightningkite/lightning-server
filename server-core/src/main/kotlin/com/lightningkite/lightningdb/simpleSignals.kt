@@ -2,6 +2,9 @@ package com.lightningkite.lightningdb
 
 import kotlinx.coroutines.flow.FlowCollector
 
+/**
+ * Runs after an item is created.
+ */
 fun <Model : Any> FieldCollection<Model>.postCreate(
     onCreate: suspend (Model) -> Unit
 ): FieldCollection<Model> = object : FieldCollection<Model> by this@postCreate {
@@ -21,10 +24,14 @@ fun <Model : Any> FieldCollection<Model>.postCreate(
     }
 }
 
+@Deprecated("Use 'interceptCreate' instead", ReplaceWith("interceptCreate(onCreate)"))
 fun <Model : Any> FieldCollection<Model>.preCreate(
     onCreate: suspend (Model) -> Model
 ): FieldCollection<Model> = interceptCreate(onCreate)
 
+/**
+ * Runs before an item is deleted.
+ */
 fun <Model : Any> FieldCollection<Model>.preDelete(
     onDelete: suspend (Model) -> Unit
 ): FieldCollection<Model> = object : FieldCollection<Model> by this@preDelete {
@@ -50,6 +57,9 @@ fun <Model : Any> FieldCollection<Model>.preDelete(
     }
 }
 
+/**
+ * Runs after an item is deleted.
+ */
 fun <Model : HasId<ID>, ID : Comparable<ID>> FieldCollection<Model>.postDelete(
     onDelete: suspend (Model) -> Unit
 ): FieldCollection<Model> = object : FieldCollection<Model> by this@postDelete {
@@ -71,6 +81,9 @@ fun <Model : HasId<ID>, ID : Comparable<ID>> FieldCollection<Model>.postDelete(
     }
 }
 
+/**
+ * Runs after an existing item is changed.
+ */
 fun <Model : HasId<ID>, ID : Comparable<ID>> FieldCollection<Model>.postChange(
     changed: suspend (Model, Model) -> Unit
 ): FieldCollection<Model> = object : FieldCollection<Model> by this@postChange {
@@ -135,6 +148,9 @@ fun <Model : HasId<ID>, ID : Comparable<ID>> FieldCollection<Model>.postChange(
         updateMany(condition, modification).changes.size
 }
 
+/**
+ * Runs after any value is added or modified in the database.
+ */
 fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.postNewValue(
     changed: suspend (Model)->Unit
 ): FieldCollection<Model> = object: FieldCollection<Model> by this@postNewValue {

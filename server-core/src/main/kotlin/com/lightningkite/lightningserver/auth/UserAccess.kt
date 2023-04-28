@@ -4,6 +4,9 @@ import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import kotlinx.serialization.KSerializer
 
+/**
+ * Information fo authentication purposes about how to access users, however they are stored.
+ */
 interface UserAccess<USER : Any, ID> {
     val serializer: KSerializer<USER>
     val idSerializer: KSerializer<ID>

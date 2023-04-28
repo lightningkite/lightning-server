@@ -34,7 +34,7 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
         )
     }
 
-    override suspend fun info(): FileInfo? {
+    override suspend fun head(): FileInfo? {
         if (!file.exists()) return null
         return FileInfo(type = contentTypeFile.takeIf { it.exists() }?.readText()?.let { ContentType(it) }
             ?: ContentType.fromExtension(file.extension),
@@ -42,7 +42,7 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
             lastModified = Instant.ofEpochMilli(file.lastModified()))
     }
 
-    override suspend fun write(content: HttpContent) {
+    override suspend fun put(content: HttpContent) {
         file.parentFile.mkdirs()
         contentTypeFile.writeText(content.type.toString())
         file.outputStream().use { o ->
@@ -52,7 +52,10 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
         }
     }
 
-    override suspend fun read(): InputStream = file.toPath().inputStream()
+    override suspend fun get(): HttpContent? = if(file.exists()) HttpContent.file(
+        file,
+        contentTypeFile.takeIf { it.exists() }?.readText()?.let { ContentType(it) } ?: ContentType.fromExtension(file.extension)
+    ) else null
 
     override suspend fun delete() {
         if (contentTypeFile.exists()) contentTypeFile.delete()

@@ -2,6 +2,9 @@ package com.lightningkite.lightningdb
 
 import kotlinx.serialization.Serializable
 
+/**
+ * Permission rules regarding updating items per-field.
+ */
 @Serializable
 data class UpdateRestrictions<T>(
     /**
@@ -32,6 +35,9 @@ data class UpdateRestrictions<T>(
     ) {
         val it = startChain<T>()
 
+        /**
+         * Makes a field unmodifiable.
+         */
         @Suppress("UNCHECKED_CAST")
         fun PropChain<T, *>.cannotBeModified() {
             fields.add(
@@ -43,6 +49,9 @@ data class UpdateRestrictions<T>(
             )
         }
 
+        /**
+         * Makes a field only modifiable if the item matches the [condition].
+         */
         @Suppress("UNCHECKED_CAST")
         infix fun PropChain<T, *>.requires(condition: Condition<T>) {
             fields.add(
@@ -52,6 +61,10 @@ data class UpdateRestrictions<T>(
             )
         }
 
+        /**
+         * Makes a field only modifiable if the item matches the [condition].
+         * In addition, the value it is being changed to must match [valueMust].
+         */
         @Suppress("UNCHECKED_CAST")
         fun <V> PropChain<T, V>.restrict(requires: Condition<T>, valueMust: (PropChain<V, V>) -> Condition<V>) {
             fields.add(
@@ -63,6 +76,9 @@ data class UpdateRestrictions<T>(
             )
         }
 
+        /**
+         * The value is only allowed to change to a value that matches [valueMust].
+         */
         @Suppress("UNCHECKED_CAST")
         fun <V> PropChain<T, V>.mustBe(valueMust: (PropChain<V, V>) -> Condition<V>) {
             fields.add(
@@ -81,6 +97,9 @@ data class UpdateRestrictions<T>(
     }
 }
 
+/**
+ * DSL for defining [UpdateRestrictions]
+ */
 inline fun <T> updateRestrictions(builder: UpdateRestrictions.Builder<T>.() -> Unit): UpdateRestrictions<T> {
     return UpdateRestrictions.Builder<T>().apply(builder).build()
 }

@@ -82,13 +82,14 @@ class LocalFilesTest: FileSystemTests() {
         runBlocking {
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
-            testFile.write(HttpContent.Text(message, ContentType.Text.Plain))
+            testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
             val signed = testFile.signedUrl
             assert(signed.startsWith(testFile.url))
             println("testFile.signedUrl: ${signed}")
             val response = system.fetch.test(
                 wildcard = signed.substringAfterLast("hosted-files").substringBefore('?'),
-                queryParameters = signed.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=') }
+                queryParameters = signed.substringAfter('?').split('&')
+                    .map { it.substringBefore('=') to it.substringAfter('=') }
             )
             println(response)
             assertEquals(HttpStatus.OK, response.status)

@@ -14,11 +14,11 @@ class MailgunEmailClient(
     val key: String,
     val domain: String,
 ) : EmailClient {
-    override suspend fun send(
+    override suspend fun sendHtml(
         subject: String,
         to: List<String>,
-        message: String,
-        htmlMessage: String?,
+        html: String,
+        plainText: String,
         attachments: List<Attachment>
     ) {
         val parts = attachments.map {
@@ -43,10 +43,8 @@ class MailgunEmailClient(
                     append("to", it)
                 }
                 append("subject", subject)
-                append("text", message)
-                htmlMessage?.let {
-                    append("html", it)
-                }
+                append("text", plainText)
+                append("html", html)
                 append("o:tracking", "false")
                 parts.forEach { append(it) }
             },

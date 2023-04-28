@@ -15,9 +15,12 @@ interface FileObject {
     fun resolve(path: String): FileObject
     val parent: FileObject?
     suspend fun list(): List<FileObject>?
-    suspend fun info(): FileInfo?
-    suspend fun write(content: HttpContent)
-    suspend fun read(): InputStream
+    @Deprecated("Use head instead", ReplaceWith("head()")) suspend fun info(): FileInfo? = head()
+    suspend fun head(): FileInfo?
+    @Deprecated("Use put instead", ReplaceWith("put(content)")) suspend fun write(content: HttpContent) = put(content)
+    @Deprecated("Use get instead", ReplaceWith("get().stream()")) suspend fun read(): InputStream = get()!!.stream()
+    suspend fun put(content: HttpContent)
+    suspend fun get(): HttpContent?
     suspend fun delete()
     fun checkSignature(queryParams: String): Boolean {
         return runBlocking {

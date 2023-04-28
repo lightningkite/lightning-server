@@ -1,5 +1,9 @@
 package com.lightningkite.lightningdb
 
+/**
+ * Intercept all kinds of creates, including [FieldCollection.insert], [FieldCollection.upsertOne], and [FieldCollection.upsertOneIgnoringResult].
+ * Allows you to modify the object before it is actually created.
+ */
 inline fun <Model : Any> FieldCollection<Model>.interceptCreate(crossinline interceptor: suspend (Model) -> Model): FieldCollection<Model> =
     object : FieldCollection<Model> by this {
         override val wraps = this@interceptCreate
@@ -19,6 +23,9 @@ inline fun <Model : Any> FieldCollection<Model>.interceptCreate(crossinline inte
         ): Boolean = wraps.upsertOneIgnoringResult(condition, modification, interceptor(model))
     }
 
+/**
+ * Intercepts all kinds of replace operations.
+ */
 inline fun <Model : Any> FieldCollection<Model>.interceptReplace(crossinline interceptor: suspend (Model) -> Model): FieldCollection<Model> =
     object : FieldCollection<Model> by this {
         override val wraps = this@interceptReplace
@@ -58,6 +65,9 @@ inline fun <Model : Any> FieldCollection<Model>.interceptReplace(crossinline int
             )
     }
 
+/**
+ * Intercepts all modifications sent to the database.
+ */
 inline fun <Model : Any> FieldCollection<Model>.interceptModification(crossinline interceptor: suspend (Modification<Model>) -> Modification<Model>): FieldCollection<Model> =
     object : FieldCollection<Model> by this {
         override val wraps = this@interceptModification
@@ -96,7 +106,9 @@ inline fun <Model : Any> FieldCollection<Model>.interceptModification(crossinlin
         ): Int = wraps.updateManyIgnoringResult(condition, interceptor(modification))
     }
 
-
+/**
+ * Intercepts all changes sent to the database, including inserting, replacing, upserting, and updating.
+ */
 inline fun <Model : Any> FieldCollection<Model>.interceptChange(crossinline interceptor: suspend (Modification<Model>) -> Modification<Model>): FieldCollection<Model> =
     object : FieldCollection<Model> by this {
         override val wraps = this@interceptChange
@@ -155,13 +167,17 @@ inline fun <Model : Any> FieldCollection<Model>.interceptChange(crossinline inte
         ): Int = wraps.updateManyIgnoringResult(condition, interceptor(modification))
     }
 
-
-inline fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.interceptChangePlus(
+/**
+ * Intercepts all changes sent to the database, including inserting, replacing, upserting, and updating.
+ * Also gives you an instance of the model that will be changed.
+ * This is significantly more expensive, as we must retrieve the data before we can calculate the change.
+ */
+inline fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.interceptChangePerInstance(
     includeMassUpdates: Boolean = true,
     crossinline interceptor: suspend (Model, Modification<Model>) -> Modification<Model>
 ): FieldCollection<Model> =
     object : FieldCollection<Model> by this {
-        override val wraps = this@interceptChangePlus
+        override val wraps = this@interceptChangePerInstance
         override suspend fun insert(models: Iterable<Model>): List<Model> =
             wraps.insert(models.map { interceptor(it, Modification.Assign(it))(it) })
 

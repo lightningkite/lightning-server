@@ -18,8 +18,7 @@ object FileRedirectHandler : Serialization.HttpContentHandler {
     override suspend fun <T> invoke(content: HttpContent, serializer: KSerializer<T>): T {
         val loc = content.text().substringBefore("\n").trim()
         val f = ServerFile(loc).fileObject
-        val info = f.info() ?: throw BadRequestException("No file found at '$loc'.")
-        val body = HttpContent.Stream({ runBlocking { f.read() } }, info.size, info.type)
+        val body = f.get() ?: throw BadRequestException("No file found at '$loc'.")
         val subtype = content.type.parameters["subtype"]?.let { ContentType(it) } ?: ContentType.Application.Json
         val basis = Serialization.parsers[subtype] ?: throw BadRequestException("No parser found for type ${subtype}.")
         return basis(body, serializer)
@@ -32,7 +31,7 @@ object FileRedirectHandler : Serialization.HttpContentHandler {
             "temp-download/",
             basis.contentType.extension ?: ""
         )
-        file.write(basis.invoke(subtype, serializer, value))
+        file.put(basis.invoke(subtype, serializer, value))
         return HttpContent.Text(file.signedUrl + "\r\n", contentType)
     }
 

@@ -3,12 +3,20 @@ package com.lightningkite.lightningdb
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
 
+/**
+ * Used for database implementations.
+ * An index that is needed for this model.
+ */
 data class NeededIndex(
     val fields: List<String>,
     val unique: Boolean = false,
     val name: String? = null,
 )
 
+/**
+ * Used for database implementations.
+ * Gives a list of needed indexes for the model.
+ */
 fun SerialDescriptor.indexes(): Set<NeededIndex> {
     val seen = HashSet<SerialDescriptor>()
     val out = HashSet<NeededIndex>()

@@ -122,15 +122,7 @@ sealed class HttpContent {
             )
         }
 
-        @OptIn(DelicateCoroutinesApi::class)
-        suspend fun file(file: FileObject): Stream {
-            val info = GlobalScope.async(start = CoroutineStart.LAZY) { file.info()!! }
-            return Stream(
-                getStream = { file.read() },
-                length = info.await().size,
-                type = info.await().type
-            )
-        }
+        suspend fun file(file: FileObject) = file.get()!!
     }
 }
 
