@@ -57,14 +57,11 @@ Built to work for all common serverless platforms.
 - [Cache](docs/cache.md)
 - [Files](docs/files.md)
 - [Email](docs/email.md)
-- [Authentication](docs/authentication.md) (todo)
+- [Authentication](docs/authentication.md)
 - [Typed Endpoints](docs/typed-endpoints.md)
-- [Tasks](docs/tasks.md) (todo)
+- [Tasks](docs/tasks.md)
 - [Websockets](docs/websockets.md) (todo)
-- [Meta](docs/meta.md) (todo)
-- [Documentation (old)](documentation.md)
-- [Quick Function List (old)](docs-feature-list.md)
-- [Demo Project (old)](demo/src/main/kotlin)
+- [Meta](docs/meta.md)
 
 ## Road Map
 
