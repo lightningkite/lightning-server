@@ -59,6 +59,7 @@ Built to work for all common serverless platforms.
 - [Email](docs/email.md)
 - [Authentication](docs/authentication.md)
 - [Typed Endpoints](docs/typed-endpoints.md)
+- [Automatic REST Endpoints](docs/autorest.md)
 - [Tasks](docs/tasks.md)
 - [Websockets](docs/websockets.md) (todo)
 - [Meta](docs/meta.md)
