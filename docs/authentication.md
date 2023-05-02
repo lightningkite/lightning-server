@@ -45,7 +45,7 @@ class AuthEndpoints(path: ServerPath): ServerPathGroup(path) {
     val userAccess = userModelInfo.userEmailAccess { User(email = it) }
     // The basic auth endpoint information.  Required no matter what kind of authentication you're doing.
     val baseAuth = BaseAuthEndpoints(
-        path = path("auth"),
+        path = path,
         userAccess = userAccess,
         jwtSigner = Server.jwt
     )
