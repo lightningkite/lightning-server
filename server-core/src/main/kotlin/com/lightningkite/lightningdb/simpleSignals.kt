@@ -151,38 +151,43 @@ fun <Model : HasId<ID>, ID : Comparable<ID>> FieldCollection<Model>.postChange(
 /**
  * Runs after any value is added or modified in the database.
  */
-fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.postNewValue(
-    changed: suspend (Model)->Unit
-): FieldCollection<Model> = object: FieldCollection<Model> by this@postNewValue {
+fun <Model : HasId<ID>, ID : Comparable<ID>> FieldCollection<Model>.postNewValue(
+    changed: suspend (Model) -> Unit
+): FieldCollection<Model> = object : FieldCollection<Model> by this@postNewValue {
     override val wraps = this@postNewValue
 
     override suspend fun insert(models: Iterable<Model>): List<Model> {
         return wraps.insert(models).onEach { changed(it) }
     }
 
-    override suspend fun replaceOne(condition: Condition<Model>, model: Model, orderBy: List<SortPart<Model>>): EntryChange<Model> =
-        wraps.replaceOne(condition, model, orderBy).also { if(it.old != null && it.new != null) changed(it.new!!) }
+    override suspend fun replaceOne(
+        condition: Condition<Model>,
+        model: Model,
+        orderBy: List<SortPart<Model>>
+    ): EntryChange<Model> =
+        wraps.replaceOne(condition, model, orderBy).also { if (it.old != null && it.new != null) changed(it.new!!) }
 
     override suspend fun upsertOne(
         condition: Condition<Model>,
         modification: Modification<Model>,
         model: Model
-    ): EntryChange<Model>  =
-        wraps.upsertOne(condition, modification, model).also { if(it.old != null && it.new != null) changed(it.new!!) }
+    ): EntryChange<Model> =
+        wraps.upsertOne(condition, modification, model).also { it.new?.let { changed(it) } }
 
     override suspend fun updateOne(
         condition: Condition<Model>,
         modification: Modification<Model>,
         orderBy: List<SortPart<Model>>
-    ): EntryChange<Model>  =
-        wraps.updateOne(condition, modification, orderBy).also { if(it.old != null && it.new != null) changed(it.new!!) }
+    ): EntryChange<Model> =
+        wraps.updateOne(condition, modification, orderBy)
+            .also { if (it.old != null && it.new != null) changed(it.new!!) }
 
     override suspend fun updateMany(
         condition: Condition<Model>,
         modification: Modification<Model>
     ): CollectionChanges<Model> = wraps.updateMany(condition, modification).also { changes ->
         changes.changes.forEach {
-            if(it.old != null && it.new != null)
+            if (it.old != null && it.new != null)
                 changed(it.new!!)
         }
     }
@@ -208,5 +213,6 @@ fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.postNewValue(
         orderBy: List<SortPart<Model>>
     ): Boolean = updateOne(condition, modification).new != null
 
-    override suspend fun updateManyIgnoringResult(condition: Condition<Model>, modification: Modification<Model>): Int = updateMany(condition, modification).changes.size
+    override suspend fun updateManyIgnoringResult(condition: Condition<Model>, modification: Modification<Model>): Int =
+        updateMany(condition, modification).changes.size
 }

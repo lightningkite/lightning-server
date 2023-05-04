@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 
 @DatabaseModel
 @Serializable
-data class TempThing(val id: Int)
+data class TempThing(override val _id: Int): HasId<Int>
 
 class AbstractSignalFieldCollection {
 
@@ -183,12 +183,12 @@ class AbstractSignalFieldCollection {
         collection.registerRawSignal {
             assertEquals(1, it.changes.size)
             val change = it.changes.first()
-            assertEquals(1, change.old?.id)
-            assertEquals(3, change.new?.id)
+            assertEquals(1, change.old?._id)
+            assertEquals(3, change.new?._id)
             signalCalled = true
         }
         signalCalled = false
-        collection.updateOne(Condition.Always(), Modification.OnField(TempThing::id, Modification.Assign(3)))
+        collection.updateOne(Condition.Always(), Modification.OnField(TempThing::_id, Modification.Assign(3)))
         assertTrue(signalCalled)
         signalCalled = false
         collection.signals.clear()
@@ -202,7 +202,7 @@ class AbstractSignalFieldCollection {
             signalCalled = true
         }
         signalCalled = false
-        collection.updateMany(Condition.Always(), Modification.OnField(TempThing::id, Modification.Assign(3)))
+        collection.updateMany(Condition.Always(), Modification.OnField(TempThing::_id, Modification.Assign(3)))
         assertTrue(signalCalled)
         signalCalled = false
         collection.signals.clear()
@@ -213,12 +213,12 @@ class AbstractSignalFieldCollection {
         collection.registerRawSignal {
             assertEquals(1, it.changes.size)
             val change = it.changes.first()
-            assertEquals(1, change.old?.id)
-            assertEquals(3, change.new?.id)
+            assertEquals(1, change.old?._id)
+            assertEquals(3, change.new?._id)
             signalCalled = true
         }
         signalCalled = false
-        collection.updateOneIgnoringResult(Condition.Always(), Modification.OnField(TempThing::id, Modification.Assign(3)))
+        collection.updateOneIgnoringResult(Condition.Always(), Modification.OnField(TempThing::_id, Modification.Assign(3)))
         assertTrue(signalCalled)
         signalCalled = false
         collection.signals.clear()
@@ -232,7 +232,7 @@ class AbstractSignalFieldCollection {
             signalCalled = true
         }
         signalCalled = false
-        collection.updateManyIgnoringResult(Condition.Always(), Modification.OnField(TempThing::id, Modification.Assign(3)))
+        collection.updateManyIgnoringResult(Condition.Always(), Modification.OnField(TempThing::_id, Modification.Assign(3)))
         assertTrue(signalCalled)
         signalCalled = false
         collection.signals.clear()
@@ -262,12 +262,12 @@ class AbstractSignalFieldCollection {
         collection.registerRawSignal {
             assertEquals(1, it.changes.size)
             val change = it.changes.first()
-            assertEquals(1, change.old?.id)
-            assertEquals(4, change.new?.id)
+            assertEquals(1, change.old?._id)
+            assertEquals(4, change.new?._id)
             signalCalled = true
         }
         signalCalled = false
-        collection.upsertOne(Condition.Always(), Modification.OnField(TempThing::id, Modification.Assign(4)), thing1)
+        collection.upsertOne(Condition.Always(), Modification.OnField(TempThing::_id, Modification.Assign(4)), thing1)
         assertTrue(signalCalled)
         signalCalled = false
         collection.signals.clear()
@@ -290,12 +290,12 @@ class AbstractSignalFieldCollection {
         collection.registerRawSignal {
             assertEquals(1, it.changes.size)
             val change = it.changes.first()
-            assertEquals(1, change.old?.id)
-            assertEquals(4, change.new?.id)
+            assertEquals(1, change.old?._id)
+            assertEquals(4, change.new?._id)
             signalCalled = true
         }
         signalCalled = false
-        collection.upsertOneIgnoringResult(Condition.Always(), Modification.OnField(TempThing::id, Modification.Assign(4)), thing1)
+        collection.upsertOneIgnoringResult(Condition.Always(), Modification.OnField(TempThing::_id, Modification.Assign(4)), thing1)
         assertTrue(signalCalled)
         signalCalled = false
         collection.signals.clear()
