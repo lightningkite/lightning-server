@@ -2,26 +2,91 @@ package com.lightningkite.lightningdb
 
 import kotlin.reflect.KProperty1
 
+// Sink properties, reduce within properties, reduce all
 
-private fun <T> Condition<T>.unpackAnd(): Sequence<Pair<List<KProperty1<*, *>>, Condition<*>>> {
-    return when (this) {
-        is Condition.And -> conditions.asSequence().flatMap { it.unpackAnd() }
-        is Condition.OnField<*, *> -> condition.unpackAnd().map {
-            (listOf(key) + it.first) to it.second
+fun <T> Condition<T>.simplify(): Condition<T> {
+    return when(this) {
+        is Condition.And -> {
+//            println("AND simplifying $this")
+            conditions.asSequence().flatMap { it.andByField() }
+                .groupBy { it.first }
+                .mapNotNull {
+//                    println("AND key ${it.key.map { it.name }}: merging parts ${it.value.map { it.second }}")
+                    val keyCond = it.value.map { it.second as Condition<Any?> }.reduce(::reduceAnd).finalSimplify()
+//                    println("AND reduced to $keyCond")
+                    when (keyCond) {
+                        is Condition.Always -> return@mapNotNull null
+                        is Condition.Never -> return Condition.Never<T>()
+                        else -> make(it.key, keyCond) as Condition<T>
+                    }
+                }
+                .let {
+//                    println("AND total simplification list: $it")
+                    if (it.isEmpty()) Condition.Always<T>()
+                    else if (it.size == 1) it.first()
+                    else Condition.And<T>(it)
+                }
+//                .also { println("AND final is $it") }
         }
-
-        else -> sequenceOf(listOf<KProperty1<*, *>>() to this)
+        is Condition.Or -> {
+//            println("OR simplifying $this")
+            conditions.asSequence().flatMap { it.orByField() }
+                .groupBy { it.first }
+                .mapNotNull {
+//                    println("OR key ${it.key.map { it.name }}: merging parts ${it.value.map { it.second }}")
+                    val keyCond = it.value.map { it.second as Condition<Any?> }.reduce(::reduceOr).finalSimplify()
+//                    println("OR reduced to $keyCond")
+                    when (keyCond) {
+                        is Condition.Always -> return Condition.Always<T>()
+                        is Condition.Never -> return@mapNotNull null
+                        else -> make(it.key, keyCond) as Condition<T>
+                    }
+                }
+                .let {
+//                    println("OR total simplification list: $it")
+                    if (it.isEmpty()) Condition.Never<T>()
+                    else if (it.size == 1) it.first()
+                    else Condition.Or<T>(it)
+                }
+//                .also { println("OR final is $it") }
+        }
+        else -> finalSimplify()
     }
 }
 
-private fun <T> Condition<T>.unpackOr(): Sequence<Pair<List<KProperty1<*, *>>, Condition<*>>> {
+private fun <T> Condition<T>.finalSimplify(): Condition<T> = when(this) {
+    is Condition.Inside -> if(values.isEmpty()) Condition.Never() else this
+    is Condition.NotInside -> if(values.isEmpty()) Condition.Always() else this
+    else -> this
+}
+
+private fun Condition<*>.andByField(): Sequence<Pair<List<KProperty1<*, *>>, Condition<*>>> {
     return when (this) {
-        is Condition.Or -> conditions.asSequence().flatMap { it.unpackAnd() }
-        is Condition.OnField<*, *> -> condition.unpackOr().map {
+        is Condition.And -> conditions.asSequence().flatMap { it.andByField() }
+        is Condition.OnField<*, *> -> condition.andByField().map {
             (listOf(key) + it.first) to it.second
         }
+        else -> {
+            val s = this.simplify()
+            if(s is Condition.OnField<*, *>) s.condition.andByField().map {
+                (listOf(s.key) + it.first) to it.second
+            } else sequenceOf(listOf<KProperty1<*, *>>() to s)
+        }
+    }
+}
 
-        else -> sequenceOf(listOf<KProperty1<*, *>>() to this)
+private fun Condition<*>.orByField(): Sequence<Pair<List<KProperty1<*, *>>, Condition<*>>> {
+    return when (this) {
+        is Condition.Or -> conditions.asSequence().flatMap { it.orByField() }
+        is Condition.OnField<*, *> -> condition.orByField().map {
+            (listOf(key) + it.first) to it.second
+        }
+        else -> {
+            val s = this.simplify()
+            if(s is Condition.OnField<*, *>) s.condition.orByField().map {
+                (listOf(s.key) + it.first) to it.second
+            } else sequenceOf(listOf<KProperty1<*, *>>() to s)
+        }
     }
 }
 
@@ -34,7 +99,7 @@ private fun make(prop: List<KProperty1<*, *>>, cond: Condition<*>): Condition<*>
     ))
 }
 
-private fun <T> reduce(a: Condition<T>, b: Condition<T>): Condition<T> {
+private fun <T> reduceAnd(a: Condition<T>, b: Condition<T>): Condition<T> {
     return when (a) {
         is Condition.Always -> b
         is Condition.Never -> a
@@ -59,10 +124,12 @@ private fun <T> reduce(a: Condition<T>, b: Condition<T>): Condition<T> {
         is Condition.GreaterThan -> when (b) {
             is Condition.GreaterThan -> if (a.value.let { it as Comparable<Any?> } > b.value.let { it as Comparable<Any?> }) a else b
             is Condition.GreaterThanOrEqual -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) a else b
+            is Condition.LessThan -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) Condition.Never() else Condition.And(listOf(a, b))
+            is Condition.LessThanOrEqual -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) Condition.Never() else Condition.And(listOf(a, b))
             is Condition.Always,
             is Condition.Never,
             is Condition.And,
-            is Condition.Equal -> reduce(b, a)
+            is Condition.Equal -> reduceAnd(b, a)
 
             else -> Condition.And(listOf(a, b))
         }
@@ -70,21 +137,25 @@ private fun <T> reduce(a: Condition<T>, b: Condition<T>): Condition<T> {
         is Condition.LessThan -> when (b) {
             is Condition.LessThan -> if (a.value.let { it as Comparable<Any?> } < b.value.let { it as Comparable<Any?> }) a else b
             is Condition.LessThanOrEqual -> if (a.value.let { it as Comparable<Any?> } <= b.value.let { it as Comparable<Any?> }) a else b
+            is Condition.GreaterThan,
+            is Condition.GreaterThanOrEqual,
             is Condition.Always,
             is Condition.Never,
             is Condition.And,
-            is Condition.Equal -> reduce(b, a)
+            is Condition.Equal -> reduceAnd(b, a)
 
             else -> Condition.And(listOf(a, b))
         }
 
         is Condition.GreaterThanOrEqual -> when (b) {
             is Condition.GreaterThanOrEqual -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) a else b
+            is Condition.LessThan -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) Condition.Never() else Condition.And(listOf(a, b))
+            is Condition.LessThanOrEqual -> if (a.value.let { it as Comparable<Any?> } > b.value.let { it as Comparable<Any?> }) Condition.Never() else Condition.And(listOf(a, b))
             is Condition.GreaterThan,
             is Condition.Always,
             is Condition.Never,
             is Condition.And,
-            is Condition.Equal -> reduce(b, a)
+            is Condition.Equal -> reduceAnd(b, a)
 
             else -> Condition.And(listOf(a, b))
         }
@@ -95,7 +166,7 @@ private fun <T> reduce(a: Condition<T>, b: Condition<T>): Condition<T> {
             is Condition.Always,
             is Condition.Never,
             is Condition.And,
-            is Condition.Equal -> reduce(b, a)
+            is Condition.Equal -> reduceAnd(b, a)
 
             else -> Condition.And(listOf(a, b))
         }
@@ -108,7 +179,7 @@ private fun <T> reduce(a: Condition<T>, b: Condition<T>): Condition<T> {
             is Condition.Always,
             is Condition.Never,
             is Condition.And,
-            is Condition.Equal -> reduce(b, a)
+            is Condition.Equal -> reduceAnd(b, a)
 
             else -> Condition.And(listOf(a, b))
         }
@@ -121,7 +192,7 @@ private fun <T> reduce(a: Condition<T>, b: Condition<T>): Condition<T> {
             is Condition.Always,
             is Condition.Never,
             is Condition.And,
-            is Condition.Equal -> reduce(b, a)
+            is Condition.Equal -> reduceAnd(b, a)
 
             else -> Condition.And(listOf(a, b))
         }
@@ -129,123 +200,98 @@ private fun <T> reduce(a: Condition<T>, b: Condition<T>): Condition<T> {
         else -> Condition.And(listOf(a, b))
     }
 }
-
-fun <T> Condition.And<T>.unpackAndMerge(): List<Condition<T>> {
-    return unpackAnd().groupBy { it.first }.map {
-        (if (it.value.size == 1)
-            make(it.key, it.value[0].second) as Condition<T>
-        else make(it.key, it.value.asSequence().map { it.second }.reduce { a, b ->
-            reduce(a as Condition<Any>, b as Condition<Any>)
-        }) as Condition<T>)
-    }
-}
-
-private fun <T> Condition<T>.simplifyWithoutMerge(): Condition<T> {
-    return when (this) {
-        is Condition.And -> {
-            conditions.filter { it !is Condition.Always }.let {
-                when (it.size) {
-                    0 -> Condition.Never()
-                    1 -> it.first().simplifyWithoutMerge()
-                    else -> Condition.And(it.map { it.simplifyWithoutMerge() })
-                }
-            }
+private fun <T> reduceOr(a: Condition<T>, b: Condition<T>): Condition<T> {
+    return when (a) {
+        is Condition.Always -> a
+        is Condition.Never -> b
+        is Condition.Or -> when (b) {
+            is Condition.Or -> Condition.Or(a.conditions + b.conditions)
+            else -> Condition.Or(a.conditions + b)
         }
 
-        is Condition.Not -> (this.condition as? Condition.Not)?.condition?.simplify() ?: Condition.Not(simplify())
-        is Condition.Or -> this.conditions.distinct().map { it.simplify() }.filter { it !is Condition.Never }.let {
-            when (it.size) {
-                0 -> Condition.Always()
-                1 -> it.first().simplify()
-                else -> Condition.Or(it)
-            }
+        is Condition.Equal -> when (b) {
+            is Condition.Equal -> if (a.value == b.value) a else Condition.Inside(listOf(a.value, b.value))
+            is Condition.GreaterThan -> if (a.value.let { it as Comparable<Any?> } > b.value.let { it as Comparable<Any?> }) b else Condition.Or(listOf(a, b))
+            is Condition.LessThan -> if (a.value.let { it as Comparable<Any?> } < b.value.let { it as Comparable<Any?> }) b else Condition.Or(listOf(a, b))
+            is Condition.GreaterThanOrEqual -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) b else Condition.Or(listOf(a, b))
+            is Condition.LessThanOrEqual -> if (a.value.let { it as Comparable<Any?> } <= b.value.let { it as Comparable<Any?> }) b else Condition.Or(listOf(a, b))
+            is Condition.NotEqual -> if (a.value != b.value) b else Condition.Always()
+            is Condition.Inside -> if (a.value in b.values) b else Condition.Inside(b.values + a.value)
+            is Condition.NotInside -> if (a.value !in b.values) b else Condition.NotInside(b.values - a.value)
+            is Condition.Or -> Condition.Or(b.conditions + a)
+            else -> Condition.Or(listOf(a, b))
         }
 
-        is Condition.Inside -> this.values.distinct().let {
-            when (it.size) {
-                0 -> Condition.Never()
-                1 -> Condition.Equal(it.first())
-                else -> Condition.Inside(it)
-            }
+        is Condition.GreaterThan -> when (b) {
+            is Condition.GreaterThan -> if (a.value.let { it as Comparable<Any?> } > b.value.let { it as Comparable<Any?> }) b else a
+            is Condition.GreaterThanOrEqual -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) b else a
+            is Condition.Always,
+            is Condition.Never,
+            is Condition.Or,
+            is Condition.Equal -> reduceOr(b, a)
+
+            else -> Condition.Or(listOf(a, b))
         }
 
-        is Condition.NotInside -> this.values.distinct().let {
-            when (it.size) {
-                0 -> Condition.Always()
-                1 -> Condition.NotEqual(it.first())
-                else -> Condition.NotInside(it)
-            }
+        is Condition.LessThan -> when (b) {
+            is Condition.LessThan -> if (a.value.let { it as Comparable<Any?> } < b.value.let { it as Comparable<Any?> }) b else a
+            is Condition.LessThanOrEqual -> if (a.value.let { it as Comparable<Any?> } <= b.value.let { it as Comparable<Any?> }) b else a
+            is Condition.Always,
+            is Condition.Never,
+            is Condition.Or,
+            is Condition.Equal -> reduceOr(b, a)
+
+            else -> Condition.Or(listOf(a, b))
         }
 
-        is Condition.OnField<*, *> -> Condition.OnField(
-            key as KProperty1<T, Any?>,
-            condition.simplify() as Condition<Any?>
-        )
+        is Condition.GreaterThanOrEqual -> when (b) {
+            is Condition.GreaterThanOrEqual -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) b else a
+            is Condition.GreaterThan,
+            is Condition.Always,
+            is Condition.Never,
+            is Condition.Or,
+            is Condition.Equal -> reduceOr(b, a)
 
-        else -> this
-    }
-}
-
-/**
- * Will reduce a condition into it's smallest relevant parts.
- * Ex: Or[Never, Always] -> Always
- * Ex: And[Never, Always] -> Never
- * Ex: And[Equal, Always] -> Equal
- */
-fun <T> Condition<T>.simplify(): Condition<T> {
-    return when (this) {
-        is Condition.And -> {
-            var foundAlways = false
-            this.unpackAndMerge().filter {
-                if (it is Condition.Always) {
-                    foundAlways = true
-                    false
-                } else true
-            }.let {
-                if (it.any { it is Condition.Never }) Condition.Never()
-                else when (it.size) {
-                    0 -> if (foundAlways) Condition.Always() else Condition.Never()
-                    1 -> it.first().simplifyWithoutMerge()
-                    else -> Condition.And(it.map { it.simplifyWithoutMerge() })
-                }
-            }
+            else -> Condition.Or(listOf(a, b))
         }
 
-        is Condition.Not -> (this.condition as? Condition.Not)?.condition?.simplify() ?: Condition.Not(simplify())
-        is Condition.Or -> {
-            this.conditions.distinct().map { it.simplify() }.filter {
-                it !is Condition.Never
-            }.let {
-                if (it.any { it is Condition.Always }) Condition.Always()
-                else when (it.size) {
-                    0 -> Condition.Never()
-                    1 -> it.first().simplify()
-                    else -> Condition.Or(it)
-                }
-            }
+        is Condition.LessThanOrEqual -> when (b) {
+            is Condition.LessThanOrEqual -> if (a.value.let { it as Comparable<Any?> } <= b.value.let { it as Comparable<Any?> }) b else a
+            is Condition.LessThan,
+            is Condition.Always,
+            is Condition.Never,
+            is Condition.Or,
+            is Condition.Equal -> reduceOr(b, a)
+
+            else -> Condition.Or(listOf(a, b))
         }
 
-        is Condition.Inside -> this.values.distinct().let {
-            when (it.size) {
-                0 -> Condition.Never()
-                1 -> Condition.Equal(it.first())
-                else -> Condition.Inside(it)
-            }
+        is Condition.Inside -> when (b) {
+            is Condition.Inside -> Condition.Inside(a.values.toSet().union(b.values.toSet()).toList())
+            is Condition.NotInside -> Condition.NotInside(b.values.toSet().minus(a.values.toSet()).toList())
+            is Condition.GreaterThan,
+            is Condition.LessThan,
+            is Condition.Always,
+            is Condition.Never,
+            is Condition.Or,
+            is Condition.Equal -> reduceOr(b, a)
+
+            else -> Condition.Or(listOf(a, b))
         }
 
-        is Condition.NotInside -> this.values.distinct().let {
-            when (it.size) {
-                0 -> Condition.Always()
-                1 -> Condition.NotEqual(it.first())
-                else -> Condition.NotInside(it)
-            }
+        is Condition.NotInside -> when (b) {
+            is Condition.NotInside -> Condition.NotInside(a.values.toSet().intersect(b.values.toSet()).toList())
+            is Condition.Inside,
+            is Condition.GreaterThan,
+            is Condition.LessThan,
+            is Condition.Always,
+            is Condition.Never,
+            is Condition.Or,
+            is Condition.Equal -> reduceOr(b, a)
+
+            else -> Condition.Or(listOf(a, b))
         }
 
-        is Condition.OnField<*, *> -> Condition.OnField(
-            key as KProperty1<T, Any?>,
-            condition.simplify() as Condition<Any?>
-        )
-
-        else -> this
+        else -> Condition.Or(listOf(a, b))
     }
 }
