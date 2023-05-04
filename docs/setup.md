@@ -45,6 +45,8 @@ repositories {
 // build.gradle.kts
 val lightningServerVersion = "0.9.2"
 dependencies {
+    //...
+    
     // An annotation processor.  Gives a nice DSL for forming queries.  You'll always want this.
     ksp("com.lightningkite.lightningserver:processor:$lightningServerVersion")
     
@@ -83,6 +85,8 @@ dependencies {
     
     // SFTP File System Implementation (warning: does not work as public file store)
     api("com.lightningkite.lightningserver:server-sftp:$lightningServerVersion")
+    
+    //...
 }
 ```
 
