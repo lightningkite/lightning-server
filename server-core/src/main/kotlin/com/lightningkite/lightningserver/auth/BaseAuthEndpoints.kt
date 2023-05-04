@@ -54,7 +54,7 @@ open class BaseAuthEndpoints<USER : Any, ID>(
 
     init {
         typedHandler.types.add(authType)
-        if (typedHandler.defaultType != null) {
+        if (typedHandler.defaultType == null) {
             typedHandler.defaultType = authType
         }
         path.docName = "Auth"
