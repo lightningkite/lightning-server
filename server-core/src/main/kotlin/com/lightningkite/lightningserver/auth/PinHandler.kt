@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
+import com.lightningkite.lightningserver.utils.BadWordList
 import java.security.SecureRandom
 import java.time.Duration
 
@@ -23,7 +24,10 @@ open class PinHandler(
     private fun cacheKey(uniqueIdentifier: String): String = "${keyPrefix}_pin_login_$uniqueIdentifier"
     suspend fun generate(uniqueIdentifier: String): String {
         val r = SecureRandom()
-        val pin = String(CharArray(length) { availableCharacters.get(r.nextInt(availableCharacters.size)) })
+        var pin = ""
+        do {
+            pin = String(CharArray(length) { availableCharacters.get(r.nextInt(availableCharacters.size)) })
+        } while (BadWordList.detectParanoid(pin))
         val fixedPin = if(mixedCaseMode) pin else pin.lowercase()
         cache().set(cacheKey(uniqueIdentifier), fixedPin.secureHash(), expiration)
         cache().set(attemptCacheKey(uniqueIdentifier), 0, expiration)

@@ -148,14 +148,15 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
 @Serializable
 @DatabaseModel
 @Suppress("ClassName")
+@IndexSet(["databaseId", "relevant"])
 data class __WebSocketDatabaseChangeSubscription(
     override val _id: WebSocketIdentifier,
-    @Index val databaseId: String,
+    val databaseId: String,
     val user: String?, //USER
     val condition: String, //Query<T>
     val mask: String, //Mask<T>
     val establishedAt: Instant,
-    @Index val relevant: Set<Int>? = null,
+    val relevant: Set<Int>? = null,
 ) : HasId<WebSocketIdentifier>
 
 fun <T, V> Condition<T>.relevantHashCodesForKey(key: KProperty1<T, V>): Set<Int>? = when(this) {
