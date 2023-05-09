@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.TestSettings
+import com.lightningkite.lightningserver.db.testmodels.TempThing
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.junit.Before
@@ -10,12 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-
-@DatabaseModel
-@Serializable
-data class TempThing(override val _id: Int): HasId<Int>
-
-class AbstractSignalFieldCollection {
+class AbstractSignalFieldCollectionTest {
 
     lateinit var collection: InMemoryFieldCollection<TempThing>
     val thing1 = TempThing(1)
@@ -26,6 +22,7 @@ class AbstractSignalFieldCollection {
     @Before
     fun setup() {
         prepareModels()
+        com.lightningkite.lightningserver.db.testmodels.prepareModels()
         collection = TestSettings.database().collection<TempThing>() as InMemoryFieldCollection
         collection.signals.clear()
     }

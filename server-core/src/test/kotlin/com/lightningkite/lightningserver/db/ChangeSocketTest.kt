@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.TestSettings
+import com.lightningkite.lightningserver.db.testmodels.TestThing
 import com.lightningkite.lightningserver.typed.test
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -14,14 +15,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ChangeSocketTest {
-    @Serializable
-    @DatabaseModel
-    data class TestThing(override val _id: UUID = UUID.randomUUID(), val value: Int = 0) : HasId<UUID>
 
     @Test
     fun test() {
         val database = TestSettings.database
         runBlocking {
+            com.lightningkite.lightningserver.db.testmodels.prepareModels()
             database().collection<TestThing>().deleteMany(Condition.Always())
             TestSettings.ws.test {
 
