@@ -31,7 +31,6 @@ dependencies {
 
     implementation("ch.qos.logback:logback-classic:$logBack")
 
-    api("com.lightningkite:kotliner-cli:1.0.3")
     implementation("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
 
     api("io.ktor:ktor-client-content-negotiation:$ktorVersion")

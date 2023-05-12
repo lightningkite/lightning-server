@@ -4,14 +4,13 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.db.testmodels.TempThing
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
 import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class AbstractSignalFieldCollectionTest {
+class TestAbstractSignalFieldCollection {
 
     lateinit var collection: InMemoryFieldCollection<TempThing>
     val thing1 = TempThing(1)
