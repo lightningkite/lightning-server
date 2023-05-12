@@ -5,13 +5,11 @@ import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.routing.bind
 import org.http4k.routing.websockets
-import org.http4k.server.PolyHandler
-import org.http4k.server.Undertow
-import org.http4k.server.asServer
+import org.http4k.server.*
 import org.http4k.websocket.Websocket
 import org.http4k.websocket.WsMessage
 
-fun runServer() {
+fun runServer(config: PolyServerConfig) {
 
     val http: (Request) -> Response = { request: Request ->
         println("Path: ${request.uri.path}")
@@ -36,8 +34,16 @@ fun runServer() {
             }
         }
     )
-    val service = PolyHandler(http, ws).asServer(Undertow(9000))
+    val service = PolyHandler(http, ws).asServer(config)
     service.start()
 
     service.block()
+}
+
+fun runUndertow(){
+    runServer(Undertow(9001))
+}
+
+fun runJetty(){
+    runServer(Jetty(9002))
 }

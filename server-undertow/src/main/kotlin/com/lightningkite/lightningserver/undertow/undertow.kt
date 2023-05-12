@@ -49,4 +49,3 @@ fun requiresWebSocketUpgrade(): (HttpServerExchange) -> Boolean = { httpServerEx
 
     containsValidConnectionHeader && containsValidUpgradeHeader
 }
-y

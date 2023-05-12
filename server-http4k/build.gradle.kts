@@ -20,6 +20,7 @@ dependencies {
     implementation(platform("org.http4k:http4k-bom:4.43.0.0"))
     implementation("org.http4k:http4k-core:4.43.0.0")
     implementation("org.http4k:http4k-server-undertow")
+    implementation("org.http4k:http4k-server-jetty")
 //    implementation("org.http4k:http4k-client-apache")
 
 
