@@ -13,7 +13,7 @@ import kotlin.test.fail
 
 class SimpleSignals {
 
-    lateinit var collection: FieldCollection<TempThing>
+    lateinit var collection: InMemoryFieldCollection<TempThing>
     val thing1 = TempThing(1)
     val thing2 = TempThing(2)
     val thing3 = TempThing(3)
@@ -27,7 +27,8 @@ class SimpleSignals {
     fun setup() {
         prepareModels()
         com.lightningkite.lightningserver.db.testmodels.prepareModels()
-        collection = TestSettings.database().collection<TempThing>()
+        collection = TestSettings.database().collection<TempThing>() as InMemoryFieldCollection
+        collection.drop()
     }
 
     @Test

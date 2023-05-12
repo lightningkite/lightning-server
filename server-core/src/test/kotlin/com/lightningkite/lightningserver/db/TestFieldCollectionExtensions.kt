@@ -12,19 +12,20 @@ import kotlin.test.assertEquals
 
 class TestFieldCollectionExtensions {
 
-    lateinit var collection: FieldCollection<TempThing>
+    lateinit var collection: InMemoryFieldCollection<TempThing>
 
     @Before
     fun setup() {
         prepareModels()
         com.lightningkite.lightningserver.db.testmodels.prepareModels()
-        collection = TestSettings.database().collection<TempThing>()
+        collection = TestSettings.database().collection<TempThing>() as InMemoryFieldCollection
+        collection.drop()
     }
 
     @Test
     fun testAll():Unit = runBlocking {
 
-        collection.insertMany(0.until(100).toList().map { TempThing(it) })
+        collection.insertMany((0 until 100).toList().map { TempThing(it) })
 
         assertEquals(100, collection.all().count())
 
