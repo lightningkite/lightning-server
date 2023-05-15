@@ -18,5 +18,5 @@ suspend inline fun <Model> Flow<Model>.collectChunked(chunkSize: Int, crossinlin
             list.clear()
         }
     }
-    action(list)
+    if(list.isNotEmpty()) action(list)
 }
