@@ -1,10 +1,24 @@
 package com.lightningkite.lightningserver.jetty
 
+import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.cors.extensionForEngineAddCors
+import com.lightningkite.lightningserver.exceptions.NotFoundException
+import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.serialization.toHttpContent
+import io.ktor.http.*
+import io.ktor.utils.io.jvm.javaio.*
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
 import org.eclipse.jetty.server.Request
 import org.eclipse.jetty.server.Server
+import org.eclipse.jetty.server.ServerConnector
 import org.eclipse.jetty.server.handler.AbstractHandler
+import org.eclipse.jetty.server.handler.AsyncDelayHandler
 import org.eclipse.jetty.server.handler.HandlerWrapper
 import org.eclipse.jetty.util.Callback
 import org.eclipse.jetty.util.Utf8StringBuilder
@@ -12,7 +26,25 @@ import org.eclipse.jetty.websocket.core.*
 import org.eclipse.jetty.websocket.core.server.WebSocketNegotiation
 import org.eclipse.jetty.websocket.core.server.WebSocketNegotiator
 import org.eclipse.jetty.websocket.core.server.WebSocketUpgradeHandler
+import java.nio.ByteBuffer
+import kotlin.io.copyTo
 
+
+suspend fun HttpResponse.adaptJetty(jettyResponse: HttpServletResponse) {
+    for (header in headers.entries) {
+        jettyResponse.setHeader(header.first, header.second)
+    }
+    jettyResponse.status = status.code
+    when (val b = body) {
+        null -> {}
+        is HttpContent.Binary -> jettyResponse.outputStream.write(b.bytes)
+        is HttpContent.Text -> jettyResponse.outputStream.write(b.bytes)
+        is HttpContent.OutStream -> b.write(jettyResponse.outputStream)
+        is HttpContent.Stream -> b.getStream().copyTo(jettyResponse.outputStream)
+        is HttpContent.Multipart -> TODO()
+    }
+    jettyResponse.contentType = body?.type.toString()
+}
 
 class LightningHttpHandler : HandlerWrapper() {
     override fun handle(
@@ -22,24 +54,53 @@ class LightningHttpHandler : HandlerWrapper() {
         response: HttpServletResponse
     ) {
 
-        println("This is my custom Handler")
-        println(target)
-        println(request.method)
-        println(request.contentType)
-        println(request.headerNames)
-        println(request.pathInfo)
-        println(request.queryString)
-        println(request.parameterMap)
+        runBlocking {
+            Http.matcher.match(target, HttpMethod(baseRequest.method.uppercase()))?.let { match ->
 
-        response.contentType = "application/json";
-        response.status = HttpServletResponse.SC_OK;
-        response.writer.println("{ \"status\": \"ok\"}");
-        baseRequest.isHandled = true
+                val lightningRequest = HttpRequest(
+                    endpoint = match.endpoint,
+                    parts = match.parts,
+                    wildcard = match.wildcard,
+                    queryParameters = baseRequest.parameterMap.toList()
+                        .flatMap { outer -> outer.second.map { outer.first to it.decodeURLPart() } },
+                    headers = HttpHeaders(
+                        baseRequest.headerNames.toList()
+                            .flatMap { outer -> baseRequest.getHeaders(outer).toList().map { outer to it } }),
+                    body = HttpContent.Stream(
+                        { baseRequest.inputStream },
+                        baseRequest.contentLengthLong,
+                        ContentType(baseRequest.contentType)
+                    ),
+                    domain = baseRequest.remoteHost,
+                    protocol = baseRequest.scheme,
+                    sourceIp = baseRequest.remoteAddr
+                )
+
+                val result = Http.execute(lightningRequest).extensionForEngineAddCors(lightningRequest)
+
+                result.adaptJetty(response)
+
+            }
+                ?: run {
+                    HttpResponse(
+                        body = LSError(
+                            HttpStatus.NotFound.code,
+                            message = "No matching path for '${target}' found",
+                        ).toHttpContent(listOf(ContentType(baseRequest.contentType))),
+                        status = HttpStatus.NotFound,
+                        headers = HttpHeaders.EMPTY
+                    )
+                        .adaptJetty(response)
+                }
+
+            baseRequest.isHandled = true
+        }
     }
-
 }
 
 class LightningWebSocketFrameHandler(negotiation: WebSocketNegotiation) : FrameHandler {
+
+    lateinit var session: CoreSession
 
     override fun onFrame(frame: Frame, callback: Callback) {
 //        try {
@@ -53,8 +114,18 @@ class LightningWebSocketFrameHandler(negotiation: WebSocketNegotiation) : FrameH
 //                    }
 //                }
 //            }
+        val incomingMessage = frame.payloadAsUTF8
         println(frame.payloadAsUTF8)
-            callback.succeeded()
+//        callback.completeWith()
+        callback.succeeded()
+        session.sendFrame(
+            Frame(
+                OpCode.TEXT,
+                incomingMessage
+            ),
+            object : Callback {},
+            false,
+        )
 //        } catch (e: Throwable) {
 //            websocket?.triggerError(e)
 //            callback.failed(e)
@@ -62,6 +133,7 @@ class LightningWebSocketFrameHandler(negotiation: WebSocketNegotiation) : FrameH
     }
 
     override fun onOpen(session: CoreSession, callback: Callback) {
+        this.session = session
 //        websocket = object : PushPullAdaptingWebSocket(upgradeRequest) {
 //            override fun send(message: WsMessage) {
 //                session.sendFrame(
@@ -91,10 +163,21 @@ class LightningWebSocketFrameHandler(negotiation: WebSocketNegotiation) : FrameH
     }
 }
 
+@Serializable
+data class TempThing(
+    val id: Int,
+    val path: String
+)
 
 fun runServer() {
 
-    val server = Server(8080)
+
+    val server = Server()
+
+    server.connectors = arrayOf(ServerConnector(server).apply {
+        port = 8941
+        this.acceptQueueSize
+    })
     val httpHandler = LightningHttpHandler()
     server.insertHandler(httpHandler)
 
@@ -105,6 +188,13 @@ fun runServer() {
     }
 
     server.insertHandler(wsHandler)
+
+    Http.endpoints[HttpEndpoint(
+        "index",
+        HttpMethod.GET
+    )] = { request ->
+        HttpResponse(HttpContent.json(TempThing(22, request.wildcard ?: "")))
+    }
 
     server.start()
     server.join()
