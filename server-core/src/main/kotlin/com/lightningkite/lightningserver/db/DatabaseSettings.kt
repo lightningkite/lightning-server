@@ -61,12 +61,12 @@ class InMemoryDatabase(val premadeData: JsonObject? = null) : Database {
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> = collections.getOrPut(name) {
-        val made = InMemoryFieldCollection<T>()
+        val serializer = Serialization.Internal.json.serializersModule.serializer(type) as KSerializer<T>
+        val made = InMemoryFieldCollection(serializer = serializer)
         premadeData?.get(name)?.let {
             val data = Serialization.Internal.json.decodeFromJsonElement(
-                ListSerializer(
-                    Serialization.Internal.json.serializersModule.serializer(type) as KSerializer<T>
-                ), it
+                ListSerializer(serializer),
+                it
             )
             made.data.addAll(data)
         }

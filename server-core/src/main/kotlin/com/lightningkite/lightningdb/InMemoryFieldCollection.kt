@@ -1,7 +1,11 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.lightningserver.exceptions.BadRequestException
+import io.ktor.util.reflect.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.KSerializer
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlin.reflect.KProperty1
@@ -10,10 +14,45 @@ import kotlin.reflect.KProperty1
  * A FieldCollection who's underlying implementation is actually manipulating a MutableList.
  * This is useful for times that an actual database is not needed, and you need to move fast, such as during Unit Tests.
  */
-open class InMemoryFieldCollection<Model : Any>(val data: MutableList<Model> = ArrayList()) :
+open class InMemoryFieldCollection<Model : Any>(
+    val data: MutableList<Model> = ArrayList(),
+    val serializer: KSerializer<Model>
+) :
     AbstractSignalFieldCollection<Model>() {
 
     private val lock = ReentrantLock()
+
+    private val uniqueIndexChecks = ConcurrentLinkedQueue<(List<EntryChange<Model>>) -> Unit>()
+
+    private fun uniqueCheck(changed: EntryChange<Model>) = uniqueCheck(listOf(changed))
+    private fun uniqueCheck(changes: List<EntryChange<Model>>) = uniqueIndexChecks.forEach { it(changes) }
+
+    init {
+        serializer.descriptor.indexes().forEach { index: NeededIndex ->
+            if (index.unique) {
+                val fields =
+                    serializer.attemptGrabFields().filterKeys { index.fields.contains(it) }.values.map { it.property }
+                uniqueIndexChecks.add { changes: List<EntryChange<Model>> ->
+                    val fieldChanges = changes.mapNotNull { entryChange ->
+                        if (
+                            (entryChange.old == null && entryChange.new != null) ||
+                            (entryChange.old != null &&
+                                    entryChange.new != null &&
+                                    fields.any { it.get(entryChange.old!!) != it.get(entryChange.new!!) })
+                        )
+                            fields.map { it to it.get(entryChange.new!!) }
+                        else
+                            null
+                    }
+                    fieldChanges.forEach { fieldValues ->
+                        if (data.any { fromDb -> fieldValues.all { (property, value) -> property.get(fromDb) == value } }) {
+                            throw BadRequestException("Unique Index Violation. The following fields are already in the database: ${fieldValues.joinToString { (property, value) -> "${property.name}: $value" }}")
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     override suspend fun find(
         condition: Condition<Model>,
@@ -63,6 +102,7 @@ open class InMemoryFieldCollection<Model : Any>(val data: MutableList<Model> = A
         .mapNotNull { groupBy.get(it) to (property.get(it)?.toDouble() ?: return@mapNotNull null) }.aggregate(aggregate)
 
     override suspend fun insertImpl(models: Iterable<Model>): List<Model> = lock.withLock {
+        uniqueCheck(models.map { EntryChange(null, it) })
         data.addAll(models)
         return models.toList()
     }
@@ -75,8 +115,10 @@ open class InMemoryFieldCollection<Model : Any>(val data: MutableList<Model> = A
         for (it in sortIndices(orderBy)) {
             val old = data[it]
             if (condition(old)) {
+                val changed = EntryChange(old, model)
+                uniqueCheck(changed)
                 data[it] = model
-                return EntryChange(old, model)
+                return changed
             }
         }
         return EntryChange(null, null)
@@ -98,9 +140,11 @@ open class InMemoryFieldCollection<Model : Any>(val data: MutableList<Model> = A
         for (it in data.indices) {
             val old = data[it]
             if (condition(old)) {
-                val changed = modification(old)
-                data[it] = changed
-                return EntryChange(old, changed)
+                val new = modification(old)
+                val changed = EntryChange(old, new)
+                uniqueCheck(changed)
+                data[it] = new
+                return changed
             }
         }
         data.add(model)
@@ -116,8 +160,10 @@ open class InMemoryFieldCollection<Model : Any>(val data: MutableList<Model> = A
             val old = data[it]
             if (condition(old)) {
                 val new = modification(old)
+                val changed = EntryChange(old, new)
+                uniqueCheck(changed)
                 data[it] = new
-                return EntryChange(old, new)
+                return changed
             }
         }
         return EntryChange(null, null)
@@ -127,18 +173,20 @@ open class InMemoryFieldCollection<Model : Any>(val data: MutableList<Model> = A
         condition: Condition<Model>,
         modification: Modification<Model>,
     ): CollectionChanges<Model> = lock.withLock {
-        val changes = ArrayList<EntryChange<Model>>()
-        var counter = 0
-        data.indices.forEach {
-            val old = data[it]
-            if (condition(old)) {
-                val new = modification(old)
-                data[it] = new
-                changes.add(EntryChange(old, new))
-                counter++
+        return data.indices
+            .mapNotNull {
+                val old = data[it]
+                if (condition(old)) {
+                    val new = modification(old)
+                    it to EntryChange(old, new)
+                } else null
             }
-        }
-        return CollectionChanges(changes = changes)
+            .let {
+                val changes = it.map { it.second }
+                uniqueCheck(changes)
+                it.forEach { (index, change) -> data[index] = change.new!! }
+                CollectionChanges(changes = changes)
+            }
     }
 
     override suspend fun deleteOneImpl(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? =
