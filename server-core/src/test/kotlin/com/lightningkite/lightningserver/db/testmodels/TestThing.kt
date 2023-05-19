@@ -2,10 +2,7 @@
 
 package com.lightningkite.lightningserver.db.testmodels
 
-import com.lightningkite.lightningdb.DatabaseModel
-import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.Unique
-import com.lightningkite.lightningdb.UniqueSet
+import com.lightningkite.lightningdb.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import java.util.*
@@ -43,4 +40,27 @@ data class UniqueComboClass(
     @Unique val unique1: Int,
     val uniqueSet1: Int,
     val uniqueSet2: Int,
+) : HasId<Int>
+
+@DatabaseModel
+@Serializable
+@UniqueSetJankPatch(["uniqueSet1", "uniqueSet2", ":", "uniqueSet3", "uniqueSet4"])
+data class UniqueSetJankClass(
+    override val _id: Int,
+    val uniqueSet1: Int,
+    val uniqueSet2: Int,
+    val uniqueSet3: Int,
+    val uniqueSet4: Int,
+) : HasId<Int>
+
+@DatabaseModel
+@Serializable
+@UniqueSetJankPatch(["uniqueSet1", "uniqueSet2", ":", "uniqueSet3", "uniqueSet4"])
+data class UniqueComboJankClass(
+    override val _id: Int,
+    @Unique val unique1: Int,
+    val uniqueSet1: Int,
+    val uniqueSet2: Int,
+    val uniqueSet3: Int,
+    val uniqueSet4: Int,
 ) : HasId<Int>
