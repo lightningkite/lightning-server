@@ -63,7 +63,7 @@ object ExternalServerFileSerializer : KSerializer<ServerFile> {
                 type.extension ?: "bin"
             )
             runBlocking {
-                file.write(HttpContent.Binary(data, type))
+                file.put(HttpContent.Binary(data, type))
             }
             return ServerFile(file.url)
         } else {

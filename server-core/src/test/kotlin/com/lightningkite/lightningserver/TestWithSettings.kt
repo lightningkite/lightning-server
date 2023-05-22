@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.db.ChangeSocketTest
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.db.ModelInfo
 import com.lightningkite.lightningserver.db.restApiWebsocket
+import com.lightningkite.lightningserver.db.testmodels.TestThing
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.engine.UnitTestEngine
 import com.lightningkite.lightningserver.engine.engine
@@ -26,10 +27,14 @@ object TestSettings {
     val oauthGoogle = setting<OauthProviderCredentials?>("oauth-google", null)
     val oauthApple = setting<OauthProviderCredentials?>("oauth-apple", null)
     val oauthGithub = setting<OauthProviderCredentials?>("oauth-github", null)
-    val ws = ServerPath("test").restApiWebsocket<Unit, ChangeSocketTest.TestThing, UUID>(database, ModelInfo(
+    val ws = ServerPath("test").restApiWebsocket<Unit, TestThing, UUID>(database, ModelInfo(
         getCollection = { database().collection() },
         forUser = { this }
     ))
+    val ws2 = ServerPath("test2").restApiWebsocket<Unit, TestThing, UUID>(database, ModelInfo(
+        getCollection = { database().collection() },
+        forUser = { this }
+    ), TestThing::_id)
 
     init {
         Settings.populateDefaults(

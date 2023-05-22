@@ -210,6 +210,12 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
         })
     }
 
+    suspend fun handleExpire(id: String) {
+        runActionResult(
+            info.collection().get(id) ?: return
+        )
+    }
+
     init {
         Tasks.onSettingsReady { api().ready(this) }
     }

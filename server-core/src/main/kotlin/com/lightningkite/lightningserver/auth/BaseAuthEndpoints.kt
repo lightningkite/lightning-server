@@ -9,6 +9,14 @@ import com.lightningkite.lightningserver.typed.typed
 import kotlinx.serialization.builtins.serializer
 import java.time.Duration
 
+/**
+ * Implements a basic set of authentication endpoints for you.
+ * Must be used in concert with some kind of authentication mechanism, such as the ones in [EmailAuthEndpoints] or [SmsAuthEndpoints].
+ * @param path The path to host the endpoints at.  Highly recommend using 'auth'.
+ * @param userAccess Rules to access the user users, wherever they may be stored.  Typically obtained through [userEmailAccess] or similar.
+ * @param landing The landing page for after a user is authenticated.  Defaults to the root.
+ * @param handleToken The action to perform upon obtaining the token.  Defaults to redirecting to [landing], but respects paths given in the `destination` query parameter.
+ */
 open class BaseAuthEndpoints<USER : Any, ID>(
     path: ServerPath,
     val userAccess: UserAccess<USER, ID>,
@@ -23,6 +31,9 @@ open class BaseAuthEndpoints<USER : Any, ID>(
         )
     }
 ) : ServerPathGroup(path) {
+    /**
+     * The [JwtTypedAuthorizationHandler.AuthType] associated with this set of auth endpoints.
+     */
     val authType = object : JwtTypedAuthorizationHandler.AuthType<USER> {
         override val name: String
             get() = userAccess.authInfo.type!!
@@ -36,27 +47,46 @@ open class BaseAuthEndpoints<USER : Any, ID>(
             Serialization.toString(userAccess.id(item), userAccess.idSerializer)
     }
 
+    /**
+     * A reference to the [JwtTypedAuthorizationHandler] that has been set in [Authentication].
+     */
     val typedHandler = JwtTypedAuthorizationHandler.current(jwtSigner)
 
     init {
         typedHandler.types.add(authType)
-        typedHandler.defaultType = authType
+        if (typedHandler.defaultType == null) {
+            typedHandler.defaultType = authType
+        }
         path.docName = "Auth"
     }
 
+    /**
+     * Creates a JWT representing the given [user].
+     */
     fun token(user: USER, expireDuration: Duration = jwtSigner().expiration): String =
         typedHandler.token(user, expireDuration)
 
+    /**
+     * Gives an [HttpResponse] that logs in the user with the given [token].
+     */
     fun redirectToLanding(token: String): HttpResponse =
         HttpResponse.redirectToGet(landingRoute.path.toString() + "?jwt=${token}")
 
+    /**
+     * Gives an [HttpResponse] that logs in as the given [user].
+     */
     fun redirectToLanding(user: USER): HttpResponse =
         HttpResponse.redirectToGet(landingRoute.path.toString() + "?jwt=${token(user, Duration.ofMinutes(5))}")
 
+    /**
+     * The landing endpoint that users arrive at after authenticating through any method.
+     * Defers to [handleToken].
+     */
     val landingRoute: HttpEndpoint = path("login-landing").get.handler {
         val subject = jwtSigner().verify(it.queryParameter("jwt")!!)
         it.handleToken(jwtSigner().token(subject))
     }
+
     val refreshToken = path("refresh-token").get.typed(
         authInfo = userAccess.authInfo,
         inputType = Unit.serializer(),

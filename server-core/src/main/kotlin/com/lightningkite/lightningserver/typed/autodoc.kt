@@ -180,6 +180,10 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                                             +desc.getElementName(index)
                                             +": "
                                             type(part)
+                                            desc.getElementAnnotations(index).filterIsInstance<Description>().firstOrNull()?.let {
+                                                +" - "
+                                                +it.text
+                                            }
                                         }
                                     }
                                 }

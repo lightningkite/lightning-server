@@ -45,7 +45,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         }
     }
 
-    override suspend fun info(): FileInfo? = withContext(Dispatchers.IO) {
+    override suspend fun head(): FileInfo? = withContext(Dispatchers.IO) {
         try {
             system.s3Async.headObject {
                 it.bucket(system.bucket)
@@ -60,7 +60,16 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         }
     }
 
-    override suspend fun write(content: HttpContent) {
+    override suspend fun read(): InputStream = withContext(Dispatchers.IO) {
+        system.s3.getObject(
+            GetObjectRequest.builder().also {
+                it.bucket(system.bucket)
+                it.key(path.unixPath)
+            }.build()
+        )
+    }
+
+    override suspend fun put(content: HttpContent) {
         withContext(Dispatchers.IO) {
             system.s3.putObject(PutObjectRequest.builder().also {
                 it.bucket(system.bucket)
@@ -74,12 +83,17 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         }
     }
 
-    override suspend fun read(): InputStream = withContext(Dispatchers.IO) {
-        system.s3.getObject(
+    override suspend fun get(): HttpContent? {
+        val s = system.s3.getObject(
             GetObjectRequest.builder().also {
                 it.bucket(system.bucket)
                 it.key(path.unixPath)
             }.build()
+        )
+        return HttpContent.Stream(
+            getStream = { s },
+            length = s.response().contentLength(),
+            type = ContentType(s.response().contentType())
         )
     }
 

@@ -5,19 +5,14 @@ import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import net.schmizz.sshj.Config
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.OpenMode
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
-import net.schmizz.sshj.xfer.FileSystemFile
-import net.schmizz.sshj.xfer.LocalDestFile
 import java.io.File
-import java.io.InputStream
 import java.time.Duration
 import java.time.Instant
-import java.util.*
 
 class Sftp(
     val host: String,
@@ -30,7 +25,7 @@ class Sftp(
         init {
             FilesSettings.register("sftp") { settings ->
                 Regex("""sftp://(?<user>[^@]+)@(?<host>[^:]+):(?<port>[0-9]+)/(?<path>[^?]*)\?(?<params>.*)""").matchEntire(
-                    settings.storageUrl
+                    settings.url
                 )?.let { match ->
                     val host = match.groups["host"]!!.value
                     val port = match.groups["port"]!!.value.toInt()
@@ -101,7 +96,7 @@ class Sftp(
             }
         }
 
-        override suspend fun info(): FileInfo? = withContext(Dispatchers.IO) {
+        override suspend fun head(): FileInfo? = withContext(Dispatchers.IO) {
             system.withClient {
                 try {
                     this.stat(sftpPath)?.let {
@@ -118,7 +113,7 @@ class Sftp(
             }
         }
 
-        override suspend fun write(content: HttpContent) = withContext(Dispatchers.IO) {
+        override suspend fun put(content: HttpContent) = withContext(Dispatchers.IO) {
             val stream = content.stream()
             system.withClient {
                 path.parent?.let { this.mkdirs(it) }
@@ -133,7 +128,7 @@ class Sftp(
             Unit
         }
 
-        override suspend fun read(): InputStream = withContext(Dispatchers.IO) {
+        override suspend fun get(): HttpContent? = withContext(Dispatchers.IO) {
             val file = File.createTempFile("temp", ".file")
             system.withClient {
                 println("$sftpPath -> ${file.path}")
@@ -145,7 +140,10 @@ class Sftp(
                     }
                 }
             }
-            file.inputStream()
+            HttpContent.file(
+                file,
+                ContentType.fromExtension(sftpPath.substringAfterLast('.'))
+            )
         }
 
         override suspend fun delete() = withContext(Dispatchers.IO) {

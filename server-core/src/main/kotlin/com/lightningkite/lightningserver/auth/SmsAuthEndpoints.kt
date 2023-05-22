@@ -11,6 +11,9 @@ import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
 import java.time.Duration
 
+/**
+ * Authentication endpoints for logging in with SMS PINs.
+ */
 open class SmsAuthEndpoints<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val phoneAccess: UserPhoneAccess<USER, ID>,

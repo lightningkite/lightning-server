@@ -52,55 +52,31 @@ class SesClient(
         .region(region)
         .credentialsProvider(credentialProvider)
         .build()
-    override suspend fun send(
+
+    override suspend fun sendHtml(
         subject: String,
         to: List<String>,
-        message: String,
-        htmlMessage: String?,
+        html: String,
+        plainText: String,
         attachments: List<Attachment>
     ) {
-        val email = if (htmlMessage == null) {
-            if (attachments.isEmpty()) {
-                SimpleEmail().setMsg(message)
-            } else {
-                val multiPart = MultiPartEmail()
-                multiPart.setMsg(message)
-                attachments.forEach {
-                    val attachment = EmailAttachment()
-                    attachment.disposition = EmailAttachment.ATTACHMENT
-                    attachment.description = it.description
-                    attachment.name = it.name
-                    when (it) {
-                        is Attachment.Remote -> {
-                            attachment.url = it.url
-                        }
-                        is Attachment.Local -> {
-                            attachment.path = it.file.absolutePath
-                        }
-                    }
-                    multiPart.attach(attachment)
+        val email = HtmlEmail()
+        email.setHtmlMsg(html)
+        email.setTextMsg(plainText)
+        attachments.forEach {
+            val attachment = EmailAttachment()
+            attachment.disposition = EmailAttachment.ATTACHMENT
+            attachment.description = it.description
+            attachment.name = it.name
+            when (it) {
+                is Attachment.Remote -> {
+                    attachment.url = it.url
                 }
-                multiPart
-            }
-        } else{
-            val email = HtmlEmail()
-            email.setHtmlMsg(htmlMessage)
-            attachments.forEach {
-                val attachment = EmailAttachment()
-                attachment.disposition = EmailAttachment.ATTACHMENT
-                attachment.description = it.description
-                attachment.name = it.name
-                when (it) {
-                    is Attachment.Remote -> {
-                        attachment.url = it.url
-                    }
-                    is Attachment.Local -> {
-                        attachment.path = it.file.absolutePath
-                    }
+                is Attachment.Local -> {
+                    attachment.path = it.file.absolutePath
                 }
-                email.attach(attachment)
             }
-            email
+            email.attach(attachment)
         }
         email.subject = subject
         email.addTo(*to.toTypedArray())

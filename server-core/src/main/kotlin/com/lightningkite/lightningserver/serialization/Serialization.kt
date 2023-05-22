@@ -63,6 +63,7 @@ abstract class Serialization {
             hasHeaderRecord = true
             ignoreUnknownColumns = true
             serializersModule = module
+            trimUnquotedWhitespace = true
         }
     }
     val yaml: Yaml by SetOnce {

@@ -3,6 +3,9 @@ package com.lightningkite.lightningdb
 import kotlinx.serialization.Serializable
 import kotlin.reflect.KProperty1
 
+/**
+ * Rules about how outgoing data should be masked to prevent unwanted information from leaking.
+ */
 @Serializable
 data class Mask<T>(
     /**
@@ -10,6 +13,9 @@ data class Mask<T>(
      */
     val pairs: List<Pair<Condition<T>, Modification<T>>> = listOf()
 ) {
+    /**
+     * Masks a single instance.
+     */
     operator fun invoke(on: T): T {
         var value = on
         for (pair in pairs) {
@@ -18,6 +24,9 @@ data class Mask<T>(
         return value
     }
 
+    /**
+     * Check under what conditions a given sort should be permitted.
+     */
     fun permitSort(on: List<SortPart<T>>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
         for (pair in pairs) {
@@ -30,6 +39,9 @@ data class Mask<T>(
         }
     }
 
+    /**
+     * Check under what conditions a property should be accessible.
+     */
     operator fun invoke(on: KProperty1<T, *>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
         for (pair in pairs) {
@@ -42,6 +54,9 @@ data class Mask<T>(
         }
     }
 
+    /**
+     * Adds additional restrictions to a condition to prevent a leak of information
+     */
     operator fun invoke(condition: Condition<T>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
         for (pair in pairs) {
@@ -54,15 +69,25 @@ data class Mask<T>(
         }
     }
 
+    /**
+     * A helper class for building a mask.
+     */
     class Builder<T>(
         val pairs: ArrayList<Pair<Condition<T>, Modification<T>>> = ArrayList()
     ) {
         val it = startChain<T>()
+
+        fun <V> PropChain<T, V>.mask(value: V, unless: Condition<T> = Condition.Always()) {
+            pairs.add(unless to mapModification(Modification.Assign(value)))
+        }
+
+        @Deprecated("Replaced with functions that cause fewer mistakes - try mask instead.")
         infix fun <V> PropChain<T, V>.maskedTo(value: V) = mapModification(Modification.Assign(value))
+        @Deprecated("Replaced with functions that cause fewer mistakes - try mask instead.")
         infix fun Modification<T>.unless(condition: Condition<T>) {
             pairs.add(condition to this)
         }
-
+        @Deprecated("Replaced with functions that cause fewer mistakes - try mask instead.")
         fun always(modification: Modification<T>) {
             pairs.add(Condition.Never<T>() to modification)
         }
@@ -74,6 +99,9 @@ data class Mask<T>(
     }
 }
 
+/**
+ * DSL for creating a [Mask].
+ */
 inline fun <T> mask(builder: Mask.Builder<T>.() -> Unit): Mask<T> {
     return Mask.Builder<T>().apply(builder).build()
 }

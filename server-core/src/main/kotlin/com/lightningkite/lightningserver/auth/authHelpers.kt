@@ -9,15 +9,34 @@ import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 
-
+/**
+ * Gets a user's JWT out of the following sources, prioritized in order:
+ * - `jwt` query parameter
+ * - `Authorization` header (removing the prefix 'Bearer ')
+ * - `Authorization` cookie (removing the prefix 'Bearer ')
+ */
 fun HttpRequest.jwt(): String? = queryParameter("jwt") ?: headers[HttpHeader.Authorization]?.removePrefix("Bearer ")
 ?: headers.cookies[HttpHeader.Authorization]?.removePrefix("Bearer ")
 
+/**
+ * Gets a user's JWT out of the following sources, prioritized in order:
+ * - `jwt` query parameter
+ * - `Authorization` header (removing the prefix 'Bearer ')
+ * - `Authorization` cookie (removing the prefix 'Bearer ')
+ */
 fun WebSockets.ConnectEvent.jwt(): String? =
     queryParameter("jwt") ?: headers[HttpHeader.Authorization]?.removePrefix("Bearer ")
     ?: headers.cookies[HttpHeader.Authorization]?.removePrefix("Bearer ")
 
-suspend fun HttpRequest.rawUser(): Any? = Authorization.handler.http(this)
+/**
+ * Shortcut for using the [Authentication] handler to get the user.
+ */
+suspend fun HttpRequest.rawUser(): Any? = Authentication.handler.http(this)
+
+/**
+ * Shortcut for using the [Authentication] handler to get the user.
+ * Requires the user match the [USER] type or throws a [UnauthorizedException].
+ */
 suspend inline fun <reified USER> HttpRequest.user(): USER {
     val raw = rawUser()
     raw?.let { it as? USER }?.let { return it }
@@ -31,7 +50,14 @@ suspend inline fun <reified USER> HttpRequest.user(): USER {
     }
 }
 
-suspend fun WebSockets.ConnectEvent.rawUser(): Any? = Authorization.handler.ws(this)
+/**
+ * Shortcut for using the [Authentication] handler to get the user.
+ */
+suspend fun WebSockets.ConnectEvent.rawUser(): Any? = Authentication.handler.ws(this)
+/**
+ * Shortcut for using the [Authentication] handler to get the user.
+ * Requires the user match the [USER] type or throws a [UnauthorizedException].
+ */
 suspend inline fun <reified USER> WebSockets.ConnectEvent.user(): USER {
     val raw = rawUser()
     raw?.let { it as? USER }?.let { return it }
@@ -44,41 +70,3 @@ suspend inline fun <reified USER> WebSockets.ConnectEvent.user(): USER {
         )
     }
 }
-
-inline fun <reified T> HttpRequest.jwt(jwtSigner: JwtSigner): T? = jwt(jwtSigner, Serialization.module.serializer())
-fun <T> HttpRequest.jwt(jwtSigner: JwtSigner, serializer: KSerializer<T>): T? =
-    jwt()?.let {
-        try {
-            jwtSigner.verify(serializer, it)
-        } catch (e: UnauthorizedException) {
-            throw UnauthorizedException(
-                message = e.message,
-                detail = e.detail.takeUnless { it.isBlank() } ?: "jwt",
-                cause = e,
-                data = e.data,
-                headers = HttpHeaders.Builder().apply {
-                    setCookie(HttpHeader.Authorization, "deleted", maxAge = 0)
-                }.build()
-            )
-        }
-    }
-
-inline fun <reified T> WebSockets.ConnectEvent.jwt(jwtSigner: JwtSigner): T? =
-    jwt(jwtSigner, Serialization.module.serializer())
-
-fun <T> WebSockets.ConnectEvent.jwt(jwtSigner: JwtSigner, serializer: KSerializer<T>): T? =
-    jwt()?.let {
-        try {
-            jwtSigner.verify(serializer, it)
-        } catch (e: UnauthorizedException) {
-            throw UnauthorizedException(
-                message = e.message,
-                detail = e.detail.takeUnless { it.isBlank() } ?: "jwt",
-                cause = e,
-                data = e.data,
-                headers = HttpHeaders.Builder().apply {
-                    setCookie(HttpHeader.Authorization, "deleted", maxAge = 0)
-                }.build()
-            )
-        }
-    }

@@ -48,9 +48,21 @@ Built to work for all common serverless platforms.
 
 ## Documentation
 
-- [Documentation](documentation.md)
-- [Quick Function List](docs-feature-list.md)
-- [Demo Project](demo/src/main/kotlin)
+- [Client Documentation](docs/use-as-client.md)
+- [Set Up](docs/setup.md)
+- [Settings](docs/settings.md)
+- [Endpoints](docs/endpoints.md)
+- [Serialization](docs/serialization.md)
+- [Database](docs/database.md)
+- [Cache](docs/cache.md)
+- [Files](docs/files.md)
+- [Email](docs/email.md)
+- [Authentication](docs/authentication.md)
+- [Typed Endpoints](docs/typed-endpoints.md)
+- [Automatic REST Endpoints](docs/autorest.md)
+- [Tasks](docs/tasks.md)
+- [Websockets](docs/websockets.md) (todo)
+- [Meta](docs/meta.md)
 
 ## Road Map
 

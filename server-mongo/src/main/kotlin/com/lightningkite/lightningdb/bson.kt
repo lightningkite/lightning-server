@@ -42,7 +42,7 @@ fun documentOf(vararg pairs: Pair<String, Any?>): Document {
     }
 }
 
-fun Condition<*>.dump(into: Document = Document(), key: String?): Document {
+private fun Condition<*>.dump(into: Document = Document(), key: String?): Document {
     when (this) {
         is Condition.Always -> {}
         is Condition.Never -> into["thisFieldWillNeverExist"] = "no never"
@@ -93,7 +93,7 @@ fun Condition<*>.dump(into: Document = Document(), key: String?): Document {
     return into
 }
 
-fun Modification<*>.dump(update: UpdateWithOptions = UpdateWithOptions(), key: String?): UpdateWithOptions {
+private fun Modification<*>.dump(update: UpdateWithOptions = UpdateWithOptions(), key: String?): UpdateWithOptions {
     val into = update.document
     when(this) {
         is Modification.Chain -> modifications.forEach { it.dump(update, key) }
@@ -159,8 +159,8 @@ data class UpdateWithOptions(
     var options: UpdateOptions = UpdateOptions()
 )
 
-fun Condition<*>.bson() = Document().also { simplify().dump(it, null) }
-fun Modification<*>.bson(): UpdateWithOptions = UpdateWithOptions().also { simplify().dump(it, null) }
+fun Condition<*>.bson() = Document().also { dump(it, null) }
+fun Modification<*>.bson(): UpdateWithOptions = UpdateWithOptions().also { dump(it, null) }
 fun <T> UpdateWithOptions.upsert(model: T, serializer: KSerializer<T>): Boolean {
     val set = (document["\$set"] as? Document) ?: document["\$set"]?.let { MongoDatabase.bson.stringify(serializer, it as T) }?.toDocument()
     val inc = (document["\$inc"] as? Document)

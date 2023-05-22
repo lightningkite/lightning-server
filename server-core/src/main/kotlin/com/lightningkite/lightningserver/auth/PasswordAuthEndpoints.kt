@@ -8,6 +8,10 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
 
+/**
+ * Authentication via password.
+ * Strongly not recommended.
+ */
 open class PasswordAuthEndpoints<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val info: UserPasswordAccess<USER, ID>

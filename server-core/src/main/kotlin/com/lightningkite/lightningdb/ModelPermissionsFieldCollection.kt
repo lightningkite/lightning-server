@@ -4,6 +4,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlin.reflect.KProperty1
 
+/**
+ * Uses [ModelPermissions] to secure a [FieldCollection].
+ */
 open class ModelPermissionsFieldCollection<Model : Any>(
     override val wraps: FieldCollection<Model>,
     val permissions: ModelPermissions<Model>
