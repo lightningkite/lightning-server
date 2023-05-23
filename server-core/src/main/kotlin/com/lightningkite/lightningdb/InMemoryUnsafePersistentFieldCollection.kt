@@ -13,9 +13,13 @@ import java.util.*
  */
 class InMemoryUnsafePersistentFieldCollection<Model : Any>(
     val encoding: StringFormat,
-    val serializer: KSerializer<Model>,
+    serializer: KSerializer<Model>,
     val file: File
-) : InMemoryFieldCollection<Model>(data = Collections.synchronizedList(ArrayList())), Closeable {
+) : InMemoryFieldCollection<Model>(
+    data = Collections.synchronizedList(ArrayList()),
+    serializer = serializer
+),
+    Closeable {
     init {
         var closing = false
         data.addAll(
