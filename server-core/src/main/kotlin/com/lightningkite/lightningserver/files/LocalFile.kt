@@ -18,6 +18,8 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
     init {
         if (!file.absolutePath.startsWith(system.rootFile.absolutePath)) throw IllegalStateException()
     }
+    override val name: String
+        get() = file.name
 
     override fun resolve(path: String): FileObject = LocalFile(system, file.resolve(path).absoluteFile)
 

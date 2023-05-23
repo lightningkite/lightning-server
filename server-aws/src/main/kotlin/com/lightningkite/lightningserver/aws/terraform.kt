@@ -206,7 +206,7 @@ internal fun handlers() {
             appendLine(
                 """
                 resource "aws_s3_bucket" "${key}" {
-                  bucket_prefix = "${namePrefixPathSegment}-${key}"
+                  bucket_prefix = "${namePrefixPathSegment}-${key.lowercase()}"
                   force_destroy = var.debug
                 }
                 resource "aws_s3_bucket_cors_configuration" "${key}" {
@@ -248,10 +248,10 @@ internal fun handlers() {
                 }
                 POLICY
                 }
-                resource "aws_s3_bucket_acl" "${key}" {
-                  bucket = aws_s3_bucket.${key}.id
-                  acl    = var.${key}_expiry == null ? "public-read" : "private" 
-                }
+                # resource "aws_s3_bucket_acl" "${key}" {
+                #   bucket = aws_s3_bucket.${key}.id
+                #   acl    = var.${key}_expiry == null ? "public-read" : "private" 
+                # }
                 resource "aws_iam_policy" "${key}" {
                   name        = "${namePrefix}-${key}"
                   path = "/${namePrefixPath}/${key}/"
@@ -1391,10 +1391,10 @@ internal fun awsLambdaHandler(
           bucket_prefix = "${project.namePrefixPathSegment}-lambda-bucket"
           force_destroy = true
         }
-        resource "aws_s3_bucket_acl" "lambda_bucket" {
-          bucket = aws_s3_bucket.lambda_bucket.id
-          acl    = "private"
-        }
+        # resource "aws_s3_bucket_acl" "lambda_bucket" {
+        #   bucket = aws_s3_bucket.lambda_bucket.id
+        #   acl    = "private"
+        # }
         resource "aws_iam_policy" "lambda_bucket" {
           name        = "${project.namePrefix}-lambda_bucket"
           path = "/${project.namePrefixPath}/lambda_bucket/"

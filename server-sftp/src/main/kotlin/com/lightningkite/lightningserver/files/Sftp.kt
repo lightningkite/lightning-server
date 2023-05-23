@@ -78,6 +78,8 @@ class Sftp(
 
     data class SftpFile(val system: Sftp, val path: File) : FileObject {
         override fun resolve(path: String): FileObject = SftpFile(system, this.path.resolve(path))
+        override val name: String
+            get() = path.name
 
         val sftpPath = if (path.path.startsWith('/')) path.path else "./${path.path}"
 
