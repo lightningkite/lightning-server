@@ -19,6 +19,8 @@ import javax.crypto.spec.SecretKeySpec
 
 data class S3File(val system: S3FileSystem, val path: File) : FileObject {
     override fun resolve(path: String): FileObject = S3File(system, this.path.resolve(path))
+    override val name: String
+        get() = path.name
 
     override val parent: FileObject?
         get() = path.parentFile?.let { S3File(system, path) } ?: if (path.unixPath.isNotEmpty()) system.root else null

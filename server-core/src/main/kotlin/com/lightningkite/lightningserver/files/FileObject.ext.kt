@@ -51,3 +51,6 @@ suspend fun FileObject.toHttpContent(): HttpContent? = this.get()
 suspend fun FileObject.copyTo(other: FileObject) {
     other.put(this.toHttpContent() ?: throw IOException("File disappeared or changed during transfer"))
 }
+
+val FileObject.nameWithoutExtension: String get() = this.name.substringBeforeLast('.')
+val FileObject.extension: String get() = this.name.substringAfterLast('.', "")
