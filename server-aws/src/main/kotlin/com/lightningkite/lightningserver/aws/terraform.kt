@@ -111,7 +111,9 @@ internal data class TerraformSection(
                             setting.serializer,
                             it
                         )
-                    })
+                    },
+                    nullable = setting.serializer.descriptor.isNullable
+                ),
             ),
             toLightningServer = mapOf(setting.name to "var.${setting.name}")
         )
@@ -153,12 +155,12 @@ internal data class TerraformHandler(
     }
 }
 
-internal data class TerraformInput(val name: String, val type: String, val default: String?) {
+internal data class TerraformInput(val name: String, val type: String, val default: String?, val nullable: Boolean = false) {
     companion object {
-        fun stringList(name: String, default: List<String>?) = TerraformInput(name, "list(string)", default?.joinToString { "\"$it\"" })
-        fun string(name: String, default: String?) = TerraformInput(name, "string", default?.let { "\"$it\"" })
-        fun boolean(name: String, default: Boolean?) = TerraformInput(name, "bool", default?.toString())
-        fun number(name: String, default: Number?) = TerraformInput(name, "number", default?.toString())
+        fun stringList(name: String, default: List<String>?, nullable: Boolean = false) = TerraformInput(name, "list(string)", default?.joinToString { "\"$it\"" }, nullable = nullable)
+        fun string(name: String, default: String?, nullable: Boolean = false) = TerraformInput(name, "string", default?.let { "\"$it\"" }, nullable = nullable)
+        fun boolean(name: String, default: Boolean?, nullable: Boolean = false) = TerraformInput(name, "bool", default?.toString(), nullable = nullable)
+        fun number(name: String, default: Number?, nullable: Boolean = false) = TerraformInput(name, "number", default?.toString(), nullable = nullable)
     }
 }
 
@@ -175,7 +177,8 @@ internal fun handlers() {
                 TerraformInput(
                     "cors",
                     "object({ allowedDomains = list(string), allowedHeaders = list(string) })",
-                    "null"
+                    "null",
+                    nullable = true
                 ),
                 TerraformInput.string(
                     "display_name",
@@ -199,14 +202,14 @@ internal fun handlers() {
         name = "S3",
         inputs = { key ->
             listOf(
-                TerraformInput.string("${key}_expiry", "P1D")
+                TerraformInput.string("${key}_expiry", "P1D", nullable = true)
             )
         },
         emit = {
             appendLine(
                 """
                 resource "aws_s3_bucket" "${key}" {
-                  bucket_prefix = "${namePrefixPathSegment}-${key}"
+                  bucket_prefix = "${namePrefixPathSegment}-${key.lowercase()}"
                   force_destroy = var.debug
                 }
                 resource "aws_s3_bucket_cors_configuration" "${key}" {
@@ -226,8 +229,18 @@ internal fun handlers() {
                     allowed_origins = ["*"]
                   }
                 }
+                resource "aws_s3_bucket_public_access_block" "$key" {
+                  count = var.${key}_expiry == null ? 1 : 0
+                  bucket = aws_s3_bucket.$key.id
+                
+                  block_public_acls   = false
+                  block_public_policy = false
+                  ignore_public_acls = false
+                  restrict_public_buckets = false
+                }
                 resource "aws_s3_bucket_policy" "$key" {  
-                  count = var.files_expiry == null ? 1 : 0
+                  depends_on = [aws_s3_bucket_public_access_block.${key}]
+                  count = var.${key}_expiry == null ? 1 : 0
                   bucket = aws_s3_bucket.$key.id   
                   policy = <<POLICY
                 {    
@@ -248,10 +261,10 @@ internal fun handlers() {
                 }
                 POLICY
                 }
-                resource "aws_s3_bucket_acl" "${key}" {
-                  bucket = aws_s3_bucket.${key}.id
-                  acl    = var.${key}_expiry == null ? "public-read" : "private" 
-                }
+                # resource "aws_s3_bucket_acl" "${key}" {
+                #   bucket = aws_s3_bucket.${key}.id
+                #   acl    = var.${key}_expiry == null ? "public-read" : "private" 
+                # }
                 resource "aws_iam_policy" "${key}" {
                   name        = "${namePrefix}-${key}"
                   path = "/${namePrefixPath}/${key}/"
@@ -1391,10 +1404,6 @@ internal fun awsLambdaHandler(
           bucket_prefix = "${project.namePrefixPathSegment}-lambda-bucket"
           force_destroy = true
         }
-        resource "aws_s3_bucket_acl" "lambda_bucket" {
-          bucket = aws_s3_bucket.lambda_bucket.id
-          acl    = "private"
-        }
         resource "aws_iam_policy" "lambda_bucket" {
           name        = "${project.namePrefix}-lambda_bucket"
           path = "/${project.namePrefixPath}/lambda_bucket/"
@@ -2079,6 +2088,7 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
                 input.default?.let { d ->
                     it.appendLine("    default = $d")
                 }
+                it.appendLine("    nullable = ${input.nullable}")
                 it.appendLine("}")
             }
             it.appendLine()

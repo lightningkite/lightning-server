@@ -80,3 +80,26 @@ fun <T, V> Modification<T>.map(
         else -> this
     }
 }
+
+suspend fun <T, V> Modification<T>.mapSuspend(
+    field: KProperty1<T, V>,
+    onModification: suspend (Modification<V>) -> Modification<V>,
+): Modification<T> {
+    return when (this) {
+        is Modification.Chain -> modifications.map { it.mapSuspend(field, onModification) }.let { Modification.Chain(it) }
+        is Modification.OnField<*, *> -> if (this.key == field) (this as Modification.OnField<T, V>).copy(
+            modification = onModification(
+                modification
+            )
+        ) else this as Modification<T>
+
+        is Modification.Assign -> Modification.Assign(
+            field.setCopy(
+                this.value,
+                onModification(Modification.Assign(field.get(this.value))).let { it as Modification.Assign<V> }.value
+            )
+        )
+
+        else -> this
+    }
+}

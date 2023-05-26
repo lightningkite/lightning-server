@@ -19,6 +19,9 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
     val client by lazy { system.blobContainerClient.getBlobClient(path.name) }
     override fun resolve(path: String): FileObject = AzureFile(system, this.path.resolve(path))
 
+    override val name: String
+        get() = path.name
+
     override val parent: FileObject?
         get() = path.parentFile?.let { AzureFile(system, path) } ?: if (path.unixPath.isNotEmpty()) system.root else null
 

@@ -14,6 +14,7 @@ import java.time.Duration
 interface FileObject {
     fun resolve(path: String): FileObject
     val parent: FileObject?
+    val name: String
     suspend fun list(): List<FileObject>?
     @Deprecated("Use head instead", ReplaceWith("head()")) suspend fun info(): FileInfo? = head()
     suspend fun head(): FileInfo?

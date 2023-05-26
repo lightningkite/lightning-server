@@ -41,9 +41,9 @@ dependencies {
     api("org.jetbrains.kotlinx:kotlinx-html-jvm:0.8.0")
 
     api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-    api("io.ktor:ktor-serialization-kotlinx-cbor:$ktorVersion")
     api("com.lightningkite:kotlinx-serialization-csv:2.0.5-SNAPSHOT")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$kotlinXSerialization")
     api("io.github.pdvrieze.xmlutil:serialization-jvm:0.85.0")
     api("com.github.jershell:kbson:0.4.5")
     api("com.charleskorn.kaml:kaml:0.49.0")
