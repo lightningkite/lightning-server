@@ -34,6 +34,23 @@ fun Modification<*>.matchesPath(field: KProperty1<*, *>): Boolean {
     }
 }
 
+fun Condition<*>.walk(action: (Condition<*>)->Unit) {
+    action(this)
+    when(this) {
+        is Condition.And -> this.conditions.forEach { it.walk(action) }
+        is Condition.Or -> this.conditions.forEach { it.walk(action) }
+        is Condition.Not -> this.condition.walk(action)
+        is Condition.ListAllElements<*> -> this.condition.walk(action)
+        is Condition.ListAnyElements<*> -> this.condition.walk(action)
+        is Condition.SetAllElements<*> -> this.condition.walk(action)
+        is Condition.SetAnyElements<*> -> this.condition.walk(action)
+        is Condition.OnKey<*> -> this.condition.walk(action)
+        is Condition.OnField<*, *> -> this.condition.walk(action)
+        is Condition.IfNotNull -> this.condition.walk(action)
+        else -> {}
+    }
+}
+
 fun Condition<*>.matchesPath(field: KProperty1<*, *>): Boolean {
     return when (this) {
         is Condition.OnField<*, *> -> field == this.key

@@ -107,10 +107,11 @@ class MongoFieldCollection<Model : Any>(
             }
             .maxTime(maxQueryMs, TimeUnit.MILLISECONDS)
             .let {
-                if (orderBy.isEmpty())
-                    it
-                else
-                    it.sort(sort(orderBy))
+                if (orderBy.isEmpty()) {
+                    var anyFts = false
+                    condition.walk { if(it is Condition.FullTextSearch) anyFts = true }
+                    if(anyFts) it.projection(Projections.metaTextScore("text_search_score")).sort(Sorts.metaTextScore("text_search_score")) else it
+                } else it.sort(sort(orderBy))
             }
             .toFlow()
             .catch { handleException(it) }
