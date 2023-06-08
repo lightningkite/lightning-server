@@ -59,7 +59,7 @@ class TableGenerator(
                         if(khrysalisUsed) {
                             appendLine("@file:SharedCode")
                         }
-                        appendLine("package ${ksName}")
+                        if(ksName.isNotEmpty()) appendLine("package ${ksName}")
                         if(khrysalisUsed) {
                             appendLine("import com.lightningkite.khrysalis.*")
                         }

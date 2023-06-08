@@ -40,8 +40,8 @@ abstract class FileSystemTests {
         runBlocking {
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
-            testFile.write(HttpContent.Text(message, ContentType.Text.Plain))
-            assertEquals(message, testFile.read().reader().readText())
+            testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
+            assertEquals(message, testFile.get()!!.stream().reader().readText())
         }
     }
 
@@ -55,8 +55,8 @@ abstract class FileSystemTests {
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
             val beforeModify = Instant.now().minusSeconds(120L)
-            testFile.write(HttpContent.Text(message, ContentType.Text.Plain))
-            val info = testFile.info()
+            testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
+            val info = testFile.head()
             assertNotNull(info)
             assertEquals(ContentType.Text.Plain, info!!.type)
             assertTrue(info.size > 0L)
@@ -74,11 +74,12 @@ abstract class FileSystemTests {
             withTimeout(10_000L) {
                 val testFile = system.root.resolve("test.txt")
                 val message = "Hello world!"
-                testFile.write(HttpContent.Text(message, ContentType.Text.Plain))
+                testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
                 val testFileNotIncluded = system.root.resolve("doNotInclude/test.txt")
-                testFileNotIncluded.write(HttpContent.Text(message, ContentType.Text.Plain))
+                testFileNotIncluded.put(HttpContent.Text(message, ContentType.Text.Plain))
                 assertContains(testFile.parent!!.list()!!.also { println(it) }, testFile)
                 assertFalse(testFileNotIncluded in testFile.parent!!.list()!!)
+                testFile.get()!!.stream().readAllBytes()
             }
         }
     }
@@ -92,7 +93,7 @@ abstract class FileSystemTests {
         runBlocking {
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
-            testFile.write(HttpContent.Text(message, ContentType.Text.Plain))
+            testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
             assert(testFile.signedUrl.startsWith(testFile.url))
             println("testFile.signedUrl: ${testFile.signedUrl}")
             assert(client.get(testFile.signedUrl).status.isSuccess())

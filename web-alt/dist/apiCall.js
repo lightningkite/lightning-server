@@ -16,7 +16,7 @@ function apiCall(url, body, request, fileUploads, responseInterceptors) {
     }
     return f.then(x => {
         var _a;
-        let response = (_a = responseInterceptors === null || responseInterceptors === void 0 ? void 0 : responseInterceptors.call(x)) !== null && _a !== void 0 ? _a : x;
+        let response = (_a = responseInterceptors === null || responseInterceptors === void 0 ? void 0 : responseInterceptors(x)) !== null && _a !== void 0 ? _a : x;
         if (!response.ok) {
             throw response;
         }

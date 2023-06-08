@@ -19,7 +19,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
     default(userToken?: string): Promise<T> {
       return Promise.reject(new Error("Not implemented"));
     },
-    query(input: Query<T>, userToken: string): Promise<Array<T>> {
+    query(input: Query<T>, userToken?: string): Promise<Array<T>> {
       const { limit, skip = 0, orderBy, condition } = input;
 
       const filteredItems = condition
@@ -62,7 +62,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
       return Promise.resolve(result);
     },
 
-    detail(id: string, userToken: string): Promise<T> {
+    detail(id: string, userToken?: string): Promise<T> {
       const result = items.find((item) => item._id === id);
       console.info(label, "detail", { id, result });
       return new Promise((resolve, reject) => {
@@ -71,19 +71,19 @@ export function mockRestEndpointFunctions<T extends HasId>(
       });
     },
 
-    insertBulk(input: Array<T>, userToken: string): Promise<Array<T>> {
+    insertBulk(input: Array<T>, userToken?: string): Promise<Array<T>> {
       input.forEach((item) => items.push(item));
       console.info(label, "insertBulk", { input });
       return Promise.resolve(input);
     },
 
-    insert(input: T, userToken: string): Promise<T> {
+    insert(input: T, userToken?: string): Promise<T> {
       items.push(input);
       console.info(label, "insert", { input });
       return Promise.resolve(input);
     },
 
-    upsert(id: string, input: T, userToken: string): Promise<T> {
+    upsert(id: string, input: T, userToken?: string): Promise<T> {
       console.info(label, "upsert", { id, input });
 
       const existingItemIndex = items.findIndex((item) => item._id === id);
@@ -95,14 +95,14 @@ export function mockRestEndpointFunctions<T extends HasId>(
       return Promise.resolve(input);
     },
 
-    bulkReplace(input: Array<T>, userToken: string): Promise<Array<T>> {
+    bulkReplace(input: Array<T>, userToken?: string): Promise<Array<T>> {
       console.info(label, "bulkReplace", { input });
 
       input.forEach((item) => this.replace(item._id, item, userToken));
       return Promise.resolve(input);
     },
 
-    replace(id: string, input: T, userToken: string): Promise<T> {
+    replace(id: string, input: T, userToken?: string): Promise<T> {
       console.info(label, "replace", { id, input });
 
       const existingItemIndex = items.findIndex((item) => item._id === id);
@@ -115,7 +115,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
 
     async bulkModify(
       input: MassModification<T>,
-      userToken: string
+      userToken?: string
     ): Promise<number> {
       console.info(label, "bulkModify", { input });
 
@@ -129,12 +129,12 @@ export function mockRestEndpointFunctions<T extends HasId>(
     modifyWithDiff(
       id: string,
       input: Modification<T>,
-      userToken: string
+      userToken?: string
     ): Promise<EntryChange<T>> {
       return Promise.resolve({});
     },
 
-    modify(id: string, input: Modification<T>, userToken: string): Promise<T> {
+    modify(id: string, input: Modification<T>, userToken?: string): Promise<T> {
       console.info(label, "modify", { id, input });
 
       const existingItemIndex = items.findIndex((item) => item._id === id);
@@ -145,7 +145,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
       return Promise.resolve(newItem);
     },
 
-    bulkDelete(input: Condition<T>, userToken: string): Promise<number> {
+    bulkDelete(input: Condition<T>, userToken?: string): Promise<number> {
       console.info(label, "bulkDelete", { input });
 
       if (!items) return Promise.reject();
@@ -154,7 +154,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
       return Promise.resolve(previousLength - items.length);
     },
 
-    delete(id: string, userToken: string): Promise<void> {
+    delete(id: string, userToken?: string): Promise<void> {
       console.info(label, "delete", { id });
 
       const existingItemIndex = items.findIndex((item) => item._id === id);
@@ -166,7 +166,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
       }
     },
 
-    count(input: Condition<T>, userToken: string): Promise<number> {
+    count(input: Condition<T>, userToken?: string): Promise<number> {
       console.info(label, "count", { input });
 
       return this.query({ condition: input }, userToken).then(
@@ -176,7 +176,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
 
     groupCount(
       input: GroupCountQuery<T>,
-      userToken: string
+      userToken?: string
     ): Promise<Record<string, number>> {
       const { condition, groupBy } = input;
 
@@ -198,7 +198,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
       return Promise.resolve(result);
     },
 
-    aggregate(input: AggregateQuery<T>, userToken: string): Promise<number> {
+    aggregate(input: AggregateQuery<T>, userToken?: string): Promise<number> {
       const { condition, aggregate, property } = input;
 
       const filteredItems = condition
@@ -217,7 +217,7 @@ export function mockRestEndpointFunctions<T extends HasId>(
 
     groupAggregate(
       input: GroupAggregateQuery<T>,
-      userToken: string
+      userToken?: string
     ): Promise<Record<string, number>> {
       const { aggregate, condition, property, groupBy } = input;
 

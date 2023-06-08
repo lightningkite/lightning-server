@@ -19,9 +19,9 @@ class LocalFileTest {
             val system = LocalFileSystem(File("./build/test-files").absoluteFile, "local-file-test", null, JwtSigner())
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
-            testFile.write(HttpContent.Text(message, ContentType.Text.Plain))
-            assertEquals(message, testFile.read().reader().readText())
-            assertNotNull(testFile.info())
+            testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
+            assertEquals(message, testFile.get()!!.stream().reader().readText())
+            assertNotNull(testFile.head())
             assertContains(testFile.parent!!.list()!!, testFile)
         }
     }

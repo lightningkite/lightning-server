@@ -4,15 +4,19 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.websocket.WebSockets
 import java.time.Duration
 
-class JwtTypedAuthorizationHandler(val jwt: () -> JwtSigner) : Authorization.Handler<Any> {
+class JwtTypedAuthorizationHandler(val jwt: () -> JwtSigner) : Authentication.Handler<Any> {
 
     companion object {
         fun current(jwt: () -> JwtSigner): JwtTypedAuthorizationHandler {
-            val existing = (Authorization.handler as? JwtTypedAuthorizationHandler)
-            if (existing != null) return existing
-            val created = JwtTypedAuthorizationHandler(jwt)
-            Authorization.handler = created
-            return created
+            if (Authentication.handlerSet) {
+                val existing = Authentication.handler
+                if (existing is JwtTypedAuthorizationHandler) return existing
+                throw Error("Authentication already set and it isn't a JwtTypedAuthorizationHandler")
+            } else {
+                val created = JwtTypedAuthorizationHandler(jwt)
+                Authentication.handler = created
+                return created
+            }
         }
     }
 

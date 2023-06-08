@@ -2,6 +2,10 @@ package com.lightningkite.lightningserver.auth
 
 import kotlinx.serialization.Serializable
 
+/**
+ * Information about someone's account in a different service.
+ * Used for OAuth.
+ */
 @Serializable
 data class ExternalServiceLogin(
     val service: String,

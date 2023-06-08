@@ -8,10 +8,21 @@ import com.lightningkite.lightningserver.settings.generalSettings
  * all throughout the server.
  */
 object HtmlDefaults {
-    var logo: String? = null
-    var primaryColor: String = "red"
-    var basePage: (content: String) -> String = { content ->
-        """
+    /**
+     * The logo of the company as an HTML element string.
+     */
+    var logo: String? by SetOnce { null }
+    /**
+     * The primary color of the company as a CSS color.
+     */
+    var primaryColor: String by SetOnce { "red" }
+
+    /**
+     * Default HTML wrapper for an HTML page in the system
+     */
+    var basePage: (content: String) -> String by SetOnce {
+        { content ->
+            """
             <!DOCTYPE html>
             <html>
               <head>
@@ -23,9 +34,15 @@ object HtmlDefaults {
               </body>
             </html>
         """.trimIndent()
+        }
     }
-    var baseEmail: (content: String) -> String = { content ->
-        """
+
+    /**
+     * Default HTML wrapper for an email from the system
+     */
+    var baseEmail: (content: String) -> String by SetOnce {
+        { content ->
+            """
             <!DOCTYPE html>
             <html>
               <head>
@@ -52,27 +69,6 @@ object HtmlDefaults {
               </body>
             </html>
         """.trimIndent()
-    }
-    var defaultLoginEmailTemplate: (suspend (email: String, link: String) -> String) = { email: String, link: String ->
-        baseEmail("""
-        <table role="presentation" style="width:100%;border-collapse:collapse;border:0;border-spacing:0;">
-            ${
-            logo?.let {
-                """
-                    <tr><td align="center" style="padding:16px;"><img src="$it" alt="${generalSettings().projectName}"/></td></tr>
-                """.trimIndent()
-            } ?: ""
         }
-            <tr><td align="center" style="padding:0px;"><h1>Log In to ${generalSettings().projectName}</h1></td></tr>
-            <tr><td align="center" style="padding:0px;"><p>We received a request for a login email for ${email}. To log in, please click the link below.</p></td></tr>
-            <tr><td align="center" style="padding:0px;">
-                <table>
-                    <tr><td align="center" style="padding:16px;background-color: $primaryColor;border-radius: 8px"><a style="color:white;text-decoration: none;font-size: 22px;" href="$link">Click here to login</a></td></tr>
-                </table>
-            </td></tr>
-            <tr><td align="center" style="padding:0px;"><p>If you did not request to be logged in, you can simply ignore this email.</p></td></tr>
-            <tr><td align="center" style="padding:0px;"><h3>${generalSettings().projectName}</h3></td></tr>
-        </table>
-        """.trimIndent())
     }
 }

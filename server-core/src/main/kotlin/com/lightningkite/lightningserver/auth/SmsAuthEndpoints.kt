@@ -9,15 +9,30 @@ import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.sms.SMSClient
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
+import java.time.Duration
 
+/**
+ * Authentication endpoints for logging in with SMS PINs.
+ */
 open class SmsAuthEndpoints<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val phoneAccess: UserPhoneAccess<USER, ID>,
     private val cache: () -> Cache,
     private val sms: () -> SMSClient,
+    val pinAvailableCharacters: List<Char> = ('0'..'9').toList(),
+    val pinLength: Int = 6,
+    val pinExpiration: Duration = Duration.ofMinutes(15),
+    val pinMaxAttempts: Int = 5,
     private val template: suspend (code: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." }
 ) : ServerPathGroup(base.path) {
-    val pin = PinHandler(cache, "sms")
+    val pin = PinHandler(
+        cache,
+        "sms",
+        availableCharacters = pinAvailableCharacters,
+        length = pinLength,
+        expiration = pinExpiration,
+        maxAttempts = pinMaxAttempts,
+    )
     val loginSms = path("login-sms").post.typed(
         summary = "SMS Login Code",
         description = "Sends a login text to the given phone",

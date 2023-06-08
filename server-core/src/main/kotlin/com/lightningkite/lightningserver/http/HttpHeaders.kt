@@ -95,3 +95,4 @@ data class HttpHeaders(val entries: List<Pair<String, String>>) {
 
 fun HttpHeaders(entries: Map<String, String>) = HttpHeaders(entries.entries.map { it.toPair() })
 fun HttpHeaders(vararg entry: Pair<String, String>) = HttpHeaders(mapOf(*entry))
+inline fun HttpHeaders(setup: HttpHeaders.Builder.()->Unit) = HttpHeaders.Builder().apply(setup).build()

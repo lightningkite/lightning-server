@@ -19,10 +19,13 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
     val client by lazy { system.blobContainerClient.getBlobClient(path.name) }
     override fun resolve(path: String): FileObject = AzureFile(system, this.path.resolve(path))
 
+    override val name: String
+        get() = path.name
+
     override val parent: FileObject?
         get() = path.parentFile?.let { AzureFile(system, path) } ?: if (path.unixPath.isNotEmpty()) system.root else null
 
-    override suspend fun info(): FileInfo? = withContext(Dispatchers.IO) {
+    override suspend fun head(): FileInfo? = withContext(Dispatchers.IO) {
         try {
             client.properties.let {
                 FileInfo(
@@ -49,7 +52,7 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
         }
     }
 
-    override suspend fun write(content: HttpContent) {
+    override suspend fun put(content: HttpContent) {
         withContext(Dispatchers.IO) {
             content.length?.let {
                 client.upload(content.stream(), it, true)
@@ -60,10 +63,13 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
         }
     }
 
-    override suspend fun read(): InputStream {
-        return withContext(Dispatchers.IO) {
-            client.openInputStream()
-        }
+    override suspend fun get(): HttpContent? {
+        val properties = client.properties
+        return HttpContent.Stream(
+            getStream = { client.openInputStream() },
+            length = properties.blobSize,
+            type = ContentType(properties.contentType)
+        )
     }
 
     override suspend fun delete() {

@@ -9,10 +9,6 @@ import software.amazon.awssdk.services.s3.S3AsyncClient
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 import java.io.File
-import java.math.BigInteger
-import java.security.MessageDigest
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
 
 class S3FileSystem(
     val region: Region,
@@ -47,7 +43,7 @@ class S3FileSystem(
     companion object {
         init {
             FilesSettings.register("s3") {
-                Regex("""s3://(?:(?<user>[^:]+):(?<password>[^@]+)@)?(?<bucket>[^.]+)\.(?:s3-)?(?<region>[^.]+)\.amazonaws.com/?""").matchEntire(it.storageUrl)?.let { match ->
+                Regex("""s3://(?:(?<user>[^:]+):(?<password>[^@]+)@)?(?<bucket>[^.]+)\.(?:s3-)?(?<region>[^.]+)\.amazonaws.com/?""").matchEntire(it.url)?.let { match ->
                     val user = match.groups["user"]?.value ?: ""
                     val password = match.groups["password"]?.value ?: ""
                     S3FileSystem(

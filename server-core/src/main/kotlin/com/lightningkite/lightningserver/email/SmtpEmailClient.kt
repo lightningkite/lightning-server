@@ -11,57 +11,31 @@ import org.apache.commons.mail.SimpleEmail
  * An email client that will send real emails through SMTP.
  */
 class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
-    override suspend fun send(
+    override suspend fun sendHtml(
         subject: String,
         to: List<String>,
-        message: String,
-        htmlMessage: String?,
+        html: String,
+        plainText: String,
         attachments: List<Attachment>
     ) {
-        val email = if (htmlMessage == null) {
-            if (attachments.isEmpty()) {
-                SimpleEmail().setMsg(message)
-            } else {
-                val multiPart = MultiPartEmail()
-                multiPart.setMsg(message)
-                attachments.forEach {
-                    val attachment = EmailAttachment()
-                    attachment.disposition = if (it.inline) EmailAttachment.INLINE else EmailAttachment.ATTACHMENT
-                    attachment.description = it.description
-                    attachment.name = it.name
-                    when (it) {
-                        is Attachment.Remote -> {
-                            attachment.url = it.url
-                        }
-
-                        is Attachment.Local -> {
-                            attachment.path = it.file.absolutePath
-                        }
-                    }
-                    multiPart.attach(attachment)
+        val email = HtmlEmail()
+        email.setHtmlMsg(html)
+        email.setTextMsg(plainText)
+        attachments.forEach {
+            val attachment = EmailAttachment()
+            attachment.disposition = if (it.inline) EmailAttachment.INLINE else EmailAttachment.ATTACHMENT
+            attachment.description = it.description
+            attachment.name = it.name
+            when (it) {
+                is Attachment.Remote -> {
+                    attachment.url = it.url
                 }
-                multiPart
-            }
-        } else {
-            val email = HtmlEmail()
-            email.setHtmlMsg(htmlMessage)
-            attachments.forEach {
-                val attachment = EmailAttachment()
-                attachment.disposition = if (it.inline) EmailAttachment.INLINE else EmailAttachment.ATTACHMENT
-                attachment.description = it.description
-                attachment.name = it.name
-                when (it) {
-                    is Attachment.Remote -> {
-                        attachment.url = it.url
-                    }
 
-                    is Attachment.Local -> {
-                        attachment.path = it.file.absolutePath
-                    }
+                is Attachment.Local -> {
+                    attachment.path = it.file.absolutePath
                 }
-                email.attach(attachment)
             }
-            email
+            email.attach(attachment)
         }
         email.hostName = smtpConfig.hostName
         if (smtpConfig.username != null || smtpConfig.password != null) {

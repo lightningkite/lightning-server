@@ -3,6 +3,9 @@ package com.lightningkite.lightningdb
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+/**
+ * Uses [ModelPermissions] to secure a [FieldCollection].
+ */
 open class ModelPermissionsFieldCollection<Model : Any>(
     override val wraps: FieldCollection<Model>,
     val permissions: ModelPermissions<Model>

@@ -4,6 +4,10 @@ import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.HttpRequest
 import kotlin.reflect.typeOf
 
+/**
+ * Reified information about a user type.
+ * The inlined [AuthInfo] function is recommended for creating these, as it will do the hard work for you.
+ */
 data class AuthInfo<USER>(
     val tryCast: (Any?) -> USER?,
     val type: String? = null,
@@ -12,6 +16,9 @@ data class AuthInfo<USER>(
     fun checker(any: Any?): Boolean = tryCast(any) != null
 }
 
+/**
+ * Attempts to cast [any] to the [USER] type, throwing an [UnauthorizedException] if auth is required and not available.
+ */
 @Suppress("UNCHECKED_CAST")
 fun <USER> AuthInfo<USER>.cast(any: Any?): USER {
     val casted = tryCast(any)
@@ -22,6 +29,10 @@ fun <USER> AuthInfo<USER>.cast(any: Any?): USER {
     )
 }
 
+/**
+ * Creates an [AuthInfo] for you.  This is the recommended way to make an [AuthInfo].
+ * Creating a [Unit]-based [AuthInfo] indicates that no authentication is performed.
+ */
 inline fun <reified USER> AuthInfo() =
     if (USER::class == Unit::class) AuthInfo<USER>(tryCast = { Unit as USER }, type = null, required = true)
     else AuthInfo<USER>(
@@ -29,4 +40,3 @@ inline fun <reified USER> AuthInfo() =
         type = typeOf<USER>().toString().substringBefore('<').substringAfterLast('.').removeSuffix("?"),
         required = !typeOf<USER>().isMarkedNullable
     )
-typealias TypeCheckOrUnauthorized<USER> = HttpRequest.() -> USER

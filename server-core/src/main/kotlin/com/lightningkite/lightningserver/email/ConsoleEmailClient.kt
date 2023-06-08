@@ -8,13 +8,21 @@ object ConsoleEmailClient : EmailClient {
     data class Email(
         val subject: String,
         val to: List<String>,
-        val message: String,
-        val htmlMessage: String?,
+        val plainText: String,
+        val html: String,
         val attachments: List<Attachment>
-    )
+    ) {
+        val message: String get() = plainText
+        val htmlMessage: String get() = html
+    }
+    var onEmailSent: (Email)->Unit = {}
 
-    override suspend fun send(
-        subject: String, to: List<String>, message: String, htmlMessage: String?, attachments: List<Attachment>
+    override suspend fun sendHtml(
+        subject: String,
+        to: List<String>,
+        html: String,
+        plainText: String,
+        attachments: List<Attachment>
     ) {
         println(buildString {
             appendLine("-----EMAIL-----")
@@ -22,11 +30,7 @@ object ConsoleEmailClient : EmailClient {
             appendLine()
             appendLine(to.joinToString())
             appendLine()
-//            htmlMessage?.let{
-//                appendLine(it)
-//                appendLine()
-//            }
-            appendLine(message)
+            appendLine(plainText)
             appendLine()
             attachments.forEach {
                 appendLine(it.name)
@@ -37,13 +41,15 @@ object ConsoleEmailClient : EmailClient {
                 appendLine(it.description)
                 appendLine()
             }
-            lastEmailSent = Email(
+            val e = Email(
                 subject = subject,
                 to = to,
-                message = message,
-                htmlMessage = htmlMessage,
+                plainText = plainText,
+                html = html,
                 attachments = attachments,
             )
+            onEmailSent(e)
+            lastEmailSent = e
         })
     }
 

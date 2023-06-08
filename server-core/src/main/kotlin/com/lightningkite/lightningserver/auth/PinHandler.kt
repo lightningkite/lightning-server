@@ -5,20 +5,31 @@ import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
+import com.lightningkite.lightningserver.utils.BadWordList
 import java.security.SecureRandom
 import java.time.Duration
 
 open class PinHandler(
     private val cache: () -> Cache,
     val keyPrefix: String,
+    val availableCharacters: List<Char> = ('0'..'9').toList(),
+    val length: Int = 6,
     val expiration: Duration = Duration.ofMinutes(15),
     val maxAttempts: Int = 5
 ) {
+    private val mixedCaseMode = availableCharacters.filter { it.isLetter() }.let {
+        it.any { it.isUpperCase() } && it.any { it.isLowerCase() }
+    }
     private fun attemptCacheKey(uniqueIdentifier: String): String = "${keyPrefix}_pin_login_attempts_$uniqueIdentifier"
     private fun cacheKey(uniqueIdentifier: String): String = "${keyPrefix}_pin_login_$uniqueIdentifier"
     suspend fun generate(uniqueIdentifier: String): String {
-        val pin = SecureRandom().nextInt(1000000).toString().padStart(6, '0')
-        cache().set(cacheKey(uniqueIdentifier), pin.secureHash(), expiration)
+        val r = SecureRandom()
+        var pin = ""
+        do {
+            pin = String(CharArray(length) { availableCharacters.get(r.nextInt(availableCharacters.size)) })
+        } while (BadWordList.detectParanoid(pin))
+        val fixedPin = if(mixedCaseMode) pin else pin.lowercase()
+        cache().set(cacheKey(uniqueIdentifier), fixedPin.secureHash(), expiration)
         cache().set(attemptCacheKey(uniqueIdentifier), 0, expiration)
         return pin
     }
@@ -33,7 +44,8 @@ open class PinHandler(
             throw NotFoundException(detail = "pin-expired", message = "PIN has expired.")
         }
         cache().add(attemptCacheKey(uniqueIdentifier), 1)
-        if (!pin.checkHash(hashedPin)) throw BadRequestException(
+        val fixedPin = if(mixedCaseMode) pin else pin.lowercase()
+        if (!fixedPin.checkHash(hashedPin)) throw BadRequestException(
             detail = "pin-incorrect",
             message = "Incorrect PIN.  ${maxAttempts - attempts} attempts remain."
         )

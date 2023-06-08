@@ -106,7 +106,7 @@ class LocalFileSystem(
         if (location != wildcard) throw BadRequestException("Token does not match file")
         if (wildcard.contains("..")) throw IllegalStateException()
         val file = root.resolve(wildcard)
-        file.write(it.body!!)
+        file.put(it.body!!)
         HttpResponse(status = HttpStatus.NoContent)
     }
 }

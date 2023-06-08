@@ -124,6 +124,7 @@ class OptionalSerializer<T : Any>(val inner: KSerializer<T>) : KSerializer<Optio
     val nullable = inner.nullable
     override val descriptor: SerialDescriptor
         get() = if(inner.descriptor.kind is PrimitiveKind) PrimitiveSerialDescriptor("Optional<${inner.descriptor.serialName}>", nullable.descriptor.kind as PrimitiveKind) else SerialDescriptor("Optional<${inner.descriptor.serialName}>", nullable.descriptor)
+
     override fun deserialize(decoder: Decoder): Optional<T> = Optional.ofNullable(nullable.deserialize(decoder))
     override fun serialize(encoder: Encoder, value: Optional<T>) {
         nullable.serialize(encoder, if (value.isPresent) value.get() else null)

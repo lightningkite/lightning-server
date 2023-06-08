@@ -61,7 +61,7 @@ data class MongoFields(
         }
         appendLine("@file:OptIn(ExperimentalSerializationApi::class, InternalSerializationApi::class)")
         appendLine()
-        appendLine("package ${packageName}")
+        if(packageName.isNotEmpty()) appendLine("package ${packageName}")
         appendLine()
         declaration.containingFile?.ktFile?.importList?.imports
             ?.map { it.importPath.toString() }

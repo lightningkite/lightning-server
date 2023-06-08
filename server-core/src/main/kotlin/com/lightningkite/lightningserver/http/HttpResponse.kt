@@ -71,5 +71,15 @@ data class HttpResponse(
             status = status,
             headers = headers
         )
+
+        inline fun <reified T> json(
+            value: T,
+            status: HttpStatus = HttpStatus.OK,
+            headers: HttpHeaders.Builder.() -> Unit = {}
+        ) = HttpResponse(
+            body = HttpContent.Json(value),
+            status = status,
+            headers = HttpHeaders(headers)
+        )
     }
 }

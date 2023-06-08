@@ -11,12 +11,22 @@ import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
+import java.time.Duration
 
+/**
+ * Endpoints for authenticating via email magic link / sent PINs.
+ * Also allows for OAuth based login, as most OAuth systems share email as a common identifier.
+ * For information on setting up OAuth, see the respective classes, [OauthAppleEndpoints], [OauthGitHubEndpoints], [OauthGoogleEndpoints], [OauthMicrosoftEndpoints].
+ */
 open class EmailAuthEndpoints<USER : Any, ID>(
     val base: BaseAuthEndpoints<USER, ID>,
     val emailAccess: UserEmailAccess<USER, ID>,
     private val cache: () -> Cache,
     private val email: () -> EmailClient,
+    val pinAvailableCharacters: List<Char> = ('0'..'9').toList(),
+    val pinLength: Int = 6,
+    val pinExpiration: Duration = Duration.ofMinutes(15),
+    val pinMaxAttempts: Int = 5,
     private val emailSubject: () -> String = { "${generalSettings().projectName} Log In" },
     private val template: (suspend (email: String, link: String, pin: String) -> String) = { email, link, pin ->
         HtmlDefaults.baseEmail("""
@@ -42,7 +52,14 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         """.trimIndent())
     },
 ) : ServerPathGroup(base.path) {
-    val pin = PinHandler(cache, "email")
+    val pin = PinHandler(
+        cache,
+        "email",
+        availableCharacters = pinAvailableCharacters,
+        length = pinLength,
+        expiration = pinExpiration,
+        maxAttempts = pinMaxAttempts,
+    )
     val loginEmail = path("login-email").post.typed(
         summary = "Email Login Link",
         description = "Sends a login email to the given address",

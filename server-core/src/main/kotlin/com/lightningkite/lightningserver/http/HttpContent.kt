@@ -72,6 +72,7 @@ sealed class HttpContent {
     }
 
     companion object {
+        @Deprecated("Use the lowercase version", ReplaceWith("html"))
         fun Html(
             body: HTML.() -> Unit,
         ): OutStream = HttpContent.OutStream(
@@ -85,7 +86,28 @@ sealed class HttpContent {
             length = null
         )
 
+        @Deprecated("Use the lowercase version", ReplaceWith("json"))
         inline fun <reified T> Json(
+            value: T
+        ): Text = HttpContent.Text(
+            string = Serialization.json.encodeToString(value),
+            type = ContentType.Application.Json
+        )
+
+        fun html(
+            body: HTML.() -> Unit,
+        ): OutStream = HttpContent.OutStream(
+            write = {
+                it.writer().use {
+                    it.write("<!DOCTYPE html>\n")
+                    it.appendHTML().html(block = body)
+                }
+            },
+            type = ContentType.Text.Html,
+            length = null
+        )
+
+        inline fun <reified T> json(
             value: T
         ): Text = HttpContent.Text(
             string = Serialization.json.encodeToString(value),
@@ -100,15 +122,7 @@ sealed class HttpContent {
             )
         }
 
-        @OptIn(DelicateCoroutinesApi::class)
-        suspend fun file(file: FileObject): Stream {
-            val info = GlobalScope.async(start = CoroutineStart.LAZY) { file.info()!! }
-            return Stream(
-                getStream = { file.read() },
-                length = info.await().size,
-                type = info.await().type
-            )
-        }
+        suspend fun file(file: FileObject) = file.get()!!
     }
 }
 
