@@ -47,13 +47,7 @@ fun Condition<*>.dump(into: Document = Document(), key: String?): Document {
         is Condition.Always -> {}
         is Condition.Never -> into["thisFieldWillNeverExist"] = "no never"
         is Condition.And -> {
-            if(conditions.any { it is Condition.Or }) {
-                into["\$and"] = conditions.map { it.dump(key = key)  }
-            } else {
-                conditions.forEach {
-                    it.dump(into, key)
-                }
-            }
+            into["\$and"] = conditions.map { it.dump(key = key)  }
         }
         is Condition.Or -> if(conditions.isEmpty()) into["thisFieldWillNeverExist"] = "no never" else into["\$or"] = conditions.map { it.dump(key = key)  }
         is Condition.Equal -> into.sub(key)["\$eq"] = value

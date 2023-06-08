@@ -15,7 +15,7 @@
     "mersenne-twister": "1.x",
     "@types/mersenne-twister": "1.x",
     "@lightningkite/khrysalis-runtime": "1.0.1",
-    "@lightningkite/rxjs-plus": "0.10.3"
+    "@lightningkite/rxjs-plus": "1.0.0"
   },
   "devDependencies": {
     "typescript": "^4.5.2",
