@@ -35,15 +35,15 @@ class SortPartSerializer<T>(val inner: KSerializer<T>): KSerializer<SortPart<T>>
         val value = decoder.decodeString()
         val descending = value.startsWith('-')
         val nameWithoutCase = value.removePrefix("-")
-        val ignoreCase = nameWithoutCase.startsWith('*')
-        val name = nameWithoutCase.removePrefix("*")
+        val ignoreCase = nameWithoutCase.startsWith('~')
+        val name = nameWithoutCase.removePrefix("~")
         return SortPart(sub.fromString(name), !descending, ignoreCase)
     }
 
     override fun serialize(encoder: Encoder, value: SortPart<T>) {
         encoder.encodeString(buildString {
             if(!value.ascending) append('-')
-            if(value.ignoreCase) append('*')
+            if(value.ignoreCase) append('~')
             append(value.field.toString())
         })
     }

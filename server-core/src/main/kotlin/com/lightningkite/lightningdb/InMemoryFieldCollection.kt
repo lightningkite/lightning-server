@@ -30,7 +30,7 @@ open class InMemoryFieldCollection<Model : Any>(
         serializer.descriptor.indexes().forEach { index: NeededIndex ->
             if (index.unique) {
                 val fields =
-                    serializer.attemptGrabFields().filterKeys { index.fields.contains(it) }.values.map { it.property }
+                    serializer.attemptGrabFields().filterKeys { index.fields.contains(it) }.values
                 uniqueIndexChecks.add { changes: List<EntryChange<Model>> ->
                     val fieldChanges = changes.mapNotNull { entryChange ->
                         if (
