@@ -32,12 +32,12 @@ class MongoFieldCollection<Model : Any>(
 ) : AbstractSignalFieldCollection<Model>() {
     val mongo: CoroutineCollection<Model> get() = getMongo()
 
-    private fun sort(orderBy: List<SortPart<Model>>): Bson = Sorts.orderBy(orderBy.map {
+    private fun sort(orderBy: List<SortPart<Model>>, lastly: Bson? = null): Bson = Sorts.orderBy(orderBy.map {
         if (it.ascending)
             Sorts.ascending(it.field.property.name)
         else
             Sorts.descending(it.field.property.name)
-    })
+    } + listOfNotNull(lastly))
 
     private inline fun <T> exceptionWrap(operation: () -> T): T {
         try {
@@ -107,11 +107,13 @@ class MongoFieldCollection<Model : Any>(
             }
             .maxTime(maxQueryMs, TimeUnit.MILLISECONDS)
             .let {
-                if (orderBy.isEmpty()) {
-                    var anyFts = false
-                    condition.walk { if(it is Condition.FullTextSearch) anyFts = true }
-                    if(anyFts) it.projection(Projections.metaTextScore("text_search_score")).sort(Sorts.metaTextScore("text_search_score")) else it
-                } else it.sort(sort(orderBy))
+                var anyFts = false
+                condition.walk { if(it is Condition.FullTextSearch) anyFts = true }
+                val mts = if(anyFts) {
+                    it.projection(Projections.metaTextScore("text_search_score"))
+                    Sorts.metaTextScore("text_search_score")
+                } else null
+                it.sort(sort(orderBy, mts))
             }
             .toFlow()
             .catch { handleException(it) }
