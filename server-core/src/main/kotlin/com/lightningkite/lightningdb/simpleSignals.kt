@@ -208,56 +208,56 @@ fun <Model : HasId<ID>, ID : Comparable<ID>> FieldCollection<Model>.postRawChang
     ): EntryChange<Model> = wraps.replaceOne(condition, model, orderBy)
         .also { changed(listOf(it) ) }
 
-    final override suspend fun updateOne(
+    override suspend fun updateOne(
         condition: Condition<Model>,
         modification: Modification<Model>,
         orderBy: List<SortPart<Model>>
     ): EntryChange<Model> = wraps.updateOne(condition, modification, orderBy)
         .also { changed(listOf(it) ) }
 
-    final override suspend fun upsertOne(
+    override suspend fun upsertOne(
         condition: Condition<Model>,
         modification: Modification<Model>,
         model: Model
     ): EntryChange<Model> = wraps.upsertOne(condition, modification, model)
         .also { changed(listOf(it) ) }
 
-    final override suspend fun updateMany(
+    override suspend fun updateMany(
         condition: Condition<Model>,
         modification: Modification<Model>
     ): CollectionChanges<Model> = wraps.updateMany(condition, modification)
         .also { changed(it.changes) }
 
 
-    final override suspend fun replaceOneIgnoringResult(
+    override suspend fun replaceOneIgnoringResult(
         condition: Condition<Model>,
         model: Model,
         orderBy: List<SortPart<Model>>
     ): Boolean = replaceOne(condition, model, orderBy).new != null
 
-    final override suspend fun upsertOneIgnoringResult(
+    override suspend fun upsertOneIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>,
         model: Model
     ): Boolean = upsertOne(condition, modification, model).old != null
 
-    final override suspend fun updateOneIgnoringResult(
+    override suspend fun updateOneIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>,
         orderBy: List<SortPart<Model>>
     ): Boolean = updateOne(condition, modification, orderBy).new != null
 
-    final override suspend fun updateManyIgnoringResult(
+    override suspend fun updateManyIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>
     ): Int = updateMany(condition, modification).changes.size
 
-    final override suspend fun deleteOneIgnoringOld(
+    override suspend fun deleteOneIgnoringOld(
         condition: Condition<Model>,
         orderBy: List<SortPart<Model>>
     ): Boolean = deleteOne(condition, orderBy) != null
 
-    final override suspend fun deleteManyIgnoringOld(condition: Condition<Model>): Int = deleteMany(condition).size
+    override suspend fun deleteManyIgnoringOld(condition: Condition<Model>): Int = deleteMany(condition).size
 
 }
 
