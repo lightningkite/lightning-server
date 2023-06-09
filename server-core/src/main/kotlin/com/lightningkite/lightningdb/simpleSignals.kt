@@ -187,6 +187,79 @@ fun <Model : HasId<ID>, ID : Comparable<ID>> FieldCollection<Model>.postNewValue
         updateMany(condition, modification).changes.size
 }
 
+fun <Model : HasId<ID>, ID : Comparable<ID>> FieldCollection<Model>.postRawChanges(
+    changed: suspend (List<EntryChange<Model>>) -> Unit
+): FieldCollection<Model> = object : FieldCollection<Model> by this@postRawChanges {
+    override val wraps = this@postRawChanges
+
+    override suspend fun insert(models: Iterable<Model>): List<Model> = wraps.insert(models)
+        .also { changed(it.map { EntryChange(null, it) }) }
+
+    override suspend fun deleteMany(condition: Condition<Model>): List<Model> = wraps.deleteMany(condition)
+        .also { changed(it.map { EntryChange(it, null) }) }
+
+    override suspend fun deleteOne(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? = wraps.deleteOne(condition, orderBy)
+        .also { changed(listOf(EntryChange(it, null)) ) }
+
+    override suspend fun replaceOne(
+        condition: Condition<Model>,
+        model: Model,
+        orderBy: List<SortPart<Model>>
+    ): EntryChange<Model> = wraps.replaceOne(condition, model, orderBy)
+        .also { changed(listOf(it) ) }
+
+    final override suspend fun updateOne(
+        condition: Condition<Model>,
+        modification: Modification<Model>,
+        orderBy: List<SortPart<Model>>
+    ): EntryChange<Model> = wraps.updateOne(condition, modification, orderBy)
+        .also { changed(listOf(it) ) }
+
+    final override suspend fun upsertOne(
+        condition: Condition<Model>,
+        modification: Modification<Model>,
+        model: Model
+    ): EntryChange<Model> = wraps.upsertOne(condition, modification, model)
+        .also { changed(listOf(it) ) }
+
+    final override suspend fun updateMany(
+        condition: Condition<Model>,
+        modification: Modification<Model>
+    ): CollectionChanges<Model> = wraps.updateMany(condition, modification)
+        .also { changed(it.changes) }
+
+
+    final override suspend fun replaceOneIgnoringResult(
+        condition: Condition<Model>,
+        model: Model,
+        orderBy: List<SortPart<Model>>
+    ): Boolean = replaceOne(condition, model, orderBy).new != null
+
+    final override suspend fun upsertOneIgnoringResult(
+        condition: Condition<Model>,
+        modification: Modification<Model>,
+        model: Model
+    ): Boolean = upsertOne(condition, modification, model).old != null
+
+    final override suspend fun updateOneIgnoringResult(
+        condition: Condition<Model>,
+        modification: Modification<Model>,
+        orderBy: List<SortPart<Model>>
+    ): Boolean = updateOne(condition, modification, orderBy).new != null
+
+    final override suspend fun updateManyIgnoringResult(
+        condition: Condition<Model>,
+        modification: Modification<Model>
+    ): Int = updateMany(condition, modification).changes.size
+
+    final override suspend fun deleteOneIgnoringOld(
+        condition: Condition<Model>,
+        orderBy: List<SortPart<Model>>
+    ): Boolean = deleteOne(condition, orderBy) != null
+
+    final override suspend fun deleteManyIgnoringOld(condition: Condition<Model>): Int = deleteMany(condition).size
+
+}
 
 /**
  * Intercept all kinds of creates, including [FieldCollection.insert], [FieldCollection.upsertOne], and [FieldCollection.upsertOneIgnoringResult].
