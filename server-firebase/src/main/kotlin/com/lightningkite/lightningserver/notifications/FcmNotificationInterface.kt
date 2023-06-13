@@ -52,6 +52,9 @@ object FcmNotificationInterface : NotificationInterface {
                 putAllData(programmaticData)
             setApnsConfig(
                 with(ApnsConfig.builder()) {
+                    data.timeToLive?.let {
+                        this.putHeader("apns-expiration", it.seconds.toString())
+                    }
                     if (notification != null) {
                         setFcmOptions(
                             ApnsFcmOptions
@@ -85,6 +88,9 @@ object FcmNotificationInterface : NotificationInterface {
                 setAndroidConfig(
                     with(AndroidConfig.builder()) {
                         setPriority(android.priority.toAndroid())
+                        data.timeToLive?.let{
+                            setTtl(it.seconds)
+                        }
                         setNotification(
                             AndroidNotification.builder()
                                 .setChannelId(android.channel)

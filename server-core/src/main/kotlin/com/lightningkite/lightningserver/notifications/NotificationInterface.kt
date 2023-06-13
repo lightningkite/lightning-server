@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.notifications
 
+import java.time.Duration
+
 
 @Deprecated("Use the new name", ReplaceWith("NotificationPriority", "com.lightningkite.lightningserver.notifications"))
 typealias Priority = NotificationPriority
@@ -45,6 +47,7 @@ data class NotificationData(
     val android: NotificationAndroid? = null,
     val ios: NotificationIos? = null,
     val web: NotificationWeb? = null,
+    val timeToLive: Duration? = null
 )
 
 
