@@ -3,6 +3,7 @@ package com.lightningkite.lightningdb
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
+import kotlin.reflect.KProperty1
 
 /**
  * Returns a Flow that will contain ALL the instances of *Model* in the collection.
@@ -146,3 +147,11 @@ suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
 suspend fun <Model : Any>
         FieldCollection<Model>.query(query: Query<Model>): Flow<Model> =
     find(query.condition, query.orderBy, query.skip, query.limit)
+
+@Deprecated("Use the built in group count with keyPaths.")
+suspend inline fun <reified Key, reified Model:Any> FieldCollection<Model>.groupCount(
+    condition: Condition<Model> = Condition.Always(),
+    groupBy: KProperty1<Model, Key>
+): Map<Key, Int> {
+    return this.groupCount<Key>(condition, path<Model>()[groupBy])
+}
