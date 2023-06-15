@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.db
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.db.testmodels.TempThing
+import com.lightningkite.lightningserver.db.testmodels._id
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Test
@@ -291,6 +292,115 @@ class SimpleSignals {
         signaledCollection.updateManyIgnoringResult(Condition.Always(), mod2)
         assertEquals(listOf(5, 5), calledIds)
         assertEquals(2, runCount)
+        calledIds.clear()
+        runCount = 0
+
+    }
+
+    @Test
+    fun testPostRawChanges():Unit = runBlocking {
+
+        val signaledCollection = collection.postRawChanges { changes: List<EntryChange<TempThing>> ->
+            calledIds.addAll(changes.flatMap { listOf(it.old?._id, it.new?._id) }.mapNotNull { it }.toSet() )
+            runCount++
+        }
+
+        signaledCollection.insert(listOf(thing1, thing2))
+        assertEquals(listOf(thing1._id, thing2._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.replaceOne(condition { it._id eq thing2._id }, thing3)
+        assertEquals(listOf(thing2._id, thing3._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.updateOne(condition { it._id eq thing3._id }, modification { it._id assign 2 })
+        assertEquals(listOf(thing3._id, thing2._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.upsertOne(condition { it._id eq thing2._id }, modification { it._id assign 3 }, thing3)
+        assertEquals(listOf(thing2._id, thing3._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.updateMany(Condition.Always(), modification { it._id assign 4 })
+        assertEquals(listOf(thing1._id, 4, thing3._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+        collection.drop()
+        collection.insertMany(listOf(thing1, thing2, thing3))
+
+
+        signaledCollection.deleteOne(Condition.Always())
+        assertEquals(listOf(thing1._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.deleteMany(Condition.Always())
+        assertEquals(listOf(thing2._id, thing3._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+        collection.drop()
+        collection.insertMany(listOf(thing1, thing2, thing3))
+
+        signaledCollection.replaceOneIgnoringResult(condition { it._id eq thing2._id }, thing3)
+        assertEquals(listOf(thing2._id, thing3._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.updateOneIgnoringResult(condition { it._id eq thing3._id }, modification { it._id assign 2 })
+        assertEquals(listOf(thing3._id, thing2._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.upsertOneIgnoringResult(condition { it._id eq thing2._id }, modification { it._id assign 3 }, thing3)
+        assertEquals(listOf(thing2._id, thing3._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.updateManyIgnoringResult(Condition.Always(), modification { it._id assign 4 })
+        assertEquals(listOf(thing1._id, 4, thing3._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        collection.drop()
+        collection.insertMany(listOf(thing1, thing2, thing3))
+
+
+        signaledCollection.deleteOneIgnoringOld(Condition.Always())
+        assertEquals(listOf(thing1._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.deleteManyIgnoringOld(Condition.Always())
+        assertEquals(listOf(thing2._id, thing3._id), calledIds)
+        assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 
