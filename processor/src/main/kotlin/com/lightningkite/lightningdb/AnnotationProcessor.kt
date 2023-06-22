@@ -37,6 +37,24 @@ class TableGenerator(
                     ).bufferedWriter().use { out ->
                         it.write(TabAppendable(out))
                     }
+                    codeGenerator.createNewFile(
+                        dependencies = it.declaration.containingFile?.let { Dependencies(false, it) }
+                            ?: Dependencies.ALL_FILES,
+                        packageName = it.packageName,
+                        fileName = it.simpleName + "Fields",
+                        extensionName = "ts.yaml"
+                    ).bufferedWriter().use { out ->
+                        it.writeTs(TabAppendable(out))
+                    }
+                    codeGenerator.createNewFile(
+                        dependencies = it.declaration.containingFile?.let { Dependencies(false, it) }
+                            ?: Dependencies.ALL_FILES,
+                        packageName = it.packageName,
+                        fileName = it.simpleName + "Fields",
+                        extensionName = "swift.yaml"
+                    ).bufferedWriter().use { out ->
+                        it.writeSwift(TabAppendable(out))
+                    }
                 } catch (e: Exception) {
                     throw Exception("Failed to generate fields for ${it.declaration.qualifiedName?.asString()}", e)
                 }

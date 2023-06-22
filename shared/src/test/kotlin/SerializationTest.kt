@@ -125,8 +125,8 @@ class SerializationTest {
     }
 
     @Test fun keyPaths() {
-        KeyPathSelf<LargeTestModel>()[LargeTestModel::embeddedNullable].safeGet(ClassUsedForEmbedding::value1).cycle()
-        KeyPathSelf<LargeTestModel>()[LargeTestModel::embedded][ClassUsedForEmbedding::value1].cycle()
+        path<LargeTestModel>().embeddedNullable.safe_value1.cycle()
+        path<LargeTestModel>().embedded.value1.cycle()
     }
 
     private inline fun <reified T> Condition<T>.cycle() {

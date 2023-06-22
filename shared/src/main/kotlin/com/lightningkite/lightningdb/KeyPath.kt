@@ -54,6 +54,12 @@ data class KeyPathSafeAccess<K, M: Any, V>(val first: KeyPath<K, M?>, val second
     override fun toString(): String = "$first?.${second.name}"
     override val properties: List<KProperty1<*, *>> get() = first.properties + listOf(second)
 }
+data class KeyPathNotNull<K, M: Any>(val source: KeyPath<K, M?>): KeyPath<K, M>() {
+    override fun get(key: K): M = source.get(key)!!
+    override fun set(key: K, value: M): K = source.set(key, value)
+    override fun toString(): String = "$source!!"
+    override val properties: List<KProperty1<*, *>> get() = source.properties
+}
 
 @OptIn(InternalSerializationApi::class)
 private class KProperty1Parser<T>(val serializer: KSerializer<T>) {
@@ -79,7 +85,7 @@ private class KProperty1Parser<T>(val serializer: KSerializer<T>) {
 }
 
 operator fun <K, V, V2> KeyPath<K, V>.get(prop: KProperty1<V, V2>) = KeyPathAccess(this, prop)
-fun <K, V: Any, V2> KeyPath<K, V?>.safeGet(prop: KProperty1<V, V2>) = KeyPathSafeAccess(this, prop)
+fun <K, V: Any, V2> KeyPath<K, V?>.getSafe(prop: KProperty1<V, V2>) = KeyPathSafeAccess(this, prop)
 
 class KeyPathSerializer<T>(val inner: KSerializer<T>): KSerializer<KeyPathPartial<T>> {
     @OptIn(ExperimentalSerializationApi::class)

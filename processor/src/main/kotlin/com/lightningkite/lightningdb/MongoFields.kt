@@ -89,6 +89,7 @@ data class MongoFields(
             appendLine("}")
             for (field in fields) {
                 appendLine("val <K> KeyPath<K, $typeReference>.${field.name}: KeyPath<K, ${field.kotlinType.toKotlin()}> get() = this[${classReference}::${field.name}]")
+                appendLine("val <K> KeyPath<K, $typeReference?>.safe_${field.name}: KeyPath<K, ${field.kotlinType.toKotlin()}?> get() = this.getSafe(${classReference}::${field.name})")
             }
             appendLine("inline val $typeReference.Companion.path: KeyPath<$typeReference, $typeReference> get() = path<$typeReference>()")
         } else {
@@ -101,7 +102,34 @@ data class MongoFields(
             appendLine("}")
             for (field in fields) {
                 appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { "reified " + it.name.asString() }}> KeyPath<ROOT, $typeReference>.${field.name}: KeyPath<ROOT, ${field.kotlinType.toKotlin()}> get() = this[${classReference}${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}::${field.name}]")
+                appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { "reified " + it.name.asString() }}> KeyPath<ROOT, $typeReference?>.safe_${field.name}: KeyPath<ROOT, ${field.kotlinType.toKotlin()}?> get() = this.getSafe(${classReference}${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}::${field.name})")
             }
+        }
+    }
+    fun writeTs(out: TabAppendable) {
+        out.appendLine("---")
+        for (field in fields) {
+            out.appendLine("- id: ${packageName}.${field.name}")
+            out.appendLine("  type: get")
+            out.appendLine("  receiver: ${packageName}.${typeReference}")
+            out.appendLine("  template: '~this~.get(\"${field.name}\")'")
+            out.appendLine("- id: ${packageName}.safe_${field.name}")
+            out.appendLine("  type: get")
+            out.appendLine("  receiver: ${packageName}.${typeReference}")
+            out.appendLine("  template: '~this~.getSafe(\"${field.name}\")'")
+        }
+    }
+    fun writeSwift(out: TabAppendable) {
+        out.appendLine("---")
+        for (field in fields) {
+            out.appendLine("- id: ${packageName}.${field.name}")
+            out.appendLine("  type: get")
+            out.appendLine("  receiver: ${packageName}.${typeReference}")
+            out.appendLine("  template: '~this~.get(${typeReference}.${field.name}Prop)'")
+            out.appendLine("- id: ${packageName}.safe_${field.name}")
+            out.appendLine("  type: get")
+            out.appendLine("  receiver: ${packageName}.${typeReference}")
+            out.appendLine("  template: '~this~.getSafe(${typeReference}.${field.name}Prop)'")
         }
     }
 }
