@@ -7,6 +7,10 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 
+/**
+ * An SMSClient implementation that sends real texts using the Twilio API.
+ */
+
 class TwilioSMSClient(
     val account: String,
     val key: String,

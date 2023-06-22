@@ -1,9 +1,11 @@
 package com.lightningkite.lightningserver.notifications
 
 /**
- * The concrete implementation of NotificationClient that will not send any notifications to an external source but just potentially print them to the console,
- * Store the last message, and call a event handler each time a message is sent.
- * This is useful for unit tests.
+ * The concrete implementation of NotificationClient that will is similar to ConsoleNotificationClient but with more options
+ * You can turn off the console printing
+ * It stores the last message sent
+ * You can set a lambda for getting send events
+ * This is useful for Unit Tests
  */
 object TestNotificationClient : NotificationClient {
     data class Message(val targets: List<String>, val data: NotificationData)

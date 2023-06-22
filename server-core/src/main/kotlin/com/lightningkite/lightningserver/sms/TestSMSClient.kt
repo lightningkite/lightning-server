@@ -1,6 +1,12 @@
 package com.lightningkite.lightningserver.sms
 
-import com.lightningkite.lightningserver.email.TestEmailClient
+/**
+ * A concrete implementation of SMSClient that will is similar to ConsoleSMSClient but with more options
+ * You can turn off the console printing
+ * It stores the last message sent
+ * You can set a lambda for getting send events
+ * This is useful for Unit Tests
+ */
 
 object TestSMSClient : SMSClient {
     data class Message(val to: String, val message: String)

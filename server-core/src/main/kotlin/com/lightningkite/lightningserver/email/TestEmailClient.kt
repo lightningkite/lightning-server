@@ -1,5 +1,12 @@
 package com.lightningkite.lightningserver.email
 
+/**
+ * A concrete implementation of EmailClient that will is similar to ConsoleEmailClient but with more options
+ * You can turn off the console printing
+ * It stores the last message sent
+ * You can set a lambda for getting send events
+ * This is useful for Unit Tests
+ */
 
 object TestEmailClient : EmailClient {
     data class Email(
