@@ -14,8 +14,8 @@ import com.lightningkite.lightningserver.settings.setting
 import java.util.concurrent.ConcurrentHashMap
 
 object TestSettings {
-    val database = setting("database", DatabaseSettings())
-    val email = setting("email", EmailSettings())
+    val database = setting("database", DatabaseSettings("ram"))
+    val email = setting("email", EmailSettings("test"))
     val jwtSigner = setting("jwt", JwtSigner())
     val files = setting("files", FilesSettings())
     val oauthGoogle = setting<OauthProviderCredentials?>("oauth-google", null)
@@ -23,9 +23,7 @@ object TestSettings {
     val oauthGithub = setting<OauthProviderCredentials?>("oauth-github", null)
 
     init {
-        Settings.populateDefaults(mapOf(
-            "database" to DatabaseSettings("ram")
-        ))
+        Settings.populateDefaults()
         engine = LocalEngine
     }
 }

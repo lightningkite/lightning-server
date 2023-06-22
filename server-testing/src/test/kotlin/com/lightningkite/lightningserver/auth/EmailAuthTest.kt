@@ -1,12 +1,7 @@
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningdb.test.TestSettings
-import com.lightningkite.lightningdb.test.User
-import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.db.ModelInfo
-import com.lightningkite.lightningserver.auth.userEmailAccess
-import com.lightningkite.lightningserver.email.ConsoleEmailClient
+import com.lightningkite.lightningserver.email.TestEmailClient
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -25,7 +20,7 @@ class EmailAuthTest {
         runBlocking {
             TestSettings.emailAuth.loginEmail.implementation(Unit, "joseph@lightningkite.com")
             val pinRegex = Regex("[0-9][0-9][0-9][0-9][0-9][0-9]")
-            val pin = (TestSettings.email() as ConsoleEmailClient).lastEmailSent?.message?.let {
+            val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.message?.let {
                 pinRegex.find(it)?.value
             }!!
             val token = TestSettings.emailAuth.loginEmailPin.implementation(Unit, EmailPinLogin("joseph@lightningkite.com", pin))

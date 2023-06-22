@@ -1,11 +1,10 @@
 package com.lightningkite.lightningserver.email
 
+import com.lightningkite.lightningserver.logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.apache.commons.mail.EmailAttachment
 import org.apache.commons.mail.HtmlEmail
-import org.apache.commons.mail.MultiPartEmail
-import org.apache.commons.mail.SimpleEmail
 
 /**
  * An email client that will send real emails through SMTP.
@@ -48,10 +47,10 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
         email.subject = subject
 //        email.addHeader("X-SES-LIST-MANAGEMENT-OPTIONS", "contactListName; topic=topicName")
         email.addTo(*to.toTypedArray())
-        println("Ready to send...")
+        logger.debug("Ready to send email...")
         withContext(Dispatchers.IO) {
             email.send()
         }
-        println("Email sent")
+        logger.debug("Email sent")
     }
 }

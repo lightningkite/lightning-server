@@ -5,12 +5,13 @@ import kotlinx.serialization.Serializable
 
 /**
  * EmailSettings defines where to send emails, and any credentials that may be required to do so.
- * There are two options currently with email. You can send it to the console, or you can use SMTP to send real emails.
+ * There are two live options built in. You can use SMTP credentials to send the email through Apache Commons, or through the MailGun API
  *
  * @param url A string containing everything needed to connect to an email server. The format is defined by the EmailClient that will consume it.
  *  For SMTP: smtp://username:password@host:port*|fromEmail*    *:Optional items
  *  For mailgun: mailgun://key@domain
  *  For Console: console
+ *  For Tests: test
  * @param fromEmail Required by at least the SMTP option. This will be the email that recipients see as the sender.
  */
 @Serializable
@@ -20,6 +21,7 @@ data class EmailSettings(
 ) : () -> EmailClient {
     companion object : Pluggable<EmailSettings, EmailClient>() {
         init {
+            EmailSettings.register("test") { TestEmailClient }
             EmailSettings.register("console") { ConsoleEmailClient }
             EmailSettings.register("mailgun") {
                 Regex("""mailgun://(?<key>[^@]+)@(?<domain>.+)""").matchEntire(it.url)?.let { match ->
