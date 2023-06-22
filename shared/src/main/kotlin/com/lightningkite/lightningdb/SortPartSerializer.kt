@@ -33,17 +33,20 @@ class SortPartSerializer<T>(val inner: KSerializer<T>): KSerializer<SortPart<T>>
     override fun deserialize(decoder: Decoder): SortPart<T> {
         val value = decoder.decodeString()
         val descending = value.startsWith('-')
-        val name = value.removePrefix("-")
+        val nameWithoutCase = value.removePrefix("-")
+        val ignoreCase = nameWithoutCase.startsWith('~')
+        val name = nameWithoutCase.removePrefix("~")
         val prop = fields[name]
         @Suppress("UNCHECKED_CAST")
         val typedProp = prop as KProperty1Partial<T>
-        return SortPart(typedProp, !descending)
+        return SortPart(typedProp, !descending, ignoreCase)
     }
 
     override fun serialize(encoder: Encoder, value: SortPart<T>) {
-        if(value.ascending)
-            encoder.encodeString(value.field.property.name)
-        else
-            encoder.encodeString("-" + value.field.property.name)
+        encoder.encodeString(buildString {
+            if(!value.ascending) append('-')
+            if(value.ignoreCase) append('~')
+            append(value.field.property.name)
+        })
     }
 }

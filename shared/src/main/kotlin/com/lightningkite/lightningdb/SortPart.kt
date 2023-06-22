@@ -10,17 +10,25 @@ import kotlin.reflect.KProperty1
 @Description("The name of the property to sort by.  Prepend a '-' if you wish to sort descending.")
 data class SortPart<T: IsCodableAndHashable>(
     val field: KProperty1Partial<T>,
-    val ascending: Boolean = true
+    val ascending: Boolean = true,
+    val ignoreCase: Boolean = false
 ) {
-    constructor(field: KProperty1<T, *>, ascending: Boolean = true):this(KProperty1Partial(field), ascending)
+    constructor(field: KProperty1<T, *>, ascending: Boolean = true, ignoreCase: Boolean = false):this(KProperty1Partial(field), ascending, ignoreCase)
 }
 
 val <T: IsCodableAndHashable> List<SortPart<T>>.comparator: Comparator<T>? get() {
     if(this.isEmpty()) return null
     return Comparator { a, b ->
         for(part in this) {
-            val result = part.field.compare.compare(a, b)
-            if(result != 0) return@Comparator if(part.ascending) result else -result
+            if (part.ignoreCase) {
+                val aString = part.field.property.get(a) as String
+                val bString = part.field.property.get(b) as String
+                val result = aString.compareTo(bString, true)
+                if(result != 0) return@Comparator if(part.ascending) result else -result
+            } else {
+                val result = part.field.compare.compare(a, b)
+                if(result != 0) return@Comparator if(part.ascending) result else -result
+            }
         }
         return@Comparator 0
     }

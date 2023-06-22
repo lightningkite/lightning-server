@@ -46,7 +46,7 @@ class SerializationTest {
         (startChain<Post>().content assign "Lightning Kite").cycle()
     }
     @Test fun demoSorts() {
-        listOf(SortPart(User::email), SortPart(User::age, ascending = false)).cycle()
+        listOf(SortPart(User::email, ignoreCase = true), SortPart(User::age, ascending = false)).cycle()
     }
     @Test fun hackTest() {
         println(serializer<List<Int>>().listElement())

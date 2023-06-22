@@ -48,7 +48,7 @@ class PostgresCollection<T : Any>(
         val items = t {
             table
                 .select { condition(condition, serializer, table).asOp() }
-                .orderBy(*orderBy.map { table.col[it.field.property.name]!! to if (it.ascending) SortOrder.ASC else SortOrder.DESC }
+                .orderBy(*orderBy.map { (if(it.ignoreCase) (table.col[it.field.property.name]!! as Column<String>).lowerCase() else table.col[it.field.property.name]!!) to if (it.ascending) SortOrder.ASC else SortOrder.DESC }
                     .toTypedArray())
                 .limit(limit, skip.toLong())
 //                .prep
