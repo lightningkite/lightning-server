@@ -14,7 +14,7 @@ import java.io.File
  * The concrete implementation of NotificationInterface that will use Firebase Messaging to send push notifications to
  * clients.
  */
-object FcmNotificationInterface : NotificationInterface {
+object FcmNotificationClient : NotificationClient {
     init {
         NotificationSettings.register("fcm") {
             var creds = it.credentials?.trim() ?: throw IllegalStateException(
@@ -30,7 +30,7 @@ object FcmNotificationInterface : NotificationInterface {
                     .setCredentials(GoogleCredentials.fromStream(creds.byteInputStream()))
                     .build()
             )
-            FcmNotificationInterface
+            FcmNotificationClient
         }
     }
 

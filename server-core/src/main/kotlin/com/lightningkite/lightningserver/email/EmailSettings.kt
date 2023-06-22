@@ -20,6 +20,7 @@ data class EmailSettings(
 ) : () -> EmailClient {
     companion object : Pluggable<EmailSettings, EmailClient>() {
         init {
+            EmailSettings.register("test") { TestEmailClient }
             EmailSettings.register("console") { ConsoleEmailClient }
             EmailSettings.register("mailgun") {
                 Regex("""mailgun://(?<key>[^@]+)@(?<domain>.+)""").matchEntire(it.url)?.let { match ->

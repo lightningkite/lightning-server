@@ -11,6 +11,7 @@ data class SMSSettings(
 
     companion object : Pluggable<SMSSettings, SMSClient>() {
         init {
+            SMSSettings.register("test") { TestSMSClient }
             SMSSettings.register("console") { ConsoleSMSClient }
             SMSSettings.register("twilio") {
 

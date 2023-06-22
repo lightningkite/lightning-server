@@ -142,9 +142,9 @@ class SecurityTest() {
 }
 
 object TestSettings {
-    val database = setting("database", DatabaseSettings())
-    val email = setting("email", EmailSettings())
-    val sms = setting("sms", SMSSettings())
+    val database = setting("database", DatabaseSettings("ram"))
+    val email = setting("email", EmailSettings("test"))
+    val sms = setting("sms", SMSSettings("test"))
     val jwtSigner = setting("jwt", JwtSigner())
     val cache = setting("cache", CacheSettings())
     val files = setting("files", FilesSettings())
@@ -164,9 +164,7 @@ object TestSettings {
     val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
 
     init {
-        Settings.populateDefaults(mapOf(
-            "database" to DatabaseSettings("ram")
-        ))
+        Settings.populateDefaults()
         engine = LocalEngine
     }
 }

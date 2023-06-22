@@ -51,7 +51,7 @@ data class NotificationData(
 )
 
 
-interface NotificationInterface {
+interface NotificationClient {
     suspend fun send(
         targets: List<String>,
         title: String? = null,

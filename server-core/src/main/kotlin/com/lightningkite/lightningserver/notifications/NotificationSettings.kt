@@ -17,15 +17,16 @@ import kotlinx.serialization.Serializable
 data class NotificationSettings(
     val implementation: String = "console",
     val credentials: String? = null
-) : () -> NotificationInterface {
+) : () -> NotificationClient {
 
-    companion object : Pluggable<NotificationSettings, NotificationInterface>() {
+    companion object : Pluggable<NotificationSettings, NotificationClient>() {
         init {
-            register("console") { ConsoleNotificationInterface }
+            register("test") { TestNotificationClient }
+            register("console") { ConsoleNotificationClient }
         }
     }
 
-    override fun invoke(): NotificationInterface = parse(implementation.lowercase(), this)
+    override fun invoke(): NotificationClient = parse(implementation.lowercase(), this)
 
 }
 

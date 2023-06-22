@@ -1,10 +1,10 @@
 package com.lightningkite.lightningserver.notifications
 
 /**
- * The concrete implementation of NotificationInterface that will not send any notifications but just print them to the console.
- * This is useful for debugging and development.
+ * The concrete implementation of NotificationClient that will simply print out everything to the console
+ * This is useful for local development.
  */
-object ConsoleNotificationInterface : NotificationInterface {
+object ConsoleNotificationClient : NotificationClient {
     override suspend fun send(
         targets: List<String>,
         data: NotificationData
