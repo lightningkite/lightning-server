@@ -7,7 +7,6 @@ import com.lightningkite.lightningserver.db.testmodels._id
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Test
-import kotlin.math.sign
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail

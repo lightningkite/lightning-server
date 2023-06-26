@@ -453,7 +453,7 @@ inline fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.interc
             val current = wraps.findOne(condition) ?: return EntryChange(null, null)
             return wraps.replaceOne(
                 Condition.OnField(HasId<ID>::_id, Condition.Equal(current._id)),
-                interceptor(model, Modification.Assign(model))(model),
+                interceptor(current, Modification.Assign(model))(model),
                 orderBy
             )
         }
@@ -466,7 +466,7 @@ inline fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.interc
             val current = wraps.findOne(condition) ?: return false
             return wraps.replaceOneIgnoringResult(
                 Condition.OnField(HasId<ID>::_id, Condition.Equal(current._id)),
-                interceptor(model, Modification.Assign(model))(model),
+                interceptor(current, Modification.Assign(model))(model),
                 orderBy
             )
         }
