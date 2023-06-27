@@ -111,10 +111,6 @@ data class MongoFields(
             out.appendLine("  type: get")
             out.appendLine("  receiver: ${packageName}.${typeReference}")
             out.appendLine("  template: '~this~.get(\"${field.name}\")'")
-            out.appendLine("- id: ${packageName}.notNull.${field.name}")
-            out.appendLine("  type: get")
-            out.appendLine("  receiver: ${packageName}.${typeReference}")
-            out.appendLine("  template: '~this~.getSafe(\"${field.name}\")'")
         }
     }
     fun writeSwift(out: TabAppendable) {
@@ -124,10 +120,6 @@ data class MongoFields(
             out.appendLine("  type: get")
             out.appendLine("  receiver: ${packageName}.${typeReference}")
             out.appendLine("  template: '~this~.get(${typeReference}.${field.name}Prop)'")
-            out.appendLine("- id: ${packageName}.notNull.${field.name}")
-            out.appendLine("  type: get")
-            out.appendLine("  receiver: ${packageName}.${typeReference}")
-            out.appendLine("  template: '~this~.getSafe(${typeReference}.${field.name}Prop)'")
         }
     }
 }
