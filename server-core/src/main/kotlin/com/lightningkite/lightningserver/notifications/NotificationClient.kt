@@ -59,7 +59,8 @@ interface NotificationClient {
         imageUrl: String? = null,
         data: Map<String, String>? = null,
         critical: Boolean = false,
-        androidChannel: String? = null
+        androidChannel: String? = null,
+        timeToLive: Duration? = null
     ) = send(
         targets = targets,
         data = NotificationData(
@@ -71,7 +72,8 @@ interface NotificationClient {
                     priority = if (critical) NotificationPriority.HIGH else NotificationPriority.NORMAL
                 )
             },
-            ios = NotificationIos(critical = critical, sound = "default")
+            ios = NotificationIos(critical = critical, sound = "default"),
+            timeToLive = timeToLive
         )
     )
 
