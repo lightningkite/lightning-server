@@ -22,8 +22,9 @@ open class DelayedFieldCollection<Model : Any>(
         orderBy: List<SortPart<Model>>,
         skip: Int,
         limit: Int,
+        skipFieldsMask: Modification<Model>?,
         maxQueryMs: Long,
-    ): Flow<Model> = wraps.find(condition, orderBy, skip, limit, maxQueryMs).onStart { delay(milliseconds) }
+    ): Flow<Model> = wraps.find(condition, orderBy, skip, limit, skipFieldsMask, maxQueryMs).onStart { delay(milliseconds) }
 
     override suspend fun count(condition: Condition<Model>): Int {
         delay(milliseconds)

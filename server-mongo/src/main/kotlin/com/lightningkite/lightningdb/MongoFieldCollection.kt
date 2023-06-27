@@ -7,10 +7,7 @@ import com.mongodb.MongoCommandException
 import com.mongodb.MongoQueryException
 import com.mongodb.client.model.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -18,6 +15,7 @@ import org.bson.BsonDocument
 import org.bson.conversions.Bson
 import org.litote.kmongo.coroutine.CoroutineCollection
 import org.litote.kmongo.coroutine.aggregate
+import org.litote.kmongo.exclude
 import org.litote.kmongo.group
 import org.litote.kmongo.match
 import java.util.concurrent.TimeUnit
@@ -91,6 +89,7 @@ class MongoFieldCollection<Model : Any>(
         orderBy: List<SortPart<Model>>,
         skip: Int,
         limit: Int,
+        skipFieldsMask: Modification<Model>?,
         maxQueryMs: Long,
     ): Flow<Model> {
         val cs = condition.simplify()
@@ -116,6 +115,11 @@ class MongoFieldCollection<Model : Any>(
                 it.sort(sort(orderBy, mts))
             }
             .toFlow()
+            .let {
+                skipFieldsMask?.let { m ->
+                    it.map { m(it) }
+                } ?: it
+            }
             .catch { handleException(it) }
     }
 

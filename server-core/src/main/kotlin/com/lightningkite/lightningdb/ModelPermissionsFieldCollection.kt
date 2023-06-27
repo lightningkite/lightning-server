@@ -19,6 +19,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         orderBy: List<SortPart<Model>>,
         skip: Int,
         limit: Int,
+        skipFieldsMask: Modification<Model>?,
         maxQueryMs: Long
     ): Flow<Model> {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
@@ -27,6 +28,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
             orderBy = orderBy,
             skip = skip,
             limit = limit,
+            skipFieldsMask = skipFieldsMask,
             maxQueryMs = maxQueryMs
         ).map { permissions.mask(it) }
     }

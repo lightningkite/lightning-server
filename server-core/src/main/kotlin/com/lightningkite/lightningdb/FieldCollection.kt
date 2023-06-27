@@ -31,6 +31,7 @@ interface FieldCollection<Model : Any> {
         orderBy: List<SortPart<Model>> = listOf(),
         skip: Int = 0,
         limit: Int = Int.MAX_VALUE,
+        skipFieldsMask: Modification<Model>? = null,
         maxQueryMs: Long = 15_000
     ): Flow<Model>
 

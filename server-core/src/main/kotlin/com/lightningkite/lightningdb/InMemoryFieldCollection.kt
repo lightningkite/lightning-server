@@ -58,6 +58,7 @@ open class InMemoryFieldCollection<Model : Any>(
         orderBy: List<SortPart<Model>>,
         skip: Int,
         limit: Int,
+        skipFieldsMask: Modification<Model>?,
         maxQueryMs: Long,
     ): Flow<Model> = flow {
         val result = lock.withLock {
@@ -70,6 +71,11 @@ open class InMemoryFieldCollection<Model : Any>(
                 }
                 .drop(skip)
                 .take(limit)
+                .let {
+                    skipFieldsMask?.let { m ->
+                        it.map { m(it) }
+                    } ?: it
+                }
                 .toList()
         }
         result
