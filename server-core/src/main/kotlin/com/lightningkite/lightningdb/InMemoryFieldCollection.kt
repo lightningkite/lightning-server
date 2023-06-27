@@ -80,10 +80,11 @@ open class InMemoryFieldCollection<Model : Any>(
 
     override suspend fun count(condition: Condition<Model>): Int = data.count { condition(it) }
 
+    @Suppress("UNCHECKED_CAST")
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
         groupBy: DataClassPath<Model, Key>,
-    ): Map<Key, Int> = data.groupingBy { groupBy.get(it) }.eachCount()
+    ): Map<Key, Int> = data.groupingBy { groupBy.get(it) }.eachCount().minus(null) as Map<Key, Int>
 
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
@@ -98,7 +99,7 @@ open class InMemoryFieldCollection<Model : Any>(
         groupBy: DataClassPath<Model, Key>,
         property: DataClassPath<Model, N>,
     ): Map<Key, Double?> = data.asSequence().filter { condition(it) }
-        .mapNotNull { groupBy.get(it) to (property.get(it)?.toDouble() ?: return@mapNotNull null) }.aggregate(aggregate)
+        .mapNotNull { (groupBy.get(it) ?: return@mapNotNull null) to (property.get(it)?.toDouble() ?: return@mapNotNull null) }.aggregate(aggregate)
 
     override suspend fun insertImpl(models: Iterable<Model>): List<Model> = lock.withLock {
         uniqueCheck(models.map { EntryChange(null, it) })

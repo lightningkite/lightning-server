@@ -89,7 +89,6 @@ data class MongoFields(
             appendLine("}")
             for (field in fields) {
                 appendLine("val <K> DataClassPath<K, $typeReference>.${field.name}: DataClassPath<K, ${field.kotlinType.toKotlin()}> get() = this[${classReference}::${field.name}]")
-                appendLine("val <K> DataClassPath<K, $typeReference?>.safe_${field.name}: DataClassPath<K, ${field.kotlinType.toKotlin()}?> get() = this.getSafe(${classReference}::${field.name})")
             }
             appendLine("inline val $typeReference.Companion.path: DataClassPath<$typeReference, $typeReference> get() = path<$typeReference>()")
         } else {
@@ -102,7 +101,6 @@ data class MongoFields(
             appendLine("}")
             for (field in fields) {
                 appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { "reified " + it.name.asString() }}> DataClassPath<ROOT, $typeReference>.${field.name}: DataClassPath<ROOT, ${field.kotlinType.toKotlin()}> get() = this[${classReference}${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}::${field.name}]")
-                appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { "reified " + it.name.asString() }}> DataClassPath<ROOT, $typeReference?>.safe_${field.name}: DataClassPath<ROOT, ${field.kotlinType.toKotlin()}?> get() = this.getSafe(${classReference}${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}::${field.name})")
             }
         }
     }
@@ -113,7 +111,7 @@ data class MongoFields(
             out.appendLine("  type: get")
             out.appendLine("  receiver: ${packageName}.${typeReference}")
             out.appendLine("  template: '~this~.get(\"${field.name}\")'")
-            out.appendLine("- id: ${packageName}.safe_${field.name}")
+            out.appendLine("- id: ${packageName}.notNull.${field.name}")
             out.appendLine("  type: get")
             out.appendLine("  receiver: ${packageName}.${typeReference}")
             out.appendLine("  template: '~this~.getSafe(\"${field.name}\")'")
@@ -126,7 +124,7 @@ data class MongoFields(
             out.appendLine("  type: get")
             out.appendLine("  receiver: ${packageName}.${typeReference}")
             out.appendLine("  template: '~this~.get(${typeReference}.${field.name}Prop)'")
-            out.appendLine("- id: ${packageName}.safe_${field.name}")
+            out.appendLine("- id: ${packageName}.notNull.${field.name}")
             out.appendLine("  type: get")
             out.appendLine("  receiver: ${packageName}.${typeReference}")
             out.appendLine("  template: '~this~.getSafe(${typeReference}.${field.name}Prop)'")

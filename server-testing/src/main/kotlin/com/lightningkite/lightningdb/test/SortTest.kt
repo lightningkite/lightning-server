@@ -73,8 +73,8 @@ abstract class SortTest {
         val reversePosts = items.sortedByDescending { it.embeddedNullable?.value2 }
         collection.insertMany(items)
         val results1 = collection.find(Condition.Always()).toList()
-        val results2 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().embeddedNullable.safe_value2, true))).toList()
-        val results3 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().embeddedNullable.safe_value2, false))).toList()
+        val results2 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().embeddedNullable.notNull.value2, true))).toList()
+        val results3 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().embeddedNullable.notNull.value2, false))).toList()
         assertEquals(items.map { it._id }, results1.map { it._id })
         assertEquals(sortedPosts.map { it._id }, results2.map { it._id })
         assertEquals(reversePosts.map { it._id }, results3.map { it._id })

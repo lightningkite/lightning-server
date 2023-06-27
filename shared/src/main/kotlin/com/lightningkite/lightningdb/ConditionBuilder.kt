@@ -20,25 +20,6 @@ fun <T : IsCodableAndHashable> path(): DataClassPath<T, T> = DataClassPathSelf()
 inline fun <T : IsCodableAndHashable> condition(setup: (DataClassPath<T, T>) -> Condition<T>): Condition<T> =
     path<T>().let(setup)
 
-fun <K : IsCodableAndHashable, V : IsCodableAndHashable> DataClassPath<K, V>.mapCondition(condition: Condition<V>): Condition<K> {
-    @Suppress("UNCHECKED_CAST")
-    return when(this) {
-        is DataClassPathSelf<*> -> condition as Condition<K>
-        is DataClassPathAccess<*, *, *> -> (first as DataClassPath<K, Any?>).mapCondition(Condition.OnField(second as KProperty1<Any?, V>, condition))
-        is DataClassPathSafeAccess<*, *, *> -> (first as DataClassPath<K, Any?>).mapCondition(Condition.IfNotNull((second as DataClassPath<Any, V>).mapCondition(condition)))
-        else -> fatalError()
-    }
-}
-fun <K : IsCodableAndHashable, V : IsCodableAndHashable> DataClassPath<K, V>.mapModification(modification: Modification<V>): Modification<K> {
-    @Suppress("UNCHECKED_CAST")
-    return when(this) {
-        is DataClassPathSelf<*> -> modification as Modification<K>
-        is DataClassPathAccess<*, *, *> -> (first as DataClassPath<K, Any?>).mapModification(Modification.OnField(second as KProperty1<Any?, V>, modification))
-        is DataClassPathSafeAccess<*, *, *> -> (first as DataClassPath<K, Any?>).mapModification(Modification.IfNotNull((second as DataClassPath<Any, V>).mapModification(modification)))
-        else -> fatalError()
-    }
-}
-
 val <K : IsCodableAndHashable> DataClassPath<K, K>.always: Condition<K> get() = Condition.Always<K>()
 val <K : IsCodableAndHashable> DataClassPath<K, K>.never: Condition<K> get() = Condition.Never<K>()
 
@@ -107,14 +88,6 @@ inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<
 
 
 //////////////
-
-
-val <K : IsCodableAndHashable, T : IsCodableAndHashable> DataClassPath<K, T?>.notNull
-    get() = CMBuilder<K, T>(
-        mapCondition = { mapCondition(Condition.IfNotNull(it)) },
-        mapModification = { mapModification(Modification.IfNotNull(it)) }
-    )
-
 
 val <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, T?>.notNull
     get() = CMBuilder<K, T>(

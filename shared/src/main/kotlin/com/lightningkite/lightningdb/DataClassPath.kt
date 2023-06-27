@@ -22,36 +22,43 @@ abstract class DataClassPathPartial<K> {
 }
 
 abstract class DataClassPath<K, V>: DataClassPathPartial<K>() {
-    abstract fun get(key: K): V
+    abstract fun get(key: K): V?
     abstract fun set(key: K, value: V): K
     @Suppress("UNCHECKED_CAST")
     override fun getAny(key: K) = get(key)
     @Suppress("UNCHECKED_CAST")
     override fun setAny(key: K, any: Any?) = set(key, any as V)
+    abstract fun mapCondition(condition: Condition<V>): Condition<K>
+    abstract fun mapModification(modification: Modification<V>): Modification<K>
 }
 
 class DataClassPathSelf<K>(): DataClassPath<K, K>() {
-    override fun get(key: K): K = key
+    override fun get(key: K): K? = key
     override fun set(key: K, value: K): K = value
     override fun toString(): String = "this"
     override fun hashCode(): Int = 0
     override fun equals(other: Any?): Boolean = other is DataClassPathSelf<*>
     override val properties: List<KProperty1<*, *>> get() = listOf()
+    override fun mapCondition(condition: Condition<K>): Condition<K> = condition
+    override fun mapModification(modification: Modification<K>): Modification<K> = modification
 }
 data class DataClassPathAccess<K, M, V>(val first: DataClassPath<K, M>, val second: KProperty1<M, V>): DataClassPath<K, V>() {
-    override fun get(key: K): V = first.get(key).let { second.get(it) }
-    override fun set(key: K, value: V): K = first.set(key, second.setCopy(first.get(key), value))
+    override fun get(key: K): V? = first.get(key)?.let { second.get(it) }
+    override fun set(key: K, value: V): K = first.get(key)?.let { first.set(key, second.setCopy(it, value)) } ?: key
     override fun toString(): String = if(first is DataClassPathSelf<*>) second.name else "$first.${second.name}"
     override val properties: List<KProperty1<*, *>> get() = first.properties + listOf(second)
+    override fun mapCondition(condition: Condition<V>): Condition<K> = first.mapCondition(Condition.OnField(second, condition))
+    override fun mapModification(modification: Modification<V>): Modification<K> = first.mapModification(Modification.OnField(second, modification))
 }
-data class DataClassPathSafeAccess<K, M: Any, V>(val first: DataClassPath<K, M?>, val second: KProperty1<M, V>): DataClassPath<K, V?>() {
-    override fun get(key: K): V? = first.get(key)?.let { second.get(it) }
-    override fun set(key: K, value: V?): K = first.get(key)?.let {
-        @Suppress("UNCHECKED_CAST")
-        first.set(key, second.setCopy(it, value as V))
-    } ?: key
-    override fun toString(): String = "$first?.${second.name}"
-    override val properties: List<KProperty1<*, *>> get() = first.properties + listOf(second)
+data class DataClassPathNotNull<K, V>(val wraps: DataClassPath<K, V?>): DataClassPath<K, V>() {
+    override val properties: List<KProperty1<*, *>>
+        get() = wraps.properties
+
+    override fun get(key: K): V? = wraps.get(key)
+    override fun set(key: K, value: V): K = wraps.set(key, value)
+    override fun toString(): String = "$wraps?"
+    override fun mapCondition(condition: Condition<V>): Condition<K> = wraps.mapCondition(Condition.IfNotNull(condition))
+    override fun mapModification(modification: Modification<V>): Modification<K> = wraps.mapModification(Modification.IfNotNull(modification))
 }
 
 @OptIn(InternalSerializationApi::class)
@@ -78,7 +85,7 @@ private class KProperty1Parser<T>(val serializer: KSerializer<T>) {
 }
 
 operator fun <K, V, V2> DataClassPath<K, V>.get(prop: KProperty1<V, V2>) = DataClassPathAccess(this, prop)
-fun <K, V: Any, V2> DataClassPath<K, V?>.getSafe(prop: KProperty1<V, V2>) = DataClassPathSafeAccess(this, prop)
+val <K, V> DataClassPath<K, V?>.notNull: DataClassPathNotNull<K, V> get() = DataClassPathNotNull(this)
 
 class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializer<DataClassPathPartial<T>> {
     @OptIn(ExperimentalSerializationApi::class)
@@ -108,7 +115,6 @@ class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializer<DataCla
     fun fromString(value: String): DataClassPathPartial<T> {
         var current: DataClassPathPartial<T>? = null
         var currentSerializer: KSerializer<*> = inner
-        var isNullable = false
         for(part in value.split('.')) {
             val name = part.removeSuffix("?")
             if(name == "this") continue
@@ -117,10 +123,11 @@ class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializer<DataCla
             val c = current
             @Suppress("UNCHECKED_CAST")
             current = if(c == null) DataClassPathAccess(DataClassPathSelf<T>(), prop.first as KProperty1<T, Any?>)
-            else if(isNullable) DataClassPathSafeAccess(c as DataClassPath<T, Any?>, prop.first as KProperty1<Any, Any?>)
             else DataClassPathAccess(c as DataClassPath<T, Any?>, prop.first as KProperty1<Any?, Any?>)
-            isNullable = part.endsWith('?')
-            if(isNullable) currentSerializer = currentSerializer.nullElement()!!
+            if(part.endsWith('?')) {
+                current = DataClassPathNotNull(current as DataClassPath<T, Any?>)
+                currentSerializer = currentSerializer.nullElement()!!
+            }
         }
 
         return current ?: DataClassPathSelf()

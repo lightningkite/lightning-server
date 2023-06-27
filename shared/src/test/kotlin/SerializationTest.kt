@@ -129,7 +129,7 @@ class SerializationTest {
     }
 
     @Test fun keyPaths() {
-        path<LargeTestModel>().embeddedNullable.safe_value1.cycle()
+        path<LargeTestModel>().embeddedNullable.notNull.value1.cycle()
         path<LargeTestModel>().embedded.value1.cycle()
     }
 
