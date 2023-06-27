@@ -16,6 +16,6 @@ data class Query<T: IsCodableAndHashable>(
         orderBy: List<SortPart<T>> = listOf(),
         skip: Int = 0,
         limit: Int = 100,
-        makeCondition: (KeyPath<T, T>)->Condition<T>,
+        makeCondition: (DataClassPath<T, T>)->Condition<T>,
     ):this(makeCondition(path()), orderBy, skip, limit)
 }

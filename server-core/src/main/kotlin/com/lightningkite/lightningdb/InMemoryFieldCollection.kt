@@ -82,21 +82,21 @@ open class InMemoryFieldCollection<Model : Any>(
 
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
-        groupBy: KeyPath<Model, Key>,
+        groupBy: DataClassPath<Model, Key>,
     ): Map<Key, Int> = data.groupingBy { groupBy.get(it) }.eachCount()
 
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        property: KeyPath<Model, N>,
+        property: DataClassPath<Model, N>,
     ): Double? =
         data.asSequence().filter { condition(it) }.mapNotNull { property.get(it)?.toDouble() }.aggregate(aggregate)
 
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        groupBy: KeyPath<Model, Key>,
-        property: KeyPath<Model, N>,
+        groupBy: DataClassPath<Model, Key>,
+        property: DataClassPath<Model, N>,
     ): Map<Key, Double?> = data.asSequence().filter { condition(it) }
         .mapNotNull { groupBy.get(it) to (property.get(it)?.toDouble() ?: return@mapNotNull null) }.aggregate(aggregate)
 

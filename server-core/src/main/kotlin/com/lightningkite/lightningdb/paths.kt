@@ -3,23 +3,23 @@ package com.lightningkite.lightningdb
 import com.lightningkite.khrysalis.IsCodableAndHashable
 import kotlin.reflect.KProperty1
 
-fun <K, V : IsCodableAndHashable> Modification<K>.valueSetForKeyPath(path: KeyPath<K, V>): V? =
-    (forKeyPath<V>(path.properties) as? Modification.Assign<V>)?.value
+fun <K, V : IsCodableAndHashable> Modification<K>.valueSetForDataClassPath(path: DataClassPath<K, V>): V? =
+    (forDataClassPath<V>(path.properties) as? Modification.Assign<V>)?.value
 
-fun <K, V : IsCodableAndHashable> Modification<K>.forKeyPath(path: KeyPath<K, V>): Modification<V>? =
-    forKeyPath<V>(path.properties)
+fun <K, V : IsCodableAndHashable> Modification<K>.forDataClassPath(path: DataClassPath<K, V>): Modification<V>? =
+    forDataClassPath<V>(path.properties)
 
 @Suppress("UNCHECKED_CAST")
-private fun <V : IsCodableAndHashable> Modification<*>.forKeyPath(list: List<KProperty1<*, *>>): Modification<V>? {
+private fun <V : IsCodableAndHashable> Modification<*>.forDataClassPath(list: List<KProperty1<*, *>>): Modification<V>? {
     return when (this) {
         is Modification.OnField<*, *> -> if (list.first() == this.key) {
             if (list.size == 1) modification as Modification<V>
-            else this.modification.forKeyPath(list.drop(1))
+            else this.modification.forDataClassPath(list.drop(1))
         } else null
 
-        is Modification.SetPerElement<*> -> this.modification.forKeyPath(list)
-        is Modification.ListPerElement<*> -> this.modification.forKeyPath(list)
-        is Modification.Chain -> this.modifications.mapNotNull { it.forKeyPath<V>(list) }.let {
+        is Modification.SetPerElement<*> -> this.modification.forDataClassPath(list)
+        is Modification.ListPerElement<*> -> this.modification.forDataClassPath(list)
+        is Modification.Chain -> this.modifications.mapNotNull { it.forDataClassPath<V>(list) }.let {
             when (it.size) {
                 0 -> null
                 1 -> it.first()
@@ -27,7 +27,7 @@ private fun <V : IsCodableAndHashable> Modification<*>.forKeyPath(list: List<KPr
             }
         }
 
-        is Modification.IfNotNull -> this.modification.forKeyPath(list)
+        is Modification.IfNotNull -> this.modification.forDataClassPath(list)
         is Modification.Assign -> Modification.Assign(list.fold(value) { value, prop ->
             (prop as KProperty1<Any?, Any?>).get(
                 value
@@ -38,7 +38,7 @@ private fun <V : IsCodableAndHashable> Modification<*>.forKeyPath(list: List<KPr
     }
 }
 
-fun Modification<*>.affects(path: KeyPathPartial<*>): Boolean = affects(path.properties)
+fun Modification<*>.affects(path: DataClassPathPartial<*>): Boolean = affects(path.properties)
 private fun Modification<*>.affects(list: List<KProperty1<*, *>>): Boolean {
     return when (this) {
         is Modification.OnField<*, *> -> if (list.first() == this.key) {
@@ -54,7 +54,7 @@ private fun Modification<*>.affects(list: List<KProperty1<*, *>>): Boolean {
     }
 }
 
-fun Condition<*>.reads(path: KeyPathPartial<*>): Boolean = reads(path.properties)
+fun Condition<*>.reads(path: DataClassPathPartial<*>): Boolean = reads(path.properties)
 private fun Condition<*>.reads(list: List<KProperty1<*, *>>): Boolean {
     return when (this) {
         is Condition.OnField<*, *> -> if (list.first() == this.key) {
@@ -150,7 +150,7 @@ fun <T> Condition<T>.guaranteedAfter(modification: Modification<T>): Boolean {
 
 @Suppress("UNCHECKED_CAST")
 fun <T, V> Modification<T>.map(
-    path: KeyPath<T, V>,
+    path: DataClassPath<T, V>,
     onModification: (Modification<V>) -> Modification<V>,
 ): Modification<T> = (this as Modification<Any?>).map<V>(path.properties, onModification) as Modification<T>
 

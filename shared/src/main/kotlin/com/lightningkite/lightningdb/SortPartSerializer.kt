@@ -29,7 +29,7 @@ class SortPartSerializer<T>(val inner: KSerializer<T>): KSerializer<SortPart<T>>
     }
 
     val fields = inner.attemptGrabFields()
-    val sub = KeyPathSerializer(inner)
+    val sub = DataClassPathSerializer(inner)
 
     override fun deserialize(decoder: Decoder): SortPart<T> {
         val value = decoder.decodeString()

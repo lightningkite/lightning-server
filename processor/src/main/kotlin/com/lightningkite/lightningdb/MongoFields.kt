@@ -88,10 +88,10 @@ data class MongoFields(
             }
             appendLine("}")
             for (field in fields) {
-                appendLine("val <K> KeyPath<K, $typeReference>.${field.name}: KeyPath<K, ${field.kotlinType.toKotlin()}> get() = this[${classReference}::${field.name}]")
-                appendLine("val <K> KeyPath<K, $typeReference?>.safe_${field.name}: KeyPath<K, ${field.kotlinType.toKotlin()}?> get() = this.getSafe(${classReference}::${field.name})")
+                appendLine("val <K> DataClassPath<K, $typeReference>.${field.name}: DataClassPath<K, ${field.kotlinType.toKotlin()}> get() = this[${classReference}::${field.name}]")
+                appendLine("val <K> DataClassPath<K, $typeReference?>.safe_${field.name}: DataClassPath<K, ${field.kotlinType.toKotlin()}?> get() = this.getSafe(${classReference}::${field.name})")
             }
-            appendLine("inline val $typeReference.Companion.path: KeyPath<$typeReference, $typeReference> get() = path<$typeReference>()")
+            appendLine("inline val $typeReference.Companion.path: DataClassPath<$typeReference, $typeReference> get() = path<$typeReference>()")
         } else {
             appendLine("fun prepare${simpleName}Fields() {")
             tab {
@@ -101,8 +101,8 @@ data class MongoFields(
             }
             appendLine("}")
             for (field in fields) {
-                appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { "reified " + it.name.asString() }}> KeyPath<ROOT, $typeReference>.${field.name}: KeyPath<ROOT, ${field.kotlinType.toKotlin()}> get() = this[${classReference}${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}::${field.name}]")
-                appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { "reified " + it.name.asString() }}> KeyPath<ROOT, $typeReference?>.safe_${field.name}: KeyPath<ROOT, ${field.kotlinType.toKotlin()}?> get() = this.getSafe(${classReference}${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}::${field.name})")
+                appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { "reified " + it.name.asString() }}> DataClassPath<ROOT, $typeReference>.${field.name}: DataClassPath<ROOT, ${field.kotlinType.toKotlin()}> get() = this[${classReference}${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}::${field.name}]")
+                appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { "reified " + it.name.asString() }}> DataClassPath<ROOT, $typeReference?>.safe_${field.name}: DataClassPath<ROOT, ${field.kotlinType.toKotlin()}?> get() = this.getSafe(${classReference}${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}::${field.name})")
             }
         }
     }

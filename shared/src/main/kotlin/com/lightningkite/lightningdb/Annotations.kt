@@ -126,12 +126,12 @@ annotation class Description(val text: String)
 
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-@Deprecated("Use GenerateKeyPaths insteated", ReplaceWith("GenerateKeyPaths"))
+@Deprecated("Use GenerateDataClassPaths insteated", ReplaceWith("GenerateDataClassPaths"))
 annotation class DatabaseModel
 
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-annotation class GenerateKeyPaths
+annotation class GenerateDataClassPaths
 
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)

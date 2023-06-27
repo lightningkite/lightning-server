@@ -131,7 +131,7 @@ class MongoFieldCollection<Model : Any>(
 
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
-        groupBy: KeyPath<Model, Key>,
+        groupBy: DataClassPath<Model, Key>,
     ): Map<Key, Int> {
         val cs = condition.simplify()
         if (cs is Condition.Never) return mapOf()
@@ -161,7 +161,7 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        property: KeyPath<Model, N>,
+        property: DataClassPath<Model, N>,
     ): Double? {
         val cs = condition.simplify()
         if (cs is Condition.Never) return null
@@ -180,8 +180,8 @@ class MongoFieldCollection<Model : Any>(
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        groupBy: KeyPath<Model, Key>,
-        property: KeyPath<Model, N>,
+        groupBy: DataClassPath<Model, Key>,
+        property: DataClassPath<Model, N>,
     ): Map<Key, Double?> {
         val cs = condition.simplify()
         if (cs is Condition.Never) return mapOf()

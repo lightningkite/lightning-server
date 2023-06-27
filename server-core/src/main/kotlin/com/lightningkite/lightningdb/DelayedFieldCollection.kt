@@ -30,7 +30,7 @@ open class DelayedFieldCollection<Model : Any>(
         return wraps.count(condition)
     }
 
-    override suspend fun <Key> groupCount(condition: Condition<Model>, groupBy: KeyPath<Model, Key>): Map<Key, Int> {
+    override suspend fun <Key> groupCount(condition: Condition<Model>, groupBy: DataClassPath<Model, Key>): Map<Key, Int> {
         delay(milliseconds)
         return wraps.groupCount(condition, groupBy)
     }
@@ -38,7 +38,7 @@ open class DelayedFieldCollection<Model : Any>(
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        property: KeyPath<Model, N>,
+        property: DataClassPath<Model, N>,
     ): Double? {
         delay(milliseconds)
         return wraps.aggregate(aggregate, condition, property)
@@ -47,8 +47,8 @@ open class DelayedFieldCollection<Model : Any>(
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        groupBy: KeyPath<Model, Key>,
-        property: KeyPath<Model, N>,
+        groupBy: DataClassPath<Model, Key>,
+        property: DataClassPath<Model, N>,
     ): Map<Key, Double?> {
         delay(milliseconds)
         return wraps.groupAggregate(aggregate, condition, groupBy, property)

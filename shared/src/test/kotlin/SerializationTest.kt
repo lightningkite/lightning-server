@@ -41,8 +41,8 @@ class SerializationTest {
     }
     @Test fun demoModifications() {
         Modification.Assign(2).cycle()
-        (path<User>().email assign "Dan").cycle()
-        (path<Post>().content assign "Lightning Kite").cycle()
+        modification<User> { it.email assign "Dan" }.cycle()
+        modification<Post> { it.content assign "Lightning Kite" }.cycle()
     }
     @Test fun demoSorts() {
         listOf(SortPart(User::email), SortPart(User::age, ascending = false)).cycle()
@@ -99,29 +99,33 @@ class SerializationTest {
     }
 
     @Test fun modifications() {
-        ((path<LargeTestModel>().int assign 2) then (path<LargeTestModel>().boolean assign true)).cycle()
-        (path<LargeTestModel>().intNullable.toCMBuilder().notNull + 1).cycle()
-        (path<LargeTestModel>().int assign 2).cycle()
-        (path<LargeTestModel>().int coerceAtMost 2).cycle()
-        (path<LargeTestModel>().int coerceAtLeast 2).cycle()
-        (path<LargeTestModel>().int + 2).cycle()
-        (path<LargeTestModel>().int * 2).cycle()
-        (path<LargeTestModel>().string + "asdf").cycle()
-        (path<LargeTestModel>().list + listOf(1, 2, 3)).cycle()
-        (path<LargeTestModel>().list.removeAll { it eq 2 }).cycle()
-        (path<LargeTestModel>().list.removeAll(listOf(1, 2))).cycle()
-        (path<LargeTestModel>().list.dropFirst()).cycle()
-        (path<LargeTestModel>().list.dropLast()).cycle()
-        (path<LargeTestModel>().set.removeAll { it eq 2 }).cycle()
-        (path<LargeTestModel>().set.removeAll(setOf(1, 2))).cycle()
-        (path<LargeTestModel>().set.dropFirst()).cycle()
-        (path<LargeTestModel>().set.dropLast()).cycle()
-        (path<LargeTestModel>().list.map { it + 2 }).cycle()
-        (path<LargeTestModel>().map + mapOf("c" to 3)).cycle()
-        (path<LargeTestModel>().map.modifyByKey(mapOf(
+//        ((path<LargeTestModel>().int assign 2) then (path<LargeTestModel>().boolean assign true)).cycle()
+        modification<LargeTestModel> {
+            it.int assign 2
+            it.boolean assign true
+        }.cycle()
+        modification<LargeTestModel> {it.intNullable.toCMBuilder().notNull + 1 }.cycle()
+        modification<LargeTestModel> {it.int assign 2 }.cycle()
+        modification<LargeTestModel> {it.int coerceAtMost 2 }.cycle()
+        modification<LargeTestModel> {it.int coerceAtLeast 2 }.cycle()
+        modification<LargeTestModel> {it.int + 2 }.cycle()
+        modification<LargeTestModel> {it.int * 2 }.cycle()
+        modification<LargeTestModel> {it.string + "asdf" }.cycle()
+        modification<LargeTestModel> {it.list + listOf(1, 2, 3) }.cycle()
+        modification<LargeTestModel> {it.list.removeAll { it eq 2 } }.cycle()
+        modification<LargeTestModel> {it.list.removeAll(listOf(1, 2)) }.cycle()
+        modification<LargeTestModel> {it.list.dropFirst() }.cycle()
+        modification<LargeTestModel> {it.list.dropLast() }.cycle()
+        modification<LargeTestModel> {it.set.removeAll { it eq 2 } }.cycle()
+        modification<LargeTestModel> {it.set.removeAll(setOf(1, 2)) }.cycle()
+        modification<LargeTestModel> {it.set.dropFirst() }.cycle()
+        modification<LargeTestModel> {it.set.dropLast() }.cycle()
+        modification<LargeTestModel> {it.list.map { it + 2 } }.cycle()
+        modification<LargeTestModel> {it.map + mapOf("c" to 3) }.cycle()
+        modification<LargeTestModel> {it.map.modifyByKey(mapOf(
             "c" to { it + 1 }
-        ))).cycle()
-        (path<LargeTestModel>().map.removeKeys(setOf("a"))).cycle()
+        ))}.cycle()
+        modification<LargeTestModel> { it.map.removeKeys(setOf("A")) }.cycle()
     }
 
     @Test fun keyPaths() {
@@ -178,11 +182,11 @@ class SerializationTest {
         println(recreated2)
         assertEquals(this, recreated2)
     }
-    private inline fun <reified T> KeyPathPartial<T>.cycle() {
+    private inline fun <reified T> DataClassPathPartial<T>.cycle() {
         println("----$this----")
         val asString = myJson.encodeToString(this)
         println(asString)
-        val recreated = myJson.decodeFromString<KeyPathPartial<T>>(asString)
+        val recreated = myJson.decodeFromString<DataClassPathPartial<T>>(asString)
         println(recreated)
         assertEquals(this, recreated)
     }

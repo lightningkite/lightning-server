@@ -65,10 +65,10 @@ fun <T> Codec<T>.fromDocument(doc: Document, registry: CodecRegistry): T {
     return this.decode(BsonDocumentReader(BsonDocumentWrapper.asBsonDocument(doc, registry)), DecoderContext.builder().build())
 }
 
-val KeyPathPartial<*>.mongo: String get() = properties.joinToString(".") { it.name }
+val DataClassPathPartial<*>.mongo: String get() = properties.joinToString(".") { it.name }
 @Suppress("UNCHECKED_CAST")
 @OptIn(InternalSerializationApi::class)
-fun <K,V> KSerializer<K>.fieldSerializer(path: KeyPath<K, V>): KSerializer<V> {
+fun <K,V> KSerializer<K>.fieldSerializer(path: DataClassPath<K, V>): KSerializer<V> {
     var current:KSerializer<*> = this
     path.properties.forEach {
         current = ((current.nullElement() ?: current) as KSerializer<Any?>).fieldSerializer(it as KProperty1<Any?, Any?>) as KSerializer<*>

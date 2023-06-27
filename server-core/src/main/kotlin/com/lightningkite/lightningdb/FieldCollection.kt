@@ -46,7 +46,7 @@ interface FieldCollection<Model : Any> {
      */
     suspend fun <Key> groupCount(
         condition: Condition<Model> = Condition.Always(),
-        groupBy: KeyPath<Model, Key>
+        groupBy: DataClassPath<Model, Key>
     ): Map<Key, Int>
 
     /**
@@ -55,7 +55,7 @@ interface FieldCollection<Model : Any> {
     suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model> = Condition.Always(),
-        property: KeyPath<Model, N>
+        property: DataClassPath<Model, N>
     ): Double?
 
     /**
@@ -64,8 +64,8 @@ interface FieldCollection<Model : Any> {
     suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model> = Condition.Always(),
-        groupBy: KeyPath<Model, Key>,
-        property: KeyPath<Model, N>
+        groupBy: DataClassPath<Model, Key>,
+        property: DataClassPath<Model, N>
     ): Map<Key, Double?>
 
 

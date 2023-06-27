@@ -16,11 +16,11 @@ class TableGenerator(
         val allDatabaseModels = resolver.getNewFiles()
             .flatMap { it.declarations }
             .mapNotNull { it as? KSClassDeclaration }
-            .filter { it.annotation("DatabaseModel") != null || it.annotation("GenerateKeyPaths") != null }
+            .filter { it.annotation("DatabaseModel") != null || it.annotation("GenerateDataClassPaths") != null }
         val changedDatabaseModels = resolver.getNewFiles()
             .flatMap { it.declarations }
             .mapNotNull { it as? KSClassDeclaration }
-            .filter { it.annotation("DatabaseModel") != null || it.annotation("GenerateKeyPaths") != null }
+            .filter { it.annotation("DatabaseModel") != null || it.annotation("GenerateDataClassPaths") != null }
 
         val seen = HashSet<KSClassDeclaration>()
         resolver.getClassDeclarationByName("kotlin.Comparable")?.let { comparable = it }

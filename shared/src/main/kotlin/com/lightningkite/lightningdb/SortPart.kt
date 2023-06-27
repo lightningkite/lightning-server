@@ -1,4 +1,3 @@
-@file:SharedCode
 package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.IsCodableAndHashable
@@ -9,11 +8,11 @@ import kotlin.reflect.KProperty1
 @Serializable(SortPartSerializer::class)
 @Description("The name of the property to sort by.  Prepend a '-' if you wish to sort descending.")
 data class SortPart<T: IsCodableAndHashable>(
-    val field: KeyPathPartial<T>,
+    val field: DataClassPathPartial<T>,
     val ascending: Boolean = true,
     val ignoreCase: Boolean = false
 ) {
-    constructor(field: KProperty1<T, *>, ascending: Boolean = true, ignoreCase: Boolean = false):this(KeyPathAccess(KeyPathSelf(), field), ascending, ignoreCase)
+    constructor(field: KProperty1<T, *>, ascending: Boolean = true, ignoreCase: Boolean = false):this(DataClassPathAccess(DataClassPathSelf(), field), ascending, ignoreCase)
 }
 
 val <T: IsCodableAndHashable> List<SortPart<T>>.comparator: Comparator<T>? get() {

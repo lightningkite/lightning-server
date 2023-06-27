@@ -27,7 +27,7 @@ data class Mask<T>(
             else -> Condition.And(totalConditions)
         }
     }
-    operator fun invoke(on: KeyPathPartial<T>): Condition<T> {
+    operator fun invoke(on: DataClassPathPartial<T>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
         for(pair in pairs) {
             if(pair.second.affects(on)) totalConditions.add(pair.first)
@@ -53,7 +53,7 @@ data class Mask<T>(
         val pairs: ArrayList<Pair<Condition<T>, Modification<T>>> = ArrayList()
     ) {
         val it = path<T>()
-        infix fun <V> KeyPath<T, V>.maskedTo(value: V) = mapModification(Modification.Assign(value))
+        infix fun <V> DataClassPath<T, V>.maskedTo(value: V) = mapModification(Modification.Assign(value))
         infix fun Modification<T>.unless(condition: Condition<T>) {
             pairs.add(condition to this)
         }

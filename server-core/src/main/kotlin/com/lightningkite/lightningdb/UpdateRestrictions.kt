@@ -13,7 +13,7 @@ data class UpdateRestrictions<T>(
     val fields: List<Part<T>> = listOf()
 ) {
     @Serializable
-    data class Part<T>(val path: KeyPathPartial<T>, val limitedIf: Condition<T>, val limitedTo: Condition<T>)
+    data class Part<T>(val path: DataClassPathPartial<T>, val limitedIf: Condition<T>, val limitedTo: Condition<T>)
 
     operator fun invoke(on: Modification<T>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
@@ -39,26 +39,26 @@ data class UpdateRestrictions<T>(
         /**
          * Makes a field unmodifiable.
          */
-        fun KeyPath<T, *>.cannotBeModified() {
+        fun DataClassPath<T, *>.cannotBeModified() {
             fields.add(Part(this, Condition.Never(), Condition.Always()))
         }
         /**
          * Makes a field only modifiable if the item matches the [condition].
          */
-        infix fun KeyPath<T, *>.requires(condition: Condition<T>) {
+        infix fun DataClassPath<T, *>.requires(condition: Condition<T>) {
             fields.add(Part(this, condition, Condition.Always()))
         }
         /**
          * Makes a field only modifiable if the item matches the [condition].
          * In addition, the value it is being changed to must match [valueMust].
          */
-        fun <V> KeyPath<T, V>.requires(requires: Condition<T>, valueMust: (KeyPath<V, V>)->Condition<V>) {
+        fun <V> DataClassPath<T, V>.requires(requires: Condition<T>, valueMust: (DataClassPath<V, V>)->Condition<V>) {
             fields.add(Part(this, requires, this.condition(valueMust)))
         }
         /**
          * The value is only allowed to change to a value that matches [valueMust].
          */
-        fun <V> KeyPath<T, V>.mustBe(valueMust: (KeyPath<V, V>)->Condition<V>) {
+        fun <V> DataClassPath<T, V>.mustBe(valueMust: (DataClassPath<V, V>)->Condition<V>) {
             fields.add(Part(this, Condition.Always(), this.condition(valueMust)))
         }
         fun build() = UpdateRestrictions(fields)

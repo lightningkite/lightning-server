@@ -206,7 +206,7 @@ private val fromLightningServerPackage = setOf(
 )
 private val skipSet = fromLightningServerPackage + setOf(
     "SortPart",
-    "KeyPath",
+    "DataClassPath",
     "KProperty1Partial",
 )
 

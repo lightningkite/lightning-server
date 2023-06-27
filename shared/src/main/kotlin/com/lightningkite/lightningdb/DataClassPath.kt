@@ -6,7 +6,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Serializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
@@ -15,14 +14,14 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.internal.GeneratedSerializer
 import kotlin.reflect.KProperty1
 
-@Serializable(KeyPathSerializer::class)
-abstract class KeyPathPartial<K> {
+@Serializable(DataClassPathSerializer::class)
+abstract class DataClassPathPartial<K> {
     abstract fun getAny(key: K): Any?
     abstract fun setAny(key: K, any: Any?): K
     abstract val properties: List<KProperty1<*, *>>
 }
 
-abstract class KeyPath<K, V>: KeyPathPartial<K>() {
+abstract class DataClassPath<K, V>: DataClassPathPartial<K>() {
     abstract fun get(key: K): V
     abstract fun set(key: K, value: V): K
     @Suppress("UNCHECKED_CAST")
@@ -31,21 +30,21 @@ abstract class KeyPath<K, V>: KeyPathPartial<K>() {
     override fun setAny(key: K, any: Any?) = set(key, any as V)
 }
 
-class KeyPathSelf<K>(): KeyPath<K, K>() {
+class DataClassPathSelf<K>(): DataClassPath<K, K>() {
     override fun get(key: K): K = key
     override fun set(key: K, value: K): K = value
     override fun toString(): String = "this"
     override fun hashCode(): Int = 0
-    override fun equals(other: Any?): Boolean = other is KeyPathSelf<*>
+    override fun equals(other: Any?): Boolean = other is DataClassPathSelf<*>
     override val properties: List<KProperty1<*, *>> get() = listOf()
 }
-data class KeyPathAccess<K, M, V>(val first: KeyPath<K, M>, val second: KProperty1<M, V>): KeyPath<K, V>() {
+data class DataClassPathAccess<K, M, V>(val first: DataClassPath<K, M>, val second: KProperty1<M, V>): DataClassPath<K, V>() {
     override fun get(key: K): V = first.get(key).let { second.get(it) }
     override fun set(key: K, value: V): K = first.set(key, second.setCopy(first.get(key), value))
-    override fun toString(): String = if(first is KeyPathSelf<*>) second.name else "$first.${second.name}"
+    override fun toString(): String = if(first is DataClassPathSelf<*>) second.name else "$first.${second.name}"
     override val properties: List<KProperty1<*, *>> get() = first.properties + listOf(second)
 }
-data class KeyPathSafeAccess<K, M: Any, V>(val first: KeyPath<K, M?>, val second: KProperty1<M, V>): KeyPath<K, V?>() {
+data class DataClassPathSafeAccess<K, M: Any, V>(val first: DataClassPath<K, M?>, val second: KProperty1<M, V>): DataClassPath<K, V?>() {
     override fun get(key: K): V? = first.get(key)?.let { second.get(it) }
     override fun set(key: K, value: V?): K = first.get(key)?.let {
         @Suppress("UNCHECKED_CAST")
@@ -53,12 +52,6 @@ data class KeyPathSafeAccess<K, M: Any, V>(val first: KeyPath<K, M?>, val second
     } ?: key
     override fun toString(): String = "$first?.${second.name}"
     override val properties: List<KProperty1<*, *>> get() = first.properties + listOf(second)
-}
-data class KeyPathNotNull<K, M: Any>(val source: KeyPath<K, M?>): KeyPath<K, M>() {
-    override fun get(key: K): M = source.get(key)!!
-    override fun set(key: K, value: M): K = source.set(key, value)
-    override fun toString(): String = "$source!!"
-    override val properties: List<KProperty1<*, *>> get() = source.properties
 }
 
 @OptIn(InternalSerializationApi::class)
@@ -84,10 +77,10 @@ private class KProperty1Parser<T>(val serializer: KSerializer<T>) {
     }
 }
 
-operator fun <K, V, V2> KeyPath<K, V>.get(prop: KProperty1<V, V2>) = KeyPathAccess(this, prop)
-fun <K, V: Any, V2> KeyPath<K, V?>.getSafe(prop: KProperty1<V, V2>) = KeyPathSafeAccess(this, prop)
+operator fun <K, V, V2> DataClassPath<K, V>.get(prop: KProperty1<V, V2>) = DataClassPathAccess(this, prop)
+fun <K, V: Any, V2> DataClassPath<K, V?>.getSafe(prop: KProperty1<V, V2>) = DataClassPathSafeAccess(this, prop)
 
-class KeyPathSerializer<T>(val inner: KSerializer<T>): KSerializer<KeyPathPartial<T>> {
+class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializer<DataClassPathPartial<T>> {
     @OptIn(ExperimentalSerializationApi::class)
     override val descriptor: SerialDescriptor = object: SerialDescriptor {
         override val kind: SerialKind = PrimitiveKind.STRING
@@ -100,20 +93,20 @@ class KeyPathSerializer<T>(val inner: KSerializer<T>): KSerializer<KeyPathPartia
         override fun getElementAnnotations(index: Int): List<Annotation> = error()
         override fun toString(): String = "PrimitiveDescriptor($serialName)"
         private fun error(): Nothing = throw IllegalStateException("Primitive descriptor does not have elements")
-        override val annotations: List<Annotation> = KeyPathPartial::class.annotations
+        override val annotations: List<Annotation> = DataClassPathPartial::class.annotations
     }
 
-    override fun deserialize(decoder: Decoder): KeyPathPartial<T> {
+    override fun deserialize(decoder: Decoder): DataClassPathPartial<T> {
         val value = decoder.decodeString()
         return fromString(value)
     }
 
-    override fun serialize(encoder: Encoder, value: KeyPathPartial<T>) {
+    override fun serialize(encoder: Encoder, value: DataClassPathPartial<T>) {
         encoder.encodeString(value.toString())
     }
 
-    fun fromString(value: String): KeyPathPartial<T> {
-        var current: KeyPathPartial<T>? = null
+    fun fromString(value: String): DataClassPathPartial<T> {
+        var current: DataClassPathPartial<T>? = null
         var currentSerializer: KSerializer<*> = inner
         var isNullable = false
         for(part in value.split('.')) {
@@ -123,13 +116,13 @@ class KeyPathSerializer<T>(val inner: KSerializer<T>): KSerializer<KeyPathPartia
             currentSerializer = prop.second
             val c = current
             @Suppress("UNCHECKED_CAST")
-            current = if(c == null) KeyPathAccess(KeyPathSelf<T>(), prop.first as KProperty1<T, Any?>)
-            else if(isNullable) KeyPathSafeAccess(c as KeyPath<T, Any?>, prop.first as KProperty1<Any, Any?>)
-            else KeyPathAccess(c as KeyPath<T, Any?>, prop.first as KProperty1<Any?, Any?>)
+            current = if(c == null) DataClassPathAccess(DataClassPathSelf<T>(), prop.first as KProperty1<T, Any?>)
+            else if(isNullable) DataClassPathSafeAccess(c as DataClassPath<T, Any?>, prop.first as KProperty1<Any, Any?>)
+            else DataClassPathAccess(c as DataClassPath<T, Any?>, prop.first as KProperty1<Any?, Any?>)
             isNullable = part.endsWith('?')
             if(isNullable) currentSerializer = currentSerializer.nullElement()!!
         }
 
-        return current ?: KeyPathSelf()
+        return current ?: DataClassPathSelf()
     }
 }

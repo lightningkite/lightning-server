@@ -40,7 +40,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
 
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
-        groupBy: KeyPath<Model, Key>
+        groupBy: DataClassPath<Model, Key>
     ): Map<Key, Int> {
         return wraps.groupCount(
             condition and permissions.read and permissions.readMask(groupBy) and permissions.readMask(condition),
@@ -51,14 +51,14 @@ open class ModelPermissionsFieldCollection<Model : Any>(
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        property: KeyPath<Model, N>
+        property: DataClassPath<Model, N>
     ): Double? = wraps.aggregate(aggregate, condition and permissions.read and permissions.readMask(condition), property)
 
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        groupBy: KeyPath<Model, Key>,
-        property: KeyPath<Model, N>
+        groupBy: DataClassPath<Model, Key>,
+        property: DataClassPath<Model, N>
     ): Map<Key, Double?> = wraps.groupAggregate(
         aggregate,
         condition and permissions.read and permissions.readMask(groupBy) and permissions.readMask(condition),

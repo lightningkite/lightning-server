@@ -14,6 +14,6 @@ fun <T, V> KProperty1<T, V>.setCopy(original: T, value: V): T {
     return impl(original, value) as T
 }
 
-@Deprecated("Don't use this!", ReplaceWith("KeyPathPartial<T>"))
-typealias KProperty1Partial<T> = KeyPathPartial<T>
-val <T> KeyPathPartial<T>.compare: Comparator<T> get() = compareBy { this.getAny(it) as? Comparable<*> }
+@Deprecated("Don't use this!", ReplaceWith("DataClassPathPartial<T>"))
+typealias KProperty1Partial<T> = DataClassPathPartial<T>
+val <T> DataClassPathPartial<T>.compare: Comparator<T> get() = compareBy { this.getAny(it) as? Comparable<*> }

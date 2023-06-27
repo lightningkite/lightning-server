@@ -5,13 +5,13 @@ import com.lightningkite.khrysalis.IsCodableAndHashable
 import com.lightningkite.khrysalis.JsName
 import com.lightningkite.khrysalis.SharedCode
 
-inline fun <T : IsCodableAndHashable> modification(setup: ModificationBuilder<T>.(KeyPath<T, T>) -> Unit): Modification<T> {
+inline fun <T : IsCodableAndHashable> modification(setup: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit): Modification<T> {
     return ModificationBuilder<T>().apply {
         setup(path())
     }.build()
 }
 
-inline fun <T : IsCodableAndHashable> Modification<T>.and(setup: ModificationBuilder<T>.(KeyPath<T, T>) -> Unit): Modification<T> {
+inline fun <T : IsCodableAndHashable> Modification<T>.and(setup: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit): Modification<T> {
     return ModificationBuilder<T>().apply {
         modifications.add(this@and)
         setup(path())
@@ -126,13 +126,13 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
 
     @JsName("xCMBuilderListRemove")
     @JvmName("listRemoveAll")
-    infix fun <T : IsCodableAndHashable> CMBuilder<K, List<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) {
+    infix fun <T : IsCodableAndHashable> CMBuilder<K, List<T>>.removeAll(condition: (DataClassPath<T, T>) -> Condition<T>) {
         modifications.add(mapModification(Modification.ListRemove(path<T>().let(condition))))
     }
 
     @JsName("xCMBuilderSetRemove")
     @JvmName("setRemoveAll")
-    infix fun <T : IsCodableAndHashable> CMBuilder<K, Set<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) {
+    infix fun <T : IsCodableAndHashable> CMBuilder<K, Set<T>>.removeAll(condition: (DataClassPath<T, T>) -> Condition<T>) {
         modifications.add(mapModification(Modification.SetRemove(path<T>().let(condition))))
     }
 
@@ -172,7 +172,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
 
     @JsName("xCMBuilderListMap")
     @JvmName("listMap")
-    inline infix fun <T : IsCodableAndHashable> CMBuilder<K, List<T>>.map(modification: ModificationBuilder<T>.(KeyPath<T, T>) -> Unit) {
+    inline infix fun <T : IsCodableAndHashable> CMBuilder<K, List<T>>.map(modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit) {
         modifications.add(
             mapModification(
                 Modification.ListPerElement(
@@ -187,7 +187,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
 
     @JsName("xCMBuilderSetMap")
     @JvmName("setMap")
-    inline infix fun <T : IsCodableAndHashable> CMBuilder<K, Set<T>>.map(modification: ModificationBuilder<T>.(KeyPath<T, T>) -> Unit) {
+    inline infix fun <T : IsCodableAndHashable> CMBuilder<K, Set<T>>.map(modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit) {
         modifications.add(
             mapModification(
                 Modification.SetPerElement(
@@ -203,8 +203,8 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
     @JsName("xCMBuilderListMapIf")
     @JvmName("listMapIf")
     inline fun <T : IsCodableAndHashable> CMBuilder<K, List<T>>.mapIf(
-        condition: (KeyPath<T, T>) -> Condition<T>,
-        modification: ModificationBuilder<T>.(KeyPath<T, T>) -> Unit,
+        condition: (DataClassPath<T, T>) -> Condition<T>,
+        modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit,
     ) {
         modifications.add(
             mapModification(
@@ -221,8 +221,8 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
     @JsName("xCMBuilderSetMapIf")
     @JvmName("setMapIf")
     inline fun <T : IsCodableAndHashable> CMBuilder<K, Set<T>>.mapIf(
-        condition: (KeyPath<T, T>) -> Condition<T>,
-        modification: ModificationBuilder<T>.(KeyPath<T, T>) -> Unit,
+        condition: (DataClassPath<T, T>) -> Condition<T>,
+        modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit,
     ) {
         modifications.add(
             mapModification(
@@ -241,7 +241,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         modifications.add(mapModification(Modification.Combine(map)))
     }
 
-    infix fun <T : IsCodableAndHashable> CMBuilder<K, Map<String, T>>.modifyByKey(map: Map<String, ModificationBuilder<T>.(KeyPath<T, T>) -> Unit>) {
+    infix fun <T : IsCodableAndHashable> CMBuilder<K, Map<String, T>>.modifyByKey(map: Map<String, ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit>) {
         modifications.add(mapModification(Modification.ModifyByKey(map.mapValues { modification(it.value) })))
     }
 
@@ -249,156 +249,156 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         modifications.add(mapModification(Modification.RemoveKeys(fields)))
     }
 
-    infix fun <T : IsCodableAndHashable> KeyPath<K, T>.assign(value: T) {
+    infix fun <T : IsCodableAndHashable> DataClassPath<K, T>.assign(value: T) {
         modifications.add(mapModification(Modification.Assign(value)))
     }
 
-    infix fun <T : Comparable<T>> KeyPath<K, T>.coerceAtMost(value: T) {
+    infix fun <T : Comparable<T>> DataClassPath<K, T>.coerceAtMost(value: T) {
         modifications.add(mapModification(Modification.CoerceAtMost(value)))
     }
 
-    infix fun <T : Comparable<T>> KeyPath<K, T>.coerceAtLeast(value: T) {
+    infix fun <T : Comparable<T>> DataClassPath<K, T>.coerceAtLeast(value: T) {
         modifications.add(mapModification(Modification.CoerceAtLeast(value)))
     }
 
-    @JsName("xKeyPathPlusNumberOld")
+    @JsName("xDataClassPathPlusNumberOld")
     @Deprecated("Use plusAssign instead", ReplaceWith("this.plusAssign(by)"))
-    infix operator fun <T : Number> KeyPath<K, T>.plus(by: T) {
+    infix operator fun <T : Number> DataClassPath<K, T>.plus(by: T) {
         modifications.add(mapModification(Modification.Increment(by)))
     }
 
     @Deprecated("Use timesAssign instead", ReplaceWith("this.timesAssign(by)"))
-    infix operator fun <T : Number> KeyPath<K, T>.times(by: T) {
+    infix operator fun <T : Number> DataClassPath<K, T>.times(by: T) {
         modifications.add(mapModification(Modification.Multiply(by)))
     }
 
-    @JsName("xKeyPathPlusStringOld")
+    @JsName("xDataClassPathPlusStringOld")
     @Deprecated("Use plusAssign instead", ReplaceWith("this.plusAssign(value)"))
-    infix operator fun KeyPath<K, String>.plus(value: String) {
+    infix operator fun DataClassPath<K, String>.plus(value: String) {
         modifications.add(mapModification(Modification.AppendString(value)))
     }
 
-    @JsName("xKeyPathPlusItemsListOld")
+    @JsName("xDataClassPathPlusItemsListOld")
     @Deprecated("Use : Assign instead", ReplaceWith("this.plusAssign(items)"))
-    infix operator fun <T> KeyPath<K, List<T>>.plus(items: List<T>) {
+    infix operator fun <T> DataClassPath<K, List<T>>.plus(items: List<T>) {
         modifications.add(mapModification(Modification.ListAppend(items)))
     }
 
-    @JsName("xKeyPathPlusItemsSetOld")
+    @JsName("xDataClassPathPlusItemsSetOld")
     @Deprecated("Use : Assign instead", ReplaceWith("this.plusAssign(items)"))
-    infix operator fun <T> KeyPath<K, Set<T>>.plus(items: Set<T>) {
+    infix operator fun <T> DataClassPath<K, Set<T>>.plus(items: Set<T>) {
         modifications.add(mapModification(Modification.SetAppend(items)))
     }
 
-    @JsName("xKeyPathPlusItemListOld")
+    @JsName("xDataClassPathPlusItemListOld")
     @JvmName("plusListOld")
     @Deprecated("Use plusAssign instead", ReplaceWith("this.plusAssign(item)"))
-    infix operator fun <T> KeyPath<K, List<T>>.plus(item: T) {
+    infix operator fun <T> DataClassPath<K, List<T>>.plus(item: T) {
         modifications.add(mapModification(Modification.ListAppend(listOf(item))))
     }
 
-    @JsName("xKeyPathPlusItemSetOld")
+    @JsName("xDataClassPathPlusItemSetOld")
     @JvmName("plusSetOld")
     @Deprecated("Use plusAssign instead", ReplaceWith("this.plusAssign(item)"))
-    infix operator fun <T> KeyPath<K, Set<T>>.plus(item: T) {
+    infix operator fun <T> DataClassPath<K, Set<T>>.plus(item: T) {
         modifications.add(mapModification(Modification.SetAppend(setOf(item))))
     }
 
-    @JsName("xKeyPathPlusNumber")
-    infix operator fun <T : Number> KeyPath<K, T>.plusAssign(by: T) {
+    @JsName("xDataClassPathPlusNumber")
+    infix operator fun <T : Number> DataClassPath<K, T>.plusAssign(by: T) {
         modifications.add(mapModification(Modification.Increment(by)))
     }
 
-    infix operator fun <T : Number> KeyPath<K, T>.timesAssign(by: T) {
+    infix operator fun <T : Number> DataClassPath<K, T>.timesAssign(by: T) {
         modifications.add(mapModification(Modification.Multiply(by)))
     }
 
-    @JsName("xKeyPathPlusString")
-    infix operator fun KeyPath<K, String>.plusAssign(value: String) {
+    @JsName("xDataClassPathPlusString")
+    infix operator fun DataClassPath<K, String>.plusAssign(value: String) {
         modifications.add(mapModification(Modification.AppendString(value)))
     }
 
-    @JsName("xKeyPathPlusItemsList")
-    infix operator fun <T> KeyPath<K, List<T>>.plusAssign(items: List<T>) {
+    @JsName("xDataClassPathPlusItemsList")
+    infix operator fun <T> DataClassPath<K, List<T>>.plusAssign(items: List<T>) {
         modifications.add(mapModification(Modification.ListAppend(items)))
     }
 
-    @JsName("xKeyPathPlusItemsSet")
-    infix operator fun <T> KeyPath<K, Set<T>>.plusAssign(items: Set<T>) {
+    @JsName("xDataClassPathPlusItemsSet")
+    infix operator fun <T> DataClassPath<K, Set<T>>.plusAssign(items: Set<T>) {
         modifications.add(mapModification(Modification.SetAppend(items)))
     }
 
-    @JsName("xKeyPathPlusItemList")
+    @JsName("xDataClassPathPlusItemList")
     @JvmName("plusList")
-    infix operator fun <T> KeyPath<K, List<T>>.plusAssign(item: T) {
+    infix operator fun <T> DataClassPath<K, List<T>>.plusAssign(item: T) {
         modifications.add(mapModification(Modification.ListAppend(listOf(item))))
     }
 
-    @JsName("xKeyPathPlusItemSet")
+    @JsName("xDataClassPathPlusItemSet")
     @JvmName("plusSet")
-    infix operator fun <T> KeyPath<K, Set<T>>.plusAssign(item: T) {
+    infix operator fun <T> DataClassPath<K, Set<T>>.plusAssign(item: T) {
         modifications.add(mapModification(Modification.SetAppend(setOf(item))))
     }
 
-    @JsName("xKeyPathListAddAll")
-    infix fun <T : IsCodableAndHashable> KeyPath<K, List<T>>.addAll(items: List<T>) {
+    @JsName("xDataClassPathListAddAll")
+    infix fun <T : IsCodableAndHashable> DataClassPath<K, List<T>>.addAll(items: List<T>) {
         modifications.add(mapModification(Modification.ListAppend(items)))
     }
 
-    @JsName("xKeyPathSetAddAll")
-    infix fun <T : IsCodableAndHashable> KeyPath<K, Set<T>>.addAll(items: Set<T>) {
+    @JsName("xDataClassPathSetAddAll")
+    infix fun <T : IsCodableAndHashable> DataClassPath<K, Set<T>>.addAll(items: Set<T>) {
         modifications.add(mapModification(Modification.SetAppend(items)))
     }
 
-    @JsName("xKeyPathListRemove")
+    @JsName("xDataClassPathListRemove")
     @JvmName("listRemoveAll")
-    infix fun <T : IsCodableAndHashable> KeyPath<K, List<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) {
+    infix fun <T : IsCodableAndHashable> DataClassPath<K, List<T>>.removeAll(condition: (DataClassPath<T, T>) -> Condition<T>) {
         modifications.add(mapModification(Modification.ListRemove(path<T>().let(condition))))
     }
 
-    @JsName("xKeyPathSetRemove")
+    @JsName("xDataClassPathSetRemove")
     @JvmName("setRemoveAll")
-    infix fun <T : IsCodableAndHashable> KeyPath<K, Set<T>>.removeAll(condition: (KeyPath<T, T>) -> Condition<T>) {
+    infix fun <T : IsCodableAndHashable> DataClassPath<K, Set<T>>.removeAll(condition: (DataClassPath<T, T>) -> Condition<T>) {
         modifications.add(mapModification(Modification.SetRemove(path<T>().let(condition))))
     }
 
-    @JsName("xKeyPathListRemoveAll")
-    infix fun <T : IsCodableAndHashable> KeyPath<K, List<T>>.removeAll(items: List<T>) {
+    @JsName("xDataClassPathListRemoveAll")
+    infix fun <T : IsCodableAndHashable> DataClassPath<K, List<T>>.removeAll(items: List<T>) {
         modifications.add(mapModification(Modification.ListRemoveInstances(items)))
     }
 
-    @JsName("xKeyPathSetRemoveAll")
-    infix fun <T : IsCodableAndHashable> KeyPath<K, Set<T>>.removeAll(items: Set<T>) {
+    @JsName("xDataClassPathSetRemoveAll")
+    infix fun <T : IsCodableAndHashable> DataClassPath<K, Set<T>>.removeAll(items: Set<T>) {
         modifications.add(mapModification(Modification.SetRemoveInstances(items)))
     }
 
-    @JsName("xKeyPathListDropLast")
+    @JsName("xDataClassPathListDropLast")
     @JvmName("listDropLast")
-    fun <T : IsCodableAndHashable> KeyPath<K, List<T>>.dropLast() {
+    fun <T : IsCodableAndHashable> DataClassPath<K, List<T>>.dropLast() {
         modifications.add(mapModification(Modification.ListDropLast()))
     }
 
-    @JsName("xKeyPathSetDropLast")
+    @JsName("xDataClassPathSetDropLast")
     @JvmName("setDropLast")
-    fun <T : IsCodableAndHashable> KeyPath<K, Set<T>>.dropLast() {
+    fun <T : IsCodableAndHashable> DataClassPath<K, Set<T>>.dropLast() {
         modifications.add(mapModification(Modification.SetDropLast()))
     }
 
-    @JsName("xKeyPathListDropFirst")
+    @JsName("xDataClassPathListDropFirst")
     @JvmName("listDropFirst")
-    fun <T : IsCodableAndHashable> KeyPath<K, List<T>>.dropFirst() {
+    fun <T : IsCodableAndHashable> DataClassPath<K, List<T>>.dropFirst() {
         modifications.add(mapModification(Modification.ListDropFirst()))
     }
 
-    @JsName("xKeyPathSetDropFirst")
+    @JsName("xDataClassPathSetDropFirst")
     @JvmName("setDropFirst")
-    fun <T : IsCodableAndHashable> KeyPath<K, Set<T>>.dropFirst() {
+    fun <T : IsCodableAndHashable> DataClassPath<K, Set<T>>.dropFirst() {
         modifications.add(mapModification(Modification.SetDropFirst()))
     }
 
-    @JsName("xKeyPathListMap")
+    @JsName("xDataClassPathListMap")
     @JvmName("listMap")
-    inline infix fun <T : IsCodableAndHashable> KeyPath<K, List<T>>.map(modification: ModificationBuilder<T>.(KeyPath<T, T>) -> Unit) {
+    inline infix fun <T : IsCodableAndHashable> DataClassPath<K, List<T>>.map(modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit) {
         modifications.add(
             mapModification(
                 Modification.ListPerElement(
@@ -411,9 +411,9 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         )
     }
 
-    @JsName("xKeyPathSetMap")
+    @JsName("xDataClassPathSetMap")
     @JvmName("setMap")
-    inline infix fun <T : IsCodableAndHashable> KeyPath<K, Set<T>>.map(modification: ModificationBuilder<T>.(KeyPath<T, T>) -> Unit) {
+    inline infix fun <T : IsCodableAndHashable> DataClassPath<K, Set<T>>.map(modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit) {
         modifications.add(
             mapModification(
                 Modification.SetPerElement(
@@ -426,11 +426,11 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         )
     }
 
-    @JsName("xKeyPathListMapIf")
+    @JsName("xDataClassPathListMapIf")
     @JvmName("listMapIf")
-    inline fun <T : IsCodableAndHashable> KeyPath<K, List<T>>.mapIf(
-        condition: (KeyPath<T, T>) -> Condition<T>,
-        modification: ModificationBuilder<T>.(KeyPath<T, T>) -> Unit,
+    inline fun <T : IsCodableAndHashable> DataClassPath<K, List<T>>.mapIf(
+        condition: (DataClassPath<T, T>) -> Condition<T>,
+        modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit,
     ) {
         modifications.add(
             mapModification(
@@ -444,11 +444,11 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         )
     }
 
-    @JsName("xKeyPathSetMapIf")
+    @JsName("xDataClassPathSetMapIf")
     @JvmName("setMapIf")
-    inline fun <T : IsCodableAndHashable> KeyPath<K, Set<T>>.mapIf(
-        condition: (KeyPath<T, T>) -> Condition<T>,
-        modification: ModificationBuilder<T>.(KeyPath<T, T>) -> Unit,
+    inline fun <T : IsCodableAndHashable> DataClassPath<K, Set<T>>.mapIf(
+        condition: (DataClassPath<T, T>) -> Condition<T>,
+        modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit,
     ) {
         modifications.add(
             mapModification(
@@ -462,16 +462,16 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         )
     }
 
-    @JsName("xKeyPathPlusMap")
-    infix operator fun <T : IsCodableAndHashable> KeyPath<K, Map<String, T>>.plus(map: Map<String, T>) {
+    @JsName("xDataClassPathPlusMap")
+    infix operator fun <T : IsCodableAndHashable> DataClassPath<K, Map<String, T>>.plus(map: Map<String, T>) {
         modifications.add(mapModification(Modification.Combine(map)))
     }
 
-    infix fun <T : IsCodableAndHashable> KeyPath<K, Map<String, T>>.modifyByKey(map: Map<String, ModificationBuilder<T>.(KeyPath<T, T>) -> Unit>) {
+    infix fun <T : IsCodableAndHashable> DataClassPath<K, Map<String, T>>.modifyByKey(map: Map<String, ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit>) {
         modifications.add(mapModification(Modification.ModifyByKey(map.mapValues { modification(it.value) })))
     }
 
-    infix fun <T : IsCodableAndHashable> KeyPath<K, Map<String, T>>.removeKeys(fields: Set<String>) {
+    infix fun <T : IsCodableAndHashable> DataClassPath<K, Map<String, T>>.removeKeys(fields: Set<String>) {
         modifications.add(mapModification(Modification.RemoveKeys(fields)))
     }
 

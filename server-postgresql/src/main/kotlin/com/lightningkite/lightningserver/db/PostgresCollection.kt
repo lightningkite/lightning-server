@@ -65,7 +65,7 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun <Key> groupCount(condition: Condition<T>, groupBy: KeyPath<T, Key>): Map<Key, Int> {
+    override suspend fun <Key> groupCount(condition: Condition<T>, groupBy: DataClassPath<T, Key>): Map<Key, Int> {
         prepare.await()
         return t {
             val groupCol = table.col[groupBy.colName] as Column<Key>
@@ -79,7 +79,7 @@ class PostgresCollection<T : Any>(
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<T>,
-        property: KeyPath<T, N>,
+        property: DataClassPath<T, N>,
     ): Double? {
         prepare.await()
         return t {
@@ -99,8 +99,8 @@ class PostgresCollection<T : Any>(
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<T>,
-        groupBy: KeyPath<T, Key>,
-        property: KeyPath<T, N>,
+        groupBy: DataClassPath<T, Key>,
+        property: DataClassPath<T, N>,
     ): Map<Key, Double?> {
         prepare.await()
         return t {

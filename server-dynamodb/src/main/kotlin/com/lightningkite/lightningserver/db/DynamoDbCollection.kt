@@ -255,7 +255,7 @@ class DynamoDbCollection<T : Any>(
         }
     }
 
-    override suspend fun <Key> groupCount(condition: Condition<T>, groupBy: KeyPath<T, Key>): Map<Key, Int> {
+    override suspend fun <Key> groupCount(condition: Condition<T>, groupBy: DataClassPath<T, Key>): Map<Key, Int> {
         val map = HashMap<Key, Int>()
         find(condition).collect {
             val key = groupBy.get(it)
@@ -267,7 +267,7 @@ class DynamoDbCollection<T : Any>(
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<T>,
-        property: KeyPath<T, N>,
+        property: DataClassPath<T, N>,
     ): Double? {
         val a = aggregate.aggregator()
         find(condition).collect {
@@ -279,8 +279,8 @@ class DynamoDbCollection<T : Any>(
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<T>,
-        groupBy: KeyPath<T, Key>,
-        property: KeyPath<T, N>,
+        groupBy: DataClassPath<T, Key>,
+        property: DataClassPath<T, N>,
     ): Map<Key, Double?> {
         val map = HashMap<Key, Aggregator>()
         find(condition).collect {
