@@ -8,7 +8,7 @@ import io.ktor.http.*
 import io.ktor.util.cio.*
 
 /**
- * An email client that will send real emails through SMTP.
+ * An email client that will send real emails through the Mailgun API.
  */
 class MailgunEmailClient(
     val key: String,

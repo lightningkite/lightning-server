@@ -6,13 +6,12 @@ import com.lightningkite.lightningdb.test.User
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelInfo
-import com.lightningkite.lightningserver.email.ConsoleEmailClient
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.test
-import com.lightningkite.lightningserver.sms.ConsoleSMSClient
+import com.lightningkite.lightningserver.sms.TestSMSClient
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.util.*
@@ -36,7 +35,7 @@ class SmsAuthTest {
         runBlocking {
             phoneAuth.loginSms.implementation(Unit, "8013693729")
             val pinRegex = Regex("[0-9][0-9][0-9][0-9][0-9][0-9]")
-            val pin = (TestSettings.sms() as ConsoleSMSClient).lastMessageSent?.message?.let {
+            val pin = (TestSettings.sms() as TestSMSClient).lastMessageSent?.message?.let {
                 pinRegex.find(it)?.value
             }!!
             val token = phoneAuth.loginSmsPin.implementation(Unit, PhonePinLogin("8013693729", pin))

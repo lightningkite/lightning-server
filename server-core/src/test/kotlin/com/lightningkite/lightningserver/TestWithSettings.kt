@@ -20,8 +20,8 @@ import kotlinx.coroutines.runBlocking
 import java.util.*
 
 object TestSettings {
-    val database = setting("database", DatabaseSettings())
-    val email = setting("email", EmailSettings())
+    val database = setting("database", DatabaseSettings("ram"))
+    val email = setting("email", EmailSettings("test"))
     val jwtSigner = setting("jwt", JwtSigner())
     val files = setting("files", FilesSettings())
     val oauthGoogle = setting<OauthProviderCredentials?>("oauth-google", null)
@@ -37,11 +37,7 @@ object TestSettings {
     ), TestThing::_id)
 
     init {
-        Settings.populateDefaults(
-            mapOf(
-                "database" to DatabaseSettings("ram")
-            )
-        )
+        Settings.populateDefaults()
         runBlocking {
             Tasks.onSettingsReady()
             engine = UnitTestEngine

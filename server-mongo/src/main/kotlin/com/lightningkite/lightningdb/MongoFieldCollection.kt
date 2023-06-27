@@ -114,6 +114,11 @@ class MongoFieldCollection<Model : Any>(
                 } else null
                 it.sort(sort(orderBy, mts))
             }
+            .let {
+                if(orderBy.any { it.ignoreCase }) {
+                    it.collation(Collation.builder().locale("en").build())
+                } else it
+            }
             .toFlow()
             .let {
                 skipFieldsMask?.let { m ->

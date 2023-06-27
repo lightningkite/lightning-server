@@ -49,7 +49,7 @@ class PostgresCollection<T : Any>(
         val items = t {
             table
                 .select { condition(condition, serializer, table).asOp() }
-                .orderBy(*orderBy.map { table.col[it.field.colName]!! to if (it.ascending) SortOrder.ASC else SortOrder.DESC }
+                .orderBy(*orderBy.map { (if(it.ignoreCase) (table.col[it.field.colName]!! as Column<String>).lowerCase() else table.col[it.field.colName]!!) to if (it.ascending) SortOrder.ASC else SortOrder.DESC }
                     .toTypedArray())
                 .limit(limit, skip.toLong())
                 .map { format.decode(serializer, it) }

@@ -102,4 +102,48 @@ abstract class SortTest {
         assertEquals(reversePosts.map { it._id }, results3.map { it._id })
     }
 
+    @Test
+    fun testSortCase():Unit = runBlocking{
+        val collection = database.collection<LargeTestModel>("SortTest_testSortCase")
+        val items = listOf(
+            LargeTestModel(string = "aa"),
+            LargeTestModel(string = "Ab"),
+            LargeTestModel(string = "ac"),
+            LargeTestModel(string = "Ad"),
+            LargeTestModel(string = "ae"),
+            LargeTestModel(string = "Af"),
+        )
+        val sortedPosts = items.sortedBy { it.string }
+        val reversePosts = items.sortedByDescending { it.string }
+        collection.insertMany(items)
+        val results1 = collection.find(Condition.Always()).toList()
+        val results2 = collection.find(Condition.Always(), orderBy = listOf(SortPart(LargeTestModel::string, true))).toList()
+        val results3 = collection.find(Condition.Always(), orderBy = listOf(SortPart(LargeTestModel::string, false))).toList()
+        assertEquals(items.map { it._id }, results1.map { it._id })
+        assertEquals(sortedPosts.map { it._id }, results2.map { it._id })
+        assertEquals(reversePosts.map { it._id }, results3.map { it._id })
+    }
+
+    @Test
+    fun testSortCaseInsensitive():Unit = runBlocking{
+        val collection = database.collection<LargeTestModel>("SortTest_testSortCaseInsensitive")
+        val items = listOf(
+            LargeTestModel(string = "aa"),
+            LargeTestModel(string = "Ab"),
+            LargeTestModel(string = "ac"),
+            LargeTestModel(string = "Ad"),
+            LargeTestModel(string = "ae"),
+            LargeTestModel(string = "Af"),
+        )
+        val sortedPosts = items.sortedBy { it.string.lowercase() }
+        val reversePosts = items.sortedByDescending { it.string.lowercase() }
+        collection.insertMany(items)
+        val results1 = collection.find(Condition.Always()).toList()
+        val results2 = collection.find(Condition.Always(), orderBy = listOf(SortPart(LargeTestModel::string, true, true))).toList()
+        val results3 = collection.find(Condition.Always(), orderBy = listOf(SortPart(LargeTestModel::string, false, true))).toList()
+        assertEquals(items.map { it._id }, results1.map { it._id })
+        assertEquals(sortedPosts.map { it._id }, results2.map { it._id })
+        assertEquals(reversePosts.map { it._id }, results3.map { it._id })
+    }
+
 }
