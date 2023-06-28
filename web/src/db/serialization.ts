@@ -2,6 +2,7 @@ import {Condition} from './Condition'
 import {Modification} from './Modification'
 import {compareBy, DataClass, parseObject, ReifiedType, TProperty1} from "@lightningkite/khrysalis-runtime";
 import {SortPart} from "./SortPart";
+import {DataClassPath, DataClassPathAccess, DataClassPathNotNull, DataClassPathSelf} from "./DataClassPath";
 
 (Condition as any).fromJSON = <T>(data: Record<string, any>, types: Array<ReifiedType>): Condition<T> => {
     const type = types[0]
@@ -288,11 +289,30 @@ import {SortPart} from "./SortPart";
     return result
 };
 
+function stringToPath(str: String): DataClassPath<any, any> {
+    let current = new DataClassPathSelf()
+    for(const part of str.split('.')) {
+        if(part.endsWith('?')) {
+            // @ts-ignore
+            current = new DataClassPathNotNull(new DataClassPathAccess(current, part.substring(0, part.length-1)))
+        } else {
+            // @ts-ignore
+            current = new DataClassPathAccess(current, part)
+        }
+    }
+    return current
+}
 (SortPart as any).prototype.toJSON = function (this: SortPart<any>): string {
-    return this.ascending ? this.field : `-${this.field}`
+    return this.ascending ? this.field.toString() : `-${this.field.toString()}`
 };
 (SortPart as any).fromJSON = <T>(value: string, types: Array<ReifiedType>): SortPart<T> => {
     const descending = value.startsWith('-')
     const realName = descending ? value.substring(1) : value
-    return new SortPart<T>(realName as (keyof T & string), !descending)
+    return new SortPart<T>(stringToPath(realName), !descending)
+}
+(DataClassPath as any).prototype.toJSON = function (this: DataClassPath<any, any>): string {
+    return this.toString()
+};
+(DataClassPath as any).fromJSON = <T>(value: string, types: Array<ReifiedType>): DataClassPath<any, any> => {
+    return stringToPath(value)
 }

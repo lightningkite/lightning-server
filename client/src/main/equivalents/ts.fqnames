@@ -1,124 +1,197 @@
 @lightningkite/lightning-server
-com.lightningkite.lightningdb.ObserveModelApi
 com.lightningkite.lightningdb.live.multiplexedSocketRaw
-com.lightningkite.lightningdb.any>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.any.K, kotlin.collections.Listcom.lightningkite.lightningdb.any.T
-com.lightningkite.lightningdb.mapIf>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.mapIf.K, kotlin.collections.Listcom.lightningkite.lightningdb.mapIf.T
 com.lightningkite.lightningdb.Condition
-com.lightningkite.lightningdb.ne>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.ne.K, com.lightningkite.lightningdb.ne.T
 com.lightningkite.lightningdb.Aggregator
 com.lightningkite.lightningdb.MultiplexMessage
-com.lightningkite.lightningdb.mock.MockFullReadModelApi
-com.lightningkite.lightningdb.nin>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.nin.K, com.lightningkite.lightningdb.nin.T
-com.lightningkite.lightningdb.dropFirst>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.dropFirst.K, kotlin.collections.Setcom.lightningkite.lightningdb.dropFirst.T
-com.lightningkite.lightningdb.ListChange
-com.lightningkite.lightningdb.Modification
-com.lightningkite.lightningdb.always>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.always.K, com.lightningkite.lightningdb.always.K
-com.lightningkite.lightningdb.anyClear>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.anyClear.K, kotlin.Int
-com.lightningkite.lightningdb.sizesEquals>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.sizesEquals.K, kotlin.collections.Setcom.lightningkite.lightningdb.sizesEquals.T
-com.lightningkite.lightningdb.apply>kotlin.collections.Listcom.lightningkite.lightningdb.apply.T
-com.lightningkite.lightningdb.HasPhoneNumber
-com.lightningkite.lightningdb.live.multiplexedSocket
+com.lightningkite.lightningserver.auth.PasswordLogin
+com.lightningkite.lightningdb.toCMBuilder>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.toCMBuilder.From, com.lightningkite.lightningdb.toCMBuilder.To
+com.lightningkite.lightningdb.any>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.any.K, kotlin.collections.Listcom.lightningkite.lightningdb.any.T
 com.lightningkite.lightningdb.sizesEquals>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.sizesEquals.K, kotlin.collections.Listcom.lightningkite.lightningdb.sizesEquals.T
-com.lightningkite.lightningdb.SignalData
+com.lightningkite.lightningdb.get>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.get.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.get.T
+com.lightningkite.lightningdb.ListChange
+com.lightningkite.lightningdb.modification>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.modification.K, com.lightningkite.lightningdb.modification.T
+com.lightningkite.lightningdb.HasPhoneNumber
+com.lightningkite.lightningserver.auth.PhonePinLogin
+com.lightningkite.lightningdb.live.multiplexedSocket
+com.lightningkite.lightningserver.files._id>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningserver.files._id.K, com.lightningkite.lightningserver.files.UploadForNextRequest
+com.lightningkite.lightningdb.all>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.all.K, kotlin.collections.Listcom.lightningkite.lightningdb.all.T
 com.lightningkite.lightningserver.files.UploadInformation
-com.lightningkite.lightningdb.dropFirst>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.dropFirst.K, kotlin.collections.Listcom.lightningkite.lightningdb.dropFirst.T
-com.lightningkite.lightningdb.removeKeys>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.removeKeys.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.removeKeys.T
-com.lightningkite.lightningdb.lte>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.lte.K, com.lightningkite.lightningdb.lte.T
-com.lightningkite.lightningdb.any>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.any.K, kotlin.collections.Setcom.lightningkite.lightningdb.any.T
-com.lightningkite.lightningdb.live._overrideWebSocketProvider
-com.lightningkite.lightningdb.AverageAggregator
-com.lightningkite.lightningdb.map>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.map.K, kotlin.collections.Setcom.lightningkite.lightningdb.map.T
-com.lightningkite.lightningdb.all>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.all.K, kotlin.collections.Listcom.lightningkite.lightningdb.all.T
-com.lightningkite.lightningdb.addAll>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.addAll.K, kotlin.collections.Listcom.lightningkite.lightningdb.addAll.T
-com.lightningkite.lightningdb.times>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.times.K, com.lightningkite.lightningdb.times.T
-com.lightningkite.lightningdb.HasEmailFields
-com.lightningkite.lightningserver.files.file>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningserver.files.file.K, com.lightningkite.lightningserver.files.UploadForNextRequest
+com.lightningkite.lightningdb.gt>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.gt.K, com.lightningkite.lightningdb.gt.T
+com.lightningkite.lightningserver.files.expires>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningserver.files.expires.K, com.lightningkite.lightningserver.files.UploadForNextRequest
+com.lightningkite.lightningdb.always>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.always.K, com.lightningkite.lightningdb.always.K
+com.lightningkite.lightningdb.all>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.all.K, kotlin.collections.Setcom.lightningkite.lightningdb.all.T
+com.lightningkite.lightningdb.nin>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.nin.K, com.lightningkite.lightningdb.nin.T
 com.lightningkite.lightningdb.map>com.lightningkite.lightningdb.CollectionChangescom.lightningkite.lightningdb.map.T
 com.lightningkite.lightningdb.mock.ItemNotFound
-com.lightningkite.lightningdb.mapIf>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.mapIf.K, kotlin.collections.Setcom.lightningkite.lightningdb.mapIf.T
-com.lightningkite.lightningserver.files._id>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningserver.files._id.K, com.lightningkite.lightningserver.files.UploadForNextRequest
-com.lightningkite.lightningdb.live.LiveObserveModelApi
-com.lightningkite.lightningdb.UUIDFor
+com.lightningkite.lightningdb.anyClear>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.anyClear.K, kotlin.Int
 com.lightningkite.lightningdb.eq>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.eq.K, com.lightningkite.lightningdb.eq.T
-com.lightningkite.lightningdb.removeAll>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.removeAll.K, kotlin.collections.Listcom.lightningkite.lightningdb.removeAll.T
-com.lightningkite.lightningserver.files.prepareUploadForNextRequestFields
+com.lightningkite.lightningdb.contains>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.contains.K, kotlin.String
+com.lightningkite.lightningdb.neq>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.neq.K, com.lightningkite.lightningdb.neq.T
+com.lightningkite.lightningdb.live.LiveObserveModelApi
+com.lightningkite.lightningdb.ne>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.ne.K, com.lightningkite.lightningdb.ne.T
+com.lightningkite.lightningdb.UUIDFor
 com.lightningkite.lightningdb.CompleteModelApi
+com.lightningkite.lightningdb.dropLast>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.dropLast.K, kotlin.collections.Setcom.lightningkite.lightningdb.dropLast.T
 com.lightningkite.lightningdb.SortPart
-com.lightningkite.lightningdb.condition>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.condition.K, com.lightningkite.lightningdb.condition.T
-com.lightningkite.lightningdb.gt>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.gt.K, com.lightningkite.lightningdb.gt.T
-com.lightningkite.lightningdb.WriteModelApi
+com.lightningkite.lightningdb.HasMaybePhoneNumber
+com.lightningkite.lightningdb.never>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.never.K, com.lightningkite.lightningdb.never.K
+com.lightningkite.lightningdb.addAll>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.addAll.K, kotlin.collections.Setcom.lightningkite.lightningdb.addAll.T
 com.lightningkite.lightningdb.GroupAggregateQuery
-com.lightningkite.lightningdb.removeAll>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.removeAll.K, kotlin.collections.Setcom.lightningkite.lightningdb.removeAll.T
-com.lightningkite.lightningdb.live.filter
 com.lightningkite.lightningdb.mock.MockWriteModelApi
-com.lightningkite.lightningdb.MassModification
+com.lightningkite.lightningdb.nin>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.nin.K, com.lightningkite.lightningdb.nin.T
 com.lightningkite.lightningdb.GroupCountQuery
-com.lightningkite.lightningserver.files.expires>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningserver.files.expires.K, com.lightningkite.lightningserver.files.UploadForNextRequest
+com.lightningkite.lightningdb.HasPasswordFields
+com.lightningkite.lightningdb.lt>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.lt.K, com.lightningkite.lightningdb.lt.T
+com.lightningkite.lightningdb.assign>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.assign.K, com.lightningkite.lightningdb.assign.T
 com.lightningkite.lightningdb.EntryChange
-com.lightningkite.lightningdb.modifyByKey>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.modifyByKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.modifyByKey.T
-com.lightningkite.lightningdb.get>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.get.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.get.T
+com.lightningkite.lightningdb.lte>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.lte.K, com.lightningkite.lightningdb.lte.T
 com.lightningkite.lightningdb.mock.MockCompleteModelApi
-com.lightningkite.lightningdb.notIn>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.notIn.K, com.lightningkite.lightningdb.notIn.T
 com.lightningkite.lightningdb.live.filter>io.reactivex.rxjava3.core.Observablecom.lightningkite.lightningdb.live.WebSocketIshcom.lightningkite.lightningdb.ListChangecom.lightningkite.lightningdb.live.filter.T, com.lightningkite.lightningdb.Querycom.lightningkite.lightningdb.live.filter.T
 com.lightningkite.lightningdb.AggregateQuery
-com.lightningkite.lightningdb.mock.MockObserveModelApi
-com.lightningkite.lightningdb.fullTextSearch>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.fullTextSearch.K, com.lightningkite.lightningdb.fullTextSearch.V
-com.lightningkite.lightningdb.StandardDeviationPopulationAggregator
-com.lightningkite.lightningdb.live.LiveReadModelApi
-com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.plus.K, kotlin.String
-com.lightningkite.lightningdb.contains>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.contains.K, kotlin.String
-com.lightningkite.lightningdb.ReadModelApi
-com.lightningkite.lightningdb.live.WebSocketIsh
-com.lightningkite.lightningdb.SumAggregator
-com.lightningkite.lightningdb.allClear>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.allClear.K, kotlin.Int
-com.lightningkite.lightningserver.serverhealth.HealthStatus
-com.lightningkite.lightningdb.CollectionChanges
+com.lightningkite.lightningdb.contains>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.contains.K, kotlin.String
+com.lightningkite.lightningdb.and>com.lightningkite.lightningdb.Modificationcom.lightningkite.lightningdb.and.T
 com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.plus.K, com.lightningkite.lightningdb.plus.T
-com.lightningkite.lightningserver.files.UploadForNextRequest
-com.lightningkite.lightningdb.condition
-com.lightningkite.lightningdb.dropLast>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.dropLast.K, kotlin.collections.Listcom.lightningkite.lightningdb.dropLast.T
-com.lightningkite.lightningserver.files.prepareModels
-com.lightningkite.lightningdb.FullReadModelApi
-com.lightningkite.lightningdb.HasPhoneNumberFields
-com.lightningkite.lightningdb.notNull>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.notNull.K, com.lightningkite.lightningdb.notNull.T
-com.lightningkite.lightningdb.lt>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.lt.K, com.lightningkite.lightningdb.lt.T
-com.lightningkite.lightningdb.addAll>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.addAll.K, kotlin.collections.Setcom.lightningkite.lightningdb.addAll.T
-com.lightningkite.lightningdb.dropLast>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.dropLast.K, kotlin.collections.Setcom.lightningkite.lightningdb.dropLast.T
-com.lightningkite.lightningdb.aggregator>com.lightningkite.lightningdb.Aggregate
-com.lightningkite.lightningdb.assign>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.assign.K, com.lightningkite.lightningdb.assign.T
-com.lightningkite.lightningdb.live.LiveCompleteModelApi
-com.lightningkite.lightningdb.map>com.lightningkite.lightningdb.EntryChangecom.lightningkite.lightningdb.map.T
-com.lightningkite.lightningdb.anySet>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.anySet.K, kotlin.Int
-com.lightningkite.lightningdb.aggregate>kotlin.sequences.Sequencekotlin.Double
-com.lightningkite.lightningdb.live.LiveFullReadModelApi
-com.lightningkite.lightningserver.serverhealth.ServerHealth
-com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.plus.K, kotlin.collections.Setcom.lightningkite.lightningdb.plus.T
-com.lightningkite.lightningdb.StandardDeviationSampleAggregator
-com.lightningkite.lightningdb.mock.MockTable
+com.lightningkite.lightningdb.lte>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.lte.K, com.lightningkite.lightningdb.lte.T
+com.lightningkite.lightningdb.removeAll>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.removeAll.K, kotlin.collections.Listcom.lightningkite.lightningdb.removeAll.T
+com.lightningkite.lightningdb.all>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.all.K, kotlin.collections.Listcom.lightningkite.lightningdb.all.T
+com.lightningkite.lightningdb.live.LiveReadModelApi
 com.lightningkite.lightningdb.never>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.never.K, com.lightningkite.lightningdb.never.K
-com.lightningkite.lightningdb.mock.MockReadModelApi
+com.lightningkite.lightningdb.SumAggregator
+com.lightningkite.lightningserver.auth.EmailPinLogin
+com.lightningkite.lightningdb.CollectionChanges
+com.lightningkite.lightningdb.neq>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.neq.K, com.lightningkite.lightningdb.neq.T
+com.lightningkite.lightningserver.files.prepareModels
+com.lightningkite.lightningdb.condition
+com.lightningkite.lightningdb.allClear>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.allClear.K, kotlin.Int
+com.lightningkite.lightningdb.get>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.get.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.get.T
+com.lightningkite.lightningdb.allSet>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.allSet.K, kotlin.Int
+com.lightningkite.lightningdb.HasPhoneNumberFields
+com.lightningkite.lightningdb.anySet>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.anySet.K, kotlin.Int
+com.lightningkite.lightningdb.sizesEquals>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.sizesEquals.K, kotlin.collections.Setcom.lightningkite.lightningdb.sizesEquals.T
+com.lightningkite.lightningdb.any>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.any.K, kotlin.collections.Setcom.lightningkite.lightningdb.any.T
 com.lightningkite.lightningdb.containsKey>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.containsKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.containsKey.T
-com.lightningkite.lightningdb.neq>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.neq.K, com.lightningkite.lightningdb.neq.T
+com.lightningkite.lightningdb.addAll>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.addAll.K, kotlin.collections.Listcom.lightningkite.lightningdb.addAll.T
+com.lightningkite.lightningdb.condition>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.condition.K, com.lightningkite.lightningdb.condition.T
+com.lightningkite.lightningdb.coerceAtLeast>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.coerceAtLeast.K, com.lightningkite.lightningdb.coerceAtLeast.T
+com.lightningkite.lightningdb.map>com.lightningkite.lightningdb.EntryChangecom.lightningkite.lightningdb.map.T
+com.lightningkite.lightningdb.aggregate>kotlin.sequences.Sequencekotlin.Double
+com.lightningkite.lightningdb.gte>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.gte.K, com.lightningkite.lightningdb.gte.T
+com.lightningkite.lightningdb.notNull>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.notNull.K, com.lightningkite.lightningdb.notNull.T
+com.lightningkite.lightningserver.serverhealth.ServerHealth
+com.lightningkite.lightningdb.mock.MockTable
+com.lightningkite.lightningdb.condition>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.condition.K, com.lightningkite.lightningdb.condition.T
+com.lightningkite.lightningdb.allClear>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.allClear.K, kotlin.Int
 com.lightningkite.lightningdb.comparator>kotlin.collections.Listcom.lightningkite.lightningdb.SortPartcom.lightningkite.lightningdb.comparator.T
 com.lightningkite.lightningdb.HasId
 com.lightningkite.lightningdb.live.LiveWriteModelApi
 com.lightningkite.lightningdb.HasIdFields
-com.lightningkite.lightningdb.map>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.map.K, kotlin.collections.Listcom.lightningkite.lightningdb.map.T
-com.lightningkite.lightningdb.KeyPath
-com.lightningkite.lightningdb.gte>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.gte.K, com.lightningkite.lightningdb.gte.T
-com.lightningkite.lightningdb.startChain
-com.lightningkite.lightningdb.all>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.all.K, kotlin.collections.Setcom.lightningkite.lightningdb.all.T
+com.lightningkite.lightningdb.SortBuilder
+com.lightningkite.lightningdb.removeAll>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.removeAll.K, kotlin.collections.Setcom.lightningkite.lightningdb.removeAll.T
+com.lightningkite.lightningdb.lt>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.lt.K, com.lightningkite.lightningdb.lt.T
 com.lightningkite.lightningdb.Query
-com.lightningkite.lightningdb.live.toListObservable>io.reactivex.rxjava3.core.Observablecom.lightningkite.lightningdb.ListChangecom.lightningkite.lightningdb.live.toListObservable.T
-com.lightningkite.lightningdb.allSet>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.allSet.K, kotlin.Int
-com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.plus.K, kotlin.collections.Listcom.lightningkite.lightningdb.plus.T
+com.lightningkite.lightningdb.startChain
+com.lightningkite.lightningdb.modifyByKey>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.modifyByKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.modifyByKey.T
 com.lightningkite.lightningdb.Aggregate
-com.lightningkite.lightningdb.coerceAtLeast>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.coerceAtLeast.K, com.lightningkite.lightningdb.coerceAtLeast.T
-com.lightningkite.lightningdb.live.toListObservable
-com.lightningkite.lightningdb.coerceAtMost>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.coerceAtMost.K, com.lightningkite.lightningdb.coerceAtMost.T
+com.lightningkite.lightningdb.eq>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.eq.K, com.lightningkite.lightningdb.eq.T
+com.lightningkite.lightningdb.notIn>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.notIn.K, com.lightningkite.lightningdb.notIn.T
+com.lightningkite.lightningdb.gt>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.gt.K, com.lightningkite.lightningdb.gt.T
+com.lightningkite.lightningdb.removeKeys>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.removeKeys.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.removeKeys.T
+com.lightningkite.lightningserver.files.file>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningserver.files.file.K, com.lightningkite.lightningserver.files.UploadForNextRequest
+com.lightningkite.lightningdb.CMBuilder
 com.lightningkite.lightningdb.HasEmail
-com.lightningkite.lightningdb.inside>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.inside.K, com.lightningkite.lightningdb.inside.T
-com.lightningkite.lightningdb.modification>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.modification.K, com.lightningkite.lightningdb.modification.T
-com.lightningkite.lightningdb.modification
+com.lightningkite.lightningdb.anySet>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.anySet.K, kotlin.Int
 com.lightningkite.lightningdb.live.sharedSocket
+com.lightningkite.lightningdb.containsKey>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.containsKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.containsKey.T
+com.lightningkite.lightningdb.dropLast>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.dropLast.K, kotlin.collections.Listcom.lightningkite.lightningdb.dropLast.T
+com.lightningkite.lightningdb.ObserveModelApi
+com.lightningkite.lightningdb.anyClear>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.anyClear.K, kotlin.Int
+com.lightningkite.lightningdb.times>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.times.K, com.lightningkite.lightningdb.times.T
+com.lightningkite.lightningdb.mock.MockFullReadModelApi
+com.lightningkite.lightningdb.Modification
+com.lightningkite.lightningdb.sizesEquals>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.sizesEquals.K, kotlin.collections.Setcom.lightningkite.lightningdb.sizesEquals.T
+com.lightningkite.lightningdb.allSet>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.allSet.K, kotlin.Int
+com.lightningkite.lightningdb.HasMaybeEmailFields
+com.lightningkite.lightningdb.apply>kotlin.collections.Listcom.lightningkite.lightningdb.apply.T
+com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.plus.K, kotlin.collections.Setcom.lightningkite.lightningdb.plus.T
+com.lightningkite.lightningdb.lte>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.lte.K, com.lightningkite.lightningdb.lte.T
+com.lightningkite.lightningdb.SignalData
+com.lightningkite.lightningdb.inside>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.inside.K, com.lightningkite.lightningdb.inside.T
+com.lightningkite.lightningdb.inside>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.inside.K, com.lightningkite.lightningdb.inside.T
+com.lightningkite.lightningdb.lt>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.lt.K, com.lightningkite.lightningdb.lt.T
+com.lightningkite.lightningdb.mapIf>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.mapIf.K, kotlin.collections.Setcom.lightningkite.lightningdb.mapIf.T
+com.lightningkite.lightningdb.live._overrideWebSocketProvider
+com.lightningkite.lightningdb.coerceAtMost>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.coerceAtMost.K, com.lightningkite.lightningdb.coerceAtMost.T
+com.lightningkite.lightningdb.any>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.any.K, kotlin.collections.Listcom.lightningkite.lightningdb.any.T
+com.lightningkite.lightningdb.AverageAggregator
+com.lightningkite.lightningdb.inside>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.inside.K, com.lightningkite.lightningdb.inside.T
+com.lightningkite.lightningdb.HasMaybePhoneNumberFields
+com.lightningkite.lightningdb.HasEmailFields
+com.lightningkite.lightningdb.fullTextSearch>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.fullTextSearch.K, com.lightningkite.lightningdb.fullTextSearch.V
+com.lightningkite.lightningdb.notIn>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.notIn.K, com.lightningkite.lightningdb.notIn.T
+com.lightningkite.lightningdb.KeyPath
+com.lightningkite.lightningdb.contains>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.contains.K, kotlin.String
+com.lightningkite.lightningserver.files.prepareUploadForNextRequestFields
+com.lightningkite.lightningdb.then>kotlin.Unit
+com.lightningkite.lightningdb.eq>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.eq.K, com.lightningkite.lightningdb.eq.T
+com.lightningkite.lightningdb.any>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.any.K, kotlin.collections.Listcom.lightningkite.lightningdb.any.T
+com.lightningkite.lightningdb.any>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.any.K, kotlin.collections.Setcom.lightningkite.lightningdb.any.T
+com.lightningkite.lightningdb.WriteModelApi
+com.lightningkite.lightningdb.dropFirst>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.dropFirst.K, kotlin.collections.Setcom.lightningkite.lightningdb.dropFirst.T
+com.lightningkite.lightningdb.any>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.any.K, kotlin.collections.Setcom.lightningkite.lightningdb.any.T
+com.lightningkite.lightningdb.live.filter
+com.lightningkite.lightningdb.MassModification
+com.lightningkite.lightningdb.containsKey>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.containsKey.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.containsKey.T
+com.lightningkite.lightningdb.map>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.map.K, kotlin.collections.Setcom.lightningkite.lightningdb.map.T
+com.lightningkite.lightningdb.gte>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.gte.K, com.lightningkite.lightningdb.gte.T
+com.lightningkite.lightningdb.anyClear>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.anyClear.K, kotlin.Int
+com.lightningkite.lightningdb.sort
+com.lightningkite.lightningdb.ne>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.ne.K, com.lightningkite.lightningdb.ne.T
 com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.plus.K, kotlin.collections.Mapkotlin.String, com.lightningkite.lightningdb.plus.T
+com.lightningkite.lightningdb.ModificationBuilder
+com.lightningkite.lightningdb.mock.MockObserveModelApi
+com.lightningkite.lightningdb.sizesEquals>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.sizesEquals.K, kotlin.collections.Listcom.lightningkite.lightningdb.sizesEquals.T
+com.lightningkite.lightningdb.notIn>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.notIn.K, com.lightningkite.lightningdb.notIn.T
+com.lightningkite.lightningdb.StandardDeviationPopulationAggregator
+com.lightningkite.lightningdb.ReadModelApi
+com.lightningkite.lightningdb.live.WebSocketIsh
+com.lightningkite.lightningdb.fullTextSearch>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.fullTextSearch.K, com.lightningkite.lightningdb.fullTextSearch.V
+com.lightningkite.lightningserver.serverhealth.HealthStatus
+com.lightningkite.lightningserver.files.UploadForNextRequest
+com.lightningkite.lightningdb.all>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.all.K, kotlin.collections.Setcom.lightningkite.lightningdb.all.T
+com.lightningkite.lightningdb.FullReadModelApi
+com.lightningkite.lightningdb.fullTextSearch>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.fullTextSearch.K, com.lightningkite.lightningdb.fullTextSearch.V
+com.lightningkite.lightningdb.live.sharedSocketShouldBeActive
+com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.plus.K, kotlin.String
+com.lightningkite.lightningdb.map>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.map.K, kotlin.collections.Listcom.lightningkite.lightningdb.map.T
+com.lightningkite.lightningdb.sizesEquals>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.sizesEquals.K, kotlin.collections.Setcom.lightningkite.lightningdb.sizesEquals.T
+com.lightningkite.lightningdb.plus>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.plus.K, kotlin.collections.Listcom.lightningkite.lightningdb.plus.T
+com.lightningkite.lightningdb.never>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.never.K, com.lightningkite.lightningdb.never.K
+com.lightningkite.lightningdb.allClear>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.allClear.K, kotlin.Int
+com.lightningkite.lightningdb.notNull>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.notNull.K, com.lightningkite.lightningdb.notNull.T
+com.lightningkite.lightningdb.aggregator>com.lightningkite.lightningdb.Aggregate
+com.lightningkite.lightningdb.live.LiveCompleteModelApi
+com.lightningkite.lightningdb.allSet>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.allSet.K, kotlin.Int
+com.lightningkite.lightningdb.live.LiveFullReadModelApi
+com.lightningkite.lightningdb.StandardDeviationSampleAggregator
+com.lightningkite.lightningdb.mock.MockReadModelApi
+com.lightningkite.lightningdb.anySet>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.anySet.K, kotlin.Int
+com.lightningkite.lightningserver.LSError
+com.lightningkite.lightningdb.always>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.always.K, com.lightningkite.lightningdb.always.K
+com.lightningkite.lightningdb.condition>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.condition.K, com.lightningkite.lightningdb.condition.T
+com.lightningkite.lightningdb.nin>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.nin.K, com.lightningkite.lightningdb.nin.T
+com.lightningkite.lightningdb.gte>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.gte.K, com.lightningkite.lightningdb.gte.T
+com.lightningkite.lightningdb.HasPassword
+com.lightningkite.lightningdb.gt>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.gt.K, com.lightningkite.lightningdb.gt.T
+com.lightningkite.lightningdb.mapIf>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.mapIf.K, kotlin.collections.Listcom.lightningkite.lightningdb.mapIf.T
+com.lightningkite.lightningdb.ne>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.ne.K, com.lightningkite.lightningdb.ne.T
+com.lightningkite.lightningdb.always>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.always.K, com.lightningkite.lightningdb.always.K
+com.lightningkite.lightningdb.live.toListObservable>io.reactivex.rxjava3.core.Observablecom.lightningkite.lightningdb.ListChangecom.lightningkite.lightningdb.live.toListObservable.T
+com.lightningkite.lightningdb.dropFirst>com.lightningkite.lightningdb.KeyPathcom.lightningkite.lightningdb.dropFirst.K, kotlin.collections.Listcom.lightningkite.lightningdb.dropFirst.T
+com.lightningkite.lightningdb.sizesEquals>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.sizesEquals.K, kotlin.collections.Listcom.lightningkite.lightningdb.sizesEquals.T
+com.lightningkite.lightningdb.all>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.all.K, kotlin.collections.Setcom.lightningkite.lightningdb.all.T
+com.lightningkite.lightningdb.live.toListObservable
+com.lightningkite.lightningdb.HasMaybeEmail
+com.lightningkite.lightningdb.all>com.lightningkite.lightningdb.DataClassPathcom.lightningkite.lightningdb.all.K, kotlin.collections.Listcom.lightningkite.lightningdb.all.T
+com.lightningkite.lightningdb.neq>com.lightningkite.lightningdb.CMBuildercom.lightningkite.lightningdb.neq.K, com.lightningkite.lightningdb.neq.T
+com.lightningkite.lightningdb.modification
+com.lightningkite.lightningdb.path

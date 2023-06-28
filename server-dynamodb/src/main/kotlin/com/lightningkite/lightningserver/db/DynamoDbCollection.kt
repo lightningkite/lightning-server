@@ -58,7 +58,6 @@ class DynamoDbCollection<T : Any>(
         orderBy: List<SortPart<T>>,
         skip: Int,
         limit: Int,
-        skipFieldsMask: Modification<T>?,
         maxQueryMs: Long,
     ): Flow<T> = findRaw(condition, orderBy, skip, limit, maxQueryMs).map { it.second }
 

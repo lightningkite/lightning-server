@@ -51,7 +51,7 @@ public final class Query<T : Codable & Hashable> : CustomStringConvertible, Hash
     public var description: String { return "Query(condition=\(String(kotlin: self.condition)), orderBy=\(String(kotlin: self.orderBy)), skip=\(String(kotlin: self.skip)), limit=\(String(kotlin: self.limit)))" }
     public func copy(_ condition: Condition<T>? = nil, orderBy: Array<SortPart<T>>? = nil, skip: Int? = nil, limit: Int? = nil) -> Query<T> { return Query(condition ?? self.condition, orderBy: orderBy ?? self.orderBy, skip: skip ?? self.skip, limit: limit ?? self.limit) }
     
-    public convenience init(orderBy: Array<SortPart<T>> = [], skip: Int = 0, limit: Int = 100, makeCondition: @escaping (KeyPath<T, T>) -> Condition<T>) {
-        self.init(makeCondition(startChain()), orderBy: orderBy, skip: skip, limit: limit)
+    public convenience init(orderBy: Array<SortPart<T>> = [], skip: Int = 0, limit: Int = 100, makeCondition: @escaping (DataClassPath<T, T>) -> Condition<T>) {
+        self.init(makeCondition(path()), orderBy: orderBy, skip: skip, limit: limit)
     }
 }

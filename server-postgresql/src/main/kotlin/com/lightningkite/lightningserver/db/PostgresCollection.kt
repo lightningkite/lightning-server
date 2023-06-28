@@ -5,7 +5,6 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import org.jetbrains.exposed.sql.*
@@ -42,7 +41,6 @@ class PostgresCollection<T : Any>(
         orderBy: List<SortPart<T>>,
         skip: Int,
         limit: Int,
-        skipFieldsMask: Modification<T>?,
         maxQueryMs: Long,
     ): Flow<T> {
         prepare.await()
@@ -52,14 +50,10 @@ class PostgresCollection<T : Any>(
                 .orderBy(*orderBy.map { (if(it.ignoreCase) (table.col[it.field.colName]!! as Column<String>).lowerCase() else table.col[it.field.colName]!!) to if (it.ascending) SortOrder.ASC else SortOrder.DESC }
                     .toTypedArray())
                 .limit(limit, skip.toLong())
+//                .prep
                 .map { format.decode(serializer, it) }
         }
         return items.asFlow()
-            .let {
-                skipFieldsMask?.let { m ->
-                    it.map { m(it) }
-                } ?: it
-            }
     }
 
     override suspend fun count(condition: Condition<T>): Int {

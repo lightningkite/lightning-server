@@ -21,6 +21,9 @@ class LiveWriteModelApi extends WriteModelApi_1.WriteModelApi {
     postBulk(values) {
         return rxjs_plus_1.HttpClient.INSTANCE.call(`${this.url}/bulk`, rxjs_plus_1.HttpClient.INSTANCE.POST, this.authHeaders, rxjs_plus_1.HttpBody.json(values), undefined).pipe(rxjs_plus_1.unsuccessfulAsError, (0, rxjs_plus_1.fromJSON)([Array, this.serializer]));
     }
+    upsert(value, id) {
+        return rxjs_plus_1.HttpClient.INSTANCE.call(`${this.url}/${value._id}`, rxjs_plus_1.HttpClient.INSTANCE.POST, this.authHeaders, rxjs_plus_1.HttpBody.json(value), undefined).pipe(rxjs_plus_1.unsuccessfulAsError, (0, rxjs_plus_1.fromJSON)(this.serializer));
+    }
     put(value) {
         return rxjs_plus_1.HttpClient.INSTANCE.call(`${this.url}/${value._id}`, rxjs_plus_1.HttpClient.INSTANCE.PUT, this.authHeaders, rxjs_plus_1.HttpBody.json(value), undefined).pipe(rxjs_plus_1.unsuccessfulAsError, (0, rxjs_plus_1.fromJSON)(this.serializer));
     }

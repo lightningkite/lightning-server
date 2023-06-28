@@ -29,6 +29,10 @@ public final class LiveWriteModelApi<Model : HasId> : WriteModelApi<Model> {
         return HttpClient.INSTANCE.call(url: "\(String(kotlin: self.url))/bulk", method: HttpClient.INSTANCE.POST, headers: self.authHeaders, body: values.toJsonRequestBody()).readJson(serializer: Array<Model>.self);
     }
     
+    override public func upsert(_ value: Model, id: UUIDFor<Model>) -> Single<Model> {
+        return HttpClient.INSTANCE.call(url: "\(String(kotlin: self.url))/\(value._id)", method: HttpClient.INSTANCE.POST, headers: self.authHeaders, body: value.toJsonRequestBody()).readJson(serializer: Model.self);
+    }
+    
     override public func put(_ value: Model) -> Single<Model> {
         return HttpClient.INSTANCE.call(url: "\(String(kotlin: self.url))/\(value._id)", method: HttpClient.INSTANCE.PUT, headers: self.authHeaders, body: value.toJsonRequestBody()).readJson(serializer: Model.self);
     }

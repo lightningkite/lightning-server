@@ -1,3 +1,4 @@
+@file:SharedCode
 package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.IsCodableAndHashable

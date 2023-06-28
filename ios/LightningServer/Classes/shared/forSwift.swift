@@ -56,6 +56,49 @@ public extension PartialKeyPathLike {
     }
 }
 
+public extension DataClassPathPartial {
+    var compare: TypedComparator<K> {
+        return { (a, b) in
+            let left = self.getAny(key: a)
+            let right = self.getAny(key: b)
+            switch left {
+            case let left as Bool:
+                return left.compareToResult(right as! Bool)
+            case let left as Int8:
+                return left.compareToResult(right as! Int8)
+            case let left as Int16:
+                return left.compareToResult(right as! Int16)
+            case let left as Int32:
+                return left.compareToResult(right as! Int32)
+            case let left as Int64:
+                return left.compareToResult(right as! Int64)
+            case let left as Int:
+                return left.compareToResult(right as! Int)
+            case let left as Float:
+                return left.compareToResult(right as! Float)
+            case let left as Double:
+                return left.compareToResult(right as! Double)
+            case let left as String:
+                return left.compareToResult(right as! String)
+            case let left as UUID:
+                return left.compareToResult(right as! UUID)
+            case let left as Date:
+                return left.compareToResult(right as! Date)
+            case let left as LocalDate:
+                return left.compareToResult(right as! LocalDate)
+            case let left as LocalTime:
+                return left.compareToResult(right as! LocalTime)
+            case let left as LocalDateTime:
+                return left.compareToResult(right as! LocalDateTime)
+            case let left as ZonedDateTime:
+                return left.compareToResult(right as! ZonedDateTime)
+            default:
+                return ComparisonResult.orderedSame
+            }
+        }
+    }
+}
+
 public protocol Number: Hashable, Codable {
     static func +(lhs: Self, rhs: Self) -> Self
     static func -(lhs: Self, rhs: Self) -> Self
@@ -781,9 +824,9 @@ extension SortPart: AltCodable {
     public static func encode(_ value: SortPart, to encoder: Encoder) throws {
         var s = encoder.singleValueContainer()
         if value.ascending {
-            try s.encode(value.field.name)
+            try s.encode(value.field.toString())
         } else {
-            try s.encode("-\(value.field.name)")
+            try s.encode("-\(value.field.toString())")
         }
     }
     
@@ -792,11 +835,9 @@ extension SortPart: AltCodable {
         let string = try s.decode(String.self)
         if string.starts(with: "-") {
             let key = string.removePrefix(prefix: "-")
-            let prop = (T.self as! AnyPropertyIterable.Type).anyProperties.find { $0.name == key } as! PartialPropertyIterableProperty<T>
-            return SortPart(field: prop, ascending: false) as! Self
+            return SortPart(field: try DataClassPathPartial<T>.from(string: key), ascending: false) as! Self
         } else {
-            let prop = (T.self as! AnyPropertyIterable.Type).anyProperties.find { $0.name == string } as! PartialPropertyIterableProperty<T>
-            return SortPart(field: prop, ascending: true) as! Self
+            return SortPart(field: try DataClassPathPartial<T>.from(string: string), ascending: true) as! Self
         }
     }
 }
@@ -816,5 +857,55 @@ extension PartialPropertyIterableProperty: AltCodable {
         } else {
             throw Exception("No property named \(string) found")
         }
+    }
+}
+
+extension DataClassPathPartial: AltCodable {
+    public static func encode(_ value: DataClassPathPartial<K>, to encoder: Encoder) throws {
+        var s = encoder.singleValueContainer()
+        try s.encode(value.toString())
+    }
+
+    public static func decode(from decoder: Decoder) throws -> Self {
+        var s = try decoder.singleValueContainer()
+        let string = try s.decode(String.self)
+        return try from(string: string)
+    }
+    
+    static public func from(string: String) throws -> Self {
+        var current: DataClassPathPartial<K> = DataClassPathSelf<K>()
+        var currentProps = (K.self as! AnyPropertyIterable.Type).anyProperties
+        for part in string.split(separator: ".") {
+            if(part.last == "?") {
+                guard let x = (currentProps.find { $0.name == part.dropLast(1) }) else {
+                    throw Exception("No property named \(string) found")
+                }
+                current = (x as! AccessFormer).access(current)
+                current = (current as! CanMakeSafe).safe() as! DataClassPathPartial<K>
+            } else {
+                guard let x = (currentProps.find { $0.name == part }) else {
+                    throw Exception("No property named \(string) found")
+                }
+                current = (x as! AccessFormer).access(current)
+            }
+        }
+        return current as! Self
+    }
+}
+
+private protocol AccessFormer {
+    func access<T>(_ access: DataClassPathPartial<T>) -> DataClassPathPartial<T>
+}
+extension PropertyIterableProperty: AccessFormer where Root: Codable & Hashable, Value: Codable & Hashable {
+    func access<T>(_ access: DataClassPathPartial<T>) -> DataClassPathPartial<T> where T : Decodable, T : Encodable, T : Hashable {
+        DataClassPathAccess<T, Root, Value>(first: access as! DataClassPath<T, Root>, second: self)
+    }
+}
+private protocol CanMakeSafe {
+    func safe() -> Any
+}
+extension DataClassPath: CanMakeSafe where V: OptionalConvertible, V.Wrapped: Hashable & Codable {
+    func safe() -> Any {
+        return DataClassPathNotNull(wraps: self as! DataClassPath<K, V.Wrapped?>)
     }
 }

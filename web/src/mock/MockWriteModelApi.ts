@@ -27,6 +27,10 @@ export class MockWriteModelApi<Model extends HasId<string>> extends WriteModelAp
         return of(values.map((it: Model): Model => (this.table.addItem(it))));
     }
     
+    public upsert(value: Model, id: UUIDFor<Model>): Observable<Model> {
+        return of(this.table.addItem(value));
+    }
+    
     public put(value: Model): Observable<Model> {
         return of(this.table.replaceItem(value));
     }
@@ -37,13 +41,13 @@ export class MockWriteModelApi<Model extends HasId<string>> extends WriteModelAp
     
     public patch(id: UUIDFor<Model>, modification: Modification<Model>): Observable<Model> {
         return ((): (Observable<Model> | null) => {
-            const temp6 = (this.table.data.get(id) ?? null);
-            if (temp6 === null || temp6 === undefined) { return null }
+            const temp7 = (this.table.data.get(id) ?? null);
+            if (temp7 === null || temp7 === undefined) { return null }
             return ((item: Model): Observable<Model> => {
                 const modified = modification.invoke(item);
                 this.table.replaceItem(modified);
                 return of(modified);
-            })(temp6)
+            })(temp7)
         })() ?? throwError(new ItemNotFound(`404 item with key ${id} not found`));
     }
     

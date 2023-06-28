@@ -11,6 +11,7 @@ public class WriteModelApi<Model : Codable & Hashable> {
     
     open func post(_ value: Model) -> Single<Model> { TODO() }
     open func postBulk(values: Array<Model>) -> Single<Array<Model>> { TODO() }
+    open func upsert(_ value: Model, id: UUIDFor<Model>) -> Single<Model> { TODO() }
     open func put(_ value: Model) -> Single<Model> { TODO() }
     open func putBulk(values: Array<Model>) -> Single<Array<Model>> { TODO() }
     open func patch(id: UUIDFor<Model>, modification: Modification<Model>) -> Single<Model> { TODO() }

@@ -42,7 +42,7 @@ data class MongoFields(
                 }
                 else -> {
                     try {
-                        if(it.shortName.asString() == "SharedCode") khrysalisUsed = true
+                        if(it.shortName.asString() == "SharedCode") return@forEach
                         appendLine(
                             "@file:${it.shortName.asString()}(${
                                 it.arguments.joinToString(", ") {
@@ -109,8 +109,8 @@ data class MongoFields(
         for (field in fields) {
             out.appendLine("- id: ${packageName}.${field.name}")
             out.appendLine("  type: get")
-            out.appendLine("  receiver: ${packageName}.${typeReference}")
-            out.appendLine("  template: '~this~.get(\"${field.name}\")'")
+            out.appendLine("  receiver: com.lightningkite.lightningdb.DataClassPath<*, ${packageName}.${typeReference}>")
+            out.appendLine("  template: '~this~.prop(\"${field.name}\")'")
         }
     }
     fun writeSwift(out: TabAppendable) {
@@ -118,8 +118,8 @@ data class MongoFields(
         for (field in fields) {
             out.appendLine("- id: ${packageName}.${field.name}")
             out.appendLine("  type: get")
-            out.appendLine("  receiver: ${packageName}.${typeReference}")
-            out.appendLine("  template: '~this~.get(${typeReference}.${field.name}Prop)'")
+            out.appendLine("  receiver: com.lightningkite.lightningdb.DataClassPath<*, ${packageName}.${typeReference}>")
+            out.appendLine("  template: '~this~.get(prop: ${typeReference}.${field.name}Prop)'")
         }
     }
 }

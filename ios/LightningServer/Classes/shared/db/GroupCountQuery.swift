@@ -5,8 +5,8 @@ import Foundation
 
 public final class GroupCountQuery<Model : Codable & Hashable> : CustomStringConvertible, Hashable, Codable {
     public var condition: Condition<Model>
-    public var groupBy: PartialPropertyIterableProperty<Model>
-    public init(_ condition: Condition<Model> = ConditionAlways(), groupBy: PartialPropertyIterableProperty<Model>) {
+    public var groupBy: DataClassPathPartial<Model>
+    public init(_ condition: Condition<Model> = ConditionAlways(), groupBy: DataClassPathPartial<Model>) {
         self.condition = condition
         self.groupBy = groupBy
         //Necessary properties should be initialized now
@@ -15,7 +15,7 @@ public final class GroupCountQuery<Model : Codable & Hashable> : CustomStringCon
         let values = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             values.contains(.condition) ? try values.decode(Condition<Model>.self, forKey: .condition) : ConditionAlways(),
-            groupBy: try values.decode(PartialPropertyIterableProperty<Model>.self, forKey: .groupBy)
+            groupBy: try values.decode(DataClassPathPartial<Model>.self, forKey: .groupBy)
         )
     }
     
@@ -37,14 +37,14 @@ public final class GroupCountQuery<Model : Codable & Hashable> : CustomStringCon
     }
     public static func == (lhs: GroupCountQuery, rhs: GroupCountQuery) -> Bool { return lhs.condition == rhs.condition && lhs.groupBy == rhs.groupBy }
     public var description: String { return "GroupCountQuery(condition=\(String(kotlin: self.condition)), groupBy=\(String(kotlin: self.groupBy)))" }
-    public func copy(_ condition: Condition<Model>? = nil, groupBy: PartialPropertyIterableProperty<Model>? = nil) -> GroupCountQuery<Model> { return GroupCountQuery(condition ?? self.condition, groupBy: groupBy ?? self.groupBy) }
+    public func copy(_ condition: Condition<Model>? = nil, groupBy: DataClassPathPartial<Model>? = nil) -> GroupCountQuery<Model> { return GroupCountQuery(condition ?? self.condition, groupBy: groupBy ?? self.groupBy) }
 }
 
 public final class AggregateQuery<Model : Codable & Hashable> : CustomStringConvertible, Hashable, Codable {
     public var aggregate: Aggregate
     public var condition: Condition<Model>
-    public var property: PartialPropertyIterableProperty<Model>
-    public init(_ aggregate: Aggregate, condition: Condition<Model> = ConditionAlways(), property: PartialPropertyIterableProperty<Model>) {
+    public var property: DataClassPathPartial<Model>
+    public init(_ aggregate: Aggregate, condition: Condition<Model> = ConditionAlways(), property: DataClassPathPartial<Model>) {
         self.aggregate = aggregate
         self.condition = condition
         self.property = property
@@ -55,7 +55,7 @@ public final class AggregateQuery<Model : Codable & Hashable> : CustomStringConv
         self.init(
             try values.decode(Aggregate.self, forKey: .aggregate),
             condition: values.contains(.condition) ? try values.decode(Condition<Model>.self, forKey: .condition) : ConditionAlways(),
-            property: try values.decode(PartialPropertyIterableProperty<Model>.self, forKey: .property)
+            property: try values.decode(DataClassPathPartial<Model>.self, forKey: .property)
         )
     }
     
@@ -80,15 +80,15 @@ public final class AggregateQuery<Model : Codable & Hashable> : CustomStringConv
     }
     public static func == (lhs: AggregateQuery, rhs: AggregateQuery) -> Bool { return lhs.aggregate == rhs.aggregate && lhs.condition == rhs.condition && lhs.property == rhs.property }
     public var description: String { return "AggregateQuery(aggregate=\(String(kotlin: self.aggregate)), condition=\(String(kotlin: self.condition)), property=\(String(kotlin: self.property)))" }
-    public func copy(_ aggregate: Aggregate? = nil, condition: Condition<Model>? = nil, property: PartialPropertyIterableProperty<Model>? = nil) -> AggregateQuery<Model> { return AggregateQuery(aggregate ?? self.aggregate, condition: condition ?? self.condition, property: property ?? self.property) }
+    public func copy(_ aggregate: Aggregate? = nil, condition: Condition<Model>? = nil, property: DataClassPathPartial<Model>? = nil) -> AggregateQuery<Model> { return AggregateQuery(aggregate ?? self.aggregate, condition: condition ?? self.condition, property: property ?? self.property) }
 }
 
 public final class GroupAggregateQuery<Model : Codable & Hashable> : CustomStringConvertible, Hashable, Codable {
     public var aggregate: Aggregate
     public var condition: Condition<Model>
-    public var groupBy: PartialPropertyIterableProperty<Model>
-    public var property: PartialPropertyIterableProperty<Model>
-    public init(_ aggregate: Aggregate, condition: Condition<Model> = ConditionAlways(), groupBy: PartialPropertyIterableProperty<Model>, property: PartialPropertyIterableProperty<Model>) {
+    public var groupBy: DataClassPathPartial<Model>
+    public var property: DataClassPathPartial<Model>
+    public init(_ aggregate: Aggregate, condition: Condition<Model> = ConditionAlways(), groupBy: DataClassPathPartial<Model>, property: DataClassPathPartial<Model>) {
         self.aggregate = aggregate
         self.condition = condition
         self.groupBy = groupBy
@@ -100,8 +100,8 @@ public final class GroupAggregateQuery<Model : Codable & Hashable> : CustomStrin
         self.init(
             try values.decode(Aggregate.self, forKey: .aggregate),
             condition: values.contains(.condition) ? try values.decode(Condition<Model>.self, forKey: .condition) : ConditionAlways(),
-            groupBy: try values.decode(PartialPropertyIterableProperty<Model>.self, forKey: .groupBy),
-            property: try values.decode(PartialPropertyIterableProperty<Model>.self, forKey: .property)
+            groupBy: try values.decode(DataClassPathPartial<Model>.self, forKey: .groupBy),
+            property: try values.decode(DataClassPathPartial<Model>.self, forKey: .property)
         )
     }
     
@@ -129,6 +129,6 @@ public final class GroupAggregateQuery<Model : Codable & Hashable> : CustomStrin
     }
     public static func == (lhs: GroupAggregateQuery, rhs: GroupAggregateQuery) -> Bool { return lhs.aggregate == rhs.aggregate && lhs.condition == rhs.condition && lhs.groupBy == rhs.groupBy && lhs.property == rhs.property }
     public var description: String { return "GroupAggregateQuery(aggregate=\(String(kotlin: self.aggregate)), condition=\(String(kotlin: self.condition)), groupBy=\(String(kotlin: self.groupBy)), property=\(String(kotlin: self.property)))" }
-    public func copy(_ aggregate: Aggregate? = nil, condition: Condition<Model>? = nil, groupBy: PartialPropertyIterableProperty<Model>? = nil, property: PartialPropertyIterableProperty<Model>? = nil) -> GroupAggregateQuery<Model> { return GroupAggregateQuery(aggregate ?? self.aggregate, condition: condition ?? self.condition, groupBy: groupBy ?? self.groupBy, property: property ?? self.property) }
+    public func copy(_ aggregate: Aggregate? = nil, condition: Condition<Model>? = nil, groupBy: DataClassPathPartial<Model>? = nil, property: DataClassPathPartial<Model>? = nil) -> GroupAggregateQuery<Model> { return GroupAggregateQuery(aggregate ?? self.aggregate, condition: condition ?? self.condition, groupBy: groupBy ?? self.groupBy, property: property ?? self.property) }
 }
 

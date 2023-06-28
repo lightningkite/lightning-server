@@ -14,6 +14,9 @@ com.lightningkite.lightningdb.live.toListObservable
 com.lightningkite.lightningdb.live.filter
 com.lightningkite.lightningdb.live.LiveReadModelApi
 com.lightningkite.lightningdb.live.LiveWriteModelApi
+com.lightningkite.lightningdb.live.sharedSocketShouldBeActive
+com.lightningkite.lightningdb.live.retryTime
+com.lightningkite.lightningdb.live.lastRetry
 com.lightningkite.lightningdb.live._overrideWebSocketProvider
 com.lightningkite.lightningdb.live.sharedSocketCache
 com.lightningkite.lightningdb.live.sharedSocket

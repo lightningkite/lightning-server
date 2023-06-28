@@ -55,7 +55,10 @@ khrysalis {
     webProjectFolder = rootDir.resolve("web")
     webSourceFolder = rootDir.resolve("web/src")
     libraryMode = true
+    additionalEquivalentDirectories = listOf(project.file("build/generated/ksp/main/resources"))
 }
+
+tasks.getByName("equivalentsJar").dependsOn("kspKotlin")
 
 standardPublishing {
     name.set("Lightning-server-Shared")

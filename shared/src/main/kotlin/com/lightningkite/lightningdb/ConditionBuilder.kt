@@ -128,8 +128,3 @@ inline val <K : IsCodableAndHashable, T : IsCodableAndHashable> CMBuilder<K, Set
         mapCondition = { mapCondition(Condition.SetAnyElements(it)) },
         mapModification = { mapModification(Modification.SetPerElement(Condition.Always(), it)) }
     )
-
-
-@CheckReturnValue
-@Deprecated("This is a no-op now.  Just use the parts.", ReplaceWith("this\nignored"))
-infix fun Unit.then(ignored: Unit): Unit = Unit

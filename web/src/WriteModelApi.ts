@@ -13,6 +13,7 @@ export abstract class WriteModelApi<Model extends any> {
     
     public abstract post(value: Model): Observable<Model>
     public abstract postBulk(values: Array<Model>): Observable<Array<Model>>
+    public abstract upsert(value: Model, id: UUIDFor<Model>): Observable<Model>
     public abstract put(value: Model): Observable<Model>
     public abstract putBulk(values: Array<Model>): Observable<Array<Model>>
     public abstract patch(id: UUIDFor<Model>, modification: Modification<Model>): Observable<Model>

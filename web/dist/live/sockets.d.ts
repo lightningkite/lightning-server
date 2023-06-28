@@ -1,6 +1,9 @@
 import { ReifiedType } from '@lightningkite/khrysalis-runtime';
 import { WebSocketInterface } from '@lightningkite/rxjs-plus';
 import { Observable } from 'rxjs';
+export declare let _sharedSocketShouldBeActive: Observable<boolean>;
+export declare function getSharedSocketShouldBeActive(): Observable<boolean>;
+export declare function setSharedSocketShouldBeActive(value: Observable<boolean>): void;
 export declare let __overrideWebSocketProvider: (((url: string) => Observable<WebSocketInterface>) | null);
 export declare function get_overrideWebSocketProvider(): (((url: string) => Observable<WebSocketInterface>) | null);
 export declare function set_overrideWebSocketProvider(value: (((url: string) => Observable<WebSocketInterface>) | null)): void;

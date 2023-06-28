@@ -104,14 +104,14 @@ class SerializationTest {
             it.int assign 2
             it.boolean assign true
         }.cycle()
-        modification<LargeTestModel> {it.intNullable.toCMBuilder().notNull + 1 }.cycle()
+        modification<LargeTestModel> {it.intNullable.toCMBuilder().notNull += 1 }.cycle()
         modification<LargeTestModel> {it.int assign 2 }.cycle()
         modification<LargeTestModel> {it.int coerceAtMost 2 }.cycle()
         modification<LargeTestModel> {it.int coerceAtLeast 2 }.cycle()
-        modification<LargeTestModel> {it.int + 2 }.cycle()
-        modification<LargeTestModel> {it.int * 2 }.cycle()
-        modification<LargeTestModel> {it.string + "asdf" }.cycle()
-        modification<LargeTestModel> {it.list + listOf(1, 2, 3) }.cycle()
+        modification<LargeTestModel> {it.int += 2 }.cycle()
+        modification<LargeTestModel> {it.int *= 2 }.cycle()
+        modification<LargeTestModel> {it.string += "asdf" }.cycle()
+        modification<LargeTestModel> {it.list += listOf(1, 2, 3) }.cycle()
         modification<LargeTestModel> {it.list.removeAll { it eq 2 } }.cycle()
         modification<LargeTestModel> {it.list.removeAll(listOf(1, 2)) }.cycle()
         modification<LargeTestModel> {it.list.dropFirst() }.cycle()
@@ -120,10 +120,10 @@ class SerializationTest {
         modification<LargeTestModel> {it.set.removeAll(setOf(1, 2)) }.cycle()
         modification<LargeTestModel> {it.set.dropFirst() }.cycle()
         modification<LargeTestModel> {it.set.dropLast() }.cycle()
-        modification<LargeTestModel> {it.list.map { it + 2 } }.cycle()
-        modification<LargeTestModel> {it.map + mapOf("c" to 3) }.cycle()
+        modification<LargeTestModel> {it.list.map { it += 2 } }.cycle()
+        modification<LargeTestModel> {it.map += mapOf("c" to 3) }.cycle()
         modification<LargeTestModel> {it.map.modifyByKey(mapOf(
-            "c" to { it + 1 }
+            "c" to { it += 1 }
         ))}.cycle()
         modification<LargeTestModel> { it.map.removeKeys(setOf("A")) }.cycle()
     }

@@ -34,10 +34,10 @@ class BasicTest() {
             collection.insertOne(t)
             assertEquals(t, collection.find(Condition.Always()).firstOrNull())
             assertEquals(t, collection.find(condition { it.byte eq 0 }).firstOrNull())
-            assertEquals(t.byte, collection.updateOne(Condition.Always(), modification { it.byte + 1 }).old?.byte)
-            assertEquals(t.byte.plus(1).toByte(), collection.updateOne(Condition.Always(), modification { it.byte + 1 }).old?.byte)
-            assertEquals(t.byte.plus(2).toByte(), collection.updateOne(Condition.Always(), modification { it.byte + 1 }).old?.byte)
-            assertEquals(t.byte.plus(3).toByte(), collection.updateOne(Condition.Always(), modification { it.byte + 1 }).old?.byte)
+            assertEquals(t.byte, collection.updateOne(Condition.Always(), modification { it.byte += 1 }).old?.byte)
+            assertEquals(t.byte.plus(1).toByte(), collection.updateOne(Condition.Always(), modification { it.byte += 1 }).old?.byte)
+            assertEquals(t.byte.plus(2).toByte(), collection.updateOne(Condition.Always(), modification { it.byte += 1 }).old?.byte)
+            assertEquals(t.byte.plus(3).toByte(), collection.updateOne(Condition.Always(), modification { it.byte += 1 }).old?.byte)
         }
     }
 

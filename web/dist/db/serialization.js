@@ -4,6 +4,7 @@ const Condition_1 = require("./Condition");
 const Modification_1 = require("./Modification");
 const khrysalis_runtime_1 = require("@lightningkite/khrysalis-runtime");
 const SortPart_1 = require("./SortPart");
+const DataClassPath_1 = require("./DataClassPath");
 Condition_1.Condition.fromJSON = (data, types) => {
     const type = types[0];
     let key = Object.keys(data)[0];
@@ -285,12 +286,32 @@ Modification_1.Modification.OnField.prototype.toJSON = function () {
     result[this.key] = this.modification;
     return result;
 };
+function stringToPath(str) {
+    let current = new DataClassPath_1.DataClassPathSelf();
+    for (const part of str.split('.')) {
+        if (part.endsWith('?')) {
+            // @ts-ignore
+            current = new DataClassPath_1.DataClassPathNotNull(new DataClassPath_1.DataClassPathAccess(current, part.substring(0, part.length - 1)));
+        }
+        else {
+            // @ts-ignore
+            current = new DataClassPath_1.DataClassPathAccess(current, part);
+        }
+    }
+    return current;
+}
 SortPart_1.SortPart.prototype.toJSON = function () {
-    return this.ascending ? this.field : `-${this.field}`;
+    return this.ascending ? this.field.toString() : `-${this.field.toString()}`;
 };
 SortPart_1.SortPart.fromJSON = (value, types) => {
     const descending = value.startsWith('-');
     const realName = descending ? value.substring(1) : value;
-    return new SortPart_1.SortPart(realName, !descending);
+    return new SortPart_1.SortPart(stringToPath(realName), !descending);
+};
+DataClassPath_1.DataClassPath.prototype.toJSON = function () {
+    return this.toString();
+};
+DataClassPath_1.DataClassPath.fromJSON = (value, types) => {
+    return stringToPath(value);
 };
 //# sourceMappingURL=serialization.js.map

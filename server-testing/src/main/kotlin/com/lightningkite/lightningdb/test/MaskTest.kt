@@ -33,7 +33,7 @@ class MaskTest {
 
         assertTrue(mask(modification { it.embedded.value2 assign 5 }) is Condition.Always)
         assertTrue(mask(modification { it.embedded.value2 assign 4 }) is Condition.Never)
-        assertTrue(mask(modification { it.embedded.value2 plus 4 }) is Condition.Never)
+        assertTrue(mask(modification { it.embedded.value2 += 4 }) is Condition.Never)
     }
 
     @Test

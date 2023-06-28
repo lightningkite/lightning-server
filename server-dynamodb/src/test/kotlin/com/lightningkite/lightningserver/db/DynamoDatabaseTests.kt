@@ -40,7 +40,7 @@ class DynamoDBTests() {
             println(collection.find(condition { it._id eq special._id }).toList())
             collection.updateMany(condition { it._id eq special._id }, modification { it.value assign 2 })
             println(collection.find(condition { it._id eq special._id }).toList())
-            collection.updateMany(condition { it._id eq special._id }, modification { it.value plus 1 })
+            collection.updateMany(condition { it._id eq special._id }, modification { it.value += 1 })
             println(collection.find(condition { it._id eq special._id }).toList())
             println(collection.find(Condition.Always()).toList())
             println(collection.find(Condition.Always(), orderBy = listOf(SortPart(TestData::value))).toList())

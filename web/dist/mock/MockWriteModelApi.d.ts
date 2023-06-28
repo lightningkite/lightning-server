@@ -11,6 +11,7 @@ export declare class MockWriteModelApi<Model extends HasId<string>> extends Writ
     constructor(table: MockTable<Model>);
     post(value: Model): Observable<Model>;
     postBulk(values: Array<Model>): Observable<Array<Model>>;
+    upsert(value: Model, id: UUIDFor<Model>): Observable<Model>;
     put(value: Model): Observable<Model>;
     putBulk(values: Array<Model>): Observable<Array<Model>>;
     patch(id: UUIDFor<Model>, modification: Modification<Model>): Observable<Model>;

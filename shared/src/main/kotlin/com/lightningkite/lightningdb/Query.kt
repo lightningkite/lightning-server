@@ -11,7 +11,6 @@ data class Query<T: IsCodableAndHashable>(
     val orderBy: List<SortPart<T>> = listOf(),
     val skip: Int = 0,
     val limit: Int = 100,
-    val skipFieldsMask: Modification<T>? = null,
 ) {
     constructor(
         orderBy: List<SortPart<T>> = listOf(),

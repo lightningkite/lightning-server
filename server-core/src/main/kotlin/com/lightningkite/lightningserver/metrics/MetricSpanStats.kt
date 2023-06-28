@@ -42,8 +42,8 @@ fun MetricSpanStats.asModification(): Modification<MetricSpanStats> {
     return modification {
         it.min coerceAtMost this@asModification.min
         it.max coerceAtLeast this@asModification.max
-        it.sum + this@asModification.sum
-        it.count + this@asModification.count
+        it.sum += this@asModification.sum
+        it.count += this@asModification.count
     }
 }
 

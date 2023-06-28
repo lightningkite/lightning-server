@@ -768,7 +768,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Byte_inc")
         val item = LargeTestModel(byte = 2.toByte())
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.byte + 3.toByte() }
+        val modification = modification<LargeTestModel> { it.byte += 3.toByte() }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals((3.toByte() + 2.toByte()).toByte(), result.byte)
@@ -779,7 +779,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Byte_mul")
         val item = LargeTestModel(byte = 2.toByte())
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.byte * 3.toByte() }
+        val modification = modification<LargeTestModel> { it.byte *= 3.toByte() }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals((3.toByte() * 2.toByte()).toByte(), result.byte)
@@ -790,7 +790,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Short_inc")
         val item = LargeTestModel(short = 2.toShort())
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.short + 3.toShort() }
+        val modification = modification<LargeTestModel> { it.short += 3.toShort() }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals((3.toShort() + 2.toShort()).toShort(), result.short)
@@ -801,7 +801,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Short_mul")
         val item = LargeTestModel(short = 2.toShort())
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.short * 3.toShort() }
+        val modification = modification<LargeTestModel> { it.short *= 3.toShort() }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals((3.toShort() * 2.toShort()).toShort(), result.short)
@@ -812,7 +812,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Int_inc")
         val item = LargeTestModel(int = 2)
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.int + 3 }
+        val modification = modification<LargeTestModel> { it.int += 3 }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals((3 + 2).toInt(), result.int)
@@ -823,7 +823,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Int_mul")
         val item = LargeTestModel(int = 2)
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.int * 3 }
+        val modification = modification<LargeTestModel> { it.int *= 3 }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals((3 * 2).toInt(), result.int)
@@ -834,7 +834,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Long_inc")
         val item = LargeTestModel(long = 2L)
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.long + 3L }
+        val modification = modification<LargeTestModel> { it.long += 3L }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals((3L + 2L).toLong(), result.long)
@@ -845,7 +845,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Long_mul")
         val item = LargeTestModel(long = 2L)
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.long * 3L }
+        val modification = modification<LargeTestModel> { it.long *= 3L }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals((3L * 2L).toLong(), result.long)
@@ -856,7 +856,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Float_inc")
         val item = LargeTestModel(float = 2f)
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.float + 3f }
+        val modification = modification<LargeTestModel> { it.float += 3f }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals((3f + 2f).toFloat(), result.float)
@@ -867,7 +867,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Float_mul")
         val item = LargeTestModel(float = 2f)
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.float * 3f }
+        val modification = modification<LargeTestModel> { it.float *= 3f }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals((3f * 2f).toFloat(), result.float)
@@ -878,7 +878,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Double_inc")
         val item = LargeTestModel(double = 2.0)
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.double + 3.0 }
+        val modification = modification<LargeTestModel> { it.double += 3.0 }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals((3.0 + 2.0).toDouble(), result.double)
@@ -889,7 +889,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Double_mul")
         val item = LargeTestModel(double = 2.0)
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.double * 3.0 }
+        val modification = modification<LargeTestModel> { it.double *= 3.0 }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals((3.0 * 2.0).toDouble(), result.double)
@@ -969,7 +969,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_List_matching")
         val item = LargeTestModel(list = listOf(1, 2, 3))
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.list.mapIf({ it gt 2 }, { it * 2 }) }
+        val modification = modification<LargeTestModel> { it.list.mapIf({ it gt 2 }, { it *= 2 }) }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals(listOf(1, 2, 6), result.list)
@@ -1046,7 +1046,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Set_matching")
         val item = LargeTestModel(set = setOf(1, 2, 3))
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.set.mapIf({ it gt 2 }, { it * 2 }) }
+        val modification = modification<LargeTestModel> { it.set.mapIf({ it gt 2 }, { it *= 2 }) }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals(setOf(1, 2, 6), result.set)
@@ -1057,7 +1057,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Map_setField")
         val item = LargeTestModel(map = mapOf("a" to 1))
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.map + mapOf("b" to 2) }
+        val modification = modification<LargeTestModel> { it.map += mapOf("b" to 2) }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals(mapOf("a" to 1, "b" to 2), result.map)
@@ -1069,7 +1069,7 @@ abstract class ModificationTests() {
         val item = LargeTestModel(map = mapOf("a" to 1))
         collection.insertOne(item)
         val modification = modification<LargeTestModel> { it.map.modifyByKey(mapOf(
-            "a" to { it + 1 }
+            "a" to { it += 1 }
         ))}
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!

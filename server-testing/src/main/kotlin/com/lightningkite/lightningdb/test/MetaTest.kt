@@ -20,7 +20,7 @@ abstract class MetaTest {
         prepareModels()
         val toInsert = MetaTestModel(
             condition = condition { it.int gt 3 },
-            modification = modification { it.int + 2 }
+            modification = modification { it.int += 2 }
         )
         c.insertOne(toInsert)
         val results = c.find(Condition.Always()).toList()

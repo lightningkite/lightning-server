@@ -24,24 +24,12 @@
     imports:
       compareBy: '@lightningkite/khrysalis-runtime'
 
-- id: com.lightningkite.lightningdb.DataClassPathPartial
-  type: type
-  template: (keyof ~T0~ & string)
 
-- id: com.lightningkite.lightningdb.DataClassPathPartial
-  type: typeRef
-  template: String
-
-- id: com.lightningkite.lightningdb.DataClassPathPartial
-  type: call
-  template: ~0~
-
-- id: com.lightningkite.lightningdb.DataClassPathPartial.compare
+- id: com.lightningkite.lightningdb.notNull
   type: get
-  template:
-    pattern: 'compareBy(~this~)'
-    imports:
-      compareBy: '@lightningkite/khrysalis-runtime'
+  receiver: com.lightningkite.lightningdb.DataClassPath
+  template: '~this~.notNull()'
+
 
 - id: com.lightningkite.lightningdb.ServerFile
   type: call

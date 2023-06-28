@@ -26,33 +26,9 @@
   type: get
   template: ~this~
 
-
-
 - id: kotlin.reflect.KProperty1
   type: type
   template: PropertyIterableProperty<~T0~, ~T1~>
-- id: com.lightningkite.lightningdb.KProperty1Partial
-  type: type
-  template: PartialPropertyIterableProperty<~T0~>
-
-- id: com.lightningkite.lightningdb.KProperty1Partial
-  type: call
-  template: ~0~
-- id: com.lightningkite.lightningdb.KProperty1Partial.property
-  type: get
-  template: ~this~
-
-- id: com.lightningkite.lightningdb.DataClassPathPartial
-  type: type
-  template: PartialPropertyIterableProperty<~T0~>
-
-- id: com.lightningkite.lightningdb.DataClassPathPartial
-  type: call
-  template: ~0~
-- id: com.lightningkite.lightningdb.DataClassPathPartial.property
-  type: get
-  template: ~this~
-
 - id: com.lightningkite.lightningdb.setCopyImplementation
   type: call
   template: ""

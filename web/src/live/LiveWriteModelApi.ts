@@ -31,6 +31,10 @@ export class LiveWriteModelApi<Model extends HasId<string>> extends WriteModelAp
         return HttpClient.INSTANCE.call(`${this.url}/bulk`, HttpClient.INSTANCE.POST, this.authHeaders, HttpBody.json(values), undefined).pipe(unsuccessfulAsError, fromJSON<Array<Model>>([Array, this.serializer]));
     }
     
+    public upsert(value: Model, id: UUIDFor<Model>): Observable<Model> {
+        return HttpClient.INSTANCE.call(`${this.url}/${value._id}`, HttpClient.INSTANCE.POST, this.authHeaders, HttpBody.json(value), undefined).pipe(unsuccessfulAsError, fromJSON<Model>(this.serializer));
+    }
+    
     public put(value: Model): Observable<Model> {
         return HttpClient.INSTANCE.call(`${this.url}/${value._id}`, HttpClient.INSTANCE.PUT, this.authHeaders, HttpBody.json(value), undefined).pipe(unsuccessfulAsError, fromJSON<Model>(this.serializer));
     }
