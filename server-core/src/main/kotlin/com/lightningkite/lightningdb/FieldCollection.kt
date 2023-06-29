@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * An abstract way to communicate with a database on a specific collection/table
@@ -33,6 +34,28 @@ interface FieldCollection<Model : Any> {
         limit: Int = Int.MAX_VALUE,
         maxQueryMs: Long = 15_000
     ): Flow<Model>
+
+    /**
+     * Query for items in the collection.
+     */
+    suspend fun findPartial(
+        fields: Set<DataClassPathPartial<Model>>,
+        condition: Condition<Model>,
+        orderBy: List<SortPart<Model>> = listOf(),
+        skip: Int = 0,
+        limit: Int = Int.MAX_VALUE,
+        maxQueryMs: Long = 15_000,
+    ): Flow<Map<String, Any?>> = find(
+        condition = condition,
+        orderBy = orderBy,
+        skip = skip,
+        limit = limit,
+        maxQueryMs = maxQueryMs
+    ).map {
+        val m = HashMap<String, Any?>()
+        fields.forEach { f -> f.setMap(it, m) }
+        m
+    }
 
     /**
      * Count the number of matching items in the collection.

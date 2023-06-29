@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.aws
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler
 import com.lightningkite.lightningserver.cache.setIfNotExists
+import com.lightningkite.lightningserver.compression.extensionForEngineCompression
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.Disconnectable
 import com.lightningkite.lightningserver.core.ServerPath
@@ -459,7 +460,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             protocol = "https",
             sourceIp = event.requestContext.identity.sourceIp
         )
-        val result = Http.execute(request).extensionForEngineAddCors(request)
+        val result = Http.execute(request).extensionForEngineAddCors(request).extensionForEngineCompression(request)
         val outHeaders = HashMap<String, String>()
         result.headers.entries.forEach { outHeaders.put(it.first, it.second) }
         val b = result.body
@@ -474,12 +475,24 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 return response
             }
 
-            b is HttpContent.Text || b.type.isText -> {
+            b is HttpContent.Text -> {
                 val response = withContext(Dispatchers.IO) {
                     APIGatewayV2HTTPResponse(
                         statusCode = result.status.code,
                         headers = outHeaders,
                         body = b.text()
+                    )
+                }
+                return response
+            }
+
+            b is HttpContent.Binary -> {
+                val response = withContext(Dispatchers.IO) {
+                    APIGatewayV2HTTPResponse(
+                        statusCode = result.status.code,
+                        headers = outHeaders,
+                        body = Base64.getEncoder().encodeToString(b.bytes),
+                        isBase64Encoded = true
                     )
                 }
                 return response

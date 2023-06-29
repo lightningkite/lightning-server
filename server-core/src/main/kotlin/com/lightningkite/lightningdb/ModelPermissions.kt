@@ -53,4 +53,9 @@ data class ModelPermissions<Model>(
      * Masks a single instance of the model.
      */
     fun mask(model: Model): Model = readMask(model)
+
+    /**
+     * Masks a single instance of the model.
+     */
+    fun mask(model: Map<String, Any?>): Map<String, Any?> = readMask(model)
 }

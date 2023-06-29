@@ -5,11 +5,23 @@ import org.junit.Test
 import java.time.Instant
 import kotlin.test.assertEquals
 import com.lightningkite.lightningdb.*
+import kotlinx.coroutines.flow.toList
 
 abstract class OperationsTests() {
 
     init { prepareModels() }
     abstract val database: Database
+
+    @Test fun test_partials(): Unit = runBlocking {
+        val collection = database.collection<LargeTestModel>("test_partials")
+        var m = LargeTestModel(int = 42)
+        collection.insertOne(m)
+        val result = collection.findPartial(
+            fields = setOf(path<LargeTestModel>().int),
+            condition = Condition.Always()
+        ).toList()
+        assertEquals(mapOf<String, Any?>("int" to m.int), result.first())
+    }
 
     @Test fun test_replace(): Unit = runBlocking {
         val collection = database.collection<LargeTestModel>("test_replace")

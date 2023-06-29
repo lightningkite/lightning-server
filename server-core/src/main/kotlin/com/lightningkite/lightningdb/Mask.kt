@@ -16,6 +16,13 @@ data class Mask<T>(
         }
         return value
     }
+    operator fun invoke(on: Map<String, Any?>): Map<String, Any?> {
+        var value = on
+        for(pair in pairs) {
+            if(pair.first(on) == false) value = pair.second(value)
+        }
+        return value
+    }
     fun permitSort(on: List<SortPart<T>>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
         for(pair in pairs) {
@@ -67,4 +74,23 @@ data class Mask<T>(
 
 inline fun <T> mask(builder: Mask.Builder<T>.()->Unit): Mask<T> {
     return Mask.Builder<T>().apply(builder).build()
+}
+
+operator fun <T> Condition<T>.invoke(map: Map<String, Any?>): Boolean? {
+    return when(this) {
+        is Condition.OnField<*, *> -> if(map.containsKey(key.name)) map[key.name].let {
+            if(it is Map<*, *>) condition(it as Map<String, Any?>)
+            else (condition as Condition<Any?>)(it)
+        } else null
+        else -> null
+    }
+}
+operator fun <T> Modification<T>.invoke(map: Map<String, Any?>): Map<String, Any?> {
+    return when(this) {
+        is Modification.OnField<*, *> -> if(map.containsKey(key.name)) map + (key.name to map[key.name].let {
+            if(it is Map<*, *>) modification(it as Map<String, Any?>)
+            else (modification as Modification<Any?>)(it)
+        }) else map
+        else -> map
+    }
 }

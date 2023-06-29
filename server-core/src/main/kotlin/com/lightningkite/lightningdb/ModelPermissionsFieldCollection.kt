@@ -31,6 +31,31 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         ).map { permissions.mask(it) }
     }
 
+    override suspend fun findPartial(
+        fields: Set<DataClassPathPartial<Model>>,
+        condition: Condition<Model>,
+        orderBy: List<SortPart<Model>>,
+        skip: Int,
+        limit: Int,
+        maxQueryMs: Long
+    ): Flow<Map<String, Any?>> {
+        val sortImposedConditions = permissions.readMask.permitSort(orderBy)
+        val allFields = fields.toMutableSet()
+        permissions.readMask.pairs.forEach {
+            it.first.emitReadPaths {
+                allFields.add(it)
+            }
+        }
+        return wraps.findPartial(
+            fields = allFields,
+            condition = condition and permissions.read and sortImposedConditions and permissions.readMask(condition),
+            orderBy = orderBy,
+            skip = skip,
+            limit = limit,
+            maxQueryMs = maxQueryMs
+        ).map { permissions.mask(it) }
+    }
+
     override suspend fun insert(models: Iterable<Model>): List<Model> {
         val passingModels = models.filter { permissions.create(it) }
         return wraps.insertMany(passingModels).map { permissions.mask(it) }

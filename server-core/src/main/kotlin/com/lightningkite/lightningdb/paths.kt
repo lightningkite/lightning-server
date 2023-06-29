@@ -73,6 +73,25 @@ private fun Condition<*>.reads(list: List<KProperty1<*, *>>): Boolean {
     }
 }
 
+fun <T> Condition<T>.readPaths(): Set<DataClassPathPartial<T>> {
+    val out = HashSet<DataClassPathPartial<T>>()
+    emitReadPaths { out.add(it) }
+    return out
+}
+fun <T> Condition<T>.emitReadPaths(out: (DataClassPathPartial<T>) -> Unit) = emitReadPaths(DataClassPathSelf<T>()) { out(it as DataClassPathPartial<T>) }
+private fun Condition<*>.emitReadPaths(soFar: DataClassPath<*, *>, out: (DataClassPathPartial<*>) -> Unit) {
+    when (this) {
+        is Condition.OnField<*, *> -> condition.emitReadPaths(DataClassPathAccess(soFar as DataClassPath<Any?, Any>, key as KProperty1<Any, Any?>), out)
+        is Condition.Not -> this.condition.emitReadPaths(soFar, out)
+        is Condition.And -> this.conditions.forEach { it.emitReadPaths(soFar, out) }
+        is Condition.Or -> this.conditions.forEach { it.emitReadPaths(soFar, out) }
+        is Condition.IfNotNull<*> -> this.condition.emitReadPaths(DataClassPathNotNull(soFar as DataClassPath<Any?, Any?>), out)
+        else -> out(soFar)
+    }
+    // COND: (a, (b, (c, x)))
+    // PATH: (((root, a), b), c)
+}
+
 fun <T> Condition<T>.readsResultOf(modification: Modification<T>): Boolean {
     return when (this) {
         is Condition.Always -> false

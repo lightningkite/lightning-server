@@ -16,6 +16,12 @@ class ConditionSimplifyKtTest {
         TestSettings
     }
 
+    @Test fun paths() {
+        condition<LargeTestModel> {
+            ( it.embedded.value1 eq "sa") and (it.boolean eq false) and (it.boolean neq true) and (it.embeddedNullable.notNull.value2 eq 42)
+        }.also { println(it) }.readPaths().let { println(it) }
+    }
+
     @Test
     fun test() {
         condition<LargeTestModel> { Condition.Never<LargeTestModel>() or Condition.Never() }.simplifyOk()

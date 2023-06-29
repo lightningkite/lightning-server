@@ -25,6 +25,15 @@ open class DelayedFieldCollection<Model : Any>(
         maxQueryMs: Long,
     ): Flow<Model> = wraps.find(condition, orderBy, skip, limit, maxQueryMs).onStart { delay(milliseconds) }
 
+    override suspend fun findPartial(
+        fields: Set<DataClassPathPartial<Model>>,
+        condition: Condition<Model>,
+        orderBy: List<SortPart<Model>>,
+        skip: Int,
+        limit: Int,
+        maxQueryMs: Long
+    ): Flow<Map<String, Any?>> = wraps.findPartial(fields, condition, orderBy, skip, limit, maxQueryMs)
+
     override suspend fun count(condition: Condition<Model>): Int {
         delay(milliseconds)
         return wraps.count(condition)
