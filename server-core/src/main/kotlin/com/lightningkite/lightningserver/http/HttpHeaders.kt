@@ -14,6 +14,7 @@ data class HttpHeaders(val entries: List<Pair<String, String>>) {
     }
 
     operator fun get(key: String): String? = normalizedEntries[key.lowercase()]?.firstOrNull()
+    fun getMany(key: String): List<String> = normalizedEntries[key.lowercase()] ?: listOf()
 
     val cookies: Map<String, String> by lazy {
         this[HttpHeader.Cookie]?.let {
@@ -45,6 +46,10 @@ data class HttpHeaders(val entries: List<Pair<String, String>>) {
         val entries = ArrayList<Pair<String, String>>()
         fun set(key: String, value: String) {
             entries.add(key to value)
+        }
+
+        fun set(headers: HttpHeaders) {
+            entries += headers.entries
         }
 
         fun setCookie(
