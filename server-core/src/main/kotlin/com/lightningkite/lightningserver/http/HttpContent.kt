@@ -18,6 +18,7 @@ import java.nio.charset.Charset
 sealed class HttpContent {
     abstract suspend fun stream(): InputStream
     suspend fun text(): String = stream().reader().readText()
+    suspend fun bytes(): ByteArray = stream().readBytes()
     abstract val length: Long?
     abstract val type: ContentType
 
