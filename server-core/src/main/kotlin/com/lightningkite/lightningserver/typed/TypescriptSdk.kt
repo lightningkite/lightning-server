@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningdb.Description
 import com.lightningkite.lightningdb.MySealedClassSerializerInterface
 import com.lightningkite.lightningdb.listElement
 import com.lightningkite.lightningdb.mapValueElement
@@ -17,14 +18,16 @@ import kotlin.reflect.KType
 fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     val safeDocumentables =
         endpoints.filter { it.inputType == Unit.serializer() || it.route.method != HttpMethod.GET }.toList()
-    appendLine("import { ${fromLightningServerPackage.joinToString()}, apiCall, Path } from '@lightningkite/lightning-server-simplified'")
+    appendLine("import { ${fromLightningServerPackage.joinToString()}, apiCall, Path, DeepPartial } from '@lightningkite/lightning-server-simplified'")
     appendLine()
     usedTypes
+        .filter { it.descriptor.simpleSerialName !in skipFromLsPackage }
         .sortedBy { it.descriptor.simpleSerialName }
         .forEach {
             when (it.descriptor.kind) {
                 is StructureKind.CLASS -> {
                     if (it is MySealedClassSerializerInterface) return@forEach
+                    emitTypeComment(it)
                     append("export interface ")
                     it.write().let { out.append(it) }
                     appendLine(" {")
@@ -39,6 +42,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
                 }
 
                 is SerialKind.ENUM -> {
+                    emitTypeComment(it)
                     append("export enum ")
                     it.write().let { out.append(it) }
                     appendLine(" {")
@@ -55,6 +59,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
 
                 is PrimitiveKind.STRING -> {
                     if (it.descriptor.simpleSerialName != "String") {
+                        emitTypeComment(it)
                         appendLine("type ${it.descriptor.simpleSerialName} = string  // ${it.descriptor.serialName}")
                     }
                 }
@@ -71,9 +76,10 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     val groups = byGroup.keys.filterNotNull().sortedBy { it.groupToPartName() }
     appendLine("export interface Api {")
     for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
+        appendLine("    ")
         appendLine("     /**")
         entry.description.split('\n').map { it.trim() }.forEach {
-            appendLine("    * $it")
+            appendLine("     * $it")
         }
         appendLine("     **/")
         append("    ")
@@ -84,6 +90,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     for (group in groups) {
         appendLine("    readonly ${group.groupToPartName()}: {")
         for (entry in byGroup[group]!!) {
+            appendLine("        ")
             appendLine("        /**")
             entry.description.split('\n').map { it.trim() }.forEach {
                 appendLine("        * $it")
@@ -112,6 +119,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         appendLine("export class $sessionClassName {")
         appendLine("    constructor(public api: Api, public ${userType.userTypeTokenName()}: string) {}")
         for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
+            appendLine("    ")
             appendLine("    /**")
             entry.description.split('\n').map { it.trim() }.forEach {
                 appendLine("    * $it")
@@ -127,6 +135,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         for (group in groups) {
             appendLine("    readonly ${group.groupToPartName()} = {")
             for (entry in byGroup[group]!!) {
+                appendLine("        ")
                 appendLine("        /**")
                 entry.description.split('\n').map { it.trim() }.forEach {
                     appendLine("        * $it")
@@ -155,6 +164,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     appendLine("export class LiveApi implements Api {")
     appendLine("    public constructor(public httpUrl: string, public socketUrl: string = httpUrl, public extraHeaders: Record<string, string> = {}, public responseInterceptors?: (x: Response)=>Response) {}")
     for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
+        appendLine("    ")
         appendLine("    /**")
         entry.description.split('\n').map { it.trim() }.forEach {
             appendLine("    * $it")
@@ -165,7 +175,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         this.functionHeader(entry, skipAuth = false)
         appendLine(" {")
         val hasInput = entry.inputType != Unit.serializer()
-        appendLine("        return apiCall(")
+        appendLine("        return apiCall<${entry.inputType.write()}>(")
         appendLine("            `\${this.httpUrl}${entry.route.path.escaped}`,")
         appendLine("            ${if (hasInput) "input" else "undefined"},")
         appendLine("            {")
@@ -186,6 +196,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     for (group in groups.sortedBy { it.groupToPartName() }) {
         appendLine("    readonly ${group.groupToPartName()} = {")
         for (entry in byGroup[group]!!) {
+            appendLine("        ")
             appendLine("        /**")
             entry.description.split('\n').map { it.trim() }.forEach {
                 appendLine("        * $it")
@@ -197,7 +208,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
             this.functionHeader(entry, skipAuth = false)
             appendLine(" => {")
             val hasInput = entry.inputType != Unit.serializer()
-            appendLine("            return apiCall(")
+            appendLine("            return apiCall<${entry.inputType.write()}>(")
             appendLine("                `\${this.httpUrl}${entry.route.path.escaped}`,")
             appendLine("                ${if (hasInput) "input" else "undefined"},")
             appendLine("                {")
@@ -221,6 +232,20 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     appendLine()
 }
 
+private fun Appendable.emitTypeComment(it: KSerializer<*>) {
+    appendLine()
+    it.descriptor.annotations
+        .filterIsInstance<Description>()
+        .takeUnless { it.isEmpty() }
+        ?.let {
+            appendLine("/**")
+            it.joinToString("\n") { it.text }.split("\n").forEach {
+                appendLine("* $it")
+            }
+            appendLine("**/")
+        }
+}
+
 private val fromLightningServerPackage = setOf(
     "Query",
     "MassModification",
@@ -232,11 +257,13 @@ private val fromLightningServerPackage = setOf(
     "AggregateQuery",
     "GroupAggregateQuery",
     "Aggregate",
-    "Partial",
     "SortPart",
     "DataClassPath",
     "DataClassPathPartial",
 )
+private val skipFromLsPackage = setOf(
+    "Partial",
+) + fromLightningServerPackage
 
 private fun String.groupToInterfaceName(): String = replaceFirstChar { it.uppercase() } + "Api"
 private fun String.groupToPartName(): String = replaceFirstChar { it.lowercase() }

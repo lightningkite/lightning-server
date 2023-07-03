@@ -10,6 +10,7 @@ import java.util.*
 @Serializable
 @DatabaseModel
 @AdminTableColumns(["name", "number", "status"])
+@Description("A model for testing Lightning Server.")
 data class TestModel(
     override val _id: UUID = UUID.randomUUID(),
     val timestamp: Instant = Instant.now(),

@@ -82,7 +82,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         inputType = QueryPartial.serializer(info.serialization.serializer),
         outputType = ListSerializer(PartialSerializer(info.serialization.serializer)),
         summary = "Query Partial",
-        description = "Gets parts of- ${collectionName}s that match the given query.",
+        description = "Gets parts of ${collectionName}s that match the given query.",
         errorCases = listOf(),
         implementation = { user: USER, input: QueryPartial<T> ->
             info.collection(user)

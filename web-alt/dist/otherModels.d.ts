@@ -2,10 +2,11 @@ import { Condition } from './Condition';
 import { Modification } from './Modification';
 export interface Query<T> {
     condition?: Condition<T>;
-    orderBy?: Array<keyof T | `-${keyof T & string}`>;
+    orderBy?: Array<SortPart<T>>;
     skip?: number;
     limit?: number;
 }
+export declare type SortPart<T> = (keyof T & string) | `-${keyof T & string}` | `~${keyof T & string}` | `-~${keyof T & string}`;
 export interface MassModification<T> {
     condition: Condition<T>;
     modification: Modification<T>;
@@ -40,3 +41,8 @@ export declare enum Aggregate {
     StandardDeviationSample = "StandardDeviationSample",
     StandardDeviationPopulation = "StandardDeviationPopulation"
 }
+export declare type DeepPartial<T> = {
+    [P in keyof T]?: (T[P] extends object ? DeepPartial<T[P]> : T[P]);
+};
+export declare type DataClassPath<T> = keyof T;
+export declare type DataClassPathPartial<T> = keyof T;
