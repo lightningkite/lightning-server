@@ -148,6 +148,15 @@ suspend fun <Model : Any>
         FieldCollection<Model>.query(query: Query<Model>): Flow<Model> =
     find(query.condition, query.orderBy, query.skip, query.limit)
 
+/**
+ * Will retrieve a list of instance of *Model* from the collection on the values in the query provided.
+ * @param query The values used in calculating a search on a collection.
+ * @return A List of *Model* from the collection that match the query provided.
+ */
+suspend fun <Model : Any>
+        FieldCollection<Model>.queryPartial(query: QueryPartial<Model>): Flow<Partial<Model>> =
+    findPartial(query.fields, query.condition, query.orderBy, query.skip, query.limit)
+
 @Deprecated("Use the built in group count with keyPaths.")
 suspend inline fun <reified Key, reified Model:Any> FieldCollection<Model>.groupCount(
     condition: Condition<Model> = Condition.Always(),

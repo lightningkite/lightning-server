@@ -20,7 +20,7 @@ abstract class OperationsTests() {
             fields = setOf(path<LargeTestModel>().int),
             condition = Condition.Always()
         ).toList()
-        assertEquals(mapOf<String, Any?>("int" to m.int), result.first())
+        assertEquals(partialOf<LargeTestModel>("int" to m.int), result.first())
     }
 
     @Test fun test_replace(): Unit = runBlocking {

@@ -109,3 +109,7 @@ internal fun <T> defer(deferred: () -> KSerializer<T>): KSerializer<T> = object 
         original.serialize(encoder, value)
     }
 }
+
+interface TypeArgSerialDescriptor : SerialDescriptor {
+
+}

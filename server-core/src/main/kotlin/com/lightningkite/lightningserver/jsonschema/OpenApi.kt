@@ -147,7 +147,7 @@ private fun <USER, INPUT : Any, OUTPUT> ApiEndpoint<USER, INPUT, OUTPUT>.openApi
         requestBody = if (this.route.method == HttpMethod.GET) null else if (this.inputType == Unit.serializer()) null else OpenApiRequestBody(
             content = mapOf(
                 ContentType.Application.Json.toString() to OpenApiMediaType(
-                    schema = builder[this.inputType],
+                    schema = builder[this.inputType.descriptor],
                     examples = mapOf()
                 )
             ),
@@ -161,7 +161,7 @@ private fun <USER, INPUT : Any, OUTPUT> ApiEndpoint<USER, INPUT, OUTPUT>.openApi
                 description = "Success",
                 content = mapOf(
                     ContentType.Application.Json.toString() to OpenApiMediaType(
-                        schema = builder[this.outputType],
+                        schema = builder[this.outputType.descriptor],
                         examples = mapOf()
                     )
                 )
@@ -174,7 +174,7 @@ val openApiDescription: OpenApiRoot by lazy {
     val builder = JsonSchemaBuilder(Serialization.json, "#/components/schemas/", useNullableProperty = true)
     Documentable.endpoints.flatMap {
         sequenceOf(it.inputType, it.outputType) + it.routeTypes.values.asSequence()
-    }.distinct().forEach { builder.get(it) }
+    }.distinct().forEach { builder.get(it.descriptor) }
 
     OpenApiRoot(
         openapi = "3.0.2",
@@ -225,7 +225,7 @@ val openApiDescription: OpenApiRoot by lazy {
                         inside = OpenApiParameterType.path,
                         description = it.key,
                         required = true,
-                        schema = builder[it.value],
+                        schema = builder[it.value.descriptor],
                         allowEmptyValue = false
                     )
                 },

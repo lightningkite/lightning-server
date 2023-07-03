@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.khrysalis.IsCodableAndHashable
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -16,7 +17,7 @@ data class Mask<T>(
         }
         return value
     }
-    operator fun invoke(on: Map<String, Any?>): Map<String, Any?> {
+    operator fun invoke(on: Partial<T>): Partial<T> {
         var value = on
         for(pair in pairs) {
             if(pair.first(on) == false) value = pair.second(value)
@@ -76,21 +77,25 @@ inline fun <T> mask(builder: Mask.Builder<T>.()->Unit): Mask<T> {
     return Mask.Builder<T>().apply(builder).build()
 }
 
-operator fun <T> Condition<T>.invoke(map: Map<String, Any?>): Boolean? {
+operator fun <T> Condition<T>.invoke(map: Partial<T>): Boolean? {
     return when(this) {
-        is Condition.OnField<*, *> -> if(map.containsKey(key.name)) map[key.name].let {
-            if(it is Map<*, *>) condition(it as Map<String, Any?>)
+        is Condition.OnField<*, *> -> if(map.parts.containsKey(key.name)) map.parts[key.name].let {
+            if(it is Partial<*>) (condition as Condition<Any?>).invoke(map = it as Partial<Any?>)
             else (condition as Condition<Any?>)(it)
         } else null
         else -> null
     }
 }
-operator fun <T> Modification<T>.invoke(map: Map<String, Any?>): Map<String, Any?> {
+operator fun <T> Modification<T>.invoke(map: Partial<T>): Partial<T> {
     return when(this) {
-        is Modification.OnField<*, *> -> if(map.containsKey(key.name)) map + (key.name to map[key.name].let {
-            if(it is Map<*, *>) modification(it as Map<String, Any?>)
-            else (modification as Modification<Any?>)(it)
-        }) else map
+        is Modification.OnField<*, *> -> if(map.parts.containsKey(key.name)) {
+            val newPartial = Partial<T>(map.parts.toMutableMap())
+            newPartial.parts[key.name] = map.parts[key.name].let {
+                if (it is Partial<*>) (modification as Modification<Any?>)(it as Partial<Any?>)
+                else (modification as Modification<Any?>)(it)
+            }
+            newPartial
+        } else map
         else -> map
     }
 }

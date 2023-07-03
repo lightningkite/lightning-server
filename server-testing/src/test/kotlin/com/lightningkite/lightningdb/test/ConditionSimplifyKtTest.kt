@@ -24,6 +24,7 @@ class ConditionSimplifyKtTest {
 
     @Test
     fun test() {
+        condition<LargeTestModel> { Condition.Always<LargeTestModel>() and Condition.Never() }.simplifyOk()
         condition<LargeTestModel> { Condition.Never<LargeTestModel>() or Condition.Never() }.simplifyOk()
         condition<LargeTestModel> { it.boolean eq false }.simplifyOk()
         condition<LargeTestModel> { it.boolean.eq(false) and Condition.Always() }.simplifyOk()

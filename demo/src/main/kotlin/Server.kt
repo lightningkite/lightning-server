@@ -69,7 +69,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         }
     }
 
-    val userInfo = ModelInfo<User, User, UUID>(
+    val userInfo = ModelInfoWithDefault<User, User, UUID>(
         getCollection = {
             database().collection<User>()
                 .interceptCreate { it.copy(hashedPassword = it.hashedPassword.secureHash()) }
@@ -82,6 +82,7 @@ object Server : ServerPathGroup(ServerPath.root) {
                     }
                 }
         },
+        defaultItem = { User(email = "") },
         forUser = { user ->
             val everyone: Condition<User> = Condition.Always()
             val self: Condition<User> = condition { it._id eq user._id }

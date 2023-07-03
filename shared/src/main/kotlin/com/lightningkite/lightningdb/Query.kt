@@ -19,3 +19,4 @@ data class Query<T: IsCodableAndHashable>(
         makeCondition: (DataClassPath<T, T>)->Condition<T>,
     ):this(makeCondition(path()), orderBy, skip, limit)
 }
+

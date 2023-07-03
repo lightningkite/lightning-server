@@ -58,6 +58,9 @@ internal fun KSerializer<*>.subSerializers(): Array<KSerializer<*>> = listElemen
     ?: (this as? GeneratedSerializer<*>)?.typeParametersSerializers()
     ?: (this as? ConditionSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: (this as? ModificationSerializer<*>)?.inner?.let { arrayOf(it) }
+    ?: (this as? PartialSerializer<*>)?.source?.let { arrayOf(it) }
+    ?: (this as? SortPartSerializer<*>)?.inner?.let { arrayOf(it) }
+    ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: arrayOf()
 
 internal fun KSerializer<*>.subAndChildSerializers(): Array<KSerializer<*>> = listElement()?.let { arrayOf(it) }
@@ -65,6 +68,9 @@ internal fun KSerializer<*>.subAndChildSerializers(): Array<KSerializer<*>> = li
     ?: (this as? GeneratedSerializer<*>)?.run { childSerializers() + typeParametersSerializers() }
     ?: (this as? ConditionSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: (this as? ModificationSerializer<*>)?.inner?.let { arrayOf(it) }
+    ?: (this as? PartialSerializer<*>)?.source?.let { arrayOf(it) }
+    ?: (this as? SortPartSerializer<*>)?.inner?.let { arrayOf(it) }
+    ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: arrayOf()
 
 internal fun KSerializer<*>.uncontextualize(): KSerializer<*> {

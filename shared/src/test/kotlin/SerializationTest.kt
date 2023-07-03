@@ -22,7 +22,7 @@ class SerializationTest {
     }
 
     @Test fun writeThing() {
-        val out = HashMap<String, Any?>()
+        val out = Partial<LargeTestModel>()
         LargeTestModel.path.embeddedNullable.notNull.value1
             .setMap(LargeTestModel(embeddedNullable = ClassUsedForEmbedding()), out)
         println(out)
@@ -30,7 +30,7 @@ class SerializationTest {
 
     @Test fun partial() {
         val serializer = PartialSerializer(User.serializer())
-        val part = mapOf(
+        val part = partialOf<User>(
             "_id" to UUID.randomUUID(),
             "email" to "test@test.com"
         )
@@ -42,8 +42,8 @@ class SerializationTest {
 
     @Test fun partial2() {
         val serializer = PartialSerializer(LargeTestModel.serializer())
-        val part = mapOf(
-            "embedded" to mapOf(
+        val part = partialOf<LargeTestModel>(
+            "embedded" to partialOf<ClassUsedForEmbedding>(
                 "value2" to 4
             ),
             "int" to 5
@@ -52,6 +52,19 @@ class SerializationTest {
         println(asText)
         println(myJson.decodeFromString(serializer, asText))
         println(myJson.decodeFromString(serializer, """{"embedded": { "value1": "Test" }}"""))
+    }
+    @Test fun partial3() {
+        val serializer = serializer<QueryPartial<LargeTestModel>>()
+        val item = QueryPartial(
+            fields = setOf(
+                path<LargeTestModel>().int,
+                path<LargeTestModel>().embeddedNullable.notNull.value1,
+            )
+        )
+        val asText = myJson.encodeToString(serializer, item)
+        println(asText)
+        val restored = myJson.decodeFromString(serializer, asText)
+        assertEquals(item, restored)
     }
 
     @Test fun oldSearchStyle() {

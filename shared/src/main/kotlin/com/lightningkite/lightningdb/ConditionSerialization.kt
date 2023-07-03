@@ -35,7 +35,7 @@ private val serializers = HashMap<KSerializer<*>, MySealedClassSerializerInterfa
 @Suppress("UNCHECKED_CAST")
 private fun <Inner> getCond(inner: KSerializer<Inner>): MySealedClassSerializerInterface<Condition<Inner>> = serializers.getOrPut(inner) {
     MySealedClassSerializer(
-        "com.lightningkite.lightningdb.Condition<${inner.descriptor.serialName}>",
+        "com.lightningkite.lightningdb.Condition",
         Condition::class as KClass<Condition<Inner>>,
         {
             val map = LinkedHashMap<String, KSerializer<out Condition<Inner>>>()
@@ -51,10 +51,14 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): MySealedClassSerializerI
             register(Condition.NotEqual.serializer(inner))
             register(Condition.Inside.serializer(inner))
             register(Condition.NotInside.serializer(inner))
-            register(Condition.GreaterThan.serializer(inner))
-            register(Condition.LessThan.serializer(inner))
-            register(Condition.GreaterThanOrEqual.serializer(inner))
-            register(Condition.LessThanOrEqual.serializer(inner))
+
+            if(inner.descriptor.kind is PrimitiveKind) {
+                register(Condition.GreaterThan.serializer(inner))
+                register(Condition.LessThan.serializer(inner))
+                register(Condition.GreaterThanOrEqual.serializer(inner))
+                register(Condition.LessThanOrEqual.serializer(inner))
+            }
+
             register(Condition.FullTextSearch.serializer(inner))
             if (inner == String.serializer()) {
                 register(Condition.StringContains.serializer())

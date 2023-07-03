@@ -36,6 +36,30 @@ annotation class AdminTableColumns(val fields: Array<String>)
 annotation class AdminTitleFields(val fields: Array<String>)
 
 /**
+ * Hide this field in admin forms.
+ */
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class AdminHidden()
+
+/**
+ * Multiline widget in admin.
+ */
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class Multiline()
+
+/**
+ * Set widget in admin using RJSF.
+ */
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class UiWidget(val type: String)
+
+/**
  * Format, passed onto schema
  */
 @SerialInfo

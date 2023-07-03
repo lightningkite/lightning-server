@@ -14,7 +14,6 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
-import kotlin.reflect.KProperty1
 
 open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     path: ServerPath,
@@ -72,6 +71,22 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         implementation = { user: USER, input: Query<T> ->
             info.collection(user)
                 .query(input)
+                .toList()
+        }
+    )
+
+    // This is used to GET a list objects, but rather than the query being in the parameter
+    // it's in the POST body.
+    val queryPartial = post("query-partial").typed(
+        authInfo = info.serialization.authInfo,
+        inputType = QueryPartial.serializer(info.serialization.serializer),
+        outputType = ListSerializer(PartialSerializer(info.serialization.serializer)),
+        summary = "Query Partial",
+        description = "Gets parts of- ${collectionName}s that match the given query.",
+        errorCases = listOf(),
+        implementation = { user: USER, input: QueryPartial<T> ->
+            info.collection(user)
+                .queryPartial(input)
                 .toList()
         }
     )

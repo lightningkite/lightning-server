@@ -8,41 +8,46 @@ import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.*
 import kotlinx.serialization.internal.GeneratedSerializer
+import kotlin.reflect.KProperty1
 
 @OptIn(InternalSerializationApi::class)
-class PartialSerializer<T>(source: KSerializer<T>): KSerializer<Map<String, Any?>> {
+class PartialSerializer<T>(source: KSerializer<T>): KSerializer<Partial<T>> {
     val source = source as GeneratedSerializer<T>
     private val childSerializers = this.source.childSerializers().map {
-        if (it is GeneratedSerializer<*>) {
+        if (it is GeneratedSerializer<*> && it.childSerializers().isNotEmpty()) {
             PartialSerializer(it)
         } else it
     }
     override val descriptor: SerialDescriptor
         get() {
-            val sourceDescriptor = source.descriptor
-            return buildClassSerialDescriptor("Partial<${sourceDescriptor.serialName}>", sourceDescriptor) {
-                for(index in 0 until sourceDescriptor.elementsCount) {
-                    val s = childSerializers[index]
-                    if(s is PartialSerializer<*>) {
-                        element(
-                            elementName = sourceDescriptor.getElementName(index),
-                            descriptor = s.descriptor,
-                            annotations = sourceDescriptor.getElementAnnotations(index),
-                            isOptional = true
-                        )
-                    } else {
-                        element(
-                            elementName = sourceDescriptor.getElementName(index),
-                            descriptor = sourceDescriptor.getElementDescriptor(index),
-                            annotations = sourceDescriptor.getElementAnnotations(index),
-                            isOptional = true
-                        )
+            try {
+                val sourceDescriptor = source.descriptor
+                return buildClassSerialDescriptor("com.lightningkite.lightningdb.Partial", sourceDescriptor) {
+                    for (index in 0 until sourceDescriptor.elementsCount) {
+                        val s = childSerializers[index]
+                        if (s is PartialSerializer<*>) {
+                            element(
+                                elementName = sourceDescriptor.getElementName(index),
+                                descriptor = s.descriptor,
+                                annotations = sourceDescriptor.getElementAnnotations(index),
+                                isOptional = true
+                            )
+                        } else {
+                            element(
+                                elementName = sourceDescriptor.getElementName(index),
+                                descriptor = sourceDescriptor.getElementDescriptor(index),
+                                annotations = sourceDescriptor.getElementAnnotations(index),
+                                isOptional = true
+                            )
+                        }
                     }
                 }
+            } catch(e: Exception) {
+                throw Exception("Failed to make partial descriptor for ${source.descriptor.serialName}", e)
             }
         }
 
-    override fun deserialize(decoder: Decoder): Map<String, Any?> = decoder.decodeStructure(descriptor) {
+    override fun deserialize(decoder: Decoder): Partial<T> = decoder.decodeStructure(descriptor) {
         val out = HashMap<String, Any?>()
         while (true) {
             when (val index = decodeElementIndex(descriptor)) {
@@ -51,29 +56,22 @@ class PartialSerializer<T>(source: KSerializer<T>): KSerializer<Map<String, Any?
                 else -> out[descriptor.getElementName(index)] = decodeSerializableElement(descriptor, index, childSerializers[index])
             }
         }
-        out
+        Partial(out)
     }
 
-    override fun serialize(encoder: Encoder, value: Map<String, Any?>) = encoder.encodeStructure(descriptor) {
-        for((key, v) in value) {
+    override fun serialize(encoder: Encoder, value: Partial<T>) = encoder.encodeStructure(descriptor) {
+        for((key, v) in value.parts) {
             val index = descriptor.getElementIndex(key)
             encodeSerializableElement(descriptor, index, childSerializers[index] as KSerializer<Any?>, v)
         }
     }
 }
 
-fun <K> DataClassPathPartial<K>.setMap(key: K, out: MutableMap<String, Any?>) {
-    var current = out
+fun <K> DataClassPathPartial<K>.setMap(key: K, out: Partial<K>) {
+    if(properties.isEmpty()) throw IllegalStateException("Path ${this} cannot be set for partial")
+    var current = out as Partial<Any?>
     for (prop in properties.dropLast(1)) {
-        current = current.getOrPut(prop.name) { HashMap<String, Any?>() } as MutableMap<String, Any?>
+        current = current.parts.getOrPut(prop.name) { Partial<Any?>() } as Partial<Any?>
     }
-    current[properties.last().name] = getAny(key)
+    current.parts[properties.last().name] = getAny(key)
 }
-
-/*
-
-Apply keypath to map
-
-Get map OR write?
-
- */

@@ -38,7 +38,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         skip: Int,
         limit: Int,
         maxQueryMs: Long
-    ): Flow<Map<String, Any?>> {
+    ): Flow<Partial<Model>> {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
         val allFields = fields.toMutableSet()
         permissions.readMask.pairs.forEach {

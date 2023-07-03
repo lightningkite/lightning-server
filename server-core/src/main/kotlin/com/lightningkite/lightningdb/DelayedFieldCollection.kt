@@ -32,7 +32,7 @@ open class DelayedFieldCollection<Model : Any>(
         skip: Int,
         limit: Int,
         maxQueryMs: Long
-    ): Flow<Map<String, Any?>> = wraps.findPartial(fields, condition, orderBy, skip, limit, maxQueryMs)
+    ): Flow<Partial<Model>> = wraps.findPartial(fields, condition, orderBy, skip, limit, maxQueryMs)
 
     override suspend fun count(condition: Condition<Model>): Int {
         delay(milliseconds)

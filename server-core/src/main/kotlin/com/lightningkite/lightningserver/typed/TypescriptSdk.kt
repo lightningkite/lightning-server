@@ -21,7 +21,6 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     appendLine()
     usedTypes
         .sortedBy { it.descriptor.simpleSerialName }
-        .filter { it.descriptor.simpleSerialName !in skipSet }
         .forEach {
             when (it.descriptor.kind) {
                 is StructureKind.CLASS -> {
@@ -72,6 +71,11 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     val groups = byGroup.keys.filterNotNull().sortedBy { it.groupToPartName() }
     appendLine("export interface Api {")
     for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
+        appendLine("     /**")
+        entry.description.split('\n').map { it.trim() }.forEach {
+            appendLine("    * $it")
+        }
+        appendLine("     **/")
         append("    ")
         append(entry.functionName)
         this.functionHeader(entry)
@@ -80,6 +84,11 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     for (group in groups) {
         appendLine("    readonly ${group.groupToPartName()}: {")
         for (entry in byGroup[group]!!) {
+            appendLine("        /**")
+            entry.description.split('\n').map { it.trim() }.forEach {
+                appendLine("        * $it")
+            }
+            appendLine("        **/")
             append("        ")
             append(entry.functionName)
             this.functionHeader(entry)
@@ -103,6 +112,11 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         appendLine("export class $sessionClassName {")
         appendLine("    constructor(public api: Api, public ${userType.userTypeTokenName()}: string) {}")
         for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
+            appendLine("    /**")
+            entry.description.split('\n').map { it.trim() }.forEach {
+                appendLine("    * $it")
+            }
+            appendLine("    **/")
             append("    ")
             append(entry.functionName)
             this.functionHeader(entry, skipAuth = true)
@@ -113,6 +127,11 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         for (group in groups) {
             appendLine("    readonly ${group.groupToPartName()} = {")
             for (entry in byGroup[group]!!) {
+                appendLine("        /**")
+                entry.description.split('\n').map { it.trim() }.forEach {
+                    appendLine("        * $it")
+                }
+                appendLine("        **/")
                 append("        ")
                 append(entry.functionName)
                 append(": ")
@@ -136,6 +155,11 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     appendLine("export class LiveApi implements Api {")
     appendLine("    public constructor(public httpUrl: string, public socketUrl: string = httpUrl, public extraHeaders: Record<string, string> = {}, public responseInterceptors?: (x: Response)=>Response) {}")
     for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
+        appendLine("    /**")
+        entry.description.split('\n').map { it.trim() }.forEach {
+            appendLine("    * $it")
+        }
+        appendLine("    **/")
         append("    ")
         append(entry.functionName)
         this.functionHeader(entry, skipAuth = false)
@@ -162,6 +186,11 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     for (group in groups.sortedBy { it.groupToPartName() }) {
         appendLine("    readonly ${group.groupToPartName()} = {")
         for (entry in byGroup[group]!!) {
+            appendLine("        /**")
+            entry.description.split('\n').map { it.trim() }.forEach {
+                appendLine("        * $it")
+            }
+            appendLine("        **/")
             append("        ")
             append(entry.functionName)
             append(": ")
@@ -203,8 +232,7 @@ private val fromLightningServerPackage = setOf(
     "AggregateQuery",
     "GroupAggregateQuery",
     "Aggregate",
-)
-private val skipSet = fromLightningServerPackage + setOf(
+    "Partial",
     "SortPart",
     "DataClassPath",
     "DataClassPathPartial",
@@ -335,6 +363,9 @@ private fun KSerializer<*>.write(): String = if (this == Unit.serializer()) "voi
             val cleanName = this.descriptor.simpleSerialName
             if (cleanName != "String") {
                 out.append(cleanName)
+                this.subSerializers().takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.write() }?.let {
+                    out.append(it)
+                }
             } else {
                 out.append("string")
             }
@@ -359,7 +390,11 @@ private fun KSerializer<*>.write(): String = if (this == Unit.serializer()) "voi
         StructureKind.OBJECT,
         SerialKind.ENUM,
         StructureKind.CLASS -> {
-            out.append(descriptor.simpleSerialName)
+            if(descriptor.serialName == "com.lightningkite.lightningdb.Partial") {
+                out.append("DeepPartial")
+            } else {
+                out.append(descriptor.simpleSerialName)
+            }
             this.subSerializers().takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.write() }?.let {
                 out.append(it)
             }

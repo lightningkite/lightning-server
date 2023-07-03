@@ -81,6 +81,8 @@ fun <T> Condition<T>.readPaths(): Set<DataClassPathPartial<T>> {
 fun <T> Condition<T>.emitReadPaths(out: (DataClassPathPartial<T>) -> Unit) = emitReadPaths(DataClassPathSelf<T>()) { out(it as DataClassPathPartial<T>) }
 private fun Condition<*>.emitReadPaths(soFar: DataClassPath<*, *>, out: (DataClassPathPartial<*>) -> Unit) {
     when (this) {
+        is Condition.Always -> {}
+        is Condition.Never -> {}
         is Condition.OnField<*, *> -> condition.emitReadPaths(DataClassPathAccess(soFar as DataClassPath<Any?, Any>, key as KProperty1<Any, Any?>), out)
         is Condition.Not -> this.condition.emitReadPaths(soFar, out)
         is Condition.And -> this.conditions.forEach { it.emitReadPaths(soFar, out) }

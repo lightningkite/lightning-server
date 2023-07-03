@@ -45,16 +45,14 @@ interface FieldCollection<Model : Any> {
         skip: Int = 0,
         limit: Int = Int.MAX_VALUE,
         maxQueryMs: Long = 15_000,
-    ): Flow<Map<String, Any?>> = find(
+    ): Flow<Partial<Model>> = find(
         condition = condition,
         orderBy = orderBy,
         skip = skip,
         limit = limit,
         maxQueryMs = maxQueryMs
     ).map {
-        val m = HashMap<String, Any?>()
-        fields.forEach { f -> f.setMap(it, m) }
-        m
+        Partial(it, fields)
     }
 
     /**

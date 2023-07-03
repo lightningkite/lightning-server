@@ -39,7 +39,7 @@ class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializer<DataCla
     @OptIn(ExperimentalSerializationApi::class)
     override val descriptor: SerialDescriptor = object: SerialDescriptor {
         override val kind: SerialKind = PrimitiveKind.STRING
-        override val serialName: String = "SortPart<${inner.descriptor.serialName}>"
+        override val serialName: String = "com.lightningkite.lightningdb.DataClassPathPartial"
         override val elementsCount: Int get() = 0
         override fun getElementName(index: Int): String = error()
         override fun getElementIndex(name: String): Int = error()

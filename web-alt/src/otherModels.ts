@@ -3,10 +3,11 @@ import { Modification } from './Modification'
 
 export interface Query<T> {
     condition?: Condition<T>// = Condition.Always<T>(),
-    orderBy?: Array<keyof T | `-${keyof T & string}`>
+    orderBy?: Array<SortPart<T>>
     skip?: number // = 0,
     limit?: number // = 100,
 }
+export type SortPart<T> = (keyof T & string) | `-${keyof T& string}` | `~${keyof T & string}` | `-~${keyof T & string}`
 export interface MassModification<T> {
     condition: Condition<T>
     modification: Modification<T>
@@ -44,3 +45,10 @@ export enum Aggregate {
     StandardDeviationSample = "StandardDeviationSample",
     StandardDeviationPopulation = "StandardDeviationPopulation",
 }
+
+export type DeepPartial<T> = {
+    [P in keyof T]?: (T[P] extends object ? DeepPartial<T[P]> : T[P]);
+};
+
+export type DataClassPath<T> = keyof T
+export type DataClassPathPartial<T> = keyof T
