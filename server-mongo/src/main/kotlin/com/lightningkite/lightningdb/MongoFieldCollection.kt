@@ -44,43 +44,40 @@ class MongoFieldCollection<Model : Any>(
             return operation()
         } catch (e: MongoBulkWriteException) {
             throw BadRequestException(
-                "Request had the following issues: ${
-                    e.writeErrors.map {
-                        ErrorCategory.fromErrorCode(
-                            it.code
-                        )
-                    }.joinToString { it.name }
-                }"
+                "The request had the following issues: ${
+                    e.writeErrors
+                        .map { ErrorCategory.fromErrorCode(it.code) }
+                        .joinToString { it.name }
+                }",
+                cause = e
             )
 
         } catch (e: MongoCommandException) {
-            throw BadRequestException("Request had the following issue: ${ErrorCategory.fromErrorCode(e.code)}")
+            throw BadRequestException("The request had the following issue: ${ErrorCategory.fromErrorCode(e.code)}", cause = e)
         } catch (e: MongoQueryException) {
-            throw BadRequestException("The request had an issue: ${e.errorMessage}")
+            throw BadRequestException("The request had the following issue: ${e.errorMessage}", cause = e)
         }
     }
 
     private fun handleException(e: Throwable) {
         when (e) {
             is MongoBulkWriteException -> throw BadRequestException(
-                "Request had the following issues: ${
-                    e.writeErrors.map {
-                        ErrorCategory.fromErrorCode(
-                            it.code
-                        )
-                    }.joinToString { it.name }
-                }"
+                "The request had the following issues: ${
+                    e.writeErrors
+                        .map { ErrorCategory.fromErrorCode(it.code) }
+                        .joinToString { it.name }
+                }",
+                cause = e
             )
 
             is MongoCommandException -> throw BadRequestException(
-                "Request had the following issue: ${
-                    ErrorCategory.fromErrorCode(
-                        e.code
-                    )
-                }"
+                "The request had the following issue: ${
+                    ErrorCategory.fromErrorCode(e.code)
+                }",
+                cause = e
             )
 
-            is MongoQueryException -> throw BadRequestException("The request had an issue: ${e.errorMessage}")
+            is MongoQueryException -> throw BadRequestException("The request had the following issue: ${e.errorMessage}", cause = e)
             else -> throw e
         }
     }

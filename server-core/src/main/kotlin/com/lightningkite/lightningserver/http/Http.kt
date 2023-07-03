@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.http
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
+import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
@@ -32,6 +33,9 @@ object Http {
     var exception: suspend (HttpRequest, Exception) -> HttpResponse =
         { request, exception ->
             if (exception is HttpStatusException) {
+                if(generalSettings.value.debug){
+                    logger.debug(exception.stackTraceToString())
+                }
                 exception.toResponse(request)
             } else {
                 exception.report(request)
