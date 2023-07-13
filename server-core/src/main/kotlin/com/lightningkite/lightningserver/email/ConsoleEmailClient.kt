@@ -1,5 +1,9 @@
 package com.lightningkite.lightningserver.email
 
+import com.lightningkite.lightningserver.http.HttpContent
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.toList
+
 /**
  * A concrete implementation of EmailClient that will simply print out everything to the console
  * This is useful for local development
@@ -7,35 +11,14 @@ package com.lightningkite.lightningserver.email
 
 object ConsoleEmailClient : EmailClient {
 
-    override suspend fun sendHtml(
-        subject: String,
-        to: List<String>,
-        html: String,
-        plainText: String,
-        attachments: List<Attachment>
-    ) {
+    override suspend fun send(email: Email) {
         println(buildString {
             appendLine("-----EMAIL-----")
-            appendLine(subject)
+            appendLine(email.subject)
             appendLine()
-            appendLine(to.joinToString())
+            appendLine(email.to.joinToString())
             appendLine()
-            if(plainText.isNotBlank())
-                appendLine(plainText)
-            else {
-                appendLine(html.emailApproximatePlainText())
-            }
-            appendLine()
-            attachments.forEach {
-                appendLine(it.name)
-                when (it) {
-                    is Attachment.Local -> appendLine(it.file)
-                    is Attachment.Remote -> appendLine(it.url)
-                }
-                appendLine(it.description)
-                appendLine()
-            }
+            appendLine(email.plainText)
         })
     }
-
 }

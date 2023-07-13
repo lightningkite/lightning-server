@@ -1,56 +1,46 @@
 package com.lightningkite.lightningserver.email
 
+import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.logger
+import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
 import org.apache.commons.mail.EmailAttachment
 import org.apache.commons.mail.HtmlEmail
+import java.util.*
+import javax.activation.DataHandler
+import javax.mail.Address
+import javax.mail.Authenticator
+import javax.mail.Multipart
+import javax.mail.PasswordAuthentication
+import javax.mail.Session
+import javax.mail.Transport
+import javax.mail.internet.MimeBodyPart
+import javax.mail.internet.MimeMessage
+import javax.mail.internet.MimeMultipart
+import javax.mail.util.ByteArrayDataSource
 
 /**
  * An email client that will send real emails through SMTP.
  */
 class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
-    override suspend fun sendHtml(
-        subject: String,
-        to: List<String>,
-        html: String,
-        plainText: String,
-        attachments: List<Attachment>
-    ) {
-        val email = HtmlEmail()
-        email.setHtmlMsg(html)
-        email.setTextMsg(plainText)
-        attachments.forEach {
-            val attachment = EmailAttachment()
-            attachment.disposition = if (it.inline) EmailAttachment.INLINE else EmailAttachment.ATTACHMENT
-            attachment.description = it.description
-            attachment.name = it.name
-            when (it) {
-                is Attachment.Remote -> {
-                    attachment.url = it.url
-                }
-
-                is Attachment.Local -> {
-                    attachment.path = it.file.absolutePath
-                }
-            }
-            email.attach(attachment)
-        }
-        email.hostName = smtpConfig.hostName
-        if (smtpConfig.username != null || smtpConfig.password != null) {
-            if (smtpConfig.username == null || smtpConfig.password == null) throw Exception("Missing Authentication")
-            email.setAuthentication(smtpConfig.username, smtpConfig.password)
-        }
-        email.setSmtpPort(smtpConfig.port)
-        email.isSSLOnConnect = smtpConfig.useSSL
-        email.setFrom(smtpConfig.fromEmail)
-        email.subject = subject
-//        email.addHeader("X-SES-LIST-MANAGEMENT-OPTIONS", "contactListName; topic=topicName")
-        email.addTo(*to.toTypedArray())
-        logger.debug("Ready to send email...")
-        withContext(Dispatchers.IO) {
-            email.send()
-        }
-        logger.debug("Email sent")
+    val session = Session.getInstance(Properties().apply {
+        put("mail.smtp.user", smtpConfig.username)
+        put("mail.smtp.host", smtpConfig.hostName)
+        put("mail.smtp.port", smtpConfig.port)
+        put("mail.smtp.auth", true)
+        put("mail.smtp.ssl.enable", smtpConfig.port == 465)
+        put("mail.smtp.starttls.enable", smtpConfig.port == 587)
+        put("mail.smtp.starttls.required", smtpConfig.port == 587)
+    }, object: Authenticator() {
+        override fun getPasswordAuthentication(): PasswordAuthentication = PasswordAuthentication(
+            smtpConfig.username,
+            smtpConfig.password
+        )
+    })
+    val from by lazy { EmailLabeledValue(smtpConfig.fromEmail, generalSettings().projectName) }
+    override suspend fun send(email: Email) {
+        Transport.send(email.copy(from = email.from ?: from).toJavaX(session))
     }
 }

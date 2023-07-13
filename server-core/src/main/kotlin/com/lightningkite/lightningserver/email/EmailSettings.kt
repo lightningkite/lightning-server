@@ -44,7 +44,6 @@ data class EmailSettings(
                                 port = port,
                                 username = match.groups["username"]!!.value,
                                 password = match.groups["password"]!!.value,
-                                useSSL = port != 25,
                                 fromEmail = params["fromEmail"]?.first() ?: it.fromEmail
                                 ?: throw IllegalStateException("SMTP Email requires a fromEmail to be set.")
                             )
@@ -65,6 +64,5 @@ data class SmtpConfig(
     val port: Int = 25,
     val username: String? = null,
     val password: String? = null,
-    val useSSL: Boolean = true,
     val fromEmail: String = "",
 )

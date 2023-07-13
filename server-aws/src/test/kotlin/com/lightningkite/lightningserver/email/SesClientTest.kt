@@ -27,7 +27,7 @@ class SesClientTest {
             }
             SesClient
             val system = EmailSettings(credentials.readText(), fromEmail = "joseph@lightningkite.com")
-            system().send("Test", listOf("joseph@lightningkite.com"), "Test Message")
+            system().send(Email("Test", to = listOf(EmailLabeledValue("joseph@lightningkite.com")), plainText = "Test Message"))
         }
     }
 }

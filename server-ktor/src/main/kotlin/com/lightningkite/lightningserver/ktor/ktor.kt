@@ -308,40 +308,40 @@ internal suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
 }
 
 internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.ContentType): HttpContent.Multipart {
-    return HttpContent.Multipart(object : Flow<HttpContent.Multipart.Part> {
-        override suspend fun collect(collector: FlowCollector<HttpContent.Multipart.Part>) {
+    return HttpContent.Multipart(myType, object : Flow<HttpContentAndHeaders> {
+        override suspend fun collect(collector: FlowCollector<HttpContentAndHeaders>) {
             this@adapt.forEachPart {
                 collector.emit(
                     when (it) {
-                        is PartData.FormItem -> HttpContent.Multipart.Part.FormItem(
+                        is PartData.FormItem -> HttpContent.Multipart.formItem(
                             it.name ?: "",
                             it.value
                         )
 
                         is PartData.FileItem -> {
                             val h = it.headers.adapt()
-                            HttpContent.Multipart.Part.DataItem(
+                            HttpContent.Multipart.dataItem(
                                 key = it.name ?: "",
                                 filename = it.originalFileName ?: "",
                                 headers = h,
                                 content = HttpContent.Stream(
                                     it.streamProvider,
                                     h.contentLength,
-                                    it.contentType?.adapt() ?: HttpContentType.Application.OctetStream
+                                    it.contentType?.adapt() ?: com.lightningkite.lightningserver.core.ContentType.Application.OctetStream
                                 )
                             )
                         }
 
                         is PartData.BinaryItem -> {
                             val h = it.headers.adapt()
-                            HttpContent.Multipart.Part.DataItem(
+                            HttpContent.Multipart.dataItem(
                                 key = it.name ?: "",
                                 filename = "",
                                 headers = h,
                                 content = HttpContent.Stream(
                                     { it.provider().asStream() },
                                     h.contentLength,
-                                    it.contentType?.adapt() ?: HttpContentType.Application.OctetStream
+                                    it.contentType?.adapt() ?: com.lightningkite.lightningserver.core.ContentType.Application.OctetStream
                                 )
                             )
                         }
@@ -351,5 +351,5 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
                 )
             }
         }
-    }, myType)
+    })
 }

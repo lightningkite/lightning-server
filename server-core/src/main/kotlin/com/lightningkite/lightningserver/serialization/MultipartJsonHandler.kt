@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
 import com.lightningkite.lightningserver.files.resolveRandom
 import com.lightningkite.lightningserver.http.HttpContent
+import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.toMultipartContent
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -27,39 +28,34 @@ class MultipartJsonHandler(val json: () -> Json) : Serialization.HttpContentPars
         val overrideData = HashMap<String, Any?>()
         var baselineJson: JsonElement = JsonNull
         multipart.parts.collect { part ->
-            when (part) {
-                is HttpContent.Multipart.Part.FormItem -> {
-                    if (part.key == multipartJsonKey) {
-                        baselineJson = json().parseToJsonElement(part.value)
-                    }
+            val key = part.headers.getValues(HttpHeader.ContentDisposition).firstOrNull() ?: return@collect
+            if (key.root == multipartJsonKey) {
+                baselineJson = json().parseToJsonElement(part.content.text())
+            } else {
+                val filename = key.parameters["filename"]
+                if (filename.isNullOrBlank()) return@collect
+                val path = key.root.split('.')
+                if (!serializer.isFile(path)) throw BadRequestException("$key is not a ServerFile.")
+                //if (
+                //    isFile.allowedTypes
+                //        .asSequence()
+                //        .map { ContentType.parse(it) }
+                //        .none { part.contentType!!.match(it) }
+                //) {
+                //    throw BadRequestException("Content type ${part.contentType} doesn't match any of the accepted types: ${isFile.allowedTypes.joinToString()}")
+                //}
+                val file = ExternalServerFileSerializer.fileSystem().root.resolveRandom(
+                    "uploaded/${filename.substringBeforeLast(".")}",
+                    contentType.extension ?: filename.substringAfterLast(".")
+                )
+                file.put(part.content)
+                var current: MutableMap<String, Any?> = overrideData
+                for (pathPart in path.dropLast(1)) {
+                    @Suppress("UNCHECKED_CAST")
+                    current =
+                        current.getOrPut(pathPart) { HashMap<String, Any?>() } as MutableMap<String, Any?>
                 }
-
-                is HttpContent.Multipart.Part.DataItem -> {
-                    if (part.filename.isBlank()) return@collect
-                    val path = part.key.split('.')
-                    if (!serializer.isFile(path)) throw BadRequestException("${part.key} is not a ServerFile.")
-                    if (part.headers.contentType == null) throw BadRequestException("Content type not provided for uploaded file")
-                    //if (
-                    //    isFile.allowedTypes
-                    //        .asSequence()
-                    //        .map { ContentType.parse(it) }
-                    //        .none { part.contentType!!.match(it) }
-                    //) {
-                    //    throw BadRequestException("Content type ${part.contentType} doesn't match any of the accepted types: ${isFile.allowedTypes.joinToString()}")
-                    //}
-                    val file = ExternalServerFileSerializer.fileSystem().root.resolveRandom(
-                        "uploaded/${part.filename.substringBeforeLast(".")}",
-                        contentType.extension ?: part.filename.substringAfterLast(".")
-                    )
-                    file.put(part.content)
-                    var current: MutableMap<String, Any?> = overrideData
-                    for (pathPart in path.dropLast(1)) {
-                        @Suppress("UNCHECKED_CAST")
-                        current =
-                            current.getOrPut(pathPart) { HashMap<String, Any?>() } as MutableMap<String, Any?>
-                    }
-                    current[path.last()] = JsonPrimitive(file.signedUrl)
-                }
+                current[path.last()] = JsonPrimitive(file.signedUrl)
             }
         }
         return if (baselineJson is JsonObject) {

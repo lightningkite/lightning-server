@@ -432,7 +432,7 @@ public class CIOMultipartDataBase2(
     }
 }
 
-suspend fun InputStream.toMultipartContent(type: com.lightningkite.lightningserver.core.ContentType): HttpContent.Multipart {
+suspend fun InputStream.toMultipartContent(type: ContentType): HttpContent.Multipart {
     return CIOMultipartDataBase2(coroutineContext, this@toMultipartContent.toByteReadChannel(coroutineContext)).adapt(
         type
     )
@@ -452,20 +452,20 @@ private fun ContentType.adapt(): io.ktor.http.ContentType =
 
 internal fun Headers.adapt(): HttpHeaders = HttpHeaders(flattenEntries())
 
-internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.ContentType): HttpContent.Multipart {
-    return HttpContent.Multipart(object : Flow<HttpContent.Multipart.Part> {
-        override suspend fun collect(collector: FlowCollector<HttpContent.Multipart.Part>) {
+internal fun MultiPartData.adapt(myType: ContentType): HttpContent.Multipart {
+    return HttpContent.Multipart(myType, object : Flow<HttpContentAndHeaders> {
+        override suspend fun collect(collector: FlowCollector<HttpContentAndHeaders>) {
             this@adapt.forEachPart {
                 collector.emit(
                     when (it) {
-                        is PartData.FormItem -> HttpContent.Multipart.Part.FormItem(
+                        is PartData.FormItem -> HttpContent.Multipart.formItem(
                             it.name ?: "",
                             it.value
                         )
 
                         is PartData.FileItem -> {
                             val h = it.headers.adapt()
-                            HttpContent.Multipart.Part.DataItem(
+                            HttpContent.Multipart.dataItem(
                                 key = it.name ?: "",
                                 filename = it.originalFileName ?: "",
                                 headers = h,
@@ -479,7 +479,7 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
 
                         is PartData.BinaryItem -> {
                             val h = it.headers.adapt()
-                            HttpContent.Multipart.Part.DataItem(
+                            HttpContent.Multipart.dataItem(
                                 key = it.name ?: "",
                                 filename = "",
                                 headers = h,
@@ -496,6 +496,6 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
                 )
             }
         }
-    }, myType)
+    })
 }
 

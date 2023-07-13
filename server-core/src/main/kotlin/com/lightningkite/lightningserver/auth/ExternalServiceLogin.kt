@@ -11,6 +11,8 @@ data class ExternalServiceLogin(
     val service: String,
     val username: String? = null,
     val email: String? = null,
-    val avatar: String? = null
+    val avatar: String? = null,
+    val scope: String,
+    val refreshToken: String? = null,
 )
 

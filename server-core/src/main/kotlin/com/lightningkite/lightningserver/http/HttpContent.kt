@@ -2,18 +2,24 @@ package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.files.FileObject
+import com.lightningkite.lightningserver.files.download
 import com.lightningkite.lightningserver.serialization.Serialization
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.utils.io.jvm.javaio.*
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.toList
 import kotlinx.html.HTML
 import kotlinx.html.html
 import kotlinx.html.stream.appendHTML
 import kotlinx.serialization.encodeToString
 import java.io.*
 import java.nio.charset.Charset
+import java.util.Enumeration
 
 sealed class HttpContent {
     abstract suspend fun stream(): InputStream
@@ -56,19 +62,41 @@ sealed class HttpContent {
         }
     }
 
-    data class Multipart(val parts: Flow<Part>, override val type: ContentType) : HttpContent() {
+    data class Multipart(override val type: ContentType, val parts: Flow<HttpContentAndHeaders>) : HttpContent() {
         override val length: Long?
             get() = null
 
         override suspend fun stream(): InputStream = throw UnsupportedOperationException()
-        sealed class Part {
-            data class FormItem(val key: String, val value: String) : Part()
-            data class DataItem(
-                val key: String,
-                val filename: String,
-                val headers: HttpHeaders,
-                val content: HttpContent
-            ) : Part()
+
+        companion object Part {
+            @Deprecated("Use lowercase function instead", ReplaceWith("formItem(key, value)"))
+            fun FormItem(key: String, value: String) = formItem(key, value)
+            @Deprecated("Use lowercase function instead", ReplaceWith("dataItem(key, filename, headers, content)"))
+            fun DataItem(
+                key: String,
+                filename: String,
+                headers: HttpHeaders,
+                content: HttpContent
+            ) = dataItem(key, filename, headers, content)
+
+            fun formItem(key: String, value: String) : HttpContentAndHeaders = HttpContentAndHeaders(
+                headers = HttpHeaders {
+                    set(HttpHeader.ContentDisposition, HttpHeaderValue("form-data", mapOf("name" to key)))
+                },
+                content = HttpContent.Text(value, ContentType.Text.Plain)
+            )
+            fun dataItem(
+                key: String,
+                filename: String,
+                headers: HttpHeaders,
+                content: HttpContent
+            ) = HttpContentAndHeaders(
+                headers = HttpHeaders {
+                    set(headers)
+                    set(HttpHeader.ContentDisposition, HttpHeaderValue("form-data", mapOf("name" to key, "filename" to filename)))
+                },
+                content = content
+            )
         }
     }
 
@@ -127,5 +155,23 @@ sealed class HttpContent {
     }
 }
 
-//1:10pm stop
-//2:06pm start
+private fun <T> Iterator<T>.toEnumeration(): Enumeration<T> {
+    return object : Enumeration<T> {
+        override fun hasMoreElements(): Boolean = this@toEnumeration.hasNext()
+        override fun nextElement(): T = this@toEnumeration.next()
+    }
+}
+
+suspend fun HttpContent.download(
+    destination: File = File.createTempFile(
+        "temp",
+        type.extension,
+    )
+): File {
+    destination.outputStream().use { out ->
+        stream().use {
+            it.copyTo(out)
+        }
+    }
+    return destination
+}

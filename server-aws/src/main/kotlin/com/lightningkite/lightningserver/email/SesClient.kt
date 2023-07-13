@@ -1,12 +1,11 @@
 package com.lightningkite.lightningserver.email
 
+import com.lightningkite.lightningserver.http.download
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
 import org.apache.commons.mail.EmailAttachment
 import org.apache.commons.mail.HtmlEmail
-import org.apache.commons.mail.MultiPartEmail
-import org.apache.commons.mail.SimpleEmail
 import software.amazon.awssdk.auth.credentials.AwsCredentials
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
@@ -14,7 +13,6 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.ses.SesAsyncClient
-import software.amazon.awssdk.services.ses.SesClient
 import software.amazon.awssdk.services.ses.model.RawMessage
 import java.io.ByteArrayOutputStream
 import java.lang.IllegalStateException
@@ -53,39 +51,36 @@ class SesClient(
         .credentialsProvider(credentialProvider)
         .build()
 
-    override suspend fun sendHtml(
-        subject: String,
-        to: List<String>,
-        html: String,
-        plainText: String,
-        attachments: List<Attachment>
-    ) {
-        val email = HtmlEmail()
-        email.setHtmlMsg(html)
-        email.setTextMsg(plainText)
+    override suspend fun send(email: Email) {
+        val subject = email.subject
+        val to = email.to
+        val html = email.html
+        val plainText = email.plainText
+        val attachments = email.attachments
+
+        val out = HtmlEmail()
+        out.setHtmlMsg(html)
+        out.setTextMsg(plainText)
         attachments.forEach {
             val attachment = EmailAttachment()
             attachment.disposition = EmailAttachment.ATTACHMENT
-            attachment.description = it.description
-            attachment.name = it.name
-            when (it) {
-                is Attachment.Remote -> {
-                    attachment.url = it.url
-                }
-                is Attachment.Local -> {
-                    attachment.path = it.file.absolutePath
-                }
-            }
-            email.attach(attachment)
+            attachment.name = it.filename
+            attachment.path = it.content.download().path
+            out.attach(attachment)
         }
-        email.subject = subject
-        email.addTo(*to.toTypedArray())
-        email.setFrom(fromEmail)
-        email.mailSession = Session.getDefaultInstance(Properties())
-        email.buildMimeMessage()
+        out.subject = subject
+        out.addTo(*to.map { it.toString() }.toTypedArray())
+        out.addCc(*email.cc.map { it.toString() }.toTypedArray())
+        out.addBcc(*email.bcc.map { it.toString() }.toTypedArray())
+        email.customHeaders?.entries?.forEach {
+            out.addHeader(it.first, it.second)
+        }
+        out.setFrom(fromEmail)
+        out.mailSession = Session.getDefaultInstance(Properties())
+        out.buildMimeMessage()
         val bytes = withContext( Dispatchers.IO) {
             ByteArrayOutputStream().use {
-                email.mimeMessage.writeTo(it)
+                out.mimeMessage.writeTo(it)
                 it.toByteArray()
             }
         }

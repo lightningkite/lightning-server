@@ -44,6 +44,20 @@ suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
         )
     }
 }
+suspend fun <T> HttpContent.parseWithDefault(serializer: KSerializer<T>, defaultType: ContentType = ContentType.Application.Json): T {
+    try {
+        val parser = Serialization.parsers[this.type]
+            ?: Serialization.parsers[defaultType]
+            ?: throw BadRequestException("Content type $type not accepted; available types are ${Serialization.parsers.keys.joinToString()}")
+        return parser(this, serializer)
+    } catch (e: SerializationException) {
+        throw BadRequestException(
+            detail = "serialization",
+            message = e.message ?: "Unknown serialization error",
+            cause = e.cause
+        )
+    }
+}
 
 suspend inline fun <reified T> T.toHttpContent(acceptedTypes: List<ContentType>): HttpContent? =
     toHttpContent(acceptedTypes, Serialization.module.serializer())
