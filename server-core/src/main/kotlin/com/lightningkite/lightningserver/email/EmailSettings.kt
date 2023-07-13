@@ -33,7 +33,7 @@ data class EmailSettings(
                     ?: throw IllegalStateException("Invalid Mailgun URL. The URL should match the pattern: mailgun://[key]@[domain]")
             }
             EmailSettings.register("smtp") {
-                Regex("""smtp://(?<username>[^:]+):(?<password>[^@]+)@(?<host>[^:]+):(?<port>[0-9]+)(?:\?(?<params>.*))?""")
+                Regex("""smtp://(?:(?<username>[^:]+):(?<password>.+)@)?(?<host>[^:@]+):(?<port>[0-9]+)(?:\?(?<params>.*))?""")
                     .matchEntire(it.url)
                     ?.let { match ->
                         val port = match.groups["port"]!!.value.toInt()
@@ -42,8 +42,8 @@ data class EmailSettings(
                             SmtpConfig(
                                 hostName = match.groups["host"]!!.value,
                                 port = port,
-                                username = match.groups["username"]!!.value,
-                                password = match.groups["password"]!!.value,
+                                username = match.groups["username"]?.value,
+                                password = match.groups["password"]?.value,
                                 useSSL = port != 25,
                                 fromEmail = params["fromEmail"]?.first() ?: it.fromEmail
                                 ?: throw IllegalStateException("SMTP Email requires a fromEmail to be set.")
@@ -61,10 +61,10 @@ data class EmailSettings(
 
 @Serializable
 data class SmtpConfig(
-    val hostName: String = "",
-    val port: Int = 25,
-    val username: String? = null,
-    val password: String? = null,
-    val useSSL: Boolean = true,
-    val fromEmail: String = "",
+    val hostName: String,
+    val port: Int,
+    val username: String?,
+    val password: String?,
+    val useSSL: Boolean,
+    val fromEmail: String,
 )

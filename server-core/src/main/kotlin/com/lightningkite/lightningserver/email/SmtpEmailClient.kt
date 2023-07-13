@@ -10,6 +10,13 @@ import org.apache.commons.mail.HtmlEmail
  * An email client that will send real emails through SMTP.
  */
 class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
+
+    init{
+        if (smtpConfig.username == null || smtpConfig.password == null) {
+            logger.warn("SMTP email configured without Authentication.")
+        }
+    }
+
     override suspend fun sendHtml(
         subject: String,
         to: List<String>,
@@ -37,8 +44,7 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
             email.attach(attachment)
         }
         email.hostName = smtpConfig.hostName
-        if (smtpConfig.username != null || smtpConfig.password != null) {
-            if (smtpConfig.username == null || smtpConfig.password == null) throw Exception("Missing Authentication")
+        if (smtpConfig.username != null && smtpConfig.password != null) {
             email.setAuthentication(smtpConfig.username, smtpConfig.password)
         }
         email.setSmtpPort(smtpConfig.port)
