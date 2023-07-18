@@ -8,6 +8,8 @@ import {
   AggregateQuery,
   GroupAggregateQuery,
   Aggregate,
+  DeepPartial,
+  QueryPartial,
 } from "./otherModels";
 import { HasId } from "./sessionRest";
 
@@ -60,6 +62,10 @@ export function mockRestEndpointFunctions<T extends HasId>(
       const result = paginatedItems;
       console.info(label, "query", { query: input, result });
       return Promise.resolve(result);
+    },
+
+    queryPartial(input: QueryPartial<T>, userToken?: string): Promise<Array<DeepPartial<T>>> {
+      return this.query(input, userToken)
     },
 
     detail(id: string, userToken?: string): Promise<T> {

@@ -6,6 +6,8 @@ import {
   EntryChange,
   GroupCountQuery,
   AggregateQuery,
+  DeepPartial,
+  QueryPartial,
 } from "./otherModels";
 
 export interface HasId {
@@ -15,6 +17,7 @@ export interface HasId {
 export interface SessionRestEndpoint<T extends HasId> {
   default(): Promise<T>;
   query(input: Query<T>): Promise<Array<T>>;
+  queryPartial(input: QueryPartial<T>): Promise<Array<DeepPartial<T>>>;
   detail(id: string): Promise<T>;
   insertBulk(input: Array<T>): Promise<Array<T>>;
   insert(input: T): Promise<T>;
