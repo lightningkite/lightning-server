@@ -18,7 +18,8 @@ class UploadEarlyEndpoint(
     val files: () -> FileSystem,
     val database: () -> Database,
     val signer: () -> JwtSigner,
-    val filePath: String = ExternalServerFileSerializer.uploadPath
+    val filePath: String = ExternalServerFileSerializer.uploadPath,
+    val expiration: Duration = Duration.ofDays(1)
 ) : ServerPathGroup(path) {
 
     companion object {
@@ -39,12 +40,13 @@ class UploadEarlyEndpoint(
         implementation = { user: Unit, nothing: Unit ->
             val newFile = files().root.resolve(filePath).resolveRandom("file", "file")
             val newItem = UploadForNextRequest(
+                expires = Instant.now().plus(expiration),
                 file = ServerFile(newFile.url)
             )
             database().collection<UploadForNextRequest>().insertOne(newItem)
             UploadInformation(
-                uploadUrl = newFile.uploadUrl(Duration.ofMinutes(15)),
-                futureCallToken = newFile.url + "?token=" + signer().token(newFile.url, Duration.ofMinutes(15))
+                uploadUrl = newFile.uploadUrl(expiration),
+                futureCallToken = newFile.url + "?token=" + signer().token(newFile.url, expiration)
             )
         }
     )
