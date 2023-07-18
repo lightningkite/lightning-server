@@ -969,7 +969,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_List_matching")
         val item = LargeTestModel(list = listOf(1, 2, 3))
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.list.mapIf({ it gt 2 }, { it *= 2 }) }
+        val modification = modification<LargeTestModel> { it.list.forEachIf({ it gt 2 }, { it *= 2 }) }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals(listOf(1, 2, 6), result.list)
@@ -1046,7 +1046,7 @@ abstract class ModificationTests() {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Set_matching")
         val item = LargeTestModel(set = setOf(1, 2, 3))
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.set.mapIf({ it gt 2 }, { it *= 2 }) }
+        val modification = modification<LargeTestModel> { it.set.forEachIf({ it gt 2 }, { it *= 2 }) }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
         assertEquals(setOf(1, 2, 6), result.set)

@@ -68,5 +68,27 @@ data class DataClassPathNotNull<K: IsCodableAndHashable, V: IsCodableAndHashable
     override fun mapCondition(condition: Condition<V>): Condition<K> = wraps.mapCondition(Condition.IfNotNull(condition))
     override fun mapModification(modification: Modification<V>): Modification<K> = wraps.mapModification(Modification.IfNotNull(modification))
 }
+data class DataClassPathList<K: IsCodableAndHashable, V: IsCodableAndHashable>(val wraps: DataClassPath<K, List<V>>): DataClassPath<K, V>() {
+    override val properties: List<KProperty1<*, *>>
+        get() = wraps.properties
+
+    override fun get(key: K): V? = wraps.get(key)?.firstOrNull()
+    override fun set(key: K, value: V): K = wraps.set(key, listOf(value))
+    override fun toString(): String = "$wraps.*"
+    override fun mapCondition(condition: Condition<V>): Condition<K> = wraps.mapCondition(Condition.ListAllElements(condition))
+    override fun mapModification(modification: Modification<V>): Modification<K> = wraps.mapModification(Modification.ListPerElement(Condition.Always(), modification))
+}
+data class DataClassPathSet<K: IsCodableAndHashable, V: IsCodableAndHashable>(val wraps: DataClassPath<K, Set<V>>): DataClassPath<K, V>() {
+    override val properties: List<KProperty1<*, *>>
+        get() = wraps.properties
+
+    override fun get(key: K): V? = wraps.get(key)?.firstOrNull()
+    override fun set(key: K, value: V): K = wraps.set(key, setOf(value))
+    override fun toString(): String = "$wraps.*"
+    override fun mapCondition(condition: Condition<V>): Condition<K> = wraps.mapCondition(Condition.SetAllElements(condition))
+    override fun mapModification(modification: Modification<V>): Modification<K> = wraps.mapModification(Modification.SetPerElement(Condition.Always(), modification))
+}
 
 val <K: IsCodableAndHashable, V: IsCodableAndHashable> DataClassPath<K, V?>.notNull: DataClassPathNotNull<K, V> get() = DataClassPathNotNull(this)
+val <K: IsCodableAndHashable, V: IsCodableAndHashable> DataClassPath<K, List<V>>.elements: DataClassPathList<K, V> get() = DataClassPathList(this)
+val <K: IsCodableAndHashable, V: IsCodableAndHashable> DataClassPath<K, Set<V>>.elements: DataClassPathSet<K, V> get() = DataClassPathSet(this)

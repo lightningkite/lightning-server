@@ -26,197 +26,6 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         else return Modification.Chain(modifications)
     }
 
-    @JsName("assignCm")
-    infix fun <T : IsCodableAndHashable> CMBuilder<K, T>.assign(value: T) {
-        modifications.add(mapModification(Modification.Assign(value)))
-    }
-
-    @JsName("coerceAtMostCm")
-    infix fun <T : Comparable<T>> CMBuilder<K, T>.coerceAtMost(value: T) {
-        modifications.add(mapModification(Modification.CoerceAtMost(value)))
-    }
-
-    @JsName("coerceAtLeastCm")
-    infix fun <T : Comparable<T>> CMBuilder<K, T>.coerceAtLeast(value: T) {
-        modifications.add(mapModification(Modification.CoerceAtLeast(value)))
-    }
-
-    @JsName("plusAssignNumberCm")
-    infix operator fun <T : Number> CMBuilder<K, T>.plusAssign(by: T) {
-        modifications.add(mapModification(Modification.Increment(by)))
-    }
-
-    @JsName("timesAssignCm")
-    infix operator fun <T : Number> CMBuilder<K, T>.timesAssign(by: T) {
-        modifications.add(mapModification(Modification.Multiply(by)))
-    }
-
-    @JsName("plusAssignStringCm")
-    infix operator fun CMBuilder<K, String>.plusAssign(value: String) {
-        modifications.add(mapModification(Modification.AppendString(value)))
-    }
-
-    @JsName("plusAssignListCm")
-    infix operator fun <T> CMBuilder<K, List<T>>.plusAssign(items: List<T>) {
-        modifications.add(mapModification(Modification.ListAppend(items)))
-    }
-
-    @JsName("plusAssignSetCm")
-    infix operator fun <T> CMBuilder<K, Set<T>>.plusAssign(items: Set<T>) {
-        modifications.add(mapModification(Modification.SetAppend(items)))
-    }
-
-    @JsName("plusAssignItemListCm")
-    @JvmName("plusList")
-    infix operator fun <T> CMBuilder<K, List<T>>.plusAssign(item: T) {
-        modifications.add(mapModification(Modification.ListAppend(listOf(item))))
-    }
-
-    @JsName("plusAssignItemSetCm")
-    @JvmName("plusSet")
-    infix operator fun <T> CMBuilder<K, Set<T>>.plusAssign(item: T) {
-        modifications.add(mapModification(Modification.SetAppend(setOf(item))))
-    }
-
-    @JsName("plusAssignListAddAllCm")
-    infix fun <T : IsCodableAndHashable> CMBuilder<K, List<T>>.addAll(items: List<T>) {
-        modifications.add(mapModification(Modification.ListAppend(items)))
-    }
-
-    @JsName("plusAssignSetAddAllCm")
-    infix fun <T : IsCodableAndHashable> CMBuilder<K, Set<T>>.addAll(items: Set<T>) {
-        modifications.add(mapModification(Modification.SetAppend(items)))
-    }
-
-    @JsName("removeAllListCm")
-    @JvmName("removeAllList")
-    infix fun <T : IsCodableAndHashable> CMBuilder<K, List<T>>.removeAll(condition: (DataClassPath<T, T>) -> Condition<T>) {
-        modifications.add(mapModification(Modification.ListRemove(path<T>().let(condition))))
-    }
-
-    @JsName("removeAllSetCm")
-    @JvmName("removeAllSet")
-    infix fun <T : IsCodableAndHashable> CMBuilder<K, Set<T>>.removeAll(condition: (DataClassPath<T, T>) -> Condition<T>) {
-        modifications.add(mapModification(Modification.SetRemove(path<T>().let(condition))))
-    }
-
-    @JsName("removeAllItemsListCm")
-    infix fun <T : IsCodableAndHashable> CMBuilder<K, List<T>>.removeAll(items: List<T>) {
-        modifications.add(mapModification(Modification.ListRemoveInstances(items)))
-    }
-
-    @JsName("removeAllItemsSetCm")
-    infix fun <T : IsCodableAndHashable> CMBuilder<K, Set<T>>.removeAll(items: Set<T>) {
-        modifications.add(mapModification(Modification.SetRemoveInstances(items)))
-    }
-
-    @JsName("dropLastListCm")
-    @JvmName("dropLastList")
-    fun <T : IsCodableAndHashable> CMBuilder<K, List<T>>.dropLast() {
-        modifications.add(mapModification(Modification.ListDropLast()))
-    }
-
-    @JsName("dropLastSetCm")
-    @JvmName("dropLastSet")
-    fun <T : IsCodableAndHashable> CMBuilder<K, Set<T>>.dropLast() {
-        modifications.add(mapModification(Modification.SetDropLast()))
-    }
-
-    @JsName("dropFirstListCm")
-    @JvmName("dropFirstList")
-    fun <T : IsCodableAndHashable> CMBuilder<K, List<T>>.dropFirst() {
-        modifications.add(mapModification(Modification.ListDropFirst()))
-    }
-
-    @JsName("dropFirstSetCm")
-    @JvmName("dropFirstSet")
-    fun <T : IsCodableAndHashable> CMBuilder<K, Set<T>>.dropFirst() {
-        modifications.add(mapModification(Modification.SetDropFirst()))
-    }
-
-    @JsName("mapListCm")
-    @JvmName("mapList")
-    inline infix fun <T : IsCodableAndHashable> CMBuilder<K, List<T>>.map(modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit) {
-        val builder = ModificationBuilder<T>()
-        modification(builder, path())
-        modifications.add(
-            mapModification(
-                Modification.ListPerElement(
-                    condition = Condition.Always<T>(),
-                    modification = builder.build()
-                )
-            )
-        )
-    }
-
-    @JsName("mapSetCm")
-    @JvmName("mapSet")
-    inline infix fun <T : IsCodableAndHashable> CMBuilder<K, Set<T>>.map(modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit) {
-        val builder = ModificationBuilder<T>()
-        modification(builder, path())
-        modifications.add(
-            mapModification(
-                Modification.SetPerElement(
-                    condition = Condition.Always<T>(),
-                    modification = builder.build()
-                )
-            )
-        )
-    }
-
-    @JsName("mapIfListCm")
-    @JvmName("mapIfList")
-    inline fun <T : IsCodableAndHashable> CMBuilder<K, List<T>>.mapIf(
-        condition: (DataClassPath<T, T>) -> Condition<T>,
-        modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit,
-    ) {
-        val builder = ModificationBuilder<T>()
-        modification(builder, path())
-        modifications.add(
-            mapModification(
-                Modification.ListPerElement(
-                    condition = path<T>().let(condition),
-                    modification = builder.build()
-                )
-            )
-        )
-    }
-
-    @JsName("mapIfSetCm")
-    @JvmName("mapIfSet")
-    inline fun <T : IsCodableAndHashable> CMBuilder<K, Set<T>>.mapIf(
-        condition: (DataClassPath<T, T>) -> Condition<T>,
-        modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit,
-    ) {
-        val builder = ModificationBuilder<T>()
-        modification(builder, path())
-        modifications.add(
-            mapModification(
-                Modification.SetPerElement(
-                    condition = path<T>().let(condition),
-                    modification = builder.build()
-                )
-            )
-        )
-    }
-
-    @JsName("plusAssignMapCm")
-    infix operator fun <T : IsCodableAndHashable> CMBuilder<K, Map<String, T>>.plusAssign(map: Map<String, T>) {
-        modifications.add(mapModification(Modification.Combine(map)))
-    }
-
-    @JsName("modifyByKeyCm")
-    infix fun <T : IsCodableAndHashable> CMBuilder<K, Map<String, T>>.modifyByKey(byKey: Map<String, ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit>) {
-        modifications.add(mapModification(Modification.ModifyByKey(byKey.mapValues { modification(it.value) })))
-    }
-
-    @JsName("removeKeysCm")
-    infix fun <T : IsCodableAndHashable> CMBuilder<K, Map<String, T>>.removeKeys(fields: Set<String>) {
-        modifications.add(mapModification(Modification.RemoveKeys(fields)))
-    }
-
-    // ---
-
     @JsName("assign")
     infix fun <T : IsCodableAndHashable> DataClassPath<K, T>.assign(value: T) {
         modifications.add(mapModification(Modification.Assign(value)))
@@ -325,9 +134,9 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         modifications.add(mapModification(Modification.SetDropFirst()))
     }
 
-    @JsName("mapList")
-    @JvmName("mapList")
-    inline infix fun <T : IsCodableAndHashable> DataClassPath<K, List<T>>.map(modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit) {
+    @JsName("forEachList")
+    @JvmName("forEachList")
+    inline infix fun <T : IsCodableAndHashable> DataClassPath<K, List<T>>.forEach(modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit) {
         val builder = ModificationBuilder<T>()
         modification(builder, path())
         modifications.add(
@@ -340,9 +149,9 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         )
     }
 
-    @JsName("mapSet")
-    @JvmName("mapSet")
-    inline infix fun <T : IsCodableAndHashable> DataClassPath<K, Set<T>>.map(modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit) {
+    @JsName("forEachSet")
+    @JvmName("forEachSet")
+    inline infix fun <T : IsCodableAndHashable> DataClassPath<K, Set<T>>.forEach(modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit) {
         val builder = ModificationBuilder<T>()
         modification(builder, path())
         modifications.add(
@@ -355,9 +164,9 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         )
     }
 
-    @JsName("mapIfList")
-    @JvmName("mapIfList")
-    inline fun <T : IsCodableAndHashable> DataClassPath<K, List<T>>.mapIf(
+    @JsName("forEachIfList")
+    @JvmName("forEachIfList")
+    inline fun <T : IsCodableAndHashable> DataClassPath<K, List<T>>.forEachIf(
         condition: (DataClassPath<T, T>) -> Condition<T>,
         modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit,
     ) {
@@ -373,9 +182,9 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
         )
     }
 
-    @JsName("mapIfSet")
-    @JvmName("mapIfSet")
-    inline fun <T : IsCodableAndHashable> DataClassPath<K, Set<T>>.mapIf(
+    @JsName("forEachIfSet")
+    @JvmName("forEachIfSet")
+    inline fun <T : IsCodableAndHashable> DataClassPath<K, Set<T>>.forEachIf(
         condition: (DataClassPath<T, T>) -> Condition<T>,
         modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit,
     ) {

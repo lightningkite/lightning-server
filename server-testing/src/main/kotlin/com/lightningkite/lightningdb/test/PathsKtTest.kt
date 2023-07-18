@@ -37,6 +37,12 @@ class PathsKtTest {
             assertFalse((path<LargeTestModel>().short eq 3).readsResultOf(modification))
             assertFalse((path<LargeTestModel>().always).readsResultOf(modification))
         }
+        (path<LargeTestModel>().listEmbedded.elements.value2 gt 2).let { condition ->
+            assertFalse(condition.readsResultOf(modification {it.intNullable assign 2}))
+            assertTrue(condition.readsResultOf(modification {it.listEmbedded.forEach { it.value2 assign 2 } }))
+            assertTrue(condition.readsResultOf(modification {it.listEmbedded.forEach { it.value2 assign 3 } }))
+            assertTrue(condition.readsResultOf(modification {it.listEmbedded.forEach { it.value2.plusAssign(1) } }))
+        }
     }
 
     @Test
@@ -54,25 +60,25 @@ class PathsKtTest {
     }
 
     @Test
-    fun testConditionModificationPasses() {
+    fun testGuaranteedAfter() {
         (path<LargeTestModel>().int gt 2).let { condition ->
-            assertFalse(condition.readsResultOf(modification { it.int assign 2 }))
-            assertTrue(condition.readsResultOf(modification { it.int assign 3 }))
-            assertFalse(condition.readsResultOf(modification { it.int += 1 }))
-            assertTrue(condition.readsResultOf(modification { it.short += 1 }))
+            assertFalse(condition.guaranteedAfter(modification { it.int assign 2 }))
+            assertTrue(condition.guaranteedAfter(modification { it.int assign 3 }))
+            assertFalse(condition.guaranteedAfter(modification { it.int += 1 }))
+            assertTrue(condition.guaranteedAfter(modification { it.short += 1 }))
         }
         (path<LargeTestModel>().intNullable.notNull gt 2).let { condition ->
-            assertFalse(condition.readsResultOf(modification { it.intNullable assign 2 }))
-            assertFalse(condition.readsResultOf(modification { it.intNullable assign null }))
-            assertTrue(condition.readsResultOf(modification { it.intNullable assign 3 }))
-            assertFalse(condition.readsResultOf(modification { it.intNullable.notNull assign 2 }))
-            assertTrue(condition.readsResultOf(modification { it.intNullable.notNull assign 3 }))
-            assertFalse(condition.readsResultOf(modification { it.intNullable.notNull plusAssign 1 }))
+            assertFalse(condition.guaranteedAfter(modification { it.intNullable assign 2 }))
+            assertFalse(condition.guaranteedAfter(modification { it.intNullable assign null }))
+            assertTrue(condition.guaranteedAfter(modification { it.intNullable assign 3 }))
+            assertFalse(condition.guaranteedAfter(modification { it.intNullable.notNull assign 2 }))
+            assertTrue(condition.guaranteedAfter(modification { it.intNullable.notNull assign 3 }))
+            assertFalse(condition.guaranteedAfter(modification { it.intNullable.notNull plusAssign 1 }))
         }
-//        (startChain<LargeTestModel>().listEmbedded.all.value2 gt 2).let { condition ->
-//            assertFalse(condition.invoke(modification<LargeTestModel> {it.listEmbedded.map { it.value2 assign 2 } }))
-//            assertTrue(condition.invoke(modification<LargeTestModel> {it.listEmbedded.map { it.value2 assign 3 } }))
-//            assertFalse(condition.invoke(modification<LargeTestModel> {it.listEmbedded.map { it.value2.plusAssign(1) } }))
-//        }
+        (path<LargeTestModel>().listEmbedded.elements.value2 gt 2).let { condition ->
+            assertFalse(condition.guaranteedAfter(modification {it.listEmbedded.forEach { it.value2 assign 2 } }))
+            assertTrue(condition.guaranteedAfter(modification {it.listEmbedded.forEach { it.value2 assign 3 } }))
+            assertFalse(condition.guaranteedAfter(modification {it.listEmbedded.forEach { it.value2.plusAssign(1) } }))
+        }
     }
 }
