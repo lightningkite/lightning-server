@@ -4,7 +4,9 @@ import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathGroup
+import com.lightningkite.lightningserver.email.Email
 import com.lightningkite.lightningserver.email.EmailClient
+import com.lightningkite.lightningserver.email.EmailLabeledValue
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.settings.setting
@@ -71,10 +73,12 @@ open class EmailAuthEndpoints<USER : Any, ID>(
             val pin = pin.generate(address)
             val link = "${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$jwt"
             email().send(
-                subject = emailSubject(),
-                to = listOf(address),
-                message = "Log in to ${generalSettings().projectName} as ${address}:\n$link\nPIN: $pin",
-                htmlMessage = template(address, link, pin)
+                Email(
+                    subject = emailSubject(),
+                    to = listOf(EmailLabeledValue(address)),
+                    plainText = "Log in to ${generalSettings().projectName} as ${address}:\n$link\nPIN: $pin",
+                    html = template(address, link, pin)
+                )
             )
             Unit
         }
@@ -90,30 +94,69 @@ open class EmailAuthEndpoints<USER : Any, ID>(
             base.token(emailAccess.byEmail(email))
         }
     )
-    val oauthGoogleSettings = setting<OauthProviderCredentials?>("oauth_google", null, optional = true)
-    val oauthGithubSettings = setting<OauthProviderCredentials?>("oauth_github", null, optional = true)
-    val oauthAppleSettings = setting<OauthAppleEndpoints.OauthAppleSettings?>("oauth_apple", null, optional = true)
-    val oauthMicrosoftSettings = setting<OauthProviderCredentials?>("oauth_microsoft", null, optional = true)
 
-    private val oauthGoogle: OauthGoogleEndpoints<USER, ID>? by lazy {
-        oauthGoogleSettings()?.let { OauthGoogleEndpoints(base, emailAccess.asExternal(), { it }) }
+    val oauthSettings = OauthProviderInfo.all.map {
+        it.settings.defineOptional("oauth_${it.identifierName}")
     }
-    private val oauthGithub: OauthGitHubEndpoints<USER, ID>? by lazy {
-        oauthGithubSettings()?.let { OauthGitHubEndpoints(base, emailAccess.asExternal(), { it }) }
+    val oauthEndpointPairs by lazy {
+        OauthProviderInfo.all.zip(oauthSettings).mapNotNull {
+            val rawCreds = it.second() ?: return@mapNotNull null
+            @Suppress("UNCHECKED_CAST")
+            val credRead = (it.first.settings as OauthProviderInfo.SettingInfo<Any>).read
+            OauthPairEndpoints(
+                path = path("oauth/${it.first.pathName}"),
+                oauthProviderInfo = it.first,
+                credentials = { credRead(rawCreds) },
+                onAccess = { response ->
+                    val profile = it.first.getProfile(response)
+                    val user = emailAccess.asExternal().byExternalService(profile)
+                    val token = base.token(user, Duration.ofMinutes(1))
+                    HttpResponse.redirectToGet("${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$token")
+                }
+            )
+        }
     }
-    private val oauthApple: OauthAppleEndpoints<USER, ID>? by lazy {
-        oauthAppleSettings()?.let { OauthAppleEndpoints(base, emailAccess.asExternal(), { it }) }
-    }
-    private val oauthMicrosoft: OauthMicrosoftEndpoints<USER, ID>? by lazy {
-        oauthMicrosoftSettings()?.let { OauthMicrosoftEndpoints(base, emailAccess.asExternal(), { it }) }
-    }
+//    val oauthGoogleSettings = setting<OauthProviderCredentials?>("oauth_google", null, optional = true)
+//    val oauthGithubSettings = setting<OauthProviderCredentials?>("oauth_github", null, optional = true)
+//    val oauthAppleSettings = setting<OauthProviderCredentialsApple?>("oauth_apple", null, optional = true)
+//    val oauthMicrosoftSettings = setting<OauthProviderCredentials?>("oauth_microsoft", null, optional = true)
+//
+//    private val oauthGoogle: OauthPairEndpoints? by lazy {
+//        oauthGoogleSettings()?.let {
+//            OauthPairEndpoints(
+//                path = path("oauth/google"),
+//                oauthProviderInfo = OauthProviderInfo.google
+//            )
+//        }
+//    }
+//    private val oauthGithub: OauthPairEndpoints? by lazy {
+//        oauthGithubSettings()?.let {
+//            OauthPairEndpoints(
+//                path = path("oauth/github"),
+//                oauthProviderInfo = OauthProviderInfo.google
+//            )
+//        }
+//    }
+//    private val oauthApple: OauthPairEndpoints? by lazy {
+//        oauthAppleSettings()?.let {
+//            OauthPairEndpoints(
+//                path = path("oauth/apple"),
+//                oauthProviderInfo = OauthProviderInfo.google
+//            )
+//        }
+//    }
+//    private val oauthMicrosoft: OauthPairEndpoints? by lazy {
+//        oauthMicrosoftSettings()?.let {
+//            OauthPairEndpoints(
+//                path = path("oauth/microsoft"),
+//                oauthProviderInfo = OauthProviderInfo.google
+//            )
+//        }
+//    }
 
     init {
         Tasks.onSettingsReady {
-            oauthGoogle
-            oauthGithub
-            oauthApple
-            oauthMicrosoft
+            oauthEndpointPairs
         }
     }
 

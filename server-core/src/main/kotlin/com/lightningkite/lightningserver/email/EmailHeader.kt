@@ -12,4 +12,5 @@ object EmailHeader {
     val Cc = "Cc"
     val References = "References"
     val DeliveredTo = "Delivered-To"
+    val ReplyTo = "Reply-To"
 }

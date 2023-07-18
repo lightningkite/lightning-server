@@ -66,7 +66,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                     allowHost(it, listOf("http", "https", "ws", "wss"))
                 }
                 it.allowedHeaders.forEach {
-                    if(it == "*") allowHeaders { true }
+                    if (it == "*") allowHeaders { true }
                     else allowHeader(it)
                 }
             }
@@ -191,6 +191,43 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
 
                             is HttpContent.Multipart -> TODO()
                         }
+                    }
+                }
+            }
+        }
+        routing {
+            route("{param...}") {
+                handle {
+                    val request = call.adapt(
+                        HttpEndpoint(
+                            call.request.origin.uri.substringBefore('?').substringBefore('#'),
+                            com.lightningkite.lightningserver.http.HttpMethod(call.request.httpMethod.value.uppercase())
+                        )
+                    )
+                    val result = Http.execute(request)
+                    for (header in result.headers.entries) {
+                        call.response.header(header.first, header.second)
+                    }
+                    call.response.status(HttpStatusCode.fromValue(result.status.code))
+                    when (val b = result.body) {
+                        null -> call.respondText("")
+                        is HttpContent.Binary -> call.respondBytes(
+                            b.bytes,
+                            ContentType.parse(b.type.toString())
+                        )
+
+                        is HttpContent.Text -> call.respondText(b.string, ContentType.parse(b.type.toString()))
+                        is HttpContent.OutStream -> call.respondOutputStream(ContentType.parse(b.type.toString())) {
+                            b.write(
+                                this
+                            )
+                        }
+
+                        is HttpContent.Stream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
+                            b.getStream().copyTo(this)
+                        }
+
+                        is HttpContent.Multipart -> TODO()
                     }
                 }
             }
@@ -327,7 +364,8 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
                                 content = HttpContent.Stream(
                                     it.streamProvider,
                                     h.contentLength,
-                                    it.contentType?.adapt() ?: com.lightningkite.lightningserver.core.ContentType.Application.OctetStream
+                                    it.contentType?.adapt()
+                                        ?: com.lightningkite.lightningserver.core.ContentType.Application.OctetStream
                                 )
                             )
                         }
@@ -341,7 +379,8 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
                                 content = HttpContent.Stream(
                                     { it.provider().asStream() },
                                     h.contentLength,
-                                    it.contentType?.adapt() ?: com.lightningkite.lightningserver.core.ContentType.Application.OctetStream
+                                    it.contentType?.adapt()
+                                        ?: com.lightningkite.lightningserver.core.ContentType.Application.OctetStream
                                 )
                             )
                         }

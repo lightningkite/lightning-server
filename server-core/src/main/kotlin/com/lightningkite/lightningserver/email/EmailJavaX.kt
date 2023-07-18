@@ -4,9 +4,11 @@ import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContentAndHeaders
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import java.util.*
 import javax.activation.DataHandler
 import javax.mail.Address
 import javax.mail.Message
@@ -43,10 +45,10 @@ private suspend fun HttpContentAndHeaders.into(part: MimePart) {
     }
 }
 
-suspend fun Email.toJavaX(session: Session): Message = MimeMessage(session).apply {
+suspend fun Email.toJavaX(session: Session = Session.getDefaultInstance(Properties(), null)): Message = MimeMessage(session).apply {
     val email = this@toJavaX
     subject = email.subject
-    email.from?.let { setFrom(InternetAddress(it.value, it.label)) }
+    email.fromEmail?.let { setFrom(InternetAddress(it, email.fromLabel)) }
     email.to.forEach { setRecipient(Message.RecipientType.TO, InternetAddress(it.value, it.label)) }
     email.cc.forEach { setRecipient(Message.RecipientType.CC, InternetAddress(it.value, it.label)) }
     email.bcc.forEach { setRecipient(Message.RecipientType.BCC, InternetAddress(it.value, it.label)) }

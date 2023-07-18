@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
+import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -23,6 +24,8 @@ open class BaseAuthEndpoints<USER : Any, ID>(
     val jwtSigner: () -> JwtSigner,
     val landing: String = "/",
     val handleToken: suspend HttpRequest.(token: String) -> HttpResponse = { token ->
+        val dest = queryParameter("destination") ?: landing
+        if(dest.contains("://")) throw ForbiddenException("Destination ")
         HttpResponse.redirectToGet(
             to = queryParameter("destination") ?: landing,
             headers = {

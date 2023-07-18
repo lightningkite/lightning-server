@@ -72,28 +72,41 @@ object Settings {
     }
 }
 
+fun <Setting, Result> setting(
+    name: String,
+    default: Setting,
+    serializer: KSerializer<Setting>,
+    optional: Boolean = false,
+    getter: (Setting)->Result,
+): Settings.Requirement<Setting, Result> {
+    @Suppress("UNCHECKED_CAST")
+    if (Settings.requirements.containsKey(name)) return Settings.requirements[name] as Settings.Requirement<Setting, Result>
+    if (Settings.sealed) throw Error("Settings have already been set; you cannot add more requirements now.  Attempted to add '$name'")
+    val req = Settings.Requirement(name, serializer, default, optional, getter)
+    Settings.requirements[name] = req
+    return req
+}
+
 inline fun <reified Goal> setting(
     name: String,
     default: Goal,
     optional: Boolean = false
-): Settings.Requirement<Goal, Goal> {
-    @Suppress("UNCHECKED_CAST")
-    if (Settings.requirements.containsKey(name)) return Settings.requirements[name] as Settings.Requirement<Goal, Goal>
-    if (Settings.sealed) throw Error("Settings have already been set; you cannot add more requirements now.  Attempted to add '$name'")
-    val req = Settings.Requirement(name, Serialization.module.serializer(), default, optional) { it }
-    Settings.requirements[name] = req
-    return req
-}
+): Settings.Requirement<Goal, Goal> = setting<Goal, Goal>(
+    name = name,
+    default = default,
+    optional = optional,
+    serializer = Serialization.module.serializer<Goal>(),
+    getter = { it }
+)
 
 inline fun <reified Serializable : () -> Goal, Goal> setting(
     name: String,
     default: Serializable,
     optional: Boolean = false
-): Settings.Requirement<Serializable, Goal> {
-    @Suppress("UNCHECKED_CAST")
-    if (Settings.requirements.containsKey(name)) return Settings.requirements[name] as Settings.Requirement<Serializable, Goal>
-    if (Settings.sealed) throw Error("Settings have already been set; you cannot add more requirements now.  Attempted to add '$name'")
-    val req = Settings.Requirement(name, Serialization.module.serializer(), default, optional) { it() }
-    Settings.requirements[name] = req
-    return req
-}
+): Settings.Requirement<Serializable, Goal> = setting<Serializable, Goal>(
+    name = name,
+    default = default,
+    optional = optional,
+    serializer = Serialization.module.serializer<Serializable>(),
+    getter = { it() }
+)

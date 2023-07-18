@@ -33,14 +33,18 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
         put("mail.smtp.ssl.enable", smtpConfig.port == 465)
         put("mail.smtp.starttls.enable", smtpConfig.port == 587)
         put("mail.smtp.starttls.required", smtpConfig.port == 587)
-    }, object: Authenticator() {
+    }, object : Authenticator() {
         override fun getPasswordAuthentication(): PasswordAuthentication = PasswordAuthentication(
             smtpConfig.username,
             smtpConfig.password
         )
     })
-    val from by lazy { EmailLabeledValue(smtpConfig.fromEmail, generalSettings().projectName) }
     override suspend fun send(email: Email) {
-        Transport.send(email.copy(from = email.from ?: from).toJavaX(session))
+        Transport.send(
+            email.copy(
+                fromEmail = email.fromEmail ?: smtpConfig.fromEmail,
+                fromLabel = email.fromLabel ?: generalSettings().projectName
+            ).toJavaX(session)
+        )
     }
 }

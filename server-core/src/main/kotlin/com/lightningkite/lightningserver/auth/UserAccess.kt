@@ -30,12 +30,12 @@ interface UserPasswordAccess<USER : Any, ID> : UserAccess<USER, ID> {
 }
 
 interface UserExternalServiceAccess<USER : Any, ID> : UserAccess<USER, ID> {
-    suspend fun byExternalService(oauth: ExternalServiceLogin): USER
+    suspend fun byExternalService(oauth: ExternalProfile): USER
 }
 
 fun <USER : Any, ID> UserEmailAccess<USER, ID>.asExternal(): UserExternalServiceAccess<USER, ID> =
     object : UserExternalServiceAccess<USER, ID>, UserAccess<USER, ID> by this {
-        override suspend fun byExternalService(oauth: ExternalServiceLogin): USER {
+        override suspend fun byExternalService(oauth: ExternalProfile): USER {
             return this@asExternal.byEmail(
                 oauth.email ?: throw BadRequestException("No verified email found in external service")
             )

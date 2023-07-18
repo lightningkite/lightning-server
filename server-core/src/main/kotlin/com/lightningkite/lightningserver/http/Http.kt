@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.utils.MutableMapWithChangeHandler
+import org.slf4j.LoggerFactory
 
 object Http {
     init {
@@ -14,6 +15,8 @@ object Http {
     }
 
     var fixEndingSlash: Boolean = true
+
+    private val logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.http.Http")
 
     val endpoints: MutableMap<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> =
         MutableMapWithChangeHandler<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> {
@@ -32,6 +35,10 @@ object Http {
     var exception: suspend (HttpRequest, Exception) -> HttpResponse =
         { request, exception ->
             if (exception is HttpStatusException) {
+                if(generalSettings().debug) {
+                    println(exception.toLSError())
+                    logger.warn(exception.toLSError().toString())
+                }
                 exception.toResponse(request)
             } else {
                 exception.report(request)
@@ -65,7 +72,11 @@ object Http {
                 } catch (e: Exception) {
                     exception(request, e)
                 }
-            } ?: notFound(request.endpoint, request)
+            } ?: notFound(request.endpoint, request).also {
+                if(generalSettings().debug) {
+                    logger.warn("${request.endpoint} not found!")
+                }
+            }
         }
     }
 }
