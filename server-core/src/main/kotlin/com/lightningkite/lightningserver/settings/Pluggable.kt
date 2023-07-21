@@ -18,7 +18,7 @@ abstract class Pluggable<S, T> {
         ?.split("&")
         ?.filter { it.isNotBlank() }
         ?.map {
-            it.substringBefore('=') to it.substringAfter('=')
+            it.substringBefore('=') to it.substringAfter('=', "")
         }
         ?.groupBy { it.first }
         ?.mapValues { it.value.map { it.second } }
