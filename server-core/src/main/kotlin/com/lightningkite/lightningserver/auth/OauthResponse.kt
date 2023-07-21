@@ -25,7 +25,8 @@ data class OauthTokenRequest(
 @Serializable
 data class OauthCode(
     val code: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    val state: String? = null,
 )
 
 @Serializable
@@ -38,7 +39,8 @@ data class OauthCodeRequest(
     val response_mode: OauthResponseMode = OauthResponseMode.form_post,
     val access_type: OauthAccessType? = null,
     val include_granted_scopes: Boolean? = null,
-    val prompt: OauthPromptType? = null
+    val prompt: OauthPromptType? = null,
+    val login_hint: String? = null,
 )
 
 @Serializable enum class OauthPromptType {

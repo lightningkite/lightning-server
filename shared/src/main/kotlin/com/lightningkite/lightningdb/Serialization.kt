@@ -10,6 +10,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.SerializersModule
 import java.time.*
+import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.*
 
@@ -52,7 +53,7 @@ object ZonedDateTimeSerializer : KSerializer<ZonedDateTime> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("java.time.ZonedDateTime", PrimitiveKind.STRING)
 
-    override fun serialize(encoder: Encoder, value: ZonedDateTime) = encoder.encodeString(value.toString())
+    override fun serialize(encoder: Encoder, value: ZonedDateTime) = encoder.encodeString(DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(value))
 }
 
 object LocalDateSerializer : KSerializer<LocalDate> {

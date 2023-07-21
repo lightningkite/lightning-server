@@ -20,7 +20,7 @@ class EmailAuthTest {
         runBlocking {
             TestSettings.emailAuth.loginEmail.implementation(Unit, "joseph@lightningkite.com")
             val pinRegex = Regex("[0-9][0-9][0-9][0-9][0-9][0-9]")
-            val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.message?.let {
+            val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.plainText?.let {
                 pinRegex.find(it)?.value
             }!!
             val token = TestSettings.emailAuth.loginEmailPin.implementation(Unit, EmailPinLogin("joseph@lightningkite.com", pin))

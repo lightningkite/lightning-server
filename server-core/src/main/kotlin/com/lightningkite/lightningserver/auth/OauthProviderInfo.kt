@@ -48,17 +48,19 @@ class OauthProviderInfo(
     fun loginUrl(
         credentials: () -> OauthProviderCredentials,
         callback: HttpEndpoint,
+        state: String = UUID.randomUUID().toString(),
         scope: String = scopeForProfile,
         accessType: OauthAccessType = OauthAccessType.online,
     ): String {
         val params = OauthCodeRequest(
             response_type = "code",
             scope = scope,
+            state = state,
             redirect_uri = callback.path.fullUrl(),
             client_id = credentials().id,
             response_mode = mode,
             access_type = accessType,
-            prompt = if(accessType == OauthAccessType.offline) OauthPromptType.consent else null
+            prompt = if(accessType == OauthAccessType.offline) OauthPromptType.consent else null,
         ).let { Serialization.properties.encodeToFormData(it) }
         return "$loginUrl?$params"
     }

@@ -11,7 +11,7 @@ import kotlin.test.assertContentEquals
 class OauthAppleEndpointsTest {
     @Test
     fun testAppleLengthFail() {
-        val s = OauthAppleEndpoints.OauthAppleSettings(
+        val s = OauthProviderCredentialsApple(
             serviceId = "serviceId",
             teamId = "teamId",
             keyId = "keyId",

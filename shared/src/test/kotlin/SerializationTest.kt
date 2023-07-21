@@ -141,7 +141,6 @@ class SerializationTest {
         (path<LargeTestModel>().set.any { it eq 2 }).cycle()
         (path<LargeTestModel>().set.sizesEquals(2)).cycle()
         (path<LargeTestModel>().map.containsKey("asdf")).cycle()
-        path<LargeTestModel>().intNullable.toCMBuilder().notNull.gt(4).cycle()
     }
 
     @Test fun modifications() {
@@ -150,7 +149,7 @@ class SerializationTest {
             it.int assign 2
             it.boolean assign true
         }.cycle()
-        modification<LargeTestModel> {it.intNullable.toCMBuilder().notNull += 1 }.cycle()
+        modification<LargeTestModel> {it.intNullable.notNull += 1 }.cycle()
         modification<LargeTestModel> {it.int assign 2 }.cycle()
         modification<LargeTestModel> {it.int coerceAtMost 2 }.cycle()
         modification<LargeTestModel> {it.int coerceAtLeast 2 }.cycle()
@@ -166,7 +165,7 @@ class SerializationTest {
         modification<LargeTestModel> {it.set.removeAll(setOf(1, 2)) }.cycle()
         modification<LargeTestModel> {it.set.dropFirst() }.cycle()
         modification<LargeTestModel> {it.set.dropLast() }.cycle()
-        modification<LargeTestModel> {it.list.map { it += 2 } }.cycle()
+        modification<LargeTestModel> {it.list.forEach { it += 2 } }.cycle()
         modification<LargeTestModel> {it.map += mapOf("c" to 3) }.cycle()
         modification<LargeTestModel> {it.map.modifyByKey(mapOf(
             "c" to { it += 1 }

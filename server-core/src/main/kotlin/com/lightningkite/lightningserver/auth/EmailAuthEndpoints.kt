@@ -9,11 +9,12 @@ import com.lightningkite.lightningserver.email.EmailClient
 import com.lightningkite.lightningserver.email.EmailLabeledValue
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.settings.generalSettings
-import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
+import com.lightningkite.lightningserver.typed.ApiEndpoint0
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
 import java.time.Duration
+import java.util.*
 
 /**
  * Endpoints for authenticating via email magic link / sent PINs.
@@ -98,21 +99,39 @@ open class EmailAuthEndpoints<USER : Any, ID>(
     val oauthSettings = OauthProviderInfo.all.map {
         it.settings.defineOptional("oauth_${it.identifierName}")
     }
+    data class OauthEndpointSet(
+        val loginRedirect: HttpEndpoint,
+        val loginApi: ApiEndpoint0<Unit, Unit, String>,
+        val callback: OauthCallbackEndpoint<UUID>,
+    )
     val oauthEndpointPairs by lazy {
         OauthProviderInfo.all.zip(oauthSettings).mapNotNull {
             val rawCreds = it.second() ?: return@mapNotNull null
             @Suppress("UNCHECKED_CAST")
             val credRead = (it.first.settings as OauthProviderInfo.SettingInfo<Any>).read
-            OauthPairEndpoints(
-                path = path("oauth/${it.first.pathName}"),
+            val callback = path("oauth/${it.first.pathName}/callback").oauthCallback<UUID>(
                 oauthProviderInfo = it.first,
-                credentials = { credRead(rawCreds) },
-                onAccess = { response ->
-                    val profile = it.first.getProfile(response)
-                    val user = emailAccess.asExternal().byExternalService(profile)
-                    val token = base.token(user, Duration.ofMinutes(1))
-                    HttpResponse.redirectToGet("${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$token")
+                credentials = { credRead(rawCreds) }
+            ) { response, uuid ->
+                val profile = it.first.getProfile(response)
+                val user = emailAccess.asExternal().byExternalService(profile)
+                val token = base.token(user, Duration.ofMinutes(1))
+                HttpResponse.redirectToGet("${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$token")
+            }
+            val loginRedirect = path("oauth/${it.first}/login").get.handler {
+                HttpResponse.redirectToGet(callback.loginUrl(UUID.randomUUID()))
+            }
+            val loginApi = path("oauth/${it.first}/login").get.typed(
+                summary = "Log In via ${it.first.niceName}",
+                errorCases = listOf(),
+                implementation = { anon: Unit, _: Unit ->
+                    callback.loginUrl(UUID.randomUUID())
                 }
+            )
+            OauthEndpointSet(
+                loginRedirect = loginRedirect,
+                loginApi = loginApi,
+                callback = callback
             )
         }
     }

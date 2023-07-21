@@ -17,8 +17,7 @@ class SmtpTest {
         val client = SmtpEmailClient(credentials.readText().let { Serialization.json.decodeFromString(credentials.readText()) })
         runBlocking {
             client.send(Email(
-                subject = "Subject 2",
-                from = EmailLabeledValue("joseph@lightningkite.com", "Joseph Ivie"),
+                subject = "Subject 2", fromLabel = "Joseph Ivie", fromEmail = "joseph@lightningkite.com",
                 to = listOf(EmailLabeledValue("joseph@lightningkite.com", "Joseph Ivie")),
                 html = "<p>Hello world!</p>",
             ))
