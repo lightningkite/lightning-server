@@ -15,11 +15,12 @@ import kotlin.reflect.KProperty1
 @OptIn(InternalSerializationApi::class)
 private class KProperty1Parser<T>(val serializer: KSerializer<T>) {
     val children = run {
-        val c = (serializer as GeneratedSerializer<T>).childSerializers().withIndex()
+        val c: Map<String, KSerializer<*>> = (serializer as GeneratedSerializer<T>).childSerializers().withIndex()
             .associate { serializer.descriptor.getElementName(it.index) to it.value }
-        serializer.attemptGrabFields().mapValues {
-            it.value to c[it.key]!!
-        }
+        val f: Map<String, KProperty1<T, *>> = serializer.attemptGrabFields()
+        c.mapNotNull {
+            it.key to ((f[it.key] ?: return@mapNotNull null) to it.value)
+        }.associate { it }
     }
     companion object {
         val existing = HashMap<KSerializer<*>, KProperty1Parser<*>>()
