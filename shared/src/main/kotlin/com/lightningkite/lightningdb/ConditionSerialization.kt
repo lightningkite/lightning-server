@@ -52,12 +52,12 @@ private fun <Inner> getCond(inner: KSerializer<Inner>): MySealedClassSerializerI
             register(Condition.Inside.serializer(inner))
             register(Condition.NotInside.serializer(inner))
 
-            if(inner.descriptor.kind is PrimitiveKind) {
+//            if(inner.descriptor.kind is PrimitiveKind) {
                 register(Condition.GreaterThan.serializer(inner))
                 register(Condition.LessThan.serializer(inner))
                 register(Condition.GreaterThanOrEqual.serializer(inner))
                 register(Condition.LessThanOrEqual.serializer(inner))
-            }
+//            }
 
             register(Condition.FullTextSearch.serializer(inner))
             if (inner == String.serializer()) {

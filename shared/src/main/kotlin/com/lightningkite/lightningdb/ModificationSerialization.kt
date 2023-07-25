@@ -44,10 +44,10 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): MySealedClassSerializerIn
                     register(Modification.IfNotNull.serializer(inner))
                 }
                 register(Modification.Assign.serializer(inner))
-                if (inner.descriptor.kind is PrimitiveKind) {
+//                if (inner.descriptor.kind is PrimitiveKind) {
                     register(Modification.CoerceAtMost.serializer(inner))
                     register(Modification.CoerceAtLeast.serializer(inner))
-                }
+//                }
                 if (inner.descriptor.kind in numberKinds) {
                     register(Modification.Increment.serializer(inner))
                     register(Modification.Multiply.serializer(inner))

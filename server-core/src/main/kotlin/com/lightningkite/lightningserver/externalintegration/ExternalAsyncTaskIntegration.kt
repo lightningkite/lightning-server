@@ -50,11 +50,6 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
         ),
         getCollection = {
             database().collection<ExternalAsyncTaskRequest>(name = "$path/ExternalTaskRequest")
-                .postChange { old, new ->
-                    if ((new.lastAttempt < Instant.now().plus(taskTimeout)) && new.result != null) {
-                        runActionResult(new)
-                    }
-                }
         },
         defaultItem = {
             ExternalAsyncTaskRequest(
@@ -152,6 +147,9 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
                 }
             } ?: return@task
             try {
+                info.collection().updateOneById(sig._id, modification {
+                    it.lastAttempt assign Instant.now()
+                })
                 val result = sig.result?.let { Serialization.Internal.json.decodeFromString(resultSerializer, it) }
                 val ourData = Serialization.Internal.json.decodeFromString(task.ourDataSerialization, sig.ourData)
                 if (result == null) {
@@ -167,7 +165,6 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
             } catch (e: Exception) {
                 info.collection().updateOneById(sig._id, modification {
                     it.processingError assign e.stackTraceToString()
-                    it.lastAttempt assign Instant.now()
                 })
             }
         }
@@ -205,9 +202,10 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
     }
 
     suspend fun handleResult(id: String, result: RESULT) {
-        info.collection().updateOneById(id, modification {
+        val r = info.collection().updateOneById(id, modification {
             it.result assign Serialization.Internal.json.encodeToString(resultSerializer, result)
         })
+        r.new?.let { runActionResult(it) }
     }
 
     suspend fun handleExpire(id: String) {

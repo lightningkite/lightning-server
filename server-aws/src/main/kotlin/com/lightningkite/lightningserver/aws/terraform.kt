@@ -716,8 +716,8 @@ internal fun handlers() {
     TerraformHandler.handler<JwtSigner>(
         inputs = { key ->
             listOf(
-                TerraformInput.number("${key}_expirationMilliseconds", 31540000000),
-                TerraformInput.number("${key}_emailExpirationMilliseconds", 1800000),
+                TerraformInput.string("${key}_expiration", "PT8760H"),
+                TerraformInput.string("${key}_emailExpiration", "PT1H"),
             )
         },
         emit = {
@@ -734,8 +734,8 @@ internal fun handlers() {
         settingOutput = { key ->
             """
                 {
-                    expirationMilliseconds = var.${key}_expirationMilliseconds 
-                    emailExpirationMilliseconds = var.${key}_emailExpirationMilliseconds 
+                    expiration = var.${key}_expiration 
+                    emailExpiration = var.${key}_emailExpiration 
                     secret = random_password.${key}.result
                 }
             """.trimIndent()
