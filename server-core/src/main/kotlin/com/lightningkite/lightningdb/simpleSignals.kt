@@ -475,9 +475,9 @@ inline fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.interc
             modification: Modification<Model>,
             model: Model
         ): EntryChange<Model> {
-            val current = wraps.findOne(condition) ?: return EntryChange(null, null)
+            val current = wraps.findOne(condition) ?: return wraps.upsertOne(condition, modification, model)
             val changed = interceptor(current, modification)
-            return wraps.upsertOne(Condition.OnField(HasId<ID>::_id, Condition.Equal(current._id)), changed, changed(model))
+            return wraps.upsertOne(condition and Condition.OnField(HasId<ID>::_id, Condition.Equal(current._id)), changed, changed(model))
         }
 
         override suspend fun upsertOneIgnoringResult(
@@ -485,9 +485,9 @@ inline fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.interc
             modification: Modification<Model>,
             model: Model
         ): Boolean {
-            val current = wraps.findOne(condition) ?: return false
+            val current = wraps.findOne(condition) ?: return wraps.upsertOneIgnoringResult(condition, modification, model)
             val changed = interceptor(current, modification)
-            return wraps.upsertOneIgnoringResult(Condition.OnField(HasId<ID>::_id, Condition.Equal(current._id)), changed, changed(model))
+            return wraps.upsertOneIgnoringResult(condition and Condition.OnField(HasId<ID>::_id, Condition.Equal(current._id)), changed, changed(model))
         }
 
         override suspend fun updateOne(
