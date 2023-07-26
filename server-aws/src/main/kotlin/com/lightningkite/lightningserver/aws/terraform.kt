@@ -488,6 +488,7 @@ internal fun handlers() {
         inputs = { key ->
             listOf(
                 TerraformInput.string("${key}_org_id", null),
+                TerraformInput.boolean("${key}_continuous_backup", false),
 //                TerraformInput.string("${key}_team_id", null)
             )
         },
@@ -516,6 +517,8 @@ internal fun handlers() {
                   provider_settings_backing_provider_name = "AWS"
                   provider_settings_provider_name = "SERVERLESS"
                   provider_settings_region_name = replace(upper(var.deployment_location), "-", "_")
+                  
+                  continuous_backup_enabled = var.${key}_continuous_backup
                 }
                 resource "mongodbatlas_database_user" "$key" {
                   username           = "$namePrefixSafe$key-main"

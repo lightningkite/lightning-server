@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningdb.test.TestSettings
+import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.email.TestEmailClient
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpHeader
@@ -9,7 +9,6 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.test
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
-import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.fail
 

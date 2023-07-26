@@ -64,7 +64,7 @@ abstract class Serialization {
             ignoreUnknownColumns = true
             serializersModule = module
             trimUnquotedWhitespace = true
-            deferToFormatWhenVariableColumns = Json
+            deferToFormatWhenVariableColumns = json
         }
     }
     val yaml: Yaml by SetOnce {

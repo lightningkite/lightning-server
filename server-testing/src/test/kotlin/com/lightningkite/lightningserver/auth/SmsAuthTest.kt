@@ -1,7 +1,7 @@
 package com.lightningkite.lightningdb.test.com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningdb.collection
-import com.lightningkite.lightningdb.test.TestSettings
+import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningdb.test.User
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.ServerPath

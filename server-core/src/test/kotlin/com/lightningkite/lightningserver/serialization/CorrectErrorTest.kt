@@ -40,40 +40,5 @@ class CorrectErrorTest {
                 println(it.body?.text())
             }
         }
-//        testApplication {
-//            application {
-//                configureSerialization()
-//                this.routing {
-//                    post(
-//                        path = "test",
-//                        summary = "Test endpoint",
-//                        errorCases = listOf(),
-//                        implementation = { input: TestModel -> input }
-//                    )
-//                }
-//            }
-//            val client = createClient {
-//                this.expectSuccess = false
-//                install(ContentNegotiation) {
-//                    json(Json {
-//                        serializersModule = ClientModule
-//                    })
-//                }
-//            }
-//            val correct = client.post("/test") {
-//                setBody(buildJsonObject { put("number", 2) })
-//                contentType(ContentType.Application.Json)
-//                accept(ContentType.Application.Json)
-//                println(headers.entries().joinToString())
-//            }
-//            assertTrue(correct.status.isSuccess())
-//            val wrong = client.post("/test") {
-//                setBody(buildJsonObject { put("number", "wrongo") })
-//                contentType(ContentType.Application.Json)
-//                accept(ContentType.Application.Json)
-//                println(headers.entries().joinToString())
-//            }
-//            assertFalse(wrong.status.isSuccess())
-//        }
     }
 }

@@ -291,9 +291,9 @@ class MongoFieldCollection<Model : Any>(
             if (m.upsert(model, serializer)) {
                 mongo.updateOne(cs.bson(), m.document, m.options).matchedCount > 0
             } else {
-                if (mongo.updateOne(cs.bson(), m.document, m.options).matchedCount != 0L)
+                if (mongo.updateOne(cs.bson(), m.document, m.options).matchedCount != 0L) {
                     true
-                else {
+                } else {
                     mongo.insertOne(model)
                     false
                 }

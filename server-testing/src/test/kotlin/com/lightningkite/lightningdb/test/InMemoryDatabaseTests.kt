@@ -1,34 +1,24 @@
-package com.lightningkite.lightningdb.test
+package com.lightningkite.lightningdb.test.com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningdb.test.*
+import com.lightningkite.lightningserver.TestSettings
+import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.cache.Cache
-import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.CacheTest
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ContentType
-import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.db.InMemoryDatabase
-import com.lightningkite.lightningserver.db.ModelInfo
-import com.lightningkite.lightningserver.email.EmailSettings
-import com.lightningkite.lightningserver.engine.LocalEngine
-import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.files.FileSystemTests
-import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.files.LocalFileSystem
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.test
-import com.lightningkite.lightningserver.settings.Settings
-import com.lightningkite.lightningserver.settings.setting
-import com.lightningkite.lightningserver.sms.SMSSettings
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.io.File
 import java.time.Duration
-import java.util.*
 import kotlin.test.assertEquals
 
 class RamAggregationsTest: AggregationsTest() {
@@ -116,7 +106,6 @@ class SecurityTest() {
     init { TestSettings }
     @Test
     fun test() {
-        prepareModels()
         runBlocking {
             val unsecured = TestSettings.database().collection<LargeTestModel>("SecurityTest_test")
             val secured = unsecured.withPermissions(ModelPermissions(
@@ -141,30 +130,3 @@ class SecurityTest() {
     }
 }
 
-object TestSettings {
-    val database = setting("database", DatabaseSettings("ram"))
-    val email = setting("email", EmailSettings("test"))
-    val sms = setting("sms", SMSSettings("test"))
-    val jwtSigner = setting("jwt", JwtSigner())
-    val cache = setting("cache", CacheSettings())
-    val files = setting("files", FilesSettings())
-    val oauthGoogle = setting<OauthProviderCredentials?>("oauth_google", null)
-    val oauthApple = setting<OauthProviderCredentialsApple?>("oauth_apple", null)
-    val oauthGithub = setting<OauthProviderCredentials?>("oauth_github", null)
-    val oauthMicrosoft = setting<OauthProviderCredentials?>("oauth_microsoft", null)
-
-
-    val info = ModelInfo<User, User, UUID>(
-        getCollection = { database().collection() },
-        forUser = { this }
-    )
-    val emailAccess: UserEmailAccess<User, UUID> = info.userEmailAccess { User(email = it, phoneNumber = it) }
-    val path = ServerPath("auth")
-    val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner)
-    val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
-
-    init {
-        Settings.populateDefaults()
-        engine = LocalEngine
-    }
-}

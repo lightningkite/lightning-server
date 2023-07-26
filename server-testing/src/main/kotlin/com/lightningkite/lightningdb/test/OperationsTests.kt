@@ -38,12 +38,13 @@ abstract class OperationsTests() {
 
     @Test fun test_wackyUpsert(): Unit = runBlocking {
         val collection = database.collection<LargeTestModel>("test_wackyUpsert")
-        var m = LargeTestModel(int = 2)
+        var m = LargeTestModel(int = 2, byte = 1)
         var updated = collection.upsertOne(condition { it._id eq m._id }, modification { it.boolean assign true }, m)
         assertEquals(null, updated.old)
+        assertEquals(m, updated.new)
         m = collection.get(m._id)!!
         assertEquals(m, updated.new)
-        updated = collection.upsertOne(condition { it._id eq m._id }, modification { it.byte assign 1 }, m)
+        updated = collection.upsertOne(condition { it._id eq m._id }, modification { it.byte assign 1 }, LargeTestModel(byte = 1))
         assertEquals(m, updated.old)
         m = collection.get(m._id)!!
         assertEquals(m, updated.new)
@@ -53,9 +54,10 @@ abstract class OperationsTests() {
         var m = LargeTestModel(int = 2, boolean = true)
         var updated = collection.upsertOne(condition { it._id eq m._id }, modification { it.boolean assign true }, m)
         assertEquals(null, updated.old)
+        assertEquals(m, updated.new)
         m = collection.get(m._id)!!
         assertEquals(m, updated.new)
-        updated = collection.upsertOne(condition { it._id eq m._id }, modification { it.byte assign 1 }, m)
+        updated = collection.upsertOne(condition { it._id eq m._id }, modification { it.byte assign 1 }, LargeTestModel(byte = 1))
         assertEquals(m, updated.old)
         m = collection.get(m._id)!!
         assertEquals(m, updated.new)
@@ -65,13 +67,14 @@ abstract class OperationsTests() {
         var m = LargeTestModel(int = 2, boolean = true, byte = 1)
         var updated = collection.upsertOne(condition { it._id eq m._id }, modification { it.byte plusAssign 1 }, m)
         assertEquals(null, updated.old)
+        assertEquals(m, updated.new)
         m = collection.get(m._id)!!
         assertEquals(m, updated.new)
-        updated = collection.upsertOne(condition { it._id eq m._id }, modification { it.byte plusAssign 1 }, m)
+        updated = collection.upsertOne(condition { it._id eq m._id }, modification { it.byte plusAssign 1 }, LargeTestModel(byte = 1))
         assertEquals(m, updated.old)
         m = collection.get(m._id)!!
         assertEquals(m, updated.new)
-        updated = collection.upsertOne(condition { it._id eq m._id }, modification { it.byte plusAssign 1 }, m)
+        updated = collection.upsertOne(condition { it._id eq m._id }, modification { it.byte plusAssign 1 }, LargeTestModel(byte = 1))
         assertEquals(m, updated.old)
         m = collection.get(m._id)!!
         assertEquals(m, updated.new)
@@ -99,18 +102,12 @@ abstract class OperationsTests() {
     @Test fun test_modUpsertIgnoring(): Unit = runBlocking {
         val collection = database.collection<LargeTestModel>("test_modUpsert")
         var m = LargeTestModel(int = 2, boolean = true, byte = 1)
-        var updated = collection.upsertOne(condition { it._id eq m._id }, modification { it.byte plusAssign 1 }, m)
-        assertEquals(null, updated.old)
+        var updated = collection.upsertOneIgnoringResult(condition { it._id eq m._id }, modification { it.byte plusAssign 1 }, m)
         m = collection.get(m._id)!!
-        assertEquals(m, updated.new)
-        updated = collection.upsertOne(condition { it._id eq m._id }, modification { it.byte plusAssign 1 }, m)
-        assertEquals(m, updated.old)
+        assertEquals(false, updated)
+        updated = collection.upsertOneIgnoringResult(condition { it._id eq m._id }, modification { it.byte plusAssign 1 }, m)
         m = collection.get(m._id)!!
-        assertEquals(m, updated.new)
-        updated = collection.upsertOne(condition { it._id eq m._id }, modification { it.byte plusAssign 1 }, m)
-        assertEquals(m, updated.old)
-        m = collection.get(m._id)!!
-        assertEquals(m, updated.new)
+        assertEquals(true, updated)
     }
 
     @Test fun test_upsertOneById(): Unit = runBlocking {

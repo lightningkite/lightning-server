@@ -1,12 +1,13 @@
 package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.TestSettings
+import com.lightningkite.lightningserver.files.serverFile
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.properties.encodeToStringMap
 import org.junit.Test
 import java.time.Instant
-import kotlin.system.measureNanoTime
 import kotlin.system.measureTimeMillis
 import kotlin.test.assertEquals
 import kotlin.test.fail
@@ -205,6 +206,11 @@ class ConditionSimplifyKtTest {
 //        println("Got ${Serialization.json.encodeToString(simplified)} from ${Serialization.json.encodeToString(this)}")
         for (data in sampleData)
             assertEquals(this(data), simplified(data))
+    }
+
+    @Test fun testA() {
+        Serialization.csv.encodeToString(TestSettings.files().root.resolve("example").serverFile)
+            .let { println(it) }
     }
 }
 

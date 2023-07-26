@@ -3,6 +3,7 @@ package com.lightningkite.lightningdb.test
 import com.lightningkite.lightningdb.Modification
 import com.lightningkite.lightningdb.modification
 import com.lightningkite.lightningdb.simplify
+import com.lightningkite.lightningserver.TestSettings
 import org.junit.Test
 import kotlin.test.assertEquals
 
