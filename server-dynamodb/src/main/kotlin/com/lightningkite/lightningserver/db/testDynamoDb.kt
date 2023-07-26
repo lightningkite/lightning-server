@@ -54,7 +54,7 @@ fun embeddedDynamo(port: Int = 7999): DynamoDbAsyncClient {
     val raw = DynamoDbAsyncClient.builder()
         .region(Region.US_WEST_2)
         .endpointOverride(URI.create("http://localhost:$port"))
-        .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("dummy-key", "dummy-secret")))
+        .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("dummykey", "dummysecret")))
         .build()
     val newDynamo = object : DynamoDbAsyncClientDelegate(raw) {
         override fun close() {
