@@ -260,6 +260,7 @@ private val fromLightningServerPackage = setOf(
     "SortPart",
     "DataClassPath",
     "DataClassPathPartial",
+    "QueryPartial",
 )
 private val skipFromLsPackage = setOf(
     "Partial",
