@@ -6,6 +6,13 @@ export interface Query<T> {
     skip?: number;
     limit?: number;
 }
+export interface QueryPartial<T> {
+    fields: Array<DataClassPathPartial<T>>;
+    condition?: Condition<T>;
+    orderBy?: Array<SortPart<T>>;
+    skip?: number;
+    limit?: number;
+}
 export declare type SortPart<T> = (keyof T & string) | `-${keyof T & string}` | `~${keyof T & string}` | `-~${keyof T & string}`;
 export interface MassModification<T> {
     condition: Condition<T>;

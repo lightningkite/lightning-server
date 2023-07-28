@@ -1,10 +1,11 @@
 import { Condition } from "./Condition";
 import { Modification } from "./Modification";
-import { Query, MassModification, EntryChange, GroupCountQuery, AggregateQuery, GroupAggregateQuery } from "./otherModels";
+import { Query, MassModification, EntryChange, GroupCountQuery, AggregateQuery, GroupAggregateQuery, DeepPartial, QueryPartial } from "./otherModels";
 import { HasId } from "./sessionRest";
 export declare function mockRestEndpointFunctions<T extends HasId>(items: T[], label: string): {
     default(userToken?: string): Promise<T>;
     query(input: Query<T>, userToken?: string): Promise<Array<T>>;
+    queryPartial(input: QueryPartial<T>, userToken?: string): Promise<Array<DeepPartial<T>>>;
     detail(id: string, userToken?: string): Promise<T>;
     insertBulk(input: Array<T>, userToken?: string): Promise<Array<T>>;
     insert(input: T, userToken?: string): Promise<T>;

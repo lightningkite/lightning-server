@@ -51,6 +51,9 @@ function mockRestEndpointFunctions(items, label) {
             console.info(label, "query", { query: input, result });
             return Promise.resolve(result);
         },
+        queryPartial(input, userToken) {
+            return this.query(input, userToken);
+        },
         detail(id, userToken) {
             const result = items.find((item) => item._id === id);
             console.info(label, "detail", { id, result });
