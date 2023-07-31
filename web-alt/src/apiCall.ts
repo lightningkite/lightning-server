@@ -10,10 +10,31 @@ type PathImpl<T, K extends keyof T> =
 
 export type Path<T> = PathImpl<T, keyof T> | (keyof T & string);
 
-export function apiCall<T>(url: string, body: T, request: RequestInit, fileUploads?: Record<Path<T>, File>, responseInterceptors?: (x: Response)=>Response): Promise<Response> {
+let sfetch: (url: string, init?: RequestInit) => Promise<Response> = fetch
+export function systemFetch(): (url: string, init?: RequestInit) => Promise<Response> {
+    return sfetch
+}
+export function setSystemFetch(func: (url: string, init?: RequestInit) => Promise<Response>) {
+    sfetch = func
+}
+
+let syncResponseInterceptors: Array<(response: Response) => Response> = []
+let asyncResponseInterceptors: Array<(response: Response) => Promise<Response>> = []
+async function interceptors(response: Response): Promise<Response> {
+    let current = response
+    for(const f of syncResponseInterceptors) {
+        current = f(current)
+    }
+    for(const f of asyncResponseInterceptors) {
+        current = await f(current)
+    }
+    return current
+}
+
+export async function apiCall<T>(url: string, body: T, request: RequestInit, fileUploads?: Record<Path<T>, File>, responseInterceptors?: (x: Response)=>Response): Promise<Response> {
     let f: Promise<Response>
     if(fileUploads === undefined || Object.keys(fileUploads).length === 0) {
-        f = fetch(url, {
+        f = interceptors(await sfetch(url, {
             ...request,
             headers: {
                 ...request.headers,
@@ -21,21 +42,21 @@ export function apiCall<T>(url: string, body: T, request: RequestInit, fileUploa
                 "Accept": "application/json",
             },
             body: JSON.stringify(body)
-        })
+        }))
     } else {
         const data = new FormData()
         data.append("__json", JSON.stringify(body))
         for(const key in fileUploads) {
             data.append(key, fileUploads[key as Path<T>], fileUploads[key as Path<T>].name)
         }
-        f = fetch(url, {
+        f = interceptors(await sfetch(url, {
             ...request,
             headers: {
                 ...request.headers,
                 "Accept": "application/json",
             },
             body: data
-        })
+        }))
     }
     return f.then(x => {
         let response = responseInterceptors?.(x) ?? x
