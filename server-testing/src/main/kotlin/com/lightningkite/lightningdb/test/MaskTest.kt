@@ -9,6 +9,35 @@ class MaskTest {
         prepareModels()
     }
 
+    @Test fun mask() {
+        val model = LargeTestModel(
+            byte = 1,
+            short = 1,
+            int = 1,
+            long = 1,
+            float = 1f
+        )
+        val mask = mask<LargeTestModel> {
+            it.byte.mask(0, it.never)
+            it.short.mask(0, it.always)
+            it.int.mask(0, it.byte eq 1)
+            it.long.mask(0, it.byte neq 1)
+            it.float.mask(0f, it.string eq "test")
+        }
+        mask(model).also(::println)
+        val also = mask(
+            Partial<LargeTestModel>(
+                mutableMapOf(
+                    "byte" to 1.toByte(),
+                    "short" to 1.toShort(),
+                    "int" to 1.toInt(),
+                    "long" to 1.toLong(),
+                    "float" to 1f,
+                )
+            )
+        ).also(::println)
+    }
+
     @Test
     fun modification() {
         val matchingMod = modification<LargeTestModel> { it.embedded.value1 assign "" }

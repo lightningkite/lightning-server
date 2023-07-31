@@ -2,6 +2,7 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.IsCodableAndHashable
 import kotlinx.serialization.Serializable
+import org.slf4j.LoggerFactory
 
 @Serializable
 data class Mask<T>(
@@ -10,6 +11,9 @@ data class Mask<T>(
      */
     val pairs: List<Pair<Condition<T>, Modification<T>>> = listOf()
 ) {
+    companion object {
+        val logger = LoggerFactory.getLogger("com.lightningkite.lightningdb.Mask")
+    }
     operator fun invoke(on: T): T {
         var value = on
         for(pair in pairs) {
@@ -20,7 +24,8 @@ data class Mask<T>(
     operator fun invoke(on: Partial<T>): Partial<T> {
         var value = on
         for(pair in pairs) {
-            if(pair.first(on) == false) value = pair.second(value)
+            val evaluated = pair.first(on)
+            if(evaluated != true) value = pair.second(value)
         }
         return value
     }
@@ -61,6 +66,9 @@ data class Mask<T>(
         val pairs: ArrayList<Pair<Condition<T>, Modification<T>>> = ArrayList()
     ) {
         val it = path<T>()
+        fun <V> DataClassPath<T, V>.mask(value: V, unless: Condition<T> = Condition.Never()) {
+            pairs.add(unless to mapModification(Modification.Assign(value)))
+        }
         infix fun <V> DataClassPath<T, V>.maskedTo(value: V) = mapModification(Modification.Assign(value))
         infix fun Modification<T>.unless(condition: Condition<T>) {
             pairs.add(condition to this)
@@ -79,6 +87,21 @@ inline fun <T> mask(builder: Mask.Builder<T>.()->Unit): Mask<T> {
 
 operator fun <T> Condition<T>.invoke(map: Partial<T>): Boolean? {
     return when(this) {
+        is Condition.Always -> true
+        is Condition.Never -> false
+        is Condition.And -> {
+            val results = this.conditions.map { it(map) }
+            if(results.any { it == false }) false
+            else if(results.any { it == null }) null
+            else true
+        }
+        is Condition.Or -> {
+            val results = this.conditions.map { it(map) }
+            if(results.any { it == true }) true
+            else if(results.any { it == null }) null
+            else true
+        }
+        is Condition.Not -> condition(map)?.not()
         is Condition.OnField<*, *> -> if(map.parts.containsKey(key.name)) map.parts[key.name].let {
             if(it is Partial<*>) (condition as Condition<Any?>).invoke(map = it as Partial<Any?>)
             else (condition as Condition<Any?>)(it)
