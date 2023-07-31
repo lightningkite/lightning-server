@@ -678,6 +678,7 @@ internal fun handlers() {
             )
         },
         emit = {
+            if(!project.vpc) throw IllegalArgumentException("A VPC is required for ElastiCache for security purposes.")
             appendLine(
                 """
                 resource "aws_elasticache_cluster" "${key}" {

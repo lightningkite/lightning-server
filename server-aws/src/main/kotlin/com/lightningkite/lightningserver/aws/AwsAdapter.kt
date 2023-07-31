@@ -2,6 +2,8 @@ package com.lightningkite.lightningserver.aws
 
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler
+import com.lightningkite.lightningserver.SetOnce
+import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.setIfNotExists
 import com.lightningkite.lightningserver.compression.extensionForEngineCompression
 import com.lightningkite.lightningserver.core.ContentType
@@ -28,11 +30,7 @@ import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.websocket.QueryParamWebSocketHandler
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import com.lightningkite.lightningserver.websocket.WebSockets
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.http.content.*
-import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.future.await
 import kotlinx.serialization.Serializable
@@ -98,16 +96,18 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         }
 
         val region by lazy { Region.of(System.getenv("AWS_REGION")) }
-        private val wsCache by lazy {
-            DynamoDbCache(
-                { DynamoDbAsyncClient.builder().region(region).build() },
-                generalSettings().wsUrl.substringAfter("://")
-                    .substringBefore('?')
-                    .filter { it.isLetterOrDigit() || it == '_' || it == '.' || it == '-' }
-            )
+        var cache: () -> Cache by SetOnce {
+            val lazy = lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+                DynamoDbCache(
+                    { DynamoDbAsyncClient.builder().region(region).build() },
+                    generalSettings().wsUrl.substringAfter("://")
+                        .substringBefore('?')
+                        .filter { it.isLetterOrDigit() || it == '_' || it == '.' || it == '-' }
+                )
+            }
+            return@SetOnce { lazy.value }
         }
 
-        fun cache() = wsCache
         val configureEngine by lazy {
             engine = object : Engine {
                 val lambdaClient = LambdaAsyncClient.builder()
