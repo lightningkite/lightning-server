@@ -45,6 +45,7 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
             when (it.descriptor.kind) {
                 is StructureKind.CLASS -> {
                     if (it is MySealedClassSerializerInterface) return@forEach
+                    appendLine("@JsonSerializable()")
                     append("class ")
                     it.write().let { out.append(it) }
                     appendLine(" {")
@@ -140,10 +141,10 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
             appendLine("        var headers = parent.extraHeaders;")
             entry.authInfo.type?.let {
                 if (entry.authInfo.required) {
-                    appendLine("        headers[\"Authorization\"] = \"Bearer ${it.userTypeTokenName()}}\";")
+                    appendLine("        headers[\"Authorization\"] = \"Bearer $${it.userTypeTokenName()}\";")
                 } else {
                     appendLine("        if (${it.userTypeTokenName()} == null) {")
-                    appendLine("            headers[\"Authorization\"] = \"Bearer ${it.userTypeTokenName()}}\";")
+                    appendLine("            headers[\"Authorization\"] = \"Bearer $${it.userTypeTokenName()}\";")
                     appendLine("        }")
                 }
             }
@@ -151,7 +152,7 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
                 appendLine(
                     "        var response = await http.${
                         entry.route.method.toString().lowercase()
-                    }(url, headers: headers, body: ${entry.inputType.writeSerialize("input")});"
+                    }(url, headers: headers, body: jsonEncode(${entry.inputType.writeSerialize("input")}));"
                 )
             } else {
                 appendLine(
@@ -160,8 +161,8 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
                     }(url, headers: headers);"
                 )
             }
-            appendLine("        if (response.statusCode / 100 != 2) {")
-            appendLine("            throw response;")
+            appendLine("        if (response.statusCode ~/ 100 != 2) {")
+            appendLine("            throw \"${'$'}{response.statusCode} ${'$'}{response.body}\";")
             appendLine("        }")
             entry.outputType.takeUnless { it == Unit.serializer() }?.let {
                 appendLine("        return ${it.writeParse("response.body")};")
@@ -191,10 +192,10 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
         appendLine("        var headers = extraHeaders;")
         entry.authInfo.type?.let {
             if (entry.authInfo.required) {
-                appendLine("        headers[\"Authorization\"] = \"Bearer ${it.userTypeTokenName()}}\";")
+                appendLine("        headers[\"Authorization\"] = \"Bearer $${it.userTypeTokenName()}\";")
             } else {
                 appendLine("        if (${it.userTypeTokenName()} == null) {")
-                appendLine("            headers[\"Authorization\"] = \"Bearer ${it.userTypeTokenName()}}\";")
+                appendLine("            headers[\"Authorization\"] = \"Bearer $${it.userTypeTokenName()}\";")
                 appendLine("        }")
             }
         }
@@ -202,7 +203,7 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
             appendLine(
                 "        var response = await http.${
                     entry.route.method.toString().lowercase()
-                }(url, headers: headers, body: ${entry.inputType.writeSerialize("input")});"
+                }(url, headers: headers, body: jsonEncode(${entry.inputType.writeSerialize("input")}));"
             )
         } else {
             appendLine(
@@ -211,8 +212,8 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
                 }(url, headers: headers);"
             )
         }
-        appendLine("        if (response.statusCode / 100 != 2) {")
-        appendLine("            throw response;")
+        appendLine("        if (response.statusCode ~/ 100 != 2) {")
+        appendLine("            throw \"${'$'}{response.statusCode} ${'$'}{response.body}\";")
         appendLine("        }")
         entry.outputType.takeUnless { it == Unit.serializer() }?.let {
             appendLine("        return ${it.writeParse("response.body")};")
@@ -473,8 +474,8 @@ private fun KSerializer<*>.writeParse(on: String): String = StringBuilder().also
         }
 
         StructureKind.LIST -> {
-            if (descriptor.isNullable) out.append("($on as List<dynamic>?)?.") else out.append("($on as List<dynamic>).")
-            out.append("map((e) => ${this.listElement()!!.writeParse("e")}).toList()")
+            if (descriptor.isNullable) out.append("($on as List<dynamic>?)?.") else out.append("(jsonDecode($on) as List<dynamic>).")
+            out.append("map((e) => ${this.write().replace("List<", "").replace(">", "")}.fromJson(e)).toList()")
         }
 
         StructureKind.MAP -> {
@@ -492,7 +493,7 @@ private fun KSerializer<*>.writeParse(on: String): String = StringBuilder().also
         StructureKind.CLASS,
         -> {
             out.append(descriptor.simpleSerialName)
-            out.append(".fromJson($on as Map<String, dynamic>)")
+            out.append(".fromJson(jsonDecode($on) as Map<String, dynamic>)")
         }
     }
 }.toString()
