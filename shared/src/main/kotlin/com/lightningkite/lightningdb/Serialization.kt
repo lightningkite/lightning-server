@@ -45,7 +45,7 @@ object InstantSerializer : KSerializer<Instant> {
 
 object ZonedDateTimeSerializer : KSerializer<ZonedDateTime> {
     override fun deserialize(decoder: Decoder): ZonedDateTime = try {
-        ZonedDateTime.parse(decoder.decodeString())
+        ZonedDateTime.parse(decoder.decodeString(), DateTimeFormatter.ISO_ZONED_DATE_TIME)
     } catch (e: DateTimeParseException) {
         throw SerializationException(e.message)
     }
@@ -53,7 +53,7 @@ object ZonedDateTimeSerializer : KSerializer<ZonedDateTime> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("java.time.ZonedDateTime", PrimitiveKind.STRING)
 
-    override fun serialize(encoder: Encoder, value: ZonedDateTime) = encoder.encodeString(DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(value))
+    override fun serialize(encoder: Encoder, value: ZonedDateTime) = encoder.encodeString(DateTimeFormatter.ISO_ZONED_DATE_TIME.format(value))
 }
 
 object LocalDateSerializer : KSerializer<LocalDate> {
