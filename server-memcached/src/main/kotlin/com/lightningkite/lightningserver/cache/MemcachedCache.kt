@@ -8,6 +8,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import net.rubyeye.xmemcached.*
 import net.rubyeye.xmemcached.aws.AWSElasticCacheClient
+import net.rubyeye.xmemcached.exception.MemcachedException
+import net.rubyeye.xmemcached.exception.NoValueException
 import java.net.InetSocketAddress
 import java.time.Duration
 
@@ -77,14 +79,20 @@ class MemcachedCache(val client: MemcachedClient) : Cache, HealthCheckable {
         timeToLive: Duration?,
         modification: (T?) -> T?,
     ): Boolean = withContext(Dispatchers.IO) {
-        client.cas(key, timeToLive?.toSeconds()?.toInt() ?: Int.MAX_VALUE, object : CASOperation<String> {
-            override fun getMaxTries(): Int = maxTries
-            override fun getNewValue(currentCAS: Long, currentValue: String?): String? {
-                return currentValue?.let { Serialization.Internal.json.decodeFromString(serializer, it) }
-                    .let(modification)
-                    ?.let { Serialization.Internal.json.encodeToString(serializer, it) }
-            }
-        })
+        try {
+            client.cas(key, timeToLive?.toSeconds()?.toInt() ?: Int.MAX_VALUE, object : CASOperation<String> {
+                override fun getMaxTries(): Int = maxTries
+                override fun getNewValue(currentCAS: Long, currentValue: String?): String? {
+                    return currentValue?.let { Serialization.Internal.json.decodeFromString(serializer, it) }
+                        .let(modification)
+                        ?.let { Serialization.Internal.json.encodeToString(serializer, it) }
+                }
+            })
+        } catch(e: NoValueException) {
+            val value = modification(null) ?: return@withContext false
+            set(key, value, serializer, timeToLive)
+            true
+        }
     }
 
     override suspend fun add(key: String, value: Int, timeToLive: Duration?) = withContext(Dispatchers.IO) {

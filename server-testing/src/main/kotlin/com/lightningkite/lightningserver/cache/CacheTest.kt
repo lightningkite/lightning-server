@@ -31,6 +31,10 @@ abstract class CacheTest {
             cache.setIfNotExists(key, 2)
             cache.setIfNotExists(key, 3)
             assertEquals(2, cache.get<Int>(key))
+
+            cache.remove(key)
+            assertTrue(cache.modify<Int>(key) { it?.plus(1) ?: 0 })
+            assertEquals(0, cache.get<Int>(key))
         }
     }
 
