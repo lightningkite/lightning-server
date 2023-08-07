@@ -5,6 +5,8 @@ import kotlinx.serialization.StringFormat
 import kotlinx.serialization.builtins.ListSerializer
 import java.io.Closeable
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.*
 
 /**
@@ -41,7 +43,7 @@ class InMemoryUnsafePersistentFieldCollection<Model : Any>(
     override fun close() {
         val temp = file.parentFile!!.resolve(file.name + ".saving")
         temp.writeText(encoding.encodeToString(ListSerializer(serializer), data.toList()))
-        temp.renameTo(file)
+        Files.move(temp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE)
         logger.debug("Saved $file")
     }
 }
