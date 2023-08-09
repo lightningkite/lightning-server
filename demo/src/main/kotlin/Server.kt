@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.*
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.email.SesClient
+import com.lightningkite.lightningserver.exceptions.SentryExceptionReporter
 import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.files.S3FileSystem
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
@@ -52,6 +53,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         DynamoDbCache
         MongoDatabase
         MemcachedCache
+        SentryExceptionReporter
         S3FileSystem
         prepareModels()
         Tasks.onSettingsReady {
@@ -181,6 +183,11 @@ object Server : ServerPathGroup(ServerPath.root) {
         println("Checking for internet...")
         val response = client.get("https://lightningkite.com")
         HttpResponse.plainText("Got status ${response.status}")
+    }
+
+    val dieSlowly = path("die-slowly").get.handler {
+        Thread.sleep(60_000L)
+        HttpResponse.plainText("Impossible.")
     }
 
     val multiplex = path("multiplex").websocket(MultiplexWebSocketHandler(cache))

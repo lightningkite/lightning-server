@@ -25,6 +25,7 @@ dependencies {
     api(project(":server-redis"))
     api(project(":server-dynamodb"))
     api(project(":server-postgresql"))
+    api(project(":server-sentry"))
 }
 
 ksp {

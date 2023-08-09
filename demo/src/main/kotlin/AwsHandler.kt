@@ -13,6 +13,7 @@ class AwsHandler : AwsAdapter() {
     companion object {
         init {
             Server
+            preventLambdaTimeoutReuse = true
             loadSettings(AwsHandler::class.java)
         }
     }

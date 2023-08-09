@@ -56,6 +56,8 @@ import java.net.URI
 import java.time.Duration
 import java.util.*
 import org.crac.Resource
+import java.util.concurrent.TimeoutException
+import kotlin.system.exitProcess
 
 
 abstract class AwsAdapter : RequestStreamHandler, Resource {
@@ -67,6 +69,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(AwsAdapter::class.java)
+        var preventLambdaTimeoutReuse: Boolean = false
 
         fun loadSettings(jclass: Class<*>) {
             logger.debug("Loading settings...")
@@ -176,43 +179,40 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
     }
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context) {
-        runBlocking {
+        try {
             val asJson = Serialization.json.parseToJsonElement(input.reader().readText()) as JsonObject
-            try {
+            val response: APIGatewayV2HTTPResponse = blockingTimeout(context.remainingTimeInMillis - 5_000L) {
                 when {
-                    asJson.containsKey("taskName") -> Serialization.json.encodeToStream(
-                        handleTask(
-                            Serialization.json.decodeFromJsonElement(
-                                TaskInvoke.serializer(),
-                                asJson
-                            )
-                        ), output
+                    asJson.containsKey("taskName") -> handleTask(
+                        Serialization.json.decodeFromJsonElement(
+                            TaskInvoke.serializer(),
+                            asJson
+                        )
                     )
 
-                    asJson.containsKey("httpMethod") -> Serialization.json.encodeToStream(
-                        handleHttp(
-                            Serialization.json.decodeFromJsonElement<APIGatewayV2HTTPEvent>(
-                                asJson
-                            )
-                        ), output
+                    asJson.containsKey("httpMethod") -> handleHttp(
+                        Serialization.json.decodeFromJsonElement<APIGatewayV2HTTPEvent>(
+                            asJson
+                        )
                     )
 
-                    asJson["requestContext"]?.jsonObject?.containsKey("connectionId") == true -> Serialization.json.encodeToStream(
-                        handleWebsocket(Serialization.json.decodeFromJsonElement<APIGatewayV2WebsocketRequest>(asJson)),
-                        output
+                    asJson["requestContext"]?.jsonObject?.containsKey("connectionId") == true -> handleWebsocket(
+                        Serialization.json.decodeFromJsonElement<APIGatewayV2WebsocketRequest>(asJson)
                     )
 
                     asJson.containsKey("scheduled") -> {
                         val parsed: Scheduled = Serialization.json.decodeFromJsonElement(asJson)
                         val schedule =
-                            Scheduler.schedules[parsed.scheduled] ?: return@runBlocking APIGatewayV2HTTPResponse(
-                                statusCode = 404,
-                                body = "No schedule '${parsed.scheduled}' found"
-                            )
+                            Scheduler.schedules[parsed.scheduled]
+                                ?: return@blockingTimeout APIGatewayV2HTTPResponse(
+                                    statusCode = 404,
+                                    body = "No schedule '${parsed.scheduled}' found"
+                                )
                         try {
                             Metrics.handlerPerformance(schedule) {
                                 schedule.handler()
                             }
+                            APIGatewayV2HTTPResponse(statusCode = 200)
                         } catch (e: Exception) {
                             e.report(schedule)
                             APIGatewayV2HTTPResponse(statusCode = 500)
@@ -223,10 +223,11 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     asJson.containsKey("panic") -> {
                         try {
                             logger.info("Activating the panic shutdown...")
-                            val result = LambdaAsyncClient.builder().region(region).build().putFunctionConcurrency {
-                                it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
-                                it.reservedConcurrentExecutions(0)
-                            }.await()
+                            val result =
+                                LambdaAsyncClient.builder().region(region).build().putFunctionConcurrency {
+                                    it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+                                    it.reservedConcurrentExecutions(0)
+                                }.await()
                             logger.info("Panic got code ${result.sdkHttpResponse().statusCode()}")
                             assert(result.sdkHttpResponse().isSuccessful)
                             APIGatewayV2HTTPResponse(statusCode = 200)
@@ -237,12 +238,24 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     }
 
                     else -> {
-                        asJson.jankMeADataClass("Something")
+                        APIGatewayV2HTTPResponse(
+                            statusCode = 500,
+                            body = "No response available for the handler"
+                        )
                     }
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                e.report(asJson)
+            }
+            Serialization.json.encodeToStream(response, output)
+            output.flush()
+        } catch (e: Exception) {
+            val ex = Exception("Full lambda failure", e)
+            ex.printStackTrace()
+            runBlocking {
+                ex.report()
+            }
+            if(preventLambdaTimeoutReuse) {
+                println("Killing self to prevent potentially broken reuse.  To disable this, set AwsAdapter.preventLambdaTimeoutReuse to false.")
+                exitProcess(1)
             }
         }
     }
@@ -342,7 +355,8 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 HttpContent.Text(raw, headers.contentType ?: ContentType.Text.Plain)
         }
         val queryParams =
-            (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
+            (event.multiValueQueryStringParameters
+                ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
 
         return when (event.requestContext.routeKey) {
             "\$connect" -> {
@@ -378,7 +392,10 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     rootWs.message(lkEvent)
                     APIGatewayV2HTTPResponse(200)
                 } catch (e: Exception) {
-                    try { lkEvent.id.close() } catch(e: Exception) { /*squish*/ }
+                    try {
+                        lkEvent.id.close()
+                    } catch (e: Exception) { /*squish*/
+                    }
                     handleWsDisconnect(event.requestContext.connectionId)
                     APIGatewayV2HTTPResponse(500, body = Serialization.json.encodeToString(e.message ?: ""))
                 }
@@ -413,7 +430,8 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 HttpContent.Text(raw, headers.contentType ?: ContentType.Text.Plain)
         }
         val queryParams =
-            (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
+            (event.multiValueQueryStringParameters
+                ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
 
         val match = Http.matcher.match(path, method) ?: run {
             if (method == HttpMethod.OPTIONS) {
