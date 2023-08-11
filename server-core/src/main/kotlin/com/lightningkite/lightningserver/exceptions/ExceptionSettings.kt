@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.exceptions
 
+import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.settings.Pluggable
 import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.Serializable
@@ -17,6 +18,12 @@ data class ExceptionSettings(
         init {
             ExceptionSettings.register("debug") { DebugExceptionReporter }
             ExceptionSettings.register("none") { NoExceptionReporter }
+            ExceptionSettings.register("grouped-db") {
+                val options = it.url.substringAfter("://")
+                val db = options.substringBefore('|')
+                val packageName = options.substringAfter('|')
+                GroupedDatabaseExceptionReporter(packageName, DatabaseSettings(db))
+            }
         }
     }
 

@@ -35,10 +35,14 @@ class MetaEndpoints<USER>(
     packageName: String = "com.mypackage",
     isAdmin: suspend (USER) -> Boolean,
 ) : ServerPathGroup(path) {
+    companion object {
+        var isAdministrator: suspend (Any?) -> Boolean = { false }
+    }
     init {
         Metrics.shouldAllowAccess = {
             isAdmin(authInfo.tryCast(it.rawUser()) as USER)
         }
+        isAdministrator = { isAdmin(authInfo.tryCast(it) as USER) }
     }
 
     val root = get.handler {
