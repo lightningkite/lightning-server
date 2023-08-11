@@ -8,6 +8,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> Mo
     crossinline getCollection: () -> FieldCollection<T>,
     crossinline forUser: suspend FieldCollection<T>.(user: USER) -> FieldCollection<T>,
     crossinline defaultItem: suspend (user: USER) -> T,
+    crossinline exampleItem: ()->T? = { null },
     modelName: String = serializer<T>().descriptor.serialName.substringBefore('<').substringAfterLast('.')
 ) = object : ModelInfoWithDefault<USER, T, ID> {
     override val collectionName: String = modelName
@@ -17,6 +18,7 @@ inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> Mo
         this.collection().forUser(user)
 
     override val serialization: ModelSerializationInfo<USER, T, ID> = ModelSerializationInfo()
+    override fun exampleItem(): T? = exampleItem()
 }
 
 fun <USER, T : HasId<ID>, ID : Comparable<ID>> ModelInfoWithDefault(
@@ -24,6 +26,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ModelInfoWithDefault(
     getCollection: () -> FieldCollection<T>,
     forUser: suspend FieldCollection<T>.(user: USER) -> FieldCollection<T>,
     defaultItem: suspend (user: USER) -> T,
+    exampleItem: ()->T? = { null },
     modelName: String = serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
 ) = object : ModelInfoWithDefault<USER, T, ID> {
     override val collectionName: String = modelName
@@ -33,8 +36,10 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ModelInfoWithDefault(
         this.collection().forUser(user)
 
     override val serialization: ModelSerializationInfo<USER, T, ID> = serialization
+    override fun exampleItem(): T? = exampleItem()
 }
 
 interface ModelInfoWithDefault<USER, T : HasId<ID>, ID : Comparable<ID>> : ModelInfo<USER, T, ID> {
-    abstract suspend fun defaultItem(user: USER): T
+    suspend fun defaultItem(user: USER): T
+    fun exampleItem(): T? = null
 }

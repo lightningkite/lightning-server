@@ -25,7 +25,7 @@ class PinHandlerTest {
     fun test() {
         runBlocking {
             val pin = PinHandler({ LocalCache }, "test")
-            pin.generate("test")
+            pin.establish("test")
             repeat(pin.maxAttempts - 1) {
                 assertException<BadRequestException>(
                     action = { pin.assert("test", "wrong") },
@@ -36,7 +36,7 @@ class PinHandlerTest {
                 action = { pin.assert("test", "wrong") },
                 verify = { it.detail == "pin-expired" }
             )
-            val expected = pin.generate("test")
+            val expected = pin.establish("test")
             pin.assert("test", expected)
         }
     }
@@ -45,7 +45,7 @@ class PinHandlerTest {
     fun testChar() {
         runBlocking {
             val pin = PinHandler({ LocalCache }, "test", availableCharacters = ('A' .. 'Z').toList())
-            pin.generate("test")
+            pin.establish("test")
             repeat(pin.maxAttempts - 1) {
                 assertException<BadRequestException>(
                     action = { pin.assert("test", "wrong") },
@@ -56,7 +56,7 @@ class PinHandlerTest {
                 action = { pin.assert("test", "wrong") },
                 verify = { it.detail == "pin-expired" }
             )
-            val expected = pin.generate("test")
+            val expected = pin.establish("test")
             pin.assert("test", expected)
         }
     }
@@ -65,7 +65,7 @@ class PinHandlerTest {
     fun testMixed() {
         runBlocking {
             val pin = PinHandler({ LocalCache }, "test", availableCharacters = ('a' .. 'z').toList() + ('A' .. 'Z').toList())
-            pin.generate("test")
+            pin.establish("test")
             repeat(pin.maxAttempts - 1) {
                 assertException<BadRequestException>(
                     action = { pin.assert("test", "wrong") },
@@ -76,7 +76,7 @@ class PinHandlerTest {
                 action = { pin.assert("test", "wrong") },
                 verify = { it.detail == "pin-expired" }
             )
-            val expected = pin.generate("test")
+            val expected = pin.establish("test")
             pin.assert("test", expected)
         }
     }

@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.ApiEndpoint0
+import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
 import java.time.Duration
@@ -65,13 +66,25 @@ open class EmailAuthEndpoints<USER : Any, ID>(
     )
     val loginEmail = path("login-email").post.typed(
         summary = "Email Login Link",
-        description = "Sends a login email to the given address",
+        description = "Sends a login email to the given address.  The email will contain both a link to instantly log in and a PIN that can be entered to log in.",
         errorCases = listOf(),
+        examples = listOf(
+            ApiExample(
+                input = "test@test.com",
+                output = Unit,
+            ),
+            ApiExample(
+                input = "TeSt@tEsT.CoM ",
+                output = Unit,
+                name = "Casing doesn't matter",
+                notes = "The casing of the email address is ignored, and the input is trimmed."
+            ),
+        ),
         successCode = HttpStatus.NoContent,
         implementation = { user: Unit, addressUnsafe: String ->
-            val address = addressUnsafe.lowercase()
+            val address = addressUnsafe.lowercase().trim()
             val jwt = base.token(emailAccess.byEmail(address), base.jwtSigner().emailExpiration)
-            val pin = pin.generate(address)
+            val pin = pin.establish(address)
             val link = "${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$jwt"
             email().send(
                 Email(
@@ -86,11 +99,12 @@ open class EmailAuthEndpoints<USER : Any, ID>(
     )
     val loginEmailPin = path("login-email-pin").post.typed(
         summary = "Email PIN Login",
-        description = "Logs in to the given email with a PIN",
+        description = "Logs in to the given account with a PIN that was provided in an email sent earlier.  Note that the PIN expires in ${pinExpiration.toMinutes()} minutes, and you are only permitted ${pinMaxAttempts} attempts.",
         errorCases = listOf(),
+        examples = listOf(ApiExample(input = EmailPinLogin("test@test.com", pin.generate()), output = "jwt.jwt.jwt")),
         successCode = HttpStatus.OK,
         implementation = { anon: Unit, input: EmailPinLogin ->
-            val email = input.email.lowercase()
+            val email = input.email.lowercase().trim()
             pin.assert(email, input.pin)
             base.token(emailAccess.byEmail(email))
         }
@@ -99,14 +113,17 @@ open class EmailAuthEndpoints<USER : Any, ID>(
     val oauthSettings = OauthProviderInfo.all.map {
         it.settings.defineOptional("oauth_${it.identifierName}")
     }
+
     data class OauthEndpointSet(
         val loginRedirect: HttpEndpoint,
         val loginApi: ApiEndpoint0<Unit, Unit, String>,
         val callback: OauthCallbackEndpoint<UUID>,
     )
+
     val oauthEndpointPairs by lazy {
         OauthProviderInfo.all.zip(oauthSettings).mapNotNull {
             val rawCreds = it.second() ?: return@mapNotNull null
+
             @Suppress("UNCHECKED_CAST")
             val credRead = (it.first.settings as OauthProviderInfo.SettingInfo<Any>).read
             val callback = path("oauth/${it.first.pathName}/callback").oauthCallback<UUID>(
@@ -123,7 +140,14 @@ open class EmailAuthEndpoints<USER : Any, ID>(
             }
             val loginApi = path("oauth/${it.first}/login").get.typed(
                 summary = "Log In via ${it.first.niceName}",
+                description = "Returns a URL which, when opened in a browser, will allow you to log into the system with ${it.first.niceName}.",
                 errorCases = listOf(),
+                examples = listOf(
+                    ApiExample(
+                        Unit,
+                        "${it.first.loginUrl}?someparams=x"
+                    )
+                ),
                 implementation = { anon: Unit, _: Unit ->
                     callback.loginUrl(UUID.randomUUID())
                 }
@@ -135,43 +159,6 @@ open class EmailAuthEndpoints<USER : Any, ID>(
             )
         }
     }
-//    val oauthGoogleSettings = setting<OauthProviderCredentials?>("oauth_google", null, optional = true)
-//    val oauthGithubSettings = setting<OauthProviderCredentials?>("oauth_github", null, optional = true)
-//    val oauthAppleSettings = setting<OauthProviderCredentialsApple?>("oauth_apple", null, optional = true)
-//    val oauthMicrosoftSettings = setting<OauthProviderCredentials?>("oauth_microsoft", null, optional = true)
-//
-//    private val oauthGoogle: OauthPairEndpoints? by lazy {
-//        oauthGoogleSettings()?.let {
-//            OauthPairEndpoints(
-//                path = path("oauth/google"),
-//                oauthProviderInfo = OauthProviderInfo.google
-//            )
-//        }
-//    }
-//    private val oauthGithub: OauthPairEndpoints? by lazy {
-//        oauthGithubSettings()?.let {
-//            OauthPairEndpoints(
-//                path = path("oauth/github"),
-//                oauthProviderInfo = OauthProviderInfo.google
-//            )
-//        }
-//    }
-//    private val oauthApple: OauthPairEndpoints? by lazy {
-//        oauthAppleSettings()?.let {
-//            OauthPairEndpoints(
-//                path = path("oauth/apple"),
-//                oauthProviderInfo = OauthProviderInfo.google
-//            )
-//        }
-//    }
-//    private val oauthMicrosoft: OauthPairEndpoints? by lazy {
-//        oauthMicrosoftSettings()?.let {
-//            OauthPairEndpoints(
-//                path = path("oauth/microsoft"),
-//                oauthProviderInfo = OauthProviderInfo.google
-//            )
-//        }
-//    }
 
     init {
         Tasks.onSettingsReady {
@@ -198,7 +185,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
     val loginEmailHtmlPost = path("login-email/form-post/").post.handler {
         val email = it.body!!.text().split('&')
             .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
-            .get("email")!!.lowercase()
+            .get("email")!!.lowercase().trim()
         val basis = try {
             loginEmail.implementation(Unit, email)
         } catch (e: Exception) {
@@ -223,11 +210,11 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         )
     }
     val loginEmailPinHtmlPost = path("login-email/form-post-code/").post.handler {
-        val basis = try {
+        val basis: String = try {
             val content = it.body!!.text().split('&')
                 .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
-            val pin = content.get("pin")!!
-            val email = content.get("email")!!.lowercase()
+            val pin = content.get("pin")!!.trim()
+            val email = content.get("email")!!.lowercase().trim()
             loginEmailPin.implementation(Unit, EmailPinLogin(email, pin))
         } catch (e: Exception) {
             e.printStackTrace()

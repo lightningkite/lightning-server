@@ -27,12 +27,20 @@ interface ApiEndpoint<USER, INPUT : Any, OUTPUT> : Documentable, (suspend (HttpR
     val successCode: HttpStatus
     val errorCases: List<LSError>
     val routeTypes: Map<String, KSerializer<*>>
+    val examples: List<ApiExample<INPUT, OUTPUT>>
 
     override val path: ServerPath
         get() = route.path
 
     suspend fun invokeAny(user: USER, input: INPUT, routes: Map<String, Any?>): OUTPUT
 }
+
+data class ApiExample<INPUT, OUTPUT>(
+    val input: INPUT,
+    val output: OUTPUT,
+    val name: String = "Example",
+    val notes: String? = null,
+)
 
 data class ApiEndpoint0<USER, INPUT : Any, OUTPUT>(
     override val route: HttpEndpoint,
@@ -43,6 +51,7 @@ data class ApiEndpoint0<USER, INPUT : Any, OUTPUT>(
     override val description: String = summary,
     override val successCode: HttpStatus = HttpStatus.OK,
     override val errorCases: List<LSError>,
+    override val examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
     val implementation: suspend (user: USER, input: INPUT) -> OUTPUT
 ) : ApiEndpoint<USER, INPUT, OUTPUT> {
     override val routeTypes: Map<String, KSerializer<*>> get() = mapOf()
@@ -72,6 +81,7 @@ data class ApiEndpoint1<USER, PATH : Comparable<PATH>, INPUT : Any, OUTPUT>(
     override val description: String = summary,
     override val successCode: HttpStatus = HttpStatus.OK,
     override val errorCases: List<LSError>,
+    override val examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
     val implementation: suspend (user: USER, path: PATH, input: INPUT) -> OUTPUT
 ) : ApiEndpoint<USER, INPUT, OUTPUT> {
     override val routeTypes: Map<String, KSerializer<*>> = mapOf(pathName to pathType)
@@ -107,6 +117,7 @@ data class ApiEndpoint2<USER, PATH : Comparable<PATH>, PATH2 : Comparable<PATH2>
     override val description: String = summary,
     override val successCode: HttpStatus = HttpStatus.OK,
     override val errorCases: List<LSError>,
+    override val examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
     val implementation: suspend (user: USER, path: PATH, path2: PATH2, input: INPUT) -> OUTPUT
 ) : ApiEndpoint<USER, INPUT, OUTPUT> {
     override val routeTypes: Map<String, KSerializer<*>> = mapOf(pathName to pathType, path2Name to path2Type)
@@ -144,6 +155,7 @@ data class ApiEndpointX<USER, INPUT : Any, OUTPUT>(
     override val successCode: HttpStatus = HttpStatus.OK,
     override val errorCases: List<LSError>,
     override val routeTypes: Map<String, KSerializer<*>>,
+    override val examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
     val implementation: suspend (user: USER, input: INPUT, pathSegments: Map<String, Any?>) -> OUTPUT
 ) : ApiEndpoint<USER, INPUT, OUTPUT> {
     override suspend fun invokeAny(user: USER, input: INPUT, routes: Map<String, Any?>) =
@@ -189,7 +201,8 @@ private fun String.parseUrlPartOrBadRequestUntyped(serializer: KSerializer<*>): 
 inline fun <reified USER, reified INPUT : Any, reified OUTPUT> HttpEndpoint.typed(
     summary: String,
     description: String = summary,
-    errorCases: List<LSError>,
+    errorCases: List<LSError> = listOf(),
+    examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
     routeTypes: Map<String, KSerializer<*>>,
     successCode: HttpStatus = HttpStatus.OK,
     noinline implementation: suspend (user: USER, input: INPUT, pathSegments: Map<String, Any?>) -> OUTPUT
@@ -200,6 +213,7 @@ inline fun <reified USER, reified INPUT : Any, reified OUTPUT> HttpEndpoint.type
     summary = summary,
     description = description,
     errorCases = errorCases,
+    examples = examples,
     routeTypes = routeTypes,
     successCode = successCode,
     implementation = implementation
@@ -215,7 +229,8 @@ fun <USER, INPUT : Any, OUTPUT> HttpEndpoint.typed(
     outputType: KSerializer<OUTPUT>,
     summary: String,
     description: String = summary,
-    errorCases: List<LSError>,
+    errorCases: List<LSError> = listOf(),
+    examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
     routeTypes: Map<String, KSerializer<*>> = mapOf(),
     successCode: HttpStatus = HttpStatus.OK,
     implementation: suspend (user: USER, input: INPUT, pathSegments: Map<String, Any?>) -> OUTPUT
@@ -226,6 +241,7 @@ fun <USER, INPUT : Any, OUTPUT> HttpEndpoint.typed(
         description = description,
         successCode = successCode,
         errorCases = errorCases,
+        examples = examples,
         routeTypes = routeTypes,
         inputType = inputType,
         outputType = outputType,
@@ -244,7 +260,8 @@ fun <USER, INPUT : Any, OUTPUT> HttpEndpoint.typed(
 inline fun <reified USER, reified INPUT : Any, reified OUTPUT> HttpEndpoint.typed(
     summary: String,
     description: String = summary,
-    errorCases: List<LSError>,
+    errorCases: List<LSError> = listOf(),
+    examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
     successCode: HttpStatus = HttpStatus.OK,
     noinline implementation: suspend (user: USER, input: INPUT) -> OUTPUT
 ): ApiEndpoint0<USER, INPUT, OUTPUT> = typed(
@@ -254,6 +271,7 @@ inline fun <reified USER, reified INPUT : Any, reified OUTPUT> HttpEndpoint.type
     summary = summary,
     description = description,
     errorCases = errorCases,
+    examples = examples,
     successCode = successCode,
     implementation = implementation
 )
@@ -268,7 +286,8 @@ fun <USER, INPUT : Any, OUTPUT> HttpEndpoint.typed(
     outputType: KSerializer<OUTPUT>,
     summary: String,
     description: String = summary,
-    errorCases: List<LSError>,
+    errorCases: List<LSError> = listOf(),
+    examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
     successCode: HttpStatus = HttpStatus.OK,
     implementation: suspend (user: USER, input: INPUT) -> OUTPUT
 ): ApiEndpoint0<USER, INPUT, OUTPUT> {
@@ -280,6 +299,7 @@ fun <USER, INPUT : Any, OUTPUT> HttpEndpoint.typed(
         summary = summary,
         description = description,
         errorCases = errorCases,
+        examples = examples,
         successCode = successCode,
         implementation = implementation
     )
@@ -295,7 +315,8 @@ fun <USER, INPUT : Any, OUTPUT> HttpEndpoint.typed(
 inline fun <reified USER, reified INPUT : Any, reified OUTPUT, reified ROUTE : Comparable<ROUTE>> HttpEndpoint.typed(
     summary: String,
     description: String = summary,
-    errorCases: List<LSError>,
+    errorCases: List<LSError> = listOf(),
+    examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
     successCode: HttpStatus = HttpStatus.OK,
     noinline implementation: suspend (user: USER, route: ROUTE, input: INPUT) -> OUTPUT
 ): ApiEndpoint1<USER, ROUTE, INPUT, OUTPUT> {
@@ -307,6 +328,7 @@ inline fun <reified USER, reified INPUT : Any, reified OUTPUT, reified ROUTE : C
         summary = summary,
         description = description,
         errorCases = errorCases,
+        examples = examples,
         successCode = successCode,
         implementation = implementation
     )
@@ -323,7 +345,8 @@ fun <USER, INPUT : Any, OUTPUT, ROUTE : Comparable<ROUTE>> HttpEndpoint.typed(
     pathType: KSerializer<ROUTE>,
     summary: String,
     description: String = summary,
-    errorCases: List<LSError>,
+    errorCases: List<LSError> = listOf(),
+    examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
     successCode: HttpStatus = HttpStatus.OK,
     implementation: suspend (user: USER, route: ROUTE, input: INPUT) -> OUTPUT
 ): ApiEndpoint1<USER, ROUTE, INPUT, OUTPUT> {
@@ -336,6 +359,7 @@ fun <USER, INPUT : Any, OUTPUT, ROUTE : Comparable<ROUTE>> HttpEndpoint.typed(
         summary = summary,
         description = description,
         errorCases = errorCases,
+        examples = examples,
         successCode = successCode,
         implementation = implementation,
         pathName = segmentNames[0],
@@ -353,7 +377,8 @@ fun <USER, INPUT : Any, OUTPUT, ROUTE : Comparable<ROUTE>> HttpEndpoint.typed(
 inline fun <reified USER, reified INPUT : Any, reified OUTPUT, reified ROUTE : Comparable<ROUTE>, reified ROUTE2 : Comparable<ROUTE2>> HttpEndpoint.typed(
     summary: String,
     description: String = summary,
-    errorCases: List<LSError>,
+    errorCases: List<LSError> = listOf(),
+    examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
     successCode: HttpStatus = HttpStatus.OK,
     noinline implementation: suspend (user: USER, route: ROUTE, route2: ROUTE2, input: INPUT) -> OUTPUT
 ): ApiEndpoint2<USER, ROUTE, ROUTE2, INPUT, OUTPUT> {
@@ -366,6 +391,7 @@ inline fun <reified USER, reified INPUT : Any, reified OUTPUT, reified ROUTE : C
         summary = summary,
         description = description,
         errorCases = errorCases,
+        examples = examples,
         successCode = successCode,
         implementation = implementation
     )
@@ -383,7 +409,8 @@ fun <USER, INPUT : Any, OUTPUT, ROUTE : Comparable<ROUTE>, ROUTE2 : Comparable<R
     path2Type: KSerializer<ROUTE2>,
     summary: String,
     description: String = summary,
-    errorCases: List<LSError>,
+    errorCases: List<LSError> = listOf(),
+    examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
     successCode: HttpStatus = HttpStatus.OK,
     implementation: suspend (user: USER, route: ROUTE, route2: ROUTE2, input: INPUT) -> OUTPUT
 ): ApiEndpoint2<USER, ROUTE, ROUTE2, INPUT, OUTPUT> {
@@ -396,6 +423,7 @@ fun <USER, INPUT : Any, OUTPUT, ROUTE : Comparable<ROUTE>, ROUTE2 : Comparable<R
         summary = summary,
         description = description,
         errorCases = errorCases,
+        examples = examples,
         successCode = successCode,
         implementation = implementation,
         pathName = segmentNames[0],

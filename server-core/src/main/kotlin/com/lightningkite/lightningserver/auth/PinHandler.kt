@@ -22,16 +22,21 @@ open class PinHandler(
     }
     private fun attemptCacheKey(uniqueIdentifier: String): String = "${keyPrefix}_pin_login_attempts_$uniqueIdentifier"
     private fun cacheKey(uniqueIdentifier: String): String = "${keyPrefix}_pin_login_$uniqueIdentifier"
-    suspend fun generate(uniqueIdentifier: String): String {
+    suspend fun establish(uniqueIdentifier: String): String {
+        val fixedPin = generate()
+        cache().set(cacheKey(uniqueIdentifier), fixedPin.secureHash(), expiration)
+        cache().set(attemptCacheKey(uniqueIdentifier), 0, expiration)
+        return fixedPin
+    }
+
+    fun generate(): String {
         val r = SecureRandom()
         var pin = ""
         do {
             pin = String(CharArray(length) { availableCharacters.get(r.nextInt(availableCharacters.size)) })
         } while (BadWordList.detectParanoid(pin))
-        val fixedPin = if(mixedCaseMode) pin else pin.lowercase()
-        cache().set(cacheKey(uniqueIdentifier), fixedPin.secureHash(), expiration)
-        cache().set(attemptCacheKey(uniqueIdentifier), 0, expiration)
-        return pin
+        val fixedPin = if (mixedCaseMode) pin else pin.lowercase()
+        return fixedPin
     }
 
     suspend fun assert(uniqueIdentifier: String, pin: String) {

@@ -28,6 +28,7 @@ import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.tasks.startupOnce
 import com.lightningkite.lightningserver.tasks.task
+import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.typed
 import com.lightningkite.lightningserver.websocket.MultiplexWebSocketHandler
 import com.lightningkite.lightningserver.websocket.websocket
@@ -169,6 +170,14 @@ object Server : ServerPathGroup(ServerPath.root) {
         summary = "Get Test Primitive",
         errorCases = listOf(),
         implementation = { user: User?, input: Unit -> "42 is great" }
+    )
+    val testObject = path("test-object").get.typed(
+        summary = "Get Test Object",
+        errorCases = listOf(),
+        examples = listOf(ApiExample(input = Unit, output = TestModel())),
+        implementation = { user: User?, input: Unit ->
+            TestModel()
+        }
     )
     val die = path("die").get.handler { throw Exception("OUCH") }
 

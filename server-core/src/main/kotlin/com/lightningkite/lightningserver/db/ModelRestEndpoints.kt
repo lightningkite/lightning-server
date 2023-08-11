@@ -8,12 +8,17 @@ import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.routes.docName
+import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.serializer
+import kotlin.random.Random
 
 open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     path: ServerPath,
@@ -31,14 +36,52 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         all.add(this)
     }
 
+    private fun exampleItem(): T? = (info as? ModelInfoWithDefault<USER, T, ID>)?.exampleItem()
+    private fun sampleConditions(): List<Condition<T>> {
+        return try {
+            val sample = exampleItem() ?: return listOf(Condition.Always())
+            listOf(Condition.Always<T>()) + info.serialization.serializer.attemptGrabFields().entries
+                .take(3)
+                .map { Condition.OnField(it.value, Condition.Equal(it.value.get(sample))) }
+        } catch (e: Exception) {
+            listOf(Condition.Always())
+        }
+    }
+
+    private fun sampleModifications(): List<Modification<T>> {
+        return try {
+            val sample = exampleItem() ?: return emptyList()
+            info.serialization.serializer.attemptGrabFields().entries
+                .filter { it.key != "_id" }
+                .take(3)
+                .map { Modification.OnField(it.value, Modification.Assign(it.value.get(sample))) }
+        } catch (e: Exception) {
+            listOf()
+        }
+    }
+
+    private fun sampleSorts(): List<List<SortPart<T>>> {
+        return try {
+            val sample = exampleItem() ?: return emptyList()
+            info.serialization.serializer.attemptGrabFields().entries
+                .filter { Serialization.Internal.module.serializer(it.value.returnType).descriptor.kind is PrimitiveKind }
+                .let {
+                    (1..3).map { _ -> it.shuffled().take(2).map { SortPart(it.value, Random.nextBoolean()) } }
+                }
+        } catch (e: Exception) {
+            listOf()
+        }
+    }
+
     val default = (info as? ModelInfoWithDefault<USER, T, ID>)?.let {
         get("_default_").typed(
             authInfo = info.serialization.authInfo,
             inputType = Unit.serializer(),
             outputType = info.serialization.serializer,
             summary = "Default",
-            description = "Gets the default ${collectionName}.",
+            description = "Gets a default ${collectionName} that would be useful to start creating a full one to insert.  Primarily used for administrative interfaces.",
             errorCases = listOf(),
+            examples = exampleItem()?.let { listOf(ApiExample(Unit, it)) } ?: listOf(),
             implementation = { user: USER, input: Unit ->
                 info.defaultItem(user)
             }
@@ -52,6 +95,12 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "List",
         description = "Gets a list of ${collectionName}s.",
         errorCases = listOf(),
+        examples = exampleItem()?.let {
+            val sampleSorts = sampleSorts()
+            sampleConditions().map {
+                ApiExample(Query(it, sampleSorts.random()), List(10) { exampleItem()!! })
+            }
+        } ?: listOf(),
         implementation = { user: USER, input: Query<T> ->
             info.collection(user)
                 .query(input)
@@ -68,6 +117,12 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Query",
         description = "Gets a list of ${collectionName}s that match the given query.",
         errorCases = listOf(),
+        examples = exampleItem()?.let {
+            val sampleSorts = sampleSorts()
+            sampleConditions().map {
+                ApiExample(Query(it, sampleSorts.random()), List(10) { exampleItem()!! })
+            }
+        } ?: listOf(),
         implementation = { user: USER, input: Query<T> ->
             info.collection(user)
                 .query(input)
@@ -84,6 +139,25 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Query Partial",
         description = "Gets parts of ${collectionName}s that match the given query.",
         errorCases = listOf(),
+        examples = exampleItem()?.let {
+            try {
+                val sampleSorts = sampleSorts()
+                val paths = info.serialization.serializer.attemptGrabFields().entries.take(2)
+                    .map { DataClassPathAccess(DataClassPathSelf(), it.value) }.toSet()
+                sampleConditions().map { cond ->
+                    ApiExample(
+                        QueryPartial(
+                            paths,
+                            condition = cond,
+                            orderBy = sampleSorts.random()
+                        ),
+                        List(10) { Partial(exampleItem()!!, paths) }
+                    )
+                }
+            } catch (e: Exception) {
+                listOf()
+            }
+        } ?: listOf(),
         implementation = { user: USER, input: QueryPartial<T> ->
             info.collection(user)
                 .queryPartial(input)
@@ -107,6 +181,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 data = ""
             )
         ),
+        examples = exampleItem()?.let { listOf(ApiExample(Unit, it)) } ?: listOf(),
         implementation = { user: USER, id: ID, input: Unit ->
             info.collection(user)
                 .get(id)
@@ -121,6 +196,10 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Insert Bulk",
         description = "Creates multiple ${collectionName}s at the same time.",
         errorCases = listOf(),
+        examples = exampleItem()?.let {
+            val items = (1..10).map { exampleItem()!! }
+            listOf(ApiExample(items, items))
+        } ?: listOf(),
         successCode = HttpStatus.Created,
         implementation = { user: USER, values: List<T> ->
             info.collection(user)
@@ -135,6 +214,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Insert",
         description = "Creates a new ${collectionName}",
         errorCases = listOf(),
+        examples = exampleItem()?.let { listOf(ApiExample(it, it)) } ?: listOf(),
         successCode = HttpStatus.Created,
         implementation = { user: USER, value: T ->
             info.collection(user)
@@ -151,6 +231,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Upsert",
         description = "Creates or updates a ${collectionName}",
         errorCases = listOf(),
+        examples = exampleItem()?.let { listOf(ApiExample(it, it)) } ?: listOf(),
         successCode = HttpStatus.Created,
         implementation = { user: USER, id: ID, value: T ->
             info.collection(user)
@@ -168,6 +249,10 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Bulk Replace",
         description = "Modifies many ${collectionName}s at the same time by ID.",
         errorCases = listOf(),
+        examples = exampleItem()?.let {
+            val items = (1..10).map { exampleItem()!! }
+            listOf(ApiExample(items, items))
+        } ?: listOf(),
         implementation = { user: USER, values: List<T> ->
             val db = info.collection(user)
             values.map { db.replaceOneById(it._id, it) }.mapNotNull { it.new }
@@ -189,6 +274,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 data = ""
             )
         ),
+        examples = exampleItem()?.let { listOf(ApiExample(it, it)) } ?: listOf(),
         implementation = { user: USER, id: ID, value: T ->
             info.collection(user)
                 .replaceOneById(id, value)
@@ -204,6 +290,18 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Bulk Modify",
         description = "Modifies many ${collectionName}s at the same time.  Returns the number of changed items.",
         errorCases = listOf(),
+        examples = exampleItem()?.let {
+            val c = sampleConditions()
+            sampleModifications().map { m ->
+                ApiExample(
+                    MassModification(
+                        c.random(),
+                        m
+                    ),
+                    3
+                )
+            }
+        } ?: listOf(),
         implementation = { user: USER, input: MassModification<T> ->
             info.collection(user)
                 .updateManyIgnoringResult(input)
@@ -225,6 +323,14 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 data = ""
             )
         ),
+        examples = exampleItem()?.let {
+            sampleModifications().map { m ->
+                ApiExample(
+                    m,
+                    EntryChange(it, m(it))
+                )
+            }
+        } ?: listOf(),
         implementation = { user: USER, id: ID, input: Modification<T> ->
             info.collection(user)
                 .updateOneById(id, input)
@@ -238,7 +344,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         outputType = info.serialization.serializer,
         pathType = info.serialization.idSerializer,
         summary = "Modify",
-        description = "Modifies a ${collectionName} by ID, returning both the previous value and new value.",
+        description = "Modifies a ${collectionName} by ID, returning the new value.",
         errorCases = listOf(
             LSError(
                 http = HttpStatus.NotFound.code,
@@ -247,6 +353,14 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 data = ""
             )
         ),
+        examples = exampleItem()?.let {
+            sampleModifications().map { m ->
+                ApiExample(
+                    m,
+                    m(it)
+                )
+            }
+        } ?: listOf(),
         implementation = { user: USER, id: ID, input: Modification<T> ->
             info.collection(user)
                 .updateOneById(id, input)
@@ -262,6 +376,14 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Bulk Delete",
         description = "Deletes all matching ${collectionName}s, returning the number of deleted items.",
         errorCases = listOf(),
+        examples = exampleItem()?.let {
+            sampleConditions().map { c ->
+                ApiExample(
+                    c,
+                    3
+                )
+            }
+        } ?: listOf(),
         implementation = { user: USER, filter: Condition<T> ->
             info.collection(user)
                 .deleteManyIgnoringOld(filter)
@@ -300,6 +422,14 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Count",
         description = "Gets the total number of ${collectionName}s matching the given condition.",
         errorCases = listOf(),
+        examples = exampleItem()?.let {
+            sampleConditions().map { c ->
+                ApiExample(
+                    c,
+                    3
+                )
+            }
+        } ?: listOf(),
         implementation = { user: USER, condition: Condition<T> ->
             info.collection(user)
                 .count(condition)
@@ -313,6 +443,14 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Count",
         description = "Gets the total number of ${collectionName}s matching the given condition.",
         errorCases = listOf(),
+        examples = exampleItem()?.let {
+            sampleConditions().map { c ->
+                ApiExample(
+                    c,
+                    3
+                )
+            }
+        } ?: listOf(),
         implementation =
         { user: USER, condition: Condition<T> ->
             info.collection(user)
@@ -327,6 +465,15 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         summary = "Group Count",
         description = "Gets the total number of ${collectionName}s matching the given condition divided by group.",
         errorCases = listOf(),
+        examples = exampleItem()?.let {
+            sampleConditions().map { c ->
+                val f = sampleSorts().random().random().field
+                ApiExample(
+                    GroupCountQuery(c, f),
+                    mapOf(f.getAny(it).toString() to 3)
+                )
+            }
+        } ?: listOf(),
         implementation = { user: USER, condition: GroupCountQuery<T> ->
             @Suppress("UNCHECKED_CAST")
             info.collection(user)

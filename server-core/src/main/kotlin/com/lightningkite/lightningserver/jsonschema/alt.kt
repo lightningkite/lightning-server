@@ -196,6 +196,7 @@ data class JsonSchemaType(
     val oneOf: List<JsonSchemaType>? = null,
     val const: String? = null,
     val links: List<JsonSchemaTypeLink>? = null,
+    val enum: List<String>? = null,
     @SerialName("ui:widget") val uiWidget: String? = null,
 )
 
@@ -262,25 +263,69 @@ class JsonSchemaBuilder(
         }
         annotation { it: MimeType -> copy(mimeType = it.mime) }
         override("com.lightningkite.lightningdb.ServerFile") { it: SerialDescriptor ->
-            JsonSchemaType(type = JsonType3(JsonType2.STRING), format = "file", options = buildJsonObject {
-                putJsonObject("upload") {
-                    put("upload_handler", "mainUploadHandler")
-                    put("auto_upload", true)
-                }
-            }, links = listOf(JsonSchemaTypeLink("{{self}}", "View File")))
-        }
-        override("java.time.LocalDate") { JsonSchemaType(type = JsonType3(JsonType2.STRING), format = "date") }
-        override("java.time.LocalTime") { JsonSchemaType(type = JsonType3(JsonType2.STRING), format = "time") }
-        override("java.time.ZonedDateTime") {
             JsonSchemaType(
+                title = "Server File",
                 type = JsonType3(JsonType2.STRING),
-                format = "date-time-zone"
+                format = "file",
+                options = buildJsonObject {
+                    putJsonObject("upload") {
+                        put("upload_handler", "mainUploadHandler")
+                        put("auto_upload", true)
+                    }
+                },
+                links = listOf(JsonSchemaTypeLink("{{self}}", "View File"))
             )
         }
-        override("java.time.Instant") { JsonSchemaType(type = JsonType3(JsonType2.STRING), format = "date-time") }
-        override("com.lightningkite.lightningdb.Condition") {
+        override("java.util.UUID") {
             JsonSchemaType(
-                title = "Condition",
+                title = "UUID",
+                type = JsonType3(JsonType2.STRING),
+                format = "uuid",
+                pattern = "^[0-9a-fA-F]{8}\\b-[0-9a-fA-F]{4}\\b-[0-9a-fA-F]{4}\\b-[0-9a-fA-F]{4}\\b-[0-9a-fA-F]{12}\$"
+            )
+        }
+        override("java.time.LocalDate") {
+            JsonSchemaType(
+                title = "Local Date",
+                type = JsonType3(JsonType2.STRING),
+                format = "date",
+                pattern = "^\\d\\d\\d\\d-\\d\\d-\\d\\d$"
+            )
+        }
+        override("java.time.LocalTime") {
+            JsonSchemaType(
+                title = "Local Time",
+                type = JsonType3(JsonType2.STRING),
+                format = "time",
+                pattern = "^\\d\\d:\\d\\d(:\\d\\d(\\.\\d+)?)?$"
+            )
+        }
+        override("java.time.ZonedDateTime") {
+            JsonSchemaType(
+                title = "Zoned Date Time",
+                type = JsonType3(JsonType2.STRING),
+                format = "date-time-zone",
+                pattern = "^\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d(:\\d\\d(\\.\\d+)?)?(([+-]\\d\\d:\\d\\d(\\[[^\\]+]\\])?)|Z)$"
+            )
+        }
+        override("java.time.Instant") {
+            JsonSchemaType(
+                title = "Instant",
+                type = JsonType3(JsonType2.STRING),
+                format = "date-time",
+                pattern = "^\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d(:\\d\\d(\\.\\d+)?)?Z$"
+            )
+        }
+        override("com.lightningkite.lightningdb.Condition") {
+            val subtype = (0 until it.elementsCount)
+                .find { index -> it.getElementName(index) == "Equal" }
+                ?.let { index ->
+                    it.getElementDescriptor(index).unwrap().serialName.substringBefore('<').substringAfterLast('.')
+                        .humanize()
+                }
+                ?: "Unknown"
+            JsonSchemaType(
+                title = "Condition for ${subtype}",
                 type = JsonType3(JsonType2.OBJECT),
                 oneOf = (0 until it.elementsCount).map { index ->
                     val key = it.getElementName(index)
@@ -293,8 +338,15 @@ class JsonSchemaBuilder(
             )
         }
         override("com.lightningkite.lightningdb.Modification") {
+            val subtype = (0 until it.elementsCount)
+                .find { index -> it.getElementName(index) == "Assign" }
+                ?.let { index ->
+                    it.getElementDescriptor(index).unwrap().serialName.substringBefore('<').substringAfterLast('.')
+                        .humanize()
+                }
+                ?: "Unknown"
             JsonSchemaType(
-                title = "Modification",
+                title = "Modification for ${subtype}",
                 type = JsonType3(JsonType2.OBJECT),
                 oneOf = (0 until it.elementsCount).map { index ->
                     val key = it.getElementName(index)
@@ -322,9 +374,9 @@ class JsonSchemaBuilder(
         existingKeys1[serializer]?.let { return it }
         val baseName = serializer.serialName
         var index = 0
-        while(true) {
-            val name = baseName + (if(index == 0) "" else index.toString())
-            if(!existingKeys2.containsKey(name)) {
+        while (true) {
+            val name = baseName + (if (index == 0) "" else index.toString())
+            if (!existingKeys2.containsKey(name)) {
                 existingKeys1[serializer] = name
                 existingKeys2[name] = serializer
                 return name
@@ -359,15 +411,15 @@ class JsonSchemaBuilder(
         }
 
         fun defining(serializer: SerialDescriptor, action: () -> JsonSchemaType): JsonSchemaType {
-            if(direct) return action()
+            if (direct) return action()
             val key = key(serializer)
             if (defining.add(key)) {
-                if(serializer.serialName == "Not") throw Exception()
+                if (serializer.serialName == "Not") throw Exception()
                 definitions[key] = action()
             }
             return JsonSchemaType(ref = refString(serializer))
         }
-        if(serializer is LazyRenamedSerialDescriptor) {
+        if (serializer is LazyRenamedSerialDescriptor) {
             return get(serializer.getter(), title = title, annotationsToApply = annotationsToApply)
         }
 
@@ -392,6 +444,7 @@ class JsonSchemaBuilder(
 
             SerialKind.ENUM -> defining(serializer) {
                 JsonSchemaType(
+                    title = desc.serialName.substringBefore('<').substringAfterLast('.').humanize(),
                     type = JsonType3(JsonType2.STRING),
                     oneOf = (0 until desc.elementsCount)
                         .map {
@@ -451,6 +504,7 @@ class JsonSchemaBuilder(
                     )
                 )
             )
+
             PolymorphicKind.OPEN -> TODO()
             SerialKind.CONTEXTUAL -> throw Error("This should not be reachable")
         }
@@ -472,8 +526,9 @@ class JsonSchemaBuilder(
 }
 
 private fun SerialDescriptor.unwrap(): SerialDescriptor {
-    if(this is LazyRenamedSerialDescriptor) return this.getter().unwrap()
-    if(this.isNullable) return this.nullElement()?.unwrap() ?: this
-    if(this.kind == SerialKind.CONTEXTUAL) return Serialization.json.serializersModule.getContextualDescriptor(this) ?: this
+    if (this is LazyRenamedSerialDescriptor) return this.getter().unwrap()
+    if (this.isNullable) return this.nullElement()?.unwrap() ?: this
+    if (this.kind == SerialKind.CONTEXTUAL) return Serialization.json.serializersModule.getContextualDescriptor(this)
+        ?: this
     return this
 }

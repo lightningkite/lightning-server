@@ -70,7 +70,7 @@ class MetaEndpoints<USER>(
             <script type="application/json" id="injectedBackendInformation">${inject}</script>
             </body>
         """.trimIndent() + original.substringAfterLast("</body>"))
-            .replace("/static/", admin.path.toString() + "/static/")
+            .replace("/static/", admin.path.toString() + "static/")
         return HttpResponse.html(content = page, headers = {
             set(
                 "Content-Security-Policy",
@@ -102,43 +102,49 @@ class MetaEndpoints<USER>(
         when (it.headers.accept.firstOrNull()) {
             ContentType.Text.Html -> HttpResponse.html(
                 content = """
-                <html>
-                  <head>
-                    <meta charset="UTF-8">
-                    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.19.5/swagger-ui.css" >
-                    <style>
-                      .topbar {
-                        display: none;
-                      }
-                    </style>
-                  </head>
-
-                  <body>
-                    <div id="swagger-ui"></div>
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.19.5/swagger-ui-bundle.js"> </script>
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.19.5/swagger-ui-standalone-preset.js"> </script>
-                    <script>
-                      window.onload = function() {
-                        const ui = SwaggerUIBundle({
-                          spec: ${Serialization.jsonWithoutDefaults.encodeToString(openApiDescription)},
-                          dom_id: '#swagger-ui',
-                          deepLinking: true,
-                          presets: [
-                            SwaggerUIBundle.presets.apis,
-                            SwaggerUIStandalonePreset
-                          ],
-                          plugins: [
-                            SwaggerUIBundle.plugins.DownloadUrl
-                          ],
-                          layout: "StandaloneLayout"
-                        })
-                     
-                        window.ui = ui
-                      }
-                  </script>
-                  </body>
-                </html>
-            """.trimIndent()
+                    <!DOCTYPE html>
+                    <html>
+                      <head>
+                        <meta charset="utf-8" />
+                        <meta name="viewport" content="width=device-width, initial-scale=1" />
+                        <meta
+                          name="description"
+                          content="SwaggerUI"
+                        />
+                        <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui.css" />
+                        <style>
+                          .topbar {
+                            display: none;
+                          }
+                        </style>
+                      </head>
+    
+                      <body>
+                        <div id="swagger-ui"></div>
+                        <script src="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui-bundle.js" crossorigin></script>
+                        <script src="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui-standalone-preset.js" crossorigin></script>
+                        <script>
+                          window.onload = function() {
+                            const ui = SwaggerUIBundle({
+                              spec: ${Serialization.jsonWithoutDefaults.encodeToString(openApiDescription)},
+                              dom_id: '#swagger-ui',
+                              deepLinking: true,
+                              presets: [
+                                SwaggerUIBundle.presets.apis,
+                                SwaggerUIStandalonePreset
+                              ],
+                              plugins: [
+                                SwaggerUIBundle.plugins.DownloadUrl
+                              ],
+                              layout: "StandaloneLayout"
+                            })
+                         
+                            window.ui = ui
+                          }
+                      </script>
+                      </body>
+                    </html>
+                """.trimIndent()
             )
 
             else -> HttpResponse(

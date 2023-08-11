@@ -4,16 +4,20 @@ import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.humanize
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.serialization.encodeToFormData
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.docGroup
 import com.lightningkite.lightningserver.typed.functionName
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 data class OpenApiRoot(
@@ -83,6 +87,7 @@ data class OpenApiRequestBody(
 @Serializable
 data class OpenApiMediaType(
     val schema: JsonSchemaType,
+    val example: JsonElement = JsonNull,
     val examples: Map<String, OpenApiExample?> = mapOf(),
 )
 
@@ -137,6 +142,20 @@ data class OpenApiContact(
     val email: String = "",
 )
 
+private fun <T> make(type: KSerializer<T>, item: T): Map<String, OpenApiExample> {
+    return mapOf(
+        "application/json" to OpenApiExample(
+            value = Serialization.json.encodeToJsonElement(type, item)
+        ),
+//        "text/csv" to OpenApiExample(
+//            value = JsonPrimitive(Serialization.csv.encodeToString(type, item))
+//        ),
+//        ContentType.Application.FormUrlEncoded.toString() to OpenApiExample(
+//            value = JsonPrimitive(Serialization.properties.encodeToFormData(type, item))
+//        )
+    )
+}
+
 private fun <USER, INPUT : Any, OUTPUT> ApiEndpoint<USER, INPUT, OUTPUT>.openApi(builder: JsonSchemaBuilder): OpenApiOperation =
     OpenApiOperation(
         summary = (this.docGroup?.let { it.humanize() + " " } ?: "") + " - " + summary,
@@ -148,13 +167,27 @@ private fun <USER, INPUT : Any, OUTPUT> ApiEndpoint<USER, INPUT, OUTPUT>.openApi
             content = mapOf(
                 ContentType.Application.Json.toString() to OpenApiMediaType(
                     schema = builder[this.inputType.descriptor],
-                    examples = mapOf()
+                    example = examples.firstOrNull()
+                        ?.let { example -> Serialization.json.encodeToJsonElement(inputType, example.input) }
+                        ?: JsonNull,
+//                    examples = examples.groupBy { it.name }.flatMap {
+//                        if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
+//                            it.copy(
+//                                name = it.name + " " + index.plus(1)
+//                            )
+//                        }
+//                    }.associate { example ->
+//                        example.name to OpenApiExample(
+//                            example.name,
+//                            value = Serialization.json.encodeToJsonElement(inputType, example.input)
+//                        )
+//                    }
                 )
             ),
             required = true
         ),
         responses = mapOf(
-            successCode.code.toString() to (if (this.inputType == Unit.serializer()) OpenApiResponse(
+            successCode.code.toString() to (if (this.outputType == Unit.serializer()) OpenApiResponse(
                 "Success",
                 mapOf()
             ) else OpenApiResponse(
@@ -162,7 +195,19 @@ private fun <USER, INPUT : Any, OUTPUT> ApiEndpoint<USER, INPUT, OUTPUT>.openApi
                 content = mapOf(
                     ContentType.Application.Json.toString() to OpenApiMediaType(
                         schema = builder[this.outputType.descriptor],
-                        examples = mapOf()
+                        example = examples.firstOrNull()
+                            ?.let { example -> Serialization.json.encodeToJsonElement(outputType, example.output) }
+                            ?: JsonNull,
+//                        examples = examples.groupBy { it.name }.flatMap {
+//                            if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
+//                                it.copy(name = it.name + " " + index.plus(1))
+//                            }
+//                        }.associate { example ->
+//                            example.name to OpenApiExample(
+//                                example.name,
+//                                value = Serialization.json.encodeToJsonElement(outputType, example.output)
+//                            )
+//                        }
                     )
                 )
             ))
@@ -218,23 +263,23 @@ val openApiDescription: OpenApiRoot by lazy {
             .groupBy {
                 it.path.toString()
             }.mapValues {
-            OpenApiPath(
-                parameters = it.value.first().routeTypes.map {
-                    OpenApiParameter(
-                        name = it.key,
-                        inside = OpenApiParameterType.path,
-                        description = it.key,
-                        required = true,
-                        schema = builder[it.value.descriptor],
-                        allowEmptyValue = false
-                    )
-                },
-                get = it.value.find { it.route.method == HttpMethod.GET }?.openApi(builder),
-                post = it.value.find { it.route.method == HttpMethod.POST }?.openApi(builder),
-                put = it.value.find { it.route.method == HttpMethod.PUT }?.openApi(builder),
-                patch = it.value.find { it.route.method == HttpMethod.PATCH }?.openApi(builder),
-                delete = it.value.find { it.route.method == HttpMethod.DELETE }?.openApi(builder),
-            )
-        }
+                OpenApiPath(
+                    parameters = it.value.first().routeTypes.map {
+                        OpenApiParameter(
+                            name = it.key,
+                            inside = OpenApiParameterType.path,
+                            description = it.key,
+                            required = true,
+                            schema = builder[it.value.descriptor],
+                            allowEmptyValue = false
+                        )
+                    },
+                    get = it.value.find { it.route.method == HttpMethod.GET }?.openApi(builder),
+                    post = it.value.find { it.route.method == HttpMethod.POST }?.openApi(builder),
+                    put = it.value.find { it.route.method == HttpMethod.PUT }?.openApi(builder),
+                    patch = it.value.find { it.route.method == HttpMethod.PATCH }?.openApi(builder),
+                    delete = it.value.find { it.route.method == HttpMethod.DELETE }?.openApi(builder),
+                )
+            }
     )
 }

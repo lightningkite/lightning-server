@@ -4,9 +4,11 @@ import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathGroup
+import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.sms.SMSClient
+import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
 import java.time.Duration
@@ -35,12 +37,25 @@ open class SmsAuthEndpoints<USER : Any, ID>(
     )
     val loginSms = path("login-sms").post.typed(
         summary = "SMS Login Code",
-        description = "Sends a login text to the given phone",
+        description = "Sends a text to the given phone with a PIN that can be used to log in.",
         errorCases = listOf(),
+        examples = listOf(
+            ApiExample(
+                input = "801-369-3729",
+                output = Unit
+            ),
+            ApiExample(
+                input = "+18013693729",
+                output = Unit,
+                notes = "The phone number format doesn't matter - all non-numeric characters are stripped."
+            ),
+        ),
         successCode = HttpStatus.NoContent,
         implementation = { user: Unit, phoneUnsafe: String ->
             val phone = phoneUnsafe.filter { it.isDigit() }
-            val pin = pin.generate(phone)
+            if(phone.isEmpty()) throw BadRequestException("Blank phone number given.")
+            if(phone.isEmpty()) throw BadRequestException("Invalid phone number.")
+            val pin = pin.establish(phone)
             sms().send(
                 to = phone,
                 message = template(pin)
@@ -50,8 +65,9 @@ open class SmsAuthEndpoints<USER : Any, ID>(
     )
     val loginSmsPin = path("login-sms-pin").post.typed(
         summary = "SMS PIN Login",
-        description = "Logs in to the given phone with a PIN",
+        description = "Logs in to the given account with a PIN that was provided in a text sent earlier.  Note that the PIN expires in ${pinExpiration.toMinutes()} minutes, and you are only permitted ${pinMaxAttempts} attempts.",
         errorCases = listOf(),
+        examples = listOf(ApiExample(PhonePinLogin("801-369-3729", pin.generate()), "jwt.jwt.jwt")),
         successCode = HttpStatus.OK,
         implementation = { anon: Unit, input: PhonePinLogin ->
             val phone = input.phone.filter { it.isDigit() }

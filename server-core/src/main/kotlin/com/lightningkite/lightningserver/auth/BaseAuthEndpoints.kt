@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.serialization.builtins.serializer
 import java.time.Duration
@@ -41,7 +42,6 @@ open class BaseAuthEndpoints<USER : Any, ID>(
         override val name: String
             get() = userAccess.authInfo.type!!
 
-        @Suppress("UNCHECKED_CAST")
         override fun tryCast(item: Any): USER? = userAccess.authInfo.tryCast(item)
         override suspend fun retrieve(reference: String): USER =
             userAccess.byId(Serialization.fromString(reference, userAccess.idSerializer))
@@ -95,8 +95,9 @@ open class BaseAuthEndpoints<USER : Any, ID>(
         inputType = Unit.serializer(),
         outputType = String.serializer(),
         summary = "Refresh token",
-        description = "Retrieves a new token for the user.",
+        description = "Creates a new token for the user, which can be used to authenticate with the API via the header 'Authorization: Bearer [insert token here]'.",
         errorCases = listOf(),
+        examples = listOf(ApiExample(input = Unit, output = "jwt.jwt.jwt")),
         implementation = { user: USER, input: Unit ->
             token(user)
         }
@@ -106,7 +107,7 @@ open class BaseAuthEndpoints<USER : Any, ID>(
         inputType = Unit.serializer(),
         outputType = userAccess.serializer,
         summary = "Get Self",
-        description = "Retrieves the user that you currently are",
+        description = "Retrieves the user that you currently authenticated as.",
         errorCases = listOf(),
         implementation = { user: USER, _: Unit -> user }
     )
@@ -115,8 +116,9 @@ open class BaseAuthEndpoints<USER : Any, ID>(
         inputType = Unit.serializer(),
         outputType = String.serializer(),
         summary = "Anonymous Token",
-        description = "Retrieves a token for a new, anonymous user.",
+        description = "Creates a token for a new, anonymous user.  The token can be used to authenticate with the API via the header 'Authorization: Bearer [insert token here]",
         errorCases = listOf(),
+        examples = listOf(ApiExample(input = Unit, output = "jwt.jwt.jwt")),
         implementation = { user: USER?, _: Unit ->
             return@typed token(userAccess.anonymous())
         }

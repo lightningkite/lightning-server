@@ -248,15 +248,38 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             Serialization.json.encodeToStream(response, output)
             output.flush()
         } catch (e: Exception) {
+            // Something basic in processing died, we must report it.
             val ex = Exception("Full lambda failure", e)
             ex.printStackTrace()
             runBlocking {
                 ex.report()
             }
-            if(preventLambdaTimeoutReuse) {
+            if (preventLambdaTimeoutReuse) {
                 println("Killing self to prevent potentially broken reuse.  To disable this, set AwsAdapter.preventLambdaTimeoutReuse to false.")
                 exitProcess(1)
             }
+        } catch (e: StackOverflowError) {
+            // StackOverflowError is bad, but not critical.  This lambda could still server other requests.
+            val ex = Exception("Full lambda failure", e)
+            ex.printStackTrace()
+            runBlocking {
+                ex.report()
+            }
+            if (preventLambdaTimeoutReuse) {
+                println("Killing self to prevent potentially broken reuse.  To disable this, set AwsAdapter.preventLambdaTimeoutReuse to false.")
+                exitProcess(1)
+            }
+        } catch (e: VirtualMachineError) {
+            // If we have a critical error, we need to make sure the process dies so Lambda doesn't attempt to reuse the VM.
+            try {
+                e.printStackTrace()
+                runBlocking {
+                    e.report()
+                }
+            } catch (t: Throwable) { /*squish*/
+            }
+            println("Killing self to prevent potentially broken reuse due to full VirtualMachineError ${e.message}.")
+            exitProcess(1)
         }
     }
 
