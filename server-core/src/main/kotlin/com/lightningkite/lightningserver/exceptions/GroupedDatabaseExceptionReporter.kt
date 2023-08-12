@@ -10,7 +10,7 @@ import java.net.NetworkInterface
 import java.time.Instant
 import java.util.*
 
-class GroupedDatabaseExceptionReporter(val packageName: String, val database: ()->Database): ExceptionReporter {
+class GroupedDatabaseExceptionReporter(val packageName: String, val database: Database): ExceptionReporter {
     init {
         prepareModels()
     }
@@ -56,7 +56,7 @@ class GroupedDatabaseExceptionReporter(val packageName: String, val database: ()
     }
 
     val modelInfo = ModelInfoWithDefault<Any, ReportedExceptionGroup, Int>(
-        getCollection = { database().collection<ReportedExceptionGroup>() },
+        getCollection = { database.collection<ReportedExceptionGroup>() },
         forUser = { user: Any? ->
             if(MetaEndpoints.isAdministrator(user)) this else throw ForbiddenException()
         },

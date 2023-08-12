@@ -25,6 +25,7 @@ dependencies {
     api("software.amazon.awssdk:ses:$awsVersion")
     api("software.amazon.awssdk:rds:$awsVersion")
     api("software.amazon.awssdk:apigatewaymanagementapi:$awsVersion")
+    api("software.amazon.awssdk:cloudwatch:$awsVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:$coroutines")
     api("com.amazonaws:aws-lambda-java-core:1.2.1")
     api("com.amazonaws:aws-lambda-java-events:3.11.0")
