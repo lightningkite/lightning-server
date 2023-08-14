@@ -8,6 +8,8 @@ import com.lightningkite.lightningserver.db.ModelInfoWithDefault
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
+import com.lightningkite.lightningserver.exceptions.NotFoundException
+import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.schedule.schedule
@@ -139,6 +141,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
             @Suppress("UNCHECKED_CAST")
             val task = sig.action?.let {
                 (resultActions[it] as? ResultAction<Any?, RESULT>) ?: run {
+                    Exception("No such handler '${sig.action}'").report()
                     info.collection()
                         .updateOneById(
                             sig._id,
@@ -166,6 +169,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
                 }
                 info.collection().deleteOneById(sig._id)
             } catch (e: Exception) {
+                e.report()
                 info.collection().updateOneById(sig._id, modification {
                     it.processingError assign e.stackTraceToString()
                 })
@@ -191,8 +195,22 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
         inputType = Unit.serializer(),
         outputType = Unit.serializer(),
         implementation = { user: USER, _: Unit ->
-            if(!isAdmin(user)) throw ForbiddenException()
+            if (!isAdmin(user)) throw ForbiddenException()
             recheck.handler.invoke()
+        }
+    )
+    val manualRecheckSingle = path("recheck/{id}").post.typed(
+        summary = "Manually recheck tasks",
+        errorCases = listOf(),
+        authInfo = info.serialization.authInfo,
+        inputType = Unit.serializer(),
+        pathType = String.serializer(),
+        outputType = Unit.serializer(),
+        implementation = { user: USER, id: String, _: Unit ->
+            if (!isAdmin(user)) throw ForbiddenException()
+            coroutineScope {
+                recheckSet.implementation(this, listOf(info.collection().get(id) ?: throw NotFoundException()))
+            }
         }
     )
 
@@ -212,7 +230,10 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
             recheckSet(it)
         }
     }
-    val recheckSet = task("$path/recheckSet", ListSerializer(ExternalAsyncTaskRequest.serializer())) { ids: List<ExternalAsyncTaskRequest> ->
+    val recheckSet = task(
+        "$path/recheckSet",
+        ListSerializer(ExternalAsyncTaskRequest.serializer())
+    ) { ids: List<ExternalAsyncTaskRequest> ->
         api().check(ids.map { it._id }).forEach { result -> handleResult(result.key, result.value) }
     }
 
