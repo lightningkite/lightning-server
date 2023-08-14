@@ -201,17 +201,25 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
         api().check(ids.map { it._id }).forEach { result -> handleResult(result.key, result.value) }
     }
 
-    suspend fun handleResult(id: String, result: RESULT) {
+    /**
+     * @return Whether the task ID was round.
+     */
+    suspend fun handleResult(id: String, result: RESULT): Boolean {
         val r = info.collection().updateOneById(id, modification {
             it.result assign Serialization.Internal.json.encodeToString(resultSerializer, result)
         })
         r.new?.let { runActionResult(it) }
+        return r.new != null
     }
 
-    suspend fun handleExpire(id: String) {
+    /**
+     * @return Whether the task ID was round.
+     */
+    suspend fun handleExpire(id: String): Boolean {
         runActionResult(
-            info.collection().get(id) ?: return
+            info.collection().get(id) ?: return false
         )
+        return true
     }
 
     init {
