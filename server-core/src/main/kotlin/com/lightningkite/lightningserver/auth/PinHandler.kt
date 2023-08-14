@@ -36,7 +36,7 @@ open class PinHandler(
             pin = String(CharArray(length) { availableCharacters.get(r.nextInt(availableCharacters.size)) })
         } while (BadWordList.detectParanoid(pin))
         val fixedPin = if (mixedCaseMode) pin else pin.lowercase()
-        return fixedPin
+        return pin
     }
 
     suspend fun assert(uniqueIdentifier: String, pin: String) {
