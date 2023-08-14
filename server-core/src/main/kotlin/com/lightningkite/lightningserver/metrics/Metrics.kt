@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.metrics
 import com.lightningkite.lightningserver.core.serverEntryPoint
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.schedule.schedule
+import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -43,15 +44,18 @@ interface Metrics {
         }
 
         suspend fun report(type: String, value: Double) {
+            if (!Settings.sealed) return
             if (type in metricsSettings().settings.tracked)
                 toReport.add(MetricEvent(type, serverEntryPoint()?.toString() ?: "Unknown", Instant.now(), value))
         }
 
         suspend fun <T> performance(type: String, action: suspend () -> T): T {
             val start = System.nanoTime()
-            val result = action()
-            report(type, (System.nanoTime() - start) / 1000000.0)
-            return result
+            return try {
+                action()
+            } finally {
+                report(type, (System.nanoTime() - start) / 1000000.0)
+            }
         }
 
         suspend fun <T> handlerPerformance(handler: Any, action: suspend () -> T): T {
@@ -82,20 +86,3 @@ inline fun regularlyAndOnShutdown(frequency: Duration, crossinline action: suspe
         }
     })
 }
-/*
-
-Kinds of metrics we need to track:
-
-Instance - How many times did this occur?
-Distribution - How long did X take
-
-Stats regularly split by entry point
-
-Track min/avg/max/sum/count per metric
-
-DB Query Time
-Calculation Time
-Usages of each entry point - SUM
-
-
- */
