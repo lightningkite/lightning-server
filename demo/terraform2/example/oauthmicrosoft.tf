@@ -6,6 +6,7 @@
 variable "oauth_microsoft" {
     type = any
     default = null
+    nullable = true
 }
 
 ##########

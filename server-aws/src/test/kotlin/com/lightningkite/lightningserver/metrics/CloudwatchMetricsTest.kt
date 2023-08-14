@@ -10,11 +10,12 @@ class CloudwatchMetricsTest {
     @Test
     fun metricsTest(): Unit = runBlocking {
         CloudwatchMetrics
+        val testMetric = MetricType("Test Metric", MetricUnit.Percent)
         MetricSettings(
-            url = "cloudwatch://us-west-2"
+            url = "cloudwatch://us-west-2/My Project"
         )().report(List(10) {
             MetricEvent(
-                type = "Test Metric",
+                testMetric,
                 entryPoint = "GET /",
                 time = Instant.now(),
                 value = Random.nextDouble()

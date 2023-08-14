@@ -3,9 +3,22 @@
 # Inputs
 ##########
 
-variable "metrics" {
-    type = any
-    default = {"url":"none","trackingByEntryPoint":["executionTime"],"trackingTotalsOnly":[],"keepFor":{"PT1H":"PT24H","PT1M":"PT2H"}}
+variable "metrics_tracked" {
+  type    = list(string)
+  default = [
+    "Health Checks Run",
+    "Execution Time",
+    "Database Wait Time",
+    "Database Call Count",
+    "Cache Wait Time",
+    "Cache Call Count",
+  ]
+  nullable = false
+}
+variable "metrics_namespace" {
+  type     = string
+  default  = "demo-example"
+  nullable = false
 }
 
 ##########
@@ -17,4 +30,30 @@ variable "metrics" {
 # Resources
 ##########
 
+resource "aws_iam_policy" "metrics" {
+  name        = "demo-example-metrics"
+  path        = "/demo/example/metrics/"
+  description = "Access to publish metrics"
+  policy      = jsonencode({
+    Version   = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "cloudwatch:PutMetricData",
+        ]
+        Effect    = "Allow"
+        Condition = {
+          StringEquals = {
+            "cloudwatch:namespace" : var.metrics_namespace
+          }
+        }
+        Resource = ["*"]
+      },
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "metrics" {
+  role       = aws_iam_role.main_exec.name
+  policy_arn = aws_iam_policy.metrics.arn
+}
 

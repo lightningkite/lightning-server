@@ -6,8 +6,9 @@ import java.time.Instant
 
 @Serializable
 data class MetricEvent(
-    val type: String,
+    val metricType: MetricType,
     val entryPoint: String,
+//    val otherDimensions: Map<String, String> = mapOf(),
     @Contextual val time: Instant,
     val value: Double
 )

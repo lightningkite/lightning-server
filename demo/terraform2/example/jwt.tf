@@ -3,13 +3,15 @@
 # Inputs
 ##########
 
-variable "jwt_expirationMilliseconds" {
-    type = number
-    default = 31540000000
+variable "jwt_expiration" {
+    type = string
+    default = "PT8760H"
+    nullable = false
 }
-variable "jwt_emailExpirationMilliseconds" {
-    type = number
-    default = 1800000
+variable "jwt_emailExpiration" {
+    type = string
+    default = "PT1H"
+    nullable = false
 }
 
 ##########

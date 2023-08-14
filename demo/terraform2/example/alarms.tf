@@ -6,21 +6,26 @@
 variable "emergencyInvocationsPerMinuteThreshold" {
     type = number
     default = 100
+    nullable = false
 }
 variable "emergencyComputePerMinuteThreshold" {
     type = number
     default = 10000
+    nullable = false
 }
 variable "panicInvocationsPerMinuteThreshold" {
     type = number
     default = 500
+    nullable = false
 }
 variable "panicComputePerMinuteThreshold" {
     type = number
     default = 50000
+    nullable = false
 }
 variable "emergencyContact" {
     type = string
+    nullable = false
 }
 
 ##########

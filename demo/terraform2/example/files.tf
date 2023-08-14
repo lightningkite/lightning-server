@@ -6,6 +6,7 @@
 variable "files_expiry" {
     type = string
     default = "P1D"
+    nullable = true
 }
 
 ##########
@@ -38,7 +39,17 @@ resource "aws_s3_bucket_cors_configuration" "files" {
     allowed_origins = ["*"]
   }
 }
+resource "aws_s3_bucket_public_access_block" "files" {
+  count = var.files_expiry == null ? 1 : 0
+  bucket = aws_s3_bucket.files.id
+
+  block_public_acls   = false
+  block_public_policy = false
+  ignore_public_acls = false
+  restrict_public_buckets = false
+}
 resource "aws_s3_bucket_policy" "files" {  
+  depends_on = [aws_s3_bucket_public_access_block.files]
   count = var.files_expiry == null ? 1 : 0
   bucket = aws_s3_bucket.files.id   
   policy = <<POLICY
@@ -60,10 +71,10 @@ resource "aws_s3_bucket_policy" "files" {
 }
 POLICY
 }
-resource "aws_s3_bucket_acl" "files" {
-  bucket = aws_s3_bucket.files.id
-  acl    = var.files_expiry == null ? "public-read" : "private" 
-}
+# resource "aws_s3_bucket_acl" "files" {
+#   bucket = aws_s3_bucket.files.id
+#   acl    = var.files_expiry == null ? "public-read" : "private" 
+# }
 resource "aws_iam_policy" "files" {
   name        = "demo-example-files"
   path = "/demo/example/files/"

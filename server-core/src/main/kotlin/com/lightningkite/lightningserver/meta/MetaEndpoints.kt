@@ -39,9 +39,6 @@ class MetaEndpoints<USER>(
         var isAdministrator: suspend (Any?) -> Boolean = { false }
     }
     init {
-        Metrics.shouldAllowAccess = {
-            isAdmin(authInfo.tryCast(it.rawUser()) as USER)
-        }
         isAdministrator = { isAdmin(authInfo.tryCast(it) as USER) }
     }
 

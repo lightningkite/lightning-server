@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningserver.aws.AwsAdapter
+import com.lightningkite.lightningserver.metrics.CloudwatchMetrics
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
 import kotlinx.serialization.decodeFromString
@@ -12,6 +13,7 @@ import software.amazon.awssdk.services.s3.S3Client
 class AwsHandler : AwsAdapter() {
     companion object {
         init {
+            CloudwatchMetrics
             Server
             preventLambdaTimeoutReuse = true
             loadSettings(AwsHandler::class.java)

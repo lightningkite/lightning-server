@@ -6,6 +6,7 @@
 variable "oauth_apple" {
     type = any
     default = null
+    nullable = true
 }
 
 ##########

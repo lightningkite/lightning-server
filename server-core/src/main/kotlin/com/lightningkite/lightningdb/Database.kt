@@ -3,6 +3,7 @@ package com.lightningkite.lightningdb
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 

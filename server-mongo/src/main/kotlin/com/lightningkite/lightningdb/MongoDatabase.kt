@@ -79,7 +79,8 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                 contextual(Binary::class, BinarySerializer)
             }))
             DatabaseSettings.register("mongodb") {
-                MongoDatabase(databaseName = it.databaseName) {
+                val databaseName: String = it.url.substringAfter("://").substringAfter('@').substringAfter('/', "").substringBefore('?')
+                MongoDatabase(databaseName = databaseName) {
                     KMongo.createClient(
                         MongoClientSettings.builder()
                             .applyConnectionString(ConnectionString(it.url))
@@ -96,7 +97,8 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                 }
             }
             DatabaseSettings.register("mongodb+srv") {
-                MongoDatabase(databaseName = it.databaseName) {
+                val databaseName: String = it.url.substringAfter("://").substringAfter('@').substringAfter('/', "").substringBefore('?')
+                MongoDatabase(databaseName = databaseName) {
                     KMongo.createClient(
                         MongoClientSettings.builder()
                             .applyConnectionString(ConnectionString(it.url))
@@ -113,10 +115,10 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                 }
             }
             DatabaseSettings.register("mongodb-test") {
-                MongoDatabase(databaseName = it.databaseName) { testMongo() }
+                MongoDatabase(databaseName = "default") { testMongo() }
             }
             DatabaseSettings.register("mongodb-file") {
-                MongoDatabase(databaseName = it.databaseName) { embeddedMongo(File(it.url.removePrefix("mongodb-file://"))) }
+                MongoDatabase(databaseName = "default") { embeddedMongo(File(it.url.removePrefix("mongodb-file://"))) }
             }
         }
     }

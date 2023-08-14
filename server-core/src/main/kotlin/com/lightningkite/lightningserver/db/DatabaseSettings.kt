@@ -20,7 +20,6 @@ import kotlin.reflect.KType
 @Serializable
 data class DatabaseSettings(
     val url: String = "ram-unsafe-persist://${File("./local/database").absolutePath}",
-    val databaseName: String = "default",
 ) : () -> Database {
 
     companion object : Pluggable<DatabaseSettings, Database>() {
@@ -39,13 +38,12 @@ data class DatabaseSettings(
                 val x = it.url.substringAfter("://")
                 val delay = x.substringBefore("/").toLong()
                 val wraps = x.substringAfter("/")
-                parse(wraps, DatabaseSettings(wraps, it.databaseName)).delayed(delay)
+                parse(wraps, DatabaseSettings(wraps)).delayed(delay)
             }
         }
     }
 
-    override fun invoke(): Database = parse(url.substringBefore("://"), this)
-
+    override fun invoke(): Database = parse(url.substringBefore("://"), this).metrics("Database")
 }
 
 /**

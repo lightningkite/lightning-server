@@ -5,6 +5,8 @@ import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.files.FilesSettings
+import com.lightningkite.lightningserver.metrics.MetricSettings
+import com.lightningkite.lightningserver.metrics.MetricType
 import com.lightningkite.lightningserver.schedule.Schedule
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -14,6 +16,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
+import software.amazon.awssdk.services.s3.model.MetricsStatus
 import java.io.File
 import java.time.LocalDate
 import java.time.ZonedDateTime
@@ -157,7 +160,7 @@ internal data class TerraformHandler(
 
 internal data class TerraformInput(val name: String, val type: String, val default: String?, val nullable: Boolean = false) {
     companion object {
-        fun stringList(name: String, default: List<String>?, nullable: Boolean = false) = TerraformInput(name, "list(string)", default?.joinToString { "\"$it\"" }, nullable = nullable)
+        fun stringList(name: String, default: List<String>?, nullable: Boolean = false) = TerraformInput(name, "list(string)", default?.joinToString(", ", "[", "]") { "\"$it\"" }, nullable = nullable)
         fun string(name: String, default: String?, nullable: Boolean = false) = TerraformInput(name, "string", default?.let { "\"$it\"" }, nullable = nullable)
         fun boolean(name: String, default: Boolean?, nullable: Boolean = false) = TerraformInput(name, "bool", default?.toString(), nullable = nullable)
         fun number(name: String, default: Number?, nullable: Boolean = false) = TerraformInput(name, "number", default?.toString(), nullable = nullable)
@@ -745,6 +748,55 @@ internal fun handlers() {
             """.trimIndent()
         }
     )
+    TerraformHandler.handler<MetricSettings>(
+        name = "Cloudwatch",
+        inputs = { key ->
+            listOf(
+                TerraformInput.stringList("${key}_tracked", MetricType.known.map { it.name }),
+                TerraformInput.string("${key}_namespace", this.projectName),
+            )
+        },
+        emit = {
+            appendLine(
+                """
+                resource "aws_iam_policy" "${key}" {
+                  name        = "${namePrefix}-${key}"
+                  path = "/${namePrefixPath}/${key}/"
+                  description = "Access to publish metrics"
+                  policy = jsonencode({
+                    Version = "2012-10-17"
+                    Statement = [
+                      {
+                        Action = [
+                          "cloudwatch:PutMetricData",
+                        ]
+                        Effect   = "Allow"
+                        Condition = {
+                            StringEquals = {
+                                "cloudwatch:namespace": var.${key}_namespace
+                            }
+                        }
+                        Resource = ["*"]
+                      },
+                    ]
+                  })
+                }
+                resource "aws_iam_role_policy_attachment" "${key}" {
+                  role       = aws_iam_role.main_exec.name
+                  policy_arn = aws_iam_policy.${key}.arn
+                }
+                """.trimIndent()
+            )
+        },
+        settingOutput = { key ->
+            """
+                {
+                    url = "cloudwatch://${'$'}{var.deployment_location}/${'$'}{var.${key}_namespace}"
+                    trackingByEntryPoint = var.${key}_tracked
+                }
+            """.trimIndent()
+        }
+    )
     TerraformHandler.handler<EmailSettings>(
         name = "SMTP through SES",
         inputs = { key ->
@@ -893,7 +945,7 @@ internal fun handlers() {
         settingOutput = { key ->
             """
                 {
-                    url = "smtp://${'$'}{aws_iam_access_key.${key}.id}:${'$'}{aws_iam_access_key.${key}.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
+                    url = "smtp://${'$'}{aws_iam_access_key.${key}.id}:${'$'}{aws_iam_access_key.${key}.ses_smtp_password_v4}@email-smtp.${'$'}{var.deployment_location}.amazonaws.com:587" 
                     fromEmail = ${if (domain) "\"noreply@${'$'}{var.domain_name}\"" else "var.${key}_sender"}
                 }
             """.trimIndent()
@@ -965,7 +1017,7 @@ internal fun handlers() {
         settingOutput = { key ->
             """
                 {
-                    url = "smtp://${'$'}{aws_iam_access_key.${key}.id}:${'$'}{aws_iam_access_key.${key}.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
+                    url = "smtp://${'$'}{aws_iam_access_key.${key}.id}:${'$'}{aws_iam_access_key.${key}.ses_smtp_password_v4}@email-smtp.${'$'}{var.deployment_location}.amazonaws.com:587" 
                     fromEmail = var.${key}_sender
                 }
             """.trimIndent()

@@ -6,6 +6,7 @@
 variable "exceptions" {
     type = any
     default = {"url":"none","sentryDsn":null}
+    nullable = false
 }
 
 ##########

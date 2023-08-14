@@ -315,7 +315,6 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         WebSocketIdentifier.register(
             type = wsType,
             send = { id, value ->
-                Metrics.report("webSocketMessages", 1.0)
                 try {
                     val result = apiGatewayManagement.postToConnection {
                         it.connectionId(id)
@@ -340,7 +339,6 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 }
             },
             close = { id ->
-                Metrics.report("webSocketCloses", 1.0)
                 try {
                     val result = apiGatewayManagement.deleteConnection {
                         it.connectionId(id)

@@ -17,7 +17,12 @@ reporting_email = "joseph@lightningkite.com"
 metrics         = {
   url                  = "db://database"
   trackingByEntryPoint = [
-    "executionTime"
+    "Health Checks Run",
+    "Execution Time",
+    "Database Wait Time",
+    "Database Call Count",
+    "Cache Wait Time",
+    "Cache Call Count",
   ]
   trackingTotalsOnly = []
 }

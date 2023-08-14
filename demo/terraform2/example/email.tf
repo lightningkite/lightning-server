@@ -5,6 +5,7 @@
 
 variable "reporting_email" {
     type = string
+    nullable = false
 }
 
 ##########
