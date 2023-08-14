@@ -7,12 +7,15 @@ import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.ModelInfoWithDefault
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
+import com.lightningkite.lightningserver.exceptions.ForbiddenException
+import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.tasks.Task
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.tasks.task
+import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
@@ -181,10 +184,22 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
         )
     }
 
+    val manualRecheck = path("recheck").post.typed(
+        summary = "Manually recheck tasks",
+        errorCases = listOf(),
+        authInfo = info.serialization.authInfo,
+        inputType = Unit.serializer(),
+        outputType = Unit.serializer(),
+        implementation = { user: USER, _: Unit ->
+            if(!isAdmin(user)) throw ForbiddenException()
+            recheck.handler.invoke()
+        }
+    )
+
     val recheck = schedule("$path/recheck", checkFrequency) {
         info.collection().find(condition {
             (it.result neq null) and (it.expiresAt lt Instant.now()) and (it.lastAttempt lt Instant.now()
-                .plus(taskTimeout))
+                .minus(taskTimeout))
         }).collect {
             runActionResult(it)
         }

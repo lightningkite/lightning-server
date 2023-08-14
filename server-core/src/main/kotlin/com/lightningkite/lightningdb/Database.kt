@@ -33,7 +33,7 @@ interface Database : HealthCheckable {
     }
 }
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class HealthCheckTestModel(override val _id: String) : HasId<String>
 

@@ -4,7 +4,7 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.khrysalis.SharedCode
-import com.lightningkite.lightningdb.DatabaseModel
+import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.ServerFile
 import kotlinx.serialization.Serializable
@@ -14,7 +14,7 @@ import java.time.Instant
 import java.util.*
 
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class UploadForNextRequest(
     override val _id: UUID = UUID.randomUUID(),

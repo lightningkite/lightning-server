@@ -8,7 +8,7 @@ import java.time.Instant
 import java.util.*
 
 @Serializable
-@DatabaseModel
+@GenerateDataClassPaths
 @AdminTableColumns(["name", "number", "status"])
 @Description("A model for testing Lightning Server.")
 data class TestModel(
@@ -33,7 +33,7 @@ enum class Status {
 }
 
 @Serializable
-@DatabaseModel
+@GenerateDataClassPaths
 data class User(
     override val _id: UUID = UUID.randomUUID(),
     override val email: String,
@@ -42,7 +42,7 @@ data class User(
 ) : HasId<UUID>, HasEmail, HasPassword
 
 @Serializable
-@DatabaseModel
+@GenerateDataClassPaths
 data class UserAlt(
     override val _id: UUID = UUID.randomUUID(),
     override val email: String

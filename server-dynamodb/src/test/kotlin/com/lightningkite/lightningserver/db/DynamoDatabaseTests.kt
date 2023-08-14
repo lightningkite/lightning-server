@@ -48,7 +48,7 @@ class DynamoDBTests() {
     }
 }
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable data class TestData(
     val _id: UUID = UUID.randomUUID(),
     @Index val value: Int = 42

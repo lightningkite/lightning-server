@@ -9,7 +9,7 @@ import kotlinx.serialization.UseContextualSerialization
 import java.time.Instant
 import java.util.*
 
-@DatabaseModel()
+@GenerateDataClassPaths()
 @Serializable
 data class User(
     override val _id: UUID = UUID.randomUUID(),
@@ -20,7 +20,7 @@ data class User(
     companion object
 }
 
-@DatabaseModel()
+@GenerateDataClassPaths()
 @Serializable
 data class Post(
     override val _id: UUID = UUID.randomUUID(),
@@ -31,7 +31,7 @@ data class Post(
     companion object
 }
 
-@DatabaseModel()
+@GenerateDataClassPaths()
 @Serializable
 data class Employee(
     override val _id: @Contextual UUID = UUID.randomUUID(),
@@ -41,7 +41,7 @@ data class Employee(
 }
 
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class EmbeddedObjectTest(
     override val _id: UUID = UUID.randomUUID(),
@@ -65,7 +65,7 @@ data class RecursiveEmbed(
     var value2:String = "value2"
 )
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class EmbeddedNullable(
     override val _id: UUID = UUID.randomUUID(),
@@ -75,7 +75,7 @@ data class EmbeddedNullable(
     companion object
 }
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class LargeTestModel(
     override val _id: UUID = UUID.randomUUID(),
@@ -112,14 +112,14 @@ data class LargeTestModel(
     companion object
 }
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class EmbeddedMap(
     override val _id: UUID = UUID.randomUUID(),
     var map: Map<String, RecursiveEmbed>,
 ) : HasId<UUID>
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class Cursed(
     override val _id: UUID = UUID.randomUUID(),
@@ -129,7 +129,7 @@ data class Cursed(
     data class Inside<T>(val item: T)
 }
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class MetaModel(
     override val _id: UUID = UUID.randomUUID(),

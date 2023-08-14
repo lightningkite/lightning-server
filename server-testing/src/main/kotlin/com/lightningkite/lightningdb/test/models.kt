@@ -3,7 +3,6 @@ package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.DatabaseModel
 import com.lightningkite.lightningdb.UUIDFor
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
@@ -12,7 +11,7 @@ import java.time.Instant
 import java.util.*
 import com.lightningkite.lightningdb.*
 
-@DatabaseModel()
+@GenerateDataClassPaths()
 @Serializable
 data class User(
     override val _id: UUID = UUID.randomUUID(),
@@ -24,7 +23,7 @@ data class User(
     companion object
 }
 
-@DatabaseModel()
+@GenerateDataClassPaths()
 @Serializable
 data class Post(
     override val _id: UUID = UUID.randomUUID(),
@@ -35,7 +34,7 @@ data class Post(
     companion object
 }
 
-@DatabaseModel()
+@GenerateDataClassPaths()
 @Serializable
 data class Employee(
     override val _id: @Contextual UUID = UUID.randomUUID(),
@@ -44,7 +43,7 @@ data class Employee(
     companion object
 }
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class EmbeddedObjectTest(
     override val _id: UUID = UUID.randomUUID(),
@@ -67,7 +66,7 @@ data class RecursiveEmbed(
     var value2:String = "value2"
 )
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class EmbeddedNullable(
     override val _id: UUID = UUID.randomUUID(),
@@ -77,7 +76,7 @@ data class EmbeddedNullable(
     companion object
 }
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class LargeTestModel(
     override val _id: UUID = UUID.randomUUID(),
@@ -114,14 +113,14 @@ data class LargeTestModel(
     companion object
 }
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class EmbeddedMap(
     override val _id: UUID = UUID.randomUUID(),
     var map: Map<String, RecursiveEmbed>,
 ) : HasId<UUID>
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class MetaTestModel(
     override val _id: UUID = UUID.randomUUID(),

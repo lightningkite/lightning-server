@@ -8,22 +8,22 @@ import kotlinx.serialization.UseContextualSerialization
 import java.util.*
 
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class TestThing(override val _id: UUID = UUID.randomUUID(), val value: Int = 0) : HasId<UUID>
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class TempThing(override val _id: Int) : HasId<Int>
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class UniqueFieldClass(
     override val _id: Int,
     @Unique val unique1: Int,
 ) : HasId<Int>
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 @UniqueSet(["uniqueSet1", "uniqueSet2"])
 data class UniqueSetClass(
@@ -32,7 +32,7 @@ data class UniqueSetClass(
     val uniqueSet2: Int,
 ) : HasId<Int>
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 @UniqueSet(["uniqueSet1", "uniqueSet2"])
 data class UniqueComboClass(
@@ -42,7 +42,7 @@ data class UniqueComboClass(
     val uniqueSet2: Int,
 ) : HasId<Int>
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 @UniqueSetJankPatch(["uniqueSet1", "uniqueSet2", ":", "uniqueSet3", "uniqueSet4"])
 data class UniqueSetJankClass(
@@ -53,7 +53,7 @@ data class UniqueSetJankClass(
     val uniqueSet4: Int,
 ) : HasId<Int>
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 @UniqueSetJankPatch(["uniqueSet1", "uniqueSet2", ":", "uniqueSet3", "uniqueSet4"])
 data class UniqueComboJankClass(

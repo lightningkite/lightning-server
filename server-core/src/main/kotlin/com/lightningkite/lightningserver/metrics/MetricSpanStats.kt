@@ -10,7 +10,7 @@ import java.time.Instant
 import kotlin.math.max
 import kotlin.math.min
 
-@DatabaseModel
+@GenerateDataClassPaths
 @IndexSetJankPatch(["type", "endpoint", "timeSpan", "timeStamp", ":", "timeSpan", "timeStamp"])
 //@IndexSet(["type", "endpoint", "timeSpan", "timeStamp"])
 //@IndexSet(["timeSpan", "timeStamp"])

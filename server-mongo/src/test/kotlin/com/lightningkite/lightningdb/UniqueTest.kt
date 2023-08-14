@@ -43,7 +43,7 @@ class UniqueTest : MongoTest() {
 
 }
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 @UniqueSet(["email", "account"])
 data class IndexingTestModel(

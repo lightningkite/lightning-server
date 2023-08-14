@@ -179,7 +179,7 @@ private class RestApiWebsocketHelper private constructor(val database: ()->Datab
 }
 
 @Serializable
-@DatabaseModel
+@GenerateDataClassPaths
 @Suppress("ClassName")
 @IndexSet(["databaseId", "relevant"])
 data class __WebSocketDatabaseChangeSubscription(

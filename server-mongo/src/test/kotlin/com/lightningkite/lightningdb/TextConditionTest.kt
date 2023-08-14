@@ -13,7 +13,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @Serializable
-@DatabaseModel
+@GenerateDataClassPaths
 @TextIndex(["string"])
 data class ModelWithTextIndex(
     override val _id: UUID = UUID.randomUUID(),

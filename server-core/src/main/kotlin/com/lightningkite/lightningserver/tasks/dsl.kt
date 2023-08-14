@@ -27,7 +27,7 @@ fun startup(priority: Double = 0.0, action: suspend () -> Unit) = Tasks.onEngine
 fun defineAfterSettings(priority: Double = 0.0, action: suspend () -> Unit) = Tasks.onSettingsReady(priority, action)
 
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class ActionHasOccurred(
     override val _id: String,
