@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Pluggable
 import kotlinx.serialization.KSerializer
@@ -43,7 +44,7 @@ data class DatabaseSettings(
         }
     }
 
-    override fun invoke(): Database = parse(url.substringBefore("://"), this).metrics("Database")
+    override fun invoke(): Database = parse(url.substringBefore("://"), this)
 }
 
 /**

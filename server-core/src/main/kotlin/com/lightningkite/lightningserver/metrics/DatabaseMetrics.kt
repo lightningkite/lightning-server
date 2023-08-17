@@ -21,6 +21,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import java.time.Duration
 import java.time.Instant
 
 class DatabaseMetrics(override val settings: MetricSettings, val database: () -> Database) :
@@ -29,16 +30,22 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         prepareModels()
     }
 
+    val keepFor: Map<Duration, Duration> = mapOf(
+        Duration.ofDays(1) to Duration.ofDays(7),
+        Duration.ofHours(2) to Duration.ofDays(1),
+        Duration.ofMinutes(10) to Duration.ofHours(2),
+    )
+
     val collection by lazy { database().collection<MetricSpanStats>() }
 
     override suspend fun report(events: List<MetricEvent>) = coroutineScope {
         val jobs = ArrayList<Job>()
-        for (span in settings.keepFor.keys) {
-            events.groupBy { it.metricType to it.entryPoint }.forEach { (typeAndEntryPoint, typeEvents) ->
+        for (span in keepFor.keys) {
+            events.filter { it.entryPoint != null }.groupBy { it.metricType to it.entryPoint }.forEach { (typeAndEntryPoint, typeEvents) ->
                 val (type, entryPoint) = typeAndEntryPoint
                 if (type.name in settings.trackingByEntryPoint) {
                     typeEvents.groupBy { it.time.roundTo(span) }.forEach { (rounded, spanEvents) ->
-                        val stats = spanEvents.stats(entryPoint, type.name, rounded, span)
+                        val stats = spanEvents.stats(entryPoint!!, type.name, rounded, span)
                         jobs.add(launch {
                             collection.upsertOneIgnoringResult(
                                 condition { m -> m._id eq stats._id },
@@ -71,7 +78,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
     }
 
     override suspend fun clean() {
-        settings.keepFor.entries.forEach { entry ->
+        keepFor.entries.forEach { entry ->
             collection.deleteManyIgnoringOld(condition {
                 (it.timeSpan eq entry.key) and
                         (it.timeStamp lt Instant.now().minus(entry.value))
@@ -84,7 +91,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         HttpResponse.html(
             content = HtmlDefaults.basePage(
                 buildString {
-                    for (span in settings.keepFor.keys) {
+                    for (span in keepFor.keys) {
                         appendLine("<h2>$span</h2>")
                         appendLine("<h3>Most Expensive</h3>")
                         collection.find(
@@ -160,7 +167,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
             appendLine("<ul>")
             val metric = it.parts["metric"]!!
             val endpoint = it.parts["endpoint"]!!
-            for (span in settings.keepFor.keys) {
+            for (span in keepFor.keys) {
                 for (summary in listOf("min", "max", "sum", "count", "average")) {
                     appendLine(
                         "<li><a href=${

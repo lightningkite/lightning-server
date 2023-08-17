@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.cache
 
+import com.lightningkite.lightningserver.metrics.Metricable
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
@@ -14,7 +15,7 @@ typealias CacheInterface = Cache
  * An abstracted model for communicating with a Cache.
  * Every implementation will handle how to get and set values in the underlying cache system.
  */
-interface Cache : HealthCheckable {
+interface Cache : HealthCheckable, Metricable<Cache> {
 
     /**
      * Returns a value of type T from the cache.
@@ -122,6 +123,8 @@ interface Cache : HealthCheckable {
             HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
         }
     }
+
+    override fun withMetrics(metricsKeyName: String): Cache = MetricsCache(this, metricsKeyName)
 }
 
 /**

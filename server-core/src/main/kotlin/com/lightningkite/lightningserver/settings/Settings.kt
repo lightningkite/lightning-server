@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.settings
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.logging.loggingSettings
+import com.lightningkite.lightningserver.metrics.Metricable
 import com.lightningkite.lightningserver.metrics.metricsCleanSchedule
 import com.lightningkite.lightningserver.metrics.metricsSettings
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -99,6 +100,7 @@ inline fun <reified Goal> setting(
     getter = { it }
 )
 
+@JvmName("settingInvokable")
 inline fun <reified Serializable : () -> Goal, Goal> setting(
     name: String,
     default: Serializable,
@@ -109,4 +111,18 @@ inline fun <reified Serializable : () -> Goal, Goal> setting(
     optional = optional,
     serializer = Serialization.module.serializer<Serializable>(),
     getter = { it() }
+)
+
+
+@JvmName("settingInvokableMetricable")
+inline fun <reified Serializable : () -> Goal, Goal: Metricable<Goal>> setting(
+    name: String,
+    default: Serializable,
+    optional: Boolean = false
+): Settings.Requirement<Serializable, Goal> = setting<Serializable, Goal>(
+    name = name,
+    default = default,
+    optional = optional,
+    serializer = Serialization.module.serializer<Serializable>(),
+    getter = { it().withMetrics(name) }
 )

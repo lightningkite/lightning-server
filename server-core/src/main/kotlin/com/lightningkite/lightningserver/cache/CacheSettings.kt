@@ -23,5 +23,5 @@ data class CacheSettings(
         }
     }
 
-    override fun invoke(): Cache = parse(url.substringBefore("://"), this).metrics("Cache")
+    override fun invoke(): Cache = parse(url.substringBefore("://"), this)
 }

@@ -1586,9 +1586,6 @@ internal fun awsLambdaHandler(
           snap_start {
             apply_on = "PublishedVersions"
           }
-          layers = [
-            "arn:aws:lambda:us-west-2:580247275435:layer:LambdaInsightsExtension:21"
-          ]
   
           ${
               if(project.vpc)

@@ -17,12 +17,7 @@ import java.time.Duration
 data class MetricSettings(
     val url: String = "none",
     val trackingByEntryPoint: Set<String> = setOf(Metrics.executionTime.name),
-    val trackingTotalsOnly: Set<String> = setOf(),
-    val keepFor: Map<Duration, Duration> = mapOf(
-        Duration.ofDays(1) to Duration.ofDays(7),
-        Duration.ofHours(2) to Duration.ofDays(1),
-        Duration.ofMinutes(10) to Duration.ofHours(2),
-    )
+    val trackingTotalsOnly: Set<String> = setOf()
 ) : () -> Metrics {
     @Transient
     val tracked = trackingTotalsOnly + trackingByEntryPoint

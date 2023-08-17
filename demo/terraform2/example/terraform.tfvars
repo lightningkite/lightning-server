@@ -19,10 +19,10 @@ metrics         = {
   trackingByEntryPoint = [
     "Health Checks Run",
     "Execution Time",
-    "Database Wait Time",
-    "Database Call Count",
-    "Cache Wait Time",
-    "Cache Call Count",
+    "database Wait Time",
+    "database Call Count",
+    "cache Wait Time",
+    "cache Call Count",
   ]
   trackingTotalsOnly = []
 }
@@ -32,3 +32,10 @@ exceptions = {
 emergencyContact = "joseph@lightningkite.com"
 #  files_expiry = null
 lambda_timeout = 45
+logging = {
+  default = {
+    filePattern = null
+    level = "DEBUG"
+    toConsole = true
+  }
+}

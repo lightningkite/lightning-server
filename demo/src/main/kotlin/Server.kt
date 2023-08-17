@@ -34,6 +34,7 @@ import com.lightningkite.lightningserver.websocket.MultiplexWebSocketHandler
 import com.lightningkite.lightningserver.websocket.websocket
 import io.ktor.client.request.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import java.lang.IllegalStateException
 import java.time.Duration
 import java.util.*
@@ -180,6 +181,10 @@ object Server : ServerPathGroup(ServerPath.root) {
         }
     )
     val die = path("die").get.handler { throw Exception("OUCH") }
+
+    val databaseCheck = path("database-check").get.handler {
+        HttpResponse.plainText(database().collection<User>()::class.qualifiedName ?: "???")
+    }
 
     val testSchedule = schedule("test-schedule", Duration.ofMinutes(1)) {
         println("Hello schedule!")

@@ -8,10 +8,10 @@ variable "metrics_tracked" {
   default = [
     "Health Checks Run",
     "Execution Time",
-    "Database Wait Time",
-    "Database Call Count",
-    "Cache Wait Time",
-    "Cache Call Count",
+    "database Wait Time",
+    "database Call Count",
+    "cache Wait Time",
+    "cache Call Count",
   ]
   nullable = false
 }

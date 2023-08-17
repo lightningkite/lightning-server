@@ -158,11 +158,7 @@ resource "aws_lambda_function" "main" {
   snap_start {
     apply_on = "PublishedVersions"
   }
-  layers = [
-    "arn:aws:lambda:us-west-2:580247275435:layer:LambdaInsightsExtension:21"
-  ]
-
-  
+  layers = []
   
   environment {
     variables = {

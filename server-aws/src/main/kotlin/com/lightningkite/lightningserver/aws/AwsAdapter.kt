@@ -56,11 +56,14 @@ import java.net.URI
 import java.time.Duration
 import java.util.*
 import org.crac.Resource
-import java.util.concurrent.TimeoutException
 import kotlin.system.exitProcess
 
 
 abstract class AwsAdapter : RequestStreamHandler, Resource {
+    init {
+        logger.debug("Initializing AwsAdapter...")
+    }
+
     @Serializable
     data class TaskInvoke(val taskName: String, val input: String)
 
@@ -111,7 +114,8 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             return@SetOnce { lazy.value }
         }
 
-        val configureEngine by lazy {
+        private val backgroundReportingActions = ArrayList<suspend () -> Unit>()
+        private val configureEngine by lazy {
             engine = object : Engine {
                 val lambdaClient = LambdaAsyncClient.builder()
                     .region(region)
@@ -133,6 +137,10 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     }.await().let {
                         it.logResult()
                     }
+                }
+
+                override fun backgroundReportingAction(action: suspend () -> Unit) {
+                    backgroundReportingActions.add(action)
                 }
             }
             logger.debug("Running Tasks.onEngineReady()...")
@@ -245,8 +253,22 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     }
                 }
             }
+            val backgroundRegularHealthActionsJob = GlobalScope.launch {
+                println("Running ${backgroundReportingActions.size} backgroundRegularHealthActions...")
+                backgroundReportingActions.forEach {
+                    try {
+                        it()
+                    } catch (e: Exception) {
+                        e.report()
+                    }
+                }
+            }
             Serialization.json.encodeToStream(response, output)
             output.flush()
+            output.close()
+            runBlocking {
+                backgroundRegularHealthActionsJob.join()
+            }
         } catch (e: Exception) {
             // Something basic in processing died, we must report it.
             val ex = Exception("Full lambda failure", e)

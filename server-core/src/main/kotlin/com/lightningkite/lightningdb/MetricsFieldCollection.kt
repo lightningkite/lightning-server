@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.metrics.Metrics
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlin.reflect.KType
 
 class MetricsFieldCollection<M: Any>(override val wraps: FieldCollection<M>, metricsKeyName: String = "Database"): FieldCollection<M> {
     val metricsKey = MetricType("$metricsKeyName Wait Time", MetricUnit.Milliseconds)
@@ -17,12 +16,12 @@ class MetricsFieldCollection<M: Any>(override val wraps: FieldCollection<M>, met
         skip: Int,
         limit: Int,
         maxQueryMs: Long
-    ): Flow<M> = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    ): Flow<M> = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         val source = wraps.find(condition, orderBy, skip, limit, maxQueryMs)
         flow {
             var now = System.nanoTime()
             var timeSum = 0L
-            Metrics.addToSum(metricsCountKey, 1.0)
+            Metrics.addToSumPerHandler(metricsCountKey, 1.0)
             try {
                 source.collect {
                     timeSum += (System.nanoTime() - now)
@@ -31,14 +30,14 @@ class MetricsFieldCollection<M: Any>(override val wraps: FieldCollection<M>, met
                 }
                 source.first()
             } finally {
-                Metrics.addToSum(metricsKey, timeSum / 1000000.0)
+                Metrics.addToSumPerHandler(metricsKey, timeSum / 1000000.0)
             }
         }
     }
 
-    override suspend fun count(condition: Condition<M>): Int = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) { wraps.count(condition) }
+    override suspend fun count(condition: Condition<M>): Int = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) { wraps.count(condition) }
 
-    override suspend fun <Key> groupCount(condition: Condition<M>, groupBy: DataClassPath<M, Key>): Map<Key, Int> = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    override suspend fun <Key> groupCount(condition: Condition<M>, groupBy: DataClassPath<M, Key>): Map<Key, Int> = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.groupCount(condition, groupBy)
     }
 
@@ -46,7 +45,7 @@ class MetricsFieldCollection<M: Any>(override val wraps: FieldCollection<M>, met
         aggregate: Aggregate,
         condition: Condition<M>,
         property: DataClassPath<M, N>
-    ): Double? = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    ): Double? = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.aggregate(aggregate, condition, property)
     }
 
@@ -55,15 +54,15 @@ class MetricsFieldCollection<M: Any>(override val wraps: FieldCollection<M>, met
         condition: Condition<M>,
         groupBy: DataClassPath<M, Key>,
         property: DataClassPath<M, N>
-    ): Map<Key, Double?> = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    ): Map<Key, Double?> = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.groupAggregate(aggregate, condition, groupBy, property)
     }
 
-    override suspend fun insert(models: Iterable<M>): List<M> = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    override suspend fun insert(models: Iterable<M>): List<M> = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.insert(models)
     }
 
-    override suspend fun replaceOne(condition: Condition<M>, model: M, orderBy: List<SortPart<M>>): EntryChange<M> = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    override suspend fun replaceOne(condition: Condition<M>, model: M, orderBy: List<SortPart<M>>): EntryChange<M> = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.replaceOne(condition, model, orderBy)
     }
 
@@ -71,11 +70,11 @@ class MetricsFieldCollection<M: Any>(override val wraps: FieldCollection<M>, met
         condition: Condition<M>,
         model: M,
         orderBy: List<SortPart<M>>
-    ): Boolean = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    ): Boolean = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.replaceOneIgnoringResult(condition, model, orderBy)
     }
 
-    override suspend fun upsertOne(condition: Condition<M>, modification: Modification<M>, model: M): EntryChange<M> = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    override suspend fun upsertOne(condition: Condition<M>, modification: Modification<M>, model: M): EntryChange<M> = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.upsertOne(condition, modification, model)
     }
 
@@ -83,7 +82,7 @@ class MetricsFieldCollection<M: Any>(override val wraps: FieldCollection<M>, met
         condition: Condition<M>,
         modification: Modification<M>,
         model: M
-    ): Boolean = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    ): Boolean = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.upsertOneIgnoringResult(condition, modification, model)
     }
 
@@ -91,7 +90,7 @@ class MetricsFieldCollection<M: Any>(override val wraps: FieldCollection<M>, met
         condition: Condition<M>,
         modification: Modification<M>,
         orderBy: List<SortPart<M>>
-    ): EntryChange<M> = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    ): EntryChange<M> = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.updateOne(condition, modification, orderBy)
     }
 
@@ -99,31 +98,31 @@ class MetricsFieldCollection<M: Any>(override val wraps: FieldCollection<M>, met
         condition: Condition<M>,
         modification: Modification<M>,
         orderBy: List<SortPart<M>>
-    ): Boolean = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    ): Boolean = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.updateOneIgnoringResult(condition, modification, orderBy)
     }
 
-    override suspend fun updateMany(condition: Condition<M>, modification: Modification<M>): CollectionChanges<M> = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    override suspend fun updateMany(condition: Condition<M>, modification: Modification<M>): CollectionChanges<M> = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.updateMany(condition, modification)
     }
 
-    override suspend fun updateManyIgnoringResult(condition: Condition<M>, modification: Modification<M>): Int = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    override suspend fun updateManyIgnoringResult(condition: Condition<M>, modification: Modification<M>): Int = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.updateManyIgnoringResult(condition, modification)
     }
 
-    override suspend fun deleteOne(condition: Condition<M>, orderBy: List<SortPart<M>>): M? = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    override suspend fun deleteOne(condition: Condition<M>, orderBy: List<SortPart<M>>): M? = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.deleteOne(condition, orderBy)
     }
 
-    override suspend fun deleteOneIgnoringOld(condition: Condition<M>, orderBy: List<SortPart<M>>): Boolean = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    override suspend fun deleteOneIgnoringOld(condition: Condition<M>, orderBy: List<SortPart<M>>): Boolean = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.deleteOneIgnoringOld(condition, orderBy)
     }
 
-    override suspend fun deleteMany(condition: Condition<M>): List<M> = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    override suspend fun deleteMany(condition: Condition<M>): List<M> = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.deleteMany(condition)
     }
 
-    override suspend fun deleteManyIgnoringOld(condition: Condition<M>): Int = Metrics.addPerformanceToSum(metricsKey, metricsCountKey) {
+    override suspend fun deleteManyIgnoringOld(condition: Condition<M>): Int = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.deleteManyIgnoringOld(condition)
     }
 
@@ -132,9 +131,3 @@ class MetricsFieldCollection<M: Any>(override val wraps: FieldCollection<M>, met
 
 fun <Model : Any> FieldCollection<Model>.metrics(metricsKeyName: String): FieldCollection<Model> =
     MetricsFieldCollection(this, metricsKeyName)
-
-fun Database.metrics(metricsKeyName: String): Database = object : Database by this {
-    override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> {
-        return this@metrics.collection<T>(type, name).metrics(metricsKeyName)
-    }
-}
