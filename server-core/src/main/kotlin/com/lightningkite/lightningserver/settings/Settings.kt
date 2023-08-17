@@ -19,6 +19,7 @@ object Settings {
         private set
 
     fun populate(map: Map<String, Any?>) {
+        if(sealed) throw IllegalStateException("Settings have already been populated.")
         sealed = true
         values.putAll(map.mapValues { Box(it.value) })
         val missing = requirements.keys - values.keys
@@ -30,6 +31,14 @@ object Settings {
                 logger.debug("Loading setting ${it.name}...")
                 it()
             }
+    }
+
+    fun reset() {
+        values.clear()
+        for(req in requirements) {
+            req.value.reset()
+        }
+        sealed = false
     }
 
     private data class Box<T>(val item: T)
@@ -47,10 +56,8 @@ object Settings {
     }
 
     fun populateDefaults(map: Map<String, Any?> = mapOf()) {
-        sealed = true
-        values.putAll(map.mapValues { Box(it.value) })
-        val missing = requirements.keys - values.keys
-        populate(missing.associateWith { requirements[it]!!.default })
+        val missing = requirements.keys - map.keys
+        populate(missing.associateWith { requirements[it]!!.default } + map)
     }
 
     data class Requirement<Serializable, Goal>(
@@ -60,12 +67,18 @@ object Settings {
         val optional: Boolean,
         val getter: (Serializable) -> Goal
     ) : () -> Goal {
-        val value by lazy<Goal> {
+        private var value = lazy<Goal> {
             @Suppress("UNCHECKED_CAST")
             getter(values[name]?.item as? Serializable ?: default)
         }
+        internal fun reset() {
+            value = lazy<Goal> {
+                @Suppress("UNCHECKED_CAST")
+                getter(values[name]?.item as? Serializable ?: default)
+            }
+        }
 
-        override fun invoke(): Goal = value
+        override fun invoke(): Goal = value.value
     }
 
     val isServerless: Boolean by lazy {
