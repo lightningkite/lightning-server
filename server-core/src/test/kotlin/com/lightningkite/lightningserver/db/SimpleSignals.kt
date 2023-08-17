@@ -13,7 +13,7 @@ import kotlin.test.fail
 
 class SimpleSignals {
 
-    lateinit var collection: InMemoryFieldCollection<TempThing>
+    lateinit var collection: FieldCollection<TempThing>
     val thing1 = TempThing(1)
     val thing2 = TempThing(2)
     val thing3 = TempThing(3)
@@ -27,8 +27,8 @@ class SimpleSignals {
     fun setup() {
         prepareModels()
         com.lightningkite.lightningserver.db.testmodels.prepareModels()
-        collection = TestSettings.database().collection<TempThing>() as InMemoryFieldCollection
-        collection.drop()
+        collection = TestSettings.database().collection<TempThing>()
+        runBlocking { collection.deleteManyIgnoringOld(Condition.Always()) }
     }
 
     @Test
@@ -338,7 +338,7 @@ class SimpleSignals {
         calledIds.clear()
         runCount = 0
 
-        collection.drop()
+        collection.deleteMany(Condition.Always())
         collection.insertMany(listOf(thing1, thing2, thing3))
 
 
@@ -355,7 +355,7 @@ class SimpleSignals {
         calledIds.clear()
         runCount = 0
 
-        collection.drop()
+        collection.deleteMany(Condition.Always())
         collection.insertMany(listOf(thing1, thing2, thing3))
 
         signaledCollection.replaceOneIgnoringResult(condition { it._id eq thing2._id }, thing3)
@@ -386,7 +386,7 @@ class SimpleSignals {
         runCount = 0
 
 
-        collection.drop()
+        collection.deleteMany(Condition.Always())
         collection.insertMany(listOf(thing1, thing2, thing3))
 
 

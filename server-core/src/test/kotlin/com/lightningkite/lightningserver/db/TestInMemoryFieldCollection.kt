@@ -25,16 +25,11 @@ class TestInMemoryFieldCollection {
 
         prepareModels()
         com.lightningkite.lightningserver.db.testmodels.prepareModels()
-        fieldCollection = TestSettings.database().collection<UniqueFieldClass>() as InMemoryFieldCollection
-        fieldCollection.drop()
-        setCollection = TestSettings.database().collection<UniqueSetClass>() as InMemoryFieldCollection
-        setCollection.drop()
-        comboCollection = TestSettings.database().collection<UniqueComboClass>() as InMemoryFieldCollection
-        comboCollection.drop()
-        setJankCollection = TestSettings.database().collection<UniqueSetJankClass>() as InMemoryFieldCollection
-        setJankCollection.drop()
-        comboJankCollection = TestSettings.database().collection<UniqueComboJankClass>() as InMemoryFieldCollection
-        comboJankCollection.drop()
+        fieldCollection = InMemoryDatabase().collection<UniqueFieldClass>() as InMemoryFieldCollection
+        setCollection = InMemoryDatabase().collection<UniqueSetClass>() as InMemoryFieldCollection
+        comboCollection = InMemoryDatabase().collection<UniqueComboClass>() as InMemoryFieldCollection
+        setJankCollection = InMemoryDatabase().collection<UniqueSetJankClass>() as InMemoryFieldCollection
+        comboJankCollection = InMemoryDatabase().collection<UniqueComboJankClass>() as InMemoryFieldCollection
 
     }
 

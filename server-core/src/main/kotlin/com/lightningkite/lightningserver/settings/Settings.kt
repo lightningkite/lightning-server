@@ -33,14 +33,6 @@ object Settings {
             }
     }
 
-    fun reset() {
-        values.clear()
-        for(req in requirements) {
-            req.value.reset()
-        }
-        sealed = false
-    }
-
     private data class Box<T>(val item: T)
 
     private val values = ConcurrentHashMap<String, Box<*>>()
@@ -67,18 +59,11 @@ object Settings {
         val optional: Boolean,
         val getter: (Serializable) -> Goal
     ) : () -> Goal {
-        private var value = lazy<Goal> {
+        private val value by lazy<Goal> {
             @Suppress("UNCHECKED_CAST")
             getter(values[name]?.item as? Serializable ?: default)
         }
-        internal fun reset() {
-            value = lazy<Goal> {
-                @Suppress("UNCHECKED_CAST")
-                getter(values[name]?.item as? Serializable ?: default)
-            }
-        }
-
-        override fun invoke(): Goal = value.value
+        override fun invoke(): Goal = value
     }
 
     val isServerless: Boolean by lazy {
