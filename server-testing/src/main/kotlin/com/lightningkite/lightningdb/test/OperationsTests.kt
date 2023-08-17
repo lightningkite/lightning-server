@@ -23,6 +23,17 @@ abstract class OperationsTests() {
         assertEquals(partialOf<LargeTestModel>("int" to m.int), result.first())
     }
 
+    @Test fun test_massUpdate(): Unit = runBlocking {
+        val collection = database.collection<LargeTestModel>("test_partials")
+        val basis = (0..100).map { LargeTestModel(int = it) }
+        collection.insert(basis)
+        val cond = condition<LargeTestModel> { it.int gt 50 }
+        val mod = modification<LargeTestModel> { it.boolean assign true }
+        val out = collection.updateMany(cond, mod)
+        assertEquals(basis.map { if(cond(it)) mod(it) else it }, collection.all().toList().sortedBy { it.int })
+        assertEquals(basis.filter { cond(it) }.map { EntryChange(it, mod(it)) }.sortedBy { it.old?.int }, out.changes.sortedBy { it.old?.int })
+    }
+
     @Test fun test_replace(): Unit = runBlocking {
         val collection = database.collection<LargeTestModel>("test_replace")
         var m = LargeTestModel()

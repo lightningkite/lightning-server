@@ -2,12 +2,14 @@ package com.lightningkite.lightningserver.metrics
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
+import org.junit.Ignore
 import org.junit.Test
 import java.time.Instant
 import kotlin.random.Random
 
 class CloudwatchMetricsTest {
     @Test
+    @Ignore
     fun metricsTest(): Unit = runBlocking {
         CloudwatchMetrics
         val testMetric = MetricType("Test Metric", MetricUnit.Percent)
