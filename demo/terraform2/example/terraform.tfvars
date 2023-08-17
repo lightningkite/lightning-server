@@ -17,7 +17,12 @@ reporting_email = "joseph@lightningkite.com"
 metrics         = {
   url                  = "db://database"
   trackingByEntryPoint = [
-    "executionTime"
+    "Health Checks Run",
+    "Execution Time",
+    "database Wait Time",
+    "database Call Count",
+    "cache Wait Time",
+    "cache Call Count",
   ]
   trackingTotalsOnly = []
 }
@@ -27,3 +32,10 @@ exceptions = {
 emergencyContact = "joseph@lightningkite.com"
 #  files_expiry = null
 lambda_timeout = 45
+logging = {
+  default = {
+    filePattern = null
+    level = "DEBUG"
+    toConsole = true
+  }
+}

@@ -17,7 +17,7 @@
         "database": "MongoDB Serverless",
         "logging": "Direct",
         "files": "S3",
-        "metrics": "Direct",
+        "metrics": "Cloudwatch",
         "email": "SMTP through SES",
         "oauth_google": "Direct",
         "oauth_microsoft": "Direct"

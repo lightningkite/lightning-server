@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.settings
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.logging.loggingSettings
+import com.lightningkite.lightningserver.metrics.Metricable
 import com.lightningkite.lightningserver.metrics.metricsCleanSchedule
 import com.lightningkite.lightningserver.metrics.metricsSettings
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -18,6 +19,7 @@ object Settings {
         private set
 
     fun populate(map: Map<String, Any?>) {
+        if(sealed) throw IllegalStateException("Settings have already been populated.")
         sealed = true
         values.putAll(map.mapValues { Box(it.value) })
         val missing = requirements.keys - values.keys
@@ -46,10 +48,8 @@ object Settings {
     }
 
     fun populateDefaults(map: Map<String, Any?> = mapOf()) {
-        sealed = true
-        values.putAll(map.mapValues { Box(it.value) })
-        val missing = requirements.keys - values.keys
-        populate(missing.associateWith { requirements[it]!!.default })
+        val missing = requirements.keys - map.keys
+        populate(missing.associateWith { requirements[it]!!.default } + map)
     }
 
     data class Requirement<Serializable, Goal>(
@@ -59,11 +59,10 @@ object Settings {
         val optional: Boolean,
         val getter: (Serializable) -> Goal
     ) : () -> Goal {
-        val value by lazy<Goal> {
+        private val value by lazy<Goal> {
             @Suppress("UNCHECKED_CAST")
             getter(values[name]?.item as? Serializable ?: default)
         }
-
         override fun invoke(): Goal = value
     }
 
@@ -99,6 +98,7 @@ inline fun <reified Goal> setting(
     getter = { it }
 )
 
+@JvmName("settingInvokable")
 inline fun <reified Serializable : () -> Goal, Goal> setting(
     name: String,
     default: Serializable,
@@ -109,4 +109,18 @@ inline fun <reified Serializable : () -> Goal, Goal> setting(
     optional = optional,
     serializer = Serialization.module.serializer<Serializable>(),
     getter = { it() }
+)
+
+
+@JvmName("settingInvokableMetricable")
+inline fun <reified Serializable : () -> Goal, Goal: Metricable<Goal>> setting(
+    name: String,
+    default: Serializable,
+    optional: Boolean = false
+): Settings.Requirement<Serializable, Goal> = setting<Serializable, Goal>(
+    name = name,
+    default = default,
+    optional = optional,
+    serializer = Serialization.module.serializer<Serializable>(),
+    getter = { it().withMetrics(name) }
 )

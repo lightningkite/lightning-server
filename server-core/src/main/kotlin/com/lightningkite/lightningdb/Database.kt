@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.lightningserver.metrics.Metricable
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.serialization.Serializable
@@ -10,7 +11,7 @@ import kotlin.reflect.typeOf
  * An abstracted model for communicating with a Database.
  * Every implementation will handle how to return a FieldCollection to perform actions on a collection/table in the underlying database system.
  */
-interface Database : HealthCheckable {
+interface Database : HealthCheckable, Metricable<Database> {
 
     /**
      * Returns a FieldCollection of type T that will access and manipulate data from a collection/table in the underlying database system.
@@ -29,6 +30,12 @@ interface Database : HealthCheckable {
             return HealthStatus(HealthStatus.Level.OK)
         } catch (e: Exception) {
             return HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
+        }
+    }
+
+    override fun withMetrics(metricsKeyName: String): Database = object : Database by this {
+        override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> {
+            return this@Database.collection<T>(type, name).metrics(metricsKeyName)
         }
     }
 }

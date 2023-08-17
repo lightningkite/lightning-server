@@ -6,6 +6,7 @@
 variable "oauth_github" {
     type = any
     default = null
+    nullable = true
 }
 
 ##########

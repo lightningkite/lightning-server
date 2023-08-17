@@ -6,10 +6,12 @@
 variable "cors" {
     type = object({ allowedDomains = list(string), allowedHeaders = list(string) })
     default = null
+    nullable = true
 }
 variable "display_name" {
     type = string
     default = "demo-example"
+    nullable = false
 }
 
 ##########

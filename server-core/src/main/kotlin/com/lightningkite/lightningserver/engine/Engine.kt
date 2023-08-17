@@ -1,11 +1,15 @@
 package com.lightningkite.lightningserver.engine
 
+import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.tasks.Task
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.time.delay
 import org.slf4j.LoggerFactory
+import java.time.Duration
 
 /**
  * An abstraction layer meant to make async tasks in each environment configurable.
@@ -13,6 +17,24 @@ import org.slf4j.LoggerFactory
  */
 interface Engine {
     suspend fun launchTask(task: Task<Any?>, input: Any?)
+    fun backgroundReportingAction(action: suspend ()->Unit) {
+        GlobalScope.launch {
+            while (true) {
+                delay(Duration.ofMinutes(5))
+                try {
+                    action()
+                } catch(e: Exception) {
+                    e.report()
+                }
+            }
+        }
+        Runtime.getRuntime().addShutdownHook(Thread {
+            Metrics.logger.info("Shutdown hook running...")
+            runBlocking {
+                action()
+            }
+        })
+    }
 }
 
 /**

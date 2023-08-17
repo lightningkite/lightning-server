@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.metrics
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.HtmlDefaults
+import com.lightningkite.lightningserver.auth.rawUser
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
@@ -9,6 +10,7 @@ import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.handler
+import com.lightningkite.lightningserver.meta.MetaEndpoints
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.queryParameters
@@ -19,6 +21,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import java.time.Duration
 import java.time.Instant
 
 class DatabaseMetrics(override val settings: MetricSettings, val database: () -> Database) :
@@ -27,16 +30,22 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         prepareModels()
     }
 
+    val keepFor: Map<Duration, Duration> = mapOf(
+        Duration.ofDays(1) to Duration.ofDays(7),
+        Duration.ofHours(2) to Duration.ofDays(1),
+        Duration.ofMinutes(10) to Duration.ofHours(2),
+    )
+
     val collection by lazy { database().collection<MetricSpanStats>() }
 
     override suspend fun report(events: List<MetricEvent>) = coroutineScope {
         val jobs = ArrayList<Job>()
-        for (span in settings.keepFor.keys) {
-            events.groupBy { it.type to it.entryPoint }.forEach { (typeAndEntryPoint, typeEvents) ->
+        for (span in keepFor.keys) {
+            events.filter { it.entryPoint != null }.groupBy { it.metricType to it.entryPoint }.forEach { (typeAndEntryPoint, typeEvents) ->
                 val (type, entryPoint) = typeAndEntryPoint
-                if (type in settings.trackingByEntryPoint) {
+                if (type.name in settings.trackingByEntryPoint) {
                     typeEvents.groupBy { it.time.roundTo(span) }.forEach { (rounded, spanEvents) ->
-                        val stats = spanEvents.stats(entryPoint, type, rounded, span)
+                        val stats = spanEvents.stats(entryPoint!!, type.name, rounded, span)
                         jobs.add(launch {
                             collection.upsertOneIgnoringResult(
                                 condition { m -> m._id eq stats._id },
@@ -47,10 +56,10 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
                     }
                 }
             }
-            events.groupBy { it.type }.forEach { (type, typeEvents) ->
-                if (type in settings.trackingTotalsOnly || type in settings.trackingByEntryPoint) {
+            events.groupBy { it.metricType }.forEach { (type, typeEvents) ->
+                if (type.name in settings.trackingTotalsOnly || type.name in settings.trackingByEntryPoint) {
                     typeEvents.groupBy { it.time.roundTo(span) }.forEach { (rounded, spanEvents) ->
-                        val stats = spanEvents.stats("total", type, rounded, span)
+                        val stats = spanEvents.stats("total", type.name, rounded, span)
                         jobs.add(launch {
                             collection.upsertOneIgnoringResult(
                                 condition { m -> m._id eq stats._id },
@@ -69,7 +78,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
     }
 
     override suspend fun clean() {
-        settings.keepFor.entries.forEach { entry ->
+        keepFor.entries.forEach { entry ->
             collection.deleteManyIgnoringOld(condition {
                 (it.timeSpan eq entry.key) and
                         (it.timeStamp lt Instant.now().minus(entry.value))
@@ -78,11 +87,11 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
     }
 
     val dashboard = get.handler { req ->
-        if (!Metrics.shouldAllowAccess(req)) throw ForbiddenException()
+        if (!MetaEndpoints.isAdministrator(req.rawUser())) throw ForbiddenException()
         HttpResponse.html(
             content = HtmlDefaults.basePage(
                 buildString {
-                    for (span in settings.keepFor.keys) {
+                    for (span in keepFor.keys) {
                         appendLine("<h2>$span</h2>")
                         appendLine("<h3>Most Expensive</h3>")
                         collection.find(
@@ -100,14 +109,14 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         )
     }
     val reportEndpoint = get("raw").handler { req ->
-        if (!Metrics.shouldAllowAccess(req)) throw ForbiddenException()
+        if (!MetaEndpoints.isAdministrator(req.rawUser())) throw ForbiddenException()
         val result = collection.query(req.queryParameters()).toList()
         HttpResponse(
             body = result.toHttpContent(req.headers.accept)
         )
     }
     val visualizeIndexA = get("visual").handler {
-        if (!Metrics.shouldAllowAccess(it)) throw ForbiddenException()
+        if (!MetaEndpoints.isAdministrator(it.rawUser())) throw ForbiddenException()
         HttpResponse.html(content = HtmlDefaults.basePage(buildString {
             appendLine("<ul>")
             for (metric in settings.trackingByEntryPoint) {
@@ -125,7 +134,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         }))
     }
     val visualizeIndexB = get("visual/{metric}").handler {
-        if (!Metrics.shouldAllowAccess(it)) throw ForbiddenException()
+        if (!MetaEndpoints.isAdministrator(it.rawUser())) throw ForbiddenException()
         HttpResponse.html(content = HtmlDefaults.basePage(buildString {
             appendLine("<ul>")
             val endpoints =
@@ -153,12 +162,12 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         }))
     }
     val visualizeIndexC = get("visual/{metric}/{endpoint}").handler {
-        if (!Metrics.shouldAllowAccess(it)) throw ForbiddenException()
+        if (!MetaEndpoints.isAdministrator(it.rawUser())) throw ForbiddenException()
         HttpResponse.html(content = HtmlDefaults.basePage(buildString {
             appendLine("<ul>")
             val metric = it.parts["metric"]!!
             val endpoint = it.parts["endpoint"]!!
-            for (span in settings.keepFor.keys) {
+            for (span in keepFor.keys) {
                 for (summary in listOf("min", "max", "sum", "count", "average")) {
                     appendLine(
                         "<li><a href=${
@@ -178,7 +187,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         }))
     }
     val visualizeSpecific = get("visual/{metric}/{endpoint}/{span}/{summary}").handler {
-        if (!Metrics.shouldAllowAccess(it)) throw ForbiddenException()
+        if (!MetaEndpoints.isAdministrator(it.rawUser())) throw ForbiddenException()
         val metric = it.parts.getValue("metric")
         val endpoint = it.parts.getValue("endpoint")
         val span = Serialization.fromString(it.parts.getValue("span"), DurationSerializer)

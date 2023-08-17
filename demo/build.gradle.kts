@@ -53,8 +53,12 @@ tasks.create("lambda", Sync::class.java) {
     dependsOn(jarTask)
     val output = jarTask.outputs.files.find { it.extension == "jar" }!!
     from(zipTree(output))
+    duplicatesStrategy = DuplicatesStrategy.WARN
     into("lib") {
-        from(configurations.runtimeClasspath)
+        from(configurations.runtimeClasspath) {
+            var index = 0
+            rename { s -> (index++).toString() + s }
+        }
     }
 }
 

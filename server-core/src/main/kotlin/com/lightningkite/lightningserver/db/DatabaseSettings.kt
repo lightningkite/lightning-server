@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Pluggable
 import kotlinx.serialization.KSerializer
@@ -20,7 +21,6 @@ import kotlin.reflect.KType
 @Serializable
 data class DatabaseSettings(
     val url: String = "ram-unsafe-persist://${File("./local/database").absolutePath}",
-    val databaseName: String = "default",
 ) : () -> Database {
 
     companion object : Pluggable<DatabaseSettings, Database>() {
@@ -39,13 +39,12 @@ data class DatabaseSettings(
                 val x = it.url.substringAfter("://")
                 val delay = x.substringBefore("/").toLong()
                 val wraps = x.substringAfter("/")
-                parse(wraps, DatabaseSettings(wraps, it.databaseName)).delayed(delay)
+                parse(wraps, DatabaseSettings(wraps)).delayed(delay)
             }
         }
     }
 
     override fun invoke(): Database = parse(url.substringBefore("://"), this)
-
 }
 
 /**
@@ -57,10 +56,10 @@ data class DatabaseSettings(
  * @param premadeData A JsonObject that contains data you wish to populate the database with on creation.
  */
 class InMemoryDatabase(val premadeData: JsonObject? = null) : Database {
-    val collections = HashMap<String, FieldCollection<*>>()
+    val collections = HashMap<Pair<KType, String>, FieldCollection<*>>()
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> = collections.getOrPut(name) {
+    override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> = collections.getOrPut(type to name) {
         val serializer = Serialization.Internal.json.serializersModule.serializer(type) as KSerializer<T>
         val made = InMemoryFieldCollection(serializer = serializer)
         premadeData?.get(name)?.let {
@@ -95,11 +94,11 @@ class InMemoryUnsafePersistenceDatabase(val folder: File) : Database {
         folder.mkdirs()
     }
 
-    val collections = HashMap<String, FieldCollection<*>>()
+    val collections = HashMap<Pair<KType, String>, FieldCollection<*>>()
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> = synchronized(collections) {
-        collections.getOrPut(name) {
+        collections.getOrPut(type to name) {
             val fileName = name.filter { it.isLetterOrDigit() }
             val oldStyle = folder.resolve(fileName)
             val storage = folder.resolve("$fileName.json")

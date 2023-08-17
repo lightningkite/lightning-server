@@ -506,7 +506,7 @@ class JsonSchemaBuilder(
             )
 
             PolymorphicKind.OPEN -> TODO()
-            SerialKind.CONTEXTUAL -> throw Error("This should not be reachable")
+            SerialKind.CONTEXTUAL -> throw Error("This should not be reachable - ${desc.serialName} could be unwrapped no further")
         }
     }
 

@@ -6,6 +6,7 @@
 variable "oauth_google" {
     type = any
     default = null
+    nullable = true
 }
 
 ##########

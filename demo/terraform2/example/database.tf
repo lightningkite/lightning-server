@@ -5,6 +5,12 @@
 
 variable "database_org_id" {
     type = string
+    nullable = false
+}
+variable "database_continuous_backup" {
+    type = bool
+    default = false
+    nullable = false
 }
 
 ##########
@@ -38,6 +44,8 @@ resource "mongodbatlas_serverless_instance" "database" {
   provider_settings_backing_provider_name = "AWS"
   provider_settings_provider_name = "SERVERLESS"
   provider_settings_region_name = replace(upper(var.deployment_location), "-", "_")
+  
+  continuous_backup_enabled = var.database_continuous_backup
 }
 resource "mongodbatlas_database_user" "database" {
   username           = "demoexampledatabase-main"

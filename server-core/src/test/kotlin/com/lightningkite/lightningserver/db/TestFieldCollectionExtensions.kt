@@ -18,8 +18,7 @@ class TestFieldCollectionExtensions {
     fun setup() {
         prepareModels()
         com.lightningkite.lightningserver.db.testmodels.prepareModels()
-        collection = TestSettings.database().collection<TempThing>() as InMemoryFieldCollection
-        collection.drop()
+        collection = InMemoryDatabase().collection<TempThing>() as InMemoryFieldCollection
     }
 
     @Test

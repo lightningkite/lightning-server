@@ -247,6 +247,7 @@ class MongoFieldCollection<Model : Any>(
         prepare.await()
         val m = modification.simplify().bson()
         return exceptionWrap {
+            // TODO: Ugly hack for handling weird upserts
             if (m.upsert(model, serializer)) {
                 mongo.findOneAndUpdate(
                     cs.bson(),
@@ -288,6 +289,7 @@ class MongoFieldCollection<Model : Any>(
         prepare.await()
         return exceptionWrap {
             val m = modification.simplify().bson()
+            // TODO: Ugly hack for handling weird upserts
             if (m.upsert(model, serializer)) {
                 mongo.updateOne(cs.bson(), m.document, m.options).matchedCount > 0
             } else {
@@ -353,6 +355,7 @@ class MongoFieldCollection<Model : Any>(
         prepare.await()
         val m = modification.simplify().bson()
         val changes = ArrayList<EntryChange<Model>>()
+        // TODO: Don't love that we have to do this in chunks, but I guess we'll live.  Could this be done with pipelines?
         exceptionWrap {
             mongo.withDocumentClass<BsonDocument>().find(cs.bson()).toFlow().collectChunked(1000) { list ->
                 mongo.updateMany(Filters.`in`("_id", list.map { it["_id"] }), m.document, m.options)
@@ -388,6 +391,7 @@ class MongoFieldCollection<Model : Any>(
         if (cs is Condition.Never) return null
         prepare.await()
         return exceptionWrap {
+            // TODO: Hack, needs some retry logic at a minimum
             mongo.withDocumentClass<BsonDocument>().find(cs.bson())
                 .let { if (orderBy.isEmpty()) it else it.sort(sort(orderBy)) }
                 .limit(1).toFlow().firstOrNull()?.let {
@@ -415,6 +419,7 @@ class MongoFieldCollection<Model : Any>(
         prepare.await()
         val remove = ArrayList<Model>()
         exceptionWrap {
+            // TODO: Don't love that we have to do this in chunks, but I guess we'll live.  Could this be done with pipelines?
             mongo.withDocumentClass<BsonDocument>().find(cs.bson()).toFlow().collectChunked(1000) { list ->
                 mongo.deleteMany(Filters.`in`("_id", list.map { it["_id"] }))
                 list.asSequence().map { MongoDatabase.bson.load(serializer, it) }
@@ -466,6 +471,7 @@ class MongoFieldCollection<Model : Any>(
                     try {
                         mongo.ensureIndex(keys, options)
                     } catch (e: MongoCommandException) {
+                        // Reform index if it already exists but with some difference in options
                         if (e.errorCode == 85) {
                             mongo.dropIndex(keys)
                             mongo.ensureIndex(keys, options)
@@ -479,6 +485,7 @@ class MongoFieldCollection<Model : Any>(
                     try {
                         mongo.ensureIndex(keys, options)
                     } catch (e: MongoCommandException) {
+                        // Reform index if it already exists but with some difference in options
                         if (e.errorCode == 85) {
                             mongo.dropIndex(keys)
                             mongo.ensureIndex(keys, options)

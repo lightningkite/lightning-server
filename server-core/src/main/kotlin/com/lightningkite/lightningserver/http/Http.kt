@@ -35,7 +35,7 @@ object Http {
     var exception: suspend (HttpRequest, Exception) -> HttpResponse =
         { request, exception ->
             if (exception is HttpStatusException) {
-                if(generalSettings().debug) {
+                if (generalSettings().debug) {
                     println(exception.toLSError())
                     logger.warn(exception.toLSError().toString())
                 }
@@ -61,21 +61,21 @@ object Http {
         )
     }
 
-    val onRequest = ArrayList<suspend (HttpRequest)->Unit>()
+    val onRequest = ArrayList<suspend (HttpRequest) -> Unit>()
 
     suspend fun execute(request: HttpRequest): HttpResponse {
-        return Metrics.handlerPerformance(request.endpoint) {
-            endpoints[request.endpoint]?.let { handler ->
-                try {
+        return endpoints[request.endpoint]?.let { handler ->
+            try {
+                Metrics.handlerPerformance(request.endpoint) {
                     onRequest.forEach { it(request) }
                     handler(request)
-                } catch (e: Exception) {
-                    exception(request, e)
                 }
-            } ?: notFound(request.endpoint, request).also {
-                if(generalSettings().debug) {
-                    logger.warn("${request.endpoint} not found!")
-                }
+            } catch (e: Exception) {
+                exception(request, e)
+            }
+        } ?: notFound(request.endpoint, request).also {
+            if (generalSettings().debug) {
+                logger.warn("${request.endpoint} not found!")
             }
         }
     }

@@ -6,14 +6,17 @@
 variable "lambda_memory_size" {
     type = number
     default = 1024
+    nullable = false
 }
 variable "lambda_timeout" {
     type = number
     default = 30
+    nullable = false
 }
 variable "lambda_snapstart" {
     type = bool
     default = false
+    nullable = false
 }
 
 ##########
@@ -28,10 +31,6 @@ variable "lambda_snapstart" {
 resource "aws_s3_bucket" "lambda_bucket" {
   bucket_prefix = "demo-example-lambda-bucket"
   force_destroy = true
-}
-resource "aws_s3_bucket_acl" "lambda_bucket" {
-  bucket = aws_s3_bucket.lambda_bucket.id
-  acl    = "private"
 }
 resource "aws_iam_policy" "lambda_bucket" {
   name        = "demo-example-lambda_bucket"
@@ -159,11 +158,7 @@ resource "aws_lambda_function" "main" {
   snap_start {
     apply_on = "PublishedVersions"
   }
-  layers = [
-    "arn:aws:lambda:us-west-2:580247275435:layer:LambdaInsightsExtension:21"
-  ]
-
-  
+  layers = []
   
   environment {
     variables = {
@@ -196,8 +191,8 @@ resource "local_sensitive_file" "settings_raw" {
         url = "dynamodb://${var.deployment_location}/demo_example"
     }
     jwt = {
-        expirationMilliseconds = var.jwt_expirationMilliseconds 
-        emailExpirationMilliseconds = var.jwt_emailExpirationMilliseconds 
+        expiration = var.jwt_expiration 
+        emailExpiration = var.jwt_emailExpiration 
         secret = random_password.jwt.result
     }
     oauth_github = var.oauth_github
@@ -218,9 +213,12 @@ resource "local_sensitive_file" "settings_raw" {
         storageUrl = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
         signedUrlExpiration = var.files_expiry
     }
-    metrics = var.metrics
+    metrics = {
+        url = "cloudwatch://${var.deployment_location}/${var.metrics_namespace}"
+        trackingByEntryPoint = var.metrics_tracked
+    }
     email = {
-        url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.us-west-2.amazonaws.com:587" 
+        url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.${var.deployment_location}.amazonaws.com:587" 
         fromEmail = "noreply@${var.domain_name}"
     }
     oauth_google = var.oauth_google

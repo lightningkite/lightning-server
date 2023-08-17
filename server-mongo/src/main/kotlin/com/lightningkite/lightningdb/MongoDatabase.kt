@@ -43,12 +43,12 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
     private var client = lazy(makeClient)
     private var databaseLazy = lazy { client.value.coroutine.getDatabase(databaseName) }
     val database get() = databaseLazy.value
-    private var coroutineCollections = ConcurrentHashMap<String, Lazy<CoroutineCollection<*>>>()
+    private var coroutineCollections = ConcurrentHashMap<Pair<KType, String>, Lazy<CoroutineCollection<*>>>()
     override suspend fun disconnect() {
         if (client.isInitialized()) client.value.close()
         client = lazy(makeClient)
         databaseLazy = lazy { client.value.coroutine.getDatabase(databaseName) }
-        coroutineCollections = ConcurrentHashMap<String, Lazy<CoroutineCollection<*>>>()
+        coroutineCollections = ConcurrentHashMap()
     }
 
     override suspend fun connect() {
@@ -79,7 +79,8 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                 contextual(Binary::class, BinarySerializer)
             }))
             DatabaseSettings.register("mongodb") {
-                MongoDatabase(databaseName = it.databaseName) {
+                val databaseName: String = it.url.substringAfter("://").substringAfter('@').substringAfter('/', "").substringBefore('?')
+                MongoDatabase(databaseName = databaseName) {
                     KMongo.createClient(
                         MongoClientSettings.builder()
                             .applyConnectionString(ConnectionString(it.url))
@@ -96,7 +97,8 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                 }
             }
             DatabaseSettings.register("mongodb+srv") {
-                MongoDatabase(databaseName = it.databaseName) {
+                val databaseName: String = it.url.substringAfter("://").substringAfter('@').substringAfter('/', "").substringBefore('?')
+                MongoDatabase(databaseName = databaseName) {
                     KMongo.createClient(
                         MongoClientSettings.builder()
                             .applyConnectionString(ConnectionString(it.url))
@@ -113,10 +115,10 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                 }
             }
             DatabaseSettings.register("mongodb-test") {
-                MongoDatabase(databaseName = it.databaseName) { testMongo() }
+                MongoDatabase(databaseName = "default") { testMongo() }
             }
             DatabaseSettings.register("mongodb-file") {
-                MongoDatabase(databaseName = it.databaseName) { embeddedMongo(File(it.url.removePrefix("mongodb-file://"))) }
+                MongoDatabase(databaseName = "default") { embeddedMongo(File(it.url.removePrefix("mongodb-file://"))) }
             }
         }
     }
@@ -130,7 +132,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                 MongoFieldCollection(
                     bson.serializersModule.serializer(type) as KSerializer<T>
                 ) {
-                    (coroutineCollections.getOrPut(name) {
+                    (coroutineCollections.getOrPut(type to name) {
                         lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
                             databaseLazy.value
                                 .database
