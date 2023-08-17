@@ -24,7 +24,7 @@ abstract class OperationsTests() {
     }
 
     @Test fun test_massUpdate(): Unit = runBlocking {
-        val collection = database.collection<LargeTestModel>("test_partials")
+        val collection = database.collection<LargeTestModel>("test_massUpdate")
         val basis = (0..100).map { LargeTestModel(int = it) }
         collection.insert(basis)
         val cond = condition<LargeTestModel> { it.int gt 50 }
