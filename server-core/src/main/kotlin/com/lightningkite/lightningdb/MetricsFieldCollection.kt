@@ -28,7 +28,6 @@ class MetricsFieldCollection<M: Any>(override val wraps: FieldCollection<M>, met
                     emit(it)
                     now = System.nanoTime()
                 }
-                source.first()
             } finally {
                 Metrics.addToSumPerHandler(metricsKey, timeSum / 1000000.0)
             }
