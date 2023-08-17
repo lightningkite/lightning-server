@@ -43,12 +43,12 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
     private var client = lazy(makeClient)
     private var databaseLazy = lazy { client.value.coroutine.getDatabase(databaseName) }
     val database get() = databaseLazy.value
-    private var coroutineCollections = ConcurrentHashMap<String, Lazy<CoroutineCollection<*>>>()
+    private var coroutineCollections = ConcurrentHashMap<Pair<KType, String>, Lazy<CoroutineCollection<*>>>()
     override suspend fun disconnect() {
         if (client.isInitialized()) client.value.close()
         client = lazy(makeClient)
         databaseLazy = lazy { client.value.coroutine.getDatabase(databaseName) }
-        coroutineCollections = ConcurrentHashMap<String, Lazy<CoroutineCollection<*>>>()
+        coroutineCollections = ConcurrentHashMap()
     }
 
     override suspend fun connect() {
@@ -132,7 +132,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                 MongoFieldCollection(
                     bson.serializersModule.serializer(type) as KSerializer<T>
                 ) {
-                    (coroutineCollections.getOrPut(name) {
+                    (coroutineCollections.getOrPut(type to name) {
                         lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
                             databaseLazy.value
                                 .database

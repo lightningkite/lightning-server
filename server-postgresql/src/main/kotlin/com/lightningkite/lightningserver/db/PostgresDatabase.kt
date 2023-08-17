@@ -57,11 +57,11 @@ class PostgresDatabase(private val makeDb: () -> Database) : com.lightningkite.l
         }
     }
 
-    private val collections = ConcurrentHashMap<String, Lazy<PostgresCollection<*>>>()
+    private val collections = ConcurrentHashMap<Pair<KType, String>, Lazy<PostgresCollection<*>>>()
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any> collection(type: KType, name: String): PostgresCollection<T> =
-        (collections.getOrPut(name) {
+        (collections.getOrPut(type to name) {
             lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
                 PostgresCollection(
                     db,
