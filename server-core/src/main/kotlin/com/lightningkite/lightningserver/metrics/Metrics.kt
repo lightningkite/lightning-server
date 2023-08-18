@@ -50,15 +50,15 @@ interface Metrics: HealthCheckable {
         init {
             Tasks.onEngineReady {
                 com.lightningkite.lightningserver.engine.engine.backgroundReportingAction {
-                    println("Assembling metrics to report...")
+                    logger.debug("Assembling metrics to report...")
                     val assembledData = ArrayList<MetricEvent>(toReport.size)
                     while (true) {
                         val item = toReport.poll() ?: break
                         assembledData.add(item)
                     }
-                    println("Reporting ${assembledData.size} metric events to ${main()}...")
+                    logger.debug("Reporting ${assembledData.size} metric events to ${main()}...")
                     main().report(assembledData)
-                    println("Report complete.")
+                    logger.debug("Report complete.")
                 }
             }
         }

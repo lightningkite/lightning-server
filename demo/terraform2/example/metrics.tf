@@ -4,21 +4,14 @@
 ##########
 
 variable "metrics_tracked" {
-  type    = list(string)
-  default = [
-    "Health Checks Run",
-    "Execution Time",
-    "database Wait Time",
-    "database Call Count",
-    "cache Wait Time",
-    "cache Call Count",
-  ]
-  nullable = false
+    type = list(string)
+    default = ["Health Checks Run", "Execution Time"]
+    nullable = false
 }
 variable "metrics_namespace" {
-  type     = string
-  default  = "demo-example"
-  nullable = false
+    type = string
+    default = "demo-example"
+    nullable = false
 }
 
 ##########
@@ -32,20 +25,20 @@ variable "metrics_namespace" {
 
 resource "aws_iam_policy" "metrics" {
   name        = "demo-example-metrics"
-  path        = "/demo/example/metrics/"
+  path = "/demo/example/metrics/"
   description = "Access to publish metrics"
-  policy      = jsonencode({
-    Version   = "2012-10-17"
+  policy = jsonencode({
+    Version = "2012-10-17"
     Statement = [
       {
         Action = [
           "cloudwatch:PutMetricData",
         ]
-        Effect    = "Allow"
+        Effect   = "Allow"
         Condition = {
-          StringEquals = {
-            "cloudwatch:namespace" : var.metrics_namespace
-          }
+            StringEquals = {
+                "cloudwatch:namespace": var.metrics_namespace
+            }
         }
         Resource = ["*"]
       },

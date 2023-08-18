@@ -1305,68 +1305,6 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
               }
               alarm_actions = [aws_sns_topic.emergency.arn]
             }
-            resource "aws_cloudwatch_event_rule" "panic" {
-              name        = "${namePrefix}_panic"
-              description = "Throttle the function in a true emergency."
-              event_pattern = jsonencode({
-                source = ["aws.cloudwatch"]
-                "detail-type" = ["CloudWatch Alarm State Change"]
-                detail = {
-                  alarmName = [
-                    aws_cloudwatch_metric_alarm.panic_invocations.alarm_name, 
-                    aws_cloudwatch_metric_alarm.panic_compute.alarm_name
-                  ]
-                  previousState = {
-                    value = ["OK", "INSUFFICIENT_DATA"]
-                  }
-                  state = {
-                    value = ["ALARM"]
-                  }
-                }
-              })
-            }
-            resource "aws_cloudwatch_event_target" "panic" {
-              rule      = aws_cloudwatch_event_rule.panic.name
-              target_id = "lambda"
-              arn       = aws_lambda_function.main.arn
-              input     = "{\"panic\": true}"
-              retry_policy {
-                maximum_event_age_in_seconds = 60
-                maximum_retry_attempts = 1
-              }
-            }
-            resource "aws_lambda_permission" "panic" {
-              action        = "lambda:InvokeFunction"
-              function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
-              principal     = "events.amazonaws.com"
-              source_arn    = aws_cloudwatch_event_rule.panic.arn
-              lifecycle {
-                create_before_destroy = $createBeforeDestroy
-              }
-            }
-            
-            resource "aws_iam_role_policy_attachment" "panic" {
-              role       = aws_iam_role.main_exec.name
-              policy_arn = aws_iam_policy.panic.arn
-            }
-    
-            resource "aws_iam_policy" "panic" {
-              name        = "${projectInfo.namePrefix}-panic"
-              path = "/${projectInfo.namePrefixPath}/panic/"
-              description = "Access to self-throttle"
-              policy = jsonencode({
-                Version = "2012-10-17"
-                Statement = [
-                  {
-                    Action = [
-                      "lambda:PutFunctionConcurrency",
-                    ]
-                    Effect   = "Allow"
-                    Resource = [aws_lambda_function.main.arn]
-                  },
-                ]
-              })
-            }
         """.trimIndent()
             )
         }
@@ -1460,30 +1398,6 @@ internal fun awsLambdaHandler(
           bucket_prefix = "${project.namePrefixPathSegment}-lambda-bucket"
           force_destroy = true
         }
-        resource "aws_iam_policy" "lambda_bucket" {
-          name        = "${project.namePrefix}-lambda_bucket"
-          path = "/${project.namePrefixPath}/lambda_bucket/"
-          description = "Access to the ${project.namePrefix}_lambda_bucket bucket"
-          policy = jsonencode({
-            Version = "2012-10-17"
-            Statement = [
-              {
-                Action = [
-                  "s3:GetObject",
-                ]
-                Effect   = "Allow"
-                Resource = [
-                    "${'$'}{aws_s3_bucket.lambda_bucket.arn}",
-                    "${'$'}{aws_s3_bucket.lambda_bucket.arn}/*",
-                ]
-              },
-            ]
-          })
-        }
-        resource "aws_iam_role_policy_attachment" "lambda_bucket" {
-          role       = aws_iam_role.main_exec.name
-          policy_arn = aws_iam_policy.lambda_bucket.arn
-        }
         
         resource "aws_iam_role" "main_exec" {
           name = "${project.namePrefix}-main-exec"
@@ -1502,26 +1416,23 @@ internal fun awsLambdaHandler(
           })
         }
         
-        resource "aws_iam_role_policy_attachment" "dynamo" {
-          role       = aws_iam_role.main_exec.name
-          policy_arn = aws_iam_policy.dynamo.arn
-        }
-        resource "aws_iam_role_policy_attachment" "main_policy_exec" {
-          role       = aws_iam_role.main_exec.name
-          policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-        }
-        resource "aws_iam_role_policy_attachment" "main_policy_vpc" {
-          role       = aws_iam_role.main_exec.name
-          policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-        }
-        
-        resource "aws_iam_policy" "dynamo" {
-          name        = "${project.namePrefix}-dynamo"
-          path = "/${project.namePrefixPath}/dynamo/"
-          description = "Access to the ${project.namePrefix}_dynamo tables in DynamoDB"
+        resource "aws_iam_policy" "bucketDynamoAndInvoke" {
+          name        = "${project.namePrefix}-bucketDynamoAndInvoke"
+          path = "/${project.namePrefixPath}/bucketDynamoAndInvoke/"
+          description = "Access to the ${project.namePrefix} bucket, dynamo, and invoke"
           policy = jsonencode({
             Version = "2012-10-17"
             Statement = [
+              {
+                Action = [
+                  "s3:GetObject",
+                ]
+                Effect   = "Allow"
+                Resource = [
+                    "${'$'}{aws_s3_bucket.lambda_bucket.arn}",
+                    "${'$'}{aws_s3_bucket.lambda_bucket.arn}/*",
+                ]
+              },
               {
                 Action = [
                   "dynamodb:*",
@@ -1529,16 +1440,6 @@ internal fun awsLambdaHandler(
                 Effect   = "Allow"
                 Resource = ["*"]
               },
-            ]
-          })
-        }
-        resource "aws_iam_policy" "lambdainvoke" {
-          name        = "${project.namePrefix}-lambdainvoke"
-          path = "/${project.namePrefixPath}/lambdainvoke/"
-          description = "Access to the ${project.namePrefix}_lambdainvoke bucket"
-          policy = jsonencode({
-            Version = "2012-10-17"
-            Statement = [
               {
                 Action = [
                   "lambda:InvokeFunction",
@@ -1550,9 +1451,21 @@ internal fun awsLambdaHandler(
           })
         }
         
-        resource "aws_iam_role_policy_attachment" "lambdainvoke" {
+        resource "aws_iam_role_policy_attachment" "bucketDynamoAndInvoke" {
           role       = aws_iam_role.main_exec.name
-          policy_arn = aws_iam_policy.lambdainvoke.arn
+          policy_arn = aws_iam_policy.bucketDynamoAndInvoke.arn
+        }
+        resource "aws_iam_role_policy_attachment" "main_policy_exec" {
+          role       = aws_iam_role.main_exec.name
+          policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        }
+        resource "aws_iam_role_policy_attachment" "main_policy_vpc" {
+          role       = aws_iam_role.main_exec.name
+          policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+        }
+        resource "aws_iam_role_policy_attachment" "insights_policy" {
+          role       = aws_iam_role.main_exec.id
+          policy_arn = "arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy"
         }
         
         resource "aws_s3_object" "app_storage" {
@@ -1606,10 +1519,6 @@ internal fun awsLambdaHandler(
           }
           
           depends_on = [aws_s3_object.app_storage]
-        }
-        resource "aws_iam_role_policy_attachment" "insights_policy" {
-          role       = aws_iam_role.main_exec.id
-          policy_arn = "arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy"
         }
 
         resource "aws_lambda_alias" "main" {

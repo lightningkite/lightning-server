@@ -58,7 +58,7 @@ class CloudwatchMetrics(
         .build()
 
     override suspend fun report(events: List<MetricEvent>) {
-        println(
+        logger.debug(
             "Sending ${events.size} metric points to CloudWatch.  Types include ${
                 events.map { it.metricType.name }.distinct().joinToString()
             }"
@@ -129,7 +129,7 @@ class CloudwatchMetrics(
                 it.namespace(namespace)
             }.await()
         }
-        println(
+        logger.debug(
             "Sent ${events.size} metric points to CloudWatch.  Types include ${
                 events.map { it.metricType.name }.distinct().joinToString()
             }"

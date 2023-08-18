@@ -148,7 +148,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
     }
 }
 
-private class RestApiWebsocketHelper private constructor(val database: ()->Database) {
+class RestApiWebsocketHelper private constructor(val database: ()->Database) {
 
     companion object {
         private val existing = HashMap<()->Database, RestApiWebsocketHelper>()

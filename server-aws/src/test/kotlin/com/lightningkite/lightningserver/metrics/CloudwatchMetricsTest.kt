@@ -14,7 +14,7 @@ class CloudwatchMetricsTest {
         CloudwatchMetrics
         val testMetric = MetricType("Test Metric", MetricUnit.Percent)
         MetricSettings(
-            url = "cloudwatch://us-west-2/My Project"
+            url = "cloudwatch://us-west-2/My Project?resolution=60"
         )().report(List(10) {
             MetricEvent(
                 testMetric,
