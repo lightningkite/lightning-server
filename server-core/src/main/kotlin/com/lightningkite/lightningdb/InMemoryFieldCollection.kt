@@ -84,7 +84,7 @@ open class InMemoryFieldCollection<Model : Any>(
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
         groupBy: DataClassPath<Model, Key>,
-    ): Map<Key, Int> = data.groupingBy { groupBy.get(it) }.eachCount().minus(null) as Map<Key, Int>
+    ): Map<Key, Int> = data.filter { condition(it) }.groupingBy { groupBy.get(it) }.eachCount().minus(null) as Map<Key, Int>
 
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,

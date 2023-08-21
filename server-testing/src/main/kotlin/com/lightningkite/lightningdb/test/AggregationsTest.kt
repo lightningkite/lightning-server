@@ -25,6 +25,21 @@ abstract class AggregationsTest() {
             LargeTestModel(int = 45, byte = 1, embedded = ClassUsedForEmbedding(value2 = 45)),
             LargeTestModel(int = 56, byte = 1, embedded = ClassUsedForEmbedding(value2 = 56)),
         ))
+        run {
+            val control = c.all().toList().asSequence().groupingBy { it.byte }.eachCount()
+            val test: Map<Byte, Int> = c.groupCount(groupBy = path<LargeTestModel>().byte)
+            assertEquals(control, test)
+        }
+        run {
+            val control = c.all().toList().asSequence().filter { it.int > 40 }.groupingBy { it.byte }.eachCount()
+            val test: Map<Byte, Int> = c.groupCount(condition { it.int gt 40 }, groupBy = path<LargeTestModel>().byte)
+            assertEquals(control, test)
+        }
+        run {
+            val control = c.all().toList().size
+            val test = c.count()
+            assertEquals(control, test)
+        }
         listOf(
             LargeTestModel.path.int,
             LargeTestModel.path.embedded.value2
@@ -56,16 +71,6 @@ abstract class AggregationsTest() {
                 for(key in control.keys) {
                     assertEquals(control[key]!!, test[key]!!, 0.0000001)
                 }
-            }
-            run {
-                val control = c.all().toList().asSequence().groupingBy { it.byte }.eachCount()
-                val test: Map<Byte, Int> = c.groupCount(groupBy = path<LargeTestModel>().byte)
-                assertEquals(control, test)
-            }
-            run {
-                val control = c.all().toList().size
-                val test = c.count()
-                assertEquals(control, test)
             }
         }
     }
