@@ -90,10 +90,6 @@ class RedisCache(val client: RedisClient) : Cache {
         timeToLive?.let { connection.getex(key, GetExArgs().ex(it)) }
     }
 
-    override suspend fun clear() {
-        connection.flushdb().collect { }
-    }
-
     override suspend fun remove(key: String) {
         connection.del(key).collect { }
     }

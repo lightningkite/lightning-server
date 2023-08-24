@@ -44,7 +44,7 @@ import com.lightningkite.lightningserver.core.ContentType as HttpContentType
 
 fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
     val logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.ktor.lightningServer")
-    val myEngine = LocalEngine
+    val myEngine = LocalEngine(cache)
     engine = myEngine
     try {
         runBlocking { Tasks.onSettingsReady() }
@@ -100,6 +100,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                             parts[s] = strings.single()
                         }
                         val id = ws.connect()
+                        val cache = LocalCache()
                         try {
                             launch {
                                 ws.listenForWebSocketMessage(id).collect {
@@ -123,7 +124,8 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                                         headers = call.request.headers.adapt(),
                                         domain = call.request.origin.host,
                                         protocol = call.request.origin.scheme,
-                                        sourceIp = call.request.origin.remoteHost
+                                        sourceIp = call.request.origin.remoteHost,
+                                        cache = cache
                                     )
                                 )
                             }
@@ -137,7 +139,8 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                                     entry.value.message(
                                         WebSockets.MessageEvent(
                                             id = id,
-                                            content = (incoming as? Frame.Text)?.readText() ?: ""
+                                            content = (incoming as? Frame.Text)?.readText() ?: "",
+                                            cache = cache
                                         )
                                     )
                                 }
@@ -150,7 +153,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                                         WebSockets.WsHandlerType.DISCONNECT
                                     )
                                 ) {
-                                    entry.value.disconnect(WebSockets.DisconnectEvent(id))
+                                    entry.value.disconnect(WebSockets.DisconnectEvent(id, cache = cache))
                                 }
                             } finally {
                                 ws.markDisconnect(id)

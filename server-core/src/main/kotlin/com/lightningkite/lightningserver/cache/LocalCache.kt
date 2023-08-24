@@ -10,13 +10,9 @@ import java.util.concurrent.ConcurrentHashMap
  * This is NOT meant for persistent or long term storage. This cache will be completely erased everytime the application is stopped.
  * This is useful in places that persistent data is not needed and speed is desired such as Unit Tests
  */
-object LocalCache : Cache {
+open class LocalCache(val entries: ConcurrentHashMap<String, Entry> = ConcurrentHashMap()) : Cache {
+    companion object: LocalCache()
     data class Entry(val value: Any?, val expires: Long? = null)
-
-    val entries by lazy {
-        logger.warn("WARNING: Using local cache.  You should NEVER see this in production or serverless.")
-        ConcurrentHashMap<String, Entry>()
-    }
 
     @Suppress("UNCHECKED_CAST")
     override suspend fun <T> get(key: String, serializer: KSerializer<T>): T? =
@@ -52,10 +48,6 @@ object LocalCache : Cache {
             else -> value
         }
         entries[key] = Entry(new, timeToLive?.toMillis()?.let { System.currentTimeMillis() + it })
-    }
-
-    override suspend fun clear() {
-        entries.clear()
     }
 
     override suspend fun remove(key: String) {

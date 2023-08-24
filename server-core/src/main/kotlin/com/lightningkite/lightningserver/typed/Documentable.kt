@@ -3,7 +3,8 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.AuthInfo
+import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.routes.docName
@@ -20,7 +21,7 @@ interface Documentable {
     val path: ServerPath
     val summary: String
     val description: String
-    val authInfo: AuthInfo<*>
+    val authRequirement: AuthRequirement<*>
 
     companion object {
         val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *>>()

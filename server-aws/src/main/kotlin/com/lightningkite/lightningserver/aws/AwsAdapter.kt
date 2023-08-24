@@ -4,6 +4,7 @@ import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler
 import com.lightningkite.lightningserver.SetOnce
 import com.lightningkite.lightningserver.cache.Cache
+import com.lightningkite.lightningserver.cache.PrefixCache
 import com.lightningkite.lightningserver.cache.setIfNotExists
 import com.lightningkite.lightningserver.compression.extensionForEngineCompression
 import com.lightningkite.lightningserver.core.ContentType
@@ -333,6 +334,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
 
     val wsType = "aws"
 
+    private fun wsCache(id: String) = PrefixCache(cache(), id + "/")
     init {
         WebSocketIdentifier.register(
             type = wsType,
@@ -356,7 +358,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     }
                     true
                 } catch (e: GoneException) {
-                    handleWsDisconnect(id)
+                    handleWsDisconnect(id, wsCache(id))
                     false
                 }
             },
@@ -400,6 +402,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         val queryParams =
             (event.multiValueQueryStringParameters
                 ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
+        val wsCache = wsCache(event.requestContext.connectionId)
 
         return when (event.requestContext.routeKey) {
             "\$connect" -> {
@@ -412,6 +415,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     headers = headers,
                     domain = event.requestContext.domainName,
                     protocol = "https",
+                    cache = wsCache,
                     sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0"
                 )
                 try {
@@ -423,14 +427,14 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             }
 
             "\$disconnect" -> {
-                handleWsDisconnect(event.requestContext.connectionId)
+                handleWsDisconnect(event.requestContext.connectionId, wsCache)
             }
 
             else -> if (body == null || body.length == 0L)
                 APIGatewayV2HTTPResponse(200)
             else {
                 val lkEvent =
-                    WebSockets.MessageEvent(WebSocketIdentifier(wsType, event.requestContext.connectionId), event.body)
+                    WebSockets.MessageEvent(WebSocketIdentifier(wsType, event.requestContext.connectionId), wsCache, event.body)
                 try {
                     rootWs.message(lkEvent)
                     APIGatewayV2HTTPResponse(200)
@@ -439,15 +443,15 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                         lkEvent.id.close()
                     } catch (e: Exception) { /*squish*/
                     }
-                    handleWsDisconnect(event.requestContext.connectionId)
+                    handleWsDisconnect(event.requestContext.connectionId, wsCache)
                     APIGatewayV2HTTPResponse(500, body = Serialization.json.encodeToString(e.message ?: ""))
                 }
             }
         }
     }
 
-    private suspend fun handleWsDisconnect(id: String): APIGatewayV2HTTPResponse {
-        val lkEvent = WebSockets.DisconnectEvent(WebSocketIdentifier(wsType, id))
+    private suspend fun handleWsDisconnect(id: String, wsCache: Cache): APIGatewayV2HTTPResponse {
+        val lkEvent = WebSockets.DisconnectEvent(WebSocketIdentifier(wsType, id), wsCache)
         return try {
             // Ensure it only runs once
             if (cache().setIfNotExists("${lkEvent.id}-closed", true, timeToLive = Duration.ofHours(1))) {

@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.auth
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import kotlinx.serialization.KSerializer
+import kotlin.reflect.KType
 
 /**
  * Information fo authentication purposes about how to access users, however they are stored.
@@ -10,7 +11,7 @@ import kotlinx.serialization.KSerializer
 interface UserAccess<USER : Any, ID> {
     val serializer: KSerializer<USER>
     val idSerializer: KSerializer<ID>
-    val authInfo: AuthInfo<USER>
+    val authRequirement: AuthRequirement<USER>
     fun id(user: USER): ID
     suspend fun byId(id: ID): USER
     suspend fun anonymous(): USER = throw ForbiddenException("Anonymous users not permitted.")

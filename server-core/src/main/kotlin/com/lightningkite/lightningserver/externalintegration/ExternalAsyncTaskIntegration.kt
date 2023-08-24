@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.externalintegration
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.AuthInfo
+import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.ModelInfoWithDefault
@@ -30,7 +30,7 @@ import java.util.*
 
 class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESULT>(
     path: ServerPath,
-    val authInfo: AuthInfo<USER>,
+    val authRequirement: AuthRequirement<USER>,
     val responseSerializer: KSerializer<RESPONSE>,
     val resultSerializer: KSerializer<RESULT>,
     val isAdmin: (user: USER) -> Boolean,
@@ -49,7 +49,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
     // Collection exposed to admins only for tasks
     val info = ModelInfoWithDefault<USER, ExternalAsyncTaskRequest, String>(
         serialization = ModelSerializationInfo(
-            authInfo = authInfo,
+            authRequirement = authRequirement,
             serializer = ExternalAsyncTaskRequest.serializer(),
             idSerializer = String.serializer()
         ),
@@ -191,7 +191,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
     val manualRecheck = path("recheck").post.typed(
         summary = "Manually recheck tasks",
         errorCases = listOf(),
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = Unit.serializer(),
         outputType = Unit.serializer(),
         implementation = { user: USER, _: Unit ->
@@ -202,7 +202,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
     val manualRecheckSingle = path("recheck/{id}").post.typed(
         summary = "Manually recheck tasks",
         errorCases = listOf(),
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = Unit.serializer(),
         pathType = String.serializer(),
         outputType = Unit.serializer(),

@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.websocket
 import com.lightningkite.lightningdb.MultiplexMessage
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.CacheHandle
+import com.lightningkite.lightningserver.cache.PrefixCache
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.NotFoundException
@@ -126,6 +127,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                                 queryParameters = message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } }
                                     ?: listOf(),
                                 id = wsIdChannel,
+                                cache = PrefixCache(event.cache, message.channel + "/"),
                                 headers = HttpHeaders(info.headers),
                                 domain = info.domain,
                                 protocol = info.protocol,
@@ -181,7 +183,8 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                     Metrics.handlerPerformance(WebSockets.HandlerSection(path, WebSockets.WsHandlerType.DISCONNECT)) {
                         otherHandler.disconnect(
                             WebSockets.DisconnectEvent(
-                                id = wsIdChannel
+                                id = wsIdChannel,
+                                cache = PrefixCache(event.cache, message.channel + "/"),
                             )
                         )
                     }
@@ -226,6 +229,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                         otherHandler.message(
                             WebSockets.MessageEvent(
                                 id = wsIdChannel,
+                                cache = PrefixCache(event.cache, message.channel + "/"),
                                 content = message.data!!
                             )
                         )
@@ -254,7 +258,8 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                         ) {
                             otherHandler.disconnect(
                                 WebSockets.DisconnectEvent(
-                                    id = wsIdChannel
+                                    id = wsIdChannel,
+                                    cache = PrefixCache(event.cache, message.channel + "/"),
                                 )
                             )
                         }
@@ -278,7 +283,8 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                     Metrics.handlerPerformance(WebSockets.HandlerSection(path, WebSockets.WsHandlerType.DISCONNECT)) {
                         otherHandler.disconnect(
                             WebSockets.DisconnectEvent(
-                                id = wsIdChannel
+                                id = wsIdChannel,
+                                cache = PrefixCache(event.cache, channel + "/"),
                             )
                         )
                     }

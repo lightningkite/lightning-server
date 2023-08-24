@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.auth.AuthInfo
+import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.parse
@@ -22,7 +22,7 @@ class ApiEndpointTest {
         runBlocking {
             val response = ApiEndpoint0(
                 route = httpEndpoint,
-                authInfo = AuthInfo(),
+                authRequirement = AuthRequirement(),
                 inputType = serializer(),
                 outputType = serializer(),
                 summary = "",
@@ -45,7 +45,7 @@ class ApiEndpointTest {
         runBlocking {
             val response = ApiEndpoint1(
                 route = httpEndpoint,
-                authInfo = AuthInfo(),
+                authRequirement = AuthRequirement(),
                 inputType = serializer(),
                 pathName = "test-path",
                 pathType = serializer(),
@@ -72,7 +72,7 @@ class ApiEndpointTest {
         runBlocking {
             val response = ApiEndpoint2(
                 route = httpEndpoint,
-                authInfo = AuthInfo(),
+                authRequirement = AuthRequirement(),
                 inputType = serializer(),
                 pathName = "test-path1",
                 pathType = serializer(),
@@ -101,7 +101,7 @@ class ApiEndpointTest {
         runBlocking {
             val response = ApiEndpointX(
                 route = httpEndpoint,
-                authInfo = AuthInfo(),
+                authRequirement = AuthRequirement(),
                 inputType = serializer(),
                 outputType = serializer(),
                 summary = "",

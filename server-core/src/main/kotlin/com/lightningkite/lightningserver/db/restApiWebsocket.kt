@@ -3,8 +3,6 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.cast
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.NotFoundException
@@ -28,6 +26,8 @@ import kotlin.reflect.KProperty1
 fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
     database: () -> Database,
     info: ModelInfo<USER, T, ID>,
+    storeUser: suspend (user: USER) -> String,
+    loadUser: suspend (string: String) -> USER,
     key: KProperty1<T, *>? = null,
 ): ApiWebsocket<USER, Query<T>, ListChange<T>> {
     prepareModels()
@@ -36,17 +36,14 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
     val helper = RestApiWebsocketHelper[database]
 
     return typedWebsocket<USER, Query<T>, ListChange<T>>(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListChange.serializer(info.serialization.serializer),
         summary = "Watch",
         description = "Gets a changing list of ${modelName}s that match the given query.",
         errorCases = listOf(),
         connect = { event ->
-            val user = event.user?.takeUnless { it == Unit }?.let {
-                @Suppress("UNCHECKED_CAST")
-                (Authentication.handler as Authentication.Handler<USER>).userToIdString(it)
-            }
+            val user = storeUser(event.user)
             val collection = info.collection(event.user)
             helper.subscriptionDb().insertOne(
                 __WebSocketDatabaseChangeSubscription(
@@ -65,11 +62,8 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
         },
         message = { event ->
             val existing = helper.subscriptionDb().get(event.id) ?: throw NotFoundException()
-            val user = existing.user?.let {
-                @Suppress("UNCHECKED_CAST")
-                (Authentication.handler as Authentication.Handler<USER>).idStringToUser(it)
-            }
-            val p = info.collection(info.serialization.authInfo.cast(user))
+            val user = existing.user?.let { loadUser(it) } ?: throw NotFoundException()
+            val p = info.collection(user)
             val q = event.content.copy(condition = p.fullCondition(event.content.condition).simplify())
             val c = Serialization.json.encodeToString(Query.serializer(info.serialization.serializer), q)
             helper.subscriptionDb().updateOne(

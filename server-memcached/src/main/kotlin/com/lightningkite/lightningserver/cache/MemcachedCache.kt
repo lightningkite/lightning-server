@@ -103,10 +103,6 @@ class MemcachedCache(val client: MemcachedClient) : Cache, HealthCheckable {
         Unit
     }
 
-    override suspend fun clear() = withContext(Dispatchers.IO) {
-        client.flushAll()
-    }
-
     override suspend fun remove(key: String) = withContext(Dispatchers.IO) {
         client.delete(key)
         Unit

@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningdb.FieldCollection
 import com.lightningkite.lightningdb.collection
+import com.lightningkite.lightningdb.get
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.*
@@ -23,6 +24,6 @@ class TestModelEndpoints(path: ServerPath): ServerPathGroup(path), ModelInfoWith
     }
 
     val rest = ModelRestEndpoints(path("rest"), this)
-    val restWebsocket = path("rest").restApiWebsocket(Server.database, this)
+    val restWebsocket = path("rest").restApiWebsocket(Server.database, this, storeUser = { it._id.toString() }, loadUser = { Server.userInfo.collection().get(UUID.fromString(it))!! })
     val admin = ModelAdminEndpoints(path("admin"), this)
 }

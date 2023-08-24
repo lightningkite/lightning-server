@@ -31,10 +31,6 @@ class MetricsCache(val wraps: Cache, metricsKeyName: String): Cache {
         wraps.add(key = key, value = value, timeToLive = timeToLive)
     }
 
-    override suspend fun clear() = Metrics.addPerformanceToSumPerHandler(metricKey, countMetricKey) {
-        wraps.clear()
-    }
-
     override suspend fun remove(key: String) = Metrics.addPerformanceToSumPerHandler(metricKey, countMetricKey) {
         wraps.remove(key)
     }

@@ -33,6 +33,7 @@ class QueryParamWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                     wildcard = match.wildcard,
                     queryParameters = fixedQueryParameters,
                     id = event.id,
+                    cache = event.cache,
                     headers = event.headers,
                     domain = event.domain,
                     protocol = event.protocol,
@@ -55,6 +56,7 @@ class QueryParamWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                 otherHandler.message(
                     WebSockets.MessageEvent(
                         id = event.id,
+                        cache = event.cache,
                         content = event.content
                     )
                 )
@@ -75,7 +77,8 @@ class QueryParamWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
         Metrics.handlerPerformance(WebSockets.HandlerSection(path, WebSockets.WsHandlerType.DISCONNECT)) {
             otherHandler.disconnect(
                 WebSockets.DisconnectEvent(
-                    id = event.id
+                    id = event.id,
+                    cache = event.cache,
                 )
             )
         }

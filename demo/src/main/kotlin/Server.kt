@@ -44,9 +44,10 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     val database = setting("database", DatabaseSettings())
     val email = setting("email", EmailSettings())
-    val jwtSigner = setting("jwt", JwtSigner())
+    val jwtSigner = setting("jwt", SecureHasherSettings())
     val files = setting("files", FilesSettings())
     val cache = setting("cache", CacheSettings())
+    val uploadEarlyTokenSecret = setting("uploadEarlyTokenSecret", Base64.getUrlEncoder().encode(Random.nextBytes(20)))
 
     init {
         Metrics
@@ -114,7 +115,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         val emailAccess = userInfo.userEmailAccess { User(email = it) }
         val passAccess =
             userInfo.userPasswordAccess { username, hashed -> User(email = username, hashedPassword = hashed) }
-        val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner)
+        val baseAuth = BaseAuthEndpoints(path, emailAccess, AuthType<UUID>(), jwtSigner, expiration = Duration.ofDays(365), emailExpiration = Duration.ofHours(1))
         val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
         val passAuth = PasswordAuthEndpoints(baseAuth, passAccess)
     }
@@ -124,22 +125,22 @@ object Server : ServerPathGroup(ServerPath.root) {
             forUser = { this }
         )
         val emailAccess = info.userEmailAccess { UserAlt(email = it) }
-        val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner)
+        val baseAuth = BaseAuthEndpoints(path, emailAccess, AuthType<UUID>(), jwtSigner, expiration = Duration.ofDays(365), emailExpiration = Duration.ofHours(1))
         val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
 
         init {
             path.docName = "auth2"
         }
     }
-    val uploadEarly = UploadEarlyEndpoint(path("upload"), files, database, jwtSigner)
+    val uploadEarly = UploadEarlyEndpoint(path("upload"), files, database, { SecureHasher.HS256(uploadEarlyTokenSecret()) })
     val testModel = TestModelEndpoints(path("test-model"))
 
     val root = path.get.handler {
-        HttpResponse.plainText("Hello ${it.rawUser()}")
+        HttpResponse.plainText("Hello ${it.user<User?>()}")
     }
 
     val socket = path("socket").websocket(
-        connect = { println("Connected $it - you are ${it.rawUser()}") },
+        connect = { println("Connected $it - you are ${it.user<User?>()}") },
         message = {
             println("Message $it")
             it.id.send(it.content)
@@ -207,5 +208,13 @@ object Server : ServerPathGroup(ServerPath.root) {
     val multiplex = path("multiplex").websocket(MultiplexWebSocketHandler(cache))
 
     val meta = path("meta").metaEndpoints<Unit> { true }
+
+    val weirdAuth = path("weird-auth").get.typed(
+        summary = "Get weird auth",
+        errorCases = listOf(),
+        implementation = { user: LazyModel<User, UUID>, _: Unit ->
+            "ID is ${user.id}"
+        }
+    )
 }
 

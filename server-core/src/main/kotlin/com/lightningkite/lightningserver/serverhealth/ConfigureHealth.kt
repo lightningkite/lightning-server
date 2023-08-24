@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.serverhealth
 
-import com.lightningkite.lightningserver.auth.AuthInfo
+import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.http.get
@@ -18,15 +18,15 @@ import java.time.Instant
  * Examples of features that can be checked on are Email, Database, and Exception Reporting.
  */
 inline fun <reified USER> ServerPath.healthCheck(noinline allowed: suspend (USER) -> Boolean = { true }): ApiEndpoint0<USER, Unit, ServerHealth> {
-    return healthCheck(AuthInfo(), allowed)
+    return healthCheck(AuthRequirement(), allowed)
 }
 
 fun <USER> ServerPath.healthCheck(
-    authInfo: AuthInfo<USER>,
+    authRequirement: AuthRequirement<USER>,
     allowed: suspend (USER) -> Boolean = { true },
 ): ApiEndpoint0<USER, Unit, ServerHealth> {
     return get.typed(
-        authInfo = authInfo,
+        authRequirement = authRequirement,
         inputType = Unit.serializer(),
         outputType = ServerHealth.serializer(),
         summary = "Get Server Health",

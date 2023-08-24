@@ -3,7 +3,7 @@ package com.lightningkite.lightningdb.test.com.lightningkite.lightningdb.test
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningdb.test.*
 import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.auth.JwtSigner
+import com.lightningkite.lightningserver.auth.SecureHasherSettings
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.CacheTest
 import com.lightningkite.lightningserver.cache.LocalCache
@@ -67,7 +67,7 @@ class LocalFilesTest: FileSystemTests() {
     init {
         TestSettings
     }
-    override val system: LocalFileSystem = LocalFileSystem(File("build/local-files-test"), "hosted-files", null, JwtSigner())
+    override val system: LocalFileSystem = LocalFileSystem(File("build/local-files-test"), "hosted-files", null, SecureHasherSettings()())
     override fun testSignedUrlAccess() {
         runBlocking {
             val testFile = system.root.resolve("test.txt")

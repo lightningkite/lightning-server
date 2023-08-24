@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.lightningserver.auth.sign
+import com.lightningkite.lightningserver.auth.verify
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.settings.generalSettings
@@ -64,15 +66,20 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
         assert(file.delete())
     }
 
-    override fun checkSignature(queryParams: String): Boolean {
+    fun checkSignature(queryParams: List<Pair<String, String>>): Boolean {
         return try {
             system.signedUrlExpiration?.let {
-                system.signer.verify(queryParams.substringAfter('=')) == file.absoluteFile.relativeTo(system.rootFile).unixPath
+                val qp = queryParams.associate { it }
+                val readUntil = qp["readUntil"]?.toLongOrNull() ?: return false
+                if(System.currentTimeMillis() > readUntil) return false
+                val signedUrlStart = "$url?readUntil=$readUntil"
+                system.signer.verify(signedUrlStart, qp["signature"] ?: "")
             } ?: true
         } catch (e: Exception) {
             false
         }
     }
+    override fun checkSignature(queryParams: String): Boolean = checkSignature(queryParams.split('&').map { it.substringBefore('=') to it.substringAfter('=') })
 
     override val url: String
         get() = generalSettings().publicUrl + "/" + system.serveDirectory + "/" + file.absoluteFile.relativeTo(
@@ -80,15 +87,25 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
         ).unixPath
 
     override val signedUrl: String
-        get() = url + (system.signedUrlExpiration?.let { expiration ->
-            "?token=" + system.signer.token(
-                file.absoluteFile.relativeTo(system.rootFile).unixPath,
-                expiration
-            )
-        } ?: "")
+        get() = if(system.signedUrlExpiration == null) url else url.plus("?readUntil=${Instant.now().plus(system.signedUrlExpiration).toEpochMilli()}").let {
+            it + "&signature=" + system.signer.sign(it)
+        }
 
-    override fun uploadUrl(timeout: Duration): String =
-        url + "?token=" + system.signer.token("W|" + file.absoluteFile.relativeTo(system.rootFile).unixPath, timeout)
+    override fun uploadUrl(timeout: Duration): String = url.plus("?writeUntil=${Instant.now().plus(timeout).toEpochMilli()}").let {
+        it + "&signature=" + system.signer.sign(it)
+    }
+
+    internal fun checkSignatureWrite(queryParams: List<Pair<String, String>>): Boolean {
+        return try {
+            val qp = queryParams.associate { it }
+            val writeUntil = qp["readUntil"]?.toLongOrNull() ?: return false
+            if(System.currentTimeMillis() > writeUntil) return false
+            val signedUrlStart = "$url?writeUntil=$writeUntil"
+            system.signer.verify(signedUrlStart, qp["signature"] ?: "")
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     override fun toString(): String = file.toString()
 

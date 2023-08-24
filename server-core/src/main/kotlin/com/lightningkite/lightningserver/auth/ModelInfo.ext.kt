@@ -22,8 +22,8 @@ fun <T, USER, ID : Comparable<ID>> T.userPasswordAccess(
             get() = info.serialization.serializer
         override val idSerializer: KSerializer<ID>
             get() = info.serialization.idSerializer
-        override val authInfo: AuthInfo<USER>
-            get() = info.serialization.authInfo
+        override val authRequirement: AuthRequirement<USER>
+            get() = info.serialization.authRequirement
 
         override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
@@ -46,8 +46,8 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailAccess(
             get() = info.serialization.serializer
         override val idSerializer: KSerializer<ID>
             get() = info.serialization.idSerializer
-        override val authInfo: AuthInfo<USER>
-            get() = info.serialization.authInfo
+        override val authRequirement: AuthRequirement<USER>
+            get() = info.serialization.authRequirement
 
         override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
@@ -72,8 +72,8 @@ fun <T, USER, ID : Comparable<ID>> T.userPhoneAccess(
             get() = info.serialization.serializer
         override val idSerializer: KSerializer<ID>
             get() = info.serialization.idSerializer
-        override val authInfo: AuthInfo<USER>
-            get() = info.serialization.authInfo
+        override val authRequirement: AuthRequirement<USER>
+            get() = info.serialization.authRequirement
 
         override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
@@ -104,8 +104,8 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailPhoneAccess(
             get() = info.serialization.serializer
         override val idSerializer: KSerializer<ID>
             get() = info.serialization.idSerializer
-        override val authInfo: AuthInfo<USER>
-            get() = info.serialization.authInfo
+        override val authRequirement: AuthRequirement<USER>
+            get() = info.serialization.authRequirement
 
         override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
@@ -132,8 +132,8 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailAccess(
             get() = info.serialization.serializer
         override val idSerializer: KSerializer<ID>
             get() = info.serialization.idSerializer
-        override val authInfo: AuthInfo<USER>
-            get() = info.serialization.authInfo
+        override val authRequirement: AuthRequirement<USER>
+            get() = info.serialization.authRequirement
 
         override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
@@ -161,8 +161,8 @@ fun <T, USER, ID : Comparable<ID>> T.userPhoneAccess(
             get() = info.serialization.serializer
         override val idSerializer: KSerializer<ID>
             get() = info.serialization.idSerializer
-        override val authInfo: AuthInfo<USER>
-            get() = info.serialization.authInfo
+        override val authRequirement: AuthRequirement<USER>
+            get() = info.serialization.authRequirement
 
         override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
@@ -199,8 +199,8 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailPhoneAccess(
             get() = info.serialization.serializer
         override val idSerializer: KSerializer<ID>
             get() = info.serialization.idSerializer
-        override val authInfo: AuthInfo<USER>
-            get() = info.serialization.authInfo
+        override val authRequirement: AuthRequirement<USER>
+            get() = info.serialization.authRequirement
 
         override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 

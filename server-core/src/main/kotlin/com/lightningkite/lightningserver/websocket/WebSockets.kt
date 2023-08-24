@@ -1,8 +1,11 @@
 package com.lightningkite.lightningserver.websocket
 
+import com.lightningkite.lightningserver.cache.Cache
+import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathMatcher
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.utils.MutableMapWithChangeHandler
 import kotlinx.coroutines.channels.Channel
@@ -24,22 +27,32 @@ object WebSockets {
             }
         }
 
-    data class ConnectEvent(
-        val path: ServerPath,
-        val parts: Map<String, String>,
-        val wildcard: String? = null,
-        val queryParameters: List<Pair<String, String>>,
+    class ConnectEvent(
+        override val path: ServerPath,
+        override val parts: Map<String, String>,
+        override val wildcard: String? = null,
+        override val queryParameters: List<Pair<String, String>>,
         val id: WebSocketIdentifier,
-        val headers: HttpHeaders,
-        val domain: String,
-        val protocol: String,
-        val sourceIp: String,
-    ) {
+        val cache: Cache,
+        override val headers: HttpHeaders,
+        override val domain: String,
+        override val protocol: String,
+        override val sourceIp: String,
+    ): Request {
         fun queryParameter(key: String): String? = queryParameters.find { it.first == key }?.second
+
+        private val cacheCalc = HashMap<Request.CacheKey<*>, Any?>()
+        override suspend fun <T> cache(key: Request.CacheKey<T>): T {
+            @Suppress("UNCHECKED_CAST")
+            if(cacheCalc.containsKey(key)) return cacheCalc[key] as T
+            val calculated = key.calculate(this)
+            cacheCalc[key] = calculated
+            return calculated
+        }
     }
 
-    data class MessageEvent(val id: WebSocketIdentifier, val content: String)
-    data class DisconnectEvent(val id: WebSocketIdentifier)
+    class MessageEvent(val id: WebSocketIdentifier, val cache: Cache, val content: String)
+    class DisconnectEvent(val id: WebSocketIdentifier, val cache: Cache)
 
     enum class WsHandlerType {
         CONNECT, MESSAGE, DISCONNECT
@@ -68,6 +81,7 @@ suspend fun ServerPath.test(
     sourceIp: String = "0.0.0.0",
     test: suspend VirtualSocket.() -> Unit,
 ) {
+    val cache = LocalCache()
     val id = WebSocketIdentifier(UUID.randomUUID().toString(), "TEST")
     val req = WebSockets.ConnectEvent(
         path = this,
@@ -78,7 +92,8 @@ suspend fun ServerPath.test(
         domain = domain,
         protocol = protocol,
         sourceIp = sourceIp,
-        id = id
+        id = id,
+        cache = cache,
     )
     val h = WebSockets.handlers[this]!!
     val channel = Channel<String>(20)
@@ -109,7 +124,7 @@ suspend fun ServerPath.test(
                         incoming = channel,
                         send = {
                             println("$id --> $it")
-                            h.message(WebSockets.MessageEvent(id, it))
+                            h.message(WebSockets.MessageEvent(id, cache, it))
                         }
                     )
                 )
@@ -117,7 +132,7 @@ suspend fun ServerPath.test(
                 error = e
             }
             println("$id Disconnecting...")
-            h.disconnect(WebSockets.DisconnectEvent(id))
+            h.disconnect(WebSockets.DisconnectEvent(id, cache))
             println("$id Disconnected.")
 
             error?.let { throw it }

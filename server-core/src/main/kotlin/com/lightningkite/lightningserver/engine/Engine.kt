@@ -1,8 +1,11 @@
 package com.lightningkite.lightningserver.engine
 
+import com.lightningkite.lightningserver.cache.Cache
+import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.tasks.Task
+import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -42,9 +45,8 @@ interface Engine {
  * This will run asynchronously with no regard for whether the task finishes or fails. This is useful
  * during local development, as well deployment in non-serverless environments when you can.
  */
-object LocalEngine : Engine {
+class LocalEngine(val websocketCache: Cache) : Engine {
     val logger = LoggerFactory.getLogger(this::class.java)
-
     override suspend fun launchTask(task: Task<Any?>, input: Any?) {
         GlobalScope.launch {
             Metrics.handlerPerformance(task) {

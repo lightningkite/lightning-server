@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.http.test
 import com.lightningkite.lightningserver.sms.TestSMSClient
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
+import java.time.Duration
 import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.fail
@@ -30,7 +31,7 @@ class SmsAuthTest {
         )
         val phoneAccess: UserPhoneAccess<User, UUID> = info.userPhoneAccess { User(email = "$it@phone", phoneNumber = it) }
         val path = ServerPath("auth")
-        val baseAuth = BaseAuthEndpoints(path, phoneAccess, TestSettings.jwtSigner)
+        val baseAuth = BaseAuthEndpoints(path, phoneAccess, AuthType<UUID>(), TestSettings.jwtSigner, expiration = Duration.ofHours(1), emailExpiration = Duration.ofMinutes(5))
         val phoneAuth = SmsAuthEndpoints(baseAuth, phoneAccess, TestSettings.cache, TestSettings.sms)
         runBlocking {
             phoneAuth.loginSms.implementation(Unit, "8013693729")
@@ -53,7 +54,7 @@ class SmsAuthTest {
         )
         val phoneAccess: UserPhoneAccess<User, UUID> = info.userPhoneAccess { User(email = "$it@phone", phoneNumber = it) }
         val path = ServerPath("auth")
-        val baseAuth = BaseAuthEndpoints(path, phoneAccess, TestSettings.jwtSigner)
+        val baseAuth = BaseAuthEndpoints(path, phoneAccess, AuthType<UUID>(), TestSettings.jwtSigner, expiration = Duration.ofHours(1), emailExpiration = Duration.ofMinutes(5))
         val phoneAuth = SmsAuthEndpoints(baseAuth, phoneAccess, TestSettings.cache, TestSettings.sms)
         runBlocking {
             phoneAuth.loginSms.implementation(Unit, "8013693729")

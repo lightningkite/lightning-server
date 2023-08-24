@@ -83,7 +83,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         successCode = HttpStatus.NoContent,
         implementation = { user: Unit, addressUnsafe: String ->
             val address = addressUnsafe.lowercase().trim()
-            val jwt = base.token(emailAccess.byEmail(address), base.jwtSigner().emailExpiration)
+            val jwt = base.token(emailAccess.byEmail(address), base.emailExpiration)
             val pin = pin.establish(address)
             val link = "${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$jwt"
             email().send(

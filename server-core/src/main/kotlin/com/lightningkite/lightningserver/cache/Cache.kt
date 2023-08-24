@@ -94,13 +94,6 @@ interface Cache : HealthCheckable, Metricable<Cache> {
      */
     suspend fun add(key: String, value: Int, timeToLive: Duration? = null)
 
-
-    /**
-     * WARNING: A Dangerous call if you aren't sure.
-     * Will remove EVERY key in the cache leaving you with an entirely empty cache.
-     */
-    suspend fun clear()
-
     /**
      * Removes a single key from cache. If the key didn't exist, nothing will happen.
      *

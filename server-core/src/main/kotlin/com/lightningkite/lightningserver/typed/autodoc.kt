@@ -98,8 +98,8 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                             }
                         }
                         p {
-                            api.authInfo.type?.let {
-                                if (api.authInfo.required) {
+                            api.authRequirement.type.subject?.name?.let {
+                                if (api.authRequirement.required) {
                                     +"You need to be authenticated as a: "
                                     +it
                                 } else {

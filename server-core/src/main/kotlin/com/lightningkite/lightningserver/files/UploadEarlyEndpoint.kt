@@ -1,7 +1,9 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.JwtSigner
+import com.lightningkite.lightningserver.auth.SecureHasher
+import com.lightningkite.lightningserver.auth.sign
+import com.lightningkite.lightningserver.auth.verify
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
@@ -17,7 +19,7 @@ class UploadEarlyEndpoint(
     path: ServerPath,
     val files: () -> FileSystem,
     val database: () -> Database,
-    val signer: () -> JwtSigner,
+    val signer: () -> SecureHasher,
     val filePath: String = ExternalServerFileSerializer.uploadPath,
     val expiration: Duration = Duration.ofDays(1)
 ) : ServerPathGroup(path) {
@@ -46,7 +48,9 @@ class UploadEarlyEndpoint(
             database().collection<UploadForNextRequest>().insertOne(newItem)
             UploadInformation(
                 uploadUrl = newFile.uploadUrl(expiration),
-                futureCallToken = newFile.url + "?token=" + signer().token(newFile.url, expiration)
+                futureCallToken = newFile.url.plus("?useUntil=${Instant.now().plus(expiration).toEpochMilli()}").let {
+                    it + "&token=" + signer().sign(it)
+                }
             )
         }
     )
@@ -62,21 +66,16 @@ class UploadEarlyEndpoint(
 
     @OptIn(DelicateCoroutinesApi::class)
     fun validateFile(url: String, params: Map<String, String>): Boolean {
-        return params["token"]?.let { token ->
-            try {
-                val tokenUrl = signer().verify(token)
-                if (url == tokenUrl) {
-                    GlobalScope.launch {
-                        database().collection<UploadForNextRequest>()
-                            .deleteMany(condition { it.file eq ServerFile(url) })
-                    }
-                    true
-                } else false
-
-            } catch (e: UnauthorizedException) {
-                false
-            }
-        } ?: false
+        val token = params["token"] ?: return false
+        val exp = params["useUntil"]?.toLongOrNull() ?: return false
+        if(System.currentTimeMillis() > exp) return false
+        val file = ServerFile(url)
+        if(!signer().verify(url.substringBefore('?') + "?useUntil=$exp", token)) return false
+        GlobalScope.launch {
+            database().collection<UploadForNextRequest>()
+                .deleteMany(condition { it.file eq ServerFile(url) })
+        }
+        return true
     }
 
 }

@@ -75,7 +75,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
 
     val default = (info as? ModelInfoWithDefault<USER, T, ID>)?.let {
         get("_default_").typed(
-            authInfo = info.serialization.authInfo,
+            authRequirement = info.serialization.authRequirement,
             inputType = Unit.serializer(),
             outputType = info.serialization.serializer,
             summary = "Default",
@@ -89,7 +89,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     }
 
     val list = get.typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
         summary = "List",
@@ -111,7 +111,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     // This is used to GET a list objects, but rather than the query being in the parameter
     // it's in the POST body.
     val query = post("query").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
         summary = "Query",
@@ -133,7 +133,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     // This is used to GET a list objects, but rather than the query being in the parameter
     // it's in the POST body.
     val queryPartial = post("query-partial").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = QueryPartial.serializer(info.serialization.serializer),
         outputType = ListSerializer(PartialSerializer(info.serialization.serializer)),
         summary = "Query Partial",
@@ -167,7 +167,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
 
     // This is used get a single object with id of _id
     val detail = get("{id}").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = Unit.serializer(),
         outputType = info.serialization.serializer,
         pathType = info.serialization.idSerializer,
@@ -190,7 +190,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val insertBulk = post("bulk").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = ListSerializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
         summary = "Insert Bulk",
@@ -208,7 +208,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val insert = post("").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
         summary = "Insert",
@@ -224,7 +224,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val upsert = post("{id}").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
         pathType = info.serialization.idSerializer,
@@ -243,7 +243,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
 
     // This is used replace many objects at once. This does make individual calls to the database. Kmongo does not have a many replace option.
     val bulkReplace = put("").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = ListSerializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
         summary = "Bulk Replace",
@@ -260,7 +260,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val replace = put("{id}").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
         pathType = info.serialization.idSerializer,
@@ -284,7 +284,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val bulkModify = patch("bulk").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = MassModification.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
         summary = "Bulk Modify",
@@ -309,7 +309,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val modifyWithDiff = patch("{id}/delta").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = Modification.serializer(info.serialization.serializer),
         outputType = EntryChange.serializer(info.serialization.serializer),
         pathType = info.serialization.idSerializer,
@@ -339,7 +339,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val modify = patch("{id}").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = Modification.serializer(info.serialization.serializer),
         outputType = info.serialization.serializer,
         pathType = info.serialization.idSerializer,
@@ -370,7 +370,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val bulkDelete = post("bulk-delete").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
         summary = "Bulk Delete",
@@ -391,7 +391,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val deleteItem = delete("{id}").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = Unit.serializer(),
         outputType = Unit.serializer(),
         pathType = info.serialization.idSerializer,
@@ -416,7 +416,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val countGet = get("count").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
         summary = "Count",
@@ -437,7 +437,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val count = post("count").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
         summary = "Count",
@@ -459,7 +459,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val groupCount = post("group-count").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = GroupCountQuery.serializer(info.serialization.serializer),
         outputType = MapSerializer(String.serializer(), Int.serializer()),
         summary = "Group Count",
@@ -483,7 +483,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val aggregate = post("aggregate").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = AggregateQuery.serializer(info.serialization.serializer),
         outputType = Double.serializer().nullable,
         summary = "Aggregate",
@@ -501,7 +501,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val groupAggregate = post("group-aggregate").typed(
-        authInfo = info.serialization.authInfo,
+        authRequirement = info.serialization.authRequirement,
         inputType = GroupAggregateQuery.serializer(info.serialization.serializer),
         outputType = MapSerializer(String.serializer(), Double.serializer().nullable),
         summary = "Group Aggregate",

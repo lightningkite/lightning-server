@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.websocket
 
+import com.lightningkite.lightningserver.engine.engine
 import kotlinx.serialization.Serializable
 import kotlin.collections.set
 

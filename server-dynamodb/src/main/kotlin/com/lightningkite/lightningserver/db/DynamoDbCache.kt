@@ -169,12 +169,6 @@ class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: St
         }.await()
     }
 
-    override suspend fun clear() {
-        ready.await()
-        ready = ready()
-        client.deleteTable { it.tableName(tableName) }.await()
-    }
-
     override suspend fun remove(key: String) {
         ready.await()
         client.deleteItem {

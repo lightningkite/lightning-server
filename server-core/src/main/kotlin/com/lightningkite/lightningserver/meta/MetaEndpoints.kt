@@ -1,19 +1,18 @@
 package com.lightningkite.lightningserver.meta
 
 import com.lightningkite.lightningserver.HtmlDefaults
-import com.lightningkite.lightningserver.auth.AuthInfo
-import com.lightningkite.lightningserver.auth.jwt
-import com.lightningkite.lightningserver.auth.rawUser
+import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.auth.user
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.adminIndex
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.jsonschema.lightningServerSchema
 import com.lightningkite.lightningserver.jsonschema.openApiDescription
-import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -31,15 +30,26 @@ import kotlinx.serialization.json.put
 
 class MetaEndpoints<USER>(
     path: ServerPath,
-    val authInfo: AuthInfo<USER>,
+    val authRequirement: AuthRequirement<USER>,
     packageName: String = "com.mypackage",
     isAdmin: suspend (USER) -> Boolean,
 ) : ServerPathGroup(path) {
+    interface AdminCheck<T> {
+        val authRequirement: AuthRequirement<T>
+        suspend fun isAdmin(item: T): Boolean
+        suspend fun check(request: HttpRequest) = isAdmin(request.user(authRequirement))
+    }
     companion object {
-        var isAdministrator: suspend (Any?) -> Boolean = { false }
+        var isAdministrator: AdminCheck<*> = object: AdminCheck<Unit> {
+            override val authRequirement: AuthRequirement<Unit> get() = AuthRequirement()
+            override suspend fun isAdmin(item: Unit): Boolean = false
+        }
     }
     init {
-        isAdministrator = { isAdmin(authInfo.tryCast(it) as USER) }
+        isAdministrator = object: AdminCheck<USER> {
+            override val authRequirement: AuthRequirement<USER> get() = this@MetaEndpoints.authRequirement
+            override suspend fun isAdmin(item: USER): Boolean = isAdmin(item)
+        }
     }
 
     val root = get.handler {
@@ -55,16 +65,13 @@ class MetaEndpoints<USER>(
         })
     }
     val docs = path("docs").apiDocs(packageName)
-    val health = path("health").healthCheck(authInfo, isAdmin)
+    val health = path("health").healthCheck(authRequirement, isAdmin)
     val isOnline = path("online").get.handler { HttpResponse.plainText("Server is running.") }
 
-    private suspend fun openAdmin(jwt: String?): HttpResponse {
+    private suspend fun openAdmin(): HttpResponse {
         val inject = buildJsonObject {
             put("url", generalSettings().publicUrl)
             put("basePage", path("admin/").toString())
-            jwt?.let {
-                put("jwt", it)
-            }
         }
         val original = client.get("https://lightning-server-admin.s3.us-west-2.amazonaws.com/index.html").bodyAsText()
         val page = (original.substringBeforeLast("</body>") + """
@@ -81,13 +88,13 @@ class MetaEndpoints<USER>(
     }
 
     val admin = path("admin/").get.handler {
-        openAdmin(it.jwt())
+        openAdmin()
     }
     val adminResources = path("admin/{...}").get.handler {
         if (it.wildcard?.contains(".") == true)
             HttpResponse.pathMovedOld("https://lightning-server-admin.s3.us-west-2.amazonaws.com/${it.wildcard}")
         else
-            openAdmin(it.jwt())
+            openAdmin()
     }
     val adminIndex = path("admin-index").adminIndex()
     val schema = path("schema").get.handler {
@@ -204,7 +211,9 @@ class MetaEndpoints<USER>(
                 const pathElement = document.getElementById("path") 
                 const messagesElement = document.getElementById("messages")
                 const token = getCookie("Authorization")
-                ws = new WebSocket("${generalSettings().wsUrl}" + pathElement.value + (token ? "?jwt=" + token : ""), "wss")
+                const url = "${generalSettings().wsUrl}" + pathElement.value + (token ? "?jwt=" + token : "")
+                console.log(url)
+                ws = new WebSocket(url, url.substring(0, url.indexOf("://")))
                 ws.addEventListener('open', ev => {
                     const newElement = document.createElement('p')
                     newElement.innerText = 'WS Opened.'
@@ -278,4 +287,4 @@ class MetaEndpoints<USER>(
 inline fun <reified USER> ServerPath.metaEndpoints(
     packageName: String = "com.mypackage",
     noinline isAdmin: suspend (USER) -> Boolean,
-): MetaEndpoints<USER> = MetaEndpoints(this, AuthInfo(), packageName, isAdmin)
+): MetaEndpoints<USER> = MetaEndpoints(this, AuthRequirement(), packageName, isAdmin)

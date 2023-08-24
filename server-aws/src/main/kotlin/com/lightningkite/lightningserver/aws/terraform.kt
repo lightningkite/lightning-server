@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.aws
 
-import com.lightningkite.lightningserver.auth.JwtSigner
+import com.lightningkite.lightningserver.auth.SecureHasherSettings
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.email.EmailSettings
@@ -720,11 +720,9 @@ internal fun handlers() {
             """.trimIndent()
         }
     )
-    TerraformHandler.handler<JwtSigner>(
+    TerraformHandler.handler<SecureHasherSettings>(
         inputs = { key ->
             listOf(
-                TerraformInput.string("${key}_expiration", "PT8760H"),
-                TerraformInput.string("${key}_emailExpiration", "PT1H"),
             )
         },
         emit = {
@@ -741,8 +739,6 @@ internal fun handlers() {
         settingOutput = { key ->
             """
                 {
-                    expiration = var.${key}_expiration 
-                    emailExpiration = var.${key}_emailExpiration 
                     secret = random_password.${key}.result
                 }
             """.trimIndent()

@@ -1,11 +1,15 @@
 package com.lightningkite.lightningserver.exceptions
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelInfoWithDefault
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
+import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.meta.MetaEndpoints
 import com.lightningkite.lightningserver.metrics.Metrics
+import com.lightningkite.lightningserver.serialization.Serialization
+import kotlinx.serialization.serializer
 import java.net.NetworkInterface
 import java.time.Instant
 import java.util.*
@@ -55,10 +59,16 @@ class GroupedDatabaseExceptionReporter(val packageName: String, val database: Da
         }
     }
 
-    val modelInfo = ModelInfoWithDefault<Any, ReportedExceptionGroup, Int>(
+    @Suppress("UNCHECKED_CAST")
+    val modelInfo = ModelInfoWithDefault<Any?, ReportedExceptionGroup, Int>(
+        serialization = ModelSerializationInfo(
+            authRequirement = MetaEndpoints.isAdministrator.authRequirement as AuthRequirement<Any?>,
+            serializer = Serialization.module.serializer(),
+            idSerializer = Serialization.module.serializer()
+        ),
         getCollection = { database.collection<ReportedExceptionGroup>() },
         forUser = { user: Any? ->
-            if(MetaEndpoints.isAdministrator(user)) this else throw ForbiddenException()
+            if((MetaEndpoints.isAdministrator as MetaEndpoints.AdminCheck<Any?>).isAdmin(user)) this else throw ForbiddenException()
         },
         defaultItem = { ReportedExceptionGroup(_id = 0, context = "", server = "", message = "", trace = "") },
     )

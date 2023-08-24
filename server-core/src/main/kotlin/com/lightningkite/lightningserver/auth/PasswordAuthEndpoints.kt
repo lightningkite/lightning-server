@@ -27,7 +27,7 @@ open class PasswordAuthEndpoints<USER : Any, ID>(
                     detail = "password-incorrect",
                     message = "Password does not match the account."
                 )
-            base.token(user, base.jwtSigner().expiration)
+            base.token(user)
         }
     )
     val loginPasswordHtml = path("login-password/").get.handler {
