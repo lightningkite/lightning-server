@@ -123,11 +123,11 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
         }
     }
 
-    private val collections = ConcurrentHashMap<String, Lazy<MongoFieldCollection<*>>>()
+    private val collections = ConcurrentHashMap<Pair<KType, String>, Lazy<MongoFieldCollection<*>>>()
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : Any> collection(type: KType, name: String): MongoFieldCollection<T> =
-        (collections.getOrPut(name) {
+        (collections.getOrPut(type to name) {
             lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
                 MongoFieldCollection(
                     bson.serializersModule.serializer(type) as KSerializer<T>

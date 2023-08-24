@@ -72,11 +72,6 @@ class InMemoryDatabase(val premadeData: JsonObject? = null) : Database {
         made
     } as FieldCollection<T>
 
-    fun drop() {
-        collections.forEach {
-            (it.value as InMemoryFieldCollection).data.clear()
-        }
-    }
 }
 
 
@@ -110,12 +105,5 @@ class InMemoryUnsafePersistenceDatabase(val folder: File) : Database {
                 storage
             )
         } as FieldCollection<T>
-    }
-
-
-    fun drop() {
-        collections.forEach {
-            (it.value as InMemoryFieldCollection).data.clear()
-        }
     }
 }
