@@ -17,7 +17,7 @@ data class TestModel(
     val name: String = "No Name",
     @Description("The number") val number: Int = 3123,
     @MimeType("text/html") @Multiline val content: String = "",
-//    @MimeType("image/*") val file: ServerFile? = null,
+    @MimeType("image/*") val file: ServerFile? = null,
     @References(TestModel::class) val replyTo: UUID? = null,
     @MultipleReferences(TestModel::class) val comments: List<UUID> = listOf(),
     val privateInfo: String? = null,
