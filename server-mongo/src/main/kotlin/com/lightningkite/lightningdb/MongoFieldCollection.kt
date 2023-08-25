@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.mongodb.ErrorCategory
 import com.mongodb.MongoBulkWriteException
 import com.mongodb.MongoCommandException
+import com.mongodb.MongoException
 import com.mongodb.MongoQueryException
 import com.mongodb.client.model.*
 import kotlinx.coroutines.*
@@ -42,42 +43,19 @@ class MongoFieldCollection<Model : Any>(
     private inline fun <T> exceptionWrap(operation: () -> T): T {
         try {
             return operation()
-        } catch (e: MongoBulkWriteException) {
-            throw BadRequestException(
-                "The request had the following issues: ${
-                    e.writeErrors
-                        .map { ErrorCategory.fromErrorCode(it.code) }
-                        .joinToString { it.name }
-                }",
-                cause = e
-            )
-
-        } catch (e: MongoCommandException) {
-            throw BadRequestException("The request had the following issue: ${ErrorCategory.fromErrorCode(e.code)}", cause = e)
-        } catch (e: MongoQueryException) {
-            throw BadRequestException("The request had the following issue: ${e.errorMessage}", cause = e)
+        } catch (e: Throwable) {
+            handleException(e)
         }
     }
 
-    private fun handleException(e: Throwable) {
-        when (e) {
-            is MongoBulkWriteException -> throw BadRequestException(
-                "The request had the following issues: ${
-                    e.writeErrors
-                        .map { ErrorCategory.fromErrorCode(it.code) }
-                        .joinToString { it.name }
-                }",
-                cause = e
-            )
-
-            is MongoCommandException -> throw BadRequestException(
-                "The request had the following issue: ${
-                    ErrorCategory.fromErrorCode(e.code)
-                }",
-                cause = e
-            )
-
-            is MongoQueryException -> throw BadRequestException("The request had the following issue: ${e.errorMessage}", cause = e)
+    private fun handleException(e: Throwable): Nothing {
+        when {
+            e is MongoBulkWriteException && e.writeErrors.all { ErrorCategory.fromErrorCode(it.code) == ErrorCategory.DUPLICATE_KEY } -> {
+                throw UniqueViolationException(cause = e, collection = mongo.namespace.collectionName)
+            }
+            e is MongoException && ErrorCategory.fromErrorCode(e.code) == ErrorCategory.DUPLICATE_KEY -> {
+                throw UniqueViolationException(cause = e, collection = mongo.namespace.collectionName)
+            }
             else -> throw e
         }
     }

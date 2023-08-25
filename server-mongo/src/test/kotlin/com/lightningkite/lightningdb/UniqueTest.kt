@@ -35,7 +35,7 @@ class UniqueTest : MongoTest() {
             try {
                 println(collection.insertOne(IndexingTestModel(email = "test@test.com", account = "asdf")))
                 fail()
-            } catch(w: BadRequestException) {
+            } catch(w: UniqueViolationException) {
                 /*expected*/
             }
         }
