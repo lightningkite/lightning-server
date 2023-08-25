@@ -49,15 +49,20 @@ open class BaseAuthEndpoints<USER : Any, ID>(
     val lazyType = AuthType(LazyModel::class, listOf(userAccess.authRequirement.type, idType))
     init {
         val jwtAuthHeader = authentication(JwtAuthenticationMethod(priority = 5, fromStringInRequest = Authentication.FromStringInRequest.AuthorizationHeader(), hasher = hasher))
+        val jwtAuthBareHeader = authentication(JwtAuthenticationMethod(priority = 2, fromStringInRequest = Authentication.FromStringInRequest.AuthorizationHeader(null), hasher = hasher))
         val jwtAuthCookie = authentication(JwtAuthenticationMethod(priority = 1, fromStringInRequest = Authentication.FromStringInRequest.AuthorizationCookie(), hasher = hasher))
-        val jwtQueryParam = authentication(JwtAuthenticationMethod(priority = 10, fromStringInRequest = Authentication.FromStringInRequest.QueryParameter("jwt"), hasher = hasher))
-        authentication<JwtClaims, LazyModel<USER, ID>>(sourceType = AuthType<JwtClaims>(), destType = lazyType) {
-            val sub = it.sub ?: return@authentication null
-            if(!sub.startsWith(jwtPrefix)) return@authentication null
+        val jwtQueryParam = authentication(JwtAuthenticationMethod(
+            priority = 10,
+            fromStringInRequest = Authentication.FromStringInRequest.QueryParameter("jwt"),
+            hasher = hasher
+        ))
+        authenticationMapper<JwtClaims, LazyModel<USER, ID>>(sourceType = AuthType<JwtClaims>(), destType = lazyType) {
+            val sub = it.sub ?: return@authenticationMapper null
+            if(!sub.startsWith(jwtPrefix)) return@authenticationMapper null
             val id = Serialization.json.decodeUnwrappingString(userAccess.idSerializer, sub.removePrefix(jwtPrefix))
             LazyModel(id, userAccess::byId)
         }
-        authentication<LazyModel<USER, ID>, USER>(sourceType = lazyType, destType = userAccess.authRequirement.type) { it.value.await() }
+        authenticationMapper<LazyModel<USER, ID>, USER>(sourceType = lazyType, destType = userAccess.authRequirement.type) { it.value.await() }
     }
 
     init {

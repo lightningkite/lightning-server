@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent

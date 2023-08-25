@@ -4,9 +4,6 @@ import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.Request
-import java.util.SortedSet
-import java.util.TreeSet
-import kotlin.reflect.typeOf
 
 /**
  * Rules for authenticating requests are defined in this object.
@@ -97,6 +94,7 @@ object Authentication {
     @Suppress("UNCHECKED_CAST")
     data class Cache<T>(val type: AuthType) : Request.CacheKey<Auth<T>?> {
         override suspend fun calculate(request: Request): Auth<T>? {
+            if(type == AuthType.none) return null
             methodsByType[type]?.let {
                 for (method in it) {
                     println("Trying $method for $type")
@@ -117,12 +115,12 @@ typealias RequestAuth<T> = Authentication.Auth<T>
 fun <T> authentication(method: Authentication.Method<T>): Authentication.Method<T> = Authentication.register(method)
 
 @LightningServerDsl
-inline fun <reified A : Any, reified B : Any> authentication(
+inline fun <reified A : Any, reified B : Any> authenticationMapper(
     priority: Int = (Authentication.methods(AuthType<A>()).maxOfOrNull { it.priority } ?: 0) - 1,
     subjectType: Authentication.SubjectType? = Authentication.methods(AuthType<A>()).mapNotNull { it.subjectType }
         .firstOrNull(),
     noinline map: suspend (A) -> B?
-): Authentication.Method<B> = authentication(
+): Authentication.Method<B> = authenticationMapper(
     sourceType = AuthType<A>(),
     destType = AuthType<B>(),
     priority = priority,
@@ -131,7 +129,7 @@ inline fun <reified A : Any, reified B : Any> authentication(
 )
 
 @LightningServerDsl
-fun <A : Any, B : Any> authentication(
+fun <A : Any, B : Any> authenticationMapper(
     sourceType: AuthType,
     destType: AuthType,
     priority: Int = (Authentication.methods(sourceType).maxOfOrNull { it.priority } ?: 0) - 1,
@@ -153,15 +151,7 @@ suspend fun <T> Request.auth(type: AuthType): Authentication.Auth<T>? =
 @Suppress("UNCHECKED_CAST")
 suspend fun <T> Request.user(authRequirement: AuthRequirement<T>): T =
     auth<T>(authRequirement.type)?.value
-        ?: if (authRequirement.required) throw UnauthorizedException() else null as T
+        ?: if (authRequirement.required) throw UnauthorizedException("You must be authorized as a ${authRequirement.type}") else null as T
 
 @Suppress("UNCHECKED_CAST")
 suspend inline fun <reified T> Request.user(): T = user(AuthRequirement<T>())
-
-//class BaseAuthEndpoints2(
-//    path: ServerPath
-//) : ServerPathGroup(path) {
-//    val self = path("self").get.typed(
-//
-//    )
-//}

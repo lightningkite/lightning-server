@@ -92,15 +92,17 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
         }
 
     override fun uploadUrl(timeout: Duration): String = url.plus("?writeUntil=${Instant.now().plus(timeout).toEpochMilli()}").let {
+        println("SIGNED $it")
         it + "&signature=" + system.signer.sign(it)
     }
 
     internal fun checkSignatureWrite(queryParams: List<Pair<String, String>>): Boolean {
         return try {
             val qp = queryParams.associate { it }
-            val writeUntil = qp["readUntil"]?.toLongOrNull() ?: return false
-            if(System.currentTimeMillis() > writeUntil) return false
+            val writeUntil = qp["writeUntil"]?.toLongOrNull() ?: return false
             val signedUrlStart = "$url?writeUntil=$writeUntil"
+            if(System.currentTimeMillis() > writeUntil) return false
+            println("CHECK $signedUrlStart")
             system.signer.verify(signedUrlStart, qp["signature"] ?: "")
         } catch (e: Exception) {
             false

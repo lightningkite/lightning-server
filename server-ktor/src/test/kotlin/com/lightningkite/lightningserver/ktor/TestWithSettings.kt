@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.ktor
 
-import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.auth.OauthProviderCredentials
+import com.lightningkite.lightningserver.auth.SecureHasherSettings
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.email.EmailSettings
@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
 object TestSettings {
     val database = setting("database", DatabaseSettings("ram"))
     val email = setting("email", EmailSettings("test"))
-    val jwtSigner = setting("jwt", JwtSigner())
+    val jwtSigner = setting("jwt", SecureHasherSettings())
     val files = setting("files", FilesSettings())
     val oauthGoogle = setting<OauthProviderCredentials?>("oauth-google", null)
     val oauthApple = setting<OauthProviderCredentials?>("oauth-apple", null)
@@ -24,6 +24,6 @@ object TestSettings {
 
     init {
         Settings.populateDefaults()
-        engine = LocalEngine
+        engine = LocalEngine(LocalCache)
     }
 }
