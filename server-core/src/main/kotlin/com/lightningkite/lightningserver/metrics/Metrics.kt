@@ -69,17 +69,17 @@ interface Metrics: HealthCheckable {
                 toReport.add(MetricEvent(type, null, Instant.now(), value))
         }
 
-        suspend inline fun reportPerHandler(type: MetricType, value: Double) {
+        suspend fun reportPerHandler(type: MetricType, value: Double) {
             if (!Settings.sealed) return
             if (type.name in metricsSettings().settings.tracked)
                 toReport.add(MetricEvent(type, serverEntryPoint()?.toString() ?: "Unknown", Instant.now(), value))
         }
 
-        suspend inline fun addToSumPerHandler(type: MetricType, value: Double) {
+        suspend fun addToSumPerHandler(type: MetricType, value: Double) {
             coroutineContext[ServerEntryPointElement.Key]?.metricSums?.compute(type) { key, it -> (it ?: 0.0) + value }
         }
 
-        suspend inline fun <T> addPerformanceToSumPerHandler(type: MetricType, countType: MetricType? = null, action: () -> T): T {
+        suspend fun <T> addPerformanceToSumPerHandler(type: MetricType, countType: MetricType? = null, action: suspend () -> T): T {
             val start = System.nanoTime()
             return try {
                 action()
@@ -89,7 +89,7 @@ interface Metrics: HealthCheckable {
             }
         }
 
-        suspend inline fun <T> performancePerHandler(type: MetricType, action: () -> T): T {
+        suspend fun <T> performancePerHandler(type: MetricType, action: suspend () -> T): T {
             val start = System.nanoTime()
             return try {
                 action()
@@ -98,7 +98,7 @@ interface Metrics: HealthCheckable {
             }
         }
 
-        suspend fun <T> handlerPerformance(handler: Any, action: () -> T): T {
+        suspend fun <T> handlerPerformance(handler: Any, action: suspend () -> T): T {
             return serverEntryPoint(handler) {
                 val result = performancePerHandler(executionTime, action)
                 try {

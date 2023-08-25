@@ -112,15 +112,15 @@ inline fun <reified Serializable : () -> Goal, Goal> setting(
 )
 
 
-@JvmName("settingInvokableMetricable")
-inline fun <reified Serializable : () -> Goal, Goal: Metricable<Goal>> setting(
-    name: String,
-    default: Serializable,
-    optional: Boolean = false
-): Settings.Requirement<Serializable, Goal> = setting<Serializable, Goal>(
-    name = name,
-    default = default,
-    optional = optional,
-    serializer = Serialization.module.serializer<Serializable>(),
-    getter = { it().withMetrics(name) }
-)
+//@JvmName("settingInvokableMetricable")
+//inline fun <reified Serializable : () -> Goal, Goal: Metricable<Goal>> setting(
+//    name: String,
+//    default: Serializable,
+//    optional: Boolean = false
+//): Settings.Requirement<Serializable, Goal> = setting<Serializable, Goal>(
+//    name = name,
+//    default = default,
+//    optional = optional,
+//    serializer = Serialization.module.serializer<Serializable>(),
+//    getter = { it().withMetrics(name) }
+//)
