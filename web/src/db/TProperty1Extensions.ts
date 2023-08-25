@@ -9,6 +9,6 @@ export function keyGet<K, V>(on: K, key: TProperty1<K, V>): V {
 
 export function keySet<K, V>(on: K, key: TProperty1<K, V>, value: V): K {
     const dict: Record<string, any> = {}
-    dict[key] = value
+    dict[key as string] = value
     return (on as unknown as DataClass).copy(dict) as unknown as K
 }

@@ -1,11 +1,11 @@
 {
   "name": "@lightningkite/lightning-server",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "dependencies": {
-    "@js-joda/core": "^4.3.1",
+    "@js-joda/core": "^5.5.3",
     "iter-tools-es": "^7.1.4",
     "rxjs": "7.4.0",
     "uuid": "8.x",
@@ -14,7 +14,7 @@
     "@types/sprintf-js": "1.1.x",
     "mersenne-twister": "1.x",
     "@types/mersenne-twister": "1.x",
-    "@lightningkite/khrysalis-runtime": "1.0.1",
+    "@lightningkite/khrysalis-runtime": "1.0.5",
     "@lightningkite/rxjs-plus": "1.0.0"
   },
   "devDependencies": {

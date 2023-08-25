@@ -30,102 +30,13 @@ class ModificationBuilder {
     }
     add(modification) { this.modifications.push(modification); }
     build() {
-        var _a;
-        return (_a = (() => {
-            const temp6 = this.modifications;
-            return (temp6.length == 1 ? temp6[0] : null);
-        })()) !== null && _a !== void 0 ? _a : new Modification_1.Modification.Chain(this.modifications);
+        if (this.modifications.length === 1) {
+            return this.modifications[0];
+        }
+        else {
+            return new Modification_1.Modification.Chain(this.modifications);
+        }
     }
-    assignCm(this_, value) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.Assign(value)));
-    }
-    coerceAtMostCm(this_, value) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.CoerceAtMost(value)));
-    }
-    coerceAtLeastCm(this_, value) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.CoerceAtLeast(value)));
-    }
-    plusAssignNumberCm(this_, by) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.Increment(by)));
-    }
-    timesAssignCm(this_, by) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.Multiply(by)));
-    }
-    plusAssignStringCm(this_, value) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.AppendString(value)));
-    }
-    plusAssignListCm(this_, items) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.ListAppend(items)));
-    }
-    plusAssignSetCm(this_, items) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.SetAppend(items)));
-    }
-    plusAssignItemListCm(this_, item) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.ListAppend([item])));
-    }
-    plusAssignItemSetCm(this_, item) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.SetAppend(new khrysalis_runtime_1.EqualOverrideSet([item]))));
-    }
-    plusAssignListAddAllCm(this_, items) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.ListAppend(items)));
-    }
-    plusAssignSetAddAllCm(this_, items) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.SetAppend(items)));
-    }
-    removeAllListCm(this_, condition) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.ListRemove((condition)((0, ConditionBuilder_1.path)()))));
-    }
-    removeAllSetCm(this_, condition) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.SetRemove((condition)((0, ConditionBuilder_1.path)()))));
-    }
-    removeAllItemsListCm(this_, items) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.ListRemoveInstances(items)));
-    }
-    removeAllItemsSetCm(this_, items) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.SetRemoveInstances(items)));
-    }
-    dropLastListCm(this_) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.ListDropLast()));
-    }
-    dropLastSetCm(this_) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.SetDropLast()));
-    }
-    dropFirstListCm(this_) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.ListDropFirst()));
-    }
-    dropFirstSetCm(this_) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.SetDropFirst()));
-    }
-    mapListCm(this_, modification) {
-        const builder = new ModificationBuilder();
-        modification(builder, (0, ConditionBuilder_1.path)());
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.ListPerElement(new Condition_1.Condition.Always(), builder.build())));
-    }
-    mapSetCm(this_, modification) {
-        const builder = new ModificationBuilder();
-        modification(builder, (0, ConditionBuilder_1.path)());
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.SetPerElement(new Condition_1.Condition.Always(), builder.build())));
-    }
-    mapIfListCm(this_, condition, modification) {
-        const builder = new ModificationBuilder();
-        modification(builder, (0, ConditionBuilder_1.path)());
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.ListPerElement((condition)((0, ConditionBuilder_1.path)()), builder.build())));
-    }
-    mapIfSetCm(this_, condition, modification) {
-        const builder = new ModificationBuilder();
-        modification(builder, (0, ConditionBuilder_1.path)());
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.SetPerElement((condition)((0, ConditionBuilder_1.path)()), builder.build())));
-    }
-    plusAssignMapCm(this_, map) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.Combine(map)));
-    }
-    modifyByKeyCm(this_, byKey) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.ModifyByKey(new Map((0, iter_tools_es_1.map)(x => [x[0], ((it) => (modification(it[1])))(x)], byKey.entries())))));
-    }
-    removeKeysCm(this_, fields) {
-        this.modifications.push(this_.mapModification(new Modification_1.Modification.RemoveKeys(fields)));
-    }
-    // ---
     assign(this_, value) {
         this.modifications.push(this_.mapModification(new Modification_1.Modification.Assign(value)));
     }
@@ -186,22 +97,22 @@ class ModificationBuilder {
     dropFirstSet(this_) {
         this.modifications.push(this_.mapModification(new Modification_1.Modification.SetDropFirst()));
     }
-    mapList(this_, modification) {
+    forEachList(this_, modification) {
         const builder = new ModificationBuilder();
         modification(builder, (0, ConditionBuilder_1.path)());
         this.modifications.push(this_.mapModification(new Modification_1.Modification.ListPerElement(new Condition_1.Condition.Always(), builder.build())));
     }
-    mapSet(this_, modification) {
+    forEachSet(this_, modification) {
         const builder = new ModificationBuilder();
         modification(builder, (0, ConditionBuilder_1.path)());
         this.modifications.push(this_.mapModification(new Modification_1.Modification.SetPerElement(new Condition_1.Condition.Always(), builder.build())));
     }
-    mapIfList(this_, condition, modification) {
+    forEachIfList(this_, condition, modification) {
         const builder = new ModificationBuilder();
         modification(builder, (0, ConditionBuilder_1.path)());
         this.modifications.push(this_.mapModification(new Modification_1.Modification.ListPerElement((condition)((0, ConditionBuilder_1.path)()), builder.build())));
     }
-    mapIfSet(this_, condition, modification) {
+    forEachIfSet(this_, condition, modification) {
         const builder = new ModificationBuilder();
         modification(builder, (0, ConditionBuilder_1.path)());
         this.modifications.push(this_.mapModification(new Modification_1.Modification.SetPerElement((condition)((0, ConditionBuilder_1.path)()), builder.build())));
