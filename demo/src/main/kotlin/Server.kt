@@ -39,6 +39,7 @@ import java.lang.IllegalStateException
 import java.time.Duration
 import java.util.*
 import kotlin.random.Random
+import kotlin.reflect.KType
 
 object Server : ServerPathGroup(ServerPath.root) {
 
@@ -79,7 +80,7 @@ object Server : ServerPathGroup(ServerPath.root) {
                 .interceptCreate { it.copy(hashedPassword = it.hashedPassword.secureHash()) }
                 .interceptModification {
                     it.map(path<User>().hashedPassword) {
-                        when(it) {
+                        when (it) {
                             is Modification.Assign -> it.copy(it.value.secureHash())
                             else -> throw IllegalStateException()
                         }
@@ -143,7 +144,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         message = {
             println("Message $it")
             it.id.send(it.content)
-            if(it.content == "die") {
+            if (it.content == "die") {
                 throw Exception("You asked me to die!")
             }
         },

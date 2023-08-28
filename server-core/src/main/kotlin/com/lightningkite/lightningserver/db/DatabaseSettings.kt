@@ -6,10 +6,12 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Pluggable
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.reflect.KType
 
 /**
@@ -44,7 +46,11 @@ data class DatabaseSettings(
         }
     }
 
-    override fun invoke(): Database = parse(url.substringBefore("://"), this)
+    @Transient val invoked = AtomicBoolean(false)
+    override fun invoke(): Database {
+        if(!invoked.compareAndSet(false, true)) throw Error()
+        return parse(url.substringBefore("://"), this)
+    }
 }
 
 /**
