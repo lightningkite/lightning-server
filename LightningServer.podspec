@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'LightningServer'
-  s.version          = '0.1.0'
+  s.version          = '0.9.1'
   s.summary          = 'LightningServer'
 
   s.description      = <<-DESC

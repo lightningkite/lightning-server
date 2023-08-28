@@ -234,25 +234,25 @@ public final class ModificationBuilder<K : Codable & Hashable> {
         self.modifications.append(this.mapModification(ModificationSetDropFirst()))
     }
     
-    public func xDataClassPathMap<T : Codable & Hashable>(_ this: DataClassPath<K, Array<T>>, modification: @escaping (ModificationBuilder<T>, DataClassPath<T, T>) -> Void) -> Void {
+    public func xDataClassPathForEach<T : Codable & Hashable>(_ this: DataClassPath<K, Array<T>>, modification: @escaping (ModificationBuilder<T>, DataClassPath<T, T>) -> Void) -> Void {
         let builder = (ModificationBuilder<T>() as ModificationBuilder<T>)
         modification(builder, path())
         self.modifications.append(this.mapModification(ModificationListPerElement(condition: ConditionAlways(), modification: builder.build())))
     }
     
-    public func xDataClassPathMap<T : Codable & Hashable>(_ this: DataClassPath<K, Set<T>>, modification: @escaping (ModificationBuilder<T>, DataClassPath<T, T>) -> Void) -> Void {
+    public func xDataClassPathForEach<T : Codable & Hashable>(_ this: DataClassPath<K, Set<T>>, modification: @escaping (ModificationBuilder<T>, DataClassPath<T, T>) -> Void) -> Void {
         let builder = (ModificationBuilder<T>() as ModificationBuilder<T>)
         modification(builder, path())
         self.modifications.append(this.mapModification(ModificationSetPerElement(condition: ConditionAlways(), modification: builder.build())))
     }
     
-    public func xDataClassPathMapIf<T : Codable & Hashable>(_ this: DataClassPath<K, Array<T>>, condition: @escaping (DataClassPath<T, T>) -> Condition<T>, modification: @escaping (ModificationBuilder<T>, DataClassPath<T, T>) -> Void) -> Void {
+    public func xDataClassPathForEachIf<T : Codable & Hashable>(_ this: DataClassPath<K, Array<T>>, condition: @escaping (DataClassPath<T, T>) -> Condition<T>, modification: @escaping (ModificationBuilder<T>, DataClassPath<T, T>) -> Void) -> Void {
         let builder = (ModificationBuilder<T>() as ModificationBuilder<T>)
         modification(builder, path())
         self.modifications.append(this.mapModification(ModificationListPerElement(condition: (condition)((path() as DataClassPath<T, T>)), modification: builder.build())))
     }
     
-    public func xDataClassPathMapIf<T : Codable & Hashable>(_ this: DataClassPath<K, Set<T>>, condition: @escaping (DataClassPath<T, T>) -> Condition<T>, modification: @escaping (ModificationBuilder<T>, DataClassPath<T, T>) -> Void) -> Void {
+    public func xDataClassPathForEachIf<T : Codable & Hashable>(_ this: DataClassPath<K, Set<T>>, condition: @escaping (DataClassPath<T, T>) -> Condition<T>, modification: @escaping (ModificationBuilder<T>, DataClassPath<T, T>) -> Void) -> Void {
         let builder = (ModificationBuilder<T>() as ModificationBuilder<T>)
         modification(builder, path())
         self.modifications.append(this.mapModification(ModificationSetPerElement(condition: (condition)((path() as DataClassPath<T, T>)), modification: builder.build())))
