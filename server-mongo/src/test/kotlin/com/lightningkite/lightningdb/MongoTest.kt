@@ -1,6 +1,6 @@
 package com.lightningkite.lightningdb
 
-import com.mongodb.reactivestreams.client.MongoClient
+import com.mongodb.kotlin.client.coroutine.MongoClient
 import org.junit.AfterClass
 import org.junit.BeforeClass
 
