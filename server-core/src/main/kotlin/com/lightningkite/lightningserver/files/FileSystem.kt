@@ -1,5 +1,8 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.core.Disconnectable
+import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 
@@ -7,7 +10,7 @@ import com.lightningkite.lightningserver.serverhealth.HealthStatus
  * An abstracted model for reading and writing files in a storage solution.
  * Every implementation will handle how to resolve FileObjects in their own system.
  */
-interface FileSystem : HealthCheckable {
+interface FileSystem : HealthCheckable, Disconnectable {
     val root: FileObject
     val rootUrls: List<String> get() = listOf(root.url)
 
@@ -28,7 +31,17 @@ interface FileSystem : HealthCheckable {
 
     override suspend fun healthCheck(): HealthStatus {
         try {
-            root.list()
+            val testFile = root.resolve("health-check/test-file.txt")
+            val testContent = "Test Content"
+            testFile.put(HttpContent.Text(testContent, ContentType.Text.Plain))
+            if (testFile.head()?.type != ContentType.Text.Plain) return HealthStatus(
+                HealthStatus.Level.ERROR,
+                additionalMessage = "Test write resulted in file of incorrect MIME type"
+            )
+            if (testFile.get()!!.text() != testContent) return HealthStatus(
+                HealthStatus.Level.ERROR,
+                additionalMessage = "Test content did not match"
+            )
             return HealthStatus(HealthStatus.Level.OK)
         } catch (e: Exception) {
             return HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)

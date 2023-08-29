@@ -1,4 +1,4 @@
-@file:UseContextualSerialization(UUID::class, Instant::class)
+@file:UseContextualSerialization(UUID::class, Instant::class, ServerFile::class)
 package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.*
@@ -64,6 +64,13 @@ data class ClassUsedForEmbedding(
 data class RecursiveEmbed(
     var embedded:RecursiveEmbed? = null,
     var value2:String = "value2"
+)
+
+@GenerateDataClassPaths
+@Serializable
+data class HasServerFiles(
+    val file: ServerFile,
+    val optionalFile: ServerFile? = null
 )
 
 @GenerateDataClassPaths

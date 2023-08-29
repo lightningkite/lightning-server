@@ -424,8 +424,8 @@ class JsonSchemaBuilder(
         }
 
         val desc = serializer.unwrap()
-        overrides[serializer.serialName.substringBefore('<')]?.let {
-            return defining(serializer) { it(serializer).applyAnnotations(annos) }
+        overrides[desc.serialName.substringBefore('<')]?.let {
+            return defining(desc) { it(desc).applyAnnotations(annos) }
         }
         return when (desc.kind) {
             PrimitiveKind.BOOLEAN -> JsonSchemaType(type = JsonType3(JsonType2.BOOLEAN)).applyAnnotations(annos)
@@ -528,7 +528,9 @@ class JsonSchemaBuilder(
 private fun SerialDescriptor.unwrap(): SerialDescriptor {
     if (this is LazyRenamedSerialDescriptor) return this.getter().unwrap()
     if (this.isNullable) return this.nullElement()?.unwrap() ?: this
-    if (this.kind == SerialKind.CONTEXTUAL) return Serialization.json.serializersModule.getContextualDescriptor(this)
-        ?: this
+    if (this.kind == SerialKind.CONTEXTUAL) {
+        return Serialization.json.serializersModule.getContextualDescriptor(this)
+            ?: throw IllegalStateException("No contextual implementation found for ${this}")
+    }
     return this
 }

@@ -2,7 +2,7 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.lightningdb.test.*
 import com.lightningkite.lightningserver.db.InMemoryDatabase
-import com.mongodb.reactivestreams.client.MongoClient
+import com.mongodb.kotlin.client.coroutine.MongoClient
 import org.junit.AfterClass
 import org.junit.BeforeClass
 

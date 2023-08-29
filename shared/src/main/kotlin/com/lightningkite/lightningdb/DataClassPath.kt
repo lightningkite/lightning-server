@@ -89,6 +89,11 @@ data class DataClassPathSet<K: IsCodableAndHashable, V: IsCodableAndHashable>(va
     override fun mapModification(modification: Modification<V>): Modification<K> = wraps.mapModification(Modification.SetPerElement(Condition.Always(), modification))
 }
 
+@JsName("notNull")
 val <K: IsCodableAndHashable, V: IsCodableAndHashable> DataClassPath<K, V?>.notNull: DataClassPathNotNull<K, V> get() = DataClassPathNotNull(this)
+@JsName("listElements")
+@get:JvmName("getListElements")
 val <K: IsCodableAndHashable, V: IsCodableAndHashable> DataClassPath<K, List<V>>.elements: DataClassPathList<K, V> get() = DataClassPathList(this)
+@JsName("setElements")
+@get:JvmName("getSetElements")
 val <K: IsCodableAndHashable, V: IsCodableAndHashable> DataClassPath<K, Set<V>>.elements: DataClassPathSet<K, V> get() = DataClassPathSet(this)

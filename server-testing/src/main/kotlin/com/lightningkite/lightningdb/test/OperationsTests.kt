@@ -1,11 +1,14 @@
 package com.lightningkite.lightningdb.test
 
-import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.time.Instant
 import kotlin.test.assertEquals
 import com.lightningkite.lightningdb.*
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.toList
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.max
+import kotlin.random.Random
 
 abstract class OperationsTests() {
 
@@ -132,5 +135,30 @@ abstract class OperationsTests() {
         assertEquals(m, updated.old)
         m = collection.get(m._id)!!
         assertEquals(m, updated.new)
+    }
+
+    @Test fun test_concurrency(): Unit = runBlocking {
+        fun collection() = database.collection<LargeTestModel>("test_concurrency")
+        val operations = (1..1000).map { modification<LargeTestModel> { it.int assign Random.nextInt() } }
+        var m = LargeTestModel(int = 2, boolean = true)
+        val opCount = AtomicInteger(0)
+        val opMax = AtomicInteger(0)
+        collection().insertOne(m)
+        coroutineScope {
+            withContext(Dispatchers.IO) {
+                operations.map {
+                    async {
+                        val c = opCount.incrementAndGet()
+                        opMax.getAndUpdate { max(it, c) }
+                        collection().updateOneById(m._id, it)
+                        opCount.decrementAndGet()
+                    }
+                }.awaitAll()
+            }
+        }
+        // This assert won't usually work as ops are not necessarily run in order.
+//        assertEquals(operations.fold(m) { acc, op -> op(acc) }, collection().get(m._id))
+        assertEquals(0, opCount.get())
+        println("Concurrent ops: ${opMax.get()}")
     }
 }

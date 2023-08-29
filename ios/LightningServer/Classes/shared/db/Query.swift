@@ -55,3 +55,5 @@ public final class Query<T : Codable & Hashable> : CustomStringConvertible, Hash
         self.init(makeCondition(path()), orderBy: orderBy, skip: skip, limit: limit)
     }
 }
+
+

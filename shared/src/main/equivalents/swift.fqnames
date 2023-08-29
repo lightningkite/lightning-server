@@ -1,4 +1,15 @@
 LightningServer
+com.lightningkite.lightningserver.exceptions.prepareReportedExceptionGroupFields
+com.lightningkite.lightningserver.exceptions._id
+com.lightningkite.lightningserver.exceptions.lastOccurredAt
+com.lightningkite.lightningserver.exceptions.count
+com.lightningkite.lightningserver.exceptions.context
+com.lightningkite.lightningserver.exceptions.server
+com.lightningkite.lightningserver.exceptions.message
+com.lightningkite.lightningserver.exceptions.trace
+com.lightningkite.lightningserver.exceptions.path
+com.lightningkite.lightningserver.exceptions
+com.lightningkite.lightningserver.exceptions.prepareModels
 com.lightningkite.lightningserver.files.prepareUploadForNextRequestFields
 com.lightningkite.lightningserver.files._id
 com.lightningkite.lightningserver.files.file
@@ -19,6 +30,9 @@ com.lightningkite.lightningdb.CheckReturnValue
 com.lightningkite.lightningdb.AdminSearchFields
 com.lightningkite.lightningdb.AdminTableColumns
 com.lightningkite.lightningdb.AdminTitleFields
+com.lightningkite.lightningdb.AdminHidden
+com.lightningkite.lightningdb.Multiline
+com.lightningkite.lightningdb.UiWidget
 com.lightningkite.lightningdb.JsonSchemaOptions
 com.lightningkite.lightningdb.JsonSchemaFormat
 com.lightningkite.lightningdb.IntegerRange
@@ -79,8 +93,6 @@ com.lightningkite.lightningdb.all
 com.lightningkite.lightningdb.any
 com.lightningkite.lightningdb.sizesEquals
 com.lightningkite.lightningdb.containsKey
-com.lightningkite.lightningdb.notNull
-com.lightningkite.lightningdb.get
 com.lightningkite.lightningdb.fieldSerializer
 com.lightningkite.lightningdb.serializers
 com.lightningkite.lightningdb.getCond
@@ -117,6 +129,10 @@ com.lightningkite.lightningdb.DataClassPath
 com.lightningkite.lightningdb.DataClassPathSelf
 com.lightningkite.lightningdb.DataClassPathAccess
 com.lightningkite.lightningdb.DataClassPathNotNull
+com.lightningkite.lightningdb.DataClassPathList
+com.lightningkite.lightningdb.DataClassPathSet
+com.lightningkite.lightningdb.notNull
+com.lightningkite.lightningdb.elements
 com.lightningkite.lightningdb.KProperty1Parser
 com.lightningkite.lightningdb.DataClassPathSerializer
 com.lightningkite.lightningdb.EntryChange
@@ -142,6 +158,7 @@ com.lightningkite.lightningdb.Modification
 com.lightningkite.lightningdb.modification
 com.lightningkite.lightningdb.and
 com.lightningkite.lightningdb.ModificationBuilder
+com.lightningkite.lightningdb.numberKinds
 com.lightningkite.lightningdb.getMod
 com.lightningkite.lightningdb.ModificationSerializer
 com.lightningkite.lightningdb.OnFieldSerializer2
@@ -169,7 +186,12 @@ com.lightningkite.lightningdb.ModificationSetDropLastSerializer
 com.lightningkite.lightningdb.MultiplexMessage
 com.lightningkite.lightningdb.MySealedClassSerializerInterface
 com.lightningkite.lightningdb.MySealedClassSerializer
+com.lightningkite.lightningdb.Partial
+com.lightningkite.lightningdb.partialOf
+com.lightningkite.lightningdb.PartialSerializer
+com.lightningkite.lightningdb.setMap
 com.lightningkite.lightningdb.Query
+com.lightningkite.lightningdb.QueryPartial
 com.lightningkite.lightningdb.UUIDSerializer
 com.lightningkite.lightningdb.InstantSerializer
 com.lightningkite.lightningdb.ZonedDateTimeSerializer
@@ -186,6 +208,7 @@ com.lightningkite.lightningdb.mapKeyElement
 com.lightningkite.lightningdb.mapValueElement
 com.lightningkite.lightningdb.nullElement
 com.lightningkite.lightningdb.defer
+com.lightningkite.lightningdb.TypeArgSerialDescriptor
 com.lightningkite.lightningdb.ServerFile
 com.lightningkite.lightningdb.ServerFileSerialization
 com.lightningkite.lightningdb.sort
@@ -202,6 +225,7 @@ com.lightningkite.lightningserver.auth.EmailPinLogin
 com.lightningkite.lightningserver.auth.PhonePinLogin
 com.lightningkite.lightningserver.auth.PasswordLogin
 com.lightningkite.lightningserver.auth
+com.lightningkite.lightningserver.exceptions.ReportedExceptionGroup
 com.lightningkite.lightningserver.files.UploadForNextRequest
 com.lightningkite.lightningserver.files.UploadInformation
 com.lightningkite.lightningserver.serverhealth.HealthStatus

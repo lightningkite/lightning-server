@@ -3,16 +3,15 @@
 import { Condition } from './Condition'
 import { path } from './ConditionBuilder'
 import { DataClassPath } from './DataClassPath'
-import { Modification } from './Modification'
 import { SortPart } from './SortPart'
 import { ReifiedType, setUpDataClass } from '@lightningkite/khrysalis-runtime'
 
 //! Declares com.lightningkite.lightningdb.Query
 export class Query<T extends any> {
-    public constructor(public readonly condition: Condition<T> = new Condition.Always<T>(), public readonly orderBy: Array<SortPart<T>> = [], public readonly skip: number = 0, public readonly limit: number = 100, public readonly skipFieldsMask: (Modification<T> | null) = null) {
+    public constructor(public readonly condition: Condition<T> = new Condition.Always<T>(), public readonly orderBy: Array<SortPart<T>> = [], public readonly skip: number = 0, public readonly limit: number = 100) {
     }
-    public static properties = ["condition", "orderBy", "skip", "limit", "skipFieldsMask"]
-    public static propertyTypes(T: ReifiedType) { return {condition: [Condition, T], orderBy: [Array, [SortPart, T]], skip: [Number], limit: [Number], skipFieldsMask: [Modification, T]} }
+    public static properties = ["condition", "orderBy", "skip", "limit"]
+    public static propertyTypes(T: ReifiedType) { return {condition: [Condition, T], orderBy: [Array, [SortPart, T]], skip: [Number], limit: [Number]} }
     copy: (values: Partial<Query<T>>) => this;
     equals: (other: any) => boolean;
     hashCode: () => number;
@@ -23,9 +22,10 @@ export class Query<T extends any> {
         limit: number = 100,
         makeCondition: ((a: DataClassPath<T, T>) => Condition<T>),
     ) {
-        let result = new Query<T>(makeCondition(path<T>()), orderBy, skip, limit, undefined);
+        let result = new Query<T>(makeCondition(path<T>()), orderBy, skip, limit);
         
         return result;
     }
 }
 setUpDataClass(Query)
+

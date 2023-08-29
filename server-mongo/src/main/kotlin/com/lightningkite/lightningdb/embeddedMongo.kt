@@ -2,12 +2,10 @@ package com.lightningkite.lightningdb
 
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
-import com.mongodb.reactivestreams.client.MongoClient
+import com.mongodb.kotlin.client.coroutine.MongoClient
 import kotlinx.coroutines.runBlocking
 import org.bson.Document
 import org.bson.UuidRepresentation
-import org.litote.kmongo.coroutine.toList
-import org.litote.kmongo.reactivestreams.KMongo
 import org.slf4j.LoggerFactory
 import java.io.File
 import de.flapdoodle.embed.mongo.packageresolver.Command
@@ -51,8 +49,8 @@ private fun embeddedMongo(deleteAfter: Boolean, replFile: File, port: Int): Mong
     if(!replFileExisted) {
         runBlocking {
             try {
-                KMongo
-                    .createClient("mongodb://localhost:$port/")
+                MongoClient
+                    .create("mongodb://localhost:$port/")
                     .getDatabase("admin")
                     .runCommand(Document().apply {
                         append("replSetInitiate", Document().apply {
@@ -71,7 +69,7 @@ private fun embeddedMongo(deleteAfter: Boolean, replFile: File, port: Int): Mong
         }
     }
 
-    val wrapped = KMongo.createClient(
+    val wrapped = MongoClient.create(
         MongoClientSettings.builder()
             .applyConnectionString(ConnectionString("mongodb://localhost:$port/?replicaSet=rs0"))
             .uuidRepresentation(UuidRepresentation.STANDARD)
@@ -82,20 +80,7 @@ private fun embeddedMongo(deleteAfter: Boolean, replFile: File, port: Int): Mong
         fromShutdownHook = true
         closeable?.close()
     }
-    val client = object : MongoClient by wrapped {
-        override fun close() {
-            if(!fromShutdownHook) {
-                Runtime.getRuntime().removeShutdownHook(shutdownHook)
-            }
-            mongodExecutable.stop()
-            try {
-                wrapped.close()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-            if(deleteAfter) replFile.deleteRecursively()
-        }
-    }
+    val client = wrapped
     closeable = client
     Runtime.getRuntime().addShutdownHook(shutdownHook)
     return client

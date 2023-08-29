@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.pubsub
 
+import com.lightningkite.lightningserver.core.Disconnectable
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
@@ -11,7 +12,7 @@ import kotlinx.serialization.serializer
 @Deprecated("Renamed to just 'PubSub'", ReplaceWith("PubSub", "com.lightningkite.lightningserver.pubsub.PubSub"))
 typealias PubSubInterface = PubSub
 
-interface PubSub : HealthCheckable {
+interface PubSub : HealthCheckable, Disconnectable {
     fun <T> get(key: String, serializer: KSerializer<T>): PubSubChannel<T>
     fun string(key: String): PubSubChannel<String>
     override suspend fun healthCheck(): HealthStatus {

@@ -45,6 +45,7 @@ dependencies {
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
     api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$kotlinXSerialization")
     api("io.github.pdvrieze.xmlutil:serialization-jvm:0.85.0")
+    api("org.mongodb:bson:4.10.0")
     api("com.github.jershell:kbson:0.4.5")
     api("com.charleskorn.kaml:kaml:0.49.0")
     api(kotlin("reflect"))

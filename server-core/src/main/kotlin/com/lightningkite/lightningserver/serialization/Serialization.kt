@@ -2,9 +2,8 @@ package com.lightningkite.lightningserver.serialization
 
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
-import com.github.jershell.kbson.Configuration
-import com.github.jershell.kbson.KBson
-import com.lightningkite.lightningdb.ClientModule
+import com.github.jershell.kbson.*
+import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.SetOnce
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
@@ -26,6 +25,10 @@ import kotlinx.serialization.properties.Properties
 import nl.adaptivity.xmlutil.XmlDeclMode
 import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
 import nl.adaptivity.xmlutil.serialization.XML
+import java.math.BigDecimal
+import java.time.*
+import java.util.*
+import kotlin.collections.HashMap
 
 /**
  * A place to hold all the support Serialization types.
@@ -71,7 +74,7 @@ abstract class Serialization {
         Yaml(module, YamlConfiguration(encodeDefaults = false, strictMode = false))
     }
     var bson: KBson by SetOnce {
-        KBson(module, Configuration())
+        KBson(module.overwriteWith(BsonOverrides), Configuration())
     }
     var xml: XML by SetOnce {
         XML(module) {

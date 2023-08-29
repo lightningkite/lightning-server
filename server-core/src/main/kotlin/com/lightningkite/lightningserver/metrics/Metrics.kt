@@ -63,7 +63,7 @@ interface Metrics: HealthCheckable {
             }
         }
 
-        suspend fun report(type: MetricType, value: Double) {
+        fun report(type: MetricType, value: Double) {
             if (!Settings.sealed) return
             if (type.name in metricsSettings().settings.tracked)
                 toReport.add(MetricEvent(type, null, Instant.now(), value))
@@ -81,21 +81,17 @@ interface Metrics: HealthCheckable {
 
         suspend fun <T> addPerformanceToSumPerHandler(type: MetricType, countType: MetricType? = null, action: suspend () -> T): T {
             val start = System.nanoTime()
-            return try {
-                action()
-            } finally {
-                addToSumPerHandler(type, (System.nanoTime() - start) / 1000000.0)
-                countType?.let { addToSumPerHandler(it, 1.0) }
-            }
+            val result = action()
+            addToSumPerHandler(type, (System.nanoTime() - start) / 1000000.0)
+            countType?.let { addToSumPerHandler(it, 1.0) }
+            return result
         }
 
         suspend fun <T> performancePerHandler(type: MetricType, action: suspend () -> T): T {
             val start = System.nanoTime()
-            return try {
-                action()
-            } finally {
-                reportPerHandler(type, (System.nanoTime() - start) / 1000000.0)
-            }
+            val result = action()
+            reportPerHandler(type, (System.nanoTime() - start) / 1000000.0)
+            return result
         }
 
         suspend fun <T> handlerPerformance(handler: Any, action: suspend () -> T): T {

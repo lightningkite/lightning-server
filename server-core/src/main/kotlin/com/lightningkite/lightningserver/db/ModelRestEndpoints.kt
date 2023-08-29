@@ -4,6 +4,7 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
+import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.HttpStatus
@@ -202,8 +203,12 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         } ?: listOf(),
         successCode = HttpStatus.Created,
         implementation = { user: USER, values: List<T> ->
-            info.collection(user)
-                .insertMany(values)
+            try {
+                info.collection(user)
+                    .insertMany(values)
+            } catch (e: UniqueViolationException) {
+                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+            }
         }
     )
 
@@ -217,9 +222,13 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         examples = exampleItem()?.let { listOf(ApiExample(it, it)) } ?: listOf(),
         successCode = HttpStatus.Created,
         implementation = { user: USER, value: T ->
-            info.collection(user)
-                .insertOne(value)
-                ?: throw ForbiddenException("Value was not posted as requested.")
+            try {
+                info.collection(user)
+                    .insertOne(value)
+                    ?: throw ForbiddenException("Value was not posted as requested.")
+            } catch (e: UniqueViolationException) {
+                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+            }
         }
     )
 
@@ -234,10 +243,14 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         examples = exampleItem()?.let { listOf(ApiExample(it, it)) } ?: listOf(),
         successCode = HttpStatus.Created,
         implementation = { user: USER, id: ID, value: T ->
-            info.collection(user)
-                .upsertOneById(id, value)
-                .new
-                ?: throw NotFoundException()
+            try {
+                info.collection(user)
+                    .upsertOneById(id, value)
+                    .new
+                    ?: throw NotFoundException()
+            } catch (e: UniqueViolationException) {
+                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+            }
         }
     )
 
@@ -254,8 +267,12 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
             listOf(ApiExample(items, items))
         } ?: listOf(),
         implementation = { user: USER, values: List<T> ->
-            val db = info.collection(user)
-            values.map { db.replaceOneById(it._id, it) }.mapNotNull { it.new }
+            try {
+                val db = info.collection(user)
+                values.map { db.replaceOneById(it._id, it) }.mapNotNull { it.new }
+            } catch (e: UniqueViolationException) {
+                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+            }
         }
     )
 
@@ -276,10 +293,14 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         ),
         examples = exampleItem()?.let { listOf(ApiExample(it, it)) } ?: listOf(),
         implementation = { user: USER, id: ID, value: T ->
-            info.collection(user)
-                .replaceOneById(id, value)
-                .new
-                ?: throw NotFoundException()
+            try {
+                info.collection(user)
+                    .replaceOneById(id, value)
+                    .new
+                    ?: throw NotFoundException()
+            } catch (e: UniqueViolationException) {
+                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+            }
         }
     )
 
@@ -303,8 +324,12 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
             }
         } ?: listOf(),
         implementation = { user: USER, input: MassModification<T> ->
-            info.collection(user)
-                .updateManyIgnoringResult(input)
+            try {
+                info.collection(user)
+                    .updateManyIgnoringResult(input)
+            } catch (e: UniqueViolationException) {
+                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+            }
         }
     )
 
@@ -332,9 +357,13 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
             }
         } ?: listOf(),
         implementation = { user: USER, id: ID, input: Modification<T> ->
-            info.collection(user)
-                .updateOneById(id, input)
-                .also { if (it.old == null && it.new == null) throw NotFoundException() }
+            try {
+                info.collection(user)
+                    .updateOneById(id, input)
+                    .also { if (it.old == null && it.new == null) throw NotFoundException() }
+            } catch (e: UniqueViolationException) {
+                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+            }
         }
     )
 
@@ -362,10 +391,14 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
             }
         } ?: listOf(),
         implementation = { user: USER, id: ID, input: Modification<T> ->
-            info.collection(user)
-                .updateOneById(id, input)
-                .also { if (it.old == null && it.new == null) throw NotFoundException() }
-                .new!!
+            try {
+                info.collection(user)
+                    .updateOneById(id, input)
+                    .also { if (it.old == null && it.new == null) throw NotFoundException() }
+                    .new!!
+            } catch (e: UniqueViolationException) {
+                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+            }
         }
     )
 

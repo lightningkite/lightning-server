@@ -3,7 +3,7 @@
 import KhrysalisRuntime
 import Foundation
 
-public final class UploadForNextRequest : HasId, CustomStringConvertible, Hashable, PropertyIterable, Codable {
+public final class UploadForNextRequest : HasId, CustomStringConvertible, Hashable, Codable {
     public typealias ID = UUID
     public var _id: UUID
     public var file: String
@@ -44,11 +44,6 @@ public final class UploadForNextRequest : HasId, CustomStringConvertible, Hashab
     }
     public static func == (lhs: UploadForNextRequest, rhs: UploadForNextRequest) -> Bool { return lhs._id == rhs._id && lhs.file == rhs.file && lhs.expires == rhs.expires }
     public var description: String { return "UploadForNextRequest(_id=\(String(kotlin: self._id)), file=\(String(kotlin: self.file)), expires=\(String(kotlin: self.expires)))" }
-    public static let _idProp: PropertyIterableProperty<UploadForNextRequest, UUID> = PropertyIterableProperty(name: "_id", path: \._id, setCopy: { (this, value) in this.copy(_id: value) })
-    public static let fileProp: PropertyIterableProperty<UploadForNextRequest, String> = PropertyIterableProperty(name: "file", path: \.file, setCopy: { (this, value) in this.copy(file: value) })
-    public static let expiresProp: PropertyIterableProperty<UploadForNextRequest, Date> = PropertyIterableProperty(name: "expires", path: \.expires, setCopy: { (this, value) in this.copy(expires: value) })
-    public static let properties: Array<PartialPropertyIterableProperty<UploadForNextRequest>> = [_idProp, fileProp, expiresProp]
-    public static var anyProperties: Array<AnyPropertyIterableProperty> { return properties.map { $0 } }
     public func copy(_id: UUID? = nil, file: String? = nil, expires: Date? = nil) -> UploadForNextRequest { return UploadForNextRequest(_id: _id ?? self._id, file: file ?? self.file, expires: expires ?? self.expires) }
 }
 

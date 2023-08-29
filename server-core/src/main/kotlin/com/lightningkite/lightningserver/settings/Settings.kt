@@ -11,6 +11,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.serializer
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 @kotlinx.serialization.Serializable(SettingsSerializer::class)
 object Settings {
@@ -52,13 +53,18 @@ object Settings {
         populate(missing.associateWith { requirements[it]!!.default } + map)
     }
 
-    data class Requirement<Serializable, Goal>(
+    class Requirement<Serializable, Goal>(
         val name: String,
         val serializer: KSerializer<Serializable>,
         val default: Serializable,
         val optional: Boolean,
-        val getter: (Serializable) -> Goal
+        getter: (Serializable) -> Goal
     ) : () -> Goal {
+        private val alreadyDone = AtomicBoolean(false)
+        private val getter: (Serializable) -> Goal = {
+            if(!alreadyDone.compareAndSet(false, true)) throw Error()
+            getter(it)
+        }
         private val value by lazy<Goal> {
             @Suppress("UNCHECKED_CAST")
             getter(values[name]?.item as? Serializable ?: default)
@@ -110,7 +116,6 @@ inline fun <reified Serializable : () -> Goal, Goal> setting(
     serializer = Serialization.module.serializer<Serializable>(),
     getter = { it() }
 )
-
 
 @JvmName("settingInvokableMetricable")
 inline fun <reified Serializable : () -> Goal, Goal: Metricable<Goal>> setting(

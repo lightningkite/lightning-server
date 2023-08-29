@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.demo
 import com.lightningkite.lightningdb.FieldCollection
 import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningdb.get
+import com.lightningkite.lightningdb.metrics
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.*
@@ -11,7 +12,7 @@ import kotlin.random.Random
 
 class TestModelEndpoints(path: ServerPath): ServerPathGroup(path), ModelInfoWithDefault<User, TestModel, UUID> {
     override val serialization: ModelSerializationInfo<User, TestModel, UUID> = ModelSerializationInfo()
-    override fun collection(): FieldCollection<TestModel> = Server.database().collection()
+    override fun collection(): FieldCollection<TestModel> = Server.database().collection<TestModel>()
     override suspend fun collection(principal: User): FieldCollection<TestModel> = collection()
     override suspend fun defaultItem(user: User): TestModel = TestModel()
     override fun exampleItem(): TestModel? {
