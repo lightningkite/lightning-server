@@ -33,11 +33,7 @@ interface Database : HealthCheckable, Metricable<Database> {
         }
     }
 
-    override fun withMetrics(metricsKeyName: String): Database = object : Database by this {
-        override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> {
-            return this@Database.collection<T>(type, name).metrics(metricsKeyName)
-        }
-    }
+    override fun withMetrics(metricsKeyName: String): Database = MetricsWrappedDatabase(this, metricsKeyName)
 }
 
 @GenerateDataClassPaths

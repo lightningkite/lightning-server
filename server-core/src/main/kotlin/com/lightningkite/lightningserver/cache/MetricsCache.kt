@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.metrics.Metrics
 import kotlinx.serialization.KSerializer
 import java.time.Duration
 
-class MetricsCache(val wraps: Cache, metricsKeyName: String): Cache {
+class MetricsCache(val wraps: Cache, metricsKeyName: String): Cache by wraps {
     val metricKey = MetricType("$metricsKeyName Wait Time", MetricUnit.Milliseconds)
     val countMetricKey = MetricType("$metricsKeyName Call Count", MetricUnit.Count)
 

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.lightningserver.core.Disconnectable
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 
@@ -7,7 +8,7 @@ import com.lightningkite.lightningserver.serverhealth.HealthStatus
  * An abstracted model for reading and writing files in a storage solution.
  * Every implementation will handle how to resolve FileObjects in their own system.
  */
-interface FileSystem : HealthCheckable {
+interface FileSystem : HealthCheckable, Disconnectable {
     val root: FileObject
     val rootUrls: List<String> get() = listOf(root.url)
 

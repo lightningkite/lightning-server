@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.metrics
 
-interface Metricable<T> {
+import com.lightningkite.lightningserver.core.Disconnectable
+
+interface Metricable<T>: Disconnectable {
     fun withMetrics(metricsKeyName: String): T
 }
