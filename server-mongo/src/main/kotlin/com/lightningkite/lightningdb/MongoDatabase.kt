@@ -104,7 +104,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
         (collections.getOrPut(type to name) {
             lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
                 MongoFieldCollection(
-                    Serialization.bson.serializersModule.serializer(type) as KSerializer<T>
+                    Serialization.Internal.bson.serializersModule.serializer(type) as KSerializer<T>
                 ) {
                     (coroutineCollections.getOrPut(type to name) {
                         lazy(LazyThreadSafetyMode.SYNCHRONIZED) {

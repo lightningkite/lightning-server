@@ -94,7 +94,7 @@ class MongoFieldCollection<Model : Any>(
                     it.collation(Collation.builder().locale("en").build())
                 } else it
             }
-            .map { Serialization.bson.load(serializer, it) }
+            .map { Serialization.Internal.bson.load(serializer, it) }
             .catch { handleException(it) }
     }
 
@@ -124,7 +124,7 @@ class MongoFieldCollection<Model : Any>(
             )
                 .toList()
                 .associate {
-                    Serialization.bson.load(
+                    Serialization.Internal.bson.load(
                         KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!),
                         it
                     )._id to it.getNumber("count").intValue()
@@ -176,7 +176,7 @@ class MongoFieldCollection<Model : Any>(
             )
                 .toList()
                 .associate {
-                    Serialization.bson.load(
+                    Serialization.Internal.bson.load(
                         KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!),
                         it
                     )._id to (if (it.isNull("value")) null else it.getNumber("value").doubleValue())
@@ -190,7 +190,7 @@ class MongoFieldCollection<Model : Any>(
         prepare.await()
         if (models.none()) return emptyList()
         val asList = models.toList()
-        exceptionWrap { mongo.insertMany(asList.map { Serialization.bson.stringify(serializer, it) }) }
+        exceptionWrap { mongo.insertMany(asList.map { Serialization.Internal.bson.stringify(serializer, it) }) }
         return asList
     }
 
@@ -217,7 +217,7 @@ class MongoFieldCollection<Model : Any>(
         return exceptionWrap {
             mongo.replaceOne(
                 cs.bson(serializer),
-                Serialization.bson.stringify(serializer, model)
+                Serialization.Internal.bson.stringify(serializer, model)
             ).matchedCount != 0L
         }
     }
@@ -246,7 +246,7 @@ class MongoFieldCollection<Model : Any>(
                         .arrayFilters(m.options.arrayFilters)
                         .hint(m.options.hint)
                         .hintString(m.options.hintString)
-                )?.let { Serialization.bson.load(serializer, it) }?.let { EntryChange(it, modification(it)) }
+                )?.let { Serialization.Internal.bson.load(serializer, it) }?.let { EntryChange(it, modification(it)) }
                     ?: EntryChange(null, model)
             } else {
                 mongo.findOneAndUpdate(
@@ -260,8 +260,8 @@ class MongoFieldCollection<Model : Any>(
                         .arrayFilters(m.options.arrayFilters)
                         .hint(m.options.hint)
                         .hintString(m.options.hintString)
-                )?.let { Serialization.bson.load(serializer, it) }?.let { EntryChange(it, modification(it)) }
-                    ?: run { mongo.insertOne(Serialization.bson.stringify(serializer, model)); EntryChange(null, model) }
+                )?.let { Serialization.Internal.bson.load(serializer, it) }?.let { EntryChange(it, modification(it)) }
+                    ?: run { mongo.insertOne(Serialization.Internal.bson.stringify(serializer, model)); EntryChange(null, model) }
             }
         }
     }
@@ -284,7 +284,7 @@ class MongoFieldCollection<Model : Any>(
                 if (mongo.updateOne(cs.bson(serializer), m.document, m.options).matchedCount != 0L) {
                     true
                 } else {
-                    mongo.insertOne(Serialization.bson.stringify(serializer, model))
+                    mongo.insertOne(Serialization.Internal.bson.stringify(serializer, model))
                     false
                 }
             }
@@ -315,7 +315,7 @@ class MongoFieldCollection<Model : Any>(
                     .hint(m.options.hint)
                     .hintString(m.options.hintString)
             ) ?: return EntryChange(null, null)
-        }.let { Serialization.bson.load(serializer,it) }
+        }.let { Serialization.Internal.bson.load(serializer,it) }
         val after = modification(before)
         return EntryChange(before, after)
     }
@@ -347,7 +347,7 @@ class MongoFieldCollection<Model : Any>(
         exceptionWrap {
             mongo.find(cs.bson(serializer)).collectChunked(1000) { list ->
                 mongo.updateMany(Filters.`in`("_id", list.map { it["_id"] }), m.document, m.options)
-                list.asSequence().map { Serialization.bson.load(serializer, it) }
+                list.asSequence().map { Serialization.Internal.bson.load(serializer, it) }
                     .forEach {
                         changes.add(EntryChange(it, modification(it)))
                     }
@@ -385,7 +385,7 @@ class MongoFieldCollection<Model : Any>(
                 .limit(1).firstOrNull()?.let {
                     val id = it["_id"]
                     mongo.deleteOne(Filters.eq("_id", id))
-                    Serialization.bson.load(serializer, it)
+                    Serialization.Internal.bson.load(serializer, it)
                 }
         }
     }
@@ -410,7 +410,7 @@ class MongoFieldCollection<Model : Any>(
             // TODO: Don't love that we have to do this in chunks, but I guess we'll live.  Could this be done with pipelines?
             mongo.withDocumentClass<BsonDocument>().find(cs.bson(serializer)).collectChunked(1000) { list ->
                 mongo.deleteMany(Filters.`in`("_id", list.map { it["_id"] }))
-                list.asSequence().map { Serialization.bson.load(serializer, it) }
+                list.asSequence().map { Serialization.Internal.bson.load(serializer, it) }
                     .forEach {
                         remove.add(it)
                     }
