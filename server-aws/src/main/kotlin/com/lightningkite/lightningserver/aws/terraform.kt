@@ -739,6 +739,31 @@ internal fun handlers() {
         settingOutput = { key ->
             """
                 {
+                    rawStringSecret = random_password.${key}.result
+                }
+            """.trimIndent()
+        }
+    )
+    TerraformHandler.handler<SecureHasherSettings>(
+        name = "Randomly Generated Secret",
+        inputs = { key ->
+            listOf(
+            )
+        },
+        emit = {
+            appendLine(
+                """
+                resource "random_password" "${key}" {
+                  length           = 48
+                  special          = true
+                  override_special = "+/"
+                }
+            """.trimIndent()
+            )
+        },
+        settingOutput = { key ->
+            """
+                {
                     secret = random_password.${key}.result
                 }
             """.trimIndent()
