@@ -44,7 +44,7 @@ object TestSettings {
     )
     val emailAccess: UserEmailAccess<User, UUID> = info.userEmailAccess { User(email = it, phoneNumber = it) }
     val path = ServerPath("auth")
-    val baseAuth = BaseAuthEndpoints(path, emailAccess, AuthType<UUID>(), jwtSigner, Duration.ofHours(1), Duration.ofMinutes(5))
+    val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner, Duration.ofHours(1), Duration.ofMinutes(5))
     val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
 
     init {

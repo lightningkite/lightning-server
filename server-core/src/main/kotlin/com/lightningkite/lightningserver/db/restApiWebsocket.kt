@@ -3,11 +3,14 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.serialization.decodeUnwrappingString
+import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import com.lightningkite.lightningserver.tasks.startup
 import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.ApiWebsocket
@@ -26,8 +29,6 @@ import kotlin.reflect.KProperty1
 fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
     database: () -> Database,
     info: ModelInfo<USER, T, ID>,
-    storeUser: suspend (user: USER) -> String,
-    loadUser: suspend (string: String) -> USER,
     key: KProperty1<T, *>? = null,
 ): ApiWebsocket<USER, Query<T>, ListChange<T>> {
     prepareModels()
@@ -43,7 +44,13 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
         description = "Gets a changing list of ${modelName}s that match the given query.",
         errorCases = listOf(),
         connect = { event ->
-            val user = storeUser(event.user)
+            val user = event.user?.let { user ->
+                @Suppress("UNCHECKED_CAST")
+                Authentication.subjects[info.serialization.authRequirement.type]?.let {
+                    it as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>
+                    Serialization.json.encodeUnwrappingString(it.idSerializer, (user as HasId<*>)._id as Comparable<Any?>)
+                }
+            }
             val collection = info.collection(event.user)
             helper.subscriptionDb().insertOne(
                 __WebSocketDatabaseChangeSubscription(
@@ -62,7 +69,13 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
         },
         message = { event ->
             val existing = helper.subscriptionDb().get(event.id) ?: throw NotFoundException()
-            val user = existing.user?.let { loadUser(it) } ?: throw NotFoundException()
+            @Suppress("UNCHECKED_CAST") val user: USER = existing.user?.let { userId ->
+                Authentication.subjects[info.serialization.authRequirement.type]?.let {
+                    it as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>
+                    val id = Serialization.json.decodeUnwrappingString(it.idSerializer, userId)
+                    it.fetch(id)
+                }
+            } as USER
             val p = info.collection(user)
             val q = event.content.copy(condition = p.fullCondition(event.content.condition).simplify())
             val c = Serialization.json.encodeToString(Query.serializer(info.serialization.serializer), q)

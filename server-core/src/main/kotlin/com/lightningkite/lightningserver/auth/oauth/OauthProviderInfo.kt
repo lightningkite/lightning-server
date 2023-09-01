@@ -76,7 +76,7 @@ class OauthProviderInfo(
                             client_id = credentials().id,
                             client_secret = credentials().secret,
                             redirect_uri = callback.path.fullUrl(),
-                            grant_type = "authorization_code",
+                            grant_type = OauthGrantTypes.authorizationCode,
                         )
                     )
                 )
@@ -95,7 +95,7 @@ class OauthProviderInfo(
                         refresh_token = refreshToken,
                         client_id = credentials().id,
                         client_secret = credentials().secret,
-                        grant_type = "refresh_token",
+                        grant_type = OauthGrantTypes.refreshToken,
                     )
                 )
             )

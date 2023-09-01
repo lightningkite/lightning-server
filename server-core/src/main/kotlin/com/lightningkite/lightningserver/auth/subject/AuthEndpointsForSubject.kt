@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.RequestAuth
+import com.lightningkite.lightningserver.auth.oauth.OauthGrantTypes
 import com.lightningkite.lightningserver.auth.oauth.OauthResponse
 import com.lightningkite.lightningserver.auth.oauth.OauthTokenRequest
 import com.lightningkite.lightningserver.auth.proof.*
@@ -160,7 +161,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
             val auth: RequestAuth<SUBJECT> = session.toAuth()
             when(input.grant_type) {
-                "refresh_token" -> {
+                OauthGrantTypes.refreshToken -> {
                     OauthResponse(
                         access_token = tokenFormat().create(handler, auth),
                         refresh_token = session._id,
@@ -168,7 +169,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         token_type = tokenFormat().type
                     )
                 }
-                "authorization_code" -> TODO()
+                OauthGrantTypes.authorizationCode -> TODO()
                 else -> throw BadRequestException("Grant type ${input.grant_type} unsupported")
             }
         }

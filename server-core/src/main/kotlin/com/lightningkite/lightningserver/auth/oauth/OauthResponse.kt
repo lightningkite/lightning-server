@@ -55,3 +55,8 @@ enum class OauthResponseMode {
 enum class OauthAccessType {
     online, offline
 }
+
+object OauthGrantTypes {
+    val authorizationCode = "authorization_code"
+    val refreshToken = "refresh_token"
+}

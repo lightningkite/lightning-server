@@ -38,8 +38,6 @@ object TestSettings {
 
     val ws = ServerPath("test").restApiWebsocket<Unit, TestThing, UUID>(
         database,
-        storeUser = { "" },
-        loadUser = { Unit },
         info = ModelInfo(
             getCollection = { database().collection() },
             forUser = { this },
@@ -47,8 +45,6 @@ object TestSettings {
     )
     val ws2 = ServerPath("test2").restApiWebsocket<Unit, TestThing, UUID>(
         database,
-        storeUser = { "" },
-        loadUser = { Unit },
         info = ModelInfo(
             getCollection = { database().collection() },
             forUser = { this },
