@@ -1,5 +1,6 @@
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.auth.oauth
 
+import com.lightningkite.lightningserver.encryption.SecureHasher
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

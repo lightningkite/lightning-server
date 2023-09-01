@@ -1,11 +1,9 @@
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.auth.oauth
 
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.*
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.serializer
 
 class OauthCallbackEndpoint<STATE>(

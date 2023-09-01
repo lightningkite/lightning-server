@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.lightningserver.auth.SecureHasher
+import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.BadRequestException

@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.encryption
 
 import com.lightningkite.lightningserver.settings.Pluggable
 import kotlinx.serialization.Serializable

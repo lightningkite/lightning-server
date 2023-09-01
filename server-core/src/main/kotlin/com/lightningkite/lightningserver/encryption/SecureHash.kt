@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.encryption
 
 import io.ktor.util.*
 import java.security.SecureRandom

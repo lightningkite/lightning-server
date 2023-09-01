@@ -1,9 +1,10 @@
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.auth.old
 
+import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.auth.oauth.ExternalProfile
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import kotlinx.serialization.KSerializer
-import kotlin.reflect.KType
 
 /**
  * Information fo authentication purposes about how to access users, however they are stored.

@@ -1,12 +1,11 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.SecureHasher
-import com.lightningkite.lightningserver.auth.sign
-import com.lightningkite.lightningserver.auth.verify
+import com.lightningkite.lightningserver.encryption.SecureHasher
+import com.lightningkite.lightningserver.encryption.sign
+import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.DelicateCoroutinesApi

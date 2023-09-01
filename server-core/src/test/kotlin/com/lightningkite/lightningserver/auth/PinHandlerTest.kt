@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.auth.old.PinHandler
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException

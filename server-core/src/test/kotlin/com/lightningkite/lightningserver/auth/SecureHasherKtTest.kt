@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.encryption.*
 import org.junit.Assert.*
 import org.junit.Test
 

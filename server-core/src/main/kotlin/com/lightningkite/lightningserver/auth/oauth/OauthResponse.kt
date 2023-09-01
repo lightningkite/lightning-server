@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.auth.oauth
 
 import kotlinx.serialization.Serializable
 import java.util.*

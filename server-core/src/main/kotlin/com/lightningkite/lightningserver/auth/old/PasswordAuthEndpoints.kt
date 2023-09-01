@@ -1,6 +1,10 @@
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.auth.old
 
+import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.HtmlDefaults
+import com.lightningkite.lightningserver.auth.PasswordLogin
+import com.lightningkite.lightningserver.encryption.checkHash
+import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.exceptions.BadRequestException
@@ -12,7 +16,7 @@ import java.net.URLDecoder
  * Authentication via password.
  * Strongly not recommended.
  */
-open class PasswordAuthEndpoints<USER : Any, ID>(
+open class PasswordAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
     val base: BaseAuthEndpoints<USER, ID>,
     val info: UserPasswordAccess<USER, ID>
 ) : ServerPathGroup(base.path) {

@@ -1,15 +1,13 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.lightningserver.auth.sign
-import com.lightningkite.lightningserver.auth.verify
+import com.lightningkite.lightningserver.encryption.sign
+import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.settings.generalSettings
 import java.io.File
-import java.io.InputStream
 import java.time.Duration
 import java.time.Instant
-import kotlin.io.path.inputStream
 
 val File.unixPath: String get() = path.replace("\\", "/")
 

@@ -70,6 +70,25 @@ fun KSType.toKotlin(annotations: Sequence<KSAnnotation> = this.annotations): Str
     } + if (isMarkedNullable) "?" else ""
 }
 
+fun KSType.toKotlinLeast(annotations: Sequence<KSAnnotation> = this.annotations, alreadyProcessed: Set<KSName> = setOf()): String {
+    (this.declaration as? KSTypeParameter)?.let { tp ->
+        if(alreadyProcessed.contains(tp.name)) return "Any?"
+        return tp.bounds.firstOrNull()?.resolve()?.toKotlinLeast(alreadyProcessed = alreadyProcessed + tp.name) ?: "Any?"
+    }
+
+    val annotationString = annotations.joinToString(" ") {
+        it.toString()
+    }.let { if (it.isBlank()) "" else "$it " }
+
+    return if (declaration.qualifiedName!!.asString() == "com.lightningkite.lightningdb.UUIDFor") {
+        "${annotationString}UUIDFor<*>"
+    } else {
+        annotationString + (declaration.safeLocalReference() + if (arguments.isNotEmpty() && this.declaration !is KSTypeAlias) {
+            arguments.joinToString(", ", "<", ">") { it.type?.resolve()?.toKotlinLeast(alreadyProcessed = alreadyProcessed) ?: "*" }
+        } else "")
+    } + if (isMarkedNullable) "?" else ""
+}
+
 fun List<ResolvedAnnotation>.byName(
     name: String,
     packageName: String = "com.lightningkite.lightningdb"

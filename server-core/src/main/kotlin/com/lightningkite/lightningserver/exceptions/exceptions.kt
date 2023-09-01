@@ -23,6 +23,13 @@ open class HttpStatusException(
     val headers: HttpHeaders = HttpHeaders.EMPTY,
     cause: Throwable? = null
 ) : Exception(message, cause) {
+    constructor(lsError: LSError): this(
+        status = HttpStatus(lsError.http),
+        detail = lsError.detail,
+        message = lsError.message,
+        data = lsError.data,
+    )
+
     override val message: String get() = super.message!!
     fun toLSError(): LSError = LSError(
         http = status.code,

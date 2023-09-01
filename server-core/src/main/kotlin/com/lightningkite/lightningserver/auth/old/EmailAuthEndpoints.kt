@@ -1,6 +1,11 @@
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.auth.old
 
+import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.HtmlDefaults
+import com.lightningkite.lightningserver.auth.EmailPinLogin
+import com.lightningkite.lightningserver.auth.oauth.OauthCallbackEndpoint
+import com.lightningkite.lightningserver.auth.oauth.OauthProviderInfo
+import com.lightningkite.lightningserver.auth.oauth.oauthCallback
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathGroup
@@ -22,7 +27,7 @@ import java.util.*
  * Also allows for OAuth based login, as most OAuth systems share email as a common identifier.
  * For information on setting up OAuth, see the respective classes, [OauthAppleEndpoints], [OauthGitHubEndpoints], [OauthGoogleEndpoints], [OauthMicrosoftEndpoints].
  */
-open class EmailAuthEndpoints<USER : Any, ID>(
+open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
     val base: BaseAuthEndpoints<USER, ID>,
     val emailAccess: UserEmailAccess<USER, ID>,
     private val cache: () -> Cache,

@@ -139,7 +139,7 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
             val hasInput = entry.inputType != Unit.serializer()
             appendLine("        var url = Uri.parse(\"\${parent.httpUrl}${entry.route.path.escaped}\");")
             appendLine("        var headers = parent.extraHeaders;")
-            entry.authRequirement.type.subject?.name?.let {
+            entry.authRequirement.type.authName?.let {
                 if (entry.authRequirement.required) {
                     appendLine("        headers[\"Authorization\"] = \"Bearer $${it.userTypeTokenName()}\";")
                 } else {
@@ -190,7 +190,7 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
         val hasInput = entry.inputType != Unit.serializer()
         appendLine("        var url = Uri.parse(\"\${httpUrl}${entry.route.path.escaped}\");")
         appendLine("        var headers = extraHeaders;")
-        entry.authRequirement.type.subject?.name?.let {
+        entry.authRequirement.type.authName?.let {
             if (entry.authRequirement.required) {
                 appendLine("        headers[\"Authorization\"] = \"Bearer $${it.userTypeTokenName()}\";")
             } else {
@@ -294,7 +294,7 @@ private fun Appendable.functionCall(
     arguments(documentable, skipAuth, overrideUserType).forEach {
         if (argComma) append(", ")
         else argComma = true
-        if (it.name == documentable.authRequirement.type.subject?.name?.userTypeTokenName() && authUsesThis) {
+        if (it.name == documentable.authRequirement.type.authName?.userTypeTokenName() && authUsesThis) {
             append("this.")
         }
         append(it.name)
@@ -323,7 +323,7 @@ private fun arguments(
         documentable.inputType.takeUnless { it == Unit.serializer() }?.let {
             DArg(name = "input", type = it)
         }?.let(::listOf),
-        documentable.authRequirement.type.subject?.name?.takeUnless { skipAuth }?.let {
+        documentable.authRequirement.type.authName?.takeUnless { skipAuth }?.let {
             DArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),
                 stringType = "String",
@@ -333,7 +333,7 @@ private fun arguments(
     ).flatten()
 
     is ApiWebsocket<*, *, *> -> listOfNotNull(
-        documentable.authRequirement.type.subject?.name?.takeUnless { skipAuth }?.let {
+        documentable.authRequirement.type.authName?.takeUnless { skipAuth }?.let {
             DArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),
                 stringType = "String",

@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.encryption.checkHash
+import com.lightningkite.lightningserver.encryption.secureHash
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

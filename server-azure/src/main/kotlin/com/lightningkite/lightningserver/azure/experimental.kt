@@ -1,16 +1,12 @@
 package com.lightningkite.lightningserver.azure
 
-import com.lightningkite.lightningserver.auth.SecureHasher
-import com.lightningkite.lightningserver.auth.SecureHasherSettings
+import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.db.DatabaseSettings
-import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.files.FilesSettings
-import com.lightningkite.lightningserver.notifications.NotificationSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.serializer
 
 

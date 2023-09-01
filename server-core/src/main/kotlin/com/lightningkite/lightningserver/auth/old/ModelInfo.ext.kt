@@ -1,6 +1,8 @@
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.auth.old
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.db.ModelInfo
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import kotlinx.serialization.KSerializer

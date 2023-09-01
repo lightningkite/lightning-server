@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.auth.old.*
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.MemcachedCache
 import com.lightningkite.lightningserver.cache.get
@@ -11,6 +12,9 @@ import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.*
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.email.SesClient
+import com.lightningkite.lightningserver.encryption.SecureHasher
+import com.lightningkite.lightningserver.encryption.SecureHasherSettings
+import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.exceptions.SentryExceptionReporter
 import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.files.S3FileSystem
@@ -34,12 +38,10 @@ import com.lightningkite.lightningserver.websocket.MultiplexWebSocketHandler
 import com.lightningkite.lightningserver.websocket.websocket
 import io.ktor.client.request.*
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
 import java.lang.IllegalStateException
 import java.time.Duration
 import java.util.*
 import kotlin.random.Random
-import kotlin.reflect.KType
 
 object Server : ServerPathGroup(ServerPath.root) {
 

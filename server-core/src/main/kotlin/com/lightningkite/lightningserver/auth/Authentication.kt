@@ -1,157 +1,77 @@
+@file:UseContextualSerialization(Instant::class)
+
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningserver.core.LightningServerDsl
-import com.lightningkite.lightningserver.exceptions.UnauthorizedException
-import com.lightningkite.lightningserver.http.HttpHeader
+import com.lightningkite.lightningserver.auth.proof.Proof
+import com.lightningkite.lightningserver.auth.proof.ProofEvidence
+import com.lightningkite.lightningserver.auth.proof.ProofOption
+import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.Request
+import com.lightningkite.lightningserver.typed.ApiEndpoint
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.UseContextualSerialization
+import java.time.Instant
 
-/**
- * Rules for authenticating requests are defined in this object.
- */
 object Authentication {
 
-    interface Method<T> : Comparable<Method<*>> {
-        val priority: Int
-        override fun compareTo(other: Method<*>): Int = this.priority.compareTo(other.priority)
-        val type: AuthType
-        val subjectType: SubjectType?
-        val defersTo: AuthType? get() = null
-        val fromStringInRequest: FromStringInRequest? get() = null
-        suspend fun tryGet(on: Request): Auth<T>?
+    // TODO: Link back up to old auth system
+    //   TODO: Parse sessions as authentication
+    //   TODO: Parse tokens as authentication
+    //   TODO: Generate tokens
+    // TODO: Fix up old auth system
+    // TODO: Easier SubjectHandler impl
+    // TODO: Implement Methods
+
+    interface Reader {
+        suspend fun request(request: Request): RequestAuth<*>?
     }
 
-    sealed interface FromStringInRequest {
-        fun getString(request: Request): String?
-        data class AuthorizationHeader(val prefix: String? = "Bearer") : FromStringInRequest {
-            override fun getString(request: Request): String? = request.headers[HttpHeader.Authorization]?.let {
-                if (prefix == null) it
-                else if (it.startsWith(prefix)) it.removePrefix(prefix).trim()
-                else null
-            }
-        }
+    val readers: MutableList<Reader> = mutableListOf()
 
-        data class AuthorizationCookie(val prefix: String? = null) : FromStringInRequest {
-            override fun getString(request: Request): String? = request.headers.cookies[HttpHeader.Authorization]?.let {
-                if (prefix == null) it
-                else if (it.startsWith(prefix)) it.removePrefix(prefix).trim()
-                else null
-            }
-        }
+    data class AuthenticateResult<SUBJECT, ID>(
+        val id: ID?,
+        val subjectCopy: SUBJECT?,
+        val options: List<ProofOption>,
+        val strengthRequired: Int = 1
+    )
 
-        data class QueryParameter(val name: String) : FromStringInRequest {
-            override fun getString(request: Request): String? =
-                request.queryParameters.find { it.first.equals(name, true) }?.second
-        }
+    interface SubjectHandler<SUBJECT, ID> {
+        val name: String
+        val idProofs: Set<String>
+        val authType: AuthType
+        val applicableProofs: Set<String>
+        suspend fun authenticate(vararg proofs: Proof): AuthenticateResult<SUBJECT, ID>?
+        suspend fun fetch(id: ID): SUBJECT
+        fun id(subject: SUBJECT): ID
+        val idSerializer: KSerializer<ID>
+        val subjectSerializer: KSerializer<SUBJECT>
+        suspend fun <OTHER, OTHERID> permitMasquerade(
+            other: SubjectHandler<OTHER, OTHERID>,
+            id: ID,
+            otherId: OTHERID
+        ): Boolean = false
 
-        data class CustomHeader(val header: String) : FromStringInRequest {
-            override fun getString(request: Request): String? = request.headers[header]
-        }
+        suspend fun cache(id: ID, subject: SUBJECT?): Map<String, String> = mapOf()
     }
 
-    data class Auth<T>(
-        val value: T,
-        val recentlyProven: Boolean,
-        val scopes: Set<String>? = null
-    ) {
-        suspend fun <D> map(mapper: suspend (T) -> D) = Auth(
-            value = mapper(value),
-            recentlyProven = recentlyProven,
-            scopes = scopes
-        )
-
-        suspend fun <D> mapMaybe(mapper: suspend (T) -> D?) = mapper(value)?.let {
-            Auth(
-                value = it,
-                recentlyProven = recentlyProven,
-                scopes = scopes
-            )
-        }
+    interface Method {
+        val humanName: String
+        val validates: String
+        val strength: Int
     }
 
-    suspend fun any(request: Request): Auth<out Any?>? {
-        methodsByType.entries.flatMap { it.value }
-            .sortedBy { -it.priority }
-            .forEach {
-                return it.tryGet(request) ?: return@forEach
-            }
-        return null
+    interface DirectProveMethod : Method {
+        val prove: ApiEndpoint<Unit, ProofEvidence, Proof>
     }
 
-    private val knownMethods = HashSet<Method<*>>()
-    private val methodsByType = HashMap<AuthType, MutableList<Method<*>>>()
-    fun <T> register(method: Method<T>): Method<T> {
-        if (!knownMethods.add(method)) return method
-        println("Registering method for ${method.type} based on ${method.defersTo}")
-        methodsByType.getOrPut(method.type) { ArrayList() }.let {
-            it.add(method)
-            it.sortDescending()
-        }
-        return method
+    interface StartAndProveMethod : Method {
+        val start: ApiEndpoint<Unit, String, String>
+        val prove: ApiEndpoint<Unit, ProofEvidence, Proof>
     }
 
-    fun methods(type: AuthType): List<Method<*>> = (methodsByType[type]?.toList() ?: listOf())
-
-    @Suppress("UNCHECKED_CAST")
-    data class Cache<T>(val type: AuthType) : Request.CacheKey<Auth<T>?> {
-        override suspend fun calculate(request: Request): Auth<T>? {
-            if(type == AuthType.none) return null
-            methodsByType[type]?.let {
-                for (method in it) {
-                    println("Trying $method for $type")
-                    return (method as Method<Any>).tryGet(request) as? Auth<T> ?: continue
-                }
-                println("Found no auth success for $type")
-                return null
-            } ?: throw Error("No authentication methods for ${type} are defined.")
-        }
+    interface ExternalMethod : Method {
+        val start: ApiEndpoint<Unit, String, String>
+        val indirectLink: ServerPath
     }
 
-    data class SubjectType(val name: String)
 }
-
-typealias RequestAuth<T> = Authentication.Auth<T>
-
-@LightningServerDsl
-fun <T> authentication(method: Authentication.Method<T>): Authentication.Method<T> = Authentication.register(method)
-
-@LightningServerDsl
-inline fun <reified A : Any, reified B : Any> authenticationMapper(
-    priority: Int = (Authentication.methods(AuthType<A>()).maxOfOrNull { it.priority } ?: 0) - 1,
-    subjectType: Authentication.SubjectType? = Authentication.methods(AuthType<A>()).mapNotNull { it.subjectType }
-        .firstOrNull(),
-    noinline map: suspend (A) -> B?
-): Authentication.Method<B> = authenticationMapper(
-    sourceType = AuthType<A>(),
-    destType = AuthType<B>(),
-    priority = priority,
-    subjectType = subjectType,
-    map = map
-)
-
-@LightningServerDsl
-fun <A : Any, B : Any> authenticationMapper(
-    sourceType: AuthType,
-    destType: AuthType,
-    priority: Int = (Authentication.methods(sourceType).maxOfOrNull { it.priority } ?: 0) - 1,
-    subjectType: Authentication.SubjectType? = Authentication.methods(sourceType).mapNotNull { it.subjectType }
-        .firstOrNull(),
-    map: suspend (A) -> B?
-): Authentication.Method<B> = Authentication.register(object : Authentication.Method<B> {
-    override val priority: Int = priority
-    override val type: AuthType = destType
-    override val defersTo: AuthType = sourceType
-    val defersToMethods get() = Authentication.methods(defersTo)
-    override val subjectType: Authentication.SubjectType? = subjectType
-    override suspend fun tryGet(on: Request): Authentication.Auth<B>? = on.auth<A>(defersTo)?.mapMaybe { map(it) }
-})
-
-suspend fun <T> Request.auth(type: AuthType): Authentication.Auth<T>? =
-    this.cache(Authentication.Cache(type))
-
-@Suppress("UNCHECKED_CAST")
-suspend fun <T> Request.user(authRequirement: AuthRequirement<T>): T =
-    auth<T>(authRequirement.type)?.value
-        ?: if (authRequirement.required) throw UnauthorizedException("You must be authorized as a ${authRequirement.type}") else null as T
-
-@Suppress("UNCHECKED_CAST")
-suspend inline fun <reified T> Request.user(): T = user(AuthRequirement<T>())

@@ -1,5 +1,7 @@
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.auth.old
 
+import com.lightningkite.lightningserver.encryption.checkHash
+import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.set

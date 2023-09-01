@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.auth.SecureHasher
+import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import kotlinx.coroutines.runBlocking

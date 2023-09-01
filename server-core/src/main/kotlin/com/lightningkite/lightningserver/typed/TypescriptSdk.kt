@@ -109,7 +109,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     appendLine()
     appendLine()
 
-    val byUserType = safeDocumentables.groupBy { it.authRequirement.type.subject?.name }
+    val byUserType = safeDocumentables.groupBy { it.authRequirement.type.authName }
     val userTypes = byUserType.keys.filterNotNull()
     userTypes.forEach { userType ->
         @Suppress("NAME_SHADOWING") val byGroup =
@@ -180,7 +180,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         appendLine("            ${if (hasInput) "input" else "undefined"},")
         appendLine("            {")
         appendLine("                method: \"${entry.route.method}\",")
-        entry.authRequirement.type.subject?.name?.let {
+        entry.authRequirement.type.authName?.let {
             appendLine("                headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
         }
         appendLine("            }, ")
@@ -213,7 +213,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
             appendLine("                ${if (hasInput) "input" else "undefined"},")
             appendLine("                {")
             appendLine("                    method: \"${entry.route.method}\",")
-            entry.authRequirement.type.subject?.name?.let {
+            entry.authRequirement.type.authName?.let {
                 appendLine("                    headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
             }
             appendLine("                }, ")
@@ -320,7 +320,7 @@ private fun Appendable.functionCall(
     arguments(documentable, skipAuth, overrideUserType).forEach {
         if (argComma) append(", ")
         else argComma = true
-        if (it.name == documentable.authRequirement.type.subject?.name?.userTypeTokenName() && authUsesThis) {
+        if (it.name == documentable.authRequirement.type.authName?.userTypeTokenName() && authUsesThis) {
             append("this.")
         }
         append(it.name)
@@ -349,7 +349,7 @@ private fun arguments(
         documentable.inputType.takeUnless { it == Unit.serializer() }?.let {
             TArg(name = "input", type = it)
         }?.let(::listOf),
-        documentable.authRequirement.type.subject?.name?.takeUnless { skipAuth }?.let {
+        documentable.authRequirement.type.authName?.takeUnless { skipAuth }?.let {
             TArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),
                 stringType = "string",
@@ -359,7 +359,7 @@ private fun arguments(
     ).flatten()
 
     is ApiWebsocket<*, *, *> -> listOfNotNull(
-        documentable.authRequirement.type.subject?.name?.takeUnless { skipAuth }?.let {
+        documentable.authRequirement.type.authName?.takeUnless { skipAuth }?.let {
             TArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),
                 stringType = "string",

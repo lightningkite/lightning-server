@@ -1,6 +1,8 @@
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.auth.old
 
+import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.HtmlDefaults
+import com.lightningkite.lightningserver.auth.PhonePinLogin
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathGroup
@@ -16,7 +18,7 @@ import java.time.Duration
 /**
  * Authentication endpoints for logging in with SMS PINs.
  */
-open class SmsAuthEndpoints<USER : Any, ID>(
+open class SmsAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
     val base: BaseAuthEndpoints<USER, ID>,
     val phoneAccess: UserPhoneAccess<USER, ID>,
     private val cache: () -> Cache,

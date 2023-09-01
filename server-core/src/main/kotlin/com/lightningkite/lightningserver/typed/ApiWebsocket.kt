@@ -2,8 +2,6 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.UserAccess
 import com.lightningkite.lightningserver.auth.user
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.core.LightningServerDsl
@@ -21,8 +19,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
-import java.time.Duration
-import java.time.Instant
 
 data class ApiWebsocket<USER, INPUT, OUTPUT>(
     override val path: ServerPath,

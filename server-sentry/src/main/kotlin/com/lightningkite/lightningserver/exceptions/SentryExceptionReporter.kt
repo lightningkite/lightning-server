@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.exceptions
 import com.lightningkite.lightningdb.HasEmail
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.schedule.Schedule
 import com.lightningkite.lightningserver.schedule.ScheduledTask
@@ -39,7 +40,7 @@ class SentryExceptionReporter(val dsn: String): ExceptionReporter {
         val ctx = Sentry.getContext()
         when (context) {
             is HttpRequest -> {
-                val p = Authentication.any(context)?.value
+                val p = context.authAny()?.get()
                 ctx.clear()
                 ctx.http = HttpInterface(
                     context.endpoint.path.toString(),
@@ -73,7 +74,7 @@ class SentryExceptionReporter(val dsn: String): ExceptionReporter {
             }
             is WebSockets.ConnectEvent -> {
                 ctx.clear()
-                val p = Authentication.any(context)?.value
+                val p = context.authAny()?.get()
                 ctx.http = HttpInterface(
                     context.path.toString(),
                     "WS",

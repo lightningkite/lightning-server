@@ -4,6 +4,10 @@ import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningdb.test.User
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.auth.old.BaseAuthEndpoints
+import com.lightningkite.lightningserver.auth.old.SmsAuthEndpoints
+import com.lightningkite.lightningserver.auth.old.UserPhoneAccess
+import com.lightningkite.lightningserver.auth.old.userPhoneAccess
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelInfo
 import com.lightningkite.lightningserver.exceptions.BadRequestException

@@ -1,8 +1,13 @@
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.auth.old
 
+import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.LazyModel
+import com.lightningkite.lightningserver.encryption.JwtClaims
+import com.lightningkite.lightningserver.encryption.SecureHasher
+import com.lightningkite.lightningserver.encryption.signJwt
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.routes.docName
@@ -24,7 +29,7 @@ import java.time.Instant
  * @param landing The landing page for after a user is authenticated.  Defaults to the root.
  * @param handleToken The action to perform upon obtaining the token.  Defaults to redirecting to [landing], but respects paths given in the `destination` query parameter.
  */
-open class BaseAuthEndpoints<USER : Any, ID>(
+open class BaseAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
     path: ServerPath,
     val userAccess: UserAccess<USER, ID>,
     val idType: AuthType,
@@ -46,23 +51,24 @@ open class BaseAuthEndpoints<USER : Any, ID>(
 
     val typeName = userAccess.authRequirement.type.classifier?.toString()?.substringAfterLast('.') ?: "Unknown"
     val jwtPrefix = "$typeName|"
-    val lazyType = AuthType(LazyModel::class, listOf(userAccess.authRequirement.type, idType))
     init {
-        val jwtAuthHeader = authentication(JwtAuthenticationMethod(priority = 5, fromStringInRequest = Authentication.FromStringInRequest.AuthorizationHeader(), hasher = hasher))
-        val jwtAuthBareHeader = authentication(JwtAuthenticationMethod(priority = 2, fromStringInRequest = Authentication.FromStringInRequest.AuthorizationHeader(null), hasher = hasher))
-        val jwtAuthCookie = authentication(JwtAuthenticationMethod(priority = 1, fromStringInRequest = Authentication.FromStringInRequest.AuthorizationCookie(), hasher = hasher))
-        val jwtQueryParam = authentication(JwtAuthenticationMethod(
-            priority = 10,
-            fromStringInRequest = Authentication.FromStringInRequest.QueryParameter("jwt"),
-            hasher = hasher
-        ))
-        authenticationMapper<JwtClaims, LazyModel<USER, ID>>(sourceType = AuthType<JwtClaims>(), destType = lazyType) {
-            val sub = it.sub ?: return@authenticationMapper null
-            if(!sub.startsWith(jwtPrefix)) return@authenticationMapper null
-            val id = Serialization.json.decodeUnwrappingString(userAccess.idSerializer, sub.removePrefix(jwtPrefix))
-            LazyModel(id, userAccess::byId)
-        }
-        authenticationMapper<LazyModel<USER, ID>, USER>(sourceType = lazyType, destType = userAccess.authRequirement.type) { it.value.await() }
+//        val jwtAuthHeader = authentication(JwtAuthenticationMethod(priority = 5, fromStringInRequest = Authentication.FromStringInRequest.AuthorizationHeader(), hasher = hasher))
+//        val jwtAuthBareHeader = authentication(JwtAuthenticationMethod(priority = 2, fromStringInRequest = Authentication.FromStringInRequest.AuthorizationHeader(null), hasher = hasher))
+//        val jwtAuthCookie = authentication(JwtAuthenticationMethod(priority = 1, fromStringInRequest = Authentication.FromStringInRequest.AuthorizationCookie(), hasher = hasher))
+//        val jwtQueryParam = authentication(
+//            JwtAuthenticationMethod(
+//            priority = 10,
+//            fromStringInRequest = Authentication.FromStringInRequest.QueryParameter("jwt"),
+//            hasher = hasher
+//        )
+//        )
+//        authenticationMapper<JwtClaims, LazyModel<USER, ID>>(sourceType = AuthType<JwtClaims>(), destType = lazyType) {
+//            val sub = it.sub ?: return@authenticationMapper null
+//            if(!sub.startsWith(jwtPrefix)) return@authenticationMapper null
+//            val id = Serialization.json.decodeUnwrappingString(userAccess.idSerializer, sub.removePrefix(jwtPrefix))
+//            LazyModel(id, userAccess::byId)
+//        }
+//        authenticationMapper<LazyModel<USER, ID>, USER>(sourceType = lazyType, destType = userAccess.authRequirement.type) { it.value.await() }
     }
 
     init {
@@ -105,7 +111,7 @@ open class BaseAuthEndpoints<USER : Any, ID>(
      * Defers to [handleToken].
      */
     val landingRoute: HttpEndpoint = path("login-landing").get.handler {
-        it.handleToken(tokenById(it.auth<LazyModel<USER, ID>>(lazyType)!!.value.id))
+        it.handleToken(tokenById(it.auth<USER>(userAccess.authRequirement.type)!!.id))
     }
 
     val refreshToken = path("refresh-token").get.typed(

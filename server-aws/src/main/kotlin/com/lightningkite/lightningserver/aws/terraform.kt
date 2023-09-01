@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.aws
 
-import com.lightningkite.lightningserver.auth.SecureHasherSettings
+import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.email.EmailSettings
@@ -16,7 +16,6 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
-import software.amazon.awssdk.services.s3.model.MetricsStatus
 import java.io.File
 import java.time.LocalDate
 import java.time.ZonedDateTime

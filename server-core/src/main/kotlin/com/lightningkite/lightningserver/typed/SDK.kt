@@ -114,11 +114,11 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
         appendLine("}")
         appendLine()
     }
-    val userTypes = safeDocumentables.groupBy { it.authRequirement.type.subject?.name }.keys.filterNotNull()
+    val userTypes = safeDocumentables.groupBy { it.authRequirement.type.authName }.keys.filterNotNull()
     userTypes.forEach { userType ->
         val byGroup = safeDocumentables
             .distinctBy { it.docGroup.toString() + "/" + it.summary }.groupBy { it.docGroup }
-            .mapValues { it.value.filter { !it.authRequirement.required || it.authRequirement.type.subject?.name == null || it.authRequirement.type.subject?.name == userType } }
+            .mapValues { it.value.filter { !it.authRequirement.required || it.authRequirement.type.authName == null || it.authRequirement.type.authName == userType } }
         val groups = byGroup.keys.filterNotNull()
         val sessionClassName = "${userType.substringAfterLast('.')}Session"
         appendLine("abstract class Abstract$sessionClassName(api: Api, ${userType.userTypeTokenName()}: String) {")
@@ -129,18 +129,18 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
         }
         for (entry in byGroup[null] ?: listOf()) {
             append("    ")
-            this.functionHeader(entry, skipAuth = entry.authRequirement.type.subject?.name == userType)
+            this.functionHeader(entry, skipAuth = entry.authRequirement.type.authName == userType)
             append(" = api.")
-            functionCall(entry, skipAuth = false, nullAuth = entry.authRequirement.type.subject?.name != userType)
+            functionCall(entry, skipAuth = false, nullAuth = entry.authRequirement.type.authName != userType)
             appendLine()
         }
         for (group in groups) {
             appendLine("    class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()}, val ${userType.userTypeTokenName()}: String) {")
             for (entry in byGroup[group]!!) {
                 append("        ")
-                this.functionHeader(entry, skipAuth = entry.authRequirement.type.subject?.name == userType)
+                this.functionHeader(entry, skipAuth = entry.authRequirement.type.authName == userType)
                 append(" = api.")
-                functionCall(entry, skipAuth = false, nullAuth = entry.authRequirement.type.subject?.name != userType)
+                functionCall(entry, skipAuth = false, nullAuth = entry.authRequirement.type.authName != userType)
                 appendLine()
             }
             appendLine("    }")
@@ -175,7 +175,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                 appendLine(" = HttpClient.call(")
                 appendLine("        url = \"\$httpUrl${entry.route.path.escaped}\",")
                 appendLine("        method = HttpClient.${entry.route.method},")
-                entry.authRequirement.type.subject?.name?.let {
+                entry.authRequirement.type.authName?.let {
                     if (entry.authRequirement.required) {
                         appendLine("        headers = mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
                     } else {
@@ -196,7 +196,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                 appendLine(" = multiplexedSocket(")
                 appendLine("        url = \"\$socketUrl?path=multiplex\", ")
                 appendLine("        path = \"${entry.path}\", ")
-                entry.authRequirement.type.subject?.name?.let {
+                entry.authRequirement.type.authName?.let {
                     if (entry.authRequirement.required) {
                         appendLine("        queryParams = mapOf(\"jwt\" to listOf(${it.userTypeTokenName()}))")
                     } else {
@@ -217,7 +217,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                     appendLine(" = HttpClient.call(")
                     appendLine("            url = \"\$httpUrl${entry.route.path.escaped}\",")
                     appendLine("            method = HttpClient.${entry.route.method},")
-                    entry.authRequirement.type.subject?.name?.let {
+                    entry.authRequirement.type.authName?.let {
                         if (entry.authRequirement.required) {
                             appendLine("            headers = mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
                         } else {
@@ -238,7 +238,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                     appendLine(" = multiplexedSocket(")
                     appendLine("            url = \"\$socketUrl?path=multiplex\", ")
                     appendLine("            path = \"${entry.path}\", ")
-                    entry.authRequirement.type.subject?.name?.let {
+                    entry.authRequirement.type.authName?.let {
                         if (entry.authRequirement.required) {
                             appendLine("            queryParams = mapOf(\"jwt\" to listOf(${it.userTypeTokenName()}))")
                         } else {
@@ -379,7 +379,7 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false): Li
         documentable.inputType.takeUnless { it == Unit.serializer() }?.let {
             Arg(name = "input", type = it)
         }?.let(::listOf),
-        documentable.authRequirement.type.subject?.name?.takeUnless { skipAuth }?.let {
+        documentable.authRequirement.type.authName?.takeUnless { skipAuth }?.let {
             if (documentable.authRequirement.required)
                 Arg(name = it.userTypeTokenName(), stringType = "String", isAuth = true)
             else
@@ -392,7 +392,7 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false): Li
             .map {
                 Arg(name = it.name, stringType = "String")
             },
-        documentable.authRequirement.type.subject?.name?.takeUnless { skipAuth }?.let {
+        documentable.authRequirement.type.authName?.takeUnless { skipAuth }?.let {
             if (documentable.authRequirement.required)
                 Arg(name = it.userTypeTokenName(), stringType = "String", isAuth = true)
             else

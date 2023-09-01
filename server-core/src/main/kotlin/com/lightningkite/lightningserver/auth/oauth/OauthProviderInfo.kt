@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.auth.oauth
 
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.debugJsonBody
@@ -7,7 +7,6 @@ import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.encodeToFormData
-import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.statusFailing
 import io.ktor.client.call.*
