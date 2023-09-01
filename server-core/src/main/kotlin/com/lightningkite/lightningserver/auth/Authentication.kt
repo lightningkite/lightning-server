@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.auth.proof.Proof
 import com.lightningkite.lightningserver.auth.proof.ProofEvidence
 import com.lightningkite.lightningserver.auth.proof.ProofOption
@@ -25,51 +26,55 @@ object Authentication {
     interface Reader {
         suspend fun request(request: Request): RequestAuth<*>?
     }
-
     val readers: MutableList<Reader> = mutableListOf()
 
-    data class AuthenticateResult<SUBJECT, ID>(
+    data class AuthenticateResult<SUBJECT: HasId<ID>, ID: Comparable<ID>>(
         val id: ID?,
         val subjectCopy: SUBJECT?,
         val options: List<ProofOption>,
         val strengthRequired: Int = 1
     )
 
-    interface SubjectHandler<SUBJECT, ID> {
+    interface SubjectHandler<SUBJECT: HasId<ID>, ID: Comparable<ID>> {
         val name: String
         val idProofs: Set<String>
         val authType: AuthType
         val applicableProofs: Set<String>
         suspend fun authenticate(vararg proofs: Proof): AuthenticateResult<SUBJECT, ID>?
+        suspend fun permitMasquerade(
+            other: SubjectHandler<*, *>,
+            id: ID,
+            otherId: Comparable<*>,
+        ): Boolean = false
+        val knownCacheTypes: List<RequestAuth.CacheKey<SUBJECT, ID, *>> get() = listOf()
+
         suspend fun fetch(id: ID): SUBJECT
-        fun id(subject: SUBJECT): ID
         val idSerializer: KSerializer<ID>
         val subjectSerializer: KSerializer<SUBJECT>
-        suspend fun <OTHER, OTHERID> permitMasquerade(
-            other: SubjectHandler<OTHER, OTHERID>,
-            id: ID,
-            otherId: OTHERID
-        ): Boolean = false
-
-        suspend fun cache(id: ID, subject: SUBJECT?): Map<String, String> = mapOf()
+    }
+    private val _subjects: MutableMap<AuthType, SubjectHandler<*, *>> = HashMap()
+    val subjects: Map<AuthType, SubjectHandler<*, *>> get() = _subjects
+    fun <SUBJECT: HasId<ID>, ID: Comparable<ID>> register(subjectHandler: SubjectHandler<SUBJECT, ID>) {
+        _subjects[subjectHandler.authType] = subjectHandler
     }
 
-    interface Method {
+
+    interface ProofMethod {
         val humanName: String
         val validates: String
         val strength: Int
     }
 
-    interface DirectProveMethod : Method {
+    interface DirectProofMethod : ProofMethod {
         val prove: ApiEndpoint<Unit, ProofEvidence, Proof>
     }
 
-    interface StartAndProveMethod : Method {
+    interface StartedProofMethod : ProofMethod {
         val start: ApiEndpoint<Unit, String, String>
         val prove: ApiEndpoint<Unit, ProofEvidence, Proof>
     }
 
-    interface ExternalMethod : Method {
+    interface ExternalProofMethod : ProofMethod {
         val start: ApiEndpoint<Unit, String, String>
         val indirectLink: ServerPath
     }

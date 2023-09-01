@@ -61,14 +61,23 @@ object Http {
         )
     }
 
-    val onRequest = ArrayList<suspend (HttpRequest) -> Unit>()
+    var interceptors = listOf<HttpInterceptor>()
+        set(value) {
+            field = value
+            // WARNING: This will melt your brain
+            fullAction = interceptors.fold<HttpInterceptor, HttpInterceptor>({ request, handler -> handler(request) }) { total, wrapper ->
+                return@fold { request, handler ->
+                    total(request) { wrapper(it, handler) }
+                }
+            }
+        }
+    private var fullAction: HttpInterceptor = { req, cont -> cont(req) }
 
     suspend fun execute(request: HttpRequest): HttpResponse {
         return endpoints[request.endpoint]?.let { handler ->
             try {
                 Metrics.handlerPerformance(request.endpoint) {
-                    onRequest.forEach { it(request) }
-                    handler(request)
+                    fullAction(request, handler)
                 }
             } catch (e: Exception) {
                 exception(request, e)
@@ -110,3 +119,5 @@ suspend fun HttpEndpoint.test(
         e.toResponse(req)
     }
 }
+
+typealias HttpInterceptor = suspend (request: HttpRequest, cont: suspend (HttpRequest) -> HttpResponse) -> HttpResponse

@@ -3,14 +3,16 @@ package com.lightningkite.lightningserver.auth
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.Request
+import java.time.Instant
 import java.util.HashMap
 
 data class RequestAuth<SUBJECT : HasId<*>>(
     val subject: Authentication.SubjectHandler<SUBJECT, *>,
     val rawId: Any,
-    val recentlyProven: Boolean,
+    val issuedAt: Instant,
     val scopes: Set<String>? = null,
-    val cachedRaw: Map<String, String> = mapOf()
+    val cachedRaw: Map<String, String> = mapOf(),
+    val thirdParty: String? = null,
 ) {
     object Key : Request.CacheKey<RequestAuth<*>?> {
         override suspend fun calculate(request: Request): RequestAuth<*>? {
@@ -29,20 +31,21 @@ data class RequestAuth<SUBJECT : HasId<*>>(
     }
 
     private val cache = HashMap<String, Any?>()
+    @Suppress("UNCHECKED_CAST")
     suspend fun <T> get(key: CacheKey<SUBJECT, *, T>): T = cache.getOrPut(key.name) {
         if (cachedRaw.containsKey(key.name)) key.deserialize(cachedRaw.getValue(key.name))
         else key.calculate(this)
     } as T
 
     private suspend fun <T> getSer(key: CacheKey<SUBJECT, *, T>): String = key.serialize(get(key))
-    suspend fun withCachedValues(vararg keys: CacheKey<SUBJECT, *, *>): RequestAuth<SUBJECT> {
+    suspend fun withCachedValues(keys: List<CacheKey<SUBJECT, *, *>>): RequestAuth<SUBJECT> {
         return copy(
             cachedRaw = keys.associate { it.name to getSer(it) }
         )
     }
 
     @Suppress("UNCHECKED_CAST")
-    suspend fun get() = (subject as Authentication.SubjectHandler<SUBJECT, Any>).fetch(rawId)
+    suspend fun get() = (subject as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>).fetch(rawId as Comparable<Any?>)
 }
 
 @Suppress("UNCHECKED_CAST")
@@ -52,7 +55,7 @@ suspend fun Request.authAny(): RequestAuth<*>? = this.cache(RequestAuth.Key)
 suspend fun <SUBJECT : HasId<*>> Request.auth(type: AuthType): RequestAuth<SUBJECT>? {
     val raw = authAny() ?: return null
     @Suppress("UNCHECKED_CAST")
-    return if (raw.subject.authType.satisfies(type)) this as RequestAuth<SUBJECT>
+    return if (raw.subject.authType.satisfies(type)) raw as RequestAuth<SUBJECT>
     else null
 }
 
@@ -62,7 +65,7 @@ suspend fun <SUBJECT : HasId<*>> Request.auth(type: AuthType): RequestAuth<SUBJE
 //suspend fun <T : HasId<*>> Request.auth(authRequirement: AuthRequirement<T?>): RequestAuth<T>? = authStar(authRequirement) as? RequestAuth<T>
 
 @Suppress("UNCHECKED_CAST")
-inline suspend fun <reified T : HasId<*>> Request.auth(): RequestAuth<T> = authStar(AuthRequirement<T>()) as RequestAuth<T>
+suspend inline fun <reified T : HasId<*>> Request.auth(): RequestAuth<T> = authStar(AuthRequirement<T>()) as RequestAuth<T>
 
 @Suppress("UNCHECKED_CAST")
 suspend fun <T> Request.authStar(authRequirement: AuthRequirement<T>): RequestAuth<*>? {

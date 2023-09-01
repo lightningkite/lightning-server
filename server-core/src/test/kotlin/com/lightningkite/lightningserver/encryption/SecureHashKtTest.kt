@@ -1,4 +1,4 @@
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.encryption
 
 import com.lightningkite.lightningserver.encryption.checkHash
 import com.lightningkite.lightningserver.encryption.secureHash

@@ -2,6 +2,9 @@ package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.auth.BaseAuthEndpoints
+import com.lightningkite.lightningserver.auth.EmailAuthEndpoints
+import com.lightningkite.lightningserver.auth.PasswordAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.*
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.MemcachedCache
@@ -118,7 +121,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         val emailAccess = userInfo.userEmailAccess { User(email = it) }
         val passAccess =
             userInfo.userPasswordAccess { username, hashed -> User(email = username, hashedPassword = hashed) }
-        val baseAuth = BaseAuthEndpoints(path, emailAccess, AuthType<UUID>(), jwtSigner, expiration = Duration.ofDays(365), emailExpiration = Duration.ofHours(1))
+        val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner, expiration = Duration.ofDays(365), emailExpiration = Duration.ofHours(1))
         val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
         val passAuth = PasswordAuthEndpoints(baseAuth, passAccess)
     }
@@ -128,7 +131,7 @@ object Server : ServerPathGroup(ServerPath.root) {
             forUser = { this }
         )
         val emailAccess = info.userEmailAccess { UserAlt(email = it) }
-        val baseAuth = BaseAuthEndpoints(path, emailAccess, AuthType<UUID>(), jwtSigner, expiration = Duration.ofDays(365), emailExpiration = Duration.ofHours(1))
+        val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner, expiration = Duration.ofDays(365), emailExpiration = Duration.ofHours(1))
         val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
 
         init {

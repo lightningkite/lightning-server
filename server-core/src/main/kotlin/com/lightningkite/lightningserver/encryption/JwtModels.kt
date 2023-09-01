@@ -19,7 +19,8 @@ data class JwtClaims(
     val thp: String? = null,
 )
 
-open class JwtException(message: String) : Exception(message)
+open class TokenException(message: String) : Exception(message)
+open class JwtException(message: String) : TokenException(message)
 open class JwtFormatException(message: String) : JwtException(message)
 open class JwtSignatureException(message: String) : JwtException(message)
 open class JwtExpiredException(message: String) : JwtException(message)

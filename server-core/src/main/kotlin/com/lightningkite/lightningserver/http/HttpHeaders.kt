@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.core.ContentType
 import java.time.Instant
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 data class HttpHeaders(val entries: List<Pair<String, String>>) {
@@ -73,7 +74,7 @@ data class HttpHeaders(val entries: List<Pair<String, String>>) {
                 append("$key=$value")
                 if (expiresAt != null) {
                     append("; Expires=")
-                    append(DateTimeFormatter.RFC_1123_DATE_TIME.format(expiresAt))
+                    append(DateTimeFormatter.RFC_1123_DATE_TIME.format(expiresAt.atOffset(ZoneOffset.UTC)))
                 }
                 if (maxAge != null) {
                     append("; Max-Age=")

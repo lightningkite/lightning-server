@@ -122,7 +122,7 @@ fun SecureHasher.verifyJwt(token: String, requiredAudience: String? = null): Jwt
     val claims: JwtClaims = Serialization.json.decodeFromString(Base64.getUrlDecoder().decode(parts[1]).toString(Charsets.UTF_8))
     requiredAudience?.let { if (claims.aud != it) return null }  // It's for someone else.  Ignore it.
     if (System.currentTimeMillis() / 1000L > claims.exp) throw JwtExpiredException("JWT has expired.")
-    println("$this Verifying ${token.substringBeforeLast('.')} is $signature")
+    println("$this Verifying ${token.substringBeforeLast('.')} is ${parts[2]}")
     if (!verify(
             token.substringBeforeLast('.').toByteArray(),
             signature

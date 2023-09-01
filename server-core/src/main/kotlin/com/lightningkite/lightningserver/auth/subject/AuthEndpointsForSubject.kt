@@ -4,21 +4,30 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthRequirement
 import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.auth.oauth.OauthResponse
 import com.lightningkite.lightningserver.auth.oauth.OauthTokenRequest
 import com.lightningkite.lightningserver.auth.proof.*
 import com.lightningkite.lightningserver.auth.subject.*
+import com.lightningkite.lightningserver.auth.token.TokenFormat
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.ModelInfo
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
+import com.lightningkite.lightningserver.encryption.JwtException
 import com.lightningkite.lightningserver.encryption.SecureHasher
+import com.lightningkite.lightningserver.encryption.TokenException
+import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
+import com.lightningkite.lightningserver.exceptions.UnauthorizedException
+import com.lightningkite.lightningserver.http.HttpHeader
+import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
+import kotlin.math.min
 import kotlin.reflect.KType
 
 class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
@@ -26,8 +35,10 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     val sessionType: KType,
     val handler: Authentication.SubjectHandler<SUBJECT, ID>,
     val database: () -> Database,
-    val hasher: () -> SecureHasher,
+    val proofHasher: () -> SecureHasher,
+    val tokenFormat: () -> TokenFormat,
 ) : ServerPathGroup(path) {
+
     val info = ModelInfo<SUBJECT, Session<SUBJECT, ID>, String>(
         modelName = "${handler.subjectSerializer.descriptor.serialName} Session",
         serialization = ModelSerializationInfo(
@@ -47,6 +58,23 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             )
         }
     )
+
+    init {
+        Authentication.readers += object: Authentication.Reader {
+            override suspend fun request(request: Request): RequestAuth<*>? {
+                try {
+                    val token =
+                        request.headers[HttpHeader.Authorization] ?: request.headers.cookies[HttpHeader.Authorization]
+                        ?: return null
+                    return tokenFormat().read(handler, token)
+                        ?: info.collection().get(token)?.toAuth()
+                } catch(e: TokenException) {
+                    throw UnauthorizedException(e.message ?: "JWT issue")
+                }
+            }
+        }
+    }
+
     val errorNoSingleUser = LSError(
         404,
         detail = "no-single-user",
@@ -57,6 +85,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         detail = "invalid-proof",
         message = "A given proof was invalid."
     )
+
     @Suppress("UNREACHABLE_CODE")
     val login = path.post.typed(
         authRequirement = AuthRequirement.none,
@@ -71,13 +100,14 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         errorCases = listOf(errorNoSingleUser, errorInvalidProof),
         implementation = { none: Unit, proofs: List<Proof> ->
             proofs.forEach {
-                if (!hasher().verify(it)) throw HttpStatusException(errorInvalidProof)
+                if (!proofHasher().verify(it)) throw HttpStatusException(errorInvalidProof)
             }
             val result =
                 handler.authenticate(*proofs.toTypedArray()) ?: throw HttpStatusException(errorNoSingleUser)
             val strength = proofs.sumOf { it.strength }
+            val maxStrengthPossible = result.options.sumOf { it.method.strength }
             IdAndAuthMethods(
-                session = if (strength >= result.strengthRequired) Session<SUBJECT, ID>(
+                session = if (strength >= min(result.strengthRequired, maxStrengthPossible)) Session<SUBJECT, ID>(
                     subjectId = result.id!!,
                     scopes = null,
                     ips = setOf(),
@@ -112,14 +142,36 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
+    suspend fun Session<SUBJECT, ID>.toAuth(): RequestAuth<SUBJECT> = RequestAuth(
+        subject = handler,
+        rawId = this.subjectId,
+        issuedAt = this.createdAt,
+        scopes = this.scopes,
+        thirdParty = this.oauthClient
+    ).withCachedValues(handler.knownCacheTypes)
+
     val token = path.get.typed(
         summary = "Get Token",
         errorCases = listOf(),
         implementation = { _: Unit, input: OauthTokenRequest ->
-            input.refresh_token
-            OauthResponse(
-                access_token = TODO()
-            )
+            val session = when {
+                input.refresh_token != null -> info.collection().get(input.refresh_token) ?: throw BadRequestException("Refresh token not recognized")
+                else -> throw BadRequestException("No authentication provided")
+            }
+            val auth: RequestAuth<SUBJECT> = session.toAuth()
+            when(input.grant_type) {
+                "refresh_token" -> {
+                    OauthResponse(
+                        access_token = tokenFormat().create(handler, auth),
+                        refresh_token = session._id,
+                        scope = auth.scopes?.joinToString(" ") ?: "*",
+                        token_type = tokenFormat().type
+                    )
+                }
+                "authorization_code" -> TODO()
+                else -> throw BadRequestException("Grant type ${input.grant_type} unsupported")
+            }
         }
     )
 }
+

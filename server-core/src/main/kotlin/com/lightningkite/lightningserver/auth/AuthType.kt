@@ -14,7 +14,8 @@ class AuthType(
         // TODO: This isn't that thorough
         return true
     }
-    val authName: String? get() = if(classifier == Unit::class) null else toString()
+    val subjectHandler: Authentication.SubjectHandler<*, *>? get() = Authentication.subjects[this]
+    val authName: String? get() = subjectHandler?.name
     override fun toString(): String = buildString {
         append(classifier.toString())
         if(arguments.isNotEmpty()) append(arguments.joinToString(", ", "<", ">"))
