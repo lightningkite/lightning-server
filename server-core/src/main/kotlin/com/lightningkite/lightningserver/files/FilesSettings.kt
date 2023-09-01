@@ -2,7 +2,6 @@
 
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.auth.SecureHasher
 import com.lightningkite.lightningserver.settings.Pluggable
 import kotlinx.serialization.Serializable
