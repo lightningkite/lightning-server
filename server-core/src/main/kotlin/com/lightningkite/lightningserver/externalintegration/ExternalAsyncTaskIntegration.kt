@@ -1,7 +1,9 @@
 package com.lightningkite.lightningserver.externalintegration
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.auth.AuthOptions
+import com.lightningkite.lightningserver.auth.RequestAuth
+import com.lightningkite.lightningserver.auth.accepts
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.ModelInfoWithDefault
@@ -18,6 +20,7 @@ import com.lightningkite.lightningserver.tasks.Task
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.typed
+import com.lightningkite.lightningserver.typed.typedAuthAbstracted
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
@@ -28,12 +31,11 @@ import java.time.Duration
 import java.time.Instant
 import java.util.*
 
-class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESULT>(
+class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
     path: ServerPath,
-    val authRequirement: AuthRequirement<USER>,
+    val authOptions: AuthOptions,
     val responseSerializer: KSerializer<RESPONSE>,
     val resultSerializer: KSerializer<RESULT>,
-    val isAdmin: (user: USER) -> Boolean,
     val database: () -> Database,
     val api: () -> Api<REQUEST, RESPONSE, RESULT>,
     val checkFrequency: Duration = Duration.ofMinutes(15),
@@ -47,35 +49,23 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
     }
 
     // Collection exposed to admins only for tasks
-    val info = ModelInfoWithDefault<USER, ExternalAsyncTaskRequest, String>(
+    val info = ModelInfoWithDefault<ExternalAsyncTaskRequest, String>(
+        authOptions = authOptions,
         serialization = ModelSerializationInfo(
-            authRequirement = authRequirement,
             serializer = ExternalAsyncTaskRequest.serializer(),
             idSerializer = String.serializer()
         ),
         getCollection = {
             database().collection<ExternalAsyncTaskRequest>(name = "$path/ExternalTaskRequest")
         },
-        defaultItem = {
+        defaultItem = { it: RequestAuth<*>? ->
             ExternalAsyncTaskRequest(
                 _id = "",
                 expiresAt = Instant.now().plus(Duration.ofDays(7)),
                 ourData = ""
             )
         },
-        forUser = { user ->
-            val admin: Condition<ExternalAsyncTaskRequest> =
-                if (isAdmin(user)) Condition.Always() else Condition.Never()
-            this
-                .withPermissions(
-                    ModelPermissions(
-                        create = admin,
-                        read = admin,
-                        update = admin,
-                        delete = admin,
-                    )
-                )
-        },
+        forUser = { this },
         modelName = "${name.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }}Request"
     )
 
@@ -188,26 +178,24 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
         )
     }
 
-    val manualRecheck = path("recheck").post.typed(
+    val manualRecheck = path("recheck").post.typedAuthAbstracted(
         summary = "Manually recheck tasks",
         errorCases = listOf(),
-        authRequirement = info.serialization.authRequirement,
+        authOptions = authOptions,
         inputType = Unit.serializer(),
         outputType = Unit.serializer(),
-        implementation = { user: USER, _: Unit ->
-            if (!isAdmin(user)) throw ForbiddenException()
+        implementation = { _: RequestAuth<*>?, _: Unit ->
             recheck.handler.invoke()
         }
     )
-    val manualRecheckSingle = path("recheck/{id}").post.typed(
+    val manualRecheckSingle = path("recheck/{id}").post.typedAuthAbstracted(
         summary = "Manually recheck tasks",
         errorCases = listOf(),
-        authRequirement = info.serialization.authRequirement,
+        authOptions = authOptions,
         inputType = Unit.serializer(),
-        pathType = String.serializer(),
+        path1Type = String.serializer(),
         outputType = Unit.serializer(),
-        implementation = { user: USER, id: String, _: Unit ->
-            if (!isAdmin(user)) throw ForbiddenException()
+        implementation = { user: RequestAuth<*>?, id: String, _: Unit ->
             coroutineScope {
                 recheckSet.implementation(this, listOf(info.collection().get(id) ?: throw NotFoundException()))
             }
@@ -263,7 +251,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
     }
 
     interface Api<REQUEST, RESPONSE : HasId<String>, RESULT> {
-        suspend fun <USER> ready(integration: ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE, RESULT>) {}
+        suspend fun ready(integration: ExternalAsyncTaskIntegration<REQUEST, RESPONSE, RESULT>) {}
         suspend fun begin(request: REQUEST): RESPONSE
         suspend fun check(ids: List<String>): Map<String, RESULT>
     }

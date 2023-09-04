@@ -156,7 +156,7 @@ private fun <T> make(type: KSerializer<T>, item: T): Map<String, OpenApiExample>
     )
 }
 
-private fun <USER, INPUT : Any, OUTPUT> ApiEndpoint<USER, INPUT, OUTPUT>.openApi(builder: JsonSchemaBuilder): OpenApiOperation =
+private fun <INPUT : Any, OUTPUT> ApiEndpoint<INPUT, OUTPUT>.openApi(builder: JsonSchemaBuilder): OpenApiOperation =
     OpenApiOperation(
         summary = (this.docGroup?.let { it.humanize() + " " } ?: "") + " - " + summary,
         description = description,

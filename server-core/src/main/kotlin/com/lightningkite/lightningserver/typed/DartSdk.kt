@@ -139,8 +139,8 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
             val hasInput = entry.inputType != Unit.serializer()
             appendLine("        var url = Uri.parse(\"\${parent.httpUrl}${entry.route.path.escaped}\");")
             appendLine("        var headers = parent.extraHeaders;")
-            entry.authRequirement.type.authName?.let {
-                if (entry.authRequirement.required) {
+            entry.primaryAuthName?.let {
+                if (entry.authOptions.contains(null).not()) {
                     appendLine("        headers[\"Authorization\"] = \"Bearer $${it.userTypeTokenName()}\";")
                 } else {
                     appendLine("        if (${it.userTypeTokenName()} == null) {")
@@ -190,8 +190,8 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
         val hasInput = entry.inputType != Unit.serializer()
         appendLine("        var url = Uri.parse(\"\${httpUrl}${entry.route.path.escaped}\");")
         appendLine("        var headers = extraHeaders;")
-        entry.authRequirement.type.authName?.let {
-            if (entry.authRequirement.required) {
+        entry.primaryAuthName?.let {
+            if (entry.authOptions.contains(null).not()) {
                 appendLine("        headers[\"Authorization\"] = \"Bearer $${it.userTypeTokenName()}\";")
             } else {
                 appendLine("        if (${it.userTypeTokenName()} == null) {")
@@ -260,7 +260,7 @@ private fun Appendable.functionHeader(
     overrideUserType: String? = null,
 ) {
     when (documentable) {
-        is ApiEndpoint<*, *, *> -> {
+        is ApiEndpoint<*, *> -> {
             append("Future<")
             documentable.outputType.write().let { append(it) }
             append(">")
@@ -294,7 +294,7 @@ private fun Appendable.functionCall(
     arguments(documentable, skipAuth, overrideUserType).forEach {
         if (argComma) append(", ")
         else argComma = true
-        if (it.name == documentable.authRequirement.type.authName?.userTypeTokenName() && authUsesThis) {
+        if (it.name == documentable.primaryAuthName?.userTypeTokenName() && authUsesThis) {
             append("this.")
         }
         append(it.name)
@@ -315,7 +315,7 @@ private fun arguments(
     skipAuth: Boolean = false,
     overrideUserType: String? = null,
 ): List<DArg> = when (documentable) {
-    is ApiEndpoint<*, *, *> -> listOfNotNull(
+    is ApiEndpoint<*, *> -> listOfNotNull(
         documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {
                 DArg(name = it.name, type = documentable.routeTypes[it.name], stringType = "String")
@@ -323,21 +323,21 @@ private fun arguments(
         documentable.inputType.takeUnless { it == Unit.serializer() }?.let {
             DArg(name = "input", type = it)
         }?.let(::listOf),
-        documentable.authRequirement.type.authName?.takeUnless { skipAuth }?.let {
+        documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
             DArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),
                 stringType = "String",
-                optional = !documentable.authRequirement.required
+                optional = !documentable.authOptions.contains(null).not()
             )
         }?.let(::listOf)
     ).flatten()
 
-    is ApiWebsocket<*, *, *> -> listOfNotNull(
-        documentable.authRequirement.type.authName?.takeUnless { skipAuth }?.let {
+    is ApiWebsocket<*, *> -> listOfNotNull(
+        documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
             DArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),
                 stringType = "String",
-                optional = !documentable.authRequirement.required
+                optional = !documentable.authOptions.contains(null).not()
             )
         }?.let(::listOf),
         documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()

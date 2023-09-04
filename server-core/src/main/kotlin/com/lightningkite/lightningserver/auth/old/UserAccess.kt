@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.auth.old
 
-import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.auth.AuthOption
+import com.lightningkite.lightningserver.auth.AuthType
 import com.lightningkite.lightningserver.auth.oauth.ExternalProfile
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
@@ -12,7 +13,7 @@ import kotlinx.serialization.KSerializer
 interface UserAccess<USER : Any, ID> {
     val serializer: KSerializer<USER>
     val idSerializer: KSerializer<ID>
-    val authRequirement: AuthRequirement<USER>
+    val authType: AuthType
     fun id(user: USER): ID
     suspend fun byId(id: ID): USER
     suspend fun anonymous(): USER = throw ForbiddenException("Anonymous users not permitted.")

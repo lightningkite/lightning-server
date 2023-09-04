@@ -57,7 +57,7 @@ open class PasswordAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
         val email = values.get("username")!!.lowercase()
         val password = values.get("password")!!
         val basis = try {
-            loginPassword.implementation(Unit, PasswordLogin(email, password))
+            loginPassword.implementation(null, PasswordLogin(email, password))
         } catch (e: Exception) {
             e.printStackTrace()
             throw e

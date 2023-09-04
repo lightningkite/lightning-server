@@ -6,7 +6,6 @@ import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.proof.Proof
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.db.LazyModel
 import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
@@ -18,6 +17,7 @@ import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.typed
+import com.lightningkite.lightningserver.typed.typedAuthAbstracted
 import io.ktor.http.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
@@ -51,11 +51,11 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
     }
 ) : ServerPathGroup(path) {
 
-    val typeName = userAccess.authRequirement.type.classifier?.toString()?.substringAfterLast('.') ?: "Unknown"
+    val typeName = userAccess.authType.classifier?.toString()?.substringAfterLast('.') ?: "Unknown"
     val jwtPrefix = "$typeName|"
     val handler: Authentication.SubjectHandler<USER, ID> = object : Authentication.SubjectHandler<USER, ID> {
         override val name: String get() = typeName
-        override val authType: AuthType get() = userAccess.authRequirement.type
+        override val authType: AuthType get() = userAccess.authType
         override val idSerializer: KSerializer<ID> get() = userAccess.idSerializer
         override val subjectSerializer: KSerializer<USER> get() = userAccess.serializer
         override suspend fun fetch(id: ID): USER = userAccess.byId(id)
@@ -85,9 +85,10 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
         Authentication.readers += object : Authentication.Reader {
             override suspend fun request(request: Request): RequestAuth<*>? {
                 try {
-                    val token =
+                    var token =
                         request.headers[HttpHeader.Authorization] ?: request.headers.cookies[HttpHeader.Authorization]
                         ?: return null
+                    token = token.removePrefix("Bearer ")
                     val claims = hasher().verifyJwt(token) ?: return null
                     val sub = claims.sub ?: return null
                     if (!sub.startsWith(jwtPrefix)) return null
@@ -155,11 +156,11 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
      * Defers to [handleToken].
      */
     val landingRoute: HttpEndpoint = path("login-landing").get.handler {
-        it.handleToken(tokenById(it.auth<USER>(userAccess.authRequirement.type)!!.id))
+        it.handleToken(tokenById(it.auth<USER>(userAccess.authType)!!.id))
     }
 
     val refreshToken = path("refresh-token").get.typed(
-        authRequirement = userAccess.authRequirement,
+        authOptions = setOf(AuthOption(userAccess.authType)),
         inputType = Unit.serializer(),
         outputType = String.serializer(),
         summary = "Refresh token",
@@ -171,7 +172,7 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
         }
     )
     val getSelf = path("self").get.typed(
-        authRequirement = userAccess.authRequirement,
+        authOptions = setOf(AuthOption(userAccess.authType)),
         inputType = Unit.serializer(),
         outputType = userAccess.serializer,
         summary = "Get Self",
@@ -179,16 +180,16 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
         errorCases = listOf(),
         implementation = { user: USER, _: Unit -> user }
     )
-    val anonymous = path("anonymous").get.typed(
-        authRequirement = AuthRequirement<Unit>(),
+    val anonymous = path("anonymous").get.typedAuthAbstracted(
+        authOptions = setOf(null),
         inputType = Unit.serializer(),
         outputType = String.serializer(),
         summary = "Anonymous Token",
         description = "Creates a token for a new, anonymous user.  The token can be used to authenticate with the API via the header 'Authorization: Bearer [insert token here]",
         errorCases = listOf(),
         examples = listOf(ApiExample(input = Unit, output = "jwt.jwt.jwt")),
-        implementation = { user: Unit, _: Unit ->
-            return@typed token(userAccess.anonymous())
+        implementation = { _, _: Unit ->
+            token(userAccess.anonymous())
         }
     )
 }

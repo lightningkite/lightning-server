@@ -2,6 +2,9 @@ package com.lightningkite.lightningserver.metrics
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.HtmlDefaults
+import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.accepts
+import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
@@ -86,7 +89,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
     }
 
     val dashboard = get.handler { req ->
-        if (!MetaEndpoints.isAdministrator.check(req)) throw ForbiddenException()
+        if (!Authentication.isSuperUser.accepts(req.authAny())) throw ForbiddenException()
         HttpResponse.html(
             content = HtmlDefaults.basePage(
                 buildString {
@@ -107,15 +110,15 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
             )
         )
     }
-    val reportEndpoint = get("raw").handler { req ->
-        if (!MetaEndpoints.isAdministrator.check(req)) throw ForbiddenException()
-        val result = collection.query(req.queryParameters()).toList()
+    val reportEndpoint = get("raw").handler { it ->
+        if (!Authentication.isSuperUser.accepts(it.authAny())) throw ForbiddenException()
+        val result = collection.query(it.queryParameters()).toList()
         HttpResponse(
-            body = result.toHttpContent(req.headers.accept)
+            body = result.toHttpContent(it.headers.accept)
         )
     }
     val visualizeIndexA = get("visual").handler {
-        if (!MetaEndpoints.isAdministrator.check(it)) throw ForbiddenException()
+        if (!Authentication.isSuperUser.accepts(it.authAny())) throw ForbiddenException()
         HttpResponse.html(content = HtmlDefaults.basePage(buildString {
             appendLine("<ul>")
             for (metric in settings.trackingByEntryPoint) {
@@ -133,7 +136,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         }))
     }
     val visualizeIndexB = get("visual/{metric}").handler {
-        if (!MetaEndpoints.isAdministrator.check(it)) throw ForbiddenException()
+        if (!Authentication.isSuperUser.accepts(it.authAny())) throw ForbiddenException()
         HttpResponse.html(content = HtmlDefaults.basePage(buildString {
             appendLine("<ul>")
             val endpoints =
@@ -161,7 +164,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         }))
     }
     val visualizeIndexC = get("visual/{metric}/{endpoint}").handler {
-        if (!MetaEndpoints.isAdministrator.check(it)) throw ForbiddenException()
+        if (!Authentication.isSuperUser.accepts(it.authAny())) throw ForbiddenException()
         HttpResponse.html(content = HtmlDefaults.basePage(buildString {
             appendLine("<ul>")
             val metric = it.parts["metric"]!!
@@ -186,7 +189,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         }))
     }
     val visualizeSpecific = get("visual/{metric}/{endpoint}/{span}/{summary}").handler {
-        if (!MetaEndpoints.isAdministrator.check(it)) throw ForbiddenException()
+        if (!Authentication.isSuperUser.accepts(it.authAny())) throw ForbiddenException()
         val metric = it.parts.getValue("metric")
         val endpoint = it.parts.getValue("endpoint")
         val span = Serialization.fromString(it.parts.getValue("span"), DurationSerializer)

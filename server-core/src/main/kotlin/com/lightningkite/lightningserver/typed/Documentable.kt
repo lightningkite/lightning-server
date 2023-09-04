@@ -3,7 +3,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.Http
@@ -21,11 +21,11 @@ interface Documentable {
     val path: ServerPath
     val summary: String
     val description: String
-    val authRequirement: AuthRequirement<*>
+    val authOptions: AuthOptions
 
     companion object {
-        val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *>>()
-        val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *, *>>()
+        val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *>>()
+        val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *>>()
         val all get() = endpoints + websockets
         val usedTypes: Collection<KSerializer<*>>
             get() {

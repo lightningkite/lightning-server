@@ -1,7 +1,10 @@
 package com.lightningkite.lightningserver.exceptions
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.auth.AuthOptions
+import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.RequestAuth
+import com.lightningkite.lightningserver.auth.accepts
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelInfoWithDefault
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
@@ -60,18 +63,23 @@ class GroupedDatabaseExceptionReporter(val packageName: String, val database: Da
     }
 
     @Suppress("UNCHECKED_CAST")
-    val modelInfo = ModelInfoWithDefault<Any?, ReportedExceptionGroup, Int>(
-        serialization = ModelSerializationInfo(
-            authRequirement = MetaEndpoints.isAdministrator.authRequirement as AuthRequirement<Any?>,
+    val modelInfo = object: ModelInfoWithDefault<ReportedExceptionGroup, Int> {
+        override val serialization = ModelSerializationInfo<ReportedExceptionGroup, Int>(
             serializer = Serialization.module.serializer(),
             idSerializer = Serialization.module.serializer()
-        ),
-        getCollection = { database.collection<ReportedExceptionGroup>() },
-        forUser = { user: Any? ->
-            if((MetaEndpoints.isAdministrator as MetaEndpoints.AdminCheck<Any?>).isAdmin(user)) this else throw ForbiddenException()
-        },
-        defaultItem = { ReportedExceptionGroup(_id = 0, context = "", server = "", message = "", trace = "") },
-    )
+        )
+        override val authOptions: AuthOptions get() = Authentication.isSuperUser
+        override fun collection(): FieldCollection<ReportedExceptionGroup> = database.collection<ReportedExceptionGroup>()
+        override suspend fun collection(auth: RequestAuth<*>?): FieldCollection<ReportedExceptionGroup> = collection()
+
+        override suspend fun defaultItem(auth: RequestAuth<*>?): ReportedExceptionGroup {
+            return ReportedExceptionGroup(_id = 0, context = "", server = "", message = "", trace = "")
+        }
+
+        override fun exampleItem(): ReportedExceptionGroup? {
+            return ReportedExceptionGroup(_id = 0, context = "", server = "", message = "", trace = "")
+        }
+    }
 
     val rest = ModelRestEndpoints(ServerPath("meta/exceptions"), modelInfo)
 }

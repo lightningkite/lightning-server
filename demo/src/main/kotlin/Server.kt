@@ -78,6 +78,9 @@ object Server : ServerPathGroup(ServerPath.root) {
                 )
             )
         }
+        Authentication.isSuperUser = setOf(AuthOption(AuthType<User>()) {
+            (it.get() as User).isSuperUser
+        })
     }
 
     val userInfo = ModelInfoWithDefault<User, User, UUID>(
@@ -218,7 +221,7 @@ object Server : ServerPathGroup(ServerPath.root) {
     val weirdAuth = path("weird-auth").get.typed(
         summary = "Get weird auth",
         errorCases = listOf(),
-        implementation = { user: LazyModel<User, UUID>, _: Unit ->
+        implementation = { user: RequestAuth<User>, _: Unit ->
             "ID is ${user.id}"
         }
     )

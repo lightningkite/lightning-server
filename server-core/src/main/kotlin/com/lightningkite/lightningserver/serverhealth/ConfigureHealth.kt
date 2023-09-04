@@ -1,12 +1,15 @@
 package com.lightningkite.lightningserver.serverhealth
 
-import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.auth.AuthOptions
+import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.typed.ApiEndpoint0
 import com.lightningkite.lightningserver.typed.typed
+import com.lightningkite.lightningserver.typed.typedAuthAbstracted
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.builtins.serializer
 import java.lang.management.ManagementFactory
@@ -17,23 +20,17 @@ import java.time.Instant
  * A route for accessing status of features, external service connections, and general server information.
  * Examples of features that can be checked on are Email, Database, and Exception Reporting.
  */
-inline fun <reified USER> ServerPath.healthCheck(noinline allowed: suspend (USER) -> Boolean = { true }): ApiEndpoint0<USER, Unit, ServerHealth> {
-    return healthCheck(AuthRequirement(), allowed)
-}
-
-fun <USER> ServerPath.healthCheck(
-    authRequirement: AuthRequirement<USER>,
-    allowed: suspend (USER) -> Boolean = { true },
-): ApiEndpoint0<USER, Unit, ServerHealth> {
-    return get.typed(
-        authRequirement = authRequirement,
+fun ServerPath.healthCheck(
+    authOptions: AuthOptions = Authentication.isSuperUser
+): ApiEndpoint0<Unit, ServerHealth> {
+    return get.typedAuthAbstracted(
+        authOptions = authOptions,
         inputType = Unit.serializer(),
         outputType = ServerHealth.serializer(),
         summary = "Get Server Health",
         description = "Gets the current status of the server",
         errorCases = listOf(),
-        implementation = { user: USER, _: Unit ->
-            if (!allowed(user)) throw ForbiddenException()
+        implementation = { user: RequestAuth<*>?, _: Unit ->
             val now = Instant.now()
             serverHealth(
                 features = Settings.requirements.mapValues { it.value() }.entries.mapNotNull {

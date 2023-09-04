@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.parse
@@ -22,12 +22,12 @@ class ApiEndpointTest {
         runBlocking {
             val response = ApiEndpoint0(
                 route = httpEndpoint,
-                authRequirement = AuthRequirement(),
+                authOptions = setOf(null),
                 inputType = serializer(),
                 outputType = serializer(),
                 summary = "",
                 errorCases = listOf(),
-                implementation = { _: Unit, value: Int -> value + 1 },
+                implementation = { _: RequestAuth<*>?, value: Int -> value + 1 },
             ).invoke(
                 HttpRequest(
                     endpoint = httpEndpoint, body = HttpContent.Text("1", type = ContentType.Application.Json)
@@ -45,14 +45,14 @@ class ApiEndpointTest {
         runBlocking {
             val response = ApiEndpoint1(
                 route = httpEndpoint,
-                authRequirement = AuthRequirement(),
+                authOptions = setOf(null),
                 inputType = serializer(),
-                pathName = "test-path",
-                pathType = serializer(),
+                path1Name = "test-path",
+                path1Type = serializer(),
                 outputType = serializer(),
                 summary = "",
                 errorCases = listOf(),
-                implementation = { _: Unit, _: String, value: Int -> value + 1 },
+                implementation = { _: RequestAuth<*>?, _: String, value: Int -> value + 1 },
             ).invoke(
                 HttpRequest(
                     endpoint = httpEndpoint,
@@ -72,55 +72,21 @@ class ApiEndpointTest {
         runBlocking {
             val response = ApiEndpoint2(
                 route = httpEndpoint,
-                authRequirement = AuthRequirement(),
+                authOptions = setOf(null),
                 inputType = serializer(),
-                pathName = "test-path1",
-                pathType = serializer(),
+                path1Name = "test-path1",
+                path1Type = serializer(),
                 path2Name = "test-path2",
                 path2Type = serializer(),
                 outputType = serializer(),
                 summary = "",
                 errorCases = listOf(),
-                implementation = { _: Unit, _: String, _: String, value: Int -> value + 1 },
+                implementation = { _: RequestAuth<*>?, _: String, _: String, value: Int -> value + 1 },
             ).invoke(
                 HttpRequest(
                     endpoint = httpEndpoint,
                     body = HttpContent.Text("1", type = ContentType.Application.Json),
                     parts = mapOf("test-path1" to "", "test-path2" to "")
-                )
-            )
-            assertEquals(expected = response.status, actual = HttpStatus.OK)
-            assertEquals(expected = response.body?.parse<Int>(), actual = 2)
-        }
-    }
-
-    @Test
-    fun testAuthEndpointX() {
-        val httpEndpoint = HttpEndpoint("post", HttpMethod("post"))
-
-        runBlocking {
-            val response = ApiEndpointX(
-                route = httpEndpoint,
-                authRequirement = AuthRequirement(),
-                inputType = serializer(),
-                outputType = serializer(),
-                summary = "",
-                errorCases = listOf(),
-                routeTypes = mapOf(
-                    "test-path1" to serializer<String>(),
-                    "test-path2" to serializer(),
-                    "test-path3" to serializer()
-                ),
-                implementation = { _: Unit, value: Int, _: Map<String, Any?> -> value + 1 },
-            ).invoke(
-                HttpRequest(
-                    endpoint = httpEndpoint,
-                    body = HttpContent.Text("1", type = ContentType.Application.Json),
-                    parts = mapOf(
-                        "test-path1" to "",
-                        "test-path2" to "",
-                        "test-path3" to "",
-                    )
                 )
             )
             assertEquals(expected = response.status, actual = HttpStatus.OK)

@@ -3,7 +3,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.NotFoundException
@@ -21,37 +21,33 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
+import kotlinx.serialization.encodeToString
 import java.time.Instant
 import java.time.Duration
 import kotlin.reflect.KProperty1
 
 @LightningServerDsl
-fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
+fun <T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
     database: () -> Database,
-    info: ModelInfo<USER, T, ID>,
+    info: ModelInfo<T, ID>,
     key: KProperty1<T, *>? = null,
-): ApiWebsocket<USER, Query<T>, ListChange<T>> {
+): ApiWebsocket<Query<T>, ListChange<T>> {
     prepareModels()
     val modelName = info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
     val modelIdentifier = info.serialization.serializer.descriptor.serialName
     val helper = RestApiWebsocketHelper[database]
 
-    return typedWebsocket<USER, Query<T>, ListChange<T>>(
-        authRequirement = info.serialization.authRequirement,
+    return typedWebsocket<Query<T>, ListChange<T>>(
+        authOptions = info.authOptions,
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListChange.serializer(info.serialization.serializer),
         summary = "Watch",
         description = "Gets a changing list of ${modelName}s that match the given query.",
         errorCases = listOf(),
         connect = { event ->
-            val user = event.user?.let { user ->
-                @Suppress("UNCHECKED_CAST")
-                Authentication.subjects[info.serialization.authRequirement.type]?.let {
-                    it as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>
-                    Serialization.json.encodeUnwrappingString(it.idSerializer, (user as HasId<*>)._id as Comparable<Any?>)
-                }
-            }
-            val collection = info.collection(event.user)
+            val auth = event.authChecked(authOptions)
+            val user = auth?.serializable()
+            val collection = info.collection(auth)
             helper.subscriptionDb().insertOne(
                 __WebSocketDatabaseChangeSubscription(
                     _id = event.id,
@@ -69,14 +65,8 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
         },
         message = { event ->
             val existing = helper.subscriptionDb().get(event.id) ?: throw NotFoundException()
-            @Suppress("UNCHECKED_CAST") val user: USER = existing.user?.let { userId ->
-                Authentication.subjects[info.serialization.authRequirement.type]?.let {
-                    it as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>
-                    val id = Serialization.json.decodeUnwrappingString(it.idSerializer, userId)
-                    it.fetch(id)
-                }
-            } as USER
-            val p = info.collection(user)
+            val auth = existing.user?.real()
+            val p = info.collection(auth)
             val q = event.content.copy(condition = p.fullCondition(event.content.condition).simplify())
             val c = Serialization.json.encodeToString(Query.serializer(info.serialization.serializer), q)
             helper.subscriptionDb().updateOne(
@@ -192,7 +182,7 @@ class RestApiWebsocketHelper private constructor(val database: ()->Database) {
 data class __WebSocketDatabaseChangeSubscription(
     override val _id: WebSocketIdentifier,
     val databaseId: String,
-    val user: String?, //USER
+    val user: RequestAuthSerializable?, //USER
     val condition: String, //Query<T>
     val mask: String, //Mask<T>
     val establishedAt: Instant,

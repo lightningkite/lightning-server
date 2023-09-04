@@ -109,7 +109,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     appendLine()
     appendLine()
 
-    val byUserType = safeDocumentables.groupBy { it.authRequirement.type.authName }
+    val byUserType = safeDocumentables.groupBy { it.primaryAuthName }
     val userTypes = byUserType.keys.filterNotNull()
     userTypes.forEach { userType ->
         @Suppress("NAME_SHADOWING") val byGroup =
@@ -180,7 +180,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         appendLine("            ${if (hasInput) "input" else "undefined"},")
         appendLine("            {")
         appendLine("                method: \"${entry.route.method}\",")
-        entry.authRequirement.type.authName?.let {
+        entry.primaryAuthName?.let {
             appendLine("                headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
         }
         appendLine("            }, ")
@@ -213,7 +213,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
             appendLine("                ${if (hasInput) "input" else "undefined"},")
             appendLine("                {")
             appendLine("                    method: \"${entry.route.method}\",")
-            entry.authRequirement.type.authName?.let {
+            entry.primaryAuthName?.let {
                 appendLine("                    headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
             }
             appendLine("                }, ")
@@ -291,13 +291,13 @@ private fun Appendable.functionHeader(
     }
     append("): ")
     when (documentable) {
-        is ApiEndpoint<*, *, *> -> {
+        is ApiEndpoint<*, *> -> {
             append("Promise<")
             documentable.outputType.write().let { append(it) }
             append(">")
         }
 
-        is ApiWebsocket<*, *, *> -> {
+        is ApiWebsocket<*, *> -> {
             append("Observable<WebSocketIsh<")
             documentable.inputType.write().let { append(it) }
             append(", ")
@@ -320,7 +320,7 @@ private fun Appendable.functionCall(
     arguments(documentable, skipAuth, overrideUserType).forEach {
         if (argComma) append(", ")
         else argComma = true
-        if (it.name == documentable.authRequirement.type.authName?.userTypeTokenName() && authUsesThis) {
+        if (it.name == documentable.primaryAuthName?.userTypeTokenName() && authUsesThis) {
             append("this.")
         }
         append(it.name)
@@ -341,7 +341,7 @@ private fun arguments(
     skipAuth: Boolean = false,
     overrideUserType: String? = null
 ): List<TArg> = when (documentable) {
-    is ApiEndpoint<*, *, *> -> listOfNotNull(
+    is ApiEndpoint<*, *> -> listOfNotNull(
         documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {
                 TArg(name = it.name, type = documentable.routeTypes[it.name], stringType = "string")
@@ -349,21 +349,21 @@ private fun arguments(
         documentable.inputType.takeUnless { it == Unit.serializer() }?.let {
             TArg(name = "input", type = it)
         }?.let(::listOf),
-        documentable.authRequirement.type.authName?.takeUnless { skipAuth }?.let {
+        documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
             TArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),
                 stringType = "string",
-                optional = !documentable.authRequirement.required
+                optional = !documentable.authOptions.contains(null).not()
             )
         }?.let(::listOf)
     ).flatten()
 
-    is ApiWebsocket<*, *, *> -> listOfNotNull(
-        documentable.authRequirement.type.authName?.takeUnless { skipAuth }?.let {
+    is ApiWebsocket<*, *> -> listOfNotNull(
+        documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
             TArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),
                 stringType = "string",
-                optional = !documentable.authRequirement.required
+                optional = !documentable.authOptions.contains(null).not()
             )
         }?.let(::listOf),
         documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()

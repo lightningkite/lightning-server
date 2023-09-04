@@ -2,9 +2,10 @@ package com.lightningkite.lightningserver.auth.subject
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.LSError
-import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.auth.AuthOption
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.RequestAuth
+import com.lightningkite.lightningserver.auth.authOptions
 import com.lightningkite.lightningserver.auth.oauth.OauthGrantTypes
 import com.lightningkite.lightningserver.auth.oauth.OauthResponse
 import com.lightningkite.lightningserver.auth.oauth.OauthTokenRequest
@@ -40,28 +41,33 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     val tokenFormat: () -> TokenFormat,
 ) : ServerPathGroup(path) {
 
-    val info = ModelInfo<SUBJECT, Session<SUBJECT, ID>, String>(
+    val info = ModelInfo<Session<SUBJECT, ID>, String>(
         modelName = "${handler.subjectSerializer.descriptor.serialName} Session",
         serialization = ModelSerializationInfo(
-            AuthRequirement(handler.authType, true),
             Session.serializer(handler.subjectSerializer, handler.idSerializer),
             idSerializer = String.serializer()
         ),
-        getCollection = { database().collection(sessionType, "SessionFor${handler.subjectSerializer.descriptor.serialName}") },
-        forUser = { subject ->
+        authOptions = setOf(null),
+        getCollection = {
+            database().collection(
+                sessionType,
+                "SessionFor${handler.subjectSerializer.descriptor.serialName}"
+            )
+        },
+        forUser = { requestAuth ->
             withPermissions(
                 permissions = ModelPermissions(
                     create = Condition.Never(),
-                    read = condition { it.subjectId eq subject._id },
+                    read = condition { if (requestAuth?.subject == handler) it.subjectId eq (requestAuth.rawId as ID) else Condition.Never() },
                     update = Condition.Never(),
-                    delete = condition { it.subjectId eq subject._id },
+                    delete = condition { if (requestAuth?.subject == handler) it.subjectId eq (requestAuth.rawId as ID) else Condition.Never() },
                 )
             )
         }
     )
 
     init {
-        Authentication.readers += object: Authentication.Reader {
+        Authentication.readers += object : Authentication.Reader {
             override suspend fun request(request: Request): RequestAuth<*>? {
                 try {
                     val token =
@@ -69,7 +75,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         ?: return null
                     return tokenFormat().read(handler, token)
                         ?: info.collection().get(token)?.toAuth()
-                } catch(e: TokenException) {
+                } catch (e: TokenException) {
                     throw UnauthorizedException(e.message ?: "JWT issue")
                 }
             }
@@ -89,7 +95,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     @Suppress("UNREACHABLE_CODE")
     val login = path.post.typed(
-        authRequirement = AuthRequirement.none,
+        authOptions = setOf(null),
         inputType = ListSerializer(Proof.serializer()),
         outputType = IdAndAuthMethods.serializer(handler.idSerializer),
         summary = "Log In",
@@ -122,7 +128,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val createSubSession = path.post.typed(
-        authRequirement = AuthRequirement(handler.authType, true),
+        authOptions = setOf(AuthOption(handler.authType)),
         inputType = SubSessionRequest.serializer(),
         outputType = String.serializer(),
         summary = "Create Sub Session",
@@ -156,11 +162,13 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         errorCases = listOf(),
         implementation = { _: Unit, input: OauthTokenRequest ->
             val session = when {
-                input.refresh_token != null -> info.collection().get(input.refresh_token) ?: throw BadRequestException("Refresh token not recognized")
+                input.refresh_token != null -> info.collection().get(input.refresh_token)
+                    ?: throw BadRequestException("Refresh token not recognized")
+
                 else -> throw BadRequestException("No authentication provided")
             }
             val auth: RequestAuth<SUBJECT> = session.toAuth()
-            when(input.grant_type) {
+            when (input.grant_type) {
                 OauthGrantTypes.refreshToken -> {
                     OauthResponse(
                         access_token = tokenFormat().create(handler, auth),
@@ -169,6 +177,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         token_type = tokenFormat().type
                     )
                 }
+
                 OauthGrantTypes.authorizationCode -> TODO()
                 else -> throw BadRequestException("Grant type ${input.grant_type} unsupported")
             }

@@ -1,7 +1,8 @@
 package com.lightningkite.lightningserver.auth.old
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.AuthRequirement
+import com.lightningkite.lightningserver.auth.AuthOption
+import com.lightningkite.lightningserver.auth.AuthType
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.db.ModelInfo
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
@@ -9,7 +10,7 @@ import kotlinx.serialization.KSerializer
 
 fun <T, USER, ID : Comparable<ID>> T.userPasswordAccess(
     newUser: suspend (email: String, hashedPassword: String) -> USER
-): UserPasswordAccess<USER, ID> where USER : HasId<ID>, USER : HasPassword, T : ModelInfo<USER, USER, ID>, USER : HasEmail {
+): UserPasswordAccess<USER, ID> where USER : HasId<ID>, USER : HasPassword, T : ModelInfo<USER, ID>, USER : HasEmail {
     val info = this
     return object : UserPasswordAccess<USER, ID> {
         override suspend fun byUsername(username: String, password: String): USER {
@@ -24,8 +25,7 @@ fun <T, USER, ID : Comparable<ID>> T.userPasswordAccess(
             get() = info.serialization.serializer
         override val idSerializer: KSerializer<ID>
             get() = info.serialization.idSerializer
-        override val authRequirement: AuthRequirement<USER>
-            get() = info.serialization.authRequirement
+        override val authType: AuthType = info.authOptions.find { it != null }!!.type
 
         override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
@@ -35,7 +35,7 @@ fun <T, USER, ID : Comparable<ID>> T.userPasswordAccess(
 
 fun <T, USER, ID : Comparable<ID>> T.userEmailAccess(
     newUser: suspend (email: String) -> USER
-): UserEmailAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, USER, ID>, USER : HasEmail {
+): UserEmailAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, ID>, USER : HasEmail {
     val info = this
     return object : UserEmailAccess<USER, ID> {
         override suspend fun byEmail(email: String): USER {
@@ -48,8 +48,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailAccess(
             get() = info.serialization.serializer
         override val idSerializer: KSerializer<ID>
             get() = info.serialization.idSerializer
-        override val authRequirement: AuthRequirement<USER>
-            get() = info.serialization.authRequirement
+        override val authType: AuthType = info.authOptions.find { it != null }!!.type
 
         override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
@@ -59,7 +58,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailAccess(
 
 fun <T, USER, ID : Comparable<ID>> T.userPhoneAccess(
     newUser: suspend (phone: String) -> USER
-): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, USER, ID>, USER : HasPhoneNumber {
+): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, ID>, USER : HasPhoneNumber {
     val info = this
     return object : UserPhoneAccess<USER, ID> {
         override suspend fun byPhone(phone: String): USER {
@@ -74,8 +73,7 @@ fun <T, USER, ID : Comparable<ID>> T.userPhoneAccess(
             get() = info.serialization.serializer
         override val idSerializer: KSerializer<ID>
             get() = info.serialization.idSerializer
-        override val authRequirement: AuthRequirement<USER>
-            get() = info.serialization.authRequirement
+        override val authType: AuthType = info.authOptions.find { it != null }!!.type
 
         override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
@@ -86,7 +84,7 @@ fun <T, USER, ID : Comparable<ID>> T.userPhoneAccess(
 fun <T, USER, ID : Comparable<ID>> T.userEmailPhoneAccess(
     newEmailUser: suspend (email: String) -> USER,
     newPhoneUser: suspend (phone: String) -> USER,
-): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, USER, ID>, USER : HasPhoneNumber, USER : HasEmail {
+): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, ID>, USER : HasPhoneNumber, USER : HasEmail {
     val info = this
     return object : UserPhoneAccess<USER, ID>, UserEmailAccess<USER, ID> {
         override suspend fun byEmail(email: String): USER {
@@ -106,8 +104,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailPhoneAccess(
             get() = info.serialization.serializer
         override val idSerializer: KSerializer<ID>
             get() = info.serialization.idSerializer
-        override val authRequirement: AuthRequirement<USER>
-            get() = info.serialization.authRequirement
+        override val authType: AuthType = info.authOptions.find { it != null }!!.type
 
         override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
@@ -119,7 +116,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailPhoneAccess(
 fun <T, USER, ID : Comparable<ID>> T.userEmailAccess(
     anonymous: suspend () -> USER,
     newUser: suspend (email: String) -> USER
-): UserEmailAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, USER, ID>, USER : HasMaybeEmail {
+): UserEmailAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, ID>, USER : HasMaybeEmail {
     val info = this
     return object : UserEmailAccess<USER, ID> {
         override suspend fun byEmail(email: String): USER {
@@ -134,8 +131,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailAccess(
             get() = info.serialization.serializer
         override val idSerializer: KSerializer<ID>
             get() = info.serialization.idSerializer
-        override val authRequirement: AuthRequirement<USER>
-            get() = info.serialization.authRequirement
+        override val authType: AuthType = info.authOptions.find { it != null }!!.type
 
         override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
@@ -149,7 +145,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailAccess(
 fun <T, USER, ID : Comparable<ID>> T.userPhoneAccess(
     anonymous: suspend () -> USER,
     newUser: suspend (phone: String) -> USER
-): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, USER, ID>, USER : HasMaybePhoneNumber {
+): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, ID>, USER : HasMaybePhoneNumber {
     val info = this
     return object : UserPhoneAccess<USER, ID> {
         override suspend fun byPhone(phone: String): USER {
@@ -163,8 +159,7 @@ fun <T, USER, ID : Comparable<ID>> T.userPhoneAccess(
             get() = info.serialization.serializer
         override val idSerializer: KSerializer<ID>
             get() = info.serialization.idSerializer
-        override val authRequirement: AuthRequirement<USER>
-            get() = info.serialization.authRequirement
+        override val authType: AuthType = info.authOptions.find { it != null }!!.type
 
         override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 
@@ -179,7 +174,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailPhoneAccess(
     anonymous: suspend () -> USER,
     newEmailUser: suspend (email: String) -> USER,
     newPhoneUser: suspend (phone: String) -> USER,
-): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, USER, ID>, USER : HasMaybePhoneNumber, USER : HasMaybeEmail {
+): UserPhoneAccess<USER, ID> where USER : HasId<ID>, T : ModelInfo<USER, ID>, USER : HasMaybePhoneNumber, USER : HasMaybeEmail {
     val info = this
     return object : UserPhoneAccess<USER, ID>, UserEmailAccess<USER, ID> {
         override suspend fun byEmail(email: String): USER {
@@ -201,8 +196,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailPhoneAccess(
             get() = info.serialization.serializer
         override val idSerializer: KSerializer<ID>
             get() = info.serialization.idSerializer
-        override val authRequirement: AuthRequirement<USER>
-            get() = info.serialization.authRequirement
+        override val authType: AuthType = info.authOptions.find { it != null }!!.type
 
         override suspend fun byId(id: ID): USER = info.collection().get(id) ?: throw UnauthorizedException()
 

@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.exceptions.BadRequestException
@@ -12,6 +13,7 @@ import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.typed
+import com.lightningkite.lightningserver.typed.typedAuthAbstracted
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -21,13 +23,13 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.serializer
 import kotlin.random.Random
 
-open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
+open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
     path: ServerPath,
-    val info: ModelInfo<USER, T, ID>
+    val info: ModelInfo<T, ID>
 ) : ServerPathGroup(path) {
 
     companion object {
-        val all = HashSet<ModelRestEndpoints<*, *, *>>()
+        val all = HashSet<ModelRestEndpoints<*, *>>()
     }
 
     val collectionName get() = info.collectionName
@@ -37,7 +39,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         all.add(this)
     }
 
-    private fun exampleItem(): T? = (info as? ModelInfoWithDefault<USER, T, ID>)?.exampleItem()
+    private fun exampleItem(): T? = (info as? ModelInfoWithDefault<T, ID>)?.exampleItem()
     private fun sampleConditions(): List<Condition<T>> {
         return try {
             val sample = exampleItem() ?: return listOf(Condition.Always())
@@ -74,23 +76,23 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         }
     }
 
-    val default = (info as? ModelInfoWithDefault<USER, T, ID>)?.let {
-        get("_default_").typed(
-            authRequirement = info.serialization.authRequirement,
+    val default = (info as? ModelInfoWithDefault<T, ID>)?.let {
+        get("_default_").typedAuthAbstracted(
+            authOptions = info.authOptions,
             inputType = Unit.serializer(),
             outputType = info.serialization.serializer,
             summary = "Default",
             description = "Gets a default ${collectionName} that would be useful to start creating a full one to insert.  Primarily used for administrative interfaces.",
             errorCases = listOf(),
             examples = exampleItem()?.let { listOf(ApiExample(Unit, it)) } ?: listOf(),
-            implementation = { user: USER, input: Unit ->
+            implementation = { user: RequestAuth<*>?, input: Unit ->
                 info.defaultItem(user)
             }
         )
     }
 
-    val list = get.typed(
-        authRequirement = info.serialization.authRequirement,
+    val list = get.typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
         summary = "List",
@@ -102,7 +104,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 ApiExample(Query(it, sampleSorts.random()), List(10) { exampleItem()!! })
             }
         } ?: listOf(),
-        implementation = { user: USER, input: Query<T> ->
+        implementation = { user: RequestAuth<*>?, input: Query<T> ->
             info.collection(user)
                 .query(input)
                 .toList()
@@ -111,8 +113,8 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
 
     // This is used to GET a list objects, but rather than the query being in the parameter
     // it's in the POST body.
-    val query = post("query").typed(
-        authRequirement = info.serialization.authRequirement,
+    val query = post("query").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
         summary = "Query",
@@ -124,7 +126,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 ApiExample(Query(it, sampleSorts.random()), List(10) { exampleItem()!! })
             }
         } ?: listOf(),
-        implementation = { user: USER, input: Query<T> ->
+        implementation = { user: RequestAuth<*>?, input: Query<T> ->
             info.collection(user)
                 .query(input)
                 .toList()
@@ -133,8 +135,8 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
 
     // This is used to GET a list objects, but rather than the query being in the parameter
     // it's in the POST body.
-    val queryPartial = post("query-partial").typed(
-        authRequirement = info.serialization.authRequirement,
+    val queryPartial = post("query-partial").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = QueryPartial.serializer(info.serialization.serializer),
         outputType = ListSerializer(PartialSerializer(info.serialization.serializer)),
         summary = "Query Partial",
@@ -159,7 +161,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 listOf()
             }
         } ?: listOf(),
-        implementation = { user: USER, input: QueryPartial<T> ->
+        implementation = { user: RequestAuth<*>?, input: QueryPartial<T> ->
             info.collection(user)
                 .queryPartial(input)
                 .toList()
@@ -167,11 +169,11 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     // This is used get a single object with id of _id
-    val detail = get("{id}").typed(
-        authRequirement = info.serialization.authRequirement,
+    val detail = get("{id}").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = Unit.serializer(),
         outputType = info.serialization.serializer,
-        pathType = info.serialization.idSerializer,
+        path1Type = info.serialization.idSerializer,
         summary = "Detail",
         description = "Gets a single ${collectionName} by ID.",
         errorCases = listOf(
@@ -183,15 +185,15 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
             )
         ),
         examples = exampleItem()?.let { listOf(ApiExample(Unit, it)) } ?: listOf(),
-        implementation = { user: USER, id: ID, input: Unit ->
+        implementation = { user: RequestAuth<*>?, id: ID, input: Unit ->
             info.collection(user)
                 .get(id)
                 ?: throw NotFoundException()
         }
     )
 
-    val insertBulk = post("bulk").typed(
-        authRequirement = info.serialization.authRequirement,
+    val insertBulk = post("bulk").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = ListSerializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
         summary = "Insert Bulk",
@@ -202,7 +204,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
             listOf(ApiExample(items, items))
         } ?: listOf(),
         successCode = HttpStatus.Created,
-        implementation = { user: USER, values: List<T> ->
+        implementation = { user: RequestAuth<*>?, values: List<T> ->
             try {
                 info.collection(user)
                     .insertMany(values)
@@ -212,8 +214,8 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val insert = post("").typed(
-        authRequirement = info.serialization.authRequirement,
+    val insert = post("").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
         summary = "Insert",
@@ -221,7 +223,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         errorCases = listOf(),
         examples = exampleItem()?.let { listOf(ApiExample(it, it)) } ?: listOf(),
         successCode = HttpStatus.Created,
-        implementation = { user: USER, value: T ->
+        implementation = { user: RequestAuth<*>?, value: T ->
             try {
                 info.collection(user)
                     .insertOne(value)
@@ -232,17 +234,17 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val upsert = post("{id}").typed(
-        authRequirement = info.serialization.authRequirement,
+    val upsert = post("{id}").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
-        pathType = info.serialization.idSerializer,
+        path1Type = info.serialization.idSerializer,
         summary = "Upsert",
         description = "Creates or updates a ${collectionName}",
         errorCases = listOf(),
         examples = exampleItem()?.let { listOf(ApiExample(it, it)) } ?: listOf(),
         successCode = HttpStatus.Created,
-        implementation = { user: USER, id: ID, value: T ->
+        implementation = { user: RequestAuth<*>?, id: ID, value: T ->
             try {
                 info.collection(user)
                     .upsertOneById(id, value)
@@ -255,8 +257,8 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     // This is used replace many objects at once. This does make individual calls to the database. Kmongo does not have a many replace option.
-    val bulkReplace = put("").typed(
-        authRequirement = info.serialization.authRequirement,
+    val bulkReplace = put("").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = ListSerializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
         summary = "Bulk Replace",
@@ -266,7 +268,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
             val items = (1..10).map { exampleItem()!! }
             listOf(ApiExample(items, items))
         } ?: listOf(),
-        implementation = { user: USER, values: List<T> ->
+        implementation = { user: RequestAuth<*>?, values: List<T> ->
             try {
                 val db = info.collection(user)
                 values.map { db.replaceOneById(it._id, it) }.mapNotNull { it.new }
@@ -276,11 +278,11 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val replace = put("{id}").typed(
-        authRequirement = info.serialization.authRequirement,
+    val replace = put("{id}").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
-        pathType = info.serialization.idSerializer,
+        path1Type = info.serialization.idSerializer,
         summary = "Replace",
         description = "Replaces a single ${collectionName} by ID.",
         errorCases = listOf(
@@ -292,7 +294,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
             )
         ),
         examples = exampleItem()?.let { listOf(ApiExample(it, it)) } ?: listOf(),
-        implementation = { user: USER, id: ID, value: T ->
+        implementation = { user: RequestAuth<*>?, id: ID, value: T ->
             try {
                 info.collection(user)
                     .replaceOneById(id, value)
@@ -304,8 +306,8 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val bulkModify = patch("bulk").typed(
-        authRequirement = info.serialization.authRequirement,
+    val bulkModify = patch("bulk").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = MassModification.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
         summary = "Bulk Modify",
@@ -323,7 +325,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         } ?: listOf(),
-        implementation = { user: USER, input: MassModification<T> ->
+        implementation = { user: RequestAuth<*>?, input: MassModification<T> ->
             try {
                 info.collection(user)
                     .updateManyIgnoringResult(input)
@@ -333,11 +335,11 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val modifyWithDiff = patch("{id}/delta").typed(
-        authRequirement = info.serialization.authRequirement,
+    val modifyWithDiff = patch("{id}/delta").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = Modification.serializer(info.serialization.serializer),
         outputType = EntryChange.serializer(info.serialization.serializer),
-        pathType = info.serialization.idSerializer,
+        path1Type = info.serialization.idSerializer,
         summary = "Modify with Diff",
         description = "Modifies a ${collectionName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
@@ -356,7 +358,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         } ?: listOf(),
-        implementation = { user: USER, id: ID, input: Modification<T> ->
+        implementation = { user: RequestAuth<*>?, id: ID, input: Modification<T> ->
             try {
                 info.collection(user)
                     .updateOneById(id, input)
@@ -367,11 +369,11 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val modify = patch("{id}").typed(
-        authRequirement = info.serialization.authRequirement,
+    val modify = patch("{id}").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = Modification.serializer(info.serialization.serializer),
         outputType = info.serialization.serializer,
-        pathType = info.serialization.idSerializer,
+        path1Type = info.serialization.idSerializer,
         summary = "Modify",
         description = "Modifies a ${collectionName} by ID, returning the new value.",
         errorCases = listOf(
@@ -390,7 +392,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         } ?: listOf(),
-        implementation = { user: USER, id: ID, input: Modification<T> ->
+        implementation = { user: RequestAuth<*>?, id: ID, input: Modification<T> ->
             try {
                 info.collection(user)
                     .updateOneById(id, input)
@@ -402,8 +404,8 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val bulkDelete = post("bulk-delete").typed(
-        authRequirement = info.serialization.authRequirement,
+    val bulkDelete = post("bulk-delete").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
         summary = "Bulk Delete",
@@ -417,17 +419,17 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         } ?: listOf(),
-        implementation = { user: USER, filter: Condition<T> ->
+        implementation = { user: RequestAuth<*>?, filter: Condition<T> ->
             info.collection(user)
                 .deleteManyIgnoringOld(filter)
         }
     )
 
-    val deleteItem = delete("{id}").typed(
-        authRequirement = info.serialization.authRequirement,
+    val deleteItem = delete("{id}").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = Unit.serializer(),
         outputType = Unit.serializer(),
-        pathType = info.serialization.idSerializer,
+        path1Type = info.serialization.idSerializer,
         summary = "Delete",
         description = "Deletes a ${collectionName} by id.",
         errorCases = listOf(
@@ -438,7 +440,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 data = ""
             )
         ),
-        implementation = { user: USER, id: ID, _: Unit ->
+        implementation = { user: RequestAuth<*>?, id: ID, _: Unit ->
             if (!info.collection(user)
                     .deleteOneById(id)
             ) {
@@ -448,8 +450,8 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val countGet = get("count").typed(
-        authRequirement = info.serialization.authRequirement,
+    val countGet = get("count").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
         summary = "Count",
@@ -463,14 +465,14 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         } ?: listOf(),
-        implementation = { user: USER, condition: Condition<T> ->
+        implementation = { user: RequestAuth<*>?, condition: Condition<T> ->
             info.collection(user)
                 .count(condition)
         }
     )
 
-    val count = post("count").typed(
-        authRequirement = info.serialization.authRequirement,
+    val count = post("count").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
         summary = "Count",
@@ -485,14 +487,14 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
             }
         } ?: listOf(),
         implementation =
-        { user: USER, condition: Condition<T> ->
+        { user: RequestAuth<*>?, condition: Condition<T> ->
             info.collection(user)
                 .count(condition)
         }
     )
 
-    val groupCount = post("group-count").typed(
-        authRequirement = info.serialization.authRequirement,
+    val groupCount = post("group-count").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = GroupCountQuery.serializer(info.serialization.serializer),
         outputType = MapSerializer(String.serializer(), Int.serializer()),
         summary = "Group Count",
@@ -507,7 +509,7 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         } ?: listOf(),
-        implementation = { user: USER, condition: GroupCountQuery<T> ->
+        implementation = { user: RequestAuth<*>?, condition: GroupCountQuery<T> ->
             @Suppress("UNCHECKED_CAST")
             info.collection(user)
                 .groupCount(condition.condition, condition.groupBy as DataClassPath<T, Any?>)
@@ -515,14 +517,14 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val aggregate = post("aggregate").typed(
-        authRequirement = info.serialization.authRequirement,
+    val aggregate = post("aggregate").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = AggregateQuery.serializer(info.serialization.serializer),
         outputType = Double.serializer().nullable,
         summary = "Aggregate",
         description = "Aggregates a property of ${collectionName}s matching the given condition.",
         errorCases = listOf(),
-        implementation = { user: USER, condition: AggregateQuery<T> ->
+        implementation = { user: RequestAuth<*>?, condition: AggregateQuery<T> ->
             @Suppress("UNCHECKED_CAST")
             info.collection(user)
                 .aggregate(
@@ -533,14 +535,14 @@ open class ModelRestEndpoints<USER, T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val groupAggregate = post("group-aggregate").typed(
-        authRequirement = info.serialization.authRequirement,
+    val groupAggregate = post("group-aggregate").typedAuthAbstracted(
+        authOptions = info.authOptions,
         inputType = GroupAggregateQuery.serializer(info.serialization.serializer),
         outputType = MapSerializer(String.serializer(), Double.serializer().nullable),
         summary = "Group Aggregate",
         description = "Aggregates a property of ${collectionName}s matching the given condition divided by group.",
         errorCases = listOf(),
-        implementation = { user: USER, condition: GroupAggregateQuery<T> ->
+        implementation = { user: RequestAuth<*>?, condition: GroupAggregateQuery<T> ->
             @Suppress("UNCHECKED_CAST")
             info.collection(user)
                 .groupAggregate(

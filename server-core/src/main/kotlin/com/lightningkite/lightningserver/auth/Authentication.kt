@@ -3,6 +3,7 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.SetOnce
 import com.lightningkite.lightningserver.auth.proof.Proof
 import com.lightningkite.lightningserver.auth.proof.ProofEvidence
 import com.lightningkite.lightningserver.auth.proof.ProofOption
@@ -58,7 +59,6 @@ object Authentication {
         _subjects[subjectHandler.authType] = subjectHandler
     }
 
-
     interface ProofMethod {
         val humanName: String
         val validates: String
@@ -66,17 +66,18 @@ object Authentication {
     }
 
     interface DirectProofMethod : ProofMethod {
-        val prove: ApiEndpoint<Unit, ProofEvidence, Proof>
+        val prove: ApiEndpoint<ProofEvidence, Proof>
     }
 
     interface StartedProofMethod : ProofMethod {
-        val start: ApiEndpoint<Unit, String, String>
-        val prove: ApiEndpoint<Unit, ProofEvidence, Proof>
+        val start: ApiEndpoint<String, String>
+        val prove: ApiEndpoint<ProofEvidence, Proof>
     }
 
     interface ExternalProofMethod : ProofMethod {
-        val start: ApiEndpoint<Unit, String, String>
+        val start: ApiEndpoint<String, String>
         val indirectLink: ServerPath
     }
 
+    var isSuperUser: AuthOptions by SetOnce { setOf() }
 }

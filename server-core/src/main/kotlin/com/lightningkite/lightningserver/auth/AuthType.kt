@@ -4,6 +4,7 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KClassifier
 import kotlin.reflect.KType
 import kotlin.reflect.full.isSubclassOf
+import kotlin.reflect.typeOf
 
 class AuthType(
     val classifier: KClassifier?,
@@ -30,3 +31,5 @@ class AuthType(
     override fun hashCode(): Int = this.classifier.hashCode() * 31 + arguments.hashCode()
     override fun equals(other: Any?): Boolean = other is AuthType && this.classifier == other.classifier && this.arguments == other.arguments
 }
+
+inline fun <reified T> AuthType(): AuthType = AuthType(typeOf<T>())

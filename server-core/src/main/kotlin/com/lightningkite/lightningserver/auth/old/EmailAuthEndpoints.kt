@@ -121,7 +121,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
 
     data class OauthEndpointSet(
         val loginRedirect: HttpEndpoint,
-        val loginApi: ApiEndpoint0<Unit, Unit, String>,
+        val loginApi: ApiEndpoint0<Unit, String>,
         val callback: OauthCallbackEndpoint<UUID>,
     )
 
@@ -192,7 +192,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
             .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             .get("email")!!.lowercase().trim()
         val basis = try {
-            loginEmail.implementation(Unit, email)
+            loginEmail.implementation(null, email)
         } catch (e: Exception) {
             e.printStackTrace()
             throw e
@@ -220,7 +220,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
                 .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             val pin = content.get("pin")!!.trim()
             val email = content.get("email")!!.lowercase().trim()
-            loginEmailPin.implementation(Unit, EmailPinLogin(email, pin))
+            loginEmailPin.implementation(null, EmailPinLogin(email, pin))
         } catch (e: Exception) {
             e.printStackTrace()
             throw e

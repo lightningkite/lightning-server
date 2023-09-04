@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.db.ModelInfo
+import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.restApiWebsocket
 import com.lightningkite.lightningserver.db.testmodels.TestThing
 import com.lightningkite.lightningserver.email.EmailSettings
@@ -36,16 +37,20 @@ object TestSettings {
 
     val path = ServerPath("auth")
 
-    val ws = ServerPath("test").restApiWebsocket<Unit, TestThing, UUID>(
+    val ws = ServerPath("test").restApiWebsocket<TestThing, UUID>(
         database,
         info = ModelInfo(
+            authOptions = setOf(null),
+            serialization = ModelSerializationInfo(),
             getCollection = { database().collection() },
             forUser = { this },
         )
     )
-    val ws2 = ServerPath("test2").restApiWebsocket<Unit, TestThing, UUID>(
+    val ws2 = ServerPath("test2").restApiWebsocket<TestThing, UUID>(
         database,
         info = ModelInfo(
+            authOptions = setOf(null),
+            serialization = ModelSerializationInfo(),
             getCollection = { database().collection() },
             forUser = { this },
         ),

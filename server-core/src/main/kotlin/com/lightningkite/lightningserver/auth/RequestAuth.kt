@@ -1,15 +1,18 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningdb.Description
 import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.Request
+import java.time.Duration
 import java.time.Instant
-import java.util.HashMap
 
 data class RequestAuth<SUBJECT : HasId<*>>(
     val subject: Authentication.SubjectHandler<SUBJECT, *>,
     val rawId: Any,
     val issuedAt: Instant,
+    @Description("The scopes permitted.  Null indicates root access.")
     val scopes: Set<String>? = null,
     val cachedRaw: Map<String, String> = mapOf(),
     val thirdParty: String? = null,
@@ -59,31 +62,18 @@ suspend fun <SUBJECT : HasId<*>> Request.auth(type: AuthType): RequestAuth<SUBJE
     else null
 }
 
-//@Suppress("UNCHECKED_CAST")
-//suspend fun <T : HasId<*>> Request.auth(authRequirement: AuthRequirement<T>): RequestAuth<T>  = authStar(authRequirement) as RequestAuth<T>
-//@Suppress("UNCHECKED_CAST")
-//suspend fun <T : HasId<*>> Request.auth(authRequirement: AuthRequirement<T?>): RequestAuth<T>? = authStar(authRequirement) as? RequestAuth<T>
-
 @Suppress("UNCHECKED_CAST")
-suspend inline fun <reified T : HasId<*>> Request.auth(): RequestAuth<T> = authStar(AuthRequirement<T>()) as RequestAuth<T>
-
-@Suppress("UNCHECKED_CAST")
-suspend fun <T> Request.authStar(authRequirement: AuthRequirement<T>): RequestAuth<*>? {
-    val raw = authAny() ?: if (authRequirement.required)
-        throw UnauthorizedException("You must be authorized as a ${authRequirement.type}")
-    else
-        return null
-    if (raw.subject.authType.satisfies(authRequirement.type)) {
-        return raw
-    }
-    if (authRequirement.required)
-        throw UnauthorizedException("You must be authorized as a ${authRequirement.type}")
-    else
-        return null
+suspend fun Request.authChecked(authOptions: AuthOptions): RequestAuth<*>? {
+    val raw = authAny() ?: if(authOptions.any { it == null }) return null else throw UnauthorizedException("You must be authorized as a ${authOptions.joinToString { it!!.type.authName ?: "???" }}")
+    if(authOptions.any { it == null || it.accepts(raw) }) return raw
+    else throw ForbiddenException("You do not match the authorization criteria.")
 }
 
-@Suppress("UNCHECKED_CAST")
-suspend fun <T> Request.user(authRequirement: AuthRequirement<T>): T = authStar(authRequirement)?.get() as T
+suspend fun AuthOption.accepts(auth: RequestAuth<*>): Boolean = this.type == auth.subject.authType &&
+        (auth.scopes == null || (this.scopes != null && auth.scopes.containsAll(this.scopes))) &&
+        (maxAge == null || Duration.between(auth.issuedAt, Instant.now()) < maxAge) &&
+        (this.additionalRequirement(auth))
 
-@Suppress("UNCHECKED_CAST")
-suspend inline fun <reified T> Request.user(): T = user(AuthRequirement<T>())
+suspend inline fun <reified T> Request.user(): T = authChecked(authOptions<T>())?.get() as T
+
+suspend fun AuthOptions.accepts(auth: RequestAuth<*>?): Boolean = if(auth == null) null in this else any { it?.accepts(auth) ?: false }

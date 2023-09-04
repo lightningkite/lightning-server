@@ -1,13 +1,10 @@
 package com.lightningkite.lightningserver.meta
 
 import com.lightningkite.lightningserver.HtmlDefaults
-import com.lightningkite.lightningserver.auth.AuthRequirement
-import com.lightningkite.lightningserver.auth.user
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.db.adminIndex
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
@@ -30,27 +27,9 @@ import kotlinx.serialization.json.put
 
 class MetaEndpoints<USER>(
     path: ServerPath,
-    val authRequirement: AuthRequirement<USER>,
     packageName: String = "com.mypackage",
     isAdmin: suspend (USER) -> Boolean,
 ) : ServerPathGroup(path) {
-    interface AdminCheck<T> {
-        val authRequirement: AuthRequirement<T>
-        suspend fun isAdmin(item: T): Boolean
-        suspend fun check(request: HttpRequest) = isAdmin(request.user(authRequirement))
-    }
-    companion object {
-        var isAdministrator: AdminCheck<*> = object: AdminCheck<Unit> {
-            override val authRequirement: AuthRequirement<Unit> get() = AuthRequirement()
-            override suspend fun isAdmin(item: Unit): Boolean = false
-        }
-    }
-    init {
-        isAdministrator = object: AdminCheck<USER> {
-            override val authRequirement: AuthRequirement<USER> get() = this@MetaEndpoints.authRequirement
-            override suspend fun isAdmin(item: USER): Boolean = isAdmin(item)
-        }
-    }
 
     val root = get.handler {
         HttpResponse(body = HttpContent.Html {
@@ -65,7 +44,7 @@ class MetaEndpoints<USER>(
         })
     }
     val docs = path("docs").apiDocs(packageName)
-    val health = path("health").healthCheck(authRequirement, isAdmin)
+    val health = path("health").healthCheck()
     val isOnline = path("online").get.handler { HttpResponse.plainText("Server is running.") }
 
     private suspend fun openAdmin(): HttpResponse {
@@ -96,7 +75,6 @@ class MetaEndpoints<USER>(
         else
             openAdmin()
     }
-    val adminIndex = path("admin-index").adminIndex()
     val schema = path("schema").get.handler {
         HttpResponse(
             body = HttpContent.Text(
@@ -275,7 +253,6 @@ class MetaEndpoints<USER>(
         health.route,
         isOnline,
         admin,
-        adminIndex,
         openApi,
         openApiJson,
         schema,
@@ -287,4 +264,4 @@ class MetaEndpoints<USER>(
 inline fun <reified USER> ServerPath.metaEndpoints(
     packageName: String = "com.mypackage",
     noinline isAdmin: suspend (USER) -> Boolean,
-): MetaEndpoints<USER> = MetaEndpoints(this, AuthRequirement(), packageName, isAdmin)
+): MetaEndpoints<USER> = MetaEndpoints(this, packageName, isAdmin)
