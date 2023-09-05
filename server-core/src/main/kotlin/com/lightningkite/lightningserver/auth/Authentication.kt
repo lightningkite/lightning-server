@@ -6,6 +6,7 @@ import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.SetOnce
 import com.lightningkite.lightningserver.auth.proof.Proof
 import com.lightningkite.lightningserver.auth.proof.ProofEvidence
+import com.lightningkite.lightningserver.auth.proof.ProofMethodInfo
 import com.lightningkite.lightningserver.auth.proof.ProofOption
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.Request
@@ -60,9 +61,11 @@ object Authentication {
     }
 
     interface ProofMethod {
+        val name: String
         val humanName: String
         val validates: String
         val strength: Int
+        val info: ProofMethodInfo get() = ProofMethodInfo(name, validates, strength)
     }
 
     interface DirectProofMethod : ProofMethod {

@@ -14,6 +14,8 @@ data class EmailPersonalization(
         return email.copy(
             customHeaders = email.customHeaders + customHeaders,
             to = to,
+            cc = cc,
+            bcc = bcc,
             html = run {
                 var current = email.html
                 for((key, value) in substitutions) {
