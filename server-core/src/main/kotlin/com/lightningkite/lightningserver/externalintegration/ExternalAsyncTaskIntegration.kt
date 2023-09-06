@@ -200,7 +200,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
         }
     )
     val manualRecheckSingle = path("recheck/{id}").post.typed(
-        summary = "Manually recheck tasks",
+        summary = "Manually recheck a task",
         errorCases = listOf(),
         authInfo = info.serialization.authInfo,
         inputType = Unit.serializer(),
