@@ -50,7 +50,10 @@ interface Documentable {
 
 val Documentable.docGroup: String? get() = generateSequence(path) { it.parent }.mapNotNull { it.docName }.firstOrNull()
 val Documentable.functionName: String
-    get() = summary.split(' ').joinToString("") { it.replaceFirstChar { it.uppercase() } }
+    get() = summary
+        .replace(Regex("""[^0-9a-zA-Z]+(?<following>.)?""")) { match ->
+            match.groups["following"]?.value?.uppercase() ?: ""
+        }
         .replaceFirstChar { it.lowercase() }
 
 internal fun KSerializer<*>.subSerializers(): Array<KSerializer<*>> = listElement()?.let { arrayOf(it) }

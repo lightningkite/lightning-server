@@ -80,7 +80,11 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
     )
 
     init {
-        path.docName = path.toString().replace("/", "_")
+        path.docName = path.toString()
+            .replace(Regex("""[^0-9a-zA-Z]+(?<following>.)?""")) { match ->
+                match.groups["following"]?.value?.uppercase() ?: ""
+            }
+            .replaceFirstChar { it.lowercase() }
     }
 
     val rest = ModelRestEndpoints(path("rest").apply { docName = this@ExternalAsyncTaskIntegration.path.docName }, info)
