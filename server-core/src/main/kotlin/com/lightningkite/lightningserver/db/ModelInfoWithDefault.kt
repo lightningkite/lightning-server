@@ -4,89 +4,68 @@ import com.lightningkite.lightningdb.FieldCollection
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.RequestAuth
-import com.lightningkite.lightningserver.auth.authOptions
+import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.typed.AuthAccessor
 import kotlinx.serialization.serializer
 
-@JvmName("ModelInfoDirect")
-inline fun <reified USER, reified T : HasId<ID>, reified ID : Comparable<ID>> ModelInfoWithDefault(
-    crossinline getCollection: () -> FieldCollection<T>,
-    crossinline forUser: suspend FieldCollection<T>.(USER) -> FieldCollection<T>,
-    modelName: String = serializer<T>().descriptor.serialName.substringBefore('<').substringAfterLast('.'),
-    crossinline defaultItem: suspend (user: USER) -> T,
-    crossinline exampleItem: ()->T? = { null },
-) = object : ModelInfoWithDefault<T, ID> {
-    override val authOptions: AuthOptions = authOptions<USER>()
-    override fun collection(): FieldCollection<T> = getCollection()
-    override suspend fun collection(auth: RequestAuth<*>?): FieldCollection<T> =
-        forUser(this.collection(), auth?.get() as USER)
+@Deprecated("User newer version with auth accessor instead, as it enables more potential optimizations.")
+inline fun <reified USER: HasId<*>?, reified T : HasId<ID>, reified ID : Comparable<ID>> ModelInfoWithDefault(
+    noinline getCollection: () -> FieldCollection<T>,
+    noinline forUser: suspend FieldCollection<T>.(principal: USER) -> FieldCollection<T>,
+    modelName: String = Serialization.module.serializer<T>().descriptor.serialName.substringBefore('<').substringAfterLast('.'),
+    noinline defaultItem: suspend (auth: USER) -> T,
+    noinline exampleItem: ()->T? = { null },
+) = ModelInfoWithDefault(
+    serialization = ModelSerializationInfo<T, ID>(),
+    authOptions = com.lightningkite.lightningserver.auth.authOptions<USER>(),
+    getCollection = getCollection,
+    forUser = forUser,
+    modelName = modelName,
+    defaultItem = defaultItem,
+    exampleItem = exampleItem,
+)
 
-    override val serialization: ModelSerializationInfo<T, ID> = ModelSerializationInfo()
-    override val collectionName: String = modelName
-    override suspend fun defaultItem(auth: RequestAuth<*>?): T = defaultItem(auth?.get() as USER)
-    override fun exampleItem(): T? = exampleItem()
-}
-
-@JvmName("ModelInfoRequired")
-inline fun <reified USER: HasId<*>, reified T : HasId<ID>, reified ID : Comparable<ID>> ModelInfoWithDefault(
-    crossinline getCollection: () -> FieldCollection<T>,
-    crossinline forUser: suspend FieldCollection<T>.(RequestAuth<USER>) -> FieldCollection<T>,
-    modelName: String = serializer<T>().descriptor.serialName.substringBefore('<').substringAfterLast('.'),
-    crossinline defaultItem2: suspend (auth: RequestAuth<USER>) -> T,
-    crossinline exampleItem: ()->T? = { null },
-) = object : ModelInfoWithDefault<T, ID> {
-    override val authOptions: AuthOptions = authOptions<USER>()
-    override fun collection(): FieldCollection<T> = getCollection()
-    @Suppress("UNCHECKED_CAST")
-    override suspend fun collection(auth: RequestAuth<*>?): FieldCollection<T> =
-        forUser(this.collection(), auth as RequestAuth<USER>)
-
-    override val serialization: ModelSerializationInfo<T, ID> = ModelSerializationInfo()
-    override val collectionName: String = modelName
-    override suspend fun defaultItem(auth: RequestAuth<*>?): T = defaultItem2(auth as RequestAuth<USER>)
-    override fun exampleItem(): T? = exampleItem()
-}
-
-@JvmName("ModelInfoOptional")
-inline fun <reified USER: HasId<*>, reified T : HasId<ID>, reified ID : Comparable<ID>> ModelInfoWithDefault(
-    crossinline getCollection: () -> FieldCollection<T>,
-    crossinline forUser: suspend FieldCollection<T>.(RequestAuth<USER>?) -> FieldCollection<T>,
-    modelName: String = serializer<T>().descriptor.serialName.substringBefore('<').substringAfterLast('.'),
-    crossinline defaultItem2: suspend (auth: RequestAuth<USER>?) -> T,
-    crossinline exampleItem: ()->T? = { null },
-) = object : ModelInfoWithDefault<T, ID> {
-    override val authOptions: AuthOptions = authOptions<USER>() + setOf(null)
-    override fun collection(): FieldCollection<T> = getCollection()
-    @Suppress("UNCHECKED_CAST")
-    override suspend fun collection(auth: RequestAuth<*>?): FieldCollection<T> =
-        forUser(this.collection(), auth as RequestAuth<USER>?)
-
-    override val serialization: ModelSerializationInfo<T, ID> = ModelSerializationInfo()
-    override val collectionName: String = modelName
-    override suspend fun defaultItem(auth: RequestAuth<*>?): T = defaultItem2(auth as RequestAuth<USER>?)
-    override fun exampleItem(): T? = exampleItem()
-}
-
-fun <T : HasId<ID>, ID : Comparable<ID>> ModelInfoWithDefault(
+@Deprecated("User newer version with auth accessor instead, as it enables more potential optimizations.")
+fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfoWithDefault(
     serialization: ModelSerializationInfo<T, ID>,
-    authOptions: AuthOptions,
+    authOptions: AuthOptions<USER>,
     getCollection: () -> FieldCollection<T>,
-    forUser: suspend FieldCollection<T>.(principal: RequestAuth<*>?) -> FieldCollection<T>,
+    forUser: suspend FieldCollection<T>.(principal: USER) -> FieldCollection<T>,
     modelName: String = serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.'),
-    defaultItem: suspend (auth: RequestAuth<*>?) -> T,
+    defaultItem: suspend (auth: USER) -> T,
     exampleItem: ()->T? = { null },
-) = object : ModelInfoWithDefault<T, ID> {
-    override val authOptions: AuthOptions = authOptions
+) = object : ModelInfoWithDefault<USER, T, ID> {
+    override val authOptions: AuthOptions<USER> = authOptions
     override val serialization: ModelSerializationInfo<T, ID> = serialization
     override fun collection(): FieldCollection<T> = getCollection()
-    override suspend fun collection(auth: RequestAuth<*>?): FieldCollection<T> =
-        this.collection().forUser(auth)
+    override suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<T> = forUser(collection(), auth.user())
 
     override val collectionName: String = modelName
-    override suspend fun defaultItem(auth: RequestAuth<*>?): T = defaultItem(auth)
+    override suspend fun defaultItem(auth: RequestAuth<USER & Any>?): T = defaultItem(auth?.get() as USER)
     override fun exampleItem(): T? = exampleItem()
 }
 
-interface ModelInfoWithDefault<T : HasId<ID>, ID : Comparable<ID>> : ModelInfo<T, ID> {
-    suspend fun defaultItem(auth: RequestAuth<*>?): T
+fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> modelInfoWithDefault(
+    serialization: ModelSerializationInfo<T, ID>,
+    authOptions: AuthOptions<USER>,
+    getCollection: () -> FieldCollection<T>,
+    forUser: suspend AuthAccessor<USER>.(collection: FieldCollection<T>) -> FieldCollection<T> = { it },
+    modelName: String = serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.'),
+    defaultItem: suspend AuthAccessor<USER>.() -> T,
+    exampleItem: ()->T? = { null },
+) = object : ModelInfoWithDefault<USER, T, ID> {
+    override val authOptions: AuthOptions<USER> = authOptions
+    override val serialization: ModelSerializationInfo<T, ID> = serialization
+    override fun collection(): FieldCollection<T> = getCollection()
+    override suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<T> =
+        auth.forUser(this.collection())
+
+    override val collectionName: String = modelName
+    override suspend fun defaultItem(auth: RequestAuth<USER & Any>?): T = defaultItem(AuthAccessor<USER>(auth))
+    override fun exampleItem(): T? = exampleItem()
+}
+
+interface ModelInfoWithDefault<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> : ModelInfo<USER, T, ID> {
+    suspend fun defaultItem(auth: RequestAuth<USER & Any>?): T
     fun exampleItem(): T? = null
 }

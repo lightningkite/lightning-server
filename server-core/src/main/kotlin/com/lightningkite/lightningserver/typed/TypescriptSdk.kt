@@ -176,7 +176,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         appendLine(" {")
         val hasInput = entry.inputType != Unit.serializer()
         appendLine("        return apiCall<${entry.inputType.write()}>(")
-        appendLine("            `\${this.httpUrl}${entry.route.path.escaped}`,")
+        appendLine("            `\${this.httpUrl}${entry.path.path.escaped}`,")
         appendLine("            ${if (hasInput) "input" else "undefined"},")
         appendLine("            {")
         appendLine("                method: \"${entry.route.method}\",")
@@ -209,7 +209,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
             appendLine(" => {")
             val hasInput = entry.inputType != Unit.serializer()
             appendLine("            return apiCall<${entry.inputType.write()}>(")
-            appendLine("                `\${this.httpUrl}${entry.route.path.escaped}`,")
+            appendLine("                `\${this.httpUrl}${entry.path.path.escaped}`,")
             appendLine("                ${if (hasInput) "input" else "undefined"},")
             appendLine("                {")
             appendLine("                    method: \"${entry.route.method}\",")
@@ -291,13 +291,13 @@ private fun Appendable.functionHeader(
     }
     append("): ")
     when (documentable) {
-        is ApiEndpoint<*, *> -> {
+        is ApiEndpoint<*, *, *, *> -> {
             append("Promise<")
             documentable.outputType.write().let { append(it) }
             append(">")
         }
 
-        is ApiWebsocket<*, *> -> {
+        is ApiWebsocket<*, *, *, *> -> {
             append("Observable<WebSocketIsh<")
             documentable.inputType.write().let { append(it) }
             append(", ")
@@ -341,10 +341,10 @@ private fun arguments(
     skipAuth: Boolean = false,
     overrideUserType: String? = null
 ): List<TArg> = when (documentable) {
-    is ApiEndpoint<*, *> -> listOfNotNull(
-        documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
-            .map {
-                TArg(name = it.name, type = documentable.routeTypes[it.name], stringType = "string")
+    is ApiEndpoint<*, *, *, *> -> listOfNotNull(
+        documentable.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
+            .mapIndexed { index, it ->
+                TArg(name = it.name, type = documentable.path.serializers[index], stringType = "String")
             },
         documentable.inputType.takeUnless { it == Unit.serializer() }?.let {
             TArg(name = "input", type = it)
@@ -353,20 +353,20 @@ private fun arguments(
             TArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),
                 stringType = "string",
-                optional = !documentable.authOptions.contains(null).not()
+                optional = !documentable.authOptions.options.contains(null).not()
             )
         }?.let(::listOf)
     ).flatten()
 
-    is ApiWebsocket<*, *> -> listOfNotNull(
+    is ApiWebsocket<*, *, *, *> -> listOfNotNull(
         documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
             TArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),
                 stringType = "string",
-                optional = !documentable.authOptions.contains(null).not()
+                optional = !documentable.authOptions.options.contains(null).not()
             )
         }?.let(::listOf),
-        documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
+        documentable.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {
                 TArg(name = it.name, stringType = "string")
             }

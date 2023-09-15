@@ -2,11 +2,12 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.IsCodableAndHashable
+import com.lightningkite.khrysalis.IsCodableAndHashableNotNull
 import com.lightningkite.khrysalis.SharedCode
 import io.reactivex.rxjava3.core.Single
 import java.util.*
 
-abstract class WriteModelApi<Model : IsCodableAndHashable> {
+abstract class WriteModelApi<Model : IsCodableAndHashableNotNull> {
     abstract fun post(value: Model): Single<Model>
     abstract fun postBulk(values: List<Model>): Single<List<Model>>
     abstract fun upsert(value: Model, id: UUIDFor<Model>): Single<Model>

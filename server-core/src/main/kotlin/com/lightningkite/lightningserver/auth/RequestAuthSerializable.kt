@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.auth
 import com.lightningkite.lightningdb.Description
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.serialization.decodeUnwrappingString
 import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
@@ -35,7 +36,7 @@ fun RequestAuthSerializable.real(): RequestAuth<*> {
         ?: throw IllegalArgumentException("Auth type ${subjectType} not known.")
     return RequestAuth(
         subject = subject,
-        rawId = id,
+        rawId = Serialization.json.decodeUnwrappingString(subject.idSerializer, id),
         issuedAt = issuedAt,
         scopes = scopes,
         cachedRaw = cachedRaw,

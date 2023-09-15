@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
@@ -11,9 +12,7 @@ import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.typed.ApiExample
-import com.lightningkite.lightningserver.typed.typed
-import com.lightningkite.lightningserver.typed.typedAuthAbstracted
+import com.lightningkite.lightningserver.typed.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -23,13 +22,13 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.serializer
 import kotlin.random.Random
 
-open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
+open class ModelRestEndpoints<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     path: ServerPath,
-    val info: ModelInfo<T, ID>
+    val info: ModelInfo<USER, T, ID>
 ) : ServerPathGroup(path) {
 
     companion object {
-        val all = HashSet<ModelRestEndpoints<*, *>>()
+        val all = HashSet<ModelRestEndpoints<*, *, *>>()
     }
 
     val collectionName get() = info.collectionName
@@ -39,7 +38,11 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
         all.add(this)
     }
 
-    private fun exampleItem(): T? = (info as? ModelInfoWithDefault<T, ID>)?.exampleItem()
+    val detailPath = path.arg<ID>("id", info.serialization.idSerializer)
+    val wholePath = TypedServerPath0(path)
+    val bulkPath = TypedServerPath0(path).path("bulk")
+
+    private fun exampleItem(): T? = (info as? ModelInfoWithDefault<USER, T, ID>)?.exampleItem()
     private fun sampleConditions(): List<Condition<T>> {
         return try {
             val sample = exampleItem() ?: return listOf(Condition.Always())
@@ -76,8 +79,8 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
         }
     }
 
-    val default = (info as? ModelInfoWithDefault<T, ID>)?.let {
-        get("_default_").typedAuthAbstracted(
+    val default = (info as? ModelInfoWithDefault<USER, T, ID>)?.let {
+        get("_default_").api<USER, Unit, T>(
             authOptions = info.authOptions,
             inputType = Unit.serializer(),
             outputType = info.serialization.serializer,
@@ -85,13 +88,13 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
             description = "Gets a default ${collectionName} that would be useful to start creating a full one to insert.  Primarily used for administrative interfaces.",
             errorCases = listOf(),
             examples = exampleItem()?.let { listOf(ApiExample(Unit, it)) } ?: listOf(),
-            implementation = { user: RequestAuth<*>?, input: Unit ->
-                info.defaultItem(user)
+            implementation = { input: Unit ->
+                info.defaultItem(authOrNull)
             }
         )
     }
 
-    val list = get.typedAuthAbstracted(
+    val list = wholePath.get.api(
         authOptions = info.authOptions,
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
@@ -104,16 +107,18 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
                 ApiExample(Query(it, sampleSorts.random()), List(10) { exampleItem()!! })
             }
         } ?: listOf(),
-        implementation = { user: RequestAuth<*>?, input: Query<T> ->
-            info.collection(user)
+        implementation = { input: Query<T> ->
+            info.collection(this)
                 .query(input)
                 .toList()
         }
     )
 
+    private fun <R, I, O> lambda(action: suspend R.(I) -> O): suspend R.(I) -> O = action
+
     // This is used to GET a list objects, but rather than the query being in the parameter
     // it's in the POST body.
-    val query = post("query").typedAuthAbstracted(
+    val query = wholePath.path("query").post.api(
         authOptions = info.authOptions,
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
@@ -126,8 +131,8 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
                 ApiExample(Query(it, sampleSorts.random()), List(10) { exampleItem()!! })
             }
         } ?: listOf(),
-        implementation = { user: RequestAuth<*>?, input: Query<T> ->
-            info.collection(user)
+        implementation = { input: Query<T> ->
+            info.collection(this)
                 .query(input)
                 .toList()
         }
@@ -135,7 +140,7 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
 
     // This is used to GET a list objects, but rather than the query being in the parameter
     // it's in the POST body.
-    val queryPartial = post("query-partial").typedAuthAbstracted(
+    val queryPartial = wholePath.path("query-partial").post.api(
         authOptions = info.authOptions,
         inputType = QueryPartial.serializer(info.serialization.serializer),
         outputType = ListSerializer(PartialSerializer(info.serialization.serializer)),
@@ -161,19 +166,18 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
                 listOf()
             }
         } ?: listOf(),
-        implementation = { user: RequestAuth<*>?, input: QueryPartial<T> ->
-            info.collection(user)
+        implementation = { input: QueryPartial<T> ->
+            info.collection(this)
                 .queryPartial(input)
                 .toList()
         }
     )
 
     // This is used get a single object with id of _id
-    val detail = get("{id}").typedAuthAbstracted(
+    val detail = detailPath.get.api(
         authOptions = info.authOptions,
         inputType = Unit.serializer(),
         outputType = info.serialization.serializer,
-        path1Type = info.serialization.idSerializer,
         summary = "Detail",
         description = "Gets a single ${collectionName} by ID.",
         errorCases = listOf(
@@ -185,14 +189,14 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
             )
         ),
         examples = exampleItem()?.let { listOf(ApiExample(Unit, it)) } ?: listOf(),
-        implementation = { user: RequestAuth<*>?, id: ID, input: Unit ->
-            info.collection(user)
-                .get(id)
+        implementation = { input: Unit ->
+            info.collection(this)
+                .get(path1)
                 ?: throw NotFoundException()
         }
     )
 
-    val insertBulk = post("bulk").typedAuthAbstracted(
+    val insertBulk = bulkPath.post.api(
         authOptions = info.authOptions,
         inputType = ListSerializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
@@ -204,9 +208,9 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
             listOf(ApiExample(items, items))
         } ?: listOf(),
         successCode = HttpStatus.Created,
-        implementation = { user: RequestAuth<*>?, values: List<T> ->
+        implementation = { values: List<T> ->
             try {
-                info.collection(user)
+                info.collection(this)
                     .insertMany(values)
             } catch (e: UniqueViolationException) {
                 throw BadRequestException(detail = "unique", message = e.message, cause = e)
@@ -214,7 +218,7 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val insert = post("").typedAuthAbstracted(
+    val insert = wholePath.post.api(
         authOptions = info.authOptions,
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
@@ -223,9 +227,9 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
         errorCases = listOf(),
         examples = exampleItem()?.let { listOf(ApiExample(it, it)) } ?: listOf(),
         successCode = HttpStatus.Created,
-        implementation = { user: RequestAuth<*>?, value: T ->
+        implementation = { value: T ->
             try {
-                info.collection(user)
+                info.collection(this)
                     .insertOne(value)
                     ?: throw ForbiddenException("Value was not posted as requested.")
             } catch (e: UniqueViolationException) {
@@ -234,20 +238,19 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val upsert = post("{id}").typedAuthAbstracted(
+    val upsert = detailPath.post.api(
         authOptions = info.authOptions,
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
-        path1Type = info.serialization.idSerializer,
         summary = "Upsert",
         description = "Creates or updates a ${collectionName}",
         errorCases = listOf(),
         examples = exampleItem()?.let { listOf(ApiExample(it, it)) } ?: listOf(),
         successCode = HttpStatus.Created,
-        implementation = { user: RequestAuth<*>?, id: ID, value: T ->
+        implementation = { value: T ->
             try {
-                info.collection(user)
-                    .upsertOneById(id, value)
+                info.collection(this)
+                    .upsertOneById(path1, value)
                     .new
                     ?: throw NotFoundException()
             } catch (e: UniqueViolationException) {
@@ -257,7 +260,7 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
     )
 
     // This is used replace many objects at once. This does make individual calls to the database. Kmongo does not have a many replace option.
-    val bulkReplace = put("").typedAuthAbstracted(
+    val bulkReplace = wholePath.put.api(
         authOptions = info.authOptions,
         inputType = ListSerializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
@@ -268,9 +271,9 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
             val items = (1..10).map { exampleItem()!! }
             listOf(ApiExample(items, items))
         } ?: listOf(),
-        implementation = { user: RequestAuth<*>?, values: List<T> ->
+        implementation = { values: List<T> ->
             try {
-                val db = info.collection(user)
+                val db = info.collection(this)
                 values.map { db.replaceOneById(it._id, it) }.mapNotNull { it.new }
             } catch (e: UniqueViolationException) {
                 throw BadRequestException(detail = "unique", message = e.message, cause = e)
@@ -278,11 +281,10 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val replace = put("{id}").typedAuthAbstracted(
+    val replace = detailPath.put.api(
         authOptions = info.authOptions,
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
-        path1Type = info.serialization.idSerializer,
         summary = "Replace",
         description = "Replaces a single ${collectionName} by ID.",
         errorCases = listOf(
@@ -294,10 +296,10 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
             )
         ),
         examples = exampleItem()?.let { listOf(ApiExample(it, it)) } ?: listOf(),
-        implementation = { user: RequestAuth<*>?, id: ID, value: T ->
+        implementation = { value: T ->
             try {
-                info.collection(user)
-                    .replaceOneById(id, value)
+                info.collection(this)
+                    .replaceOneById(path1, value)
                     .new
                     ?: throw NotFoundException()
             } catch (e: UniqueViolationException) {
@@ -306,7 +308,7 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val bulkModify = patch("bulk").typedAuthAbstracted(
+    val bulkModify = bulkPath.patch.api(
         authOptions = info.authOptions,
         inputType = MassModification.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
@@ -325,9 +327,9 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         } ?: listOf(),
-        implementation = { user: RequestAuth<*>?, input: MassModification<T> ->
+        implementation = { input: MassModification<T> ->
             try {
-                info.collection(user)
+                info.collection(this)
                     .updateManyIgnoringResult(input)
             } catch (e: UniqueViolationException) {
                 throw BadRequestException(detail = "unique", message = e.message, cause = e)
@@ -335,11 +337,10 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val modifyWithDiff = patch("{id}/delta").typedAuthAbstracted(
+    val modifyWithDiff = detailPath.path("delta").patch.api(
         authOptions = info.authOptions,
         inputType = Modification.serializer(info.serialization.serializer),
         outputType = EntryChange.serializer(info.serialization.serializer),
-        path1Type = info.serialization.idSerializer,
         summary = "Modify with Diff",
         description = "Modifies a ${collectionName} by ID, returning both the previous value and new value.",
         errorCases = listOf(
@@ -358,10 +359,10 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         } ?: listOf(),
-        implementation = { user: RequestAuth<*>?, id: ID, input: Modification<T> ->
+        implementation = { input: Modification<T> ->
             try {
-                info.collection(user)
-                    .updateOneById(id, input)
+                info.collection(this)
+                    .updateOneById(path1, input)
                     .also { if (it.old == null && it.new == null) throw NotFoundException() }
             } catch (e: UniqueViolationException) {
                 throw BadRequestException(detail = "unique", message = e.message, cause = e)
@@ -369,11 +370,10 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val modify = patch("{id}").typedAuthAbstracted(
+    val modify = detailPath.patch.api(
         authOptions = info.authOptions,
         inputType = Modification.serializer(info.serialization.serializer),
         outputType = info.serialization.serializer,
-        path1Type = info.serialization.idSerializer,
         summary = "Modify",
         description = "Modifies a ${collectionName} by ID, returning the new value.",
         errorCases = listOf(
@@ -392,10 +392,10 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         } ?: listOf(),
-        implementation = { user: RequestAuth<*>?, id: ID, input: Modification<T> ->
+        implementation = { input: Modification<T> ->
             try {
-                info.collection(user)
-                    .updateOneById(id, input)
+                info.collection(this)
+                    .updateOneById(path1, input)
                     .also { if (it.old == null && it.new == null) throw NotFoundException() }
                     .new!!
             } catch (e: UniqueViolationException) {
@@ -404,7 +404,7 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val bulkDelete = post("bulk-delete").typedAuthAbstracted(
+    val bulkDelete = post("bulk-delete").api(
         authOptions = info.authOptions,
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
@@ -419,17 +419,16 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         } ?: listOf(),
-        implementation = { user: RequestAuth<*>?, filter: Condition<T> ->
-            info.collection(user)
+        implementation = { filter: Condition<T> ->
+            info.collection(this)
                 .deleteManyIgnoringOld(filter)
         }
     )
 
-    val deleteItem = delete("{id}").typedAuthAbstracted(
+    val deleteItem = detailPath.delete.api(
         authOptions = info.authOptions,
         inputType = Unit.serializer(),
         outputType = Unit.serializer(),
-        path1Type = info.serialization.idSerializer,
         summary = "Delete",
         description = "Deletes a ${collectionName} by id.",
         errorCases = listOf(
@@ -440,9 +439,9 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
                 data = ""
             )
         ),
-        implementation = { user: RequestAuth<*>?, id: ID, _: Unit ->
-            if (!info.collection(user)
-                    .deleteOneById(id)
+        implementation = { _: Unit ->
+            if (!info.collection(this)
+                    .deleteOneById(path1)
             ) {
                 throw NotFoundException()
             }
@@ -450,7 +449,7 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val countGet = get("count").typedAuthAbstracted(
+    val countGet = get("count").api(
         authOptions = info.authOptions,
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
@@ -465,13 +464,13 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         } ?: listOf(),
-        implementation = { user: RequestAuth<*>?, condition: Condition<T> ->
-            info.collection(user)
+        implementation = { condition: Condition<T> ->
+            info.collection(this)
                 .count(condition)
         }
     )
 
-    val count = post("count").typedAuthAbstracted(
+    val count = post("count").api(
         authOptions = info.authOptions,
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
@@ -487,13 +486,13 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
             }
         } ?: listOf(),
         implementation =
-        { user: RequestAuth<*>?, condition: Condition<T> ->
-            info.collection(user)
+        { condition: Condition<T> ->
+            info.collection(this)
                 .count(condition)
         }
     )
 
-    val groupCount = post("group-count").typedAuthAbstracted(
+    val groupCount = post("group-count").api(
         authOptions = info.authOptions,
         inputType = GroupCountQuery.serializer(info.serialization.serializer),
         outputType = MapSerializer(String.serializer(), Int.serializer()),
@@ -509,24 +508,24 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
         } ?: listOf(),
-        implementation = { user: RequestAuth<*>?, condition: GroupCountQuery<T> ->
+        implementation = { condition: GroupCountQuery<T> ->
             @Suppress("UNCHECKED_CAST")
-            info.collection(user)
+            info.collection(this)
                 .groupCount(condition.condition, condition.groupBy as DataClassPath<T, Any?>)
                 .mapKeys { it.key.toString() }
         }
     )
 
-    val aggregate = post("aggregate").typedAuthAbstracted(
+    val aggregate = post("aggregate").api(
         authOptions = info.authOptions,
         inputType = AggregateQuery.serializer(info.serialization.serializer),
         outputType = Double.serializer().nullable,
         summary = "Aggregate",
         description = "Aggregates a property of ${collectionName}s matching the given condition.",
         errorCases = listOf(),
-        implementation = { user: RequestAuth<*>?, condition: AggregateQuery<T> ->
+        implementation = { condition: AggregateQuery<T> ->
             @Suppress("UNCHECKED_CAST")
-            info.collection(user)
+            info.collection(this)
                 .aggregate(
                     condition.aggregate,
                     condition.condition,
@@ -535,16 +534,16 @@ open class ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val groupAggregate = post("group-aggregate").typedAuthAbstracted(
+    val groupAggregate = post("group-aggregate").api(
         authOptions = info.authOptions,
         inputType = GroupAggregateQuery.serializer(info.serialization.serializer),
         outputType = MapSerializer(String.serializer(), Double.serializer().nullable),
         summary = "Group Aggregate",
         description = "Aggregates a property of ${collectionName}s matching the given condition divided by group.",
         errorCases = listOf(),
-        implementation = { user: RequestAuth<*>?, condition: GroupAggregateQuery<T> ->
+        implementation = { condition: GroupAggregateQuery<T> ->
             @Suppress("UNCHECKED_CAST")
-            info.collection(user)
+            info.collection(this)
                 .groupAggregate(
                     condition.aggregate,
                     condition.condition,

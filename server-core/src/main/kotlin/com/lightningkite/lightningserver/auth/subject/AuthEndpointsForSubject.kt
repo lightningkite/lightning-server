@@ -2,21 +2,16 @@ package com.lightningkite.lightningserver.auth.subject
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.LSError
-import com.lightningkite.lightningserver.auth.AuthOption
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.RequestAuth
-import com.lightningkite.lightningserver.auth.authOptions
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.oauth.OauthGrantTypes
 import com.lightningkite.lightningserver.auth.oauth.OauthResponse
 import com.lightningkite.lightningserver.auth.oauth.OauthTokenRequest
 import com.lightningkite.lightningserver.auth.proof.*
-import com.lightningkite.lightningserver.auth.subject.*
 import com.lightningkite.lightningserver.auth.token.TokenFormat
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.db.ModelInfo
+import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
-import com.lightningkite.lightningserver.encryption.JwtException
 import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.encryption.TokenException
 import com.lightningkite.lightningserver.exceptions.BadRequestException
@@ -26,7 +21,7 @@ import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.typed.typed
+import com.lightningkite.lightningserver.typed.api
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlin.math.min
@@ -41,21 +36,22 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     val tokenFormat: () -> TokenFormat,
 ) : ServerPathGroup(path) {
 
-    val info = ModelInfo<Session<SUBJECT, ID>, String>(
+    val info = modelInfo<HasId<*>?, Session<SUBJECT, ID>, String>(
         modelName = "${handler.subjectSerializer.descriptor.serialName} Session",
         serialization = ModelSerializationInfo(
             Session.serializer(handler.subjectSerializer, handler.idSerializer),
             idSerializer = String.serializer()
         ),
-        authOptions = setOf(null),
+        authOptions = noAuth,
         getCollection = {
             database().collection(
                 sessionType,
                 "SessionFor${handler.subjectSerializer.descriptor.serialName}"
             )
         },
-        forUser = { requestAuth ->
-            withPermissions(
+        forUser = { collection: FieldCollection<Session<SUBJECT, ID>> ->
+            val requestAuth = this.authOrNull
+            collection.withPermissions(
                 permissions = ModelPermissions(
                     create = Condition.Never(),
                     read = condition { if (requestAuth?.subject == handler) it.subjectId eq (requestAuth.rawId as ID) else Condition.Never() },
@@ -94,8 +90,8 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     )
 
     @Suppress("UNREACHABLE_CODE")
-    val login = path.post.typed(
-        authOptions = setOf(null),
+    val login = path.post.api(
+        authOptions = noAuth,
         inputType = ListSerializer(Proof.serializer()),
         outputType = IdAndAuthMethods.serializer(handler.idSerializer),
         summary = "Log In",
@@ -105,7 +101,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             ).joinToString()
         }",
         errorCases = listOf(errorNoSingleUser, errorInvalidProof),
-        implementation = { none: Unit, proofs: List<Proof> ->
+        implementation = { proofs: List<Proof> ->
             proofs.forEach {
                 if (!proofHasher().verify(it)) throw HttpStatusException(errorInvalidProof)
             }
@@ -127,17 +123,17 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val createSubSession = path.post.typed(
-        authOptions = setOf(AuthOption(handler.authType)),
+    val createSubSession = path.post.api(
+        authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType))),
         inputType = SubSessionRequest.serializer(),
         outputType = String.serializer(),
         summary = "Create Sub Session",
         description = "Creates a session with more limited authorization",
         errorCases = listOf(),
-        implementation = { user: SUBJECT, request: SubSessionRequest ->
+        implementation = { request: SubSessionRequest ->
             val session = Session<SUBJECT, ID>(
                 label = request.label,
-                subjectId = user._id,
+                subjectId = user()!!._id,
                 scopes = request.scopes,
                 expires = request.expires,
                 oauthClient = request.oauthClient,
@@ -157,10 +153,11 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         thirdParty = this.oauthClient
     ).withCachedValues(handler.knownCacheTypes)
 
-    val token = path.get.typed(
+    val token = path.get.api(
+        authOptions = noAuth,
         summary = "Get Token",
         errorCases = listOf(),
-        implementation = { _: Unit, input: OauthTokenRequest ->
+        implementation = { input: OauthTokenRequest ->
             val session = when {
                 input.refresh_token != null -> info.collection().get(input.refresh_token)
                     ?: throw BadRequestException("Refresh token not recognized")

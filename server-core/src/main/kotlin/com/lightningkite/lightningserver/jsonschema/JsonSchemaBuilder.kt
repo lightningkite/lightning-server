@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.jsonschema
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.humanize
@@ -70,7 +71,7 @@ data class LightningServerSchemaEndpoint(
 val lightningServerSchema: LightningServerSchema by lazy {
     val builder = JsonSchemaBuilder(Serialization.json)
     Documentable.endpoints.flatMap {
-        sequenceOf(it.inputType, it.outputType) + it.routeTypes.values.asSequence()
+        sequenceOf(it.inputType, it.outputType) + it.route.path.serializers.asSequence()
     }.distinct().forEach { builder.get(it.descriptor) }
     LightningServerSchema(
         definitions = builder.definitions,
@@ -80,7 +81,7 @@ val lightningServerSchema: LightningServerSchema by lazy {
                 group = it.docGroup,
                 method = it.route.method.toString(),
                 path = it.path.toString(),
-                routes = it.routeTypes.mapValues { builder.get(it.value.descriptor) },
+                routes = it.route.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().map { it.name }.zip(it.route.path.serializers.map { builder.get(it.descriptor) }).associate { it },
                 input = builder.get(it.inputType.descriptor),
                 output = builder.get(it.outputType.descriptor),
             )
@@ -392,121 +393,125 @@ class JsonSchemaBuilder(
         title: String = "Value",
         direct: Boolean = false,
     ): JsonSchemaType {
-        val annos = annotationsToApply + serializer.annotations
-        if (serializer.isNullable) {
-            val inner = get(serializer.nullElement()!!, annos, title)
-            if (useNullableProperty) {
-                return inner.copy(nullable = true)
-            } else {
-                if (inner.type?.inner?.isPrimitive == true) {
-                    return inner.copy(type = inner.type.copy(nullable = true))
-                }
-                return JsonSchemaType(
-                    oneOf = listOf(
-                        inner.copy(title = title),
-                        JsonSchemaType(type = JsonType3(JsonType2.NULL), title = "$title N/A")
+        try {
+            val annos = annotationsToApply + serializer.annotations
+            if (serializer.isNullable) {
+                val inner = get(serializer.nullElement()!!, annos, title)
+                if (useNullableProperty) {
+                    return inner.copy(nullable = true)
+                } else {
+                    if (inner.type?.inner?.isPrimitive == true) {
+                        return inner.copy(type = inner.type.copy(nullable = true))
+                    }
+                    return JsonSchemaType(
+                        oneOf = listOf(
+                            inner.copy(title = title),
+                            JsonSchemaType(type = JsonType3(JsonType2.NULL), title = "$title N/A")
+                        )
                     )
-                )
+                }
             }
-        }
 
-        fun defining(serializer: SerialDescriptor, action: () -> JsonSchemaType): JsonSchemaType {
-            if (direct) return action()
-            val key = key(serializer)
-            if (defining.add(key)) {
-                if (serializer.serialName == "Not") throw Exception()
-                definitions[key] = action()
+            fun defining(serializer: SerialDescriptor, action: () -> JsonSchemaType): JsonSchemaType {
+                if (direct) return action()
+                val key = key(serializer)
+                if (defining.add(key)) {
+                    if (serializer.serialName == "Not") throw Exception()
+                    definitions[key] = action()
+                }
+                return JsonSchemaType(ref = refString(serializer))
             }
-            return JsonSchemaType(ref = refString(serializer))
-        }
-        if (serializer is LazyRenamedSerialDescriptor) {
-            return get(serializer.getter(), title = title, annotationsToApply = annotationsToApply)
-        }
+            if (serializer is LazyRenamedSerialDescriptor) {
+                return get(serializer.getter(), title = title, annotationsToApply = annotationsToApply)
+            }
 
-        val desc = serializer.unwrap()
-        overrides[desc.serialName.substringBefore('<')]?.let {
-            return defining(desc) { it(desc).applyAnnotations(annos) }
-        }
-        return when (desc.kind) {
-            PrimitiveKind.BOOLEAN -> JsonSchemaType(type = JsonType3(JsonType2.BOOLEAN)).applyAnnotations(annos)
-            PrimitiveKind.BYTE,
-            PrimitiveKind.SHORT,
-            PrimitiveKind.LONG,
-            PrimitiveKind.INT -> JsonSchemaType(type = JsonType3(JsonType2.INTEGER)).applyAnnotations(annos)
+            val desc = serializer.unwrap()
+            overrides[desc.serialName.substringBefore('<')]?.let {
+                return defining(desc) { it(desc).applyAnnotations(annos) }
+            }
+            return when (desc.kind) {
+                PrimitiveKind.BOOLEAN -> JsonSchemaType(type = JsonType3(JsonType2.BOOLEAN)).applyAnnotations(annos)
+                PrimitiveKind.BYTE,
+                PrimitiveKind.SHORT,
+                PrimitiveKind.LONG,
+                PrimitiveKind.INT -> JsonSchemaType(type = JsonType3(JsonType2.INTEGER)).applyAnnotations(annos)
 
-            PrimitiveKind.FLOAT,
-            PrimitiveKind.DOUBLE,
-            -> JsonSchemaType(type = JsonType3(JsonType2.NUMBER)).applyAnnotations(annos)
+                PrimitiveKind.FLOAT,
+                PrimitiveKind.DOUBLE,
+                -> JsonSchemaType(type = JsonType3(JsonType2.NUMBER)).applyAnnotations(annos)
 
-            PrimitiveKind.CHAR,
-            PrimitiveKind.STRING,
-            -> JsonSchemaType(type = JsonType3(JsonType2.STRING)).applyAnnotations(annos)
+                PrimitiveKind.CHAR,
+                PrimitiveKind.STRING,
+                -> JsonSchemaType(type = JsonType3(JsonType2.STRING)).applyAnnotations(annos)
 
-            SerialKind.ENUM -> defining(serializer) {
-                JsonSchemaType(
-                    title = desc.serialName.substringBefore('<').substringAfterLast('.').humanize(),
-                    type = JsonType3(JsonType2.STRING),
-                    oneOf = (0 until desc.elementsCount)
-                        .map {
-                            val value = desc.getElementName(it)
-                            JsonSchemaType(
-                                title = desc.getElementAnnotations(it).filterIsInstance<DisplayName>()
-                                    .firstOrNull()?.text
-                                    ?: value.humanize(),
-                                const = value
+                SerialKind.ENUM -> defining(serializer) {
+                    JsonSchemaType(
+                        title = desc.serialName.substringBefore('<').substringAfterLast('.').humanize(),
+                        type = JsonType3(JsonType2.STRING),
+                        oneOf = (0 until desc.elementsCount)
+                            .map {
+                                val value = desc.getElementName(it)
+                                JsonSchemaType(
+                                    title = desc.getElementAnnotations(it).filterIsInstance<DisplayName>()
+                                        .firstOrNull()?.text
+                                        ?: value.humanize(),
+                                    const = value
+                                )
+                            }
+                    ).applyAnnotations(annos)
+                }
+
+                StructureKind.LIST -> JsonSchemaType(
+                    type = JsonType3(JsonType2.ARRAY),
+                    items = get(
+                        serializer.getElementDescriptor(0), title = title
+                    )
+                ).applyAnnotations(annos)
+
+                StructureKind.MAP -> JsonSchemaType(
+                    type = JsonType3(JsonType2.OBJECT),
+                    additionalProperties = get(serializer.getElementDescriptor(1), title = title)
+                ).applyAnnotations(annos)
+
+                StructureKind.CLASS -> defining(serializer) {
+                    JsonSchemaType(
+                        title = desc.serialName.substringBefore('<').substringAfterLast('.').humanize(),
+                        type = JsonType3(JsonType2.OBJECT),
+                        properties = (0 until desc.elementsCount).associate {
+                            val propTitle = desc.getElementName(it).humanize()
+                            desc.getElementName(it) to get(
+                                desc.getElementDescriptor(it),
+                                desc.getElementAnnotations(it),
+                                propTitle
+                            ).copy(
+                                title = propTitle
                             )
                         }
-                ).applyAnnotations(annos)
-            }
+                    ).applyAnnotations(annos)
+                }
 
-            StructureKind.LIST -> JsonSchemaType(
-                type = JsonType3(JsonType2.ARRAY),
-                items = get(
-                    serializer.getElementDescriptor(0), title = title
-                )
-            ).applyAnnotations(annos)
-
-            StructureKind.MAP -> JsonSchemaType(
-                type = JsonType3(JsonType2.OBJECT),
-                additionalProperties = get(serializer.getElementDescriptor(1), title = title)
-            ).applyAnnotations(annos)
-
-            StructureKind.CLASS -> defining(serializer) {
-                JsonSchemaType(
-                    title = desc.serialName.substringBefore('<').substringAfterLast('.').humanize(),
+                StructureKind.OBJECT -> JsonSchemaType(
                     type = JsonType3(JsonType2.OBJECT),
-                    properties = (0 until desc.elementsCount).associate {
-                        val propTitle = desc.getElementName(it).humanize()
-                        desc.getElementName(it) to get(
-                            desc.getElementDescriptor(it),
-                            desc.getElementAnnotations(it),
-                            propTitle
-                        ).copy(
-                            title = propTitle
-                        )
-                    }
+                    properties = mapOf()
                 ).applyAnnotations(annos)
-            }
 
-            StructureKind.OBJECT -> JsonSchemaType(
-                type = JsonType3(JsonType2.OBJECT),
-                properties = mapOf()
-            ).applyAnnotations(annos)
-
-            PolymorphicKind.SEALED -> JsonSchemaType(
-                type = JsonType3(JsonType2.OBJECT),
-                properties = mapOf(
-                    "type" to JsonSchemaType(
-                        type = JsonType3(JsonType2.STRING),
-                        oneOf = (0 until desc.elementsCount).map { index ->
-                            get(desc.getElementDescriptor(index))
-                        }
+                PolymorphicKind.SEALED -> JsonSchemaType(
+                    type = JsonType3(JsonType2.OBJECT),
+                    properties = mapOf(
+                        "type" to JsonSchemaType(
+                            type = JsonType3(JsonType2.STRING),
+                            oneOf = (0 until desc.elementsCount).map { index ->
+                                get(desc.getElementDescriptor(index))
+                            }
+                        )
                     )
                 )
-            )
 
-            PolymorphicKind.OPEN -> TODO()
-            SerialKind.CONTEXTUAL -> throw Error("This should not be reachable - ${desc.serialName} could be unwrapped no further")
+                PolymorphicKind.OPEN -> TODO()
+                SerialKind.CONTEXTUAL -> throw Error("This should not be reachable - ${desc.serialName} could be unwrapped no further")
+            }
+        } catch(e: Exception) {
+            throw Exception("Failed to get schema for ${serializer.serialName}", e)
         }
     }
 

@@ -10,7 +10,7 @@ import java.time.Instant
 
 data class RequestAuth<SUBJECT : HasId<*>>(
     val subject: Authentication.SubjectHandler<SUBJECT, *>,
-    val rawId: Any,
+    val rawId: Comparable<*>,
     val issuedAt: Instant,
     @Description("The scopes permitted.  Null indicates root access.")
     val scopes: Set<String>? = null,
@@ -63,17 +63,17 @@ suspend fun <SUBJECT : HasId<*>> Request.auth(type: AuthType): RequestAuth<SUBJE
 }
 
 @Suppress("UNCHECKED_CAST")
-suspend fun Request.authChecked(authOptions: AuthOptions): RequestAuth<*>? {
-    val raw = authAny() ?: if(authOptions.any { it == null }) return null else throw UnauthorizedException("You must be authorized as a ${authOptions.joinToString { it!!.type.authName ?: "???" }}")
-    if(authOptions.any { it == null || it.accepts(raw) }) return raw
+suspend fun <USER: HasId<*>?> Request.authChecked(authOptions: AuthOptions<USER>): RequestAuth<USER & Any>? {
+    val raw = authAny() ?: if(authOptions.options.any { it == null }) return null else throw UnauthorizedException("You must be authorized as a ${authOptions.options.joinToString { it!!.type.authName ?: "???" }}")
+    if(authOptions.options.any { it == null || it.accepts(raw) }) return raw as RequestAuth<USER & Any>
     else throw ForbiddenException("You do not match the authorization criteria.")
 }
 
-suspend fun AuthOption.accepts(auth: RequestAuth<*>): Boolean = this.type == auth.subject.authType &&
+suspend fun AuthOption.accepts(auth: RequestAuth<*>): Boolean = (this.type == auth.subject.authType || auth.subject.authType == AuthType.any) &&
         (auth.scopes == null || (this.scopes != null && auth.scopes.containsAll(this.scopes))) &&
         (maxAge == null || Duration.between(auth.issuedAt, Instant.now()) < maxAge) &&
         (this.additionalRequirement(auth))
 
-suspend inline fun <reified T> Request.user(): T = authChecked(authOptions<T>())?.get() as T
+suspend inline fun <reified T> Request.user(): T = authAny()?.get() as T
 
-suspend fun AuthOptions.accepts(auth: RequestAuth<*>?): Boolean = if(auth == null) null in this else any { it?.accepts(auth) ?: false }
+suspend fun <USER: HasId<*>?> AuthOptions<USER>.accepts(auth: RequestAuth<*>?): Boolean = if(auth == null) null in this.options else this.options.any { it?.accepts(auth) ?: false }

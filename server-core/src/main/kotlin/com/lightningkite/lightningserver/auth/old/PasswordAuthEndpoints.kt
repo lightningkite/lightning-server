@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.typed.AuthAndPathParts
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
 
@@ -57,7 +58,7 @@ open class PasswordAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
         val email = values.get("username")!!.lowercase()
         val password = values.get("password")!!
         val basis = try {
-            loginPassword.implementation(null, PasswordLogin(email, password))
+            loginPassword.implementation(AuthAndPathParts(null, arrayOf()), PasswordLogin(email, password))
         } catch (e: Exception) {
             e.printStackTrace()
             throw e

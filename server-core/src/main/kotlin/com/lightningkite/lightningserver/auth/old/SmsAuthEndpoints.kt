@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.sms.SMSClient
 import com.lightningkite.lightningserver.typed.ApiExample
+import com.lightningkite.lightningserver.typed.AuthAndPathParts
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
 import java.time.Duration
@@ -99,7 +100,7 @@ open class SmsAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
             .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             .get("phone")!!.filter { it.isDigit() }
         val basis = try {
-            loginSms.implementation(null, phone)
+            loginSms.implementation(AuthAndPathParts(null, arrayOf()), phone)
         } catch (e: Exception) {
             e.printStackTrace()
             throw e
@@ -127,7 +128,7 @@ open class SmsAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
                 .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             val pin = content.get("pin")!!
             val phone = content.get("phone")!!.filter { it.isDigit() }
-            loginSmsPin.implementation(null, PhonePinLogin(phone, pin))
+            loginSmsPin.implementation(AuthAndPathParts(null, arrayOf()), PhonePinLogin(phone, pin))
         } catch (e: Exception) {
             e.printStackTrace()
             throw e

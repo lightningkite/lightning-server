@@ -2,10 +2,14 @@ package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.auth.BaseAuthEndpoints
-import com.lightningkite.lightningserver.auth.EmailAuthEndpoints
-import com.lightningkite.lightningserver.auth.PasswordAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.*
+import com.lightningkite.lightningserver.auth.old.BaseAuthEndpoints
+import com.lightningkite.lightningserver.auth.old.EmailAuthEndpoints
+import com.lightningkite.lightningserver.auth.old.PasswordAuthEndpoints
+import com.lightningkite.lightningserver.auth.proof.EmailProofEndpoints
+import com.lightningkite.lightningserver.auth.proof.OneTimePasswordProofEndpoints
+import com.lightningkite.lightningserver.auth.proof.PinHandler
+import com.lightningkite.lightningserver.auth.proof.SmsProofEndpoints
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.MemcachedCache
 import com.lightningkite.lightningserver.cache.get
@@ -13,9 +17,9 @@ import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.*
+import com.lightningkite.lightningserver.email.Email
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.email.SesClient
-import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.exceptions.SentryExceptionReporter
@@ -27,11 +31,11 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.handler
 import com.lightningkite.lightningserver.meta.metaEndpoints
 import com.lightningkite.lightningserver.metrics.Metrics
-import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.FileRedirectHandler
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.setting
+import com.lightningkite.lightningserver.sms.SMSSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.tasks.startupOnce
 import com.lightningkite.lightningserver.tasks.task
@@ -50,10 +54,10 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     val database = setting("database", DatabaseSettings())
     val email = setting("email", EmailSettings())
+    val sms = setting("sms", SMSSettings())
     val jwtSigner = setting("jwt", SecureHasherSettings())
     val files = setting("files", FilesSettings())
     val cache = setting("cache", CacheSettings())
-    val uploadEarlyTokenSecret = setting("uploadEarlyTokenSecret", Base64.getUrlEncoder().encode(Random.nextBytes(20)))
 
     init {
         Metrics
@@ -78,9 +82,9 @@ object Server : ServerPathGroup(ServerPath.root) {
                 )
             )
         }
-        Authentication.isSuperUser = setOf(AuthOption(AuthType<User>()) {
+        Authentication.isSuperUser = authRequired<User> {
             (it.get() as User).isSuperUser
-        })
+        }
     }
 
     val userInfo = ModelInfoWithDefault<User, User, UUID>(
@@ -128,20 +132,20 @@ object Server : ServerPathGroup(ServerPath.root) {
         val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
         val passAuth = PasswordAuthEndpoints(baseAuth, passAccess)
     }
-    val auth2 = object : ServerPathGroup(path("auth2")) {
-        val info = ModelInfo<UserAlt, UserAlt, UUID>(
-            getCollection = { database().collection<UserAlt>() },
-            forUser = { this }
-        )
-        val emailAccess = info.userEmailAccess { UserAlt(email = it) }
-        val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner, expiration = Duration.ofDays(365), emailExpiration = Duration.ofHours(1))
-        val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
-
-        init {
-            path.docName = "auth2"
-        }
-    }
-    val uploadEarly = UploadEarlyEndpoint(path("upload"), files, database, { SecureHasher.HS256(uploadEarlyTokenSecret()) })
+//    val auth2 = object : ServerPathGroup(path("auth2")) {
+//        val info = ModelInfo<UserAlt, UserAlt, UUID>(
+//            getCollection = { database().collection<UserAlt>() },
+//            forUser = { this }
+//        )
+//        val emailAccess = info.userEmailAccess { UserAlt(email = it) }
+//        val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner, expiration = Duration.ofDays(365), emailExpiration = Duration.ofHours(1))
+//        val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
+//
+//        init {
+//            path.docName = "auth2"
+//        }
+//    }
+    val uploadEarly = UploadEarlyEndpoint(path("upload"), files, database, jwtSigner)
     val testModel = TestModelEndpoints(path("test-model"))
 
     val root = path.get.handler {
@@ -225,5 +229,14 @@ object Server : ServerPathGroup(ServerPath.root) {
             "ID is ${user.id}"
         }
     )
+
+    val pins = PinHandler(cache, "pins")
+    val proofPhone = SmsProofEndpoints(path("proof/phone"), jwtSigner, pins, sms)
+    val proofEmail = EmailProofEndpoints(path("proof/email"), jwtSigner, pins, email, Email(
+        subject = "Log In Code",
+        to = listOf(),
+        plainText = "Your PIN is {{PIN}}."
+    ))
+    val proofOtp = OneTimePasswordProofEndpoints(path("proof/otp"), jwtSigner, database, cache)
 }
 

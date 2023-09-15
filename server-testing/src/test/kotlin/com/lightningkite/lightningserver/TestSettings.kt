@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver
 
 import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningdb.test.User
-import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.oauth.OauthProviderCredentials
 import com.lightningkite.lightningserver.auth.oauth.OauthProviderCredentialsApple
 import com.lightningkite.lightningserver.auth.old.BaseAuthEndpoints
@@ -13,7 +12,7 @@ import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.DatabaseSettings
-import com.lightningkite.lightningserver.db.ModelInfo
+import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.engine.LocalEngine
@@ -38,7 +37,7 @@ object TestSettings {
     val oauthMicrosoft = setting<OauthProviderCredentials?>("oauth_microsoft", null)
 
 
-    val info = ModelInfo<User, User, UUID>(
+    val info = modelInfo<User, User, UUID>(
         getCollection = { database().collection() },
         forUser = { this }
     )

@@ -1,4 +1,4 @@
-@file:OptIn(InternalSerializationApi::class)
+@file:OptIn(InternalSerializationApi::class, InternalSerializationApi::class)
 
 package com.lightningkite.lightningserver.typed
 
@@ -18,14 +18,14 @@ import kotlinx.serialization.descriptors.capturedKClass
 import kotlinx.serialization.internal.GeneratedSerializer
 
 interface Documentable {
-    val path: ServerPath
+    val path: TypedServerPath
     val summary: String
     val description: String
-    val authOptions: AuthOptions
+    val authOptions: AuthOptions<*>
 
     companion object {
-        val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *>>()
-        val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *>>()
+        val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *, *>>()
+        val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *, *, *>>()
         val all get() = endpoints + websockets
         val usedTypes: Collection<KSerializer<*>>
             get() {
@@ -49,7 +49,7 @@ interface Documentable {
     }
 }
 
-val Documentable.docGroup: String? get() = generateSequence(path) { it.parent }.mapNotNull { it.docName }.firstOrNull()
+val Documentable.docGroup: String? get() = generateSequence(path.path) { it.parent }.mapNotNull { it.docName }.firstOrNull()
 val Documentable.functionName: String
     get() = summary.split(' ').joinToString("") { it.replaceFirstChar { it.uppercase() } }
         .replaceFirstChar { it.lowercase() }

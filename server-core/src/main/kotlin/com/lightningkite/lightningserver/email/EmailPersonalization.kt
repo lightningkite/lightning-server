@@ -19,21 +19,21 @@ data class EmailPersonalization(
             html = run {
                 var current = email.html
                 for((key, value) in substitutions) {
-                    current.replace(key, value.escapeHTML())
+                    current = current.replace(key, value.escapeHTML())
                 }
                 current
             },
             subject = run {
                 var current = email.subject
                 for((key, value) in substitutions) {
-                    current.replace(key, value)
+                    current = current.replace(key, value)
                 }
                 current
             },
             plainText = run {
                 var current = email.plainText
                 for((key, value) in substitutions) {
-                    current.replace(key, value)
+                    current = current.replace(key, value)
                 }
                 current
             }

@@ -26,7 +26,7 @@ class AuthType(
         arguments = type.arguments.map { it.type?.let { AuthType(it) } }
     )
     companion object {
-        val none = AuthType(Unit::class, listOf())
+        val any = AuthType(Any::class, listOf())
     }
     override fun hashCode(): Int = this.classifier.hashCode() * 31 + arguments.hashCode()
     override fun equals(other: Any?): Boolean = other is AuthType && this.classifier == other.classifier && this.arguments == other.arguments

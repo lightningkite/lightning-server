@@ -2,14 +2,12 @@ package com.lightningkite.lightningserver.externalintegration
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.AuthOptions
-import com.lightningkite.lightningserver.auth.RequestAuth
-import com.lightningkite.lightningserver.auth.accepts
+import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.db.ModelInfoWithDefault
+import com.lightningkite.lightningserver.db.modelInfoWithDefault
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
-import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.post
@@ -19,8 +17,7 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.tasks.Task
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.tasks.task
-import com.lightningkite.lightningserver.typed.typed
-import com.lightningkite.lightningserver.typed.typedAuthAbstracted
+import com.lightningkite.lightningserver.typed.*
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
@@ -33,7 +30,7 @@ import java.util.*
 
 class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
     path: ServerPath,
-    val authOptions: AuthOptions,
+    val authOptions: AuthOptions<*> = Authentication.isSuperUser,
     val responseSerializer: KSerializer<RESPONSE>,
     val resultSerializer: KSerializer<RESULT>,
     val database: () -> Database,
@@ -49,8 +46,8 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
     }
 
     // Collection exposed to admins only for tasks
-    val info = ModelInfoWithDefault<ExternalAsyncTaskRequest, String>(
-        authOptions = authOptions,
+    val info = modelInfoWithDefault<HasId<*>, ExternalAsyncTaskRequest, String>(
+        authOptions = authOptions as AuthOptions<HasId<*>>,
         serialization = ModelSerializationInfo(
             serializer = ExternalAsyncTaskRequest.serializer(),
             idSerializer = String.serializer()
@@ -58,14 +55,14 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
         getCollection = {
             database().collection<ExternalAsyncTaskRequest>(name = "$path/ExternalTaskRequest")
         },
-        defaultItem = { it: RequestAuth<*>? ->
+        defaultItem = {
             ExternalAsyncTaskRequest(
                 _id = "",
                 expiresAt = Instant.now().plus(Duration.ofDays(7)),
                 ourData = ""
             )
         },
-        forUser = { this },
+        forUser = { it },
         modelName = "${name.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }}Request"
     )
 
@@ -178,26 +175,25 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
         )
     }
 
-    val manualRecheck = path("recheck").post.typedAuthAbstracted(
+    val manualRecheck = path("recheck").post.api(
         summary = "Manually recheck tasks",
         errorCases = listOf(),
         authOptions = authOptions,
         inputType = Unit.serializer(),
         outputType = Unit.serializer(),
-        implementation = { _: RequestAuth<*>?, _: Unit ->
+        implementation = { _: Unit ->
             recheck.handler.invoke()
         }
     )
-    val manualRecheckSingle = path("recheck/{id}").post.typedAuthAbstracted(
+    val manualRecheckSingle = path("recheck").arg<String>("id").post.api(
         summary = "Manually recheck tasks",
         errorCases = listOf(),
         authOptions = authOptions,
         inputType = Unit.serializer(),
-        path1Type = String.serializer(),
         outputType = Unit.serializer(),
-        implementation = { user: RequestAuth<*>?, id: String, _: Unit ->
+        implementation = { _: Unit ->
             coroutineScope {
-                recheckSet.implementation(this, listOf(info.collection().get(id) ?: throw NotFoundException()))
+                recheckSet.implementation(this, listOf(info.collection().get(path1) ?: throw NotFoundException()))
             }
         }
     )

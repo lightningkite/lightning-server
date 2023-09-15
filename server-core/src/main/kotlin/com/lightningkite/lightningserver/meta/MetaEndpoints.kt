@@ -250,7 +250,7 @@ class MetaEndpoints<USER>(
     }
     val endpoints = listOf<HttpEndpoint>(
         docs,
-        health.route,
+        health.route.endpoint,
         isOnline,
         admin,
         openApi,

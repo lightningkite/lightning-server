@@ -9,7 +9,7 @@ import com.lightningkite.lightningserver.auth.old.SmsAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.UserPhoneAccess
 import com.lightningkite.lightningserver.auth.old.userPhoneAccess
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.db.ModelInfo
+import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -29,7 +29,7 @@ class SmsAuthTest {
     }
     @Test
     fun testPinCorrect() {
-        val info = ModelInfo<User, User, UUID>(
+        val info = modelInfo<User, User, UUID>(
             getCollection = { TestSettings.database().collection() },
             forUser = { this }
         )
@@ -52,7 +52,7 @@ class SmsAuthTest {
     }
     @Test
     fun testPinIncorrect() {
-        val info = ModelInfo<User, User, UUID>(
+        val info = modelInfo<User, User, UUID>(
             getCollection = { TestSettings.database().collection() },
             forUser = { this }
         )

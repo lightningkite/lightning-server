@@ -38,7 +38,7 @@ fun loadSettings(settingsFile: File): Settings {
         val suggested =
             settingsFile.absoluteFile.parentFile.resolve(settingsFile.nameWithoutExtension + ".suggested.json")
         logger.error("Settings were incorrect.  Suggested updates are inside ${suggested.absolutePath}.")
-        Settings.populateDefaults()
+        Settings.repair()
         suggested.writeText(json.encodeToString(Settings))
         e.printStackTrace()
         exitProcess(1)

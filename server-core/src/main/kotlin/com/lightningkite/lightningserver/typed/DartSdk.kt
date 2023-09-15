@@ -137,10 +137,10 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
             this.functionHeader(entry, skipAuth = false)
             appendLine(" async {")
             val hasInput = entry.inputType != Unit.serializer()
-            appendLine("        var url = Uri.parse(\"\${parent.httpUrl}${entry.route.path.escaped}\");")
+            appendLine("        var url = Uri.parse(\"\${parent.httpUrl}${entry.route.path.path.escaped}\");")
             appendLine("        var headers = parent.extraHeaders;")
             entry.primaryAuthName?.let {
-                if (entry.authOptions.contains(null).not()) {
+                if (entry.authOptions.options.contains(null).not()) {
                     appendLine("        headers[\"Authorization\"] = \"Bearer $${it.userTypeTokenName()}\";")
                 } else {
                     appendLine("        if (${it.userTypeTokenName()} == null) {")
@@ -188,10 +188,10 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
         this.functionHeader(entry, skipAuth = false)
         appendLine(" async {")
         val hasInput = entry.inputType != Unit.serializer()
-        appendLine("        var url = Uri.parse(\"\${httpUrl}${entry.route.path.escaped}\");")
+        appendLine("        var url = Uri.parse(\"\${httpUrl}${entry.path.path.escaped}\");")
         appendLine("        var headers = extraHeaders;")
         entry.primaryAuthName?.let {
-            if (entry.authOptions.contains(null).not()) {
+            if (entry.authOptions.options.contains(null).not()) {
                 appendLine("        headers[\"Authorization\"] = \"Bearer $${it.userTypeTokenName()}\";")
             } else {
                 appendLine("        if (${it.userTypeTokenName()} == null) {")
@@ -260,7 +260,7 @@ private fun Appendable.functionHeader(
     overrideUserType: String? = null,
 ) {
     when (documentable) {
-        is ApiEndpoint<*, *> -> {
+        is ApiEndpoint<*, *, *, *> -> {
             append("Future<")
             documentable.outputType.write().let { append(it) }
             append(">")
@@ -315,10 +315,10 @@ private fun arguments(
     skipAuth: Boolean = false,
     overrideUserType: String? = null,
 ): List<DArg> = when (documentable) {
-    is ApiEndpoint<*, *> -> listOfNotNull(
-        documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
-            .map {
-                DArg(name = it.name, type = documentable.routeTypes[it.name], stringType = "String")
+    is ApiEndpoint<*, *, *, *> -> listOfNotNull(
+        documentable.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
+            .mapIndexed { index, it ->
+                DArg(name = it.name, type = documentable.path.serializers[index], stringType = "String")
             },
         documentable.inputType.takeUnless { it == Unit.serializer() }?.let {
             DArg(name = "input", type = it)
@@ -327,20 +327,20 @@ private fun arguments(
             DArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),
                 stringType = "String",
-                optional = !documentable.authOptions.contains(null).not()
+                optional = !documentable.authOptions.options.contains(null).not()
             )
         }?.let(::listOf)
     ).flatten()
 
-    is ApiWebsocket<*, *> -> listOfNotNull(
+    is ApiWebsocket<*, *, *, *> -> listOfNotNull(
         documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
             DArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),
                 stringType = "String",
-                optional = !documentable.authOptions.contains(null).not()
+                optional = !documentable.authOptions.options.contains(null).not()
             )
         }?.let(::listOf),
-        documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
+        documentable.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {
                 DArg(name = it.name, stringType = "String")
             }

@@ -36,7 +36,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
     private var client = lazy(makeClient)
     private var databaseLazy = lazy { client.value.getDatabase(databaseName) }
     val database get() = databaseLazy.value
-    private var coroutineCollections = ConcurrentHashMap<Pair<KType, String>, Lazy<MongoCollection<BsonDocument>>>()
+    private var coroutineCollections = ConcurrentHashMap<Pair<KSerializer<*>, String>, Lazy<MongoCollection<BsonDocument>>>()
     override suspend fun disconnect() {
         if (client.isInitialized()) client.value.close()
         client = lazy(makeClient)
@@ -97,16 +97,14 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
         }
     }
 
-    private val collections = ConcurrentHashMap<Pair<KType, String>, Lazy<MongoFieldCollection<*>>>()
+    private val collections = ConcurrentHashMap<Pair<KSerializer<*>, String>, Lazy<MongoFieldCollection<*>>>()
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T : Any> collection(type: KType, name: String): MongoFieldCollection<T> =
-        (collections.getOrPut(type to name) {
+    override fun <T : Any> collection(serializer: KSerializer<T>, name: String): MongoFieldCollection<T> =
+        (collections.getOrPut(serializer to name) {
             lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-                MongoFieldCollection(
-                    Serialization.Internal.bson.serializersModule.serializer(type) as KSerializer<T>
-                ) {
-                    (coroutineCollections.getOrPut(type to name) {
+                MongoFieldCollection(serializer) {
+                    (coroutineCollections.getOrPut(serializer to name) {
                         lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
                             databaseLazy.value
                                 .getCollection(name, BsonDocument::class.java)

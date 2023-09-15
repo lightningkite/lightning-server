@@ -122,7 +122,7 @@ fun <T> FlowContent.jsForm(
     div { this.id = id }
     script {
         unsafe {
-            UploadEarlyEndpoint.default?.endpoint?.path?.fullUrl()?.let { uploadUrl ->
+            UploadEarlyEndpoint.default?.endpoint?.path?.path?.fullUrl()?.let { uploadUrl ->
                 +"""
                 JSONEditor.defaults.callbacks = {
                     upload: {

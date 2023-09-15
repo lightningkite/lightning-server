@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
@@ -15,22 +16,41 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.serializer
 import java.net.URLDecoder
 
-interface ApiEndpoint<INPUT : Any, OUTPUT> : Documentable, (suspend (HttpRequest) -> HttpResponse) {
-    val route: HttpEndpoint
-    override val authOptions: AuthOptions
-    val inputType: KSerializer<INPUT>
-    val outputType: KSerializer<OUTPUT>
-    override val summary: String
-    override val description: String
-    val successCode: HttpStatus
-    val errorCases: List<LSError>
-    val routeTypes: Map<String, KSerializer<*>>
-    val examples: List<ApiExample<INPUT, OUTPUT>>
-
-    override val path: ServerPath
+data class ApiEndpoint<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
+    val route: TypedHttpEndpoint<PATH>,
+    override val authOptions: AuthOptions<USER>,
+    val inputType: KSerializer<INPUT>,
+    val outputType: KSerializer<OUTPUT>,
+    override val summary: String,
+    override val description: String,
+    val successCode: HttpStatus,
+    val errorCases: List<LSError>,
+    val examples: List<ApiExample<INPUT, OUTPUT>>,
+    val implementation: suspend AuthAndPathParts<USER, PATH>.(INPUT)->OUTPUT,
+) : Documentable, (suspend (HttpRequest) -> HttpResponse) {
+    override val path: TypedServerPath
         get() = route.path
+    private val wildcards = route.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
 
-    suspend fun invokeAny(auth: RequestAuth<*>, input: INPUT, routes: Map<String, Any?>): OUTPUT
+    override suspend fun invoke(it: HttpRequest): HttpResponse {
+        val auth = it.authChecked<USER>(authOptions)
+        @Suppress("UNCHECKED_CAST") val input: INPUT = when (route.method) {
+            HttpMethod.GET, HttpMethod.HEAD -> it.queryParameters(inputType)
+            else -> if (inputType == Unit.serializer()) Unit as INPUT else it.body!!.parse(inputType)
+        }
+        @Suppress("UNCHECKED_CAST") val result = AuthAndPathParts<USER, PATH>(
+            authOrNull = auth,
+            parts = route.path.serializers.mapIndexed { idx, ser ->
+                val name = wildcards.get(idx).name
+                val str = it.parts[name] ?: throw BadRequestException("Route segment $name not found")
+                str.parseUrlPartOrBadRequest(route.path.serializers[idx])
+            }.toTypedArray()
+        ).implementation(input)
+        return HttpResponse(
+            body = result.toHttpContent(it.headers.accept, outputType),
+            status = successCode
+        )
+    }
 }
 
 data class ApiExample<INPUT, OUTPUT>(
@@ -40,20 +60,117 @@ data class ApiExample<INPUT, OUTPUT>(
     val notes: String? = null,
 )
 
-
-inline fun <reified T : Comparable<T>> String.parseUrlPartOrBadRequest(): T = parseUrlPartOrBadRequest(
-    Serialization.module.serializer()
-)
-
-fun <T> String.parseUrlPartOrBadRequest(serializer: KSerializer<T>): T = try {
+private fun <T> String.parseUrlPartOrBadRequest(serializer: KSerializer<T>): T = try {
     Serialization.fromString(URLDecoder.decode(this, Charsets.UTF_8), serializer)
 } catch (e: Exception) {
-    throw BadRequestException("ID ${this} could not be parsed as a ${serializer.descriptor.serialName}.")
+    throw BadRequestException("Path part ${this} could not be parsed as a ${serializer.descriptor.serialName}.")
 }
 
-private fun String.parseUrlPartOrBadRequestUntyped(serializer: KSerializer<*>): Any? = try {
-    Serialization.fromString(URLDecoder.decode(this, Charsets.UTF_8), serializer)
-} catch (e: Exception) {
-    throw BadRequestException("ID ${this} could not be parsed as a ${serializer.descriptor.serialName}.")
+@LightningServerDsl
+fun <USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT> TypedHttpEndpoint<PATH>.api(
+    authOptions: AuthOptions<USER>,
+    inputType: KSerializer<INPUT>,
+    outputType: KSerializer<OUTPUT>,
+    summary: String,
+    description: String = summary,
+    errorCases: List<LSError> = listOf(),
+    examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
+    successCode: HttpStatus = HttpStatus.OK,
+    implementation: suspend AuthAndPathParts<USER, PATH>.(INPUT)->OUTPUT
+): ApiEndpoint<USER, PATH, INPUT, OUTPUT> {
+    val api = ApiEndpoint<USER, PATH, INPUT, OUTPUT>(
+        route = this,
+        authOptions = authOptions,
+        inputType = inputType,
+        outputType = outputType,
+        summary = summary,
+        description = description,
+        errorCases = errorCases,
+        examples = examples,
+        successCode = successCode,
+        implementation = implementation,
+    )
+    endpoint.handler(api)
+    return api
 }
 
+@LightningServerDsl
+inline fun <USER: HasId<*>?, PATH: TypedServerPath, reified INPUT, reified OUTPUT> TypedHttpEndpoint<PATH>.api(
+    summary: String,
+    description: String = summary,
+    authOptions: AuthOptions<USER>,
+    errorCases: List<LSError> = listOf(),
+    examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
+    successCode: HttpStatus = HttpStatus.OK,
+    noinline implementation: suspend AuthAndPathParts<USER, PATH>.(INPUT)->OUTPUT
+): ApiEndpoint<USER, PATH, INPUT, OUTPUT> {
+    val api = ApiEndpoint<USER, PATH, INPUT, OUTPUT>(
+        route = this,
+        authOptions = authOptions,
+        inputType = Serialization.module.serializer<INPUT>(),
+        outputType = Serialization.module.serializer<OUTPUT>(),
+        summary = summary,
+        description = description,
+        errorCases = errorCases,
+        examples = examples,
+        successCode = successCode,
+        implementation = implementation,
+    )
+    endpoint.handler(api)
+    return api
+}
+
+
+@LightningServerDsl
+fun <USER: HasId<*>?, INPUT, OUTPUT> HttpEndpoint.api(
+    authOptions: AuthOptions<USER>,
+    inputType: KSerializer<INPUT>,
+    outputType: KSerializer<OUTPUT>,
+    summary: String,
+    description: String = summary,
+    errorCases: List<LSError> = listOf(),
+    examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
+    successCode: HttpStatus = HttpStatus.OK,
+    implementation: suspend AuthAndPathParts<USER, TypedServerPath0>.(INPUT)->OUTPUT
+): ApiEndpoint<USER, TypedServerPath0, INPUT, OUTPUT> {
+    val api = ApiEndpoint<USER, TypedServerPath0, INPUT, OUTPUT>(
+        route = TypedHttpEndpoint(TypedServerPath0(path), method),
+        authOptions = authOptions,
+        inputType = inputType,
+        outputType = outputType,
+        summary = summary,
+        description = description,
+        errorCases = errorCases,
+        examples = examples,
+        successCode = successCode,
+        implementation = implementation,
+    )
+    handler(api)
+    return api
+}
+
+@LightningServerDsl
+inline fun <USER: HasId<*>?, reified INPUT, reified OUTPUT> HttpEndpoint.api(
+    summary: String,
+    description: String = summary,
+    authOptions: AuthOptions<USER>,
+    errorCases: List<LSError> = listOf(),
+    examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
+    successCode: HttpStatus = HttpStatus.OK,
+    noinline implementation: suspend AuthAndPathParts<USER, TypedServerPath0>.(INPUT)->OUTPUT
+): ApiEndpoint<USER, TypedServerPath0, INPUT, OUTPUT> {
+    val api = ApiEndpoint<USER, TypedServerPath0, INPUT, OUTPUT>(
+        route = TypedHttpEndpoint(TypedServerPath0(path), method),
+        authOptions = authOptions,
+        inputType = Serialization.module.serializer<INPUT>(),
+        outputType = Serialization.module.serializer<OUTPUT>(),
+        summary = summary,
+        description = description,
+        errorCases = errorCases,
+        examples = examples,
+        successCode = successCode,
+        implementation = implementation,
+    )
+    handler(api)
+    return api
+}

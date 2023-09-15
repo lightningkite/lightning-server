@@ -16,8 +16,8 @@ import com.lightningkite.lightningserver.serialization.decodeUnwrappingString
 import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.ApiExample
+import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.typed
-import com.lightningkite.lightningserver.typed.typedAuthAbstracted
 import io.ktor.http.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
@@ -82,6 +82,16 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
                 }
             } ?: cont(req)
         }
+        Authentication.register(object: Authentication.SubjectHandler<USER, ID> {
+            override val name: String get() = userAccess.authType.toString().substringAfterLast('.')
+            override val idProofs: Set<String> get() = setOf()
+            override val authType: AuthType get() = userAccess.authType
+            override val applicableProofs: Set<String> get() = setOf()
+            override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<USER, ID>? = null
+            override val idSerializer: KSerializer<ID> get() = userAccess.idSerializer
+            override val subjectSerializer: KSerializer<USER> get() = userAccess.serializer
+            override suspend fun fetch(id: ID): USER = userAccess.byId(id)
+        })
         Authentication.readers += object : Authentication.Reader {
             override suspend fun request(request: Request): RequestAuth<*>? {
                 try {
@@ -159,36 +169,37 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
         it.handleToken(tokenById(it.auth<USER>(userAccess.authType)!!.id))
     }
 
-    val refreshToken = path("refresh-token").get.typed(
-        authOptions = setOf(AuthOption(userAccess.authType)),
+    val loggedIn = AuthOptions<USER>(setOf(AuthOption(userAccess.authType)))
+    val refreshToken = path("refresh-token").get.api(
+        authOptions = loggedIn,
         inputType = Unit.serializer(),
         outputType = String.serializer(),
         summary = "Refresh token",
         description = "Creates a new token for the user, which can be used to authenticate with the API via the header 'Authorization: Bearer [insert token here]'.",
         errorCases = listOf(),
         examples = listOf(ApiExample(input = Unit, output = "jwt.jwt.jwt")),
-        implementation = { user: USER, input: Unit ->
-            token(user)
+        implementation = { input: Unit ->
+            token(user())
         }
     )
-    val getSelf = path("self").get.typed(
-        authOptions = setOf(AuthOption(userAccess.authType)),
+    val getSelf = path("self").get.api(
+        authOptions = loggedIn,
         inputType = Unit.serializer(),
         outputType = userAccess.serializer,
         summary = "Get Self",
         description = "Retrieves the user that you currently authenticated as.",
         errorCases = listOf(),
-        implementation = { user: USER, _: Unit -> user }
+        implementation = { _: Unit -> user() }
     )
-    val anonymous = path("anonymous").get.typedAuthAbstracted(
-        authOptions = setOf(null),
+    val anonymous = path("anonymous").get.api(
+        authOptions = noAuth,
         inputType = Unit.serializer(),
         outputType = String.serializer(),
         summary = "Anonymous Token",
         description = "Creates a token for a new, anonymous user.  The token can be used to authenticate with the API via the header 'Authorization: Bearer [insert token here]",
         errorCases = listOf(),
         examples = listOf(ApiExample(input = Unit, output = "jwt.jwt.jwt")),
-        implementation = { _, _: Unit ->
+        implementation = { _: Unit ->
             token(userAccess.anonymous())
         }
     )

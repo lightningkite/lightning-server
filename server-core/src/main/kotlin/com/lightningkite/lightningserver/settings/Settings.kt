@@ -53,6 +53,12 @@ object Settings {
         populate(missing.associateWith { requirements[it]!!.default } + map)
     }
 
+    fun repair() {
+        sealed = false
+        val missing = requirements.keys - values.keys
+        populate(missing.associateWith { requirements[it]!!.default })
+    }
+
     class Requirement<Serializable, Goal>(
         val name: String,
         val serializer: KSerializer<Serializable>,

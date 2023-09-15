@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.core
 
 import io.ktor.http.*
+import kotlinx.serialization.KSerializer
 
 data class ServerPath(val segments: List<Segment>, val after: Afterwards = Afterwards.None) {
     companion object {
@@ -63,11 +64,10 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
     )
 
     @LightningServerDsl
-    fun path(string: String, configure: ServerPath.() -> Unit = {}) = ServerPath(
+    fun path(string: String) = ServerPath(
         segments = segments + Segment.fromString(string),
         after = Afterwards.fromString(string)
     )
-        .apply(configure)
 
     override fun toString(): String = "/" + segments.joinToString("/") + when (after) {
         Afterwards.None -> ""
@@ -86,42 +86,4 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
             Afterwards.TrailingSlash -> "/"
             Afterwards.ChainedWildcard -> "/$wildcard"
         }
-
-    data class Match(
-        val path: ServerPath,
-        val parts: Map<String, String>,
-        val wildcard: String?
-    )
-
-    fun match(pathParts: List<String>, endingSlash: Boolean): Match? {
-        if (segments.size > pathParts.size) return null
-        if (after != Afterwards.ChainedWildcard && pathParts.size != segments.size) return null
-        when (after) {
-            Afterwards.None -> if (endingSlash) return null
-            Afterwards.TrailingSlash -> if (!endingSlash) return null
-            Afterwards.ChainedWildcard -> {}
-        }
-        val parts = HashMap<String, String>()
-        segments.asSequence().zip(pathParts.asSequence())
-            .forEach {
-                when (val s = it.first) {
-                    is Segment.Constant -> if (s.value != it.second) return null
-                    is Segment.Wildcard -> parts[s.name] = it.second.decodeURLPart()
-                }
-            }
-        return Match(
-            path = this,
-            parts = parts,
-            wildcard = if (after == Afterwards.ChainedWildcard) pathParts.drop(segments.size)
-                .joinToString("/") + (if (endingSlash) "/" else "") else null
-        )
-    }
-
-    fun toggleEndingSlash() = copy(
-        after = when (after) {
-            ServerPath.Afterwards.TrailingSlash -> ServerPath.Afterwards.None
-            ServerPath.Afterwards.None -> ServerPath.Afterwards.TrailingSlash
-            ServerPath.Afterwards.ChainedWildcard -> throw IllegalArgumentException()
-        }
-    )
 }

@@ -85,30 +85,17 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                             +"Input: "
                             api.inputType.let {
                                 type(it)
-                            } ?: run {
-                                +"N/A"
                             }
                         }
                         p {
                             +"Output: "
                             api.outputType.let {
                                 type(it)
-                            } ?: run {
-                                +"N/A"
                             }
                         }
                         p {
-                            api.primaryAuthName?.let {
-                                if (api.authOptions.contains(null).not()) {
-                                    +"You need to be authenticated as a: "
-                                    +it
-                                } else {
-                                    +"You may be authenticated as a: "
-                                    +it
-                                }
-                            } ?: run {
-                                +"This endpoint requires no authentication."
-                            }
+                            +"You need to be authenticated as a: "
+                            +api.authOptions.options.joinToString { if(it == null) "no authentication" else it.type.authName ?: "???" }
                         }
                     }
                 }

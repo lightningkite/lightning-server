@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.jsonschema
 
+import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.humanize
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -156,7 +158,7 @@ private fun <T> make(type: KSerializer<T>, item: T): Map<String, OpenApiExample>
     )
 }
 
-private fun <INPUT : Any, OUTPUT> ApiEndpoint<INPUT, OUTPUT>.openApi(builder: JsonSchemaBuilder): OpenApiOperation =
+private fun ApiEndpoint<*, *, *, *>.openApi(builder: JsonSchemaBuilder): OpenApiOperation =
     OpenApiOperation(
         summary = (this.docGroup?.let { it.humanize() + " " } ?: "") + " - " + summary,
         description = description,
@@ -168,7 +170,7 @@ private fun <INPUT : Any, OUTPUT> ApiEndpoint<INPUT, OUTPUT>.openApi(builder: Js
                 ContentType.Application.Json.toString() to OpenApiMediaType(
                     schema = builder[this.inputType.descriptor],
                     example = examples.firstOrNull()
-                        ?.let { example -> Serialization.json.encodeToJsonElement(inputType, example.input) }
+                        ?.let { example -> Serialization.json.encodeToJsonElement(inputType as KSerializer<Any?>, example.input) }
                         ?: JsonNull,
 //                    examples = examples.groupBy { it.name }.flatMap {
 //                        if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
@@ -196,7 +198,7 @@ private fun <INPUT : Any, OUTPUT> ApiEndpoint<INPUT, OUTPUT>.openApi(builder: Js
                     ContentType.Application.Json.toString() to OpenApiMediaType(
                         schema = builder[this.outputType.descriptor],
                         example = examples.firstOrNull()
-                            ?.let { example -> Serialization.json.encodeToJsonElement(outputType, example.output) }
+                            ?.let { example -> Serialization.json.encodeToJsonElement(outputType as KSerializer<Any?>, example.output) }
                             ?: JsonNull,
 //                        examples = examples.groupBy { it.name }.flatMap {
 //                            if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
@@ -218,7 +220,7 @@ private fun <INPUT : Any, OUTPUT> ApiEndpoint<INPUT, OUTPUT>.openApi(builder: Js
 val openApiDescription: OpenApiRoot by lazy {
     val builder = JsonSchemaBuilder(Serialization.json, "#/components/schemas/", useNullableProperty = true)
     Documentable.endpoints.flatMap {
-        sequenceOf(it.inputType, it.outputType) + it.routeTypes.values.asSequence()
+        sequenceOf(it.inputType, it.outputType) + it.route.path.serializers.asSequence()
     }.distinct().forEach { builder.get(it.descriptor) }
 
     OpenApiRoot(
@@ -264,13 +266,16 @@ val openApiDescription: OpenApiRoot by lazy {
                 it.path.toString()
             }.mapValues {
                 OpenApiPath(
-                    parameters = it.value.first().routeTypes.map {
+                    parameters = it.value.first().path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(
+                        it.value.first().route.path.serializers
+                    ) { seg, ser ->
+                        val name = seg.name
                         OpenApiParameter(
-                            name = it.key,
+                            name = name,
                             inside = OpenApiParameterType.path,
-                            description = it.key,
+                            description = name,
                             required = true,
-                            schema = builder[it.value.descriptor],
+                            schema = builder[ser.descriptor],
                             allowEmptyValue = false
                         )
                     },

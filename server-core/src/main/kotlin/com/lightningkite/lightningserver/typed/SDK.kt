@@ -87,7 +87,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
         val sessionClassName = "AbstractAnonymousSession"
         val byGroup = safeDocumentables
             .distinctBy { it.docGroup.toString() + "/" + it.summary }.groupBy { it.docGroup }
-            .mapValues { it.value.filter { !it.authOptions.contains(null).not() } }
+            .mapValues { it.value.filter { !it.authOptions.options.contains(null).not() } }
         val groups = byGroup.keys.filterNotNull()
         appendLine("open class $sessionClassName(val api: Api) {")
         for (group in groups) {
@@ -118,7 +118,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
     userTypes.forEach { userType ->
         val byGroup = safeDocumentables
             .distinctBy { it.docGroup.toString() + "/" + it.summary }.groupBy { it.docGroup }
-            .mapValues { it.value.filter { !it.authOptions.contains(null).not() || it.primaryAuthName == null || it.primaryAuthName == userType } }
+            .mapValues { it.value.filter { !it.authOptions.options.contains(null).not() || it.primaryAuthName == null || it.primaryAuthName == userType } }
         val groups = byGroup.keys.filterNotNull()
         val sessionClassName = "${userType.substringAfterLast('.')}Session"
         appendLine("abstract class Abstract$sessionClassName(api: Api, ${userType.userTypeTokenName()}: String) {")
@@ -171,12 +171,12 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
         append("    override ")
         this.functionHeader(entry)
         when (entry) {
-            is ApiEndpoint<*, *> -> {
+            is ApiEndpoint<*, *, *, *> -> {
                 appendLine(" = HttpClient.call(")
-                appendLine("        url = \"\$httpUrl${entry.route.path.escaped}\",")
+                appendLine("        url = \"\$httpUrl${entry.path.path.escaped}\",")
                 appendLine("        method = HttpClient.${entry.route.method},")
                 entry.primaryAuthName?.let {
-                    if (entry.authOptions.contains(null).not()) {
+                    if (entry.authOptions.options.contains(null).not()) {
                         appendLine("        headers = mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
                     } else {
                         appendLine("        headers = if(${it.userTypeTokenName()} != null) mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\") else mapOf(),")
@@ -192,12 +192,12 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                 }
             }
 
-            is ApiWebsocket<*, *> -> {
+            is ApiWebsocket<*, *, *, *> -> {
                 appendLine(" = multiplexedSocket(")
                 appendLine("        url = \"\$socketUrl?path=multiplex\", ")
                 appendLine("        path = \"${entry.path}\", ")
                 entry.primaryAuthName?.let {
-                    if (entry.authOptions.contains(null).not()) {
+                    if (entry.authOptions.options.contains(null).not()) {
                         appendLine("        queryParams = mapOf(\"jwt\" to listOf(${it.userTypeTokenName()}))")
                     } else {
                         appendLine("        queryParams = if(${it.userTypeTokenName()} != null) mapOf(\"jwt\" to listOf(${it.userTypeTokenName()})) else mapOf()")
@@ -213,12 +213,12 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
             append("        override ")
             this.functionHeader(entry)
             when (entry) {
-                is ApiEndpoint<*, *> -> {
+                is ApiEndpoint<*, *, *, *> -> {
                     appendLine(" = HttpClient.call(")
-                    appendLine("            url = \"\$httpUrl${entry.route.path.escaped}\",")
+                    appendLine("            url = \"\$httpUrl${entry.path.path.escaped}\",")
                     appendLine("            method = HttpClient.${entry.route.method},")
                     entry.primaryAuthName?.let {
-                        if (entry.authOptions.contains(null).not()) {
+                        if (entry.authOptions.options.contains(null).not()) {
                             appendLine("            headers = mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
                         } else {
                             appendLine("            headers = if(${it.userTypeTokenName()} != null) mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\") else mapOf(),")
@@ -234,12 +234,12 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                     }
                 }
 
-                is ApiWebsocket<*, *> -> {
+                is ApiWebsocket<*, *, *, *> -> {
                     appendLine(" = multiplexedSocket(")
                     appendLine("            url = \"\$socketUrl?path=multiplex\", ")
                     appendLine("            path = \"${entry.path}\", ")
                     entry.primaryAuthName?.let {
-                        if (entry.authOptions.contains(null).not()) {
+                        if (entry.authOptions.options.contains(null).not()) {
                             appendLine("            queryParams = mapOf(\"jwt\" to listOf(${it.userTypeTokenName()}))")
                         } else {
                             appendLine("            queryParams = if(${it.userTypeTokenName()} != null) mapOf(\"jwt\" to listOf(${it.userTypeTokenName()})) else mapOf()")
@@ -256,8 +256,8 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
 }.toString()
 
 private val Documentable.Companion.safeDocumentables
-    get() = (Http.endpoints.values.filterIsInstance<ApiEndpoint<*, *>>()
-        .filter { it.route.method != HttpMethod.GET || it.inputType == Unit.serializer() } + WebSockets.handlers.values.filterIsInstance<ApiWebsocket<*, *>>())
+    get() = (Http.endpoints.values.filterIsInstance<ApiEndpoint<*, *, *, *>>()
+        .filter { it.route.method != HttpMethod.GET || it.inputType == Unit.serializer() } + WebSockets.handlers.values.filterIsInstance<ApiWebsocket<*, *, *, *>>())
         .distinctBy { it.docGroup.toString() + "/" + it.summary }
 
 private class CodeEmitter(val packageName: String, val body: StringBuilder = StringBuilder()) : Appendable by body {
@@ -326,7 +326,7 @@ private fun CodeEmitter.functionHeader(documentable: Documentable, skipAuth: Boo
     }
     append("): ")
     when (documentable) {
-        is ApiEndpoint<*, *> -> {
+        is ApiEndpoint<*, *, *, *> -> {
             append("Single<")
             append(documentable.outputType.kotlinTypeString(this).let {
                 if (it.endsWith("?"))
@@ -336,7 +336,7 @@ private fun CodeEmitter.functionHeader(documentable: Documentable, skipAuth: Boo
             append(">")
         }
 
-        is ApiWebsocket<*, *> -> {
+        is ApiWebsocket<*, *, *, *> -> {
             append("Observable<WebSocketIsh<")
             append(documentable.outputType.kotlinTypeString(this))
             append(", ")
@@ -371,29 +371,29 @@ private data class Arg(
 )
 
 private fun arguments(documentable: Documentable, skipAuth: Boolean = false): List<Arg> = when (documentable) {
-    is ApiEndpoint<*, *> -> listOfNotNull(
-        documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
-            .map {
-                Arg(name = it.name, type = documentable.routeTypes[it.name], stringType = "String")
+    is ApiEndpoint<*, *, *, *> -> listOfNotNull(
+        documentable.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
+            .mapIndexed { index, it ->
+                Arg(name = it.name, type = documentable.path.serializers[index], stringType = "String")
             },
         documentable.inputType.takeUnless { it == Unit.serializer() }?.let {
             Arg(name = "input", type = it)
         }?.let(::listOf),
         documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
-            if (documentable.authOptions.contains(null).not())
+            if (documentable.authOptions.options.contains(null).not())
                 Arg(name = it.userTypeTokenName(), stringType = "String", isAuth = true)
             else
                 Arg(name = it.userTypeTokenName(), stringType = "String?", default = "null", isAuth = true)
         }?.let(::listOf),
     ).flatten()
 
-    is ApiWebsocket<*, *> -> listOfNotNull(
-        documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
+    is ApiWebsocket<*, *, *, *> -> listOfNotNull(
+        documentable.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {
                 Arg(name = it.name, stringType = "String")
             },
         documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
-            if (documentable.authOptions.contains(null).not())
+            if (documentable.authOptions.options.contains(null).not())
                 Arg(name = it.userTypeTokenName(), stringType = "String", isAuth = true)
             else
                 Arg(name = it.userTypeTokenName(), stringType = "String?", default = "null", isAuth = true)

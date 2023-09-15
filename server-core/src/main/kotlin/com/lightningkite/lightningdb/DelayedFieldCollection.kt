@@ -3,6 +3,7 @@ package com.lightningkite.lightningdb
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onStart
+import kotlinx.serialization.KSerializer
 import kotlin.reflect.KProperty1
 import kotlin.reflect.KType
 
@@ -164,7 +165,7 @@ fun <Model : Any> FieldCollection<Model>.delayed(milliseconds: Long): FieldColle
     DelayedFieldCollection(this, milliseconds)
 
 fun Database.delayed(milliseconds: Long): Database = object : Database by this {
-    override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> {
-        return this@delayed.collection<T>(type, name).delayed(milliseconds)
+    override fun <T : Any> collection(serializer: KSerializer<T>, name: String): FieldCollection<T> {
+        return this@delayed.collection<T>(serializer, name).delayed(milliseconds)
     }
 }

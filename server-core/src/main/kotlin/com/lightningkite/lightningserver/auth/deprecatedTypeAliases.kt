@@ -16,9 +16,9 @@ typealias EmailAuthEndpoints<USER, ID> = EmailAuthEndpoints<USER, ID>
 typealias SmsAuthEndpoints<USER, ID> = SmsAuthEndpoints<USER, ID>
 @Deprecated("New import; use not recommended.  Please use the newer auth system.  It will require refactors.")
 typealias PasswordAuthEndpoints<USER, ID> = PasswordAuthEndpoints<USER, ID>
-@Deprecated("JwtSigner has been fully deprecated in favor of using SecureHasher.", ReplaceWith("SecureHasherSettings", "com.lightningkite.lightningserver.encryption.SecureHasher"))
-typealias JwtSigner = SecureHasher
-@Deprecated("AuthInfo has been replaced with AuthOptions", ReplaceWith("AuthOptions"))
-typealias AuthInfo<T> = AuthOptions
-@Deprecated("AuthInfo has been replaced with AuthRequirement", ReplaceWith("AuthRequirement()"))
-inline fun <reified T> AuthInfo(): AuthOptions = authOptions<T>()
+//@Deprecated("JwtSigner has been fully deprecated in favor of using SecureHasher.", ReplaceWith("SecureHasherSettings", "com.lightningkite.lightningserver.encryption.SecureHasher"))
+//typealias JwtSigner = SecureHasher
+//@Deprecated("AuthInfo has been replaced with AuthOptions", ReplaceWith("AuthOptions<T>"))
+//typealias AuthInfo<T> = AuthOptions<T>
+//@Deprecated("AuthInfo has been replaced with AuthRequirement", ReplaceWith("AuthRequirement()"))
+//inline fun <reified T: HasId<*>> AuthInfo(): AuthOptions<T> = authRequired<T>()

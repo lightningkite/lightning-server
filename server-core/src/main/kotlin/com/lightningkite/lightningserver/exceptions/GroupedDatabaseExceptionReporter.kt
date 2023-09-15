@@ -4,18 +4,15 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.RequestAuth
-import com.lightningkite.lightningserver.auth.accepts
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelInfoWithDefault
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
-import com.lightningkite.lightningserver.meta.MetaEndpoints
-import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.typed.AuthAccessor
 import kotlinx.serialization.serializer
 import java.net.NetworkInterface
 import java.time.Instant
-import java.util.*
 
 class GroupedDatabaseExceptionReporter(val packageName: String, val database: Database): ExceptionReporter {
     init {
@@ -63,16 +60,17 @@ class GroupedDatabaseExceptionReporter(val packageName: String, val database: Da
     }
 
     @Suppress("UNCHECKED_CAST")
-    val modelInfo = object: ModelInfoWithDefault<ReportedExceptionGroup, Int> {
+    val modelInfo = object: ModelInfoWithDefault<HasId<*>, ReportedExceptionGroup, Int> {
         override val serialization = ModelSerializationInfo<ReportedExceptionGroup, Int>(
             serializer = Serialization.module.serializer(),
             idSerializer = Serialization.module.serializer()
         )
-        override val authOptions: AuthOptions get() = Authentication.isSuperUser
+        override val authOptions: AuthOptions<HasId<*>> get() = Authentication.isSuperUser as AuthOptions<HasId<*>>
         override fun collection(): FieldCollection<ReportedExceptionGroup> = database.collection<ReportedExceptionGroup>()
-        override suspend fun collection(auth: RequestAuth<*>?): FieldCollection<ReportedExceptionGroup> = collection()
 
-        override suspend fun defaultItem(auth: RequestAuth<*>?): ReportedExceptionGroup {
+        override suspend fun collection(auth: AuthAccessor<HasId<*>>): FieldCollection<ReportedExceptionGroup> = collection()
+
+        override suspend fun defaultItem(auth: RequestAuth<HasId<*>>?): ReportedExceptionGroup {
             return ReportedExceptionGroup(_id = 0, context = "", server = "", message = "", trace = "")
         }
 

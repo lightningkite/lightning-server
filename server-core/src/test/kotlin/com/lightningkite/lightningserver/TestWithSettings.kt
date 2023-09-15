@@ -1,12 +1,14 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.collection
+import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.auth.oauth.OauthProviderCredentials
 import com.lightningkite.lightningserver.auth.oauth.OauthProviderCredentialsApple
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.DatabaseSettings
-import com.lightningkite.lightningserver.db.ModelInfo
+import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.restApiWebsocket
 import com.lightningkite.lightningserver.db.testmodels.TestThing
@@ -15,7 +17,11 @@ import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.engine.UnitTestEngine
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.files.FilesSettings
+import com.lightningkite.lightningserver.logging.LoggingSettings
+import com.lightningkite.lightningserver.logging.loggingSettings
+import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.settings.Settings
+import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.sms.SMSSettings
 import com.lightningkite.lightningserver.tasks.Tasks
@@ -37,29 +43,32 @@ object TestSettings {
 
     val path = ServerPath("auth")
 
-    val ws = ServerPath("test").restApiWebsocket<TestThing, UUID>(
+    val ws = ServerPath("test").restApiWebsocket<HasId<*>?, TestThing, UUID>(
         database,
-        info = ModelInfo(
-            authOptions = setOf(null),
+        info = modelInfo(
+            authOptions = noAuth,
             serialization = ModelSerializationInfo(),
             getCollection = { database().collection() },
-            forUser = { this },
+            forUser = { it },
         )
     )
-    val ws2 = ServerPath("test2").restApiWebsocket<TestThing, UUID>(
+    val ws2 = ServerPath("test2").restApiWebsocket<HasId<*>?, TestThing, UUID>(
         database,
-        info = ModelInfo(
-            authOptions = setOf(null),
+        info = modelInfo(
+            authOptions = noAuth,
             serialization = ModelSerializationInfo(),
             getCollection = { database().collection() },
-            forUser = { this },
+            forUser = { it },
         ),
         key = TestThing::_id
     )
 
     init {
         com.lightningkite.lightningdb.prepareModels()
-        Settings.populateDefaults()
+        Settings.populateDefaults(mapOf(
+            generalSettings.name to GeneralServerSettings(debug = true),
+            loggingSettings.name to LoggingSettings(default = LoggingSettings.ContextSettings(filePattern = null, toConsole = true, level = "DEBUG"))
+        ))
         runBlocking {
             Tasks.onSettingsReady()
             engine = UnitTestEngine

@@ -40,6 +40,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines")
     api("org.jetbrains.kotlinx:kotlinx-html-jvm:0.8.0")
 
+    api("dev.turingcomplete:kotlin-onetimepassword:2.4.0")
     api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     api("com.lightningkite:kotlinx-serialization-csv:2.1.0-SNAPSHOT")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")

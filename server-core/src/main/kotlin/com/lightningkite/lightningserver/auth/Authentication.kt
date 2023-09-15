@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.auth.proof.ProofOption
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.typed.ApiEndpoint
+import com.lightningkite.lightningserver.typed.TypedServerPath0
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.UseContextualSerialization
 import java.time.Instant
@@ -69,18 +70,18 @@ object Authentication {
     }
 
     interface DirectProofMethod : ProofMethod {
-        val prove: ApiEndpoint<ProofEvidence, Proof>
+        val prove: ApiEndpoint<*, TypedServerPath0, ProofEvidence, Proof>
     }
 
     interface StartedProofMethod : ProofMethod {
-        val start: ApiEndpoint<String, String>
-        val prove: ApiEndpoint<ProofEvidence, Proof>
+        val start: ApiEndpoint<*, TypedServerPath0, String, String>
+        val prove: ApiEndpoint<*, TypedServerPath0, ProofEvidence, Proof>
     }
 
     interface ExternalProofMethod : ProofMethod {
-        val start: ApiEndpoint<String, String>
+        val start: ApiEndpoint<*, TypedServerPath0, String, String>
         val indirectLink: ServerPath
     }
 
-    var isSuperUser: AuthOptions by SetOnce { setOf() }
+    var isSuperUser: AuthOptions<*> by SetOnce { AuthOptions<HasId<*>>(setOf()) }
 }

@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.auth.proof
 
 import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.email.Email
@@ -12,6 +13,7 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.ApiExample
+import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.typed
 import java.time.Instant
 import java.util.*
@@ -26,51 +28,54 @@ abstract class PinBasedProofEndpoints(
         get() = 10
 
     open fun normalize(to: String): String = to.lowercase().trim()
-    abstract fun send(to: String, pin: String)
+    abstract suspend fun send(to: String, pin: String)
+    abstract val exampleTarget: String
 
-    override val start: ApiEndpoint<String, String> = path("start").post.typed(
-        summary = "Begin Email Ownership Proof",
-        description = "Sends a login code to the given address.  The email will contain both a link to instantly log in and a PIN that can be combined with the returned key to log in.",
+    override val start = path("start").post.api(
+        authOptions = noAuth,
+        summary = "Begin $name Ownership Proof",
+        description = "Sends a login code to the given ${name.lowercase()}.  The message will contain both a PIN that can be combined with the returned key to log in.",
         errorCases = listOf(),
         examples = listOf(
             ApiExample(
-                input = "test@test.com",
+                input = exampleTarget,
                 output = "generated_opaque_identifier",
             ),
             ApiExample(
-                input = "TeSt@tEsT.CoM ",
+                input = exampleTarget.uppercase(),
                 output = "generated_opaque_identifier",
                 name = "Casing doesn't matter",
-                notes = "The casing of the email address is ignored, and the input is trimmed."
+                notes = "The casing of the target is ignored, and the input is trimmed."
             ),
         ),
-        successCode = HttpStatus.NoContent,
-        implementation = { _: Unit, addressUnsafe: String ->
+        successCode = HttpStatus.OK,
+        implementation = { addressUnsafe: String ->
             val address = normalize(addressUnsafe)
             val p = pin.establish(address)
             send(address, p.pin)
             p.key
         }
     )
-    override val prove: ApiEndpoint<ProofEvidence, Proof> = path("prove").post.typed(
+    override val prove = path("prove").post.api(
+        authOptions = noAuth,
         summary = "Prove $validates ownership",
-        description = "Logs in to the given account with a PIN that was  sent earlier and the key from that request.  Note that the PIN expires in ${pin.expiration.toMinutes()} minutes, and you are only permitted ${pin.maxAttempts} attempts.",
+        description = "Logs in to the given account with a PIN that was sent earlier and the key from that request.  Note that the PIN expires in ${pin.expiration.toMinutes()} minutes, and you are only permitted ${pin.maxAttempts} attempts.",
         errorCases = listOf(),
         examples = listOf(
             ApiExample(
-                input = ProofEvidence("test@test.com", pin.generate()),
+                input = ProofEvidence(exampleTarget, pin.generate()),
                 output = Proof(
                     via = name,
                     of = validates,
                     strength = strength,
-                    value = "test@test.com",
+                    value = exampleTarget,
                     at = Instant.now(),
                     signature = "opaquesignaturevalue"
                 )
             )
         ),
         successCode = HttpStatus.OK,
-        implementation = { _: Unit, input: ProofEvidence ->
+        implementation = { input: ProofEvidence ->
             proofHasher().makeProof(
                 info = info,
                 value = pin.assert(input.value, input.secret),

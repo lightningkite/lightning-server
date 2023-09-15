@@ -9,45 +9,41 @@ import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.serialization.decodeUnwrappingString
-import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import com.lightningkite.lightningserver.tasks.startup
 import com.lightningkite.lightningserver.tasks.task
-import com.lightningkite.lightningserver.typed.ApiWebsocket
-import com.lightningkite.lightningserver.typed.typedWebsocket
+import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import kotlinx.serialization.encodeToString
 import java.time.Instant
 import java.time.Duration
 import kotlin.reflect.KProperty1
 
 @LightningServerDsl
-fun <T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
+fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
     database: () -> Database,
-    info: ModelInfo<T, ID>,
+    info: ModelInfo<USER, T, ID>,
     key: KProperty1<T, *>? = null,
-): ApiWebsocket<Query<T>, ListChange<T>> {
+): ApiWebsocket<USER, TypedServerPath0, Query<T>, ListChange<T>> {
     prepareModels()
     val modelName = info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
     val modelIdentifier = info.serialization.serializer.descriptor.serialName
     val helper = RestApiWebsocketHelper[database]
 
-    return typedWebsocket<Query<T>, ListChange<T>>(
+    return apiWebsocket<USER, Query<T>, ListChange<T>>(
         authOptions = info.authOptions,
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListChange.serializer(info.serialization.serializer),
         summary = "Watch",
         description = "Gets a changing list of ${modelName}s that match the given query.",
         errorCases = listOf(),
-        connect = { event ->
-            val auth = event.authChecked(authOptions)
+        connect = {
+            val auth = this.authOrNull
             val user = auth?.serializable()
-            val collection = info.collection(auth)
+            val collection = info.collection(this)
             helper.subscriptionDb().insertOne(
                 __WebSocketDatabaseChangeSubscription(
                     _id = event.id,
@@ -63,14 +59,14 @@ fun <T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
                 )
             )
         },
-        message = { event ->
-            val existing = helper.subscriptionDb().get(event.id) ?: throw NotFoundException()
-            val auth = existing.user?.real()
-            val p = info.collection(auth)
-            val q = event.content.copy(condition = p.fullCondition(event.content.condition).simplify())
+        message = { query ->
+            val existing = helper.subscriptionDb().get(socketId) ?: throw NotFoundException()
+            @Suppress("UNCHECKED_CAST") val auth = existing.user?.real() as? RequestAuth<USER & Any>
+            val p = info.collection(AuthAccessor(auth))
+            val q = query.copy(condition = p.fullCondition(query.condition).simplify())
             val c = Serialization.json.encodeToString(Query.serializer(info.serialization.serializer), q)
             helper.subscriptionDb().updateOne(
-                condition = condition { it._id eq event.id },
+                condition = condition { it._id eq socketId },
                 modification = modification {
                     it.condition assign c
                     if(key != null)
@@ -79,10 +75,10 @@ fun <T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
                         it.relevant assign null
                 },
             )
-            send(event.id, ListChange(wholeList = p.query(q).toList()))
+            send(ListChange(wholeList = p.query(q).toList()))
         },
-        disconnect = { event ->
-            helper.subscriptionDb().deleteMany(condition { it._id eq event.id })
+        disconnect = {
+            helper.subscriptionDb().deleteMany(condition { it._id eq socketId })
         }
     ).apply {
         val sendWsChanges = task(
