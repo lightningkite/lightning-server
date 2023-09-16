@@ -10,23 +10,27 @@ import kotlinx.serialization.serializer
 
 sealed interface TypedServerPath {
     val path: ServerPath
-    val serializers: Array<KSerializer<*>>
+    val serializers: Array<KSerializer<*>> get() = parameters.map { it.serializer }.toTypedArray()
+    val parameters: Array<TypedServerPathParameter<*>>
 }
+
+data class TypedServerPathParameter<T>(val name: String, val description: String?, val serializer: KSerializer<T>)
+
 data class TypedServerPath0(override val path: ServerPath): TypedServerPath {
     @LightningServerDsl fun path(string: String) = copy(path = path.path(string))
-    override val serializers: Array<KSerializer<*>> = arrayOf()
+    override val parameters: Array<TypedServerPathParameter<*>> = arrayOf()
 }
-data class TypedServerPath1<A>(override val path: ServerPath, val a: KSerializer<A>): TypedServerPath {
+data class TypedServerPath1<A>(override val path: ServerPath, val a: TypedServerPathParameter<A>): TypedServerPath {
     @LightningServerDsl fun path(string: String) = copy(path = path.path(string))
-    override val serializers: Array<KSerializer<*>> = arrayOf(a)
+    override val parameters: Array<TypedServerPathParameter<*>> = arrayOf(a)
 }
-data class TypedServerPath2<A, B>(override val path: ServerPath, val a: KSerializer<A>, val b: KSerializer<B>): TypedServerPath {
+data class TypedServerPath2<A, B>(override val path: ServerPath, val a: TypedServerPathParameter<A>, val b: TypedServerPathParameter<B>): TypedServerPath {
     @LightningServerDsl fun path(string: String) = copy(path = path.path(string))
-    override val serializers: Array<KSerializer<*>> = arrayOf(a, b)
+    override val parameters: Array<TypedServerPathParameter<*>> = arrayOf(a, b)
 }
-data class TypedServerPath3<A, B, C>(override val path: ServerPath, val a: KSerializer<A>, val b: KSerializer<B>, val c: KSerializer<C>): TypedServerPath {
+data class TypedServerPath3<A, B, C>(override val path: ServerPath, val a: TypedServerPathParameter<A>, val b: TypedServerPathParameter<B>, val c: TypedServerPathParameter<C>): TypedServerPath {
     @LightningServerDsl fun path(string: String) = copy(path = path.path(string))
-    override val serializers: Array<KSerializer<*>> = arrayOf(a, b, c)
+    override val parameters: Array<TypedServerPathParameter<*>> = arrayOf(a, b, c)
 }
 
 data class TypedHttpEndpoint<PathType: TypedServerPath>(
@@ -47,43 +51,30 @@ data class TypedHttpEndpoint<PathType: TypedServerPath>(
 @LightningServerDsl val ServerPath.typed get() = TypedServerPath0(this)
 
 @LightningServerDsl
-inline fun <reified A> TypedServerPath0.arg(key: String): TypedServerPath1<A> = TypedServerPath1(
-    path = path.copy(segments = path.segments + ServerPath.Segment.Wildcard(key)),
-    a = Serialization.module.serializer(),
+inline fun <reified A> TypedServerPath0.arg(name: String, description: String? = null): TypedServerPath1<A> = TypedServerPath1(
+    path = path.copy(segments = path.segments + ServerPath.Segment.Wildcard(name)),
+    a = TypedServerPathParameter(name, description, Serialization.module.serializer()),
 )
 @LightningServerDsl
-inline fun <reified A> ServerPath.arg(key: String): TypedServerPath1<A> = TypedServerPath1(
-    path = copy(segments = segments + ServerPath.Segment.Wildcard(key)),
-    a = Serialization.module.serializer(),
+inline fun <reified A> ServerPath.arg(name: String, description: String? = null): TypedServerPath1<A> = TypedServerPath1(
+    path = copy(segments = segments + ServerPath.Segment.Wildcard(name)),
+    a = TypedServerPathParameter(name, description, Serialization.module.serializer()),
 )
 @LightningServerDsl
-inline fun <A, reified B> TypedServerPath1<A>.arg(key: String): TypedServerPath2<A, B> = TypedServerPath2(
-    path = path.copy(segments = path.segments + ServerPath.Segment.Wildcard(key)),
+fun <A> ServerPath.arg(name: String, description: String? = null, serializer: KSerializer<A>): TypedServerPath1<A> = TypedServerPath1(
+    path = copy(segments = segments + ServerPath.Segment.Wildcard(name)),
+    a = TypedServerPathParameter(name, description, serializer),
+)
+@LightningServerDsl
+fun <A, B> TypedServerPath1<A>.arg(name: String, description: String? = null, serializer: KSerializer<B>): TypedServerPath2<A, B> = TypedServerPath2(
+    path = path.copy(segments = path.segments + ServerPath.Segment.Wildcard(name)),
     a = a,
-    b = Serialization.module.serializer(),
+    b = TypedServerPathParameter(name, description, serializer),
 )
 @LightningServerDsl
-inline fun <A, B, reified C> TypedServerPath2<A, B>.arg(key: String): TypedServerPath3<A, B, C> = TypedServerPath3(
-    path = path.copy(segments = path.segments + ServerPath.Segment.Wildcard(key)),
-    a = a,
-    b = b,
-    c = Serialization.module.serializer(),
-)
-@LightningServerDsl
-fun <A> ServerPath.arg(key: String, serializer: KSerializer<A>): TypedServerPath1<A> = TypedServerPath1(
-    path = copy(segments = segments + ServerPath.Segment.Wildcard(key)),
-    a = serializer,
-)
-@LightningServerDsl
-fun <A, B> TypedServerPath1<A>.arg(key: String, serializer: KSerializer<B>): TypedServerPath2<A, B> = TypedServerPath2(
-    path = path.copy(segments = path.segments + ServerPath.Segment.Wildcard(key)),
-    a = a,
-    b = serializer,
-)
-@LightningServerDsl
-fun <A, B, C> TypedServerPath2<A, B>.arg(key: String, serializer: KSerializer<C>): TypedServerPath3<A, B, C> = TypedServerPath3(
-    path = path.copy(segments = path.segments + ServerPath.Segment.Wildcard(key)),
+fun <A, B, C> TypedServerPath2<A, B>.arg(name: String, description: String? = null, serializer: KSerializer<C>): TypedServerPath3<A, B, C> = TypedServerPath3(
+    path = path.copy(segments = path.segments + ServerPath.Segment.Wildcard(name)),
     a = a,
     b = b,
-    c = serializer,
+    c = TypedServerPathParameter(name, description, serializer),
 )
