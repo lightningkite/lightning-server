@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSerializationApi::class, InternalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package com.lightningkite.lightningdb
 
@@ -45,8 +45,8 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): MySealedClassSerializerIn
                 }
                 register(Modification.Assign.serializer(inner))
 //                if (inner.descriptor.kind is PrimitiveKind) {
-                    register(Modification.CoerceAtMost.serializer(inner))
-                    register(Modification.CoerceAtLeast.serializer(inner))
+                register(Modification.CoerceAtMost.serializer(inner))
+                register(Modification.CoerceAtLeast.serializer(inner))
 //                }
                 if (inner.descriptor.kind in numberKinds) {
                     register(Modification.Increment.serializer(inner))
@@ -76,18 +76,19 @@ private fun <Inner> getMod(inner: KSerializer<Inner>): MySealedClassSerializerIn
                         register(Modification.RemoveKeys.serializer(element))
                     }
                 }
-                if (inner is GeneratedSerializer<*> && inner.descriptor.kind == StructureKind.CLASS && inner !is MySealedClassSerializerInterface) {
-                    val childSerializers = inner.childSerializers()
-                    val fields = inner.attemptGrabFields()
-                    for (index in 0 until inner.descriptor.elementsCount) {
-                        val name = inner.descriptor.getElementName(index)
-                        val prop = fields[name]!!
-                        register(
-                            OnFieldSerializer2<Any, Any?>(
-                                prop as KProperty1<Any, Any?>,
-                                Modification.serializer(childSerializers[index]) as KSerializer<Modification<Any?>>
+                if (inner.descriptor.kind == StructureKind.CLASS && inner !is MySealedClassSerializerInterface) {
+                    inner.childSerializers()?.let { childSerializers ->
+                        val fields = inner.attemptGrabFields()
+                        for (index in 0 until inner.descriptor.elementsCount) {
+                            val name = inner.descriptor.getElementName(index)
+                            val prop = fields[name]!!
+                            register(
+                                OnFieldSerializer2<Any, Any?>(
+                                    prop as KProperty1<Any, Any?>,
+                                    Modification.serializer(childSerializers[index]) as KSerializer<Modification<Any?>>
+                                )
                             )
-                        )
+                        }
                     }
                 }
                 if (inner.descriptor.isNullable) {

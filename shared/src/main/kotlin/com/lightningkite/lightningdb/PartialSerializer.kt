@@ -1,20 +1,13 @@
 package com.lightningkite.lightningdb
 
-import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.SerialKind
-import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.*
-import kotlinx.serialization.internal.GeneratedSerializer
-import kotlin.reflect.KProperty1
 
-@OptIn(InternalSerializationApi::class)
-class PartialSerializer<T>(source: KSerializer<T>): KSerializer<Partial<T>> {
-    val source = source as GeneratedSerializer<T>
-    private val childSerializers = this.source.childSerializers().map {
-        if (it is GeneratedSerializer<*> && it.childSerializers().isNotEmpty()) {
+class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> {
+    private val childSerializers = this.source.childSerializers()!!.map {
+        if (it.childSerializers() != null) {
             PartialSerializer(it)
         } else it
     }

@@ -5,7 +5,6 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.*
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind

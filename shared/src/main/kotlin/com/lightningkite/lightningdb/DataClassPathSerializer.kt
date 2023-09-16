@@ -1,7 +1,6 @@
 package com.lightningkite.lightningdb
 
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -12,10 +11,9 @@ import kotlinx.serialization.internal.GeneratedSerializer
 import kotlin.reflect.KProperty1
 
 
-@OptIn(InternalSerializationApi::class)
 private class KProperty1Parser<T>(val serializer: KSerializer<T>) {
     val children = run {
-        val c: Map<String, KSerializer<*>> = (serializer as GeneratedSerializer<T>).childSerializers().withIndex()
+        val c: Map<String, KSerializer<*>> = serializer.childSerializers()!!.withIndex()
             .associate { serializer.descriptor.getElementName(it.index) to it.value }
         val f: Map<String, KProperty1<T, *>> = serializer.attemptGrabFields()
         c.mapNotNull {
