@@ -7,10 +7,7 @@ import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.SetSerializer
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.SerialKind
-import kotlinx.serialization.descriptors.capturedKClass
+import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.internal.GeneratedSerializer
@@ -130,4 +127,16 @@ private fun Type.clazz(): Class<*> = when (this) {
     is ParameterizedType -> this.rawType.clazz()
     is Class<*> -> this
     else -> TODO()
+}
+
+
+fun <K, V> KSerializer<K>.fieldSerializer(property: KProperty1<K, V>): KSerializer<V>? {
+    val index = this.descriptor.elementNames.indexOf(property.name)
+    @Suppress("UNCHECKED_CAST")
+    return this.childSerializers()?.get(index) as? KSerializer<V>
+}
+
+fun <K> KSerializer<K>.fieldSerializer(fieldName: String): KSerializer<*>? {
+    val index = this.descriptor.elementNames.indexOf(fieldName)
+    return this.childSerializers()?.get(index)
 }

@@ -5,166 +5,95 @@ package com.lightningkite.lightningdb
 import com.lightningkite.khrysalis.IsEquatable
 import com.lightningkite.khrysalis.fatalError
 import kotlinx.serialization.*
+import kotlinx.serialization.builtins.*
 import kotlin.reflect.KClass
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.SetSerializer
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.*
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.internal.GeneratedSerializer
-import java.lang.IllegalStateException
 import java.util.*
 import kotlin.reflect.KProperty1
-import kotlin.reflect.full.allSupertypes
-import kotlin.reflect.jvm.jvmErasure
 
-fun <K, V> KSerializer<K>.fieldSerializer(property: KProperty1<K, V>): KSerializer<V>? {
-    val index = this.descriptor.elementNames.indexOf(property.name)
-    @Suppress("UNCHECKED_CAST")
-    return this.childSerializers()?.get(index) as? KSerializer<V>
+private fun <T> commonOptions(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> = listOf(
+    MySealedClassSerializer.Option(Condition.Never.serializer(inner)) { it is Condition.Never },
+    MySealedClassSerializer.Option(Condition.Always.serializer(inner)) { it is Condition.Always },
+    MySealedClassSerializer.Option(Condition.And.serializer(inner)) { it is Condition.And },
+    MySealedClassSerializer.Option(Condition.Or.serializer(inner)) { it is Condition.Or },
+    MySealedClassSerializer.Option(Condition.Not.serializer(inner)) { it is Condition.Not },
+    MySealedClassSerializer.Option(Condition.Equal.serializer(inner)) { it is Condition.Equal },
+    MySealedClassSerializer.Option(Condition.NotEqual.serializer(inner)) { it is Condition.NotEqual },
+    MySealedClassSerializer.Option(Condition.Inside.serializer(inner)) { it is Condition.Inside },
+    MySealedClassSerializer.Option(Condition.NotInside.serializer(inner)) { it is Condition.NotInside },
+)
+private fun <T: Any> nullableOptions(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T?>, *>> = commonOptions(inner.nullable) + listOf(
+    MySealedClassSerializer.Option(Condition.IfNotNull.serializer(inner)) { it is Condition.IfNotNull },
+)
+private fun <T: Comparable<T>> comparableOptions(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> = commonOptions(inner) + listOf(
+    MySealedClassSerializer.Option(Condition.GreaterThan.serializer(inner)) { it is Condition.GreaterThan },
+    MySealedClassSerializer.Option(Condition.LessThan.serializer(inner)) { it is Condition.LessThan },
+    MySealedClassSerializer.Option(Condition.GreaterThanOrEqual.serializer(inner)) { it is Condition.GreaterThanOrEqual },
+    MySealedClassSerializer.Option(Condition.LessThanOrEqual.serializer(inner)) { it is Condition.LessThanOrEqual },
+)
+private fun <T> listOptions(element: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<List<T>>, *>>  = commonOptions(ListSerializer(element)) + listOf(
+    MySealedClassSerializer.Option(Condition.ListAllElements.serializer(element), setOf("AllElements")) { it is Condition.ListAllElements },
+    MySealedClassSerializer.Option(Condition.ListAnyElements.serializer(element), setOf("AnyElements")) { it is Condition.ListAnyElements },
+    MySealedClassSerializer.Option(Condition.ListSizesEquals.serializer(element), setOf("SizesEquals")) { it is Condition.ListSizesEquals },
+)
+private fun <T> setOptions(element: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<Set<T>>, *>>  = commonOptions(SetSerializer(element)) + listOf(
+    MySealedClassSerializer.Option(Condition.SetAllElements.serializer(element)) { it is Condition.SetAllElements },
+    MySealedClassSerializer.Option(Condition.SetAnyElements.serializer(element)) { it is Condition.SetAnyElements },
+    MySealedClassSerializer.Option(Condition.SetSizesEquals.serializer(element)) { it is Condition.SetSizesEquals },
+)
+private fun <T> stringMapOptions(element: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<Map<String, T>>, *>>  = commonOptions(
+    MapSerializer(String.serializer(), element)
+) + listOf(
+    MySealedClassSerializer.Option(Condition.Exists.serializer(element)) { it is Condition.Exists },
+    MySealedClassSerializer.Option(Condition.OnKey.serializer(element)) { it is Condition.OnKey },
+)
+private val intOptions: List<MySealedClassSerializer.Option<Condition<Int>, *>>  = comparableOptions(Int.serializer()) + listOf(
+    MySealedClassSerializer.Option(Condition.IntBitsClear.serializer()) { it is Condition.IntBitsClear },
+    MySealedClassSerializer.Option(Condition.IntBitsSet.serializer()) { it is Condition.IntBitsSet },
+    MySealedClassSerializer.Option(Condition.IntBitsAnyClear.serializer()) { it is Condition.IntBitsAnyClear },
+    MySealedClassSerializer.Option(Condition.IntBitsAnySet.serializer()) { it is Condition.IntBitsAnySet },
+)
+private val stringOptions: List<MySealedClassSerializer.Option<Condition<String>, *>>  = comparableOptions(String.serializer()) + listOf(
+    MySealedClassSerializer.Option(Condition.StringContains.serializer(), setOf("Search")) { it is Condition.StringContains },
+    MySealedClassSerializer.Option(Condition.RegexMatches.serializer()) { it is Condition.RegexMatches },
+)
+//private fun <T: Any> classOptions(inner: KSerializer<T>, fields: List<KProperty1Alt<T, *>>): List<MySealedClassSerializer.Option<Condition<T>, *>> = commonOptions(inner) + fields.map { prop ->
+//    MySealedClassSerializer.Option(ConditionOnFieldSerializer(prop)) { it is Condition.OnField<*, *> && it.key.name == prop.name }
+//}
+private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> = commonOptions(inner) + inner.childSerializers()!!.let {
+    val f = inner.attemptGrabFields()
+    it.mapIndexed { index, ser ->
+        MySealedClassSerializer.Option(ConditionOnFieldSerializer(
+            f[inner.descriptor.getElementName(index)] as KProperty1<T, Any?>,
+            ser as KSerializer<Any?>
+        )) { it is Condition.OnField<*, *> && it.key.name == inner.descriptor.getElementName(index) }
+    }
 }
 
-fun <K> KSerializer<K>.fieldSerializer(fieldName: String): KSerializer<*>? {
-    val index = this.descriptor.elementNames.indexOf(fieldName)
-    return this.childSerializers()?.get(index)
-}
-
-private val serializers = HashMap<KSerializer<*>, MySealedClassSerializerInterface<*>>()
-
-@Suppress("UNCHECKED_CAST")
-private fun <Inner> getCond(inner: KSerializer<Inner>): MySealedClassSerializerInterface<Condition<Inner>> =
-    serializers.getOrPut(inner) {
-        MySealedClassSerializer(
-            "com.lightningkite.lightningdb.Condition",
-            Condition::class as KClass<Condition<Inner>>,
-            {
-                val map = LinkedHashMap<String, KSerializer<out Condition<Inner>>>()
-                fun register(serializer: KSerializer<out Condition<*>>) {
-                    map[serializer.descriptor.serialName] = (serializer as KSerializer<out Condition<Inner>>)
-                }
-                register(Condition.Never.serializer(inner))
-                register(Condition.Always.serializer(inner))
-                register(Condition.And.serializer(inner))
-                register(Condition.Or.serializer(inner))
-                register(Condition.Not.serializer(inner))
-                register(Condition.Equal.serializer(inner))
-                register(Condition.NotEqual.serializer(inner))
-                register(Condition.Inside.serializer(inner))
-                register(Condition.NotInside.serializer(inner))
-
-//            if(inner.descriptor.kind is PrimitiveKind) {
-                register(Condition.GreaterThan.serializer(inner))
-                register(Condition.LessThan.serializer(inner))
-                register(Condition.GreaterThanOrEqual.serializer(inner))
-                register(Condition.LessThanOrEqual.serializer(inner))
-//            }
-
-                register(Condition.FullTextSearch.serializer(inner))
-                if (inner == String.serializer()) {
-                    register(Condition.StringContains.serializer())
-                    register(Condition.RegexMatches.serializer())
-                }
-                if (inner == Int.serializer()) {
-                    register(Condition.IntBitsClear.serializer())
-                    register(Condition.IntBitsSet.serializer())
-                    register(Condition.IntBitsAnyClear.serializer())
-                    register(Condition.IntBitsAnySet.serializer())
-                }
-                if (inner.descriptor.kind == StructureKind.LIST) {
-                    inner.listElement()?.let { element ->
-                        register(Condition.ListAllElements.serializer(element))
-                        register(Condition.ListAnyElements.serializer(element))
-                        register(Condition.ListSizesEquals.serializer(element))
-                        register(Condition.SetAllElements.serializer(element))
-                        register(Condition.SetAnyElements.serializer(element))
-                        register(Condition.SetSizesEquals.serializer(element))
-                    }
-                }
-                if (inner.descriptor.kind == StructureKind.MAP) {
-                    inner.mapValueElement()?.let { element ->
-                        register(Condition.Exists.serializer(element))
-                        register(Condition.OnKey.serializer(element))
-                    }
-                }
-                if (inner.descriptor.kind == StructureKind.CLASS && inner !is MySealedClassSerializerInterface) {
-                    inner.childSerializers()?.let { childSerializers ->
-                        val fields = try {
-                            inner.attemptGrabFields()
-                        } catch (e: Exception) {
-                            throw Exception("Failed while getting inner fields from ${inner}", e)
-                        }
-                        for (index in 0 until inner.descriptor.elementsCount) {
-                            val name = inner.descriptor.getElementName(index)
-                            val prop = fields[name]!!
-                            register(
-                                OnFieldSerializer<Any, Any?>(
-                                    prop as KProperty1<Any, Any?>,
-                                    Condition.serializer(childSerializers[index]) as KSerializer<Condition<Any?>>
-                                )
-                            )
-                        }
-                    }
-                }
-                if (inner.descriptor.isNullable) {
-                    inner.nullElement()?.let { element ->
-                        register(Condition.IfNotNull.serializer(element))
-                    }
-                }
-                map
-            },
-            alternateReadNames = mapOf(
-                "Search" to "StringContains",
-                "AllElements" to "ListAllElements",
-                "AnyElements" to "ListAnyElements",
-                "SizesEquals" to "ListSizesEquals",
-            ),
-            annotations = Condition::class.annotations
-        ) {
-            when (it) {
-                is Condition.Never -> "Never"
-                is Condition.Always -> "Always"
-                is Condition.And -> "And"
-                is Condition.Or -> "Or"
-                is Condition.Not -> "Not"
-                is Condition.Equal -> "Equal"
-                is Condition.NotEqual -> "NotEqual"
-                is Condition.Inside -> "Inside"
-                is Condition.NotInside -> "NotInside"
-                is Condition.GreaterThan -> "GreaterThan"
-                is Condition.LessThan -> "LessThan"
-                is Condition.GreaterThanOrEqual -> "GreaterThanOrEqual"
-                is Condition.LessThanOrEqual -> "LessThanOrEqual"
-                is Condition.StringContains -> "StringContains"
-                is Condition.RegexMatches -> "RegexMatches"
-                is Condition.FullTextSearch -> "FullTextSearch"
-                is Condition.IntBitsClear -> "IntBitsClear"
-                is Condition.IntBitsSet -> "IntBitsSet"
-                is Condition.IntBitsAnyClear -> "IntBitsAnyClear"
-                is Condition.IntBitsAnySet -> "IntBitsAnySet"
-                is Condition.ListAllElements<*> -> "ListAllElements"
-                is Condition.ListAnyElements<*> -> "ListAnyElements"
-                is Condition.ListSizesEquals<*> -> "ListSizesEquals"
-                is Condition.SetAllElements<*> -> "SetAllElements"
-                is Condition.SetAnyElements<*> -> "SetAnyElements"
-                is Condition.SetSizesEquals<*> -> "SetSizesEquals"
-                is Condition.Exists<*> -> "Exists"
-                is Condition.OnKey<*> -> "OnKey"
-                is Condition.IfNotNull<*> -> "IfNotNull"
-                is Condition.OnField<*, *> -> it.key.name
-                else -> fatalError()
+private val cache = HashMap<KSerializer<*>, KSerializer<*>>()
+class ConditionSerializer<T>(val inner: KSerializer<T>): KSerializer<Condition<T>> by (cache.getOrPut(inner) {
+    MySealedClassSerializer<Condition<T>>("com.lightningkite.lightningdb.Condition", {
+        val r = when {
+            inner.nullElement() != null -> nullableOptions(inner.nullElement()!! as KSerializer<Any>)
+            inner.descriptor.kind == PrimitiveKind.STRING -> stringOptions
+            inner.descriptor.kind == PrimitiveKind.INT -> intOptions
+            inner.descriptor.kind == StructureKind.MAP -> stringMapOptions(inner.mapValueElement()!!)
+            inner.descriptor.kind == StructureKind.LIST -> {
+                if(inner.descriptor.serialName.contains("Set")) setOptions(inner.listElement()!!)
+                else listOptions(inner.listElement()!!)
             }
+            inner.childSerializers() != null -> classOptionsReflective(inner as KSerializer<Any>)
+            else -> comparableOptions(inner as KSerializer<String>)
         }
-    } as MySealedClassSerializerInterface<Condition<Inner>>
+        r as List<MySealedClassSerializer.Option<Condition<T>, out Condition<T>>>
+    })
+} as KSerializer<Condition<T>>)
 
-class ConditionSerializer<Inner>(val inner: KSerializer<Inner>) :
-    MySealedClassSerializerInterface<Condition<Inner>> by getCond(inner)
-
-class OnFieldSerializer<K : Any, V>(
+class ConditionOnFieldSerializer<K : Any, V>(
     val field: KProperty1<K, V>,
-    val conditionSerializer: KSerializer<Condition<V>>
+    val inner: KSerializer<V>,
 ) : WrappingSerializer<Condition.OnField<K, V>, Condition<V>>(field.name) {
-    override fun getDeferred(): KSerializer<Condition<V>> = conditionSerializer
+    override fun getDeferred(): KSerializer<Condition<V>> = Condition.serializer(inner)
     override fun inner(it: Condition.OnField<K, V>): Condition<V> = it.condition
     override fun outer(it: Condition<V>): Condition.OnField<K, V> = Condition.OnField(field, it)
 }

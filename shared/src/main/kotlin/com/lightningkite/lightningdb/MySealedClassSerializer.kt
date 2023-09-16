@@ -10,39 +10,37 @@ import kotlinx.serialization.json.JsonNames
 import kotlin.IllegalStateException
 import kotlin.reflect.KClass
 
-interface MySealedClassSerializerInterface<T: Any>: KSerializer<T> {
-    val serializerMap: Map<String, KSerializer<out T>>
-}
-
-public class MySealedClassSerializer<T : Any>(
+class MySealedClassSerializer<T : Any>(
     serialName: String,
-    val baseClass: KClass<T>,
-    private val getSerializerMap: () -> Map<String, KSerializer<out T>>,
-    val alternateReadNames: Map<String, String> = mapOf(),
+    options: () -> List<Option<T, out T>>,
     val annotations: List<Annotation> = listOf(),
-    val getName: (T) -> String
-) : MySealedClassSerializerInterface<T> {
+) : KSerializer<T> {
 
-    override val serializerMap by lazy { getSerializerMap() }
-    private val indexToName by lazy { serializerMap.keys.toTypedArray() }
+    class Option<Base, T: Base>(
+        val serializer: KSerializer<T>,
+        val alternativeNames: Set<String> = setOf(),
+        val isInstance: (Base) -> Boolean,
+    )
+
+    val options by lazy(options)
+
     private val nameToIndex by lazy {
-        val map = HashMap<String, Int>()
-        indexToName.withIndex().forEach { map[it.value] = it.index }
-        alternateReadNames.forEach {
-            map[it.value]?.let { o -> map[it.key] = o }
-        }
-        map
+        this.options.flatMapIndexed { index, it ->
+            (listOf(it.serializer.descriptor.serialName) + it.alternativeNames)
+                .map { n -> n to index }
+        }.associate { it }
     }
-    private val serializers by lazy { indexToName.map { serializerMap[it]!! }.toTypedArray() }
-    private fun getIndex(item: T): Int = nameToIndex[getName(item)]
-        ?: throw IllegalStateException("No serializer inside ${descriptor.serialName} found for ${getName(item)}; available: ${indexToName.joinToString()}")
+    private fun getIndex(item: T): Int = options.indexOfFirst { it.isInstance(item) }
+        .also {
+            if(it == -1)
+                throw IllegalStateException("No serializer inside ${descriptor.serialName} found for ${item}")
+        }
 
     override val descriptor: SerialDescriptor = defer(serialName, StructureKind.CLASS) {
         buildClassSerialDescriptor(serialName) {
             this.annotations = this@MySealedClassSerializer.annotations
-            val reversedAlternates = alternateReadNames.entries.groupBy { it.value }.mapValues { it.value.map { it.key } }
-            for ((index, s) in serializers.withIndex()) {
-                element(s.descriptor.serialName, s.descriptor, isOptional = true, annotations = indexToName[index].let { reversedAlternates[it] }
+            for ((index, s) in this@MySealedClassSerializer.options.withIndex()) {
+                element(s.serializer.descriptor.serialName, s.serializer.descriptor, isOptional = true, annotations = this@MySealedClassSerializer.options[index].alternativeNames
                     ?.let { listOf(JsonNames(*it.toTypedArray())) } ?: listOf())
             }
         }
@@ -53,7 +51,7 @@ public class MySealedClassSerializer<T : Any>(
             val index = decodeElementIndex(descriptor)
             if (index == CompositeDecoder.DECODE_DONE) throw SerializationException("Single key expected, but received none.")
             if (index == CompositeDecoder.UNKNOWN_NAME) throw SerializationException("Unknown key received.")
-            val result = decodeSerializableElement(descriptor, index, serializers[index])
+            val result = decodeSerializableElement(descriptor, index, options[index].serializer)
             if(decodeElementIndex(descriptor) != CompositeDecoder.DECODE_DONE) throw SerializationException("Single key expected, but received multiple.")
             result
         }
@@ -63,7 +61,7 @@ public class MySealedClassSerializer<T : Any>(
         encoder.encodeStructure(descriptor) {
             val index = getIndex(value)
             @Suppress("UNCHECKED_CAST")
-            this.encodeSerializableElement<Any?>(descriptor, index, serializers[index] as KSerializer<Any?>, value)
+            this.encodeSerializableElement<Any?>(descriptor, index, options[index].serializer as KSerializer<Any?>, value)
         }
     }
 }
