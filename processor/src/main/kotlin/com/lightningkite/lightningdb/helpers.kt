@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
 import com.google.devtools.ksp.symbol.*
+import org.jetbrains.kotlin.util.capitalizeDecapitalize.decapitalizeAsciiOnly
 import kotlin.math.min
 
 val KSTypeReference.usesSub: Boolean get() = (this.resolve().declaration as? KSClassDeclaration)?.usesSub ?: false
@@ -61,13 +62,20 @@ fun KSType.toKotlin(annotations: Sequence<KSAnnotation> = this.annotations): Str
         it.toString()
     }.let { if (it.isBlank()) "" else "$it " }
 
-    return if (declaration.qualifiedName!!.asString() == "com.lightningkite.lightningdb.UUIDFor") {
-        "${annotationString}UUIDFor<*>"
-    } else {
-        annotationString + (declaration.safeLocalReference() + if (arguments.isNotEmpty() && this.declaration !is KSTypeAlias) {
-            arguments.joinToString(", ", "<", ">") { it.type?.toKotlin() ?: "*" }
-        } else "")
-    } + if (isMarkedNullable) "?" else ""
+    return annotationString + (declaration.safeLocalReference() + if (arguments.isNotEmpty() && this.declaration !is KSTypeAlias) {
+        arguments.joinToString(", ", "<", ">") { it.type?.toKotlin() ?: "*" }
+    } else "") + if (isMarkedNullable) "?" else ""
+}
+
+fun KSType.toKotlinSerializer(contextualTypes: List<KSType>): String {
+    if(this in contextualTypes) return "ContextualSerializer(${this.toKotlin()}::class)" + if (isMarkedNullable) ".nullable" else ""
+    (this.declaration as? KSTypeParameter)?.let { return it.name.asString().decapitalizeAsciiOnly() }
+
+    val annotationString = annotations.joinToString(" ") {
+        it.toString()
+    }.let { if (it.isBlank()) "" else "$it " }
+
+    return annotationString + declaration.safeLocalReference() + ".serializer" + arguments.joinToString(", ", "(", ")") { it.type?.resolve()?.toKotlinSerializer(contextualTypes) ?: "*" } + if (isMarkedNullable) ".nullable" else ""
 }
 
 fun KSType.toKotlinLeast(annotations: Sequence<KSAnnotation> = this.annotations, alreadyProcessed: Set<KSName> = setOf()): String {
@@ -80,13 +88,9 @@ fun KSType.toKotlinLeast(annotations: Sequence<KSAnnotation> = this.annotations,
         it.toString()
     }.let { if (it.isBlank()) "" else "$it " }
 
-    return if (declaration.qualifiedName!!.asString() == "com.lightningkite.lightningdb.UUIDFor") {
-        "${annotationString}UUIDFor<*>"
-    } else {
-        annotationString + (declaration.safeLocalReference() + if (arguments.isNotEmpty() && this.declaration !is KSTypeAlias) {
-            arguments.joinToString(", ", "<", ">") { it.type?.resolve()?.toKotlinLeast(alreadyProcessed = alreadyProcessed) ?: "*" }
-        } else "")
-    } + if (isMarkedNullable) "?" else ""
+    return annotationString + (declaration.safeLocalReference() + if (arguments.isNotEmpty() && this.declaration !is KSTypeAlias) {
+        arguments.joinToString(", ", "<", ">") { it.type?.resolve()?.toKotlinLeast(alreadyProcessed = alreadyProcessed) ?: "*" }
+    } else "") + if (isMarkedNullable) "?" else ""
 }
 
 fun List<ResolvedAnnotation>.byName(

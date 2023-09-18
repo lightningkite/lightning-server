@@ -1,8 +1,10 @@
+@file:UseContextualSerialization(Instant::class)
 package com.lightningkite.lightningserver.exceptions
 
 import com.lightningkite.lightningdb.*
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseContextualSerialization
 import java.time.Instant
 import java.util.*
 
@@ -12,7 +14,7 @@ import java.util.*
 @GenerateDataClassPaths
 data class ReportedExceptionGroup(
     override val _id: Int,
-    @Contextual val lastOccurredAt: Instant = Instant.now(),
+    /*@Contextual */val lastOccurredAt: Instant = Instant.now(),
     val count: Int = 1,
     val context: String,
     val server: String,
