@@ -31,7 +31,7 @@ class SentryExceptionReporter(val dsn: String): ExceptionReporter {
 
     init {
         val name = generalSettings().projectName.filter { it.isLetterOrDigit() }
-        val version = System.getenv("AWS_LAMBDA_FUNCTION_VERSION").takeUnless { it.isBlank() } ?: "UNKNOWN"
+        val version = System.getenv("AWS_LAMBDA_FUNCTION_VERSION")?.takeUnless { it.isBlank() } ?: "UNKNOWN"
         Sentry.init("$dsn?release=$version&environment=$name")
     }
 

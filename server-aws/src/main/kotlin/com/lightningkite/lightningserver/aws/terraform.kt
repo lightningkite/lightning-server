@@ -1060,6 +1060,7 @@ internal fun defaultAwsHandler(project: TerraformProjectInfo) = with(project) {
                     appendLine("""   
                     module "vpc" {
                       source = "terraform-aws-modules/vpc/aws"
+                      version = "4.0.2"
                     
                       name = "$namePrefix"
                       cidr = "${'$'}{var.ip_prefix}.0.0/16"
