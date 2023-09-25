@@ -69,19 +69,25 @@ private fun embeddedMongo(deleteAfter: Boolean, replFile: File, port: Int): Mong
         }
     }
 
-    val wrapped = MongoClient.create(
+    val client = MongoClient.create(
         MongoClientSettings.builder()
-            .applyConnectionString(ConnectionString("mongodb://localhost:$port/?replicaSet=rs0"))
-            .uuidRepresentation(UuidRepresentation.STANDARD)
-            .build())
-    var closeable: Closeable? = null
-    var fromShutdownHook = false
-    val shutdownHook = Thread {
-        fromShutdownHook = true
-        closeable?.close()
-    }
-    val client = wrapped
-    closeable = client
-    Runtime.getRuntime().addShutdownHook(shutdownHook)
+            .apply {
+
+                applyConnectionString(ConnectionString("mongodb://localhost:$port/?replicaSet=rs0"))
+                uuidRepresentation(UuidRepresentation.STANDARD)
+            }
+            .build()
+    )
+
+
+    Runtime.getRuntime().addShutdownHook(Thread {
+        try {
+            client.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        mongodExecutable.stop()
+        if (deleteAfter) replFile.deleteRecursively()
+    })
     return client
 }

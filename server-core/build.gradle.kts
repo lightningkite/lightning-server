@@ -34,7 +34,7 @@ dependencies {
     implementation("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
 
     api("io.ktor:ktor-client-content-negotiation:$ktorVersion")
-    api("io.ktor:ktor-client-cio:$ktorVersion")
+    api("io.ktor:ktor-client-cio-jvm:2.3.4")
 
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines")
