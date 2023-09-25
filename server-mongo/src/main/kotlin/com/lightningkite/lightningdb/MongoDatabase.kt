@@ -1,6 +1,5 @@
 package com.lightningkite.lightningdb
 
-import com.github.jershell.kbson.*
 import com.lightningkite.lightningserver.core.Disconnectable
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -9,23 +8,13 @@ import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.kotlin.client.coroutine.MongoClient
 import com.mongodb.kotlin.client.coroutine.MongoCollection
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.overwriteWith
 import kotlinx.serialization.serializer
 import org.bson.BsonDocument
-import org.bson.BsonTimestamp
 import org.bson.UuidRepresentation
-import org.bson.types.Binary
-import org.bson.types.ObjectId
 import java.io.File
-import java.math.BigDecimal
-import java.time.*
-import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
 class MongoDatabase(val databaseName: String, private val makeClient: () -> MongoClient) : Database, Disconnectable {
@@ -53,46 +42,78 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
     companion object {
         init {
             DatabaseSettings.register("mongodb") {
-                val databaseName: String =
-                    it.url.substringAfter("://").substringAfter('@').substringAfter('/', "").substringBefore('?')
-                MongoDatabase(databaseName = databaseName) {
-                    MongoClient.create(MongoClientSettings.builder()
-                        .applyConnectionString(ConnectionString(it.url))
-                        .uuidRepresentation(UuidRepresentation.STANDARD)
-                        .applyToConnectionPoolSettings {
-                            if (Settings.isServerless) {
-                                it.maxSize(4)
-                                it.maxConnectionIdleTime(15, TimeUnit.SECONDS)
-                                it.maxConnectionLifeTime(1L, TimeUnit.MINUTES)
-                            }
+                Regex("""mongodb://.*/(?<databaseName>[^?]+)(?:\?.*)?""")
+                    .matchEntire(it.url)
+                    ?.let { match ->
+                        MongoDatabase(databaseName = match.groups["databaseName"]!!.value) {
+                            MongoClient.create(MongoClientSettings.builder()
+                                .applyConnectionString(ConnectionString(it.url))
+                                .uuidRepresentation(UuidRepresentation.STANDARD)
+                                .applyToConnectionPoolSettings {
+                                    if (Settings.isServerless) {
+                                        it.maxSize(4)
+                                        it.maxConnectionIdleTime(15, TimeUnit.SECONDS)
+                                        it.maxConnectionLifeTime(1L, TimeUnit.MINUTES)
+                                    }
+                                }
+                                .build()
+                            )
                         }
-                        .build()
-                    )
-                }
+                    }
+                    ?: throw IllegalStateException("Invalid mongodb URL. The URL should match the pattern: mongodb://[credentials and host information]/[databaseName]?[params]")
             }
             DatabaseSettings.register("mongodb+srv") {
-                val databaseName: String =
-                    it.url.substringAfter("://").substringAfter('@').substringAfter('/', "").substringBefore('?')
-                MongoDatabase(databaseName = databaseName) {
-                    MongoClient.create(MongoClientSettings.builder()
-                        .applyConnectionString(ConnectionString(it.url))
-                        .uuidRepresentation(UuidRepresentation.STANDARD)
-                        .applyToConnectionPoolSettings {
-                            if (Settings.isServerless) {
-                                it.maxSize(4)
-                                it.maxConnectionIdleTime(15, TimeUnit.SECONDS)
-                                it.maxConnectionLifeTime(1L, TimeUnit.MINUTES)
-                            }
+                Regex("""mongodb\+srv://.*/(?<databaseName>[^?]+)(?:\?.*)?""")
+                    .matchEntire(it.url)
+                    ?.let { match ->
+                        MongoDatabase(databaseName = match.groups["databaseName"]!!.value) {
+                            MongoClient.create(MongoClientSettings.builder()
+                                .applyConnectionString(ConnectionString(it.url))
+                                .uuidRepresentation(UuidRepresentation.STANDARD)
+                                .applyToConnectionPoolSettings {
+                                    if (Settings.isServerless) {
+                                        it.maxSize(4)
+                                        it.maxConnectionIdleTime(15, TimeUnit.SECONDS)
+                                        it.maxConnectionLifeTime(1L, TimeUnit.MINUTES)
+                                    }
+                                }
+                                .build()
+                            )
                         }
-                        .build()
-                    )
-                }
+                    }
+                    ?: throw IllegalStateException("Invalid mongodb URL. The URL should match the pattern: mongodb+srv://[credentials and host information]/[databaseName]?[params]")
             }
             DatabaseSettings.register("mongodb-test") {
-                MongoDatabase(databaseName = "default") { testMongo() }
+                Regex("""mongodb-test://(?:\?(?<params>.*))?""")
+                    .matchEntire(it.url)
+                    ?.let { match ->
+                        val params: Map<String, List<String>>? = match.groups["params"]?.value?.let { params ->
+                            DatabaseSettings.parseParameterString(params)
+                        }
+                        MongoDatabase(databaseName = "default") {
+                            testMongo(version = params?.get("mongoVersion")?.firstOrNull())
+                        }
+                    }
+                    ?: throw IllegalStateException("Invalid mongodb-test URL. The URL should match the pattern: mongodb-test://?[params]\nAvailable params are: mongoVersion")
             }
             DatabaseSettings.register("mongodb-file") {
-                MongoDatabase(databaseName = "default") { embeddedMongo(File(it.url.removePrefix("mongodb-file://"))) }
+                Regex("""mongodb-file://(?<folder>[^?]+)(?:\?(?<params>.*))?""")
+                    .matchEntire(it.url)
+                    ?.let { match ->
+                        val folder = match.groups["folder"]!!.value
+                        val params: Map<String, List<String>>? = match.groups["params"]?.value?.let { params ->
+                            DatabaseSettings.parseParameterString(params)
+                        }
+                        MongoDatabase(databaseName = params?.get("databaseName")?.firstOrNull() ?: "default") {
+                            embeddedMongo(
+                                replFile = File(folder),
+                                port = params?.get("port")?.firstOrNull()?.toIntOrNull(),
+                                version = params?.get("mongoVersion")?.firstOrNull()
+                            )
+                        }
+
+                    }
+                    ?: throw IllegalStateException("Invalid mongodb-file URL. The URL should match the pattern: mongodb-file://[FolderPath]?[params]\nAvailable params are: mongoVersion, port, databaseName")
             }
         }
     }

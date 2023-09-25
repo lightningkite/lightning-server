@@ -18,13 +18,12 @@ import java.nio.file.Files
 
 fun testMongo(
     replFile: File = Files.createTempDirectory("embeddedMongo").toFile(),
-    port: Int? = null,
     version: String? = null
 ): MongoClient = embeddedMongo(
-    true,
-    replFile,
-    port ?: Network.freeServerPort(Network.getLocalHost()),
-    version?.let { Version.Main.valueOf(it) } ?: Version.Main.V6_0
+    deleteAfter = true,
+    replFile = replFile,
+    port = Network.freeServerPort(Network.getLocalHost()),
+    version = version?.let { Version.Main.valueOf(it) } ?: Version.Main.V6_0
 )
 
 fun embeddedMongo(
@@ -33,10 +32,10 @@ fun embeddedMongo(
     version: String? = null
 ): MongoClient =
     embeddedMongo(
-        false,
-        replFile,
-        port ?: 54961,
-        version?.let { Version.Main.valueOf(it) } ?: Version.Main.V6_0
+        deleteAfter = false,
+        replFile = replFile,
+        port = port ?: 54961,
+        version = version?.let { Version.Main.valueOf(it) } ?: Version.Main.V6_0
     )
 
 private fun embeddedMongo(
