@@ -3,26 +3,48 @@ package com.lightningkite.lightningdb
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.kotlin.client.coroutine.MongoClient
+import de.flapdoodle.embed.mongo.MongodStarter
+import de.flapdoodle.embed.mongo.config.*
+import de.flapdoodle.embed.mongo.distribution.Version
+import de.flapdoodle.embed.mongo.packageresolver.Command
+import de.flapdoodle.embed.process.config.process.ProcessOutput
+import de.flapdoodle.embed.process.runtime.Network
 import kotlinx.coroutines.runBlocking
 import org.bson.Document
 import org.bson.UuidRepresentation
 import org.slf4j.LoggerFactory
 import java.io.File
-import de.flapdoodle.embed.mongo.packageresolver.Command
-import de.flapdoodle.embed.mongo.MongodStarter
-import de.flapdoodle.embed.mongo.config.*
-import de.flapdoodle.embed.mongo.distribution.Version
-import de.flapdoodle.embed.process.config.process.ProcessOutput
-import de.flapdoodle.embed.process.runtime.Network
-import java.io.Closeable
 import java.nio.file.Files
 
-fun testMongo(replFile: File = Files.createTempDirectory("embeddedMongo").toFile(), port: Int = Network.freeServerPort(Network.getLocalHost())): MongoClient
-    = embeddedMongo(true, replFile, port)
-fun embeddedMongo(replFile: File = File("./build/embeddedMongo"), port: Int = 54961): MongoClient
-    = embeddedMongo(false, replFile, port)
+fun testMongo(
+    replFile: File = Files.createTempDirectory("embeddedMongo").toFile(),
+    port: Int? = null,
+    version: String? = null
+): MongoClient = embeddedMongo(
+    true,
+    replFile,
+    port ?: Network.freeServerPort(Network.getLocalHost()),
+    version?.let { Version.Main.valueOf(it) } ?: Version.Main.V6_0
+)
 
-private fun embeddedMongo(deleteAfter: Boolean, replFile: File, port: Int): MongoClient {
+fun embeddedMongo(
+    replFile: File = File("./build/embeddedMongo"),
+    port: Int? = null,
+    version: String? = null
+): MongoClient =
+    embeddedMongo(
+        false,
+        replFile,
+        port ?: 54961,
+        version?.let { Version.Main.valueOf(it) } ?: Version.Main.V6_0
+    )
+
+private fun embeddedMongo(
+    deleteAfter: Boolean,
+    replFile: File,
+    port: Int,
+    version: Version.Main = Version.Main.V6_0
+): MongoClient {
     val starter = MongodStarter.getInstance(
         Defaults.runtimeConfigFor(Command.MongoD, LoggerFactory.getLogger("embeddedMongo"))
             .processOutput(ProcessOutput.silent())
@@ -30,8 +52,9 @@ private fun embeddedMongo(deleteAfter: Boolean, replFile: File, port: Int): Mong
     )
     val replFileExisted = replFile.exists() && replFile.list()?.isEmpty() == false
     replFile.mkdirs()
+
     val mongodConfig: MongodConfig = MongodConfig.builder()
-        .version(Version.Main.V6_0)
+        .version(version)
         .replication(Storage(replFile.toString(), "rs0", 128))
         .cmdOptions(
             MongoCmdOptions.builder()
@@ -46,7 +69,7 @@ private fun embeddedMongo(deleteAfter: Boolean, replFile: File, port: Int): Mong
     val mongodExecutable = starter.prepare(mongodConfig)
     mongodExecutable.start()
 
-    if(!replFileExisted) {
+    if (!replFileExisted) {
         runBlocking {
             try {
                 MongoClient
