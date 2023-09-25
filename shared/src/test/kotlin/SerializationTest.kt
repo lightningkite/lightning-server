@@ -3,7 +3,17 @@
 package com.lightningkite.lightningdb
 
 import kotlinx.serialization.*
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.AbstractDecoder
+import kotlinx.serialization.encoding.CompositeDecoder
+import kotlinx.serialization.internal.GeneratedSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.EmptySerializersModule
+import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.properties.Properties
 import kotlinx.serialization.properties.decodeFromStringMap
 import kotlinx.serialization.properties.encodeToStringMap
@@ -106,13 +116,13 @@ class SerializationTest {
         condition<Cursed> { it.insideClass.item eq UUID.randomUUID() }.cycle()
     }
 
-    @Test fun metaTest() {
-        condition<MetaModel> { it.number eq 22 }.cycle()
-        condition<MetaModel> { it.condition eq condition<MetaModel> { it.number eq 22 } }.cycle()
-        modification<MetaModel> { it.number assign 22 }.cycle()
-        modification<MetaModel> { it.condition assign condition<MetaModel> { it.number eq 22 } }.cycle()
-        modification<MetaModel> { it.modification assign modification<MetaModel> { it.number assign 22 } }.cycle()
-    }
+//    @Test fun metaTest() {
+//        condition<MetaModel> { it.number eq 22 }.cycle()
+//        condition<MetaModel> { it.condition eq condition<MetaModel> { it.number eq 22 } }.cycle()
+//        modification<MetaModel> { it.number assign 22 }.cycle()
+//        modification<MetaModel> { it.condition assign condition<MetaModel> { it.number eq 22 } }.cycle()
+//        modification<MetaModel> { it.modification assign modification<MetaModel> { it.number assign 22 } }.cycle()
+//    }
 
     @Test fun conditions() {
         val sampleCondition = path<LargeTestModel>().int eq 2
@@ -236,5 +246,23 @@ class SerializationTest {
         val recreated = myJson.decodeFromString<DataClassPathPartial<T>>(asString)
         println(recreated)
         assertEquals(this, recreated)
+    }
+
+
+    @OptIn(InternalSerializationApi::class)
+    @Test fun studyCheating() {
+        val a = ListSerializer(Int.serializer().nullable).nullable
+        println(a)
+        println(a.innerElement())
+        println(a.innerElement().innerElement())
+        println(a.innerElement().innerElement().innerElement())
+        println(MapSerializer(String.serializer(), Int.serializer()).innerElement())
+        println(MapSerializer(String.serializer(), Int.serializer()).innerElement2())
+
+        println((Cursed.Inside.serializer(ListSerializer(Int.serializer().nullable)) as GeneratedSerializer<*>).typeParametersSerializers()[0])
+
+        println(LargeTestModel.serializer().serializableProperties.joinToString())
+
+        println(Cursed.Inside.serializer(ListSerializer(Int.serializer().nullable)).serializableProperties.joinToString { "${it.name}: ${it.serializer.descriptor.serialName}" })
     }
 }

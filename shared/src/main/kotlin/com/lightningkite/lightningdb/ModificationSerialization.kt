@@ -50,7 +50,7 @@ private fun <T> numberOptions(serializer: KSerializer<T>): List<MySealedClassSer
 private val stringOptions: List<MySealedClassSerializer.Option<Modification<String>, *>>  = comparableOptions(String.serializer()) + listOf(
     MySealedClassSerializer.Option(Modification.AppendString.serializer()) { it is Modification.AppendString },
 )
-//private fun <T: Any> classOptions(inner: KSerializer<T>, fields: List<KProperty1Alt<T, *>>): List<MySealedClassSerializer.Option<Modification<T>, *>> = commonOptions(inner) + fields.map { prop ->
+//private fun <T: Any> classOptions(inner: KSerializer<T>, fields: List<SerializableProperty<T, *>>): List<MySealedClassSerializer.Option<Modification<T>, *>> = commonOptions(inner) + fields.map { prop ->
 //    MySealedClassSerializer.Option(ModificationOnFieldSerializer(prop)) { it is Modification.OnField<*, *> && it.key.name == prop.name }
 //}
 private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<T>, *>> = commonOptions(inner) + inner.childSerializers()!!.let {
@@ -63,8 +63,8 @@ private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySeale
     }
 }
 
-private val cache = HashMap<KSerializer<*>, KSerializer<*>>()
-data class ModificationSerializer<T>(val inner: KSerializer<T>): KSerializer<Modification<T>> by (cache.getOrPut(inner) {
+private val cache = HashMap<KSerializerKey, KSerializer<*>>()
+data class ModificationSerializer<T>(val inner: KSerializer<T>): KSerializer<Modification<T>> by (cache.getOrPut(KSerializerKey(inner)) {
     MySealedClassSerializer<Modification<T>>("com.lightningkite.lightningdb.Modification", {
         println("PREPARING FIELDS FOR ${inner.descriptor.serialName}")
         val r = when {

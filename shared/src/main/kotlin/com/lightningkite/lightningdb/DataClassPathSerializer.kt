@@ -21,9 +21,9 @@ private class KProperty1Parser<T>(val serializer: KSerializer<T>) {
         }.associate { it }
     }
     companion object {
-        val existing = HashMap<KSerializer<*>, KProperty1Parser<*>>()
+        val existing = HashMap<KSerializerKey, KProperty1Parser<*>>()
         @Suppress("UNCHECKED_CAST")
-        operator fun <T> get(serializer: KSerializer<T>): KProperty1Parser<T> = existing.getOrPut(serializer) {
+        operator fun <T> get(serializer: KSerializer<T>): KProperty1Parser<T> = existing.getOrPut(KSerializerKey(serializer)) {
             KProperty1Parser(serializer)
         } as KProperty1Parser<T>
     }

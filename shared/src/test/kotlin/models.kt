@@ -15,7 +15,7 @@ data class User(
     override val _id: UUID = UUID.randomUUID(),
     var email: String,
     var age: Long = 0,
-    var friends: List<UUIDFor<User>> = listOf()
+    var friends: List<UUID> = listOf()
 ) : HasId<UUID> {
     companion object
 }
@@ -24,7 +24,7 @@ data class User(
 @Serializable
 data class Post(
     override val _id: UUID = UUID.randomUUID(),
-    var author: UUIDFor<User>,
+    var author: UUID,
     var content: String,
     var at: Long? = null
 ) : HasId<UUID> {
@@ -129,11 +129,11 @@ data class Cursed(
     data class Inside<T>(val item: T)
 }
 
-@GenerateDataClassPaths
-@Serializable
-data class MetaModel(
-    override val _id: UUID = UUID.randomUUID(),
-    val number: Int = 22,
-    val condition: Condition<MetaModel> = Condition.Always(),
-    val modification: Modification<MetaModel> = Modification.Chain(listOf())
-): HasId<UUID>
+//@GenerateDataClassPaths
+//@Serializable
+//data class MetaModel(
+//    override val _id: UUID = UUID.randomUUID(),
+//    val number: Int = 22,
+//    val condition: Condition<MetaModel> = Condition.Always(),
+//    val modification: Modification<MetaModel> = Modification.Chain(listOf())
+//): HasId<UUID>

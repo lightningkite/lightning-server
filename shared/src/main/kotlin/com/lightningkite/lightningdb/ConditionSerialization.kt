@@ -57,7 +57,7 @@ private val stringOptions: List<MySealedClassSerializer.Option<Condition<String>
     MySealedClassSerializer.Option(Condition.StringContains.serializer(), setOf("Search")) { it is Condition.StringContains },
     MySealedClassSerializer.Option(Condition.RegexMatches.serializer()) { it is Condition.RegexMatches },
 )
-//private fun <T: Any> classOptions(inner: KSerializer<T>, fields: List<KProperty1Alt<T, *>>): List<MySealedClassSerializer.Option<Condition<T>, *>> = commonOptions(inner) + fields.map { prop ->
+//private fun <T: Any> classOptions(inner: KSerializer<T>, fields: List<SerializableProperty<T, *>>): List<MySealedClassSerializer.Option<Condition<T>, *>> = commonOptions(inner) + fields.map { prop ->
 //    MySealedClassSerializer.Option(ConditionOnFieldSerializer(prop)) { it is Condition.OnField<*, *> && it.key.name == prop.name }
 //}
 private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> = commonOptions(inner) + inner.childSerializers()!!.let {
@@ -70,17 +70,17 @@ private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySeale
     }
 }
 
-private val cache = HashMap<KSerializer<*>, KSerializer<*>>()
-class ConditionSerializer<T>(val inner: KSerializer<T>): KSerializer<Condition<T>> by (cache.getOrPut(inner) {
+private val cache = HashMap<KSerializerKey, KSerializer<*>>()
+class ConditionSerializer<T>(val inner: KSerializer<T>): KSerializer<Condition<T>> by (cache.getOrPut(KSerializerKey(inner)) {
     MySealedClassSerializer<Condition<T>>("com.lightningkite.lightningdb.Condition", {
         val r = when {
-            inner.nullElement() != null -> nullableOptions(inner.nullElement()!! as KSerializer<Any>)
+            inner.descriptor.isNullable -> nullableOptions(inner.innerElement() as KSerializer<Any>)
             inner.descriptor.kind == PrimitiveKind.STRING -> stringOptions
             inner.descriptor.kind == PrimitiveKind.INT -> intOptions
-            inner.descriptor.kind == StructureKind.MAP -> stringMapOptions(inner.mapValueElement()!!)
+            inner.descriptor.kind == StructureKind.MAP -> stringMapOptions(inner.innerElement2())
             inner.descriptor.kind == StructureKind.LIST -> {
-                if(inner.descriptor.serialName.contains("Set")) setOptions(inner.listElement()!!)
-                else listOptions(inner.listElement()!!)
+                if(inner.descriptor.serialName.contains("Set")) setOptions(inner.innerElement())
+                else listOptions(inner.innerElement())
             }
             inner.childSerializers() != null -> classOptionsReflective(inner as KSerializer<Any>)
             else -> comparableOptions(inner as KSerializer<String>)

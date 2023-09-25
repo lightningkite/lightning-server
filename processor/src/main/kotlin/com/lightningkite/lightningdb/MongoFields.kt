@@ -83,11 +83,14 @@ data class MongoFields(
         val contextualTypes = declaration.containingFile?.annotation("UseContextualSerialization", "kotlinx.serialization")?.arguments?.firstOrNull()
             ?.value
             ?.let { it as? List<KSType> }
+            ?.map { it.declaration }
             ?: listOf()
         appendLine("// Contextual types: ${contextualTypes}")
         if(declaration.typeParameters.isEmpty()) {
             appendLine("fun prepare${simpleName}Fields() {")
             tab {
+                appendLine("val props: Array<SerializableProperty<$classReference, *>> = arrayOf(${fields.joinToString { field -> "${simpleName}_${field.name}" }})")
+                appendLine("$classReference.serializer().properties { props }")
                 for (field in fields) {
                     appendLine("$classReference::${field.name}.setCopyImplementation { original, value -> original.copy(${field.name} = value) }")
                 }
@@ -100,7 +103,7 @@ data class MongoFields(
             appendLine()
             appendLine()
             for (field in fields) {
-                appendLine("object ${simpleName}_${field.name}: KProperty1Alt<$typeReference, ${field.kotlinType.toKotlin()}> {")
+                appendLine("object ${simpleName}_${field.name}: SerializableProperty<$typeReference, ${field.kotlinType.toKotlin()}> {")
                 tab {
                     appendLine("""override val name: String = "${field.name}"""")
                     appendLine("""override fun get(receiver: $typeReference): ${field.kotlinType.toKotlin()} = receiver.${field.name}""")
@@ -112,6 +115,15 @@ data class MongoFields(
         } else {
             appendLine("fun prepare${simpleName}Fields() {")
             tab {
+                val nothings = declaration.typeParameters.joinToString(", ") { "NothingSerializer()" }
+                appendLine("$classReference.serializer($nothings).properties { args -> arrayOf(")
+                tab {
+                    val args = declaration.typeParameters.indices.joinToString(", ") { "args[$it]" }
+                    for(field in fields) {
+                        appendLine("${simpleName}_${field.name}($args)")
+                    }
+                }
+                appendLine(") }")
                 for (field in fields) {
                     appendLine("$classReference<${declaration.typeParameters.joinToString(", ") { it.bounds.firstOrNull()?.resolve()?.toKotlinLeast(alreadyProcessed = setOf(it.name)) ?: "Any?" }}>::${field.name}.setCopyImplementation { original, value -> original.copy(${field.name} = value) }")
                 }
@@ -123,7 +135,7 @@ data class MongoFields(
             appendLine()
             appendLine()
             for (field in fields) {
-                appendLine("class ${simpleName}_${field.name}<${declaration.typeParameters.joinToString(", ") { it.name.asString() + ": " + (it.bounds.firstOrNull()?.toKotlin() ?: "Any?") }}>(${declaration.typeParameters.joinToString(", ") { it.name.asString().decapitalizeAsciiOnly() + ": KSerializer<${it.name.asString()}>" }}): KProperty1Alt<$typeReference, ${field.kotlinType.toKotlin()}> {")
+                appendLine("class ${simpleName}_${field.name}<${declaration.typeParameters.joinToString(", ") { it.name.asString() + ": " + (it.bounds.firstOrNull()?.toKotlin() ?: "Any?") }}>(${declaration.typeParameters.joinToString(", ") { it.name.asString().decapitalizeAsciiOnly() + ": KSerializer<${it.name.asString()}>" }}): SerializableProperty<$typeReference, ${field.kotlinType.toKotlin()}> {")
                 tab {
                     appendLine("""override val name: String = "${field.name}"""")
                     appendLine("""override fun get(receiver: $typeReference): ${field.kotlinType.toKotlin()} = receiver.${field.name}""")
