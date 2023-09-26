@@ -57,6 +57,6 @@ enum class OauthAccessType {
 }
 
 object OauthGrantTypes {
-    val authorizationCode = "authorization_code"
-    val refreshToken = "refresh_token"
+    const val authorizationCode = "authorization_code"
+    const val refreshToken = "refresh_token"
 }

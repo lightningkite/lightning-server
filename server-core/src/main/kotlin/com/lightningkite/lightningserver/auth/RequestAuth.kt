@@ -7,9 +7,11 @@ import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.Request
 import java.time.Duration
 import java.time.Instant
+import java.util.UUID
 
 data class RequestAuth<SUBJECT : HasId<*>>(
     val subject: Authentication.SubjectHandler<SUBJECT, *>,
+    val sessionId: UUID?,
     val rawId: Comparable<*>,
     val issuedAt: Instant,
     @Description("The scopes permitted.  Null indicates root access.")

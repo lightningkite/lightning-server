@@ -31,6 +31,7 @@ class JwtTokenFormat(
         return hasher().signJwt(
             JwtClaims(
                 iss = issuer,
+                sid = auth.sessionId,
                 sub = "${handler.name}|${Serialization.json.encodeUnwrappingString<ID>(handler.idSerializer, auth.id)}",
                 aud = audience,
                 exp = Instant.now().plus(Duration.ofMinutes(5)).epochSecond,
@@ -59,7 +60,8 @@ class JwtTokenFormat(
             issuedAt = Instant.ofEpochSecond(claims.iat),
             scopes = claims.scope?.split(' ')?.toSet(),
             cachedRaw = mapOf(),
-            thirdParty = claims.thp
+            thirdParty = claims.thp,
+            sessionId = claims.sid,
         )
     }
 

@@ -6,10 +6,10 @@ import com.lightningkite.lightningserver.auth.old.*
 import com.lightningkite.lightningserver.auth.old.BaseAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.EmailAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.PasswordAuthEndpoints
-import com.lightningkite.lightningserver.auth.proof.EmailProofEndpoints
-import com.lightningkite.lightningserver.auth.proof.OneTimePasswordProofEndpoints
+import com.lightningkite.lightningserver.auth.proof.*
 import com.lightningkite.lightningserver.auth.proof.PinHandler
-import com.lightningkite.lightningserver.auth.proof.SmsProofEndpoints
+import com.lightningkite.lightningserver.auth.subject.AuthEndpointsForSubject
+import com.lightningkite.lightningserver.auth.token.JwtTokenFormat
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.MemcachedCache
 import com.lightningkite.lightningserver.cache.get
@@ -22,6 +22,7 @@ import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.email.SesClient
 import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.encryption.secureHash
+import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.SentryExceptionReporter
 import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.files.S3FileSystem
@@ -45,6 +46,7 @@ import com.lightningkite.lightningserver.websocket.MultiplexWebSocketHandler
 import com.lightningkite.lightningserver.websocket.websocket
 import io.ktor.client.request.*
 import kotlinx.coroutines.delay
+import kotlinx.serialization.KSerializer
 import java.lang.IllegalStateException
 import java.time.Duration
 import java.util.*
@@ -238,5 +240,42 @@ object Server : ServerPathGroup(ServerPath.root) {
         plainText = "Your PIN is {{PIN}}."
     ))
     val proofOtp = OneTimePasswordProofEndpoints(path("proof/otp"), jwtSigner, database, cache)
+    val subjects = AuthEndpointsForSubject(
+        path("subject"),
+        object: Authentication.SubjectHandler<User, UUID> {
+            override val name: String get() = "User"
+            override val idProofs: Set<String> = setOf("email")
+            override val authType: AuthType get() = AuthType<User>()
+            override val applicableProofs: Set<String> = setOf("email", "otp")
+            override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<User, UUID>? {
+                val emailIdentifier = proofs.find { it.of == "email" } ?: return null
+                val user = userInfo.collection().findOne(condition { it.email eq emailIdentifier.value }) ?: run {
+                    userInfo.collection().insertOne(User(
+                        email = emailIdentifier.value
+                    ))
+                } ?: return null
+                val options = listOfNotNull(
+                    ProofOption(proofEmail.info, user.email),
+                    proofOtp.proofOption(this, user._id),
+                )
+                return Authentication.AuthenticateResult(
+                    id = user._id,
+                    subjectCopy = user,
+                    options = options,
+                    strengthRequired = 15
+                )
+            }
+
+            override val idSerializer: KSerializer<UUID>
+                get() = userInfo.serialization.idSerializer
+            override val subjectSerializer: KSerializer<User>
+                get() = userInfo.serialization.serializer
+
+            override suspend fun fetch(id: UUID): User = userInfo.collection().get(id) ?: throw NotFoundException()
+        },
+        database = database,
+        proofHasher = jwtSigner,
+        tokenFormat = { JwtTokenFormat(jwtSigner) }
+    )
 }
 

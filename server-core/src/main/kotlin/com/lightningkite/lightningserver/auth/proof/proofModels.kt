@@ -54,41 +54,6 @@ data class ProofEvidence(
     val secret: String
 )
 
-@GenerateDataClassPaths
-@Serializable
-data class OauthClient(
-    override val _id: String,
-    val scopes: Set<String>,
-    val secretHash: String,
-) : HasId<String> {
-
-}
-
-@Serializable
-data class SubSessionRequest(
-    val label: String,
-    val scopes: Set<String>? = null,
-    val oauthClient: String? = null,
-    val expires: Instant? = null,
-)
-
-@GenerateDataClassPaths
-@Serializable
-data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
-    override val _id: String = Base64.getEncoder().encodeToString(ByteArray(24) { 0 }.apply {
-        SecureRandom.getInstanceStrong().nextBytes(this)
-    }),
-    val label: String? = null,
-    val subjectId: ID,
-    val createdAt: Instant = Instant.now(),
-    val lastUsed: Instant = Instant.now(),
-    val expires: Instant? = null,
-    val ips: Set<String> = setOf(),
-    val userAgents: Set<String> = setOf(),
-    val scopes: Set<String>? = null,
-    val oauthClient: String? = null,
-) : HasId<String>
-
 @Serializable
 data class ProofMethodInfo(
     val via: String,
@@ -110,12 +75,4 @@ data class Proof(
     val value: String,
     val at: Instant,
     val signature: String,
-)
-
-@Serializable
-data class IdAndAuthMethods<ID>(
-    val id: ID? = null,
-    val options: List<ProofOption> = listOf(),
-    val strengthRequired: Int = 1,
-    @References(Session::class) val session: String? = null,
 )

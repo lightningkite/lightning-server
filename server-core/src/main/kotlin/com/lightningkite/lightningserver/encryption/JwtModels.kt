@@ -1,6 +1,9 @@
+@file:UseContextualSerialization(UUID::class)
 package com.lightningkite.lightningserver.encryption
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseContextualSerialization
+import java.util.UUID
 
 @Serializable
 data class JwtHeader(val typ: String = "JWT", val alg: String = "HS256")
@@ -17,6 +20,7 @@ data class JwtClaims(
     val userId: String? = null,
     val scope: String? = null,
     val thp: String? = null,
+    val sid: UUID? = null,
 )
 
 open class TokenException(message: String) : Exception(message)

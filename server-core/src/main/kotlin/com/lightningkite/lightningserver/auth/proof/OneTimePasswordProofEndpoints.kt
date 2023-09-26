@@ -47,7 +47,7 @@ class OneTimePasswordProofEndpoints(
     override val humanName: String
         get() = "One-time Password"
     override val validates: String
-        get() = "optKey"
+        get() = "otp"
     override val strength: Int
         get() = 5
 
@@ -66,11 +66,7 @@ class OneTimePasswordProofEndpoints(
         Tasks.onSettingsReady {
             Authentication.subjects.forEach {
                 ModelRestEndpoints<HasId<*>, OtpSecret<Comparable<Any>>, Comparable<Any>>(path("secrets/${it.value.name.lowercase()}"), modelInfo< HasId<*>, OtpSecret<Comparable<Any>>, Comparable<Any>>(
-                    serialization = ModelSerializationInfo(OtpSecret.serializer(it.value.idSerializer.also { println(it.descriptor.serialName) } as KSerializer<Comparable<Any>>).also {
-                        println(it.descriptor.serialName)
-                        println(it.serializableProperties?.joinToString { "${it.name}: ${it.serializer.descriptor.serialName}" })
-                        println(it.descriptor.getElementDescriptor(0).serialName)
-                    }, it.value.idSerializer as KSerializer<Comparable<Any>>),
+                    serialization = ModelSerializationInfo(OtpSecret.serializer(it.value.idSerializer as KSerializer<Comparable<Any>>), it.value.idSerializer as KSerializer<Comparable<Any>>),
                     authOptions = Authentication.isSuperUser as AuthOptions<HasId<*>>,
                     getCollection = { table(it.value) as FieldCollection<OtpSecret<Comparable<Any>>> },
                     modelName = "OtpSecret For ${it.value.name}"
@@ -153,4 +149,16 @@ class OneTimePasswordProofEndpoints(
             )
         }
     )
+
+    suspend fun <ID: Comparable<ID>> established(handler: Authentication.SubjectHandler<*, ID>, id: ID): Boolean {
+        @Suppress("UNCHECKED_CAST")
+        return table(handler).get(id as Comparable<Any>) != null
+    }
+    suspend fun <ID: Comparable<ID>> proofOption(handler: Authentication.SubjectHandler<*, ID>, id: ID): ProofOption? {
+        return if(established(handler, id)) {
+            ProofOption(info, key(handler, id))
+        } else {
+            null
+        }
+    }
 }

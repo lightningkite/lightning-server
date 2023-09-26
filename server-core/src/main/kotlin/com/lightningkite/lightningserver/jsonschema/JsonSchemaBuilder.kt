@@ -372,7 +372,6 @@ class JsonSchemaBuilder(
         }
     }
 
-    @OptIn(InternalSerializationApi::class)
     operator fun get(
         serializer: KSerializer<*>,
         annotationsToApply: List<Annotation> = listOf(),

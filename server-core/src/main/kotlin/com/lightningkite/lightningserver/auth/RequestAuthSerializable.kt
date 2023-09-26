@@ -1,4 +1,4 @@
-@file:UseContextualSerialization(Instant::class)
+@file:UseContextualSerialization(Instant::class, UUID::class)
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningdb.Description
@@ -11,10 +11,12 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import java.time.Instant
+import java.util.*
 
 @Serializable
 data class RequestAuthSerializable(
     val subjectType: String,
+    val sessionId: UUID?,
     val id: String,
     val issuedAt: Instant,
     @Description("The scopes permitted.  Null indicates root access.")
@@ -30,6 +32,7 @@ fun RequestAuth<*>.serializable() = RequestAuthSerializable(
     issuedAt = issuedAt,
     scopes = scopes,
     cachedRaw = cachedRaw,
+    sessionId = sessionId,
     thirdParty = thirdParty,
 )
 
@@ -42,6 +45,7 @@ fun RequestAuthSerializable.real(): RequestAuth<*> {
         issuedAt = issuedAt,
         scopes = scopes,
         cachedRaw = cachedRaw,
+        sessionId = sessionId,
         thirdParty = thirdParty,
     )
 }

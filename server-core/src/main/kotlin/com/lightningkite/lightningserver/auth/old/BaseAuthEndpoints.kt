@@ -107,7 +107,8 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
                     return RequestAuth(
                         subject = handler,
                         rawId = id,
-                        issuedAt = Instant.ofEpochSecond(claims.iat)
+                        issuedAt = Instant.ofEpochSecond(claims.iat),
+                        sessionId = null
                     )
                 } catch (e: JwtException) {
                     throw UnauthorizedException(e.message ?: "JWT issue")
