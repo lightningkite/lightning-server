@@ -263,6 +263,6 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 @JvmInline
 private value class RefreshToken(val string: String) {
     constructor(_id: UUID, secret: String):this("$_id:$secret")
-    val _id: UUID get() = UUID.fromString(string.substringBefore(':', "").also { println(it) })
+    val _id: UUID get() = UUID.fromString(string.substringBefore(':', ""))
     val plainTextSecret: String get() = string.substringAfter(':', "")
 }

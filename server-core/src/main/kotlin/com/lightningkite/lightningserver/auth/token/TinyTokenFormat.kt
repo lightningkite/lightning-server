@@ -27,10 +27,10 @@ class TinyTokenFormat(
         out.write(Serialization.javaData.encodeToByteArray(RequestAuthSerializable.serializer(), auth.serializable()))
         val r = out.toByteArray()
         hasher().sign(r) + r
-    }.let { Base64.getEncoder().encodeToString(it) }
+    }.let { Base64.getUrlEncoder().encodeToString(it) }
 
     companion object {
-        fun readUnsafe(skip: Int, data: String): RequestAuthSerializable = readUnsafe(skip, Base64.getDecoder().decode(data))
+        fun readUnsafe(skip: Int, data: String): RequestAuthSerializable = readUnsafe(skip, Base64.getUrlDecoder().decode(data))
         fun readUnsafe(skip: Int, data: ByteArray): RequestAuthSerializable {
             return Serialization.javaData.decodeFromByteArray(RequestAuthSerializable.serializer(), data.sliceArray(skip until data.size))
         }
@@ -40,7 +40,7 @@ class TinyTokenFormat(
         handler: Authentication.SubjectHandler<SUBJECT, ID>,
         value: String
     ): RequestAuth<SUBJECT>? = try {
-        val decoded = Base64.getDecoder().decode(value)
+        val decoded = Base64.getUrlDecoder().decode(value)
         val signature = decoded.sliceArray(0 until resultSize)
         val data = decoded.sliceArray(resultSize until decoded.size)
         if(!hasher().verify(data, signature)) throw TokenException("Incorrect signature")

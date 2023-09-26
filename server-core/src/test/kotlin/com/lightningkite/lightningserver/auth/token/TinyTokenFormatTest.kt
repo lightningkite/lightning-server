@@ -48,12 +48,4 @@ class TinyTokenFormatTest {
         assertEquals(a, format.read(subject, format.create(subject, a).also { println(it) }))
         assertNull(format.read(subject, format.create(subject, a).let { it.dropLast(1).plus(it.last().plus(1)) }))
     }
-
-    @Test fun readWrong() {
-        TestSettings
-        val f = TinyTokenFormat(SecureHasherSettings())
-        val token = "7aE1/cTA14azwc68FbC31lJH+Y2O7wuOhUg9j0SrCusABFVzZXIB1S1ZRR1PT/iEebSxv4y/uwAkNzRiMjk0NmQtNzM1ZS00OTU2LWE5NGItOTc0MDIxYjJjMDA0AAABitNyVTUAAAAAAQAFZW1haWwADXRlc3RAdGVzdC5jb20A"
-        assertNull(f.read(subject, token))
-        println(TinyTokenFormat.readUnsafe(f.resultSize, token))
-    }
 }

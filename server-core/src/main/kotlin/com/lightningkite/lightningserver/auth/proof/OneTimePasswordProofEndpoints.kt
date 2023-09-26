@@ -139,7 +139,6 @@ class OneTimePasswordProofEndpoints(
             @Suppress("UNCHECKED_CAST")
             val secret = table(subject).get(id as Comparable<Any>)
                 ?: throw BadRequestException("User ID and code do not match")
-            println("Expect ${secret.generator.generate()}")
             if (!secret.generator.isValid(input.secret, postedAt)) throw BadRequestException("User ID and code do not match")
             cache().remove(cacheKey)
             proofHasher().makeProof(
