@@ -14,7 +14,7 @@ interface SerializableProperty<A, B> {
 }
 private val serClassToList = HashMap<KClass<*>, (Array<KSerializer<*>>)->Array<SerializableProperty<*, *>>>()
 @Suppress("UNCHECKED_CAST")
-val <T> KSerializer<T>.serializableProperties: Array<SerializableProperty<T, *>> get() = (serClassToList[this::class]?.invoke(tryTypeParameterSerializers() ?: arrayOf()) ?: arrayOf()) as Array<SerializableProperty<T, *>>
+val <T> KSerializer<T>.serializableProperties: Array<SerializableProperty<T, *>>? get() = (serClassToList[this::class]?.invoke(tryTypeParameterSerializers() ?: arrayOf())) as? Array<SerializableProperty<T, *>>
 fun <T, S: KSerializer<T>> S.properties(action: (Array<KSerializer<Nothing>>)->Array<SerializableProperty<T, *>>) {
     @Suppress("UNCHECKED_CAST")
     serClassToList[this::class] = action as (Array<KSerializer<*>>)->Array<SerializableProperty<*, *>>
@@ -34,3 +34,4 @@ fun <T, S: KSerializer<T>> S.properties(action: (Array<KSerializer<Nothing>>)->A
 //    override fun get(receiver: List<T>): T = receiver.first()
 //    override fun setCopy(receiver: List<T>, value: T): List<T> = listOf(value) + receiver.drop(1)
 //}
+

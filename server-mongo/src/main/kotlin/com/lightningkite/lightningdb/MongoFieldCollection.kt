@@ -19,13 +19,13 @@ import kotlinx.serialization.Serializable
 import org.bson.BsonDocument
 import org.bson.conversions.Bson
 import java.util.concurrent.TimeUnit
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 /**
  * MongoFieldCollection implements FieldCollection specifically for a MongoDB server.
  */
 class MongoFieldCollection<Model : Any>(
-    val serializer: KSerializer<Model>,
+    override val serializer: KSerializer<Model>,
     private val getMongo: () -> MongoCollection<BsonDocument>,
 ) : AbstractSignalFieldCollection<Model>() {
     val mongo: MongoCollection<BsonDocument> get() = getMongo()
@@ -125,7 +125,7 @@ class MongoFieldCollection<Model : Any>(
                 .toList()
                 .associate {
                     Serialization.Internal.bson.load(
-                        KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!),
+                        KeyHolder.serializer(groupBy.serializer),
                         it
                     )._id to it.getNumber("count").intValue()
                 }
@@ -177,7 +177,7 @@ class MongoFieldCollection<Model : Any>(
                 .toList()
                 .associate {
                     Serialization.Internal.bson.load(
-                        KeyHolder.serializer(serializer.fieldSerializer(groupBy)!!),
+                        KeyHolder.serializer(groupBy.serializer),
                         it
                     )._id to (if (it.isNull("value")) null else it.getNumber("value").doubleValue())
                 }

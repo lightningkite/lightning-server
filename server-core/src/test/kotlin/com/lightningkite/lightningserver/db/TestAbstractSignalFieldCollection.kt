@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.db
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.db.testmodels.TempThing
+import com.lightningkite.lightningserver.db.testmodels.TempThing__id
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Test
@@ -183,7 +184,7 @@ class TestAbstractSignalFieldCollection {
             signalCalled = true
         }
         signalCalled = false
-        collection.updateOne(Condition.Always(), Modification.OnField(TempThing::_id, Modification.Assign(3)))
+        collection.updateOne(Condition.Always(), Modification.OnField(TempThing__id, Modification.Assign(3)))
         assertTrue(signalCalled)
         signalCalled = false
         collection.signals.clear()
@@ -197,7 +198,7 @@ class TestAbstractSignalFieldCollection {
             signalCalled = true
         }
         signalCalled = false
-        collection.updateMany(Condition.Always(), Modification.OnField(TempThing::_id, Modification.Assign(3)))
+        collection.updateMany(Condition.Always(), Modification.OnField(TempThing__id, Modification.Assign(3)))
         assertTrue(signalCalled)
         signalCalled = false
         collection.signals.clear()
@@ -213,7 +214,7 @@ class TestAbstractSignalFieldCollection {
             signalCalled = true
         }
         signalCalled = false
-        collection.updateOneIgnoringResult(Condition.Always(), Modification.OnField(TempThing::_id, Modification.Assign(3)))
+        collection.updateOneIgnoringResult(Condition.Always(), Modification.OnField(TempThing__id, Modification.Assign(3)))
         assertTrue(signalCalled)
         signalCalled = false
         collection.signals.clear()
@@ -227,7 +228,7 @@ class TestAbstractSignalFieldCollection {
             signalCalled = true
         }
         signalCalled = false
-        collection.updateManyIgnoringResult(Condition.Always(), Modification.OnField(TempThing::_id, Modification.Assign(3)))
+        collection.updateManyIgnoringResult(Condition.Always(), Modification.OnField(TempThing__id, Modification.Assign(3)))
         assertTrue(signalCalled)
         signalCalled = false
         collection.signals.clear()
@@ -262,7 +263,7 @@ class TestAbstractSignalFieldCollection {
             signalCalled = true
         }
         signalCalled = false
-        collection.upsertOne(Condition.Always(), Modification.OnField(TempThing::_id, Modification.Assign(4)), thing1)
+        collection.upsertOne(Condition.Always(), Modification.OnField(TempThing__id, Modification.Assign(4)), thing1)
         assertTrue(signalCalled)
         signalCalled = false
         collection.signals.clear()
@@ -290,7 +291,7 @@ class TestAbstractSignalFieldCollection {
             signalCalled = true
         }
         signalCalled = false
-        collection.upsertOneIgnoringResult(Condition.Always(), Modification.OnField(TempThing::_id, Modification.Assign(4)), thing1)
+        collection.upsertOneIgnoringResult(Condition.Always(), Modification.OnField(TempThing__id, Modification.Assign(4)), thing1)
         assertTrue(signalCalled)
         signalCalled = false
         collection.signals.clear()

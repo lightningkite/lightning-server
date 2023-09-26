@@ -14,7 +14,7 @@ fun <T, USER, ID : Comparable<ID>> T.userPasswordAccess(
     return object : UserPasswordAccess<USER, ID> {
         override suspend fun byUsername(username: String, password: String): USER {
             val lowercased = username.lowercase()
-            return info.collection().findOne(Condition.OnField(HasEmailFields.email(), Condition.Equal(lowercased)))
+            return info.collection().findOne(Condition.OnField(serializer.email(), Condition.Equal(lowercased)))
                 ?: newUser(lowercased, password.secureHash()).let { info.collection().insertOne(it)!! }
         }
 
@@ -39,7 +39,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailAccess(
     return object : UserEmailAccess<USER, ID> {
         override suspend fun byEmail(email: String): USER {
             val lowercased = email.lowercase()
-            return info.collection().findOne(Condition.OnField(HasEmailFields.email(), Condition.Equal(lowercased)))
+            return info.collection().findOne(Condition.OnField(serializer.email(), Condition.Equal(lowercased)))
                 ?: newUser(lowercased).let { info.collection().insertOne(it)!! }
         }
 
@@ -63,7 +63,7 @@ fun <T, USER, ID : Comparable<ID>> T.userPhoneAccess(
         override suspend fun byPhone(phone: String): USER {
             val cleaned = phone.filter { it.isDigit() }
             return info.collection()
-                .findOne(Condition.OnField(HasPhoneNumberFields.phoneNumber(), Condition.Equal(cleaned))) ?: newUser(
+                .findOne(Condition.OnField(serializer.phoneNumber(), Condition.Equal(cleaned))) ?: newUser(
                 cleaned
             ).let { info.collection().insertOne(it)!! }
         }
@@ -88,14 +88,14 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailPhoneAccess(
     return object : UserPhoneAccess<USER, ID>, UserEmailAccess<USER, ID> {
         override suspend fun byEmail(email: String): USER {
             val lowercased = email.lowercase()
-            return info.collection().findOne(Condition.OnField(HasEmailFields.email(), Condition.Equal(lowercased)))
+            return info.collection().findOne(Condition.OnField(serializer.email(), Condition.Equal(lowercased)))
                 ?: newEmailUser(lowercased).let { info.collection().insertOne(it)!! }
         }
 
         override suspend fun byPhone(phone: String): USER {
             val cleaned = phone.filter { it.isDigit() }
             return info.collection()
-                .findOne(Condition.OnField(HasPhoneNumberFields.phoneNumber(), Condition.Equal(cleaned)))
+                .findOne(Condition.OnField(serializer.phoneNumber(), Condition.Equal(cleaned)))
                 ?: newPhoneUser(cleaned).let { info.collection().insertOne(it)!! }
         }
 
@@ -121,7 +121,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailAccess(
         override suspend fun byEmail(email: String): USER {
             val lowercased = email.lowercase()
             return info.collection()
-                .findOne(Condition.OnField(HasMaybeEmailFields.email(), Condition.Equal(lowercased))) ?: newUser(
+                .findOne(Condition.OnField(serializer.email(), Condition.Equal(lowercased))) ?: newUser(
                 lowercased
             ).let { info.collection().insertOne(it)!! }
         }
@@ -150,7 +150,7 @@ fun <T, USER, ID : Comparable<ID>> T.userPhoneAccess(
         override suspend fun byPhone(phone: String): USER {
             val cleaned = phone.filter { it.isDigit() }
             return info.collection()
-                .findOne(Condition.OnField(HasMaybePhoneNumberFields.phoneNumber(), Condition.Equal(cleaned)))
+                .findOne(Condition.OnField(serializer.phoneNumber(), Condition.Equal(cleaned)))
                 ?: newUser(cleaned).let { info.collection().insertOne(it)!! }
         }
 
@@ -179,7 +179,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailPhoneAccess(
         override suspend fun byEmail(email: String): USER {
             val lowercased = email.lowercase()
             return info.collection()
-                .findOne(Condition.OnField(HasMaybeEmailFields.email(), Condition.Equal(lowercased))) ?: newEmailUser(
+                .findOne(Condition.OnField(serializer.email(), Condition.Equal(lowercased))) ?: newEmailUser(
                 lowercased
             ).let { info.collection().insertOne(it)!! }
         }
@@ -187,7 +187,7 @@ fun <T, USER, ID : Comparable<ID>> T.userEmailPhoneAccess(
         override suspend fun byPhone(phone: String): USER {
             val cleaned = phone.filter { it.isDigit() }
             return info.collection()
-                .findOne(Condition.OnField(HasMaybePhoneNumberFields.phoneNumber(), Condition.Equal(cleaned)))
+                .findOne(Condition.OnField(serializer.phoneNumber(), Condition.Equal(cleaned)))
                 ?: newPhoneUser(cleaned).let { info.collection().insertOne(it)!! }
         }
 

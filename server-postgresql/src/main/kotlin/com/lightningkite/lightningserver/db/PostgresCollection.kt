@@ -17,7 +17,7 @@ import java.sql.Connection.TRANSACTION_SERIALIZABLE
 class PostgresCollection<T : Any>(
     val db: Database,
     val name: String,
-    val serializer: KSerializer<T>,
+    override val serializer: KSerializer<T>,
 ) : AbstractSignalFieldCollection<T>() {
     companion object {
         var format = DbMapLikeFormat(Serialization.module)

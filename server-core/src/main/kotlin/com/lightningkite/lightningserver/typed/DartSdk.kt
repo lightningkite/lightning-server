@@ -2,7 +2,7 @@
 
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningdb.MySealedClassSerializerInterface
+import com.lightningkite.lightningdb.MySealedClassSerializer
 import com.lightningkite.lightningdb.listElement
 import com.lightningkite.lightningdb.mapValueElement
 import com.lightningkite.lightningserver.camelCase
@@ -44,7 +44,7 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
         .forEach {
             when (it.descriptor.kind) {
                 is StructureKind.CLASS -> {
-                    if (it is MySealedClassSerializerInterface) return@forEach
+                    if (it is MySealedClassSerializer) return@forEach
                     appendLine("@JsonSerializable()")
                     append("class ")
                     it.write().let { out.append(it) }
@@ -243,7 +243,7 @@ private val fromLightningServerPackage = setOf(
 )
 private val skipSet = fromLightningServerPackage + setOf(
     "SortPart",
-    "KProperty1Partial",
+    "SerializablePropertyPartial",
 )
 
 private fun String.groupToInterfaceName(): String = replaceFirstChar { it.uppercase() } + "Api"

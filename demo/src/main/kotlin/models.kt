@@ -22,7 +22,6 @@ data class TestModel(
     @MultipleReferences(TestModel::class) val comments: List<UUID> = listOf(),
     val privateInfo: String? = null,
     val status: Status = Status.DRAFT,
-    val allowedReplies: Condition<TestModel> = Condition.Always(),
     @AdminHidden val hiddenField: Boolean = false
 ) : HasId<UUID>
 

@@ -14,11 +14,11 @@ import software.amazon.awssdk.services.dynamodb.model.*
 
 class DynamoDbCollection<T : Any>(
     val client: DynamoDbAsyncClient,
-    val serializer: KSerializer<T>,
+    override val serializer: KSerializer<T>,
     val tableName: String,
 ) : AbstractSignalFieldCollection<T>() {
 
-    val idSerializer = serializer.fieldSerializer("_id") as? KSerializer<Any>
+    val idSerializer = serializer.serializableProperties!!.find { it.name == "_id" }!!.serializer as KSerializer<Any?>
 
     suspend fun findRaw(
         condition: Condition<T>,

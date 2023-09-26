@@ -61,18 +61,18 @@ inline fun <reified A> ServerPath.arg(name: String, description: String? = null)
     a = TypedServerPathParameter(name, description, Serialization.module.serializer()),
 )
 @LightningServerDsl
-fun <A> ServerPath.arg(name: String, description: String? = null, serializer: KSerializer<A>): TypedServerPath1<A> = TypedServerPath1(
+fun <A> ServerPath.arg(name: String, serializer: KSerializer<A>, description: String? = null): TypedServerPath1<A> = TypedServerPath1(
     path = copy(segments = segments + ServerPath.Segment.Wildcard(name)),
     a = TypedServerPathParameter(name, description, serializer),
 )
 @LightningServerDsl
-fun <A, B> TypedServerPath1<A>.arg(name: String, description: String? = null, serializer: KSerializer<B>): TypedServerPath2<A, B> = TypedServerPath2(
+fun <A, B> TypedServerPath1<A>.arg(name: String, serializer: KSerializer<B>, description: String? = null): TypedServerPath2<A, B> = TypedServerPath2(
     path = path.copy(segments = path.segments + ServerPath.Segment.Wildcard(name)),
     a = a,
     b = TypedServerPathParameter(name, description, serializer),
 )
 @LightningServerDsl
-fun <A, B, C> TypedServerPath2<A, B>.arg(name: String, description: String? = null, serializer: KSerializer<C>): TypedServerPath3<A, B, C> = TypedServerPath3(
+fun <A, B, C> TypedServerPath2<A, B>.arg(name: String, serializer: KSerializer<C>, description: String? = null): TypedServerPath3<A, B, C> = TypedServerPath3(
     path = path.copy(segments = path.segments + ServerPath.Segment.Wildcard(name)),
     a = a,
     b = b,

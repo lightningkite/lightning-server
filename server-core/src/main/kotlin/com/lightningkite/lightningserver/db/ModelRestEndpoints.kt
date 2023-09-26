@@ -43,36 +43,40 @@ open class ModelRestEndpoints<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID
     val bulkPath = TypedServerPath0(path).path("bulk")
 
     private fun exampleItem(): T? = (info as? ModelInfoWithDefault<USER, T, ID>)?.exampleItem()
+
+    @Suppress("UNCHECKED_CAST")
     private fun sampleConditions(): List<Condition<T>> {
         return try {
             val sample = exampleItem() ?: return listOf(Condition.Always())
-            listOf(Condition.Always<T>()) + info.serialization.serializer.attemptGrabFields().entries
+            listOf(Condition.Always<T>()) + info.serialization.serializer.serializableProperties!!
                 .take(3)
-                .map { Condition.OnField(it.value, Condition.Equal(it.value.get(sample))) }
+                .map { Condition.OnField(it as SerializableProperty<T, Any?>, Condition.Equal(it.get(sample))) }
         } catch (e: Exception) {
             listOf(Condition.Always())
         }
     }
 
+    @Suppress("UNCHECKED_CAST")
     private fun sampleModifications(): List<Modification<T>> {
         return try {
             val sample = exampleItem() ?: return emptyList()
-            info.serialization.serializer.attemptGrabFields().entries
-                .filter { it.key != "_id" }
+            info.serialization.serializer.serializableProperties!!
+                .filter { it.name != "_id" }
                 .take(3)
-                .map { Modification.OnField(it.value, Modification.Assign(it.value.get(sample))) }
+                .map { Modification.OnField(it as SerializableProperty<T, Any?>, Modification.Assign(it.get(sample))) }
         } catch (e: Exception) {
             listOf()
         }
     }
 
+    @Suppress("UNCHECKED_CAST")
     private fun sampleSorts(): List<List<SortPart<T>>> {
         return try {
             val sample = exampleItem() ?: return emptyList()
-            info.serialization.serializer.attemptGrabFields().entries
-                .filter { Serialization.Internal.module.serializer(it.value.returnType).descriptor.kind is PrimitiveKind }
+            info.serialization.serializer.serializableProperties!!
+                .filter { it.serializer.descriptor.kind is PrimitiveKind }
                 .let {
-                    (1..3).map { _ -> it.shuffled().take(2).map { SortPart(it.value, Random.nextBoolean()) } }
+                    (1..3).map { _ -> it.shuffled().take(2).map { SortPart(DataClassPathAccess(DataClassPathSelf(info.serialization.serializer), it), Random.nextBoolean()) } }
                 }
         } catch (e: Exception) {
             listOf()
@@ -150,8 +154,8 @@ open class ModelRestEndpoints<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID
         examples = exampleItem()?.let {
             try {
                 val sampleSorts = sampleSorts()
-                val paths = info.serialization.serializer.attemptGrabFields().entries.take(2)
-                    .map { DataClassPathAccess(DataClassPathSelf(), it.value) }.toSet()
+                val paths = info.serialization.serializer.serializableProperties!!.take(2)
+                    .map { DataClassPathAccess(DataClassPathSelf(this.info.serialization.serializer), it) }.toSet()
                 sampleConditions().map { cond ->
                     ApiExample(
                         QueryPartial(

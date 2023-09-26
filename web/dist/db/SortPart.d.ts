@@ -14,6 +14,6 @@ export declare class SortPart<T extends any> {
     copy: (values: Partial<SortPart<T>>) => this;
     equals: (other: any) => boolean;
     hashCode: () => number;
-    static constructorKProperty1comSortPartTAnyBooleanBoolean<T extends any>(field: TProperty1<T, any>, ascending?: boolean, ignoreCase?: boolean): SortPart<T>;
+    static constructorSerializablePropertycomSortPartTAnyBooleanBoolean<T extends any>(field: TProperty1<T, any>, ascending?: boolean, ignoreCase?: boolean): SortPart<T>;
 }
 export declare function xListComparatorGet<T extends any>(this_: Array<SortPart<T>>): (Comparator<T> | null);

@@ -12,9 +12,7 @@ data class SortPart<T: IsCodableAndHashable>(
     val field: DataClassPathPartial<T>,
     val ascending: Boolean = true,
     val ignoreCase: Boolean = false
-) {
-    constructor(field: KProperty1<T, *>, ascending: Boolean = true, ignoreCase: Boolean = false):this(DataClassPathAccess(DataClassPathSelf(), field), ascending, ignoreCase)
-}
+)
 
 val <T: IsCodableAndHashable> List<SortPart<T>>.comparator: Comparator<T>? get() {
     if(this.isEmpty()) return null

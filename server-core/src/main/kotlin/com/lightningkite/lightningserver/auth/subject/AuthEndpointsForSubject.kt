@@ -54,9 +54,11 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             collection.withPermissions(
                 permissions = ModelPermissions(
                     create = Condition.Never(),
-                    read = condition { if (requestAuth?.subject == handler) it.subjectId eq (requestAuth.rawId as ID) else Condition.Never() },
+                    read = if (requestAuth?.subject == handler) Condition.OnField(Session_subjectId(handler.subjectSerializer, handler.idSerializer), Condition.Equal(requestAuth.rawId as ID)) else Condition.Never(),
+//                    read = condition { if (requestAuth?.subject == handler) it.subjectId eq (requestAuth.rawId as ID) else Condition.Never() },
                     update = Condition.Never(),
-                    delete = condition { if (requestAuth?.subject == handler) it.subjectId eq (requestAuth.rawId as ID) else Condition.Never() },
+                    delete = if (requestAuth?.subject == handler) Condition.OnField(Session_subjectId(handler.subjectSerializer, handler.idSerializer), Condition.Equal(requestAuth.rawId as ID)) else Condition.Never(),
+//                    delete = condition { if (requestAuth?.subject == handler) it.subjectId eq (requestAuth.rawId as ID) else Condition.Never() },
                 )
             )
         }

@@ -1,28 +1,27 @@
 package com.lightningkite.lightningdb
 
-import kotlin.reflect.KProperty1
+import com.lightningkite.khrysalis.JsName
+import com.lightningkite.lightningdb.SerializableProperty
+import kotlinx.serialization.KSerializer
 
 @Suppress("UNCHECKED_CAST")
-object HasIdFields {
-    fun <T: HasId<ID>, ID: Comparable<ID>> _id() = HasId<ID>::_id as KProperty1<T, ID>
-}
+fun <Model: HasId<ID>, ID> KSerializer<Model>._id() = serializableProperties!!.find { it.name == "_id" }!! as SerializableProperty<Model, ID>
+
 @Suppress("UNCHECKED_CAST")
-object HasEmailFields {
-    fun <T: HasEmail> email() = HasEmail::email as KProperty1<T, String>
-}
+fun <Model: HasEmail> KSerializer<Model>.email() = serializableProperties!!.find { it.name == "email" }!! as SerializableProperty<Model, String>
+
 @Suppress("UNCHECKED_CAST")
-object HasPhoneNumberFields {
-    fun <T: HasPhoneNumber> phoneNumber() = HasPhoneNumber::phoneNumber as KProperty1<T, String>
-}
+fun <Model: HasPhoneNumber> KSerializer<Model>.phoneNumber() = serializableProperties!!.find { it.name == "phoneNumber" }!! as SerializableProperty<Model, String>
+
+@JvmName("emailMaybe")
+@JsName("emailMaybe")
 @Suppress("UNCHECKED_CAST")
-object HasMaybeEmailFields {
-    fun <T: HasMaybeEmail> email() = HasMaybeEmail::email as KProperty1<T, String?>
-}
+fun <Model: HasMaybeEmail> KSerializer<Model>.email() = serializableProperties!!.find { it.name == "email" }!! as SerializableProperty<Model, String?>
+
+@JvmName("phoneNumberMaybe")
+@JsName("phoneNumberMaybe")
 @Suppress("UNCHECKED_CAST")
-object HasMaybePhoneNumberFields {
-    fun <T: HasMaybePhoneNumber> phoneNumber() = HasMaybePhoneNumber::phoneNumber as KProperty1<T, String?>
-}
+fun <Model: HasMaybePhoneNumber> KSerializer<Model>.phoneNumber() = serializableProperties!!.find { it.name == "phoneNumber" }!! as SerializableProperty<Model, String?>
+
 @Suppress("UNCHECKED_CAST")
-object HasPasswordFields {
-    fun <T: HasPassword> hashedPassword() = HasPassword::hashedPassword as KProperty1<T, String>
-}
+fun <Model: HasPassword> KSerializer<Model>.hashedPassword() = serializableProperties!!.find { it.name == "hashedPassword" }!! as SerializableProperty<Model, String>

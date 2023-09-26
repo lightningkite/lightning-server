@@ -10,7 +10,7 @@ class PathsKtTest {
     }
 
     @Test
-    fun testModificationKProperty1() {
+    fun testModificationSerializableProperty() {
         (path<LargeTestModel>().int).let { modification ->
             assertTrue(modification<LargeTestModel>{it.int assign 3}.affects(modification))
             assertTrue(modification<LargeTestModel>{it.int += 3}.affects(modification))
@@ -46,7 +46,7 @@ class PathsKtTest {
     }
 
     @Test
-    fun testConditionKProperty1() {
+    fun testConditionSerializableProperty() {
         (path<LargeTestModel>().int).let { modification ->
             assertTrue((path<LargeTestModel>().int eq 3).reads(modification))
             assertTrue((path<LargeTestModel>().int gt 3).reads(modification))

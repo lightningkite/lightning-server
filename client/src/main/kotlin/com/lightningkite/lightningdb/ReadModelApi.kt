@@ -9,5 +9,5 @@ import java.util.*
 
 abstract class ReadModelApi<Model : IsCodableAndHashableNotNull> {
     abstract fun list(query: Query<Model>): Single<List<Model>>
-    abstract fun get(id: UUIDFor<Model>): Single<Model>
+    abstract fun get(id: UUID): Single<Model>
 }

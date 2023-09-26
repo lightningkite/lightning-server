@@ -4,7 +4,7 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.*
 import kotlinx.serialization.*
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 @Serializable(ConditionSerializer::class)
 // Why is this class open instead of sealed?  See https://github.com/Kotlin/kotlinx.serialization/issues/1843
@@ -208,7 +208,7 @@ open class Condition<T : IsCodableAndHashable> protected constructor() {
     }
 
     data class OnField<K : IsCodableAndHashable, V : IsCodableAndHashable>(
-        val key: KProperty1<in K, V>,
+        val key: SerializableProperty<in K, V>,
         val condition: Condition<V>,
     ) : Condition<K>() {
         override fun invoke(on: K): Boolean = condition(key.get(on))

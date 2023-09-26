@@ -98,7 +98,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
                         appendLine("<h3>Most Expensive</h3>")
                         collection.find(
                             condition = condition { it.timeSpan.eq(span) and it.endpoint.neq("total") and it.type.eq("executionTime") },
-                            orderBy = listOf(SortPart(MetricSpanStats::sum, ascending = false)),
+                            orderBy = sort { it.sum.descending() },
                             limit = 10
                         ).toList().forEach {
                             appendLine("<p>${it.endpoint} - ${it.sum} ms</p>")
@@ -223,7 +223,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
                 condition = condition {
                     (it.type eq metric) and (it.timeSpan eq span) and (it.endpoint eq endpoint)
                 },
-                orderBy = listOf(SortPart(MetricSpanStats::timeStamp)),
+                orderBy = sort { it.timeStamp.ascending() },
                 limit = 1000
             )
         ).toList()

@@ -102,10 +102,18 @@ class SerializationTest {
         modification<Post> { it.content assign "Lightning Kite" }.cycle()
     }
     @Test fun demoSorts() {
-        listOf(SortPart(User::email), SortPart(User::age, ascending = false)).cycle()
-        listOf(SortPart(User::email, ignoreCase = true), SortPart(User::age, ascending = false)).cycle()
+        sort<User> {
+            it.email.ascending()
+            it.age.descending()
+        }.cycle()
+        sort<User> {
+            it.email.ascending(ignoreCase = true)
+            it.age.descending()
+        }.cycle()
     }
+    @OptIn(InternalSerializationApi::class)
     @Test fun hackTest() {
+        println((Cursed.Inside.serializer(Int.serializer()) as GeneratedSerializer<*>).childSerializers().joinToString())
         println(serializer<List<Int>>().listElement())
         println(serializer<Map<String, Int>>().mapValueElement())
         println(serializer<Int?>().nullElement())
@@ -261,8 +269,8 @@ class SerializationTest {
 
         println((Cursed.Inside.serializer(ListSerializer(Int.serializer().nullable)) as GeneratedSerializer<*>).typeParametersSerializers()[0])
 
-        println(LargeTestModel.serializer().serializableProperties.joinToString())
+        println(LargeTestModel.serializer().serializableProperties?.joinToString())
 
-        println(Cursed.Inside.serializer(ListSerializer(Int.serializer().nullable)).serializableProperties.joinToString { "${it.name}: ${it.serializer.descriptor.serialName}" })
+        println(Cursed.Inside.serializer(ListSerializer(Int.serializer().nullable)).serializableProperties?.joinToString { "${it.name}: ${it.serializer.descriptor.serialName}" })
     }
 }

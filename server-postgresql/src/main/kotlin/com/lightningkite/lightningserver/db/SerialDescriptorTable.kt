@@ -415,6 +415,13 @@ private fun SerialDescriptor.getRealElementDescriptor(index: Int): SerialDescrip
 }
 
 private fun SerialDescriptor.unnull(): SerialDescriptor = this.nullElement() ?: this
+private fun SerialDescriptor.nullElement(): SerialDescriptor? {
+    try {
+        val theoreticalMethod = this::class.java.getDeclaredField("original")
+        try { theoreticalMethod.isAccessible = true } catch(e: Exception) {}
+        return theoreticalMethod.get(this) as SerialDescriptor
+    } catch(e: Exception) { return null }
+}
 
 internal class SerialDescriptorForNullable(
     internal val original: SerialDescriptor,

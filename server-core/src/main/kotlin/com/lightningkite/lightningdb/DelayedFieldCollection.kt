@@ -4,7 +4,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onStart
 import kotlinx.serialization.KSerializer
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 import kotlin.reflect.KType
 
 /**
@@ -16,6 +16,7 @@ open class DelayedFieldCollection<Model : Any>(
     override val wraps: FieldCollection<Model>,
     val milliseconds: Long
 ) : FieldCollection<Model> {
+    override val serializer: KSerializer<Model> get() = wraps.serializer
     override suspend fun fullCondition(condition: Condition<Model>): Condition<Model> = wraps.fullCondition(condition)
     override suspend fun mask(): Mask<Model> = wraps.mask()
     override suspend fun find(

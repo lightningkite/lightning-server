@@ -26,7 +26,7 @@
   type: get
   template: ~this~
 
-- id: kotlin.reflect.KProperty1
+- id: kotlin.reflect.SerializableProperty
   type: type
   template: PropertyIterableProperty<~T0~, ~T1~>
 - id: com.lightningkite.lightningdb.setCopyImplementation

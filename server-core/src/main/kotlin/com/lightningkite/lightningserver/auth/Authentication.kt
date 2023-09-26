@@ -25,6 +25,10 @@ object Authentication {
     // TODO: Fix up old auth system
     // TODO: Easier SubjectHandler impl
     // TODO: Implement Methods
+    init {
+        com.lightningkite.lightningserver.auth.prepareModels()
+        com.lightningkite.lightningserver.auth.proof.prepareModels()
+    }
 
     interface Reader {
         suspend fun request(request: Request): RequestAuth<*>?

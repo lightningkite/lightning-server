@@ -1,6 +1,6 @@
 package com.lightningkite.lightningdb
 
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 /**
  * Defines permissions for accessing a model in a database.

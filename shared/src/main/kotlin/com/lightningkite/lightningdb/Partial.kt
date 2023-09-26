@@ -1,6 +1,6 @@
 package com.lightningkite.lightningdb
 
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 data class Partial<T>(val parts: MutableMap<String, Any?> = mutableMapOf()) {
     constructor(item: T, paths: Set<DataClassPathPartial<T>>):this() {

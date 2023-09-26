@@ -10,7 +10,7 @@ import org.bson.codecs.DecoderContext
 import org.bson.codecs.EncoderContext
 import org.bson.codecs.configuration.CodecRegistry
 import java.util.*
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 import kotlin.reflect.typeOf
 
 fun BsonValue.setPath(path: String, value: BsonValue) {
@@ -66,12 +66,3 @@ fun <T> Codec<T>.fromDocument(doc: Document, registry: CodecRegistry): T {
 }
 
 val DataClassPathPartial<*>.mongo: String get() = properties.joinToString(".") { it.name }
-@Suppress("UNCHECKED_CAST")
-@OptIn(InternalSerializationApi::class)
-fun <K,V> KSerializer<K>.fieldSerializer(path: DataClassPath<K, V>): KSerializer<V> {
-    var current:KSerializer<*> = this
-    path.properties.forEach {
-        current = ((current.nullElement() ?: current) as KSerializer<Any?>).fieldSerializer(it as KProperty1<Any?, Any?>) as KSerializer<*>
-    }
-    return current as KSerializer<V>
-}

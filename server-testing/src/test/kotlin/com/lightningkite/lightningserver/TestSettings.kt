@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver
 
 import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningdb.test.User
+import com.lightningkite.lightningserver.auth.authOptions
 import com.lightningkite.lightningserver.auth.oauth.OauthProviderCredentials
 import com.lightningkite.lightningserver.auth.oauth.OauthProviderCredentialsApple
 import com.lightningkite.lightningserver.auth.old.BaseAuthEndpoints
@@ -12,6 +13,7 @@ import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.DatabaseSettings
+import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.encryption.SecureHasherSettings
@@ -39,7 +41,9 @@ object TestSettings {
 
     val info = modelInfo<User, User, UUID>(
         getCollection = { database().collection() },
-        forUser = { this }
+        forUser = { it },
+        authOptions = authOptions(),
+        serialization = ModelSerializationInfo()
     )
     val emailAccess: UserEmailAccess<User, UUID> = info.userEmailAccess { User(email = it, phoneNumber = it) }
     val path = ServerPath("auth")

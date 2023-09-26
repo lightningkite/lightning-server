@@ -16,7 +16,7 @@ class MockWriteModelApi<Model : HasId<UUID>>(
     override fun postBulk(values: List<Model>): Single<List<Model>> =
         Single.just(values.map { table.addItem(it) })
 
-    override fun upsert(value: Model, id: UUIDFor<Model>): Single<Model> =
+    override fun upsert(value: Model, id: UUID): Single<Model> =
         Single.just(table.addItem(value))
 
     override fun put(value: Model): Single<Model> =
@@ -25,7 +25,7 @@ class MockWriteModelApi<Model : HasId<UUID>>(
     override fun putBulk(values: List<Model>): Single<List<Model>> =
         Single.just(values.map { table.replaceItem(it) })
 
-    override fun patch(id: UUIDFor<Model>, modification: Modification<Model>): Single<Model> =
+    override fun patch(id: UUID, modification: Modification<Model>): Single<Model> =
         table.data[id]?.let { item ->
             val modified = modification.invoke(item)
             table.replaceItem(modified)
@@ -39,7 +39,7 @@ class MockWriteModelApi<Model : HasId<UUID>>(
             .map { table.replaceItem(modification.modification.invoke(it)) })
             .map { it.size.toLong() }
 
-    override fun delete(id: UUIDFor<Model>): Single<Unit> = Single.just(table.deleteItemById(id))
+    override fun delete(id: UUID): Single<Unit> = Single.just(table.deleteItemById(id))
 
     override fun deleteBulk(condition: Condition<Model>): Single<Unit> = Single.just(table
         .asList()

@@ -1,3 +1,4 @@
+@file:UseContextualSerialization(Instant::class)
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningdb.Description
@@ -8,13 +9,14 @@ import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseContextualSerialization
 import java.time.Instant
 
 @Serializable
 data class RequestAuthSerializable(
     val subjectType: String,
     val id: String,
-    @Contextual val issuedAt: Instant,
+    val issuedAt: Instant,
     @Description("The scopes permitted.  Null indicates root access.")
     val scopes: Set<String>? = null,
     val cachedRaw: Map<String, String> = mapOf(),

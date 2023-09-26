@@ -152,7 +152,7 @@ fun <T> FlowContent.jsForm(
                     disable_properties: true,
                     form_name_root: "$title",
                     collapsed: $collapsed,
-                    schema: ${Serialization.json.schema(serializer.descriptor)},
+                    schema: ${Serialization.json.schema(serializer)},
                     max_depth: 5
                 });
                 window.${jsEditorName} = $jsEditorName
@@ -191,7 +191,7 @@ fun <T> FlowContent.displayUntyped(
                     disable_properties: true,
                     form_name_root: "$title",
                     collapsed: $collapsed,
-                    schema: ${Serialization.json.schema(serializer.descriptor)}
+                    schema: ${Serialization.json.schema(serializer)}
                 });
                 ${jsEditorName}.disable()
                 ${

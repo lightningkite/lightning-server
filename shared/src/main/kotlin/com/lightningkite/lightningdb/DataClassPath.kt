@@ -13,13 +13,13 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.internal.GeneratedSerializer
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 @Serializable(DataClassPathSerializer::class)
 abstract class DataClassPathPartial<K : IsCodableAndHashable> : Hashable {
     abstract fun getAny(key: K): Any?
     abstract fun setAny(key: K, any: Any?): K
-    abstract val properties: List<KProperty1<*, *>>
+    abstract val properties: List<SerializableProperty<*, *>>
     abstract override fun hashCode(): Int
     abstract override fun toString(): String
     abstract override fun equals(other: Any?): Boolean
@@ -38,23 +38,25 @@ abstract class DataClassPath<K : IsCodableAndHashable, V : IsCodableAndHashable>
     abstract fun mapModification(modification: Modification<V>): Modification<K>
 
     @JsName("prop")
-    operator fun <V2> get(prop: KProperty1<V, V2>) = DataClassPathAccess(this, prop)
+    operator fun <V2> get(prop: SerializableProperty<V, V2>) = DataClassPathAccess(this, prop)
+
+    abstract val serializer: KSerializer<V>
 }
 
-class DataClassPathSelf<K : IsCodableAndHashable>() : DataClassPath<K, K>() {
+class DataClassPathSelf<K : IsCodableAndHashable>(override val serializer: KSerializer<K>) : DataClassPath<K, K>() {
     override fun get(key: K): K? = key
     override fun set(key: K, value: K): K = value
     override fun toString(): String = "this"
     override fun hashCode(): Int = 0
     override fun equals(other: Any?): Boolean = other is DataClassPathSelf<*>
-    override val properties: List<KProperty1<*, *>> get() = listOf()
+    override val properties: List<SerializableProperty<*, *>> get() = listOf()
     override fun mapCondition(condition: Condition<K>): Condition<K> = condition
     override fun mapModification(modification: Modification<K>): Modification<K> = modification
 }
 
 data class DataClassPathAccess<K : IsCodableAndHashable, M : IsCodableAndHashable, V : IsCodableAndHashable>(
     val first: DataClassPath<K, M>,
-    val second: KProperty1<M, V>
+    val second: SerializableProperty<M, V>
 ) : DataClassPath<K, V>() {
     override fun get(key: K): V? = first.get(key)?.let {
         try {
@@ -66,17 +68,19 @@ data class DataClassPathAccess<K : IsCodableAndHashable, M : IsCodableAndHashabl
 
     override fun set(key: K, value: V): K = first.get(key)?.let { first.set(key, second.setCopy(it, value)) } ?: key
     override fun toString(): String = if (first is DataClassPathSelf<*>) second.name else "$first.${second.name}"
-    override val properties: List<KProperty1<*, *>> get() = first.properties + listOf(second)
+    override val properties: List<SerializableProperty<*, *>> get() = first.properties + listOf(second)
     override fun mapCondition(condition: Condition<V>): Condition<K> =
         first.mapCondition(Condition.OnField(second, condition))
 
     override fun mapModification(modification: Modification<V>): Modification<K> =
         first.mapModification(Modification.OnField(second, modification))
+
+    override val serializer: KSerializer<V> get() = second.serializer
 }
 
 data class DataClassPathNotNull<K : IsCodableAndHashable, V : IsCodableAndHashable>(val wraps: DataClassPath<K, V?>) :
     DataClassPath<K, V>() {
-    override val properties: List<KProperty1<*, *>>
+    override val properties: List<SerializableProperty<*, *>>
         get() = wraps.properties
 
     override fun get(key: K): V? = wraps.get(key)
@@ -87,11 +91,14 @@ data class DataClassPathNotNull<K : IsCodableAndHashable, V : IsCodableAndHashab
 
     override fun mapModification(modification: Modification<V>): Modification<K> =
         wraps.mapModification(Modification.IfNotNull(modification))
+
+    @Suppress("UNCHECKED_CAST")
+    override val serializer: KSerializer<V> get() = wraps.serializer.nullElement()!! as KSerializer<V>
 }
 
 data class DataClassPathList<K : IsCodableAndHashable, V : IsCodableAndHashable>(val wraps: DataClassPath<K, List<V>>) :
     DataClassPath<K, V>() {
-    override val properties: List<KProperty1<*, *>>
+    override val properties: List<SerializableProperty<*, *>>
         get() = wraps.properties
 
     override fun get(key: K): V? = wraps.get(key)?.firstOrNull()
@@ -102,11 +109,13 @@ data class DataClassPathList<K : IsCodableAndHashable, V : IsCodableAndHashable>
 
     override fun mapModification(modification: Modification<V>): Modification<K> =
         wraps.mapModification(Modification.ListPerElement(Condition.Always(), modification))
+
+    override val serializer: KSerializer<V> get() = wraps.serializer.listElement()!! as KSerializer<V>
 }
 
 data class DataClassPathSet<K : IsCodableAndHashable, V : IsCodableAndHashable>(val wraps: DataClassPath<K, Set<V>>) :
     DataClassPath<K, V>() {
-    override val properties: List<KProperty1<*, *>>
+    override val properties: List<SerializableProperty<*, *>>
         get() = wraps.properties
 
     override fun get(key: K): V? = wraps.get(key)?.firstOrNull()
@@ -117,6 +126,8 @@ data class DataClassPathSet<K : IsCodableAndHashable, V : IsCodableAndHashable>(
 
     override fun mapModification(modification: Modification<V>): Modification<K> =
         wraps.mapModification(Modification.SetPerElement(Condition.Always(), modification))
+
+    override val serializer: KSerializer<V> get() = wraps.serializer.listElement()!! as KSerializer<V>
 }
 
 @JsName("notNull")

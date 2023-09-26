@@ -4,7 +4,6 @@ package com.lightningkite.lightningdb.live
 import com.lightningkite.khrysalis.SharedCode
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.UUIDFor
 import com.lightningkite.rx.okhttp.HttpClient
 import com.lightningkite.rx.okhttp.defaultJsonMapper
 import com.lightningkite.rx.okhttp.readJson
@@ -44,7 +43,7 @@ class LiveReadModelApi<Model : HasId<UUID>>(
     ).readJson(ListSerializer(serializer))
 
 
-    override fun get(id: UUIDFor<Model>): Single<Model> = HttpClient.call(
+    override fun get(id: UUID): Single<Model> = HttpClient.call(
         url = "$url/$id",
         method = HttpClient.GET,
         headers = authHeaders,

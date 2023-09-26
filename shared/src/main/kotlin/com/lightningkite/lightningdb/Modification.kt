@@ -4,7 +4,7 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.*
 import kotlinx.serialization.*
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 @Serializable(ModificationSerializer::class)
 // Why is this class open instead of sealed?  See https://github.com/Kotlin/kotlinx.serialization/issues/1843
@@ -181,7 +181,7 @@ open class Modification<T: IsCodableAndHashable> protected constructor()  {
         override fun invokeDefault(): Map<String, T> = mapOf()
     }
 
-    data class OnField<K: IsCodableAndHashable, V: IsCodableAndHashable>(val key: KProperty1<K, V>, val modification: Modification<V>): Modification<K>() {
+    data class OnField<K: IsCodableAndHashable, V: IsCodableAndHashable>(val key: SerializableProperty<K, V>, val modification: Modification<V>): Modification<K>() {
         override fun invoke(on: K): K = key.setCopy(on, modification(key.get(on)))
         override fun invokeDefault(): K {
             fatalError("Cannot mutate a field that doesn't exist")

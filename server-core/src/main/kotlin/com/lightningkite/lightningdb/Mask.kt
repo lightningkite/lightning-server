@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.IsCodableAndHashable
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 
@@ -63,9 +64,10 @@ data class Mask<T>(
         }
     }
     class Builder<T>(
+        serializer: KSerializer<T>,
         val pairs: ArrayList<Pair<Condition<T>, Modification<T>>> = ArrayList()
     ) {
-        val it = path<T>()
+        val it = DataClassPathSelf(serializer)
         fun <V> DataClassPath<T, V>.mask(value: V, unless: Condition<T> = Condition.Never()) {
             pairs.add(unless to mapModification(Modification.Assign(value)))
         }
@@ -81,8 +83,8 @@ data class Mask<T>(
     }
 }
 
-inline fun <T> mask(builder: Mask.Builder<T>.()->Unit): Mask<T> {
-    return Mask.Builder<T>().apply(builder).build()
+inline fun <reified T> mask(builder: Mask.Builder<T>.()->Unit): Mask<T> {
+    return Mask.Builder<T>(serializerOrContextual()).apply(builder).build()
 }
 
 operator fun <T> Condition<T>.invoke(map: Partial<T>): Boolean? {

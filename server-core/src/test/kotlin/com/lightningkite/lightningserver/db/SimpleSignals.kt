@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.db
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.db.testmodels.TempThing
+import com.lightningkite.lightningserver.db.testmodels.TempThing__id
 import com.lightningkite.lightningserver.db.testmodels._id
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
@@ -20,8 +21,8 @@ class SimpleSignals {
     var runCount = 0
     var calledIds: MutableList<Int> = mutableListOf()
 
-    val mod1 = Modification.OnField(TempThing::_id, Modification.Assign(4))
-    val mod2 = Modification.OnField(TempThing::_id, Modification.Assign(5))
+    val mod1 = Modification.OnField(TempThing__id, Modification.Assign(4))
+    val mod2 = Modification.OnField(TempThing__id, Modification.Assign(5))
 
     @Before
     fun setup() {

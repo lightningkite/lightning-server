@@ -7,7 +7,7 @@ import kotlinx.serialization.builtins.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 import java.util.*
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 private fun <T> commonOptions(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<T>, *>> = listOf(
     MySealedClassSerializer.Option(Modification.Chain.serializer(inner)) { it is Modification.Chain },
@@ -53,20 +53,18 @@ private val stringOptions: List<MySealedClassSerializer.Option<Modification<Stri
 //private fun <T: Any> classOptions(inner: KSerializer<T>, fields: List<SerializableProperty<T, *>>): List<MySealedClassSerializer.Option<Modification<T>, *>> = commonOptions(inner) + fields.map { prop ->
 //    MySealedClassSerializer.Option(ModificationOnFieldSerializer(prop)) { it is Modification.OnField<*, *> && it.key.name == prop.name }
 //}
-private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<T>, *>> = commonOptions(inner) + inner.childSerializers()!!.let {
-    val f = inner.attemptGrabFields()
+private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<T>, *>> = commonOptions(inner) + inner.serializableProperties!!.let {
     it.mapIndexed { index, ser ->
         MySealedClassSerializer.Option(ModificationOnFieldSerializer(
-            f[inner.descriptor.getElementName(index)] as KProperty1<T, Any?>,
-            ser as KSerializer<Any?>
+            ser
         )) { it is Modification.OnField<*, *> && it.key.name == inner.descriptor.getElementName(index) }
     }
 }
 
-private val cache = HashMap<KSerializerKey, KSerializer<*>>()
-data class ModificationSerializer<T>(val inner: KSerializer<T>): KSerializer<Modification<T>> by (cache.getOrPut(KSerializerKey(inner)) {
+private val cache = HashMap<KSerializerKey, MySealedClassSerializerInterface<*>>()
+@Suppress("UNCHECKED_CAST")
+data class ModificationSerializer<T>(val inner: KSerializer<T>): MySealedClassSerializerInterface<Modification<T>> by (cache.getOrPut(KSerializerKey(inner)) {
     MySealedClassSerializer<Modification<T>>("com.lightningkite.lightningdb.Modification", {
-        println("PREPARING FIELDS FOR ${inner.descriptor.serialName}")
         val r = when {
             inner.nullElement() != null -> nullableOptions(inner.nullElement()!! as KSerializer<Any>)
             inner.descriptor.kind == PrimitiveKind.STRING -> stringOptions
@@ -81,18 +79,17 @@ data class ModificationSerializer<T>(val inner: KSerializer<T>): KSerializer<Mod
                 if(inner.descriptor.serialName.contains("Set")) setOptions(inner.listElement()!!)
                 else listOptions(inner.listElement()!!)
             }
-            inner.childSerializers() != null -> classOptionsReflective(inner as KSerializer<Any>)
+            inner.serializableProperties != null -> classOptionsReflective(inner as KSerializer<Any>)
             else -> comparableOptions(inner as KSerializer<String>)
-        }.onEach { println(it.serializer.descriptor.serialName) }
+        }
         r as List<MySealedClassSerializer.Option<Modification<T>, out Modification<T>>>
     })
-} as KSerializer<Modification<T>>)
+} as MySealedClassSerializerInterface<Modification<T>>)
 
 class ModificationOnFieldSerializer<K : Any, V>(
-    val field: KProperty1<K, V>,
-    val inner: KSerializer<V>
+    val field: SerializableProperty<K, V>
 ) : WrappingSerializer<Modification.OnField<K, V>, Modification<V>>(field.name) {
-    override fun getDeferred(): KSerializer<Modification<V>> = Modification.serializer(inner)
+    override fun getDeferred(): KSerializer<Modification<V>> = Modification.serializer(field.serializer)
     override fun inner(it: Modification.OnField<K, V>): Modification<V> = it.modification
     override fun outer(it: Modification<V>): Modification.OnField<K, V> = Modification.OnField(field, it)
 }

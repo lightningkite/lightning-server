@@ -4,7 +4,6 @@ package com.lightningkite.lightningdb.mock
 import com.lightningkite.khrysalis.SharedCode
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.UUIDFor
 import io.reactivex.rxjava3.core.Single
 import kotlin.math.min
 import java.util.*
@@ -24,7 +23,7 @@ class MockReadModelApi<Model : HasId<UUID>>(
                 .take(query.limit)
         )
 
-    override fun get(id: UUIDFor<Model>): Single<Model> = table.getItem(id)?.let {
+    override fun get(id: UUID): Single<Model> = table.getItem(id)?.let {
         Single.just(it)
     } ?: Single.error(ItemNotFound("404 item with key $id not found"))
 }

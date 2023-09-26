@@ -20,13 +20,13 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import java.time.Instant
 import java.time.Duration
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 @LightningServerDsl
 fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
     database: () -> Database,
     info: ModelInfo<USER, T, ID>,
-    key: KProperty1<T, *>? = null,
+    key: SerializableProperty<T, *>? = null,
 ): ApiWebsocket<USER, TypedServerPath0, Query<T>, ListChange<T>> {
     prepareModels()
     val modelName = info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
@@ -186,7 +186,7 @@ data class __WebSocketDatabaseChangeSubscription(
 ) : HasId<WebSocketIdentifier>
 
 
-fun <T, V> Condition<T>.relevantHashCodesForKey(key: KProperty1<T, V>): Set<Int>? = when(this) {
+fun <T, V> Condition<T>.relevantHashCodesForKey(key: SerializableProperty<T, V>): Set<Int>? = when(this) {
     is Condition.And<T> -> conditions
         .asSequence()
         .mapNotNull { it.relevantHashCodesForKey(key) }

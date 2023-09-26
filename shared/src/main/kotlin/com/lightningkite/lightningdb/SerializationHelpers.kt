@@ -10,6 +10,8 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.internal.GeneratedSerializer
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
+import kotlin.reflect.KClass
+import kotlin.reflect.typeOf
 
 
 abstract class WrappingSerializer<OUTER, INNER>(val name: String) : KSerializer<OUTER> {
@@ -154,3 +156,12 @@ fun KSerializer<*>.nullElement(): KSerializer<*>? {
 
 @OptIn(InternalSerializationApi::class)
 fun KSerializer<*>.tryTypeParameterSerializers(): Array<KSerializer<*>>? = (this as? GeneratedSerializer<*>)?.typeParametersSerializers()
+
+@OptIn(InternalSerializationApi::class)
+fun KSerializer<*>.tryChildSerializers(): Array<KSerializer<*>>? = (this as? GeneratedSerializer<*>)?.childSerializers()
+
+@Suppress("UNCHECKED_CAST")
+inline fun <reified T> serializerOrContextual(): KSerializer<T> {
+    val t = typeOf<T>()
+    return (serializerOrNull(t) ?: ContextualSerializer(t.classifier as KClass<*>)) as KSerializer<T>
+}

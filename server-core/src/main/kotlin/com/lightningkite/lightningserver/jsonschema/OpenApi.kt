@@ -168,7 +168,7 @@ private fun ApiEndpoint<*, *, *, *>.openApi(builder: JsonSchemaBuilder): OpenApi
         requestBody = if (this.route.method == HttpMethod.GET) null else if (this.inputType == Unit.serializer()) null else OpenApiRequestBody(
             content = mapOf(
                 ContentType.Application.Json.toString() to OpenApiMediaType(
-                    schema = builder[this.inputType.descriptor],
+                    schema = builder[this.inputType],
                     example = examples.firstOrNull()
                         ?.let { example -> Serialization.json.encodeToJsonElement(inputType as KSerializer<Any?>, example.input) }
                         ?: JsonNull,
@@ -196,7 +196,7 @@ private fun ApiEndpoint<*, *, *, *>.openApi(builder: JsonSchemaBuilder): OpenApi
                 description = "Success",
                 content = mapOf(
                     ContentType.Application.Json.toString() to OpenApiMediaType(
-                        schema = builder[this.outputType.descriptor],
+                        schema = builder[this.outputType],
                         example = examples.firstOrNull()
                             ?.let { example -> Serialization.json.encodeToJsonElement(outputType as KSerializer<Any?>, example.output) }
                             ?: JsonNull,
@@ -221,7 +221,7 @@ val openApiDescription: OpenApiRoot by lazy {
     val builder = JsonSchemaBuilder(Serialization.json, "#/components/schemas/", useNullableProperty = true)
     Documentable.endpoints.flatMap {
         sequenceOf(it.inputType, it.outputType) + it.route.path.serializers.asSequence()
-    }.distinct().forEach { builder.get(it.descriptor) }
+    }.distinct().forEach { builder.get(it) }
 
     OpenApiRoot(
         openapi = "3.0.2",
@@ -263,7 +263,7 @@ val openApiDescription: OpenApiRoot by lazy {
         ),
         paths = Documentable.endpoints.filter { it.route.method != HttpMethod.GET || it.inputType == Unit.serializer() }
             .groupBy {
-                it.path.toString()
+                it.path.path.toString()
             }.mapValues {
                 OpenApiPath(
                     parameters = it.value.first().path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().zip(
@@ -275,7 +275,7 @@ val openApiDescription: OpenApiRoot by lazy {
                             inside = OpenApiParameterType.path,
                             description = name,
                             required = true,
-                            schema = builder[ser.descriptor],
+                            schema = builder[ser],
                             allowEmptyValue = false
                         )
                     },

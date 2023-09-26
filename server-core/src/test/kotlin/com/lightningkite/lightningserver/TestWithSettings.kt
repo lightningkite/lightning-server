@@ -12,6 +12,7 @@ import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.restApiWebsocket
 import com.lightningkite.lightningserver.db.testmodels.TestThing
+import com.lightningkite.lightningserver.db.testmodels.TestThing__id
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.engine.UnitTestEngine
@@ -60,7 +61,7 @@ object TestSettings {
             getCollection = { database().collection() },
             forUser = { it },
         ),
-        key = TestThing::_id
+        key = TestThing__id
     )
 
     init {

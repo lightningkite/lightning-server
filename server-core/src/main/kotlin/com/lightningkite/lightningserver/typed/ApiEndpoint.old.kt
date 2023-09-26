@@ -5,6 +5,7 @@ import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
+import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.KSerializer
@@ -144,7 +145,7 @@ fun <USER, PATH, INPUT : Any, OUTPUT> HttpEndpoint.typed(
     successCode: HttpStatus = HttpStatus.OK,
     implementation: suspend (user: USER, route: PATH, input: INPUT) -> OUTPUT
 ): ApiEndpoint<HasId<*>?, TypedServerPath1<PATH>, INPUT, OUTPUT> = TypedHttpEndpoint(
-    TypedServerPath1(this.path, pathType),
+    TypedServerPath1(this.path, TypedServerPathParameter(path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()[0].name, null, pathType)),
     this.method
 ).api<HasId<*>?, TypedServerPath1<PATH>, INPUT, OUTPUT>(
     authOptions = authOptions,
@@ -228,7 +229,9 @@ fun <USERNN : HasId<*>, USER : USERNN?, PATH, PATH2, INPUT : Any, OUTPUT> HttpEn
     successCode: HttpStatus = HttpStatus.OK,
     implementation: suspend (user: USER, path: PATH, path2: PATH2, input: INPUT) -> OUTPUT
 ): ApiEndpoint<HasId<*>?, TypedServerPath2<PATH, PATH2>, INPUT, OUTPUT> = TypedHttpEndpoint(
-    TypedServerPath2(this.path, pathType, path2Type),
+    TypedServerPath2(this.path,
+        TypedServerPathParameter(path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()[0].name, null, pathType),
+        TypedServerPathParameter(path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()[1].name, null, path2Type)),
     this.method
 ).api<HasId<*>?, TypedServerPath2<PATH, PATH2>, INPUT, OUTPUT>(
     authOptions = authOptions,

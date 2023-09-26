@@ -4,7 +4,7 @@ package com.lightningkite.lightningdb
 import com.lightningkite.khrysalis.*
 import kotlinx.serialization.Serializable
 import java.util.*
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 @SwiftProtocolExtends("Codable", "Hashable")
 interface HasId<ID : Comparable<ID>> {

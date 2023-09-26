@@ -13,7 +13,7 @@ class SortPart {
         this.ignoreCase = ignoreCase;
     }
     static propertyTypes(T) { return { field: [DataClassPath_1.DataClassPathPartial, T], ascending: [Boolean], ignoreCase: [Boolean] }; }
-    static constructorKProperty1comSortPartTAnyBooleanBoolean(field, ascending = true, ignoreCase = false) {
+    static constructorSerializablePropertycomSortPartTAnyBooleanBoolean(field, ascending = true, ignoreCase = false) {
         let result = new SortPart(new DataClassPath_1.DataClassPathAccess(new DataClassPath_1.DataClassPathSelf(), field), ascending, ignoreCase);
         return result;
     }

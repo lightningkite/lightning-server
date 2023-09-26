@@ -6,10 +6,10 @@ import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.*
 
 class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> {
-    private val childSerializers = this.source.childSerializers()!!.map {
-        if (it.childSerializers() != null) {
-            PartialSerializer(it)
-        } else it
+    private val childSerializers = this.source.serializableProperties!!.map {
+        if (it.serializer.serializableProperties != null) {
+            PartialSerializer(it.serializer)
+        } else it.serializer
     }
     override val descriptor: SerialDescriptor
         get() {

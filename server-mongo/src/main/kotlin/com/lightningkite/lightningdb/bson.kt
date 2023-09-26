@@ -25,7 +25,7 @@ import java.time.*
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 fun documentOf(): Document {
     return Document()
@@ -95,7 +95,7 @@ private fun <T> Condition<T>.dump(serializer: KSerializer<T>, into: Document = D
         )
         is Condition.SetSizesEquals<*> -> into.sub(key)["\$size"] = count
         is Condition.ListSizesEquals<*> -> into.sub(key)["\$size"] = count
-        is Condition.OnField<*, *> -> (condition as Condition<Any?>).dump((serializer as KSerializer<Any>).fieldSerializer(this.key as KProperty1<Any, Any?>) as KSerializer<Any?>, into, if (key == null) this.key.name else "$key.${this.key.name}")
+        is Condition.OnField<*, *> -> (condition as Condition<Any?>).dump(this.key.serializer as KSerializer<Any?>, into, if (key == null) this.key.name else "$key.${this.key.name}")
     }
     return into
 }
@@ -112,7 +112,7 @@ private fun <T> Modification<T>.dump(serializer: KSerializer<T>, update: UpdateW
         is Modification.AppendString -> TODO("Appending strings is not supported yet")
         is Modification.IfNotNull<*> -> (modification as Modification<Any?>).dump(serializer.nullElement()!! as KSerializer<Any?>, update, key)
         is Modification.OnField<*, *> ->
-            (modification as Modification<Any?>).dump((serializer as KSerializer<Any>).fieldSerializer(this.key as KProperty1<Any, Any?>) as KSerializer<Any?>, update, if (key == null) this.key.name else "$key.${this.key.name}")
+            (modification as Modification<Any?>).dump(this.key.serializer as KSerializer<Any?>, update, if (key == null) this.key.name else "$key.${this.key.name}")
         is Modification.ListAppend<*> -> into.sub("\$push").sub(key)["\$each"] = items.let { Serialization.Internal.bson.stringifyAny(serializer as KSerializer<List<Any?>>, it) }
         is Modification.ListRemove<*> -> into["\$pull", key] = (condition as Condition<Any?>).bson(serializer.listElement() as KSerializer<Any?>)
         is Modification.ListRemoveInstances<*> -> into["\$pullAll", key] = items.let { Serialization.Internal.bson.stringifyAny(serializer as KSerializer<List<Any?>>, it) }

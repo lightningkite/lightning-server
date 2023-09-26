@@ -5,13 +5,13 @@ import com.lightningkite.khrysalis.IsCodableAndHashable
 import com.lightningkite.khrysalis.JsName
 import com.lightningkite.khrysalis.SharedCode
 
-inline fun <T : IsCodableAndHashable> modification(setup: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit): Modification<T> {
+inline fun <reified T : IsCodableAndHashable> modification(setup: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit): Modification<T> {
     return ModificationBuilder<T>().apply {
         setup(this, path())
     }.build()
 }
 
-inline fun <T : IsCodableAndHashable> Modification<T>.and(setup: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit): Modification<T> {
+inline fun <reified T : IsCodableAndHashable> Modification<T>.and(setup: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit): Modification<T> {
     return ModificationBuilder<T>().apply {
         this.modifications.add(this@and)
         setup(this, path())
@@ -90,13 +90,13 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
 
     @JsName("removeAllList")
     @JvmName("removeAllList")
-    infix fun <T : IsCodableAndHashable> DataClassPath<K, List<T>>.removeAll(condition: (DataClassPath<T, T>) -> Condition<T>) {
+    inline infix fun <reified T : IsCodableAndHashable> DataClassPath<K, List<T>>.removeAll(condition: (DataClassPath<T, T>) -> Condition<T>) {
         modifications.add(mapModification(Modification.ListRemove(path<T>().let(condition))))
     }
 
     @JsName("removeAllSet")
     @JvmName("removeAllSet")
-    infix fun <T : IsCodableAndHashable> DataClassPath<K, Set<T>>.removeAll(condition: (DataClassPath<T, T>) -> Condition<T>) {
+    inline infix fun <reified T : IsCodableAndHashable> DataClassPath<K, Set<T>>.removeAll(condition: (DataClassPath<T, T>) -> Condition<T>) {
         modifications.add(mapModification(Modification.SetRemove(path<T>().let(condition))))
     }
 
@@ -136,7 +136,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
 
     @JsName("forEachList")
     @JvmName("forEachList")
-    inline infix fun <T : IsCodableAndHashable> DataClassPath<K, List<T>>.forEach(modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit) {
+    inline infix fun <reified T : IsCodableAndHashable> DataClassPath<K, List<T>>.forEach(modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit) {
         val builder = ModificationBuilder<T>()
         modification(builder, path())
         modifications.add(
@@ -151,7 +151,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
 
     @JsName("forEachSet")
     @JvmName("forEachSet")
-    inline infix fun <T : IsCodableAndHashable> DataClassPath<K, Set<T>>.forEach(modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit) {
+    inline infix fun <reified T : IsCodableAndHashable> DataClassPath<K, Set<T>>.forEach(modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit) {
         val builder = ModificationBuilder<T>()
         modification(builder, path())
         modifications.add(
@@ -166,7 +166,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
 
     @JsName("forEachIfList")
     @JvmName("forEachIfList")
-    inline fun <T : IsCodableAndHashable> DataClassPath<K, List<T>>.forEachIf(
+    inline fun <reified T : IsCodableAndHashable> DataClassPath<K, List<T>>.forEachIf(
         condition: (DataClassPath<T, T>) -> Condition<T>,
         modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit,
     ) {
@@ -184,7 +184,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
 
     @JsName("forEachIfSet")
     @JvmName("forEachIfSet")
-    inline fun <T : IsCodableAndHashable> DataClassPath<K, Set<T>>.forEachIf(
+    inline fun <reified T : IsCodableAndHashable> DataClassPath<K, Set<T>>.forEachIf(
         condition: (DataClassPath<T, T>) -> Condition<T>,
         modification: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit,
     ) {
@@ -206,7 +206,7 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
     }
 
     @JsName("modifyByKey")
-    infix fun <T : IsCodableAndHashable> DataClassPath<K, Map<String, T>>.modifyByKey(byKey: Map<String, ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit>) {
+    inline infix fun <reified T : IsCodableAndHashable> DataClassPath<K, Map<String, T>>.modifyByKey(byKey: Map<String, ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit>) {
         modifications.add(mapModification(Modification.ModifyByKey(byKey.mapValues { modification(it.value) })))
     }
 

@@ -5,19 +5,19 @@
   type: set
   template: '(~this~ as any)._fields = ~value~'
 
-- id: com.lightningkite.lightningdb.KProperty1Partial
+- id: com.lightningkite.lightningdb.SerializablePropertyPartial
   type: type
   template: (keyof ~T0~ & string)
 
-- id: com.lightningkite.lightningdb.KProperty1Partial
+- id: com.lightningkite.lightningdb.SerializablePropertyPartial
   type: typeRef
   template: String
 
-- id: com.lightningkite.lightningdb.KProperty1Partial
+- id: com.lightningkite.lightningdb.SerializablePropertyPartial
   type: call
   template: ~0~
 
-- id: com.lightningkite.lightningdb.KProperty1Partial.compare
+- id: com.lightningkite.lightningdb.SerializablePropertyPartial.compare
   type: get
   template:
     pattern: 'compareBy(~this~)'

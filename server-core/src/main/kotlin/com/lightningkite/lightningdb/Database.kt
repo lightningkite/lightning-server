@@ -27,6 +27,7 @@ interface Database : HealthCheckable, Metricable<Database> {
      * Will attempt inserting data into the database to confirm that the connection is alive and available.
      */
     override suspend fun healthCheck(): HealthStatus {
+        prepareModels()
         try {
             val c = collection<HealthCheckTestModel>()
             val id = "HealthCheck"
@@ -34,7 +35,7 @@ interface Database : HealthCheckable, Metricable<Database> {
             assert(c.get(id) != null)
             return HealthStatus(HealthStatus.Level.OK)
         } catch (e: Exception) {
-            return HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
+            return HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message ?: e::class.qualifiedName)
         }
     }
 

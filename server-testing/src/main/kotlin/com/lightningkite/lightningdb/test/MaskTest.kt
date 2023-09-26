@@ -88,9 +88,9 @@ class MaskTest {
     @Test
     fun sort() {
         val matchingMod = modification<LargeTestModel> { it.int assign 2 }
-        val matchingSort = SortPart(LargeTestModel::int)
-        val notMatchingSortA = SortPart(LargeTestModel::byte)
-        val notMatchingSortV = SortPart(LargeTestModel::string)
+        val matchingSort = SortPart(path<LargeTestModel>().int)
+        val notMatchingSortA = SortPart(path<LargeTestModel>().byte)
+        val notMatchingSortV = SortPart(path<LargeTestModel>().string)
 
         val mask = mask { always(it.int.maskedTo(2)) }
 

@@ -26,7 +26,6 @@ class SortPartSerializer<T>(val inner: KSerializer<T>): KSerializer<SortPart<T>>
         override val annotations: List<Annotation> = SortPart::class.annotations
     }
 
-    val fields = inner.attemptGrabFields()
     val sub = DataClassPathSerializer(inner)
 
     override fun deserialize(decoder: Decoder): SortPart<T> {

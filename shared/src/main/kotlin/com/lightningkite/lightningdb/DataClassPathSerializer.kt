@@ -8,26 +8,21 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.internal.GeneratedSerializer
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 
-private class KProperty1Parser<T>(val serializer: KSerializer<T>) {
+private class SerializablePropertyParser<T>(val serializer: KSerializer<T>) {
     val children = run {
-        val c: Map<String, KSerializer<*>> = serializer.childSerializers()!!.withIndex()
-            .associate { serializer.descriptor.getElementName(it.index) to it.value }
-        val f: Map<String, KProperty1<T, *>> = serializer.attemptGrabFields()
-        c.mapNotNull {
-            it.key to ((f[it.key] ?: return@mapNotNull null) to it.value)
-        }.associate { it }
+        serializer.serializableProperties!!.associateBy {it.name }
     }
     companion object {
-        val existing = HashMap<KSerializerKey, KProperty1Parser<*>>()
+        val existing = HashMap<KSerializerKey, SerializablePropertyParser<*>>()
         @Suppress("UNCHECKED_CAST")
-        operator fun <T> get(serializer: KSerializer<T>): KProperty1Parser<T> = existing.getOrPut(KSerializerKey(serializer)) {
-            KProperty1Parser(serializer)
-        } as KProperty1Parser<T>
+        operator fun <T> get(serializer: KSerializer<T>): SerializablePropertyParser<T> = existing.getOrPut(KSerializerKey(serializer)) {
+            SerializablePropertyParser(serializer)
+        } as SerializablePropertyParser<T>
     }
-    operator fun invoke(key: String): Pair<KProperty1<T, *>, KSerializer<*>> {
+    operator fun invoke(key: String): SerializableProperty<T, *> {
         @Suppress("UNCHECKED_CAST")
         return children[key]
             ?: throw IllegalStateException("Could find no property with name '$key' on ${serializer.descriptor.serialName}")
@@ -65,18 +60,18 @@ class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializer<DataCla
         for(part in value.split('.')) {
             val name = part.removeSuffix("?")
             if(name == "this") continue
-            val prop = KProperty1Parser[currentSerializer](name)
-            currentSerializer = prop.second
+            val prop = SerializablePropertyParser[currentSerializer](name)
+            currentSerializer = prop.serializer
             val c = current
             @Suppress("UNCHECKED_CAST")
-            current = if(c == null) DataClassPathAccess(DataClassPathSelf<T>(), prop.first as KProperty1<T, Any?>)
-            else DataClassPathAccess(c as DataClassPath<T, Any?>, prop.first as KProperty1<Any?, Any?>)
+            current = if(c == null) DataClassPathAccess(DataClassPathSelf<T>(inner), prop as SerializableProperty<T, Any?>)
+            else DataClassPathAccess(c as DataClassPath<T, Any?>, prop as SerializableProperty<Any?, Any?>)
             if(part.endsWith('?')) {
                 current = DataClassPathNotNull(current as DataClassPath<T, Any?>)
                 currentSerializer = currentSerializer.nullElement()!!
             }
         }
 
-        return current ?: DataClassPathSelf()
+        return current ?: DataClassPathSelf(inner)
     }
 }

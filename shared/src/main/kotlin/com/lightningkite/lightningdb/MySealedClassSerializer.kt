@@ -10,11 +10,15 @@ import kotlinx.serialization.json.JsonNames
 import kotlin.IllegalStateException
 import kotlin.reflect.KClass
 
+interface MySealedClassSerializerInterface<T: Any>: KSerializer<T> {
+    val options: List<MySealedClassSerializer.Option<T, out T>>
+}
+
 class MySealedClassSerializer<T : Any>(
     serialName: String,
     options: () -> List<Option<T, out T>>,
     val annotations: List<Annotation> = listOf(),
-) : KSerializer<T> {
+) : MySealedClassSerializerInterface<T> {
 
     class Option<Base, T: Base>(
         val serializer: KSerializer<T>,
@@ -22,7 +26,7 @@ class MySealedClassSerializer<T : Any>(
         val isInstance: (Base) -> Boolean,
     )
 
-    val options by lazy(options)
+    override val options by lazy(options)
 
     private val nameToIndex by lazy {
         this.options.flatMapIndexed { index, it ->

@@ -69,11 +69,11 @@ suspend fun <USER: HasId<*>?> Request.authChecked(authOptions: AuthOptions<USER>
     else throw ForbiddenException("You do not match the authorization criteria.")
 }
 
-suspend fun AuthOption.accepts(auth: RequestAuth<*>): Boolean = (this.type == auth.subject.authType || auth.subject.authType == AuthType.any) &&
+suspend fun AuthOption.accepts(auth: RequestAuth<*>): Boolean = (this.type == auth.subject.authType || this.type == AuthType.any) &&
         (auth.scopes == null || (this.scopes != null && auth.scopes.containsAll(this.scopes))) &&
         (maxAge == null || Duration.between(auth.issuedAt, Instant.now()) < maxAge) &&
         (this.additionalRequirement(auth))
 
 suspend inline fun <reified T> Request.user(): T = authAny()?.get() as T
 
-suspend fun <USER: HasId<*>?> AuthOptions<USER>.accepts(auth: RequestAuth<*>?): Boolean = if(auth == null) null in this.options else this.options.any { it?.accepts(auth) ?: false }
+suspend fun <USER: HasId<*>?> AuthOptions<USER>.accepts(auth: RequestAuth<*>?): Boolean = null in this.options || (auth != null && this.options.any { it?.accepts(auth) ?: false })

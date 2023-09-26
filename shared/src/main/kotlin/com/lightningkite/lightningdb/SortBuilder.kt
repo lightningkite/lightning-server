@@ -3,9 +3,10 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.*
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
+import kotlinx.serialization.KSerializer
 
-inline fun <T : IsCodableAndHashable> sort(setup: SortBuilder<T>.(DataClassPath<T, T>) -> Unit): List<SortPart<T>> {
+inline fun <reified T : IsCodableAndHashable> sort(setup: SortBuilder<T>.(DataClassPath<T, T>) -> Unit): List<SortPart<T>> {
     return SortBuilder<T>().apply {
         setup(this, path())
     }.build()
@@ -15,8 +16,8 @@ class SortBuilder<K : IsCodableAndHashable>() {
     val sortParts = ArrayList<SortPart<K>>()
     fun add(sort: SortPart<K>) { sortParts.add(sort) }
     fun build(): List<SortPart<K>> = sortParts.toList()
-    @JsName("ascending") fun <V> DataClassPath<K, V>.ascending() = SortPart(this, true)
-    @JsName("descending") fun <V> DataClassPath<K, V>.descending() = SortPart(this, false)
-    @JsName("ascendingString") fun DataClassPath<K, String>.ascending(ignoreCase: Boolean) = SortPart(this, true, ignoreCase)
-    @JsName("descendingString") fun DataClassPath<K, String>.descending(ignoreCase: Boolean) = SortPart(this, false, ignoreCase)
+    @JsName("ascending") fun <V> DataClassPath<K, V>.ascending() = add(SortPart<K>(this, true))
+    @JsName("descending") fun <V> DataClassPath<K, V>.descending() = add(SortPart<K>(this, false))
+    @JsName("ascendingString") fun DataClassPath<K, String>.ascending(ignoreCase: Boolean) = add(SortPart<K>(this, true, ignoreCase))
+    @JsName("descendingString") fun DataClassPath<K, String>.descending(ignoreCase: Boolean) = add(SortPart<K>(this, false, ignoreCase))
 }

@@ -3,7 +3,6 @@ package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.UUIDFor
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
@@ -18,7 +17,7 @@ data class User(
     @Unique override var email: String,
     @Unique override val phoneNumber: String,
     var age: Long = 0,
-    var friends: List<UUIDFor<User>> = listOf()
+    var friends: List<UUID> = listOf()
 ) : HasId<UUID>, HasEmail, HasPhoneNumber {
     companion object
 }
@@ -27,7 +26,7 @@ data class User(
 @Serializable
 data class Post(
     override val _id: UUID = UUID.randomUUID(),
-    var author: UUIDFor<User>,
+    var author: UUID,
     var content: String,
     var at: Long? = null
 ) : HasId<UUID> {

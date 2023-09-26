@@ -15,7 +15,7 @@ import kotlin.concurrent.withLock
  */
 open class InMemoryFieldCollection<Model : Any>(
     val data: MutableList<Model> = ArrayList(),
-    val serializer: KSerializer<Model>
+    override val serializer: KSerializer<Model>
 ) :
     AbstractSignalFieldCollection<Model>() {
 
@@ -29,8 +29,7 @@ open class InMemoryFieldCollection<Model : Any>(
     init {
         serializer.descriptor.indexes().forEach { index: NeededIndex ->
             if (index.unique) {
-                val fields =
-                    serializer.attemptGrabFields().filterKeys { index.fields.contains(it) }.values
+                val fields = serializer.serializableProperties!!.filter { index.fields.contains(it.name) }
                 uniqueIndexChecks.add { changes: List<EntryChange<Model>> ->
                     val fieldChanges = changes.mapNotNull { entryChange ->
                         if (
@@ -44,8 +43,12 @@ open class InMemoryFieldCollection<Model : Any>(
                             null
                     }
                     fieldChanges.forEach { fieldValues ->
-                        if (data.any { fromDb -> fieldValues.all { (property, value) -> property.get(fromDb) == value } }) {
-                            throw BadRequestException("Unique Index Violation. The following fields are already in the database: ${fieldValues.joinToString { (property, value) -> "${property.name}: $value" }}")
+                        if (data.any { fromDb ->
+                                fieldValues.all { (property, value) ->
+                                    property.get(fromDb) == value
+                                }
+                            }) {
+                            throw UniqueViolationException(collection = serializer.descriptor.serialName, key = fields.joinToString { it.name }, cause = IllegalStateException())
                         }
                     }
                 }
@@ -84,7 +87,8 @@ open class InMemoryFieldCollection<Model : Any>(
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
         groupBy: DataClassPath<Model, Key>,
-    ): Map<Key, Int> = data.filter { condition(it) }.groupingBy { groupBy.get(it) }.eachCount().minus(null) as Map<Key, Int>
+    ): Map<Key, Int> =
+        data.filter { condition(it) }.groupingBy { groupBy.get(it) }.eachCount().minus(null) as Map<Key, Int>
 
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
@@ -99,7 +103,9 @@ open class InMemoryFieldCollection<Model : Any>(
         groupBy: DataClassPath<Model, Key>,
         property: DataClassPath<Model, N>,
     ): Map<Key, Double?> = data.asSequence().filter { condition(it) }
-        .mapNotNull { (groupBy.get(it) ?: return@mapNotNull null) to (property.get(it)?.toDouble() ?: return@mapNotNull null) }.aggregate(aggregate)
+        .mapNotNull {
+            (groupBy.get(it) ?: return@mapNotNull null) to (property.get(it)?.toDouble() ?: return@mapNotNull null)
+        }.aggregate(aggregate)
 
     override suspend fun insertImpl(models: Iterable<Model>): List<Model> = lock.withLock {
         uniqueCheck(models.map { EntryChange(null, it) })

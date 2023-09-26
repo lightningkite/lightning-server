@@ -5,6 +5,7 @@ package com.lightningkite.lightningserver.db
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.db.testmodels.TestThing
+import com.lightningkite.lightningserver.db.testmodels.TestThing_value
 import com.lightningkite.lightningserver.typed.test
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -55,7 +56,7 @@ class ChangeSocketTest {
                 // Limited query
 
                 while(incoming.tryReceive().isSuccess) {}
-                this.send(Query(Condition.OnField(TestThing::value, Condition.Equal(42))))
+                this.send(Query(Condition.OnField(TestThing_value, Condition.Equal(42))))
                 assertEquals(ListChange(wholeList = listOf()), incoming.receive().also { println("Got $it") })
 
                 assertNotSent(TestThing())
@@ -102,7 +103,7 @@ class ChangeSocketTest {
                 // Limited query
 
                 while(incoming.tryReceive().isSuccess) {}
-                this.send(Query(Condition.OnField(TestThing::value, Condition.Equal(42))))
+                this.send(Query(Condition.OnField(TestThing_value, Condition.Equal(42))))
                 assertEquals(ListChange(wholeList = listOf()), incoming.receive().also { println("Got $it") })
 
                 assertNotSent(TestThing())

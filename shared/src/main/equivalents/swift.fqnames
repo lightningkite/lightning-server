@@ -133,7 +133,7 @@ com.lightningkite.lightningdb.DataClassPathList
 com.lightningkite.lightningdb.DataClassPathSet
 com.lightningkite.lightningdb.notNull
 com.lightningkite.lightningdb.elements
-com.lightningkite.lightningdb.KProperty1Parser
+com.lightningkite.lightningdb.SerializablePropertyParser
 com.lightningkite.lightningdb.DataClassPathSerializer
 com.lightningkite.lightningdb.EntryChange
 com.lightningkite.lightningdb.GroupCountQuery
@@ -146,7 +146,7 @@ com.lightningkite.lightningdb.HasMaybeEmail
 com.lightningkite.lightningdb.HasMaybePhoneNumber
 com.lightningkite.lightningdb.HasPassword
 
-com.lightningkite.lightningdb.KProperty1_setCopyImplementation
+com.lightningkite.lightningdb.SerializableProperty_setCopyImplementation
 com.lightningkite.lightningdb.setCopyImplementation
 com.lightningkite.lightningdb.setCopy
 com.lightningkite.lightningdb.compare

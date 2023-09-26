@@ -36,10 +36,10 @@ class OneTimePasswordProofEndpoints(
     val database: () -> Database,
     val cache: () -> Cache,
     val config: TimeBasedOneTimePasswordConfig = TimeBasedOneTimePasswordConfig(
-        timeStep = 15,
+        timeStep = 30,
         timeStepUnit = TimeUnit.SECONDS,
         codeDigits = 6,
-        hmacAlgorithm = HmacAlgorithm.SHA512
+        hmacAlgorithm = HmacAlgorithm.SHA1
     )
 ) : ServerPathGroup(path), Authentication.DirectProofMethod {
     override val name: String
@@ -62,10 +62,15 @@ class OneTimePasswordProofEndpoints(
     }
 
     init {
+        prepareModels()
         Tasks.onSettingsReady {
             Authentication.subjects.forEach {
                 ModelRestEndpoints<HasId<*>, OtpSecret<Comparable<Any>>, Comparable<Any>>(path("secrets/${it.value.name.lowercase()}"), modelInfo< HasId<*>, OtpSecret<Comparable<Any>>, Comparable<Any>>(
-                    serialization = ModelSerializationInfo(OtpSecret.serializer(it.value.idSerializer as KSerializer<Comparable<Any>>), it.value.idSerializer as KSerializer<Comparable<Any>>),
+                    serialization = ModelSerializationInfo(OtpSecret.serializer(it.value.idSerializer.also { println(it.descriptor.serialName) } as KSerializer<Comparable<Any>>).also {
+                        println(it.descriptor.serialName)
+                        println(it.serializableProperties?.joinToString { "${it.name}: ${it.serializer.descriptor.serialName}" })
+                        println(it.descriptor.getElementDescriptor(0).serialName)
+                    }, it.value.idSerializer as KSerializer<Comparable<Any>>),
                     authOptions = Authentication.isSuperUser as AuthOptions<HasId<*>>,
                     getCollection = { table(it.value) as FieldCollection<OtpSecret<Comparable<Any>>> },
                     modelName = "OtpSecret For ${it.value.name}"
@@ -100,6 +105,7 @@ class OneTimePasswordProofEndpoints(
                 issuer = generalSettings().projectName,
                 config = config
             )
+            table(auth.subject).deleteOneById(auth.rawId as Comparable<Any>)
             table(auth.subject).insertOne(secret)
             secret.url
         }
@@ -137,6 +143,7 @@ class OneTimePasswordProofEndpoints(
             @Suppress("UNCHECKED_CAST")
             val secret = table(subject).get(id as Comparable<Any>)
                 ?: throw BadRequestException("User ID and code do not match")
+            println("Expect ${secret.generator.generate()}")
             if (!secret.generator.isValid(input.secret, postedAt)) throw BadRequestException("User ID and code do not match")
             cache().remove(cacheKey)
             proofHasher().makeProof(

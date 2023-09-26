@@ -3,11 +3,11 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.*
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
-fun <T : IsCodableAndHashable> path(): DataClassPath<T, T> = DataClassPathSelf()
+inline fun <reified T : IsCodableAndHashable> path(): DataClassPath<T, T> = DataClassPathSelf(serializerOrContextual<T>())
 
-inline fun <T : IsCodableAndHashable> condition(setup: (DataClassPath<T, T>) -> Condition<T>): Condition<T> =
+inline fun <reified T : IsCodableAndHashable> condition(setup: (DataClassPath<T, T>) -> Condition<T>): Condition<T> =
     path<T>().let(setup)
 
 val <K : IsCodableAndHashable> DataClassPath<K, K>.always: Condition<K> get() = Condition.Always<K>()
@@ -33,11 +33,11 @@ infix fun <K : IsCodableAndHashable> DataClassPath<K, Int>.anySet(mask: Int) = m
 infix fun <K : IsCodableAndHashable> DataClassPath<K, String>.contains(value: String) = mapCondition(Condition.StringContains(value, ignoreCase = true))
 @JsName("xDataClassPathContainsCased") fun <K : IsCodableAndHashable> DataClassPath<K, String>.contains(value: String, ignoreCase: Boolean) = mapCondition(Condition.StringContains(value, ignoreCase = ignoreCase))
 fun <K : IsCodableAndHashable, V : IsCodableAndHashable> DataClassPath<K, V>.fullTextSearch(value: String, ignoreCase: Boolean, ) = mapCondition(Condition.FullTextSearch<V>(value, ignoreCase = ignoreCase))
-@JsName("xDataClassPathListAll") @JvmName("listAll") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> DataClassPath<K, List<T>>.all(condition: (DataClassPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAllElements(path<T>().let(condition)))
-@JsName("xDataClassPathListAny") @JvmName("listAny") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> DataClassPath<K, List<T>>.any(condition: (DataClassPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAnyElements(path<T>().let(condition)))
+@JsName("xDataClassPathListAll") @JvmName("listAll") inline infix fun <K : IsCodableAndHashable, reified T : IsCodableAndHashable> DataClassPath<K, List<T>>.all(condition: (DataClassPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAllElements(path<T>().let(condition)))
+@JsName("xDataClassPathListAny") @JvmName("listAny") inline infix fun <K : IsCodableAndHashable, reified T : IsCodableAndHashable> DataClassPath<K, List<T>>.any(condition: (DataClassPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAnyElements(path<T>().let(condition)))
 @JsName("xDataClassPathListSizedEqual") @JvmName("listSizedEqual") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> DataClassPath<K, List<T>>.sizesEquals(count: Int) = mapCondition(Condition.ListSizesEquals(count))
-@JsName("xDataClassPathSetAll") @JvmName("setAll") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> DataClassPath<K, Set<T>>.all(condition: (DataClassPath<T, T>) -> Condition<T>) = mapCondition(Condition.SetAllElements(path<T>().let(condition)))
-@JsName("xDataClassPathSetAny") @JvmName("setAny") inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> DataClassPath<K, Set<T>>.any(condition: (DataClassPath<T, T>) -> Condition<T>) = mapCondition(Condition.SetAnyElements(path<T>().let(condition)))
+@JsName("xDataClassPathSetAll") @JvmName("setAll") inline infix fun <K : IsCodableAndHashable, reified T : IsCodableAndHashable> DataClassPath<K, Set<T>>.all(condition: (DataClassPath<T, T>) -> Condition<T>) = mapCondition(Condition.SetAllElements(path<T>().let(condition)))
+@JsName("xDataClassPathSetAny") @JvmName("setAny") inline infix fun <K : IsCodableAndHashable, reified T : IsCodableAndHashable> DataClassPath<K, Set<T>>.any(condition: (DataClassPath<T, T>) -> Condition<T>) = mapCondition(Condition.SetAnyElements(path<T>().let(condition)))
 @JsName("xDataClassPathSetSizedEqual") @JvmName("setSizedEqual") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> DataClassPath<K, Set<T>>.sizesEquals(count: Int) = mapCondition(Condition.SetSizesEquals(count))
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> DataClassPath<K, Map<String, T>>.containsKey(key: String) = mapCondition(Condition.Exists(key))
-inline infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> DataClassPath<K, T>.condition(make: (DataClassPath<T, T>) -> Condition<T>): Condition<K> = mapCondition(make(path<T>()))
+inline infix fun <K : IsCodableAndHashable, reified T : IsCodableAndHashable> DataClassPath<K, T>.condition(make: (DataClassPath<T, T>) -> Condition<T>): Condition<K> = mapCondition(make(path<T>()))

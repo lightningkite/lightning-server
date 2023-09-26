@@ -9,7 +9,7 @@ import kotlinx.serialization.builtins.*
 import kotlin.reflect.KClass
 import kotlinx.serialization.descriptors.*
 import java.util.*
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 private fun <T> commonOptions(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> = listOf(
     MySealedClassSerializer.Option(Condition.Never.serializer(inner)) { it is Condition.Never },
@@ -60,18 +60,17 @@ private val stringOptions: List<MySealedClassSerializer.Option<Condition<String>
 //private fun <T: Any> classOptions(inner: KSerializer<T>, fields: List<SerializableProperty<T, *>>): List<MySealedClassSerializer.Option<Condition<T>, *>> = commonOptions(inner) + fields.map { prop ->
 //    MySealedClassSerializer.Option(ConditionOnFieldSerializer(prop)) { it is Condition.OnField<*, *> && it.key.name == prop.name }
 //}
-private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> = commonOptions(inner) + inner.childSerializers()!!.let {
-    val f = inner.attemptGrabFields()
+private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> = commonOptions(inner) + inner.serializableProperties!!.let {
     it.mapIndexed { index, ser ->
         MySealedClassSerializer.Option(ConditionOnFieldSerializer(
-            f[inner.descriptor.getElementName(index)] as KProperty1<T, Any?>,
-            ser as KSerializer<Any?>
+            ser
         )) { it is Condition.OnField<*, *> && it.key.name == inner.descriptor.getElementName(index) }
     }
 }
 
-private val cache = HashMap<KSerializerKey, KSerializer<*>>()
-class ConditionSerializer<T>(val inner: KSerializer<T>): KSerializer<Condition<T>> by (cache.getOrPut(KSerializerKey(inner)) {
+private val cache = HashMap<KSerializerKey, MySealedClassSerializerInterface<*>>()
+@Suppress("UNCHECKED_CAST")
+class ConditionSerializer<T>(val inner: KSerializer<T>): MySealedClassSerializerInterface<Condition<T>> by (cache.getOrPut(KSerializerKey(inner)) {
     MySealedClassSerializer<Condition<T>>("com.lightningkite.lightningdb.Condition", {
         val r = when {
             inner.descriptor.isNullable -> nullableOptions(inner.innerElement() as KSerializer<Any>)
@@ -82,18 +81,17 @@ class ConditionSerializer<T>(val inner: KSerializer<T>): KSerializer<Condition<T
                 if(inner.descriptor.serialName.contains("Set")) setOptions(inner.innerElement())
                 else listOptions(inner.innerElement())
             }
-            inner.childSerializers() != null -> classOptionsReflective(inner as KSerializer<Any>)
+            inner.serializableProperties != null -> classOptionsReflective(inner as KSerializer<Any>)
             else -> comparableOptions(inner as KSerializer<String>)
         }
         r as List<MySealedClassSerializer.Option<Condition<T>, out Condition<T>>>
     })
-} as KSerializer<Condition<T>>)
+} as MySealedClassSerializerInterface<Condition<T>>)
 
 class ConditionOnFieldSerializer<K : Any, V>(
-    val field: KProperty1<K, V>,
-    val inner: KSerializer<V>,
+    val field: SerializableProperty<K, V>
 ) : WrappingSerializer<Condition.OnField<K, V>, Condition<V>>(field.name) {
-    override fun getDeferred(): KSerializer<Condition<V>> = Condition.serializer(inner)
+    override fun getDeferred(): KSerializer<Condition<V>> = Condition.serializer(field.serializer)
     override fun inner(it: Condition.OnField<K, V>): Condition<V> = it.condition
     override fun outer(it: Condition<V>): Condition.OnField<K, V> = Condition.OnField(field, it)
 }

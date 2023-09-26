@@ -1,9 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningdb.Description
-import com.lightningkite.lightningdb.MySealedClassSerializerInterface
-import com.lightningkite.lightningdb.listElement
-import com.lightningkite.lightningdb.mapValueElement
+import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.HttpMethod
 import kotlinx.serialization.InternalSerializationApi
@@ -26,7 +23,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         .forEach {
             when (it.descriptor.kind) {
                 is StructureKind.CLASS -> {
-                    if (it is MySealedClassSerializerInterface) return@forEach
+                    if (it is MySealedClassSerializer) return@forEach
                     emitTypeComment(it)
                     append("export interface ")
                     it.write().let { out.append(it) }

@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.docGroup
+import com.lightningkite.lightningserver.typed.uncontextualize
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ArraySerializer
 import kotlinx.serialization.descriptors.*
@@ -28,7 +29,6 @@ import kotlin.collections.iterator
 import kotlin.collections.listOf
 import kotlin.collections.map
 import kotlin.collections.mapOf
-import kotlin.collections.mapValues
 import kotlin.collections.mutableMapOf
 import kotlin.collections.mutableSetOf
 import kotlin.collections.plus
@@ -72,7 +72,7 @@ val lightningServerSchema: LightningServerSchema by lazy {
     val builder = JsonSchemaBuilder(Serialization.json)
     Documentable.endpoints.flatMap {
         sequenceOf(it.inputType, it.outputType) + it.route.path.serializers.asSequence()
-    }.distinct().forEach { builder.get(it.descriptor) }
+    }.distinct().forEach { builder.get(it) }
     LightningServerSchema(
         definitions = builder.definitions,
         uploadEarlyEndpoint = UploadEarlyEndpoint.default?.path?.fullUrl(),
@@ -80,19 +80,19 @@ val lightningServerSchema: LightningServerSchema by lazy {
             LightningServerSchemaEndpoint(
                 group = it.docGroup,
                 method = it.route.method.toString(),
-                path = it.path.toString(),
-                routes = it.route.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().map { it.name }.zip(it.route.path.serializers.map { builder.get(it.descriptor) }).associate { it },
-                input = builder.get(it.inputType.descriptor),
-                output = builder.get(it.outputType.descriptor),
+                path = it.path.path.toString(),
+                routes = it.route.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().map { it.name }.zip(it.route.path.serializers.map { builder.get(it) }).associate { it },
+                input = builder.get(it.inputType),
+                output = builder.get(it.outputType),
             )
         }.toList(),
         models = ModelRestEndpoints.all.associate {
             it.collectionName.kabobCase() to LightningServerSchemaModel(
                 collectionName = it.collectionName.humanize(),
                 url = it.path.fullUrl(),
-                ref = builder.refString(it.info.serialization.serializer.descriptor),
-                conditionRef = builder.refString(Condition.serializer(it.info.serialization.serializer).descriptor),
-                modificationRef = builder.refString(Modification.serializer(it.info.serialization.serializer).descriptor),
+                ref = builder.refString(it.info.serialization.serializer),
+                conditionRef = builder.refString(Condition.serializer(it.info.serialization.serializer)),
+                modificationRef = builder.refString(Modification.serializer(it.info.serialization.serializer)),
                 searchFields = it.info.serialization.serializer.descriptor.annotations
                     .filterIsInstance<AdminSearchFields>()
                     .firstOrNull()
@@ -214,13 +214,13 @@ data class JsonSchemaTypeLink(
     val rel: String,
 )
 
-fun Json.schemaDefinitions(types: Iterable<SerialDescriptor>): Map<String, JsonSchemaType> {
+fun Json.schemaDefinitions(types: Iterable<KSerializer<*>>): Map<String, JsonSchemaType> {
     val b = JsonSchemaBuilder(this)
     for (it in types) b.get(it)
     return b.definitions
 }
 
-fun Json.schema(type: SerialDescriptor): JsonSchemaDefinition {
+fun Json.schema(type: KSerializer<*>): JsonSchemaDefinition {
     val b = JsonSchemaBuilder(this)
     b.get(type)
     return JsonSchemaDefinition(
@@ -237,7 +237,7 @@ class JsonSchemaBuilder(
 ) {
     val definitions = mutableMapOf<String, JsonSchemaType>()
     val defining = mutableSetOf<String>()
-    val overrides = mutableMapOf<String, (SerialDescriptor) -> JsonSchemaType>()
+    val overrides = mutableMapOf<String, (KSerializer<*>) -> JsonSchemaType>()
     val annotationHandlers = mutableMapOf<KClass<*>, (JsonSchemaType, Annotation) -> JsonSchemaType>()
 
     init {
@@ -250,20 +250,20 @@ class JsonSchemaBuilder(
         annotation { it: AdminHidden -> copy(uiWidget = "hidden") }
         annotation { it: Multiline -> copy(uiWidget = "textarea") }
         annotation { it: UiWidget -> copy(uiWidget = it.type) }
-        annotation { it: References -> copy(references = key(json.serializersModule.serializer(it.references.java).descriptor)) }
+        annotation { it: References -> copy(references = key(json.serializersModule.serializer(it.references.java))) }
         annotation { it: MultipleReferences ->
             copy(
                 items = items!!.copy(
                     references = key(
                         json.serializersModule.serializer(
                             it.references.java
-                        ).descriptor
+                        )
                     )
                 )
             )
         }
         annotation { it: MimeType -> copy(mimeType = it.mime) }
-        override("com.lightningkite.lightningdb.ServerFile") { it: SerialDescriptor ->
+        override("com.lightningkite.lightningdb.ServerFile") {
             JsonSchemaType(
                 title = "Server File",
                 type = JsonType3(JsonType2.STRING),
@@ -318,43 +318,29 @@ class JsonSchemaBuilder(
             )
         }
         override("com.lightningkite.lightningdb.Condition") {
-            val subtype = (0 until it.elementsCount)
-                .find { index -> it.getElementName(index) == "Equal" }
-                ?.let { index ->
-                    it.getElementDescriptor(index).unwrap().serialName.substringBefore('<').substringAfterLast('.')
-                        .humanize()
-                }
-                ?: "Unknown"
+            val subtype = (it as ConditionSerializer<*>).inner
             JsonSchemaType(
                 title = "Condition for ${subtype}",
                 type = JsonType3(JsonType2.OBJECT),
-                oneOf = (0 until it.elementsCount).map { index ->
-                    val key = it.getElementName(index)
+                oneOf = it.options.map {
                     JsonSchemaType(
-                        title = key,
+                        title = it.serializer.descriptor.serialName,
                         type = JsonType3(JsonType2.OBJECT),
-                        properties = mapOf(key to get(it.getElementDescriptor(index), direct = true))
+                        properties = mapOf(it.serializer.descriptor.serialName to get(it.serializer, direct = true))
                     )
                 }
             )
         }
         override("com.lightningkite.lightningdb.Modification") {
-            val subtype = (0 until it.elementsCount)
-                .find { index -> it.getElementName(index) == "Assign" }
-                ?.let { index ->
-                    it.getElementDescriptor(index).unwrap().serialName.substringBefore('<').substringAfterLast('.')
-                        .humanize()
-                }
-                ?: "Unknown"
+            val subtype = (it as ModificationSerializer<*>).inner
             JsonSchemaType(
                 title = "Modification for ${subtype}",
                 type = JsonType3(JsonType2.OBJECT),
-                oneOf = (0 until it.elementsCount).map { index ->
-                    val key = it.getElementName(index)
+                oneOf = it.options.map {
                     JsonSchemaType(
-                        title = key,
+                        title = it.serializer.descriptor.serialName,
                         type = JsonType3(JsonType2.OBJECT),
-                        properties = mapOf(key to get(it.getElementDescriptor(index), direct = true))
+                        properties = mapOf(it.serializer.descriptor.serialName to get(it.serializer, direct = true))
                     )
                 }
             )
@@ -365,15 +351,15 @@ class JsonSchemaBuilder(
         annotationHandlers[T::class] = { a, b -> a.handler(b as T) }
     }
 
-    inline fun override(key: String, crossinline handler: (SerialDescriptor) -> JsonSchemaType) {
+    inline fun override(key: String, crossinline handler: (KSerializer<*>) -> JsonSchemaType) {
         overrides[key] = { handler(it) }
     }
 
-    val existingKeys1 = HashMap<SerialDescriptor, String>()
-    val existingKeys2 = HashMap<String, SerialDescriptor>()
-    fun key(serializer: SerialDescriptor): String {
+    val existingKeys1 = HashMap<KSerializer<*>, String>()
+    val existingKeys2 = HashMap<String, KSerializer<*>>()
+    fun key(serializer: KSerializer<*>): String {
         existingKeys1[serializer]?.let { return it }
-        val baseName = serializer.serialName
+        val baseName = serializer.descriptor.serialName
         var index = 0
         while (true) {
             val name = baseName + (if (index == 0) "" else index.toString())
@@ -388,14 +374,14 @@ class JsonSchemaBuilder(
 
     @OptIn(InternalSerializationApi::class)
     operator fun get(
-        serializer: SerialDescriptor,
+        serializer: KSerializer<*>,
         annotationsToApply: List<Annotation> = listOf(),
         title: String = "Value",
         direct: Boolean = false,
     ): JsonSchemaType {
         try {
-            val annos = annotationsToApply + serializer.annotations
-            if (serializer.isNullable) {
+            val annos = annotationsToApply + serializer.descriptor.annotations
+            if (serializer.descriptor.isNullable) {
                 val inner = get(serializer.nullElement()!!, annos, title)
                 if (useNullableProperty) {
                     return inner.copy(nullable = true)
@@ -412,24 +398,24 @@ class JsonSchemaBuilder(
                 }
             }
 
-            fun defining(serializer: SerialDescriptor, action: () -> JsonSchemaType): JsonSchemaType {
+            fun defining(serializer: KSerializer<*>, action: () -> JsonSchemaType): JsonSchemaType {
                 if (direct) return action()
                 val key = key(serializer)
                 if (defining.add(key)) {
-                    if (serializer.serialName == "Not") throw Exception()
+                    if (serializer.descriptor.serialName == "Not") throw Exception()
                     definitions[key] = action()
                 }
                 return JsonSchemaType(ref = refString(serializer))
             }
-            if (serializer is LazyRenamedSerialDescriptor) {
-                return get(serializer.getter(), title = title, annotationsToApply = annotationsToApply)
+            if (serializer is WrappingSerializer<*, *>) {
+                return get(serializer.to, title = title, annotationsToApply = annotationsToApply)
             }
 
-            val desc = serializer.unwrap()
-            overrides[desc.serialName.substringBefore('<')]?.let {
-                return defining(desc) { it(desc).applyAnnotations(annos) }
+            val ser = serializer.unwrap()
+            overrides[ser.descriptor.serialName.substringBefore('<')]?.let {
+                return defining(ser) { it(ser).applyAnnotations(annos) }
             }
-            return when (desc.kind) {
+            return when (ser.descriptor.kind) {
                 PrimitiveKind.BOOLEAN -> JsonSchemaType(type = JsonType3(JsonType2.BOOLEAN)).applyAnnotations(annos)
                 PrimitiveKind.BYTE,
                 PrimitiveKind.SHORT,
@@ -446,13 +432,13 @@ class JsonSchemaBuilder(
 
                 SerialKind.ENUM -> defining(serializer) {
                     JsonSchemaType(
-                        title = desc.serialName.substringBefore('<').substringAfterLast('.').humanize(),
+                        title = ser.descriptor.serialName.substringBefore('<').substringAfterLast('.').humanize(),
                         type = JsonType3(JsonType2.STRING),
-                        oneOf = (0 until desc.elementsCount)
+                        oneOf = (0 until ser.descriptor.elementsCount)
                             .map {
-                                val value = desc.getElementName(it)
+                                val value = ser.descriptor.getElementName(it)
                                 JsonSchemaType(
-                                    title = desc.getElementAnnotations(it).filterIsInstance<DisplayName>()
+                                    title = ser.descriptor.getElementAnnotations(it).filterIsInstance<DisplayName>()
                                         .firstOrNull()?.text
                                         ?: value.humanize(),
                                     const = value
@@ -464,24 +450,34 @@ class JsonSchemaBuilder(
                 StructureKind.LIST -> JsonSchemaType(
                     type = JsonType3(JsonType2.ARRAY),
                     items = get(
-                        serializer.getElementDescriptor(0), title = title
+                        serializer.innerElement(), title = title
                     )
                 ).applyAnnotations(annos)
 
                 StructureKind.MAP -> JsonSchemaType(
                     type = JsonType3(JsonType2.OBJECT),
-                    additionalProperties = get(serializer.getElementDescriptor(1), title = title)
+                    additionalProperties = get(serializer.innerElement2(), title = title)
                 ).applyAnnotations(annos)
 
                 StructureKind.CLASS -> defining(serializer) {
                     JsonSchemaType(
-                        title = desc.serialName.substringBefore('<').substringAfterLast('.').humanize(),
+                        title = ser.descriptor.serialName.substringBefore('<').substringAfterLast('.').humanize(),
                         type = JsonType3(JsonType2.OBJECT),
-                        properties = (0 until desc.elementsCount).associate {
-                            val propTitle = desc.getElementName(it).humanize()
-                            desc.getElementName(it) to get(
-                                desc.getElementDescriptor(it),
-                                desc.getElementAnnotations(it),
+                        properties = ser.serializableProperties?.associate {
+                            val propTitle = it.name.humanize()
+                            it.name to get(
+                                it.serializer,
+                                ser.descriptor.getElementIndex(it.name).takeUnless { it == -1 }?.let { ser.descriptor.getElementAnnotations(it) } ?: listOf(),
+                                propTitle
+                            ).copy(
+                                title = propTitle
+                            )
+                        } ?: ser.tryChildSerializers()?.withIndex()?.associate {
+                            val name = ser.descriptor.getElementName(it.index)
+                            val propTitle = name.humanize()
+                            name to get(
+                                it.value,
+                                ser.descriptor.getElementAnnotations(it.index),
                                 propTitle
                             ).copy(
                                 title = propTitle
@@ -495,23 +491,12 @@ class JsonSchemaBuilder(
                     properties = mapOf()
                 ).applyAnnotations(annos)
 
-                PolymorphicKind.SEALED -> JsonSchemaType(
-                    type = JsonType3(JsonType2.OBJECT),
-                    properties = mapOf(
-                        "type" to JsonSchemaType(
-                            type = JsonType3(JsonType2.STRING),
-                            oneOf = (0 until desc.elementsCount).map { index ->
-                                get(desc.getElementDescriptor(index))
-                            }
-                        )
-                    )
-                )
-
+                PolymorphicKind.SEALED -> TODO()
                 PolymorphicKind.OPEN -> TODO()
-                SerialKind.CONTEXTUAL -> throw Error("This should not be reachable - ${desc.serialName} could be unwrapped no further")
+                SerialKind.CONTEXTUAL -> throw Error("This should not be reachable - ${ser.descriptor.serialName} could be unwrapped no further")
             }
         } catch(e: Exception) {
-            throw Exception("Failed to get schema for ${serializer.serialName}", e)
+            throw Exception("Failed to get schema for ${serializer.descriptor.serialName}", e)
         }
     }
 
@@ -527,15 +512,12 @@ class JsonSchemaBuilder(
         return current
     }
 
-    fun refString(serializer: SerialDescriptor): String = refString + key(serializer)
-}
-
-private fun SerialDescriptor.unwrap(): SerialDescriptor {
-    if (this is LazyRenamedSerialDescriptor) return this.getter().unwrap()
-    if (this.isNullable) return this.nullElement()?.unwrap() ?: this
-    if (this.kind == SerialKind.CONTEXTUAL) {
-        return Serialization.json.serializersModule.getContextualDescriptor(this)
-            ?: throw IllegalStateException("No contextual implementation found for ${this}")
+    @Suppress("UNCHECKED_CAST")
+    fun KSerializer<*>.unwrap(): KSerializer<*> {
+        return if(this.descriptor.isNullable) this.innerElement()
+        else if(this is ContextualSerializer) return Serialization.module.getContextual<Any>(this.descriptor.capturedKClass as KClass<Any>) as KSerializer<*>
+        else this
     }
-    return this
+
+    fun refString(serializer: KSerializer<*>): String = refString + key(serializer)
 }

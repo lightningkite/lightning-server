@@ -6,8 +6,10 @@ import com.lightningkite.lightningserver.metrics.Metrics
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.KSerializer
 
 class MetricsFieldCollection<M: Any>(override val wraps: FieldCollection<M>, metricsKeyName: String = "Database"): FieldCollection<M> {
+    override val serializer: KSerializer<M> get() = wraps.serializer
     val metricsKey = MetricType("$metricsKeyName Wait Time", MetricUnit.Milliseconds)
     val metricsCountKey = MetricType("$metricsKeyName Call Count", MetricUnit.Count)
     override suspend fun find(

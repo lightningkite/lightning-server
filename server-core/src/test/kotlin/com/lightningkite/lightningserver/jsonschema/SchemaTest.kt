@@ -20,26 +20,27 @@ class SchemaTest {
 
     @Test
     fun quick() {
-        val schema = Json.schema(Post.serializer().descriptor)
+        val schema = Json.schema(Post.serializer())
         println(Serialization.jsonWithoutDefaults.encodeToString(schema))
     }
 
     @Test
     fun condition() {
         prepareModels()
-        val schema = Json.schema(Condition.serializer(Post.serializer()).descriptor)
+        val schema = Json.schema(Condition.serializer(Post.serializer()))
         println(Serialization.jsonWithoutDefaults.encodeToString(schema))
     }
 
     @Test
     fun modification() {
         prepareModels()
-        val schema = Json.schema(Modification.serializer(Post.serializer()).descriptor)
+        val schema = Json.schema(Modification.serializer(Post.serializer()))
         println(Serialization.jsonWithoutDefaults.encodeToString(schema))
     }
 
     @Test
     fun params() {
+        prepareModels()
         println(
             Properties.encodeToStringMap(condition<Post> { (it.author eq "Bill") and (it.title eq "Bills Greatest") }).entries.joinToString(
                 "&"
@@ -53,7 +54,7 @@ class SchemaTest {
 
     @Test
     fun nullableSchema() {
-        val schema = Serialization.json.schema(Acknowledgement.serializer().descriptor)
+        val schema = Serialization.json.schema(Acknowledgement.serializer())
         println(Serialization.jsonWithoutDefaults.encodeToString(schema))
     }
 }

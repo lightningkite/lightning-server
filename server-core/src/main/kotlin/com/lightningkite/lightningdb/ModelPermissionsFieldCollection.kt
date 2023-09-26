@@ -2,6 +2,7 @@ package com.lightningkite.lightningdb
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.KSerializer
 
 /**
  * Uses [ModelPermissions] to secure a [FieldCollection].
@@ -10,6 +11,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
     override val wraps: FieldCollection<Model>,
     val permissions: ModelPermissions<Model>
 ) : FieldCollection<Model> {
+    override val serializer: KSerializer<Model> get() = wraps.serializer
     override fun registerRawSignal(callback: suspend (CollectionChanges<Model>) -> Unit) {
         wraps.registerRawSignal(callback)
     }

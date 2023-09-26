@@ -1,3 +1,4 @@
+@file:UseContextualSerialization(Duration::class)
 package com.lightningkite.lightningserver.auth.proof
 
 import com.lightningkite.lightningdb.GenerateDataClassPaths
@@ -8,6 +9,7 @@ import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordGenerator
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseContextualSerialization
 import org.bouncycastle.util.encoders.Base32
 import java.time.Duration
 import java.time.temporal.ChronoUnit
@@ -20,7 +22,7 @@ data class OtpSecret<ID : Comparable<ID>>(
     val secretBase32: String,
     val label: String,
     val issuer: String,
-    @Contextual val period: Duration,
+    val period: Duration,
     val digits: Int,
     val algorithm: OtpHashAlgorithm
 ) : HasId<ID> {
@@ -62,7 +64,14 @@ data class OtpSecret<ID : Comparable<ID>>(
             .issuer(issuer)
             .digits(digits)
             .period(period.toMillis(), TimeUnit.MILLISECONDS)
+            .algorithm(when (algorithm) {
+                OtpHashAlgorithm.SHA1 -> HmacAlgorithm.SHA1
+                OtpHashAlgorithm.SHA256 -> HmacAlgorithm.SHA256
+                OtpHashAlgorithm.SHA512 -> HmacAlgorithm.SHA512
+            })
             .buildToString()
+            .replace("+", "%20")
+            .replace("/?", "?")
     val config: TimeBasedOneTimePasswordConfig
         get() = TimeBasedOneTimePasswordConfig(
             timeStep = period.toMillis(),

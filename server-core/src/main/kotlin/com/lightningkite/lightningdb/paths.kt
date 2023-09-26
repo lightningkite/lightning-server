@@ -1,7 +1,9 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.khrysalis.IsCodableAndHashable
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.NothingSerializer
 
 fun <K, V : IsCodableAndHashable> Modification<K>.valueSetForDataClassPath(path: DataClassPath<K, V>): V? =
     (forDataClassPath<V>(path.properties) as? Modification.Assign<V>)?.value
@@ -10,7 +12,7 @@ fun <K, V : IsCodableAndHashable> Modification<K>.forDataClassPath(path: DataCla
     forDataClassPath<V>(path.properties)
 
 @Suppress("UNCHECKED_CAST")
-private fun <V : IsCodableAndHashable> Modification<*>.forDataClassPath(list: List<KProperty1<*, *>>): Modification<V>? {
+private fun <V : IsCodableAndHashable> Modification<*>.forDataClassPath(list: List<SerializableProperty<*, *>>): Modification<V>? {
     return when (this) {
         is Modification.OnField<*, *> -> if (list.first() == this.key) {
             if (list.size == 1) modification as Modification<V>
@@ -29,7 +31,7 @@ private fun <V : IsCodableAndHashable> Modification<*>.forDataClassPath(list: Li
 
         is Modification.IfNotNull -> this.modification.forDataClassPath(list)
         is Modification.Assign -> Modification.Assign(list.fold(value) { value, prop ->
-            (prop as KProperty1<Any?, Any?>).get(
+            (prop as SerializableProperty<Any?, Any?>).get(
                 value
             )
         } as V)
@@ -39,7 +41,7 @@ private fun <V : IsCodableAndHashable> Modification<*>.forDataClassPath(list: Li
 }
 
 fun Modification<*>.affects(path: DataClassPathPartial<*>): Boolean = affects(path.properties)
-private fun Modification<*>.affects(list: List<KProperty1<*, *>>): Boolean {
+private fun Modification<*>.affects(list: List<SerializableProperty<*, *>>): Boolean {
     return when (this) {
         is Modification.OnField<*, *> -> if (list.first() == this.key) {
             if (list.size == 1) true
@@ -55,7 +57,7 @@ private fun Modification<*>.affects(list: List<KProperty1<*, *>>): Boolean {
 }
 
 fun Condition<*>.reads(path: DataClassPathPartial<*>): Boolean = reads(path.properties)
-private fun Condition<*>.reads(list: List<KProperty1<*, *>>): Boolean {
+private fun Condition<*>.reads(list: List<SerializableProperty<*, *>>): Boolean {
     return when (this) {
         is Condition.OnField<*, *> -> if (list.first() == this.key) {
             if (list.size == 1) true
@@ -78,12 +80,15 @@ fun <T> Condition<T>.readPaths(): Set<DataClassPathPartial<T>> {
     emitReadPaths { out.add(it) }
     return out
 }
-fun <T> Condition<T>.emitReadPaths(out: (DataClassPathPartial<T>) -> Unit) = emitReadPaths(DataClassPathSelf<T>()) { out(it as DataClassPathPartial<T>) }
+@Suppress("UNCHECKED_CAST")
+fun <T> Condition<T>.emitReadPaths(out: (DataClassPathPartial<T>) -> Unit) = emitReadPaths(DataClassPathSelf<T>(
+    NothingSerializer() as KSerializer<T>
+)) { out(it as DataClassPathPartial<T>) }
 private fun Condition<*>.emitReadPaths(soFar: DataClassPath<*, *>, out: (DataClassPathPartial<*>) -> Unit) {
     when (this) {
         is Condition.Always -> {}
         is Condition.Never -> {}
-        is Condition.OnField<*, *> -> condition.emitReadPaths(DataClassPathAccess(soFar as DataClassPath<Any?, Any>, key as KProperty1<Any, Any?>), out)
+        is Condition.OnField<*, *> -> condition.emitReadPaths(DataClassPathAccess(soFar as DataClassPath<Any?, Any>, key as SerializableProperty<Any, Any?>), out)
         is Condition.Not -> this.condition.emitReadPaths(soFar, out)
         is Condition.And -> this.conditions.forEach { it.emitReadPaths(soFar, out) }
         is Condition.Or -> this.conditions.forEach { it.emitReadPaths(soFar, out) }
@@ -177,7 +182,7 @@ fun <T, V> Modification<T>.map(
 
 @Suppress("UNCHECKED_CAST")
 private fun <V> Modification<*>.map(
-    list: List<KProperty1<*, *>>,
+    list: List<SerializableProperty<*, *>>,
     onModification: (Modification<V>) -> Modification<V>,
 ): Modification<*> {
     return when (this) {
@@ -186,7 +191,7 @@ private fun <V> Modification<*>.map(
 
         is Modification.OnField<*, *> -> if (list.first() == this.key) {
             if (list.size == 1) Modification.OnField(
-                key = this.key as KProperty1<Any?, Any?>,
+                key = this.key as SerializableProperty<Any?, Any?>,
                 modification = onModification(modification as Modification<V>) as Modification<Any?>
             ) as Modification<Any?>
             else this.modification.map(list.drop(1), onModification)
@@ -198,14 +203,14 @@ private fun <V> Modification<*>.map(
         is Modification.Assign -> {
             fun mapValue(
                 value: Any?,
-                list: List<KProperty1<Any?, Any?>>,
+                list: List<SerializableProperty<Any?, Any?>>,
                 onValue: (V) -> V,
             ): Any? {
                 if (value == null) return null
                 if (list.isEmpty()) return onValue(value as V)
                 return list.first().setCopy(value, mapValue(list.first().get(value), list.drop(1), onValue))
             }
-            Modification.Assign(mapValue(value, list as List<KProperty1<Any?, Any?>>) {
+            Modification.Assign(mapValue(value, list as List<SerializableProperty<Any?, Any?>>) {
                 (onModification(Modification.Assign(it)) as Modification.Assign).value
             })
         }

@@ -46,7 +46,7 @@ class LiveWriteModelApi<Model : HasId<UUID>>(
         body = values.toJsonRequestBody(ListSerializer(serializer)),
     ).readJson(ListSerializer(serializer))
 
-    override fun upsert(value: Model, id: UUIDFor<Model>): Single<Model> = HttpClient.call(
+    override fun upsert(value: Model, id: UUID): Single<Model> = HttpClient.call(
         url = "$url/${value._id}",
         method = HttpClient.POST,
         headers = authHeaders,
@@ -67,7 +67,7 @@ class LiveWriteModelApi<Model : HasId<UUID>>(
         body = values.toJsonRequestBody(ListSerializer(serializer)),
     ).readJson(ListSerializer(serializer))
 
-    override fun patch(id: UUIDFor<Model>, modification: Modification<Model>): Single<Model> = HttpClient.call(
+    override fun patch(id: UUID, modification: Modification<Model>): Single<Model> = HttpClient.call(
         url = "$url/$id",
         method = HttpClient.PATCH,
         headers = authHeaders,
@@ -84,7 +84,7 @@ class LiveWriteModelApi<Model : HasId<UUID>>(
             .flatMap { it.readText() }
             .map { it.toLong() }
 
-    override fun delete(id: UUIDFor<Model>): Single<Unit> = HttpClient.call(
+    override fun delete(id: UUID): Single<Unit> = HttpClient.call(
         url = "$url/$id",
         method = HttpClient.DELETE,
         headers = authHeaders,

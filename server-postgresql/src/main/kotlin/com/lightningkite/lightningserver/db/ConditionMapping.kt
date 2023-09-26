@@ -7,7 +7,7 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.ops.InListOrNotInListBaseOp
 import org.jetbrains.exposed.sql.ops.SingleValueInListOp
 import org.jetbrains.exposed.sql.statements.UpdateBuilder
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 internal data class FieldSet2<V>(val serializer: KSerializer<V>, val fields: Map<String, ExpressionWithColumnType<Any?>>) {
     constructor(serializer: KSerializer<V>, table: SerialDescriptorTable) : this(
@@ -16,8 +16,8 @@ internal data class FieldSet2<V>(val serializer: KSerializer<V>, val fields: Map
     )
     val single: ExpressionWithColumnType<Any?> get() = fields[""] ?: throw IllegalStateException("No column found for ${serializer.descriptor.serialName}")
     fun single(value: V): Pair<ExpressionWithColumnType<Any?>, Expression<Any?>> = single to LiteralOp(single.columnType, formatSingle(value))
-    fun sub(property: KProperty1<V, *>) = FieldSet2<Any?>(
-        serializer = serializer.fieldSerializer(property) as KSerializer<Any?>,
+    fun sub(property: SerializableProperty<V, *>) = FieldSet2<Any?>(
+        serializer = property.serializer as KSerializer<Any?>,
         fields = fields.filter { it.key == property.name || it.key.startsWith(property.name + "__") }
             .mapKeys { it.key.substringAfter(property.name).removePrefix("__") }
     )
@@ -219,7 +219,7 @@ private fun <T> ISqlExpressionBuilder.condition(
 
         is Condition.OnField<*, *> -> condition<Any?>(
             condition.condition as Condition<Any?>,
-            fieldSet.sub(condition.key as KProperty1<T, Any?>)
+            fieldSet.sub(condition.key as SerializableProperty<T, Any?>)
         )
 
         else -> throw IllegalArgumentException()
@@ -381,6 +381,6 @@ private fun <T> FieldModifier.modification(
         is Modification.Combine<*> -> TODO()
         is Modification.ModifyByKey<*> -> TODO()
         is Modification.RemoveKeys<*> -> TODO()
-        is Modification.OnField<*, *> -> sub(modification.key.name).modification(modification.modification as Modification<Any?>, fieldSet.sub(modification.key as KProperty1<T, Any?>))
+        is Modification.OnField<*, *> -> sub(modification.key.name).modification(modification.modification as Modification<Any?>, fieldSet.sub(modification.key as SerializableProperty<T, Any?>))
     }
 }

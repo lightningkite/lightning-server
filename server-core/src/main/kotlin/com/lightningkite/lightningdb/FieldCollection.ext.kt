@@ -3,7 +3,7 @@ package com.lightningkite.lightningdb
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 /**
  * Returns a Flow that will contain ALL the instances of *Model* in the collection.
@@ -59,7 +59,7 @@ suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
     id: ID,
     modification: Modification<Model>
 ): Boolean {
-    return updateOneIgnoringResult(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), modification)
+    return updateOneIgnoringResult(Condition.OnField(serializer._id(), Condition.Equal(id)), modification)
 }
 
 /**
@@ -73,7 +73,7 @@ suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
     id: ID,
     modification: Modification<Model>
 ): EntryChange<Model> {
-    return updateOne(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), modification)
+    return updateOne(Condition.OnField(serializer._id(), Condition.Equal(id)), modification)
 }
 
 /**
@@ -85,7 +85,7 @@ suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
         FieldCollection<Model>.deleteOneById(
     id: ID
 ): Boolean {
-    return deleteOneIgnoringOld(Condition.OnField(HasIdFields._id(), Condition.Equal(id)))
+    return deleteOneIgnoringOld(Condition.OnField(serializer._id(), Condition.Equal(id)))
 }
 
 /**
@@ -98,7 +98,7 @@ suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
         FieldCollection<Model>.replaceOneById(
     id: ID,
     model: Model
-) = replaceOne(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), model)
+) = replaceOne(Condition.OnField(serializer._id(), Condition.Equal(id)), model)
 
 
 /**
@@ -111,7 +111,7 @@ suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
         FieldCollection<Model>.upsertOneById(
     id: ID,
     model: Model
-) = upsertOne(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), Modification.Assign(model), model)
+) = upsertOne(Condition.OnField(serializer._id(), Condition.Equal(id)), Modification.Assign(model), model)
 
 
 /**
@@ -123,7 +123,7 @@ suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
         FieldCollection<Model>.get(
     id: ID
 ): Model? {
-    return find(Condition.OnField(HasIdFields._id(), Condition.Equal(id)), limit = 1).firstOrNull()
+    return find(Condition.OnField(serializer._id(), Condition.Equal(id)), limit = 1).firstOrNull()
 }
 
 /**
@@ -135,7 +135,7 @@ suspend fun <Model : HasId<ID>, ID : Comparable<ID>>
         FieldCollection<Model>.getMany(
     ids: Collection<ID>
 ): List<Model> {
-    return find(Condition.OnField(HasIdFields._id(), Condition.Inside(ids.toList()))).toList()
+    return find(Condition.OnField(serializer._id(), Condition.Inside(ids.toList()))).toList()
 }
 
 
@@ -160,7 +160,7 @@ suspend fun <Model : Any>
 @Deprecated("Use the built in group count with keyPaths.")
 suspend inline fun <reified Key, reified Model:Any> FieldCollection<Model>.groupCount(
     condition: Condition<Model> = Condition.Always(),
-    groupBy: KProperty1<Model, Key>
+    groupBy: SerializableProperty<Model, Key>
 ): Map<Key, Int> {
     return this.groupCount<Key>(condition, path<Model>()[groupBy])
 }

@@ -13,7 +13,7 @@ export class SortPart<T extends any> {
     equals: (other: any) => boolean;
     hashCode: () => number;
     
-    public static constructorKProperty1comSortPartTAnyBooleanBoolean<T extends any>(field: TProperty1<T, any>, ascending: boolean = true, ignoreCase: boolean = false) {
+    public static constructorSerializablePropertycomSortPartTAnyBooleanBoolean<T extends any>(field: TProperty1<T, any>, ascending: boolean = true, ignoreCase: boolean = false) {
         let result = new SortPart<T>(new DataClassPathAccess<T, T, (any | null)>(new DataClassPathSelf<T>(), field), ascending, ignoreCase);
         
         return result;

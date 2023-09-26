@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.auth.old.SmsAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.UserPhoneAccess
 import com.lightningkite.lightningserver.auth.old.userPhoneAccess
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpHeader
@@ -16,6 +17,7 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.test
 import com.lightningkite.lightningserver.sms.TestSMSClient
+import com.lightningkite.lightningserver.typed.AuthAndPathParts
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.time.Duration
@@ -31,21 +33,23 @@ class SmsAuthTest {
     fun testPinCorrect() {
         val info = modelInfo<User, User, UUID>(
             getCollection = { TestSettings.database().collection() },
-            forUser = { this }
+            forUser = { it },
+            authOptions = authOptions<User>(),
+            serialization = ModelSerializationInfo()
         )
         val phoneAccess: UserPhoneAccess<User, UUID> = info.userPhoneAccess { User(email = "$it@phone", phoneNumber = it) }
         val path = ServerPath("auth")
         val baseAuth = BaseAuthEndpoints(path, phoneAccess, TestSettings.jwtSigner, expiration = Duration.ofHours(1), emailExpiration = Duration.ofMinutes(5))
         val phoneAuth = SmsAuthEndpoints(baseAuth, phoneAccess, TestSettings.cache, TestSettings.sms)
         runBlocking {
-            phoneAuth.loginSms.implementation(null, "8013693729")
+            phoneAuth.loginSms.implementation(AuthAndPathParts(null, arrayOf()), "8013693729")
             val pinRegex = Regex("[0-9][0-9][0-9][0-9][0-9][0-9]")
             val pin = (TestSettings.sms() as TestSMSClient).lastMessageSent?.message?.let {
                 pinRegex.find(it)?.value
             }!!
-            val token = phoneAuth.loginSmsPin.implementation(null, PhonePinLogin("8013693729", pin))
+            val token = phoneAuth.loginSmsPin.implementation(AuthAndPathParts(null, arrayOf()), PhonePinLogin("8013693729", pin))
             assertEquals(
-                HttpStatus.OK, baseAuth.getSelf.route.test(
+                HttpStatus.OK, baseAuth.getSelf.route.endpoint.test(
                 headers = HttpHeaders(HttpHeader.Authorization to token, HttpHeader.ContentType to "application/json")
             ).status)
         }
@@ -54,18 +58,20 @@ class SmsAuthTest {
     fun testPinIncorrect() {
         val info = modelInfo<User, User, UUID>(
             getCollection = { TestSettings.database().collection() },
-            forUser = { this }
+            forUser = { it },
+            authOptions = authOptions<User>(),
+            serialization = ModelSerializationInfo()
         )
         val phoneAccess: UserPhoneAccess<User, UUID> = info.userPhoneAccess { User(email = "$it@phone", phoneNumber = it) }
         val path = ServerPath("auth")
         val baseAuth = BaseAuthEndpoints(path, phoneAccess, TestSettings.jwtSigner, expiration = Duration.ofHours(1), emailExpiration = Duration.ofMinutes(5))
         val phoneAuth = SmsAuthEndpoints(baseAuth, phoneAccess, TestSettings.cache, TestSettings.sms)
         runBlocking {
-            phoneAuth.loginSms.implementation(null, "8013693729")
+            phoneAuth.loginSms.implementation(AuthAndPathParts(null, arrayOf()), "8013693729")
             val pinRegex = Regex("[0-9][0-9][0-9][0-9][0-9][0-9]")
             val pin = "wrong"
             try {
-                phoneAuth.loginSmsPin.implementation(null, PhonePinLogin("8013693729", pin))
+                phoneAuth.loginSmsPin.implementation(AuthAndPathParts(null, arrayOf()), PhonePinLogin("8013693729", pin))
                 fail()
             } catch (e: BadRequestException) {
                 assertEquals("Incorrect PIN.  4 attempts remain.", e.message)

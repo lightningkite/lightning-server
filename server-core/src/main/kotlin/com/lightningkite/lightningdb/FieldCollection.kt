@@ -2,6 +2,7 @@ package com.lightningkite.lightningdb
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.KSerializer
 
 /**
  * An abstract way to communicate with a database on a specific collection/table
@@ -9,6 +10,8 @@ import kotlinx.coroutines.flow.map
  * will have it's own implementation of this interface.
  */
 interface FieldCollection<Model : Any> {
+    val serializer: KSerializer<Model>
+
     /**
      * The field collection this wraps, if any.
      */

@@ -5,7 +5,6 @@ import com.lightningkite.khrysalis.SharedCode
 import com.lightningkite.lightningdb.Condition
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.SignalData
-import com.lightningkite.lightningdb.UUIDFor
 import io.reactivex.rxjava3.core.Observer
 import io.reactivex.rxjava3.subjects.PublishSubject
 import java.util.*
@@ -14,12 +13,12 @@ import java.util.*
 
 class MockTable<Model : HasId<UUID>> {
 
-    val data: MutableMap<UUIDFor<Model>, Model> = mutableMapOf()
+    val data: MutableMap<UUID, Model> = mutableMapOf()
     val signals: PublishSubject<SignalData<Model>> = PublishSubject.create()
 
     fun observe(condition: Condition<Model>) = signals.map { data.values.filter { condition(it) } }
 
-    fun getItem(id: UUIDFor<Model>): Model? = data[id]
+    fun getItem(id: UUID): Model? = data[id]
 
     fun asList(): List<Model> = data.values.toList()
 
@@ -39,7 +38,7 @@ class MockTable<Model : HasId<UUID>> {
         deleteItemById(item._id)
     }
 
-    fun deleteItemById(id: UUIDFor<Model>) {
+    fun deleteItemById(id: UUID) {
         data[id]?.let { item ->
             data.remove(id)
             signals.onNext(SignalData(item = item, created = false, deleted = true))

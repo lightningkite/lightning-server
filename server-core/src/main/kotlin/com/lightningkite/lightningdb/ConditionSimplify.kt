@@ -1,6 +1,6 @@
 package com.lightningkite.lightningdb
 
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 // Sink properties, reduce within properties, reduce all
 
@@ -60,7 +60,7 @@ private fun <T> Condition<T>.finalSimplify(): Condition<T> = when(this) {
     else -> this
 }
 
-private fun Condition<*>.andByField(): Sequence<Pair<List<KProperty1<*, *>>, Condition<*>>> {
+private fun Condition<*>.andByField(): Sequence<Pair<List<SerializableProperty<*, *>>, Condition<*>>> {
     return when (this) {
         is Condition.And -> conditions.asSequence().flatMap { it.andByField() }
         is Condition.OnField<*, *> -> condition.andByField().map {
@@ -70,12 +70,12 @@ private fun Condition<*>.andByField(): Sequence<Pair<List<KProperty1<*, *>>, Con
             val s = this.simplify()
             if(s is Condition.OnField<*, *>) s.condition.andByField().map {
                 (listOf(s.key) + it.first) to it.second
-            } else sequenceOf(listOf<KProperty1<*, *>>() to s)
+            } else sequenceOf(listOf<SerializableProperty<*, *>>() to s)
         }
     }
 }
 
-private fun Condition<*>.orByField(): Sequence<Pair<List<KProperty1<*, *>>, Condition<*>>> {
+private fun Condition<*>.orByField(): Sequence<Pair<List<SerializableProperty<*, *>>, Condition<*>>> {
     return when (this) {
         is Condition.Or -> conditions.asSequence().flatMap { it.orByField() }
         is Condition.OnField<*, *> -> condition.orByField().map {
@@ -85,16 +85,16 @@ private fun Condition<*>.orByField(): Sequence<Pair<List<KProperty1<*, *>>, Cond
             val s = this.simplify()
             if(s is Condition.OnField<*, *>) s.condition.orByField().map {
                 (listOf(s.key) + it.first) to it.second
-            } else sequenceOf(listOf<KProperty1<*, *>>() to s)
+            } else sequenceOf(listOf<SerializableProperty<*, *>>() to s)
         }
     }
 }
 
-private fun make(prop: List<KProperty1<*, *>>, cond: Condition<*>): Condition<*> {
+private fun make(prop: List<SerializableProperty<*, *>>, cond: Condition<*>): Condition<*> {
     @Suppress("UNCHECKED_CAST")
     (return if (prop.isEmpty()) cond
     else Condition.OnField(
-        prop.first() as KProperty1<Any?, Any?>,
+        prop.first() as SerializableProperty<Any?, Any?>,
         make(prop.subList(1, prop.size), cond) as Condition<Any?>
     ))
 }

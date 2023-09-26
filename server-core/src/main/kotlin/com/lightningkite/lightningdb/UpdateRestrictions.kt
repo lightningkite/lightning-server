@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
 /**
@@ -33,9 +34,10 @@ data class UpdateRestrictions<T>(
     }
 
     class Builder<T>(
+        serializer: KSerializer<T>,
         val fields: ArrayList<Part<T>> = ArrayList()
     ) {
-        val it = path<T>()
+        val it = DataClassPathSelf(serializer)
         /**
          * Makes a field unmodifiable.
          */
@@ -52,13 +54,13 @@ data class UpdateRestrictions<T>(
          * Makes a field only modifiable if the item matches the [condition].
          * In addition, the value it is being changed to must match [valueMust].
          */
-        fun <V> DataClassPath<T, V>.requires(requires: Condition<T>, valueMust: (DataClassPath<V, V>)->Condition<V>) {
+        inline fun <reified V> DataClassPath<T, V>.requires(requires: Condition<T>, valueMust: (DataClassPath<V, V>)->Condition<V>) {
             fields.add(Part(this, requires, this.condition(valueMust)))
         }
         /**
          * The value is only allowed to change to a value that matches [valueMust].
          */
-        fun <V> DataClassPath<T, V>.mustBe(valueMust: (DataClassPath<V, V>)->Condition<V>) {
+        inline fun <reified V> DataClassPath<T, V>.mustBe(valueMust: (DataClassPath<V, V>)->Condition<V>) {
             fields.add(Part(this, Condition.Always(), this.condition(valueMust)))
         }
         fun build() = UpdateRestrictions(fields)
@@ -69,6 +71,6 @@ data class UpdateRestrictions<T>(
 /**
  * DSL for defining [UpdateRestrictions]
  */
-inline fun <T> updateRestrictions(builder: UpdateRestrictions.Builder<T>.()->Unit): UpdateRestrictions<T> {
-    return UpdateRestrictions.Builder<T>().apply(builder).build()
+inline fun <reified T> updateRestrictions(builder: UpdateRestrictions.Builder<T>.()->Unit): UpdateRestrictions<T> {
+    return UpdateRestrictions.Builder<T>(serializerOrContextual()).apply(builder).build()
 }
