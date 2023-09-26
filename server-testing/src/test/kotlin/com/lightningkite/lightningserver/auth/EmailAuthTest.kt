@@ -18,12 +18,12 @@ class EmailAuthTest {
     @Test
     fun testPinCorrect() {
         runBlocking {
-            TestSettings.emailAuth.loginEmail.implementation(AuthAndPathParts(null, arrayOf()), "joseph@lightningkite.com")
+            TestSettings.emailAuth.loginEmail.implementation(AuthAndPathParts(null, null, arrayOf()), "joseph@lightningkite.com")
             val pinRegex = Regex("[0-9][0-9][0-9][0-9][0-9][0-9]")
             val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.plainText?.let {
                 pinRegex.find(it)?.value
             }!!
-            val token = TestSettings.emailAuth.loginEmailPin.implementation(AuthAndPathParts(null, arrayOf()), EmailPinLogin("joseph@lightningkite.com", pin))
+            val token = TestSettings.emailAuth.loginEmailPin.implementation(AuthAndPathParts(null, null, arrayOf()), EmailPinLogin("joseph@lightningkite.com", pin))
             assertEquals(
                 HttpStatus.OK, TestSettings.baseAuth.getSelf.route.endpoint.test(
                 headers = HttpHeaders(HttpHeader.Authorization to token, HttpHeader.ContentType to "application/json")
@@ -33,11 +33,11 @@ class EmailAuthTest {
     @Test
     fun testPinIncorrect() {
         runBlocking {
-            TestSettings.emailAuth.loginEmail.implementation(AuthAndPathParts(null, arrayOf()), "joseph@lightningkite.com")
+            TestSettings.emailAuth.loginEmail.implementation(AuthAndPathParts(null, null, arrayOf()), "joseph@lightningkite.com")
             val pinRegex = Regex("[0-9][0-9][0-9][0-9][0-9][0-9]")
             val pin = "wrong"
             try {
-                TestSettings.emailAuth.loginEmailPin.implementation(AuthAndPathParts(null, arrayOf()), EmailPinLogin("joseph@lightningkite.com", pin))
+                TestSettings.emailAuth.loginEmailPin.implementation(AuthAndPathParts(null, null, arrayOf()), EmailPinLogin("joseph@lightningkite.com", pin))
                 fail()
             } catch (e: BadRequestException) {
                 assertEquals("Incorrect PIN.  4 attempts remain.", e.message)
