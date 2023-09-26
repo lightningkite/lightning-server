@@ -48,7 +48,8 @@ data class ApiWebsocket<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
                 str.parseUrlPartOrBadRequest(path.serializers[idx])
             }.toTypedArray(),
             event = event,
-            outputSerializer = outputType
+            outputSerializer = outputType,
+            rawRequest = event
         )
         this.connect.invoke(receiver)
     }

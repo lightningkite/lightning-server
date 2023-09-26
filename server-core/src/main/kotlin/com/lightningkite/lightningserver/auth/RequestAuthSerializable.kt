@@ -36,8 +36,8 @@ fun RequestAuth<*>.serializable() = RequestAuthSerializable(
     thirdParty = thirdParty,
 )
 
-fun RequestAuthSerializable.real(): RequestAuth<*> {
-    val subject = Authentication.subjects.values.find { it.name == this.subjectType } as? Authentication.SubjectHandler<HasId<Comparable<Any>>, Comparable<Any>>
+fun RequestAuthSerializable.real(subjectHandler: Authentication.SubjectHandler<*, *>? = null): RequestAuth<*> {
+    val subject = subjectHandler ?: Authentication.subjects.values.find { it.name == this.subjectType } as? Authentication.SubjectHandler<HasId<Comparable<Any>>, Comparable<Any>>
         ?: throw IllegalArgumentException("Auth type ${subjectType} not known.")
     return RequestAuth(
         subject = subject,

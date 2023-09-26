@@ -62,7 +62,7 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebs
         message = { query ->
             val existing = helper.subscriptionDb().get(socketId) ?: throw NotFoundException()
             @Suppress("UNCHECKED_CAST") val auth = existing.user?.real() as? RequestAuth<USER & Any>
-            val p = info.collection(AuthAccessor(auth))
+            val p = info.collection(AuthAccessor(auth, null))
             val q = query.copy(condition = p.fullCondition(query.condition).simplify())
             val c = Serialization.json.encodeToString(Query.serializer(info.serialization.serializer), q)
             helper.subscriptionDb().updateOne(

@@ -61,7 +61,7 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> modelInfoWithDefault(
         auth.forUser(this.collection())
 
     override val collectionName: String = modelName
-    override suspend fun defaultItem(auth: RequestAuth<USER & Any>?): T = defaultItem(AuthAccessor<USER>(auth))
+    override suspend fun defaultItem(auth: RequestAuth<USER & Any>?): T = defaultItem(AuthAccessor<USER>(auth, null))
     override fun exampleItem(): T? = exampleItem()
 }
 

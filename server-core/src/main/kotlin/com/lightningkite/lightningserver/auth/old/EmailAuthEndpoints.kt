@@ -193,7 +193,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
             .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             .get("email")!!.lowercase().trim()
         val basis = try {
-            loginEmail.implementation(AuthAndPathParts(null, arrayOf()), email)
+            loginEmail.implementation(AuthAndPathParts(null, null, arrayOf()), email)
         } catch (e: Exception) {
             e.printStackTrace()
             throw e
@@ -221,7 +221,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
                 .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             val pin = content.get("pin")!!.trim()
             val email = content.get("email")!!.lowercase().trim()
-            loginEmailPin.implementation(AuthAndPathParts(null, arrayOf()), EmailPinLogin(email, pin))
+            loginEmailPin.implementation(AuthAndPathParts(null, null, arrayOf()), EmailPinLogin(email, pin))
         } catch (e: Exception) {
             e.printStackTrace()
             throw e

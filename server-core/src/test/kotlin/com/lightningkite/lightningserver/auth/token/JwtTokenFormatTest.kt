@@ -1,24 +1,28 @@
 @file:UseContextualSerialization(UUID::class)
-package com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.auth.token
 
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.UUIDSerializer
+import com.lightningkite.lightningserver.TestSettings
+import com.lightningkite.lightningserver.auth.AuthType
+import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.auth.proof.Proof
-import kotlinx.coroutines.runBlocking
+import com.lightningkite.lightningserver.encryption.SecureHasher
+import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import org.junit.Assert.assertFalse
+import org.junit.Assert.*
 import org.junit.Test
 import java.time.Instant
-import java.util.UUID
-import kotlin.test.assertTrue
+import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalUnit
+import java.util.*
 
-class RequestAuthTest {
+class JwtTokenFormatTest {
     @Serializable
     data class Sample(override val _id: UUID = UUID.randomUUID()): HasId<UUID>
-    @Serializable
-    data class Sample2(override val _id: UUID = UUID.randomUUID()): HasId<UUID>
     val subject = object: Authentication.SubjectHandler<Sample, UUID> {
         override val name: String
             get() = "sample"
@@ -39,14 +43,10 @@ class RequestAuthTest {
         override suspend fun fetch(id: UUID): Sample =  Sample(id)
 
     }
-    @Test fun test(): Unit = runBlocking {
-        val sample = RequestAuth(subject, UUID.randomUUID(), rawId = UUID.randomUUID(), issuedAt = Instant.now())
-        val myAuth = AuthOption(AuthType<Sample>())
-        val otherAuth = AuthOption(AuthType<Sample2>())
-        AuthOption(AuthType.any).accepts(sample)
-        assertTrue(myAuth.accepts(sample))
-        assertFalse(otherAuth.accepts(sample))
-        assertTrue(noAuth.accepts(sample))
-        assertTrue(anyAuth.accepts(sample))
+    @Test fun test() {
+        TestSettings
+        val format = JwtTokenFormat(SecureHasherSettings())
+        val a = RequestAuth<Sample>(subject, UUID.randomUUID(), UUID.randomUUID(), Instant.now().truncatedTo(ChronoUnit.SECONDS), setOf("test", "test2"), thirdParty = "thirdparty")
+        assertEquals(a, format.read(subject, format.create(subject, a).also { println(it) }))
     }
 }

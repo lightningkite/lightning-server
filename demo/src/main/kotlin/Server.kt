@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.auth.proof.*
 import com.lightningkite.lightningserver.auth.proof.PinHandler
 import com.lightningkite.lightningserver.auth.subject.AuthEndpointsForSubject
 import com.lightningkite.lightningserver.auth.token.JwtTokenFormat
+import com.lightningkite.lightningserver.auth.token.TinyTokenFormat
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.MemcachedCache
 import com.lightningkite.lightningserver.cache.get
@@ -276,7 +277,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         },
         database = database,
         proofHasher = jwtSigner,
-        tokenFormat = { JwtTokenFormat(jwtSigner) }
+        tokenFormat = { TinyTokenFormat(jwtSigner) }
     )
 }
 

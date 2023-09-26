@@ -100,7 +100,7 @@ open class SmsAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
             .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             .get("phone")!!.filter { it.isDigit() }
         val basis = try {
-            loginSms.implementation(AuthAndPathParts(null, arrayOf()), phone)
+            loginSms.implementation(AuthAndPathParts(null, null, arrayOf()), phone)
         } catch (e: Exception) {
             e.printStackTrace()
             throw e
@@ -128,7 +128,7 @@ open class SmsAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
                 .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             val pin = content.get("pin")!!
             val phone = content.get("phone")!!.filter { it.isDigit() }
-            loginSmsPin.implementation(AuthAndPathParts(null, arrayOf()), PhonePinLogin(phone, pin))
+            loginSmsPin.implementation(AuthAndPathParts(null, null, arrayOf()), PhonePinLogin(phone, pin))
         } catch (e: Exception) {
             e.printStackTrace()
             throw e

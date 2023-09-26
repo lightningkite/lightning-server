@@ -2,13 +2,16 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.auth.RequestAuth
+import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.KSerializer
 
 open class AuthAccessor<USER: HasId<*>?>(
-    val authOrNull: RequestAuth<USER & Any>?
+    val authOrNull: RequestAuth<USER & Any>?,
+    val rawRequest: Request?,
 ) {
     @Suppress("UNCHECKED_CAST")
     suspend fun user() = authOrNull?.get() as USER
@@ -16,16 +19,18 @@ open class AuthAccessor<USER: HasId<*>?>(
 
 open class AuthAndPathParts<USER: HasId<*>?, PATH: TypedServerPath>(
     authOrNull: RequestAuth<USER & Any>?,
+    rawRequest: Request?,
     val parts: Array<Any?>
-): AuthAccessor<USER>(authOrNull) {
+): AuthAccessor<USER>(authOrNull, rawRequest) {
 }
 
 open class AuthPathPartsAndConnect<USER: HasId<*>?, PATH: TypedServerPath, OUTPUT>(
     authOrNull: RequestAuth<USER & Any>?,
+    rawRequest: Request?,
     parts: Array<Any?>,
     val event: WebSockets.ConnectEvent,
     val outputSerializer: KSerializer<OUTPUT>,
-): AuthAndPathParts<USER, PATH>(authOrNull, parts) {
+): AuthAndPathParts<USER, PATH>(authOrNull, rawRequest, parts) {
     suspend fun send(value: OUTPUT) {
         event.id.send(Serialization.json.encodeToString(outputSerializer, value))
     }

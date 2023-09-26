@@ -40,6 +40,7 @@ data class ApiEndpoint<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
         }
         @Suppress("UNCHECKED_CAST") val result = AuthAndPathParts<USER, PATH>(
             authOrNull = auth,
+            rawRequest = it,
             parts = route.path.serializers.mapIndexed { idx, ser ->
                 val name = wildcards.get(idx).name
                 val str = it.parts[name] ?: throw BadRequestException("Route segment $name not found")

@@ -93,7 +93,10 @@ abstract class Serialization {
         }
     }
     var javaData: JavaData by SetOnce {
-        JavaData(module)
+        JavaData(module.overwriteWith(SerializersModule {
+            contextual(UUID::class, UUIDPartsSerializer)
+            contextual(Instant::class, InstantLongSerializer)
+        }))
     }
     var properties: Properties by SetOnce {
         Properties(module)

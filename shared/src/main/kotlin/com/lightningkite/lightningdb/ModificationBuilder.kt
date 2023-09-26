@@ -11,6 +11,12 @@ inline fun <reified T : IsCodableAndHashable> modification(setup: ModificationBu
     }.build()
 }
 
+inline fun <T : IsCodableAndHashable> modification(path: DataClassPath<T, T>, setup: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit): Modification<T> {
+    return ModificationBuilder<T>().apply {
+        setup(this, path)
+    }.build()
+}
+
 inline fun <reified T : IsCodableAndHashable> Modification<T>.and(setup: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit): Modification<T> {
     return ModificationBuilder<T>().apply {
         this.modifications.add(this@and)

@@ -22,6 +22,7 @@ import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.Request
+import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.auth
@@ -29,6 +30,7 @@ import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
+import java.time.Instant
 import java.util.*
 import kotlin.math.min
 
@@ -44,7 +46,8 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         prepareModels()
     }
 
-    val sessionSerializer =  Session.serializer(handler.subjectSerializer, handler.idSerializer)
+    val sessionSerializer = Session.serializer(handler.subjectSerializer, handler.idSerializer)
+    val dataClassPath = DataClassPathSelf(sessionSerializer)
 
     val info = modelInfo<HasId<*>?, Session<SUBJECT, ID>, UUID>(
         modelName = "${handler.name}Session",
@@ -71,7 +74,6 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
             val isAdmin: Condition<Session<SUBJECT, ID>> =
                 if (Authentication.isSuperUser.accepts(requestAuth)) Condition.Always() else Condition.Never()
-            val path = DataClassPathSelf(sessionSerializer)
             collection.withPermissions(
                 permissions = ModelPermissions(
                     create = isAdmin,
@@ -80,19 +82,19 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     update = canUse,
                     updateRestrictions = UpdateRestrictions(
                         listOf(
-                            UpdateRestrictions.Part(path._id, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(path.derivedFrom, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(path.secretHash, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(path.label, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(path.subjectId, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(path.createdAt, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(path.lastUsed, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(path.expires, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(path.terminated, canUse, Condition.Always()),
-                            UpdateRestrictions.Part(path.ips, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(path.userAgents, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(path.scopes, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(path.oauthClient, isAdmin, Condition.Always()),
+                            UpdateRestrictions.Part(dataClassPath._id, isAdmin, Condition.Always()),
+                            UpdateRestrictions.Part(dataClassPath.derivedFrom, isAdmin, Condition.Always()),
+                            UpdateRestrictions.Part(dataClassPath.secretHash, isAdmin, Condition.Always()),
+                            UpdateRestrictions.Part(dataClassPath.label, isAdmin, Condition.Always()),
+                            UpdateRestrictions.Part(dataClassPath.subjectId, isAdmin, Condition.Always()),
+                            UpdateRestrictions.Part(dataClassPath.createdAt, isAdmin, Condition.Always()),
+                            UpdateRestrictions.Part(dataClassPath.lastUsed, isAdmin, Condition.Always()),
+                            UpdateRestrictions.Part(dataClassPath.expires, isAdmin, Condition.Always()),
+                            UpdateRestrictions.Part(dataClassPath.terminated, canUse, Condition.Always()),
+                            UpdateRestrictions.Part(dataClassPath.ips, isAdmin, Condition.Always()),
+                            UpdateRestrictions.Part(dataClassPath.userAgents, isAdmin, Condition.Always()),
+                            UpdateRestrictions.Part(dataClassPath.scopes, isAdmin, Condition.Always()),
+                            UpdateRestrictions.Part(dataClassPath.oauthClient, isAdmin, Condition.Always()),
                         )
                     ),
                     delete = isAdmin,
@@ -106,10 +108,10 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             override suspend fun request(request: Request): RequestAuth<*>? {
                 try {
                     val token =
-                        request.headers[HttpHeader.Authorization] ?: request.headers.cookies[HttpHeader.Authorization]
+                        request.headers[HttpHeader.Authorization]?.removePrefix("bearer ")?.removePrefix("Bearer ") ?: request.headers.cookies[HttpHeader.Authorization]
                         ?: return null
                     return tokenFormat().read(handler, token)
-                        ?: RefreshToken(token).session()?.toAuth()
+                        ?: RefreshToken(token).session(request)?.toAuth()
                 } catch (e: TokenException) {
                     throw UnauthorizedException(e.message ?: "JWT issue")
                 }
@@ -213,7 +215,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         errorCases = listOf(),
         implementation = { input: OauthTokenRequest ->
             val session = when {
-                input.refresh_token != null -> RefreshToken(input.refresh_token).session() ?: throw BadRequestException("Refresh token not recognized")
+                input.refresh_token != null -> RefreshToken(input.refresh_token).session(this.rawRequest ?: throw BadRequestException()) ?: throw BadRequestException("Refresh token not recognized")
                 else -> throw BadRequestException("No authentication provided")
             }
             val auth: RequestAuth<SUBJECT> = session.toAuth()
@@ -231,14 +233,29 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
+    val tokenSimple = path("token/simple").post.api(
+        authOptions = noAuth,
+        summary = "Get Token",
+        errorCases = listOf(),
+        implementation = { refresh: String ->
+            val session = RefreshToken(refresh).session(this.rawRequest ?: throw BadRequestException()) ?: throw BadRequestException("Refresh token not recognized")
+            tokenFormat().create(handler, session.toAuth())
+        }
+    )
+
     val sessions = ModelRestEndpoints(
         path = path("sessions"),
         info = info
     )
 
-    private suspend fun RefreshToken.session(): Session<SUBJECT, ID>? {
+    private suspend fun RefreshToken.session(request: Request): Session<SUBJECT, ID>? {
         val session = info.collection().get(_id) ?: return null
         if(!plainTextSecret.checkHash(session.secretHash)) return null
+        info.collection().updateOneById(_id, modification(dataClassPath) {
+            it.lastUsed assign Instant.now()
+            it.userAgents addAll setOf(request.headers[HttpHeader.UserAgent] ?: "")
+            it.ips addAll setOf(request.sourceIp)
+        })
         return session
     }
 }
@@ -246,6 +263,6 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 @JvmInline
 private value class RefreshToken(val string: String) {
     constructor(_id: UUID, secret: String):this("$_id:$secret")
-    val _id: UUID get() = UUID.fromString(string.substringBefore(':', ""))
+    val _id: UUID get() = UUID.fromString(string.substringBefore(':', "").also { println(it) })
     val plainTextSecret: String get() = string.substringAfter(':', "")
 }

@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.serialization
 
-import com.lightningkite.lightningserver.logger
 import kotlinx.serialization.BinaryFormat
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerializationStrategy
@@ -14,7 +13,6 @@ import java.io.*
 
 class JavaData(override val serializersModule: SerializersModule) : BinaryFormat {
     override fun <T> decodeFromByteArray(deserializer: DeserializationStrategy<T>, bytes: ByteArray): T {
-        logger.debug("Decoding $deserializer from ${bytes.contentToString()}")
         return DataInputDecoder(DataInputStream(ByteArrayInputStream(bytes))).decodeSerializableValue(deserializer)
     }
 
@@ -87,3 +85,5 @@ class JavaData(override val serializersModule: SerializersModule) : BinaryFormat
         override fun decodeNotNullMark(): Boolean = decodeBoolean()
     }
 }
+
+
