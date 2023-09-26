@@ -84,7 +84,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                     ?: throw IllegalStateException("Invalid mongodb URL. The URL should match the pattern: mongodb+srv://[credentials and host information]/[databaseName]?[params]")
             }
             DatabaseSettings.register("mongodb-test") {
-                Regex("""mongodb-test://(?:\?(?<params>.*))?""")
+                Regex("""mongodb-test(?:://\?(?<params>.*))?""")
                     .matchEntire(it.url)
                     ?.let { match ->
                         val params: Map<String, List<String>>? = match.groups["params"]?.value?.let { params ->
