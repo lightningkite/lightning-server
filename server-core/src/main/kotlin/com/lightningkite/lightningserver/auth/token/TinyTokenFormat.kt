@@ -39,15 +39,13 @@ class TinyTokenFormat(
     override fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> read(
         handler: Authentication.SubjectHandler<SUBJECT, ID>,
         value: String
-    ): RequestAuth<SUBJECT>? = try {
+    ): RequestAuth<SUBJECT>? {
         val decoded = Base64.getUrlDecoder().decode(value)
         val signature = decoded.sliceArray(0 until resultSize)
         val data = decoded.sliceArray(resultSize until decoded.size)
         if(!hasher().verify(data, signature)) throw TokenException("Incorrect signature")
         val decompressed = data
         @Suppress("UNCHECKED_CAST")
-        Serialization.javaData.decodeFromByteArray(RequestAuthSerializable.serializer(), decompressed).real(handler) as? RequestAuth<SUBJECT>
-    } catch( e: Exception) {
-        null
+        return Serialization.javaData.decodeFromByteArray(RequestAuthSerializable.serializer(), decompressed).real(handler) as? RequestAuth<SUBJECT>
     }
 }
