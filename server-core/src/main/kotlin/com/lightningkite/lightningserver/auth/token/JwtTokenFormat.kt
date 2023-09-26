@@ -13,6 +13,8 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.decodeUnwrappingString
 import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import com.lightningkite.lightningserver.settings.generalSettings
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import java.time.Duration
 import java.time.Instant
 
@@ -39,6 +41,7 @@ class JwtTokenFormat(
                 nbf = Instant.now().epochSecond,
                 scope = auth.scopes?.joinToString(" "),
                 thp = auth.thirdParty,
+                cache = Serialization.json.encodeToString(auth.cachedRaw)
             )
         )
     }
@@ -59,9 +62,9 @@ class JwtTokenFormat(
             rawId = Serialization.json.decodeUnwrappingString(handler.idSerializer, sub),
             issuedAt = Instant.ofEpochSecond(claims.iat),
             scopes = claims.scope?.split(' ')?.toSet(),
-            cachedRaw = mapOf(),
             thirdParty = claims.thp,
             sessionId = claims.sid,
+            cachedRaw = claims.cache?.let { Serialization.json.decodeFromString<Map<String, String>>(it) } ?: mapOf()
         )
     }
 

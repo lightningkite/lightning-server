@@ -272,6 +272,7 @@ object Server : ServerPathGroup(ServerPath.root) {
                 get() = userInfo.serialization.serializer
 
             override suspend fun fetch(id: UUID): User = userInfo.collection().get(id) ?: throw NotFoundException()
+            override val knownCacheTypes: List<RequestAuth.CacheKey<User, UUID, *>> = listOf(EmailCacheKey)
         },
         database = database,
         proofHasher = jwtSigner,
@@ -279,3 +280,10 @@ object Server : ServerPathGroup(ServerPath.root) {
     )
 }
 
+object EmailCacheKey: RequestAuth.CacheKey<User, UUID, String> {
+    override val name: String
+        get() = "email"
+    override fun deserialize(string: String): String = string
+    override fun serialize(value: String): String = value
+    override suspend fun calculate(auth: RequestAuth<User>): String = auth.get().email
+}

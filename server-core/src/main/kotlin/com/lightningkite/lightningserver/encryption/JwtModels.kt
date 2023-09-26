@@ -21,6 +21,7 @@ data class JwtClaims(
     val scope: String? = null,
     val thp: String? = null,
     val sid: UUID? = null,
+    val cache: String? = null,
 )
 
 open class TokenException(message: String) : Exception(message)

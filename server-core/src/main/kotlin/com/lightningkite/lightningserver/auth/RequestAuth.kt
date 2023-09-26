@@ -50,7 +50,7 @@ data class RequestAuth<SUBJECT : HasId<*>>(
     }
 
     @Suppress("UNCHECKED_CAST")
-    suspend fun get() = (subject as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>).fetch(rawId as Comparable<Any?>)
+    suspend fun get() = (subject as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>).fetch(rawId as Comparable<Any?>) as SUBJECT
 }
 
 @Suppress("UNCHECKED_CAST")
