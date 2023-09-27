@@ -17,7 +17,7 @@ class PrivateTinyTokenFormat(
     override fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         handler: Authentication.SubjectHandler<SUBJECT, ID>,
         auth: RequestAuth<SUBJECT>
-    ): String = run {
+    ): String = handler.name + "/" + run {
         encryptor().encrypt(Serialization.javaData.encodeToByteArray(RequestAuthSerializable.serializer(), auth.serializable(
             Instant.now().plus(expiration))))
     }.let { Base64.getUrlEncoder().encodeToString(it) }
@@ -26,8 +26,9 @@ class PrivateTinyTokenFormat(
         handler: Authentication.SubjectHandler<SUBJECT, ID>,
         value: String
     ): RequestAuth<SUBJECT>? {
+        if(!value.startsWith(handler.name + "/")) return null
         try {
-            val decoded = Base64.getUrlDecoder().decode(value)
+            val decoded = Base64.getUrlDecoder().decode(value.substringAfter('/'))
             val plain = encryptor().decrypt(decoded)
             @Suppress("UNCHECKED_CAST")
             return Serialization.javaData.decodeFromByteArray(RequestAuthSerializable.serializer(), plain)

@@ -48,6 +48,7 @@ fun RequestAuth<*>.serializable(expiresAt: Instant) = RequestAuthSerializable(
 fun RequestAuthSerializable.real(subjectHandler: Authentication.SubjectHandler<*, *>? = null): RequestAuth<*> {
     val subject = subjectHandler ?: Authentication.subjects.values.find { it.name == this.subjectType } as? Authentication.SubjectHandler<HasId<Comparable<Any>>, Comparable<Any>>
         ?: throw TokenException("Auth type ${subjectType} not known.")
+    if(subjectHandler != null && this.subjectType != subjectHandler.name) throw TokenException("Subject type mismatch")
     if(this.expiresAt < Instant.now()) throw TokenException("Authorization has expired.")
     return RequestAuth(
         subject = subject,

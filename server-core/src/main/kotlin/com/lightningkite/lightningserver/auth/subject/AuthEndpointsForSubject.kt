@@ -256,6 +256,17 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
+    val self = path("self").get.api(
+        summary = "Get Self",
+        authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType))),
+        errorCases = listOf(),
+        inputType = Unit.serializer(),
+        outputType = handler.subjectSerializer,
+        implementation = { _ ->
+            auth.get()
+        }
+    )
+
     val sessions = ModelRestEndpoints(
         path = path("sessions"),
         info = info
