@@ -30,11 +30,11 @@ abstract class TokenFormatTest {
     val subject = object: Authentication.SubjectHandler<Sample, UUID> {
         override val name: String
             get() = "sample"
-        override val idProofs: Set<String>
+        override val idProofs: Set<Authentication.ProofMethod>
             get() = setOf()
         override val authType: AuthType
             get() = AuthType<Sample>()
-        override val applicableProofs: Set<String>
+        override val applicableProofs: Set<Authentication.ProofMethod>
             get() = setOf()
 
         override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<Sample, UUID>? = null

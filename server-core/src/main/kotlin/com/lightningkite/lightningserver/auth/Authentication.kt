@@ -44,9 +44,9 @@ object Authentication {
 
     interface SubjectHandler<SUBJECT: HasId<ID>, ID: Comparable<ID>> {
         val name: String
-        val idProofs: Set<String>
+        val idProofs: Set<ProofMethod>
         val authType: AuthType
-        val applicableProofs: Set<String>
+        val applicableProofs: Set<ProofMethod>
         suspend fun authenticate(vararg proofs: Proof): AuthenticateResult<SUBJECT, ID>?
         suspend fun permitMasquerade(
             other: SubjectHandler<*, *>,

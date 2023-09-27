@@ -245,9 +245,9 @@ object Server : ServerPathGroup(ServerPath.root) {
         path("subject"),
         object: Authentication.SubjectHandler<User, UUID> {
             override val name: String get() = "User"
-            override val idProofs: Set<String> = setOf("email")
+            override val idProofs: Set<Authentication.ProofMethod> = setOf(proofEmail)
             override val authType: AuthType get() = AuthType<User>()
-            override val applicableProofs: Set<String> = setOf("email", "otp")
+            override val applicableProofs: Set<Authentication.ProofMethod> = setOf(proofOtp)
             override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<User, UUID>? {
                 val emailIdentifier = proofs.find { it.of == "email" } ?: return null
                 val user = userInfo.collection().findOne(condition { it.email eq emailIdentifier.value }) ?: run {
