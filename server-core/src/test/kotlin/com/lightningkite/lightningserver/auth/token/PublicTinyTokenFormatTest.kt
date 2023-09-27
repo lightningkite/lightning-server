@@ -1,28 +1,20 @@
 @file:UseContextualSerialization(UUID::class)
 package com.lightningkite.lightningserver.auth.token
 
-import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.UUIDSerializer
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.auth.proof.Proof
 import com.lightningkite.lightningserver.encryption.SecureHasherSettings
-import com.lightningkite.lightningserver.encryption.TokenException
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
-import org.junit.Assert
-import org.junit.Assert.*
 import org.junit.Test
 import java.time.Duration
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 import java.util.*
-import kotlin.test.assertFailsWith
 
-class TinyTokenFormatTest: TokenFormatTest() {
-    override fun format(expiration: Duration): TokenFormat = TinyTokenFormat(SecureHasherSettings(), expiration)
+class PublicTinyTokenFormatTest: TokenFormatTest() {
+    override fun format(expiration: Duration): TokenFormat = PublicTinyTokenFormat(SecureHasherSettings(), expiration)
 
     init { TestSettings }
 

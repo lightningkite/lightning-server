@@ -8,7 +8,7 @@ import com.lightningkite.lightningserver.auth.proof.PinHandler
 import com.lightningkite.lightningserver.auth.proof.Proof
 import com.lightningkite.lightningserver.auth.proof.ProofOption
 import com.lightningkite.lightningserver.auth.subject.AuthEndpointsForSubject
-import com.lightningkite.lightningserver.auth.token.TinyTokenFormat
+import com.lightningkite.lightningserver.auth.token.PublicTinyTokenFormat
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.*
@@ -143,7 +143,7 @@ object TestSettings {
         handler = subject,
         database = database,
         proofHasher = jwtSigner,
-        tokenFormat = { TinyTokenFormat(jwtSigner) }
+        tokenFormat = { PublicTinyTokenFormat(jwtSigner) }
     )
 
     object EmailCacheKey : RequestAuth.CacheKey<TestUser, UUID, String>() {

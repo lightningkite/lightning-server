@@ -10,7 +10,6 @@ import com.lightningkite.lightningserver.auth.proof.*
 import com.lightningkite.lightningserver.auth.proof.PinHandler
 import com.lightningkite.lightningserver.auth.subject.AuthEndpointsForSubject
 import com.lightningkite.lightningserver.auth.token.JwtTokenFormat
-import com.lightningkite.lightningserver.auth.token.TinyTokenFormat
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.MemcachedCache
 import com.lightningkite.lightningserver.cache.get

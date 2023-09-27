@@ -4,19 +4,13 @@ import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.encryption.TokenException
-import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.serialization.Serialization
-import kotlinx.serialization.Serializable
-import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.time.Duration
 import java.time.Instant
 import java.util.Base64
-import java.util.zip.GZIPInputStream
-import java.util.zip.GZIPOutputStream
-import kotlin.math.sign
 
-class TinyTokenFormat(
+class PublicTinyTokenFormat(
     val hasher: () -> SecureHasher,
     val expiration: Duration = Duration.ofMinutes(5),
 ): TokenFormat {
