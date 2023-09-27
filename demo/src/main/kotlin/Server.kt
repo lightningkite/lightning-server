@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.auth.proof.*
 import com.lightningkite.lightningserver.auth.proof.PinHandler
 import com.lightningkite.lightningserver.auth.subject.AuthEndpointsForSubject
 import com.lightningkite.lightningserver.auth.token.JwtTokenFormat
+import com.lightningkite.lightningserver.auth.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.MemcachedCache
 import com.lightningkite.lightningserver.cache.get
@@ -20,6 +21,8 @@ import com.lightningkite.lightningserver.db.*
 import com.lightningkite.lightningserver.email.Email
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.email.SesClient
+import com.lightningkite.lightningserver.encryption.Encryptor
+import com.lightningkite.lightningserver.encryption.EncryptorSettings
 import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.exceptions.NotFoundException
@@ -59,6 +62,7 @@ object Server : ServerPathGroup(ServerPath.root) {
     val email = setting("email", EmailSettings())
     val sms = setting("sms", SMSSettings())
     val jwtSigner = setting("jwt", SecureHasherSettings())
+    val encryptor = setting("encryptor", EncryptorSettings())
     val files = setting("files", FilesSettings())
     val cache = setting("cache", CacheSettings())
 
@@ -277,7 +281,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         },
         database = database,
         proofHasher = jwtSigner,
-        tokenFormat = { JwtTokenFormat(jwtSigner) }
+        tokenFormat = { PrivateTinyTokenFormat(encryptor) }
     )
 }
 

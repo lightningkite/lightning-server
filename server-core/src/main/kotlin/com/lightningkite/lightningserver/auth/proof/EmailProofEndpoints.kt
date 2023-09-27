@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.email.EmailPersonalization
 import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.typed
@@ -23,6 +24,9 @@ class EmailProofEndpoints(
     val email: () -> EmailClient,
     val emailTemplate: Email
 ) : PinBasedProofEndpoints(path, proofHasher, pin) {
+    init {
+        if(path.docName == null) path.docName = "EmailProof"
+    }
 
     override val name: String
         get() = "email"

@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.email.EmailPersonalization
 import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.sms.SMSClient
 import com.lightningkite.lightningserver.typed.ApiEndpoint
@@ -25,6 +26,9 @@ class SmsProofEndpoints(
     val sms: () -> SMSClient,
     val smsTemplate: (pin: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." }
 ) : PinBasedProofEndpoints(path, proofHasher, pin) {
+    init {
+        if(path.docName == null) path.docName = "SmsProof"
+    }
 
     override val name: String
         get() = "phone"

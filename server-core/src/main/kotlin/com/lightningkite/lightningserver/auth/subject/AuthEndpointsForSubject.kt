@@ -24,6 +24,7 @@ import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.auth
 import kotlinx.serialization.ContextualSerializer
@@ -44,6 +45,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     init {
         prepareModels()
+        if(path.docName == null) path.docName = "${handler.name}Auth"
     }
 
     val sessionSerializer = Session.serializer(handler.subjectSerializer, handler.idSerializer)

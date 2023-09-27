@@ -10,17 +10,6 @@ import java.security.SecureRandom
 import java.time.Instant
 import java.util.*
 
-
-@GenerateDataClassPaths
-@Serializable
-data class OauthClient(
-    override val _id: String,
-    val scopes: Set<String>,
-    val secretHash: String,
-) : HasId<String> {
-
-}
-
 @Serializable
 data class SubSessionRequest(
     val label: String,

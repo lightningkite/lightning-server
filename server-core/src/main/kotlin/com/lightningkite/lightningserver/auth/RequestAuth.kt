@@ -3,13 +3,15 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningdb.Description
 import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
+import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.Request
+import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import kotlinx.serialization.UseSerializers
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
@@ -26,10 +28,37 @@ data class RequestAuth<SUBJECT : HasId<*>>(
     object Key : Request.CacheKey<RequestAuth<*>?> {
         override suspend fun calculate(request: Request): RequestAuth<*>? {
             for (reader in Authentication.readers) {
-                return reader.request(request) ?: continue
+                return reader.request(request)?.let {
+                    request.headers[HttpHeader.XMasquerade]?.let { m ->
+                        val otherType = m.substringBefore('.')
+                        val otherHandler = Authentication.subjects.values.find { it.name == otherType } ?: throw BadRequestException("No subject type ${otherType} known")
+                        val otherId = m.substringAfter('.')
+                        @Suppress("UNCHECKED_CAST")
+                        if(it.permitMasquerade(
+                            otherHandler as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>,
+                            Serialization.fromString(otherId, otherHandler.idSerializer)
+                        )) {
+                            RequestAuth(
+                                subject = otherHandler,
+                                sessionId = it.sessionId,
+                                rawId = otherId,
+                                issuedAt = it.issuedAt,
+                                scopes = it.scopes,
+                                thirdParty = "${it.subject.name} ${it.rawId} masquerading"
+                            )
+                        } else {
+                            throw ForbiddenException()
+                        }
+                    }
+                } ?: continue
             }
             return null
         }
+    }
+
+    private suspend fun permitMasquerade(other: Authentication.SubjectHandler<*, *>, otherId: Comparable<*>): Boolean {
+        @Suppress("UNCHECKED_CAST")
+        return (subject as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>).permitMasquerade(other, rawId as Comparable<Any?>, otherId)
     }
 
     abstract class CacheKey<SUBJECT : HasId<ID>, ID : Comparable<ID>, VALUE> {

@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.decodeUnwrappingString
 import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
@@ -42,6 +43,9 @@ class OneTimePasswordProofEndpoints(
         hmacAlgorithm = HmacAlgorithm.SHA1
     )
 ) : ServerPathGroup(path), Authentication.DirectProofMethod {
+    init {
+        if(path.docName == null) path.docName = "OneTimePasswordProof"
+    }
     override val name: String
         get() = "otp"
     override val humanName: String
