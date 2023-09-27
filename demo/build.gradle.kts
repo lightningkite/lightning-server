@@ -27,11 +27,12 @@ repositories {
     mavenCentral()
 }
 
+val ktorVersion:String by project
 dependencies {
     api(project(":server"))
     ksp(project(":processor"))
     implementation("com.lightningkite:kotliner-cli:1.0.3")
-    implementation("io.ktor:ktor-server-call-logging:2.1.0")
+    implementation("io.ktor:ktor-server-call-logging:$ktorVersion")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation(project(":client"))
 }

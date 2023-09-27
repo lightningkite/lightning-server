@@ -6,8 +6,8 @@ import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import com.google.firebase.messaging.Notification as FCMNotification
 import java.io.File
+import com.google.firebase.messaging.Notification as FCMNotification
 
 
 /**
@@ -17,10 +17,14 @@ import java.io.File
 object FcmNotificationClient : NotificationClient {
     init {
         NotificationSettings.register("fcm") {
-            var creds = it.credentials?.trim() ?: throw IllegalStateException(
-                "FCM was selected for notification implementation, but no credential file was provided."
-            )
-            if(!creds.startsWith('{')) {
+
+            var creds = it.credentials?.trim()
+                ?: it.implementation.substringAfter("://", "").takeIf { it.isNotBlank() }
+                ?: throw IllegalStateException(
+                    "FCM was selected for notifications, but no credentials were provided."
+                )
+
+            if (!creds.startsWith('{')) {
                 val file = File(creds)
                 assert(file.exists()) { "FCM credentials file not found at '$file'" }
                 creds = file.readText()
@@ -88,7 +92,7 @@ object FcmNotificationClient : NotificationClient {
                 setAndroidConfig(
                     with(AndroidConfig.builder()) {
                         setPriority(android.priority.toAndroid())
-                        data.timeToLive?.let{
+                        data.timeToLive?.let {
                             setTtl(it.seconds)
                         }
                         setNotification(
