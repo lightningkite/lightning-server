@@ -15,17 +15,19 @@ class TableGenerator(
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val allDatabaseModels = resolver.getNewFiles()
             .flatMap { it.declarations }
-            .mapNotNull { it as? KSClassDeclaration }
+            .filterIsInstance<KSClassDeclaration>()
+            .flatMap { sequenceOf(it) + it.declarations.filterIsInstance<KSClassDeclaration>() }
             .filter { it.annotation("DatabaseModel") != null || it.annotation("GenerateDataClassPaths") != null }
         val changedDatabaseModels = resolver.getNewFiles()
             .flatMap { it.declarations }
-            .mapNotNull { it as? KSClassDeclaration }
+            .filterIsInstance<KSClassDeclaration>()
+            .flatMap { sequenceOf(it) + it.declarations.filterIsInstance<KSClassDeclaration>() }
             .filter { it.annotation("DatabaseModel") != null || it.annotation("GenerateDataClassPaths") != null }
 
         val seen = HashSet<KSClassDeclaration>()
         resolver.getClassDeclarationByName("kotlin.Comparable")?.let { comparable = it }
         changedDatabaseModels
-            .flatMap { MongoFields(it).allSubs(seen) }
+            .map { MongoFields(it) }
             .distinct()
             .forEach {
                 try {
@@ -63,7 +65,7 @@ class TableGenerator(
         seen.clear()
 
         allDatabaseModels
-            .flatMap { MongoFields(it).allSubs(seen) }
+            .map { MongoFields(it) }
             .distinct()
             .groupBy { it.packageName }
             .forEach { ksName, ksClassDeclarations ->

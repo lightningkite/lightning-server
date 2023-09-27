@@ -48,6 +48,7 @@ import com.lightningkite.lightningserver.websocket.websocket
 import io.ktor.client.request.*
 import kotlinx.coroutines.delay
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.serializer
 import java.lang.IllegalStateException
 import java.time.Duration
 import java.util.*
@@ -277,14 +278,14 @@ object Server : ServerPathGroup(ServerPath.root) {
         },
         database = database,
         proofHasher = jwtSigner,
-        tokenFormat = { TinyTokenFormat(jwtSigner) }
+        tokenFormat = { JwtTokenFormat(jwtSigner) }
     )
 }
 
-object EmailCacheKey: RequestAuth.CacheKey<User, UUID, String> {
+object EmailCacheKey: RequestAuth.CacheKey<User, UUID, String>() {
     override val name: String
         get() = "email"
-    override fun deserialize(string: String): String = string
-    override fun serialize(value: String): String = value
+    override val serializer: KSerializer<String>
+        get() = String.serializer()
     override suspend fun calculate(auth: RequestAuth<User>): String = auth.get().email
 }

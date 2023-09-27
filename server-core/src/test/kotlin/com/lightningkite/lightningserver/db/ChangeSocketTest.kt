@@ -4,11 +4,10 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.db.testmodels.TestThing
-import com.lightningkite.lightningserver.db.testmodels.TestThing_value
+import com.lightningkite.lightningserver.testmodels.TestThing
+import com.lightningkite.lightningserver.testmodels.TestThing_value
 import com.lightningkite.lightningserver.typed.test
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import org.junit.Test
 import java.util.*
@@ -21,7 +20,7 @@ class ChangeSocketTest {
     fun test() {
         val database = TestSettings.database
         runBlocking {
-            com.lightningkite.lightningserver.db.testmodels.prepareModels()
+            com.lightningkite.lightningserver.testmodels.prepareModels()
             database().collection<TestThing>().deleteMany(Condition.Always())
             TestSettings.ws.test {
 

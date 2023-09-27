@@ -6,6 +6,7 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.time.Instant
@@ -19,8 +20,17 @@ object UUIDPartsSerializer: KSerializer<UUID> {
 
     override fun deserialize(decoder: Decoder): UUID {
         val s = decoder.beginStructure(descriptor)
-        val m = s.decodeLongElement(descriptor, 0)
-        val l = s.decodeLongElement(descriptor, 1)
+        var m = 0L
+        var l = 0L
+        while(true) {
+            var index = s.decodeElementIndex(descriptor)
+            when(index) {
+                0 -> m = s.decodeLongElement(descriptor, 0)
+                1 -> l = s.decodeLongElement(descriptor, 1)
+                CompositeDecoder.DECODE_DONE -> break
+                else -> {}
+            }
+        }
         s.endStructure(descriptor)
         return UUID(m, l)
     }

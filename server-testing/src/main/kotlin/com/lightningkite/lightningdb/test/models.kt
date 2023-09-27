@@ -53,6 +53,7 @@ data class EmbeddedObjectTest(
     companion object
 }
 
+@GenerateDataClassPaths
 @Serializable
 data class ClassUsedForEmbedding(
     var value1:String = "default",

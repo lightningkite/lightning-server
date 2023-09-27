@@ -10,11 +10,16 @@ import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.auth.proof.Proof
 import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.encryption.TokenException
+import com.lightningkite.lightningserver.testmodels.TestUser
+import kotlinx.coroutines.*
+import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
+import kotlinx.serialization.builtins.serializer
 import org.junit.Assert
 import org.junit.Test
+import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.*
@@ -23,41 +28,38 @@ import kotlin.test.assertNull
 
 abstract class TokenFormatTest {
 
-    abstract fun format(): TokenFormat
+    abstract fun format(expiration: Duration = Duration.ofMinutes(5)): TokenFormat
 
-    @Serializable
-    data class Sample(override val _id: UUID = UUID.randomUUID()): HasId<UUID>
-    val subject = object: Authentication.SubjectHandler<Sample, UUID> {
-        override val name: String
-            get() = "sample"
-        override val idProofs: Set<Authentication.ProofMethod>
-            get() = setOf()
-        override val authType: AuthType
-            get() = AuthType<Sample>()
-        override val applicableProofs: Set<Authentication.ProofMethod>
-            get() = setOf()
-
-        override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<Sample, UUID>? = null
-
-        override val idSerializer: KSerializer<UUID>
-            get() = UUIDSerializer
-        override val subjectSerializer: KSerializer<Sample>
-            get() = Sample.serializer()
-
-        override suspend fun fetch(id: UUID): Sample =  Sample(id)
-
+    @OptIn(DelicateCoroutinesApi::class)
+    val sampleAuth = GlobalScope.async(start = CoroutineStart.LAZY) {
+        RequestAuth<TestUser>(
+            TestSettings.subject,
+            UUID.randomUUID(),
+            TestSettings.testUser.await()._id,
+            Instant.now().truncatedTo(ChronoUnit.SECONDS),
+            setOf("test", "test2"),
+            thirdParty = "thirdparty"
+        ).precache(listOf(TestSettings.EmailCacheKey))
     }
+
     @Test
-    fun testCycle() {
+    fun testCycle(): Unit = runBlocking {
         val format = format()
-        val a = RequestAuth<Sample>(subject, UUID.randomUUID(), UUID.randomUUID(), Instant.now().truncatedTo(ChronoUnit.SECONDS), setOf("test", "test2"), thirdParty = "thirdparty")
-        Assert.assertEquals(a, format.read(subject, format.create(subject, a).also { println(it) }))
+        Assert.assertEquals(sampleAuth.await(), format.read(TestSettings.subject, format.create(TestSettings.subject, sampleAuth.await()).also { println(it) }))
     }
     @Test
-    fun testDifferentHashFails() {
-        val a = RequestAuth<Sample>(subject, UUID.randomUUID(), UUID.randomUUID(), Instant.now().truncatedTo(ChronoUnit.SECONDS), setOf("test", "test2"), thirdParty = "thirdparty")
+    fun testDifferentHashFails(): Unit = runBlocking {
         assertFailsWith<TokenException> {
-            format().read(subject, format().create(subject, a))
+            format().read(TestSettings.subject, format().create(TestSettings.subject, sampleAuth.await()))
+        }
+    }
+
+    @Test fun expires(): Unit = runBlocking {
+        assertFailsWith<TokenException> {
+            val format = format(Duration.ofMillis(1))
+            val created = format.create(TestSettings.subject, sampleAuth.await())
+            Thread.sleep(1)
+            format.read(TestSettings.subject, created)
         }
     }
 }

@@ -42,7 +42,7 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebs
         errorCases = listOf(),
         connect = {
             val auth = this.authOrNull
-            val user = auth?.serializable()
+            val user = auth?.serializable(Instant.now().plus(Duration.ofDays(1)))
             val collection = info.collection(this)
             helper.subscriptionDb().insertOne(
                 __WebSocketDatabaseChangeSubscription(

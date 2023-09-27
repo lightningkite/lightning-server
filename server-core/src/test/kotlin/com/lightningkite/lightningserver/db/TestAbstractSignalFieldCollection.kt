@@ -1,9 +1,8 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.db.testmodels.TempThing
-import com.lightningkite.lightningserver.db.testmodels.TempThing__id
+import com.lightningkite.lightningserver.testmodels.TempThing
+import com.lightningkite.lightningserver.testmodels.TempThing__id
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Test
@@ -22,7 +21,7 @@ class TestAbstractSignalFieldCollection {
     @Before
     fun setup() {
         prepareModels()
-        com.lightningkite.lightningserver.db.testmodels.prepareModels()
+        com.lightningkite.lightningserver.testmodels.prepareModels()
         collection = InMemoryDatabase().collection<TempThing>() as InMemoryFieldCollection
     }
 

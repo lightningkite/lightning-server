@@ -42,12 +42,12 @@ class SmsAuthTest {
         val baseAuth = BaseAuthEndpoints(path, phoneAccess, TestSettings.jwtSigner, expiration = Duration.ofHours(1), emailExpiration = Duration.ofMinutes(5))
         val phoneAuth = SmsAuthEndpoints(baseAuth, phoneAccess, TestSettings.cache, TestSettings.sms)
         runBlocking {
-            phoneAuth.loginSms.implementation(AuthAndPathParts(null, arrayOf()), "8013693729")
+            phoneAuth.loginSms.implementation(AuthAndPathParts(null, null, arrayOf()), "8013693729")
             val pinRegex = Regex("[0-9][0-9][0-9][0-9][0-9][0-9]")
             val pin = (TestSettings.sms() as TestSMSClient).lastMessageSent?.message?.let {
                 pinRegex.find(it)?.value
             }!!
-            val token = phoneAuth.loginSmsPin.implementation(AuthAndPathParts(null, arrayOf()), PhonePinLogin("8013693729", pin))
+            val token = phoneAuth.loginSmsPin.implementation(AuthAndPathParts(null, null, arrayOf()), PhonePinLogin("8013693729", pin))
             assertEquals(
                 HttpStatus.OK, baseAuth.getSelf.route.endpoint.test(
                 headers = HttpHeaders(HttpHeader.Authorization to token, HttpHeader.ContentType to "application/json")
@@ -67,11 +67,11 @@ class SmsAuthTest {
         val baseAuth = BaseAuthEndpoints(path, phoneAccess, TestSettings.jwtSigner, expiration = Duration.ofHours(1), emailExpiration = Duration.ofMinutes(5))
         val phoneAuth = SmsAuthEndpoints(baseAuth, phoneAccess, TestSettings.cache, TestSettings.sms)
         runBlocking {
-            phoneAuth.loginSms.implementation(AuthAndPathParts(null, arrayOf()), "8013693729")
+            phoneAuth.loginSms.implementation(AuthAndPathParts(null, null, arrayOf()), "8013693729")
             val pinRegex = Regex("[0-9][0-9][0-9][0-9][0-9][0-9]")
             val pin = "wrong"
             try {
-                phoneAuth.loginSmsPin.implementation(AuthAndPathParts(null, arrayOf()), PhonePinLogin("8013693729", pin))
+                phoneAuth.loginSmsPin.implementation(AuthAndPathParts(null, null, arrayOf()), PhonePinLogin("8013693729", pin))
                 fail()
             } catch (e: BadRequestException) {
                 assertEquals("Incorrect PIN.  4 attempts remain.", e.message)

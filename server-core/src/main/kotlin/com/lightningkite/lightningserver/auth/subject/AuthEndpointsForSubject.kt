@@ -215,7 +215,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         scopes = this.scopes,
         sessionId = this._id,
         thirdParty = this.oauthClient
-    ).withCachedValues(handler.knownCacheTypes)
+    )
 
     val token = path("token").post.api(
         authOptions = noAuth,
@@ -229,7 +229,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
                 else -> throw BadRequestException("No authentication provided")
             }
-            val auth: RequestAuth<SUBJECT> = session.toAuth()
+            val auth: RequestAuth<SUBJECT> = session.toAuth().precache(handler.knownCacheTypes)
             when (input.grant_type) {
                 OauthGrantTypes.refreshToken -> {
                     OauthResponse(
@@ -252,7 +252,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         implementation = { refresh: String ->
             val session = RefreshToken(refresh).session(this.rawRequest ?: throw BadRequestException())
                 ?: throw BadRequestException("Refresh token not recognized")
-            tokenFormat().create(handler, session.toAuth())
+            tokenFormat().create(handler, session.toAuth().precache(handler.knownCacheTypes))
         }
     )
 

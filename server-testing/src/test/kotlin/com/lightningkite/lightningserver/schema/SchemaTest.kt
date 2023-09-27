@@ -18,7 +18,7 @@ class SchemaTest {
             println(it.descriptor.serialName)
             println(it.descriptor::class.qualifiedName)
         }
-        val schema = Serialization.json.schema(LargeTestModel.serializer().descriptor)
+        val schema = Serialization.json.schema(LargeTestModel.serializer())
         println(Json(Serialization.json) { prettyPrint = true }.encodeToString(schema))
     }
 }

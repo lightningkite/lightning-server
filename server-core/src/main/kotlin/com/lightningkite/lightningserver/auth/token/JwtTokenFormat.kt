@@ -1,13 +1,8 @@
 package com.lightningkite.lightningserver.auth.token
 
 import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.RequestAuth
-import com.lightningkite.lightningserver.auth.id
-import com.lightningkite.lightningserver.encryption.JwtClaims
-import com.lightningkite.lightningserver.encryption.SecureHasher
-import com.lightningkite.lightningserver.encryption.signJwt
-import com.lightningkite.lightningserver.encryption.verifyJwt
+import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.decodeUnwrappingString
@@ -20,6 +15,7 @@ import java.time.Instant
 
 class JwtTokenFormat(
     val hasher: () -> SecureHasher,
+    val expiration: Duration = Duration.ofMinutes(5),
     val issuerOverride: String? = null,
     val audienceOverride: String? = null,
 ): TokenFormat {
@@ -36,12 +32,12 @@ class JwtTokenFormat(
                 sid = auth.sessionId,
                 sub = "${handler.name}|${Serialization.json.encodeUnwrappingString<ID>(handler.idSerializer, auth.id)}",
                 aud = audience,
-                exp = Instant.now().plus(Duration.ofMinutes(5)).epochSecond,
+                exp = Instant.now().plus(expiration).epochSecond,
                 iat = auth.issuedAt.epochSecond,
                 nbf = Instant.now().epochSecond,
                 scope = auth.scopes?.joinToString(" "),
                 thp = auth.thirdParty,
-                cache = Serialization.json.encodeToString(auth.cachedRaw)
+                cache = Serialization.json.encodeToString(auth.cacheKeyMap())
             )
         )
     }
@@ -54,18 +50,20 @@ class JwtTokenFormat(
         val claims = hasher().verifyJwt(value, audience) ?: return null
         val rawSub = claims.sub!!
         val sub = if(rawSub.startsWith(prefix)) rawSub.removePrefix(prefix) else return null
-        if(Instant.now() > Instant.ofEpochSecond(claims.exp)) throw UnauthorizedException("Token has expired")
-        if(claims.nbf?.let { Instant.now() < Instant.ofEpochSecond(it) } == true) throw UnauthorizedException("Token not valid yet")
-        if(claims.nbf?.let { Instant.now() < Instant.ofEpochSecond(it) } == true) throw UnauthorizedException("Token not valid yet")
+        if(Instant.now() > Instant.ofEpochSecond(claims.exp)) throw TokenException("Token has expired")
+        if(claims.nbf?.let { Instant.now() < Instant.ofEpochSecond(it) } == true) throw TokenException("Token not valid yet")
         return RequestAuth(
             subject = handler,
             rawId = Serialization.json.decodeUnwrappingString(handler.idSerializer, sub),
             issuedAt = Instant.ofEpochSecond(claims.iat),
             scopes = claims.scope?.split(' ')?.toSet(),
             thirdParty = claims.thp,
-            sessionId = claims.sid,
-            cachedRaw = claims.cache?.let { Serialization.json.decodeFromString<Map<String, String>>(it) } ?: mapOf()
-        )
+            sessionId = claims.sid
+        ).also {
+            claims.cache?.let { c ->
+                it.cacheKeyMap(Serialization.json.decodeFromString(CacheKeyMapSerializer, c))
+            }
+        }
     }
 
 }

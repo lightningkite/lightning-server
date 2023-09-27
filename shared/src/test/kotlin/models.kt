@@ -53,12 +53,14 @@ data class EmbeddedObjectTest(
 }
 
 
+@GenerateDataClassPaths
 @Serializable
 data class ClassUsedForEmbedding(
     var value1:String = "default",
     var value2:Int = 1
 )
 
+@GenerateDataClassPaths
 @Serializable
 data class RecursiveEmbed(
     var embedded:RecursiveEmbed? = null,
@@ -126,6 +128,7 @@ data class Cursed(
     val insideClass: Inside<UUID>
 ): HasId<UUID> {
     @Serializable
+    @GenerateDataClassPaths
     data class Inside<T>(val item: T)
 }
 

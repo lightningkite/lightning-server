@@ -26,7 +26,6 @@ object Authentication {
     // TODO: Easier SubjectHandler impl
     // TODO: Implement Methods
     init {
-        com.lightningkite.lightningserver.auth.prepareModels()
         com.lightningkite.lightningserver.auth.proof.prepareModels()
     }
 

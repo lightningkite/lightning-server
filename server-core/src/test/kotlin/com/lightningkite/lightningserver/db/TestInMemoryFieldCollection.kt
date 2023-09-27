@@ -4,8 +4,7 @@ import com.lightningkite.lightningdb.InMemoryFieldCollection
 import com.lightningkite.lightningdb.UniqueViolationException
 import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningdb.insertOne
-import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.db.testmodels.*
+import com.lightningkite.lightningserver.testmodels.*
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Test
@@ -24,7 +23,7 @@ class TestInMemoryFieldCollection {
     fun setup(){
 
         prepareModels()
-        com.lightningkite.lightningserver.db.testmodels.prepareModels()
+        com.lightningkite.lightningserver.testmodels.prepareModels()
         fieldCollection = InMemoryDatabase().collection<UniqueFieldClass>() as InMemoryFieldCollection
         setCollection = InMemoryDatabase().collection<UniqueSetClass>() as InMemoryFieldCollection
         comboCollection = InMemoryDatabase().collection<UniqueComboClass>() as InMemoryFieldCollection
