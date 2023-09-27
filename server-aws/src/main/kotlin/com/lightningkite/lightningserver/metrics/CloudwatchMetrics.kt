@@ -28,7 +28,7 @@ class CloudwatchMetrics(
 
         init {
             MetricSettings.register("cloudwatch") {
-                Regex("""cloudwatch:\/\/((?:(?<user>[a-zA-Z0-9+\/]+):(?<password>[a-zA-Z0-9+\/]+)@)?(?<region>[a-zA-Z0-9-]+))/(?<namespace>[^?]+)""").matchEntire(
+                Regex("""cloudwatch://((?:(?<user>[a-zA-Z0-9+/]+):(?<password>[a-zA-Z0-9+/]+)@)?(?<region>[a-zA-Z0-9-]+))/(?<namespace>[^?]+)""").matchEntire(
                     it.url
                 )?.let { match ->
                     val user = match.groups["user"]?.value ?: ""

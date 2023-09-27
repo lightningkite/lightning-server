@@ -9,7 +9,7 @@ data class HttpHeaderValue(
         raw.substringAfter(';').split(';').associate { it.substringBefore('=').trim() to it.substringAfter('=').trim() }
     )
 
-    override fun toString(): String = root + (parameters.entries.takeUnless { it.isEmpty() }?.joinToString("; ") {
+    override fun toString(): String = "$root; " + (parameters.entries.takeUnless { it.isEmpty() }?.joinToString("; ") {
         "${it.key}=${it.value}"
     } ?: "")
 }

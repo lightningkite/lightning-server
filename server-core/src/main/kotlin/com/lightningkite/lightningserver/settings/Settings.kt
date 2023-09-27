@@ -21,7 +21,6 @@ object Settings {
 
     fun populate(map: Map<String, Any?>) {
         if(sealed) throw IllegalStateException("Settings have already been populated.")
-        sealed = true
         values.putAll(map.mapValues { Box(it.value) })
         val missing = requirements.keys - values.keys
         if (requirements.filter { it.key in missing }.any { !it.value.optional }) {
@@ -32,6 +31,7 @@ object Settings {
                 logger.debug("Loading setting ${it.name}...")
                 it()
             }
+        sealed = true
     }
 
     private data class Box<T>(val item: T)

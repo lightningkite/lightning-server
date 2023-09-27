@@ -21,12 +21,17 @@ data class ExceptionSettings(
             ExceptionSettings.register("debug") { DebugExceptionReporter }
             ExceptionSettings.register("none") { NoExceptionReporter }
             ExceptionSettings.register("grouped-db") {
-                val options = it.url.substringAfter("://")
-                val dbString = options.substringBefore('|')
-                val packageName = options.substringAfter('|')
-                val database = (Settings.requirements[dbString]?.invoke() as? Database)
-                        ?: DatabaseSettings(dbString).invoke()
-                GroupedDatabaseExceptionReporter(packageName, database)
+
+                Regex("""grouped-db://(?<dbString>[^|]+)\|(?<packageName>.+)""")
+                    .matchEntire(it.url)
+                    ?.let { match ->
+                        val dbString = match.groups["dbString"]!!.value
+                        val packageName = match.groups["packageName"]!!.value
+                        val database = (Settings.requirements[dbString]?.invoke() as? Database)
+                            ?: DatabaseSettings(dbString).invoke()
+                        GroupedDatabaseExceptionReporter(packageName, database)
+                    }
+                    ?: throw IllegalStateException("Invalid grouped-db URL. The URL should match the pattern: grouped-db://[dbString:Database Setting Name]|[packageName]")
             }
         }
     }
