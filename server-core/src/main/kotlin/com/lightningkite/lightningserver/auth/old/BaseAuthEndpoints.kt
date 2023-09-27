@@ -60,8 +60,8 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
         override val subjectSerializer: KSerializer<USER> get() = userAccess.serializer
         override suspend fun fetch(id: ID): USER = userAccess.byId(id)
 
-        override val idProofs: Set<String> get() = setOf()
-        override val applicableProofs: Set<String> get() = setOf()
+        override val idProofs: Set<Authentication.ProofMethod> get() = setOf()
+        override val applicableProofs: Set<Authentication.ProofMethod> get() = setOf()
         override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<USER, ID>? = null
 
     }
@@ -84,9 +84,9 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
         }
         Authentication.register(object: Authentication.SubjectHandler<USER, ID> {
             override val name: String get() = userAccess.authType.toString().substringAfterLast('.')
-            override val idProofs: Set<String> get() = setOf()
+            override val idProofs: Set<Authentication.ProofMethod> get() = setOf()
             override val authType: AuthType get() = userAccess.authType
-            override val applicableProofs: Set<String> get() = setOf()
+            override val applicableProofs: Set<Authentication.ProofMethod> get() = setOf()
             override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<USER, ID>? = null
             override val idSerializer: KSerializer<ID> get() = userAccess.idSerializer
             override val subjectSerializer: KSerializer<USER> get() = userAccess.serializer
