@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.cache
 
 import com.lightningkite.lightningserver.logger
 import kotlinx.serialization.KSerializer
-import java.time.Duration
+import kotlin.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -19,7 +19,7 @@ open class LocalCache(val entries: ConcurrentHashMap<String, Entry> = Concurrent
         entries[key]?.takeIf { it.expires == null || it.expires > System.currentTimeMillis() }?.value as? T
 
     override suspend fun <T> set(key: String, value: T, serializer: KSerializer<T>, timeToLive: Duration?) {
-        entries[key] = Entry(value, timeToLive?.toMillis()?.let { System.currentTimeMillis() + it })
+        entries[key] = Entry(value, timeToLive?.inWholeMilliseconds?.let { System.currentTimeMillis() + it })
     }
 
     override suspend fun <T> setIfNotExists(
@@ -29,7 +29,7 @@ open class LocalCache(val entries: ConcurrentHashMap<String, Entry> = Concurrent
         timeToLive: Duration?
     ): Boolean {
         if (entries[key] == null) {
-            entries[key] = Entry(value, timeToLive?.toMillis()?.let { System.currentTimeMillis() + it })
+            entries[key] = Entry(value, timeToLive?.inWholeMilliseconds?.let { System.currentTimeMillis() + it })
             return true
         }
         return false
@@ -47,7 +47,7 @@ open class LocalCache(val entries: ConcurrentHashMap<String, Entry> = Concurrent
             is Double -> (current + value)
             else -> value
         }
-        entries[key] = Entry(new, timeToLive?.toMillis()?.let { System.currentTimeMillis() + it })
+        entries[key] = Entry(new, timeToLive?.inWholeMilliseconds?.let { System.currentTimeMillis() + it })
     }
 
     override suspend fun remove(key: String) {

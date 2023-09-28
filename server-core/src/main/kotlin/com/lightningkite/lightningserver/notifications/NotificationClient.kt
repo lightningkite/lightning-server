@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.notifications
 
-import java.time.Duration
+import kotlin.time.Duration
 
 
 @Deprecated("Use the new name", ReplaceWith("NotificationPriority", "com.lightningkite.lightningserver.notifications"))

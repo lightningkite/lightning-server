@@ -2,8 +2,10 @@ package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.Condition
 import com.lightningkite.lightningdb.setCopy
-import java.time.Instant
+import kotlinx.datetime.Instant
 import com.lightningkite.lightningdb.SerializableProperty
+import kotlinx.datetime.Clock
+import kotlin.time.Duration.Companion.seconds
 
 object LargeTestModelConditions {
     class Case(
@@ -101,9 +103,9 @@ object LargeTestModelConditions {
         ComparableType<Instant>(
             LargeTestModel_instant,
             LargeTestModel_instantNullable,
-            Instant.now().minusSeconds(1),
-            Instant.now(),
-            Instant.now().plusSeconds(1)
+            Clock.System.now().minus(1.seconds),
+            Clock.System.now(),
+            Clock.System.now().plus(1.seconds)
         ),
     )
 

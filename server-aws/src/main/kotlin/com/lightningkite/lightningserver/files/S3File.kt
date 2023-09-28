@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.toKotlinInstant
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.model.*
 import java.io.File
@@ -13,9 +14,10 @@ import java.io.InputStream
 import java.math.BigInteger
 import java.net.URLDecoder
 import java.security.MessageDigest
-import java.time.Duration
+import kotlin.time.Duration
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import kotlin.time.toJavaDuration
 
 data class S3File(val system: S3FileSystem, val path: File) : FileObject {
     override fun resolve(path: String): FileObject = S3File(system, this.path.resolve(path))
@@ -54,7 +56,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
                 it.key(path.toString())
             }.await().let {
                 FileInfo(
-                    type = ContentType(it.contentType()), size = it.contentLength(), lastModified = it.lastModified()
+                    type = ContentType(it.contentType()), size = it.contentLength(), lastModified = it.lastModified().toKotlinInstant()
                 )
             }
         } catch (e: NoSuchKeyException) {
@@ -109,7 +111,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
     }
 
     override fun checkSignature(queryParams: String): Boolean {
-        if (system.signedUrlExpirationSeconds != null) {
+        if (system.signedUrlDuration != null) {
             val headers = queryParams.split('&').associate {
                 URLDecoder.decode(it.substringBefore('='), Charsets.UTF_8) to URLDecoder.decode(
                     it.substringAfter(
@@ -158,9 +160,9 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         get() = "https://${system.bucket}.s3.${system.region.id()}.amazonaws.com/${path.unixPath}"
 
     override val signedUrl: String
-        get() = system.signedUrlExpirationSeconds?.let { e ->
+        get() = system.signedUrlDuration?.let { e ->
             system.signer.presignGetObject {
-                it.signatureDuration(Duration.ofSeconds(e.toLong()))
+                it.signatureDuration(system.signedUrlDuration.toJavaDuration())
                 it.getObjectRequest {
                     it.bucket(system.bucket)
                     it.key(path.unixPath)
@@ -169,7 +171,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         } ?: url
 
     override fun uploadUrl(timeout: Duration): String = system.signer.presignPutObject {
-        it.signatureDuration(timeout)
+        it.signatureDuration(timeout.toJavaDuration())
         it.putObjectRequest {
             it.bucket(system.bucket)
             it.key(path.unixPath)

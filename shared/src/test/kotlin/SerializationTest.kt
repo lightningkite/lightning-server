@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningdb
 
+import kotlinx.datetime.Clock
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -18,7 +19,7 @@ import kotlinx.serialization.properties.Properties
 import kotlinx.serialization.properties.decodeFromStringMap
 import kotlinx.serialization.properties.encodeToStringMap
 import org.junit.Test
-import java.time.Instant
+import kotlinx.datetime.Instant
 import java.util.*
 import kotlin.test.assertEquals
 
@@ -144,7 +145,7 @@ class SerializationTest {
         Condition.NotEqual(sampleInstance).cycle()
         Condition.Inside(listOf(sampleInstance)).cycle()
         Condition.NotInside(listOf(sampleInstance)).cycle()
-        (path<LargeTestModel>().instant gt Instant.now()).cycle()
+        (path<LargeTestModel>().instant gt Clock.System.now()).cycle()
         (path<LargeTestModel>().int gt 2).cycle()
         (path<LargeTestModel>().int lt 2).cycle()
         (path<LargeTestModel>().int gte 2).cycle()

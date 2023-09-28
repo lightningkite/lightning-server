@@ -37,9 +37,10 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import org.slf4j.LoggerFactory
-import java.time.*
-import java.util.*
+import kotlinx.datetime.*
 import kotlin.collections.HashMap
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import com.lightningkite.lightningserver.core.ContentType as HttpContentType
 
 fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
@@ -242,10 +243,10 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                     val upcomingRun = cache.get<Long>(it.name + "-nextRun") ?: run {
                         val time = when (val s = it.schedule) {
                             is Schedule.Daily -> {
-                                val now = ZonedDateTime.now(s.zone)
-                                val runTimeToday = ZonedDateTime.of(LocalDate.now(), s.time, s.zone)
-                                if (now > runTimeToday) runTimeToday.plusDays(1).toInstant().toEpochMilli()
-                                else runTimeToday.toInstant().toEpochMilli()
+                                val now = Clock.System.now()
+                                val runTimeToday = now.toLocalDateTime(s.zone).date.atTime(s.time).toInstant(s.zone)
+                                if (now > runTimeToday) runTimeToday.plus(1.days).toEpochMilliseconds()
+                                else runTimeToday.toEpochMilliseconds()
                             }
 
                             is Schedule.Frequency -> {
@@ -257,7 +258,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                     }
                     delay((upcomingRun - System.currentTimeMillis()).coerceAtLeast(1L))
                     if (cache.setIfNotExists(it.name + "-lock", true)) {
-                        cache.set(it.name + "-lock", true, Duration.ofHours(1))
+                        cache.set(it.name + "-lock", true, 1.hours)
                         try {
                             Metrics.handlerPerformance(it) {
                                 it.handler()
@@ -266,10 +267,10 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                             exceptionSettings().report(t)
                         }
                         val nextRun = when (val s = it.schedule) {
-                            is Schedule.Daily -> ZonedDateTime.of(LocalDate.now().plusDays(1), s.time, s.zone)
-                                .toInstant().toEpochMilli()
+                            is Schedule.Daily -> LocalDateTime(Clock.System.now().toLocalDateTime(s.zone).date.plus(DatePeriod(days = 1)), s.time).toInstant(s.zone)
+                                .toEpochMilliseconds()
 
-                            is Schedule.Frequency -> upcomingRun + s.gap.toMillis()
+                            is Schedule.Frequency -> upcomingRun + s.gap.inWholeMilliseconds
                         }
                         cache.set<Long>(it.name + "-nextRun", nextRun)
                         cache.remove(it.name + "-lock")

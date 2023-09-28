@@ -14,9 +14,10 @@ import kotlinx.serialization.encodeToString
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
-import java.time.Duration
+import kotlin.time.Duration
 import kotlin.test.assertContains
 import com.lightningkite.lightningserver.files.FileSystemTests
+import kotlin.time.Duration.Companion.days
 
 class AzureFileSystemTest: FileSystemTests() {
     override val system: FileSystem? by lazy {
@@ -26,7 +27,7 @@ class AzureFileSystemTest: FileSystemTests() {
             return@lazy null
         }
         AzureFileSystem
-        FilesSettings(credentials.readText(), signedUrlExpiration = Duration.ofDays(1))()
+        FilesSettings(credentials.readText(), signedUrlExpiration = 1.days)()
     }
 
     override fun uploadHeaders(builder: HttpRequestBuilder) {

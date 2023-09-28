@@ -2,10 +2,11 @@
 package com.lightningkite.lightningserver.exceptions
 
 import com.lightningkite.lightningdb.*
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import java.time.Instant
+import kotlinx.datetime.Instant
 import java.util.*
 
 @AdminTitleFields(["message"])
@@ -14,7 +15,7 @@ import java.util.*
 @GenerateDataClassPaths
 data class ReportedExceptionGroup(
     override val _id: Int,
-    /*@Contextual */val lastOccurredAt: Instant = Instant.now(),
+    /*@Contextual */val lastOccurredAt: Instant = Clock.System.now(),
     val count: Int = 1,
     val context: String,
     val server: String,

@@ -1,14 +1,16 @@
 package com.lightningkite.lightningserver.auth.oauth
 
 import com.lightningkite.lightningserver.encryption.SecureHasher
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 import java.util.*
+import kotlin.time.Duration.Companion.days
 
 /**
  * SETUP STEPS:
@@ -50,14 +52,14 @@ data class OauthProviderCredentialsApple(
                 }).toByteArray())
             )
             append('.')
-            val issuedAt = Instant.now().minus(Duration.ofDays(1))
+            val issuedAt = Clock.System.now().minus(1.days)
             append(
                 Base64.getUrlEncoder().withoutPadding().encodeToString(
                     withDefaults.encodeToString(
                         buildJsonObject {
                             put("iss", teamId)
-                            put("iat", issuedAt.toEpochMilli().div(1000))
-                            put("exp", issuedAt.plus(Duration.ofDays(5)).toEpochMilli().div(1000))
+                            put("iat", issuedAt.toEpochMilliseconds().div(1000))
+                            put("exp", issuedAt.plus(5.days).toEpochMilliseconds().div(1000))
                             put("aud", "https://appleid.apple.com")
                             put("sub", serviceId)
                         }

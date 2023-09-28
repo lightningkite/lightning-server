@@ -21,8 +21,9 @@ import com.lightningkite.lightningserver.typed.typed
 import io.ktor.http.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.*
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Implements a basic set of authentication endpoints for you.
@@ -98,7 +99,7 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
                     return RequestAuth(
                         subject = handler,
                         rawId = id,
-                        issuedAt = Instant.ofEpochSecond(claims.iat),
+                        issuedAt = Instant.fromEpochSeconds(claims.iat),
                         sessionId = null
                     )
                 } catch (e: JwtException) {
@@ -117,7 +118,7 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
      */
     suspend fun refreshToken(token: String, expireDuration: Duration = expiration): String = hasher().signJwt(
         hasher().verifyJwt(token)!!.copy(
-            exp = Instant.now().plus(expireDuration).epochSecond,
+            exp = Clock.System.now().plus(expireDuration).epochSeconds,
         )
     )
 
@@ -135,9 +136,9 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
             iss = generalSettings().publicUrl,
             aud = generalSettings().publicUrl,
             sub = jwtPrefix + Serialization.json.encodeUnwrappingString(userAccess.idSerializer, id),
-            exp = Instant.now().plus(expireDuration).epochSecond,
-            iat = Instant.now().epochSecond,
-            nbf = Instant.now().epochSecond,
+            exp = Clock.System.now().plus(expireDuration).epochSeconds,
+            iat = Clock.System.now().epochSeconds,
+            nbf = Clock.System.now().epochSeconds,
         )
     )
 
@@ -151,7 +152,7 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
      * Gives an [HttpResponse] that logs in as the given [user].
      */
     suspend fun redirectToLanding(user: USER): HttpResponse =
-        HttpResponse.redirectToGet(landingRoute.path.toString() + "?jwt=${token(user, Duration.ofMinutes(5))}")
+        HttpResponse.redirectToGet(landingRoute.path.toString() + "?jwt=${token(user, 5.minutes)}")
 
     /**
      * The landing endpoint that users arrive at after authenticating through any method.

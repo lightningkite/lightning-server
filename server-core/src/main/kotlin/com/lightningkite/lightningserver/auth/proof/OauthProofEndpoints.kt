@@ -19,8 +19,8 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.*
 import io.ktor.http.*
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.*
 import java.util.*
 
 class OauthProofEndpoints(
@@ -50,7 +50,7 @@ class OauthProofEndpoints(
         HttpResponse.redirectToGet(continueUiAuthUrl() + "?proof=${Serialization.json.encodeToString(Proof.serializer(), proofHasher().makeProof(
             info = info,
             value = email,
-            at = Instant.now()
+            at = Clock.System.now()
         )).encodeURLQueryComponent()}")
     }
     override val indirectLink: ServerPath = path("open").get.handler {

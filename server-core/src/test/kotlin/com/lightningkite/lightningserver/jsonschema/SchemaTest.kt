@@ -11,8 +11,8 @@ import kotlinx.serialization.properties.Properties
 import kotlinx.serialization.properties.encodeToStringMap
 import org.junit.Test
 import java.net.URLEncoder
-import java.time.Instant
-import java.time.LocalDate
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import java.util.*
 import kotlin.test.assertTrue
 

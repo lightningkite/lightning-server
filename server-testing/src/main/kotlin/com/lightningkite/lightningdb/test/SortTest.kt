@@ -3,11 +3,12 @@ package com.lightningkite.lightningdb.test
 import com.lightningkite.lightningdb.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
 import org.junit.Before
 import org.junit.Test
-import java.time.Instant
-import java.time.temporal.ChronoUnit
+import kotlinx.datetime.Instant
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.minutes
 
 abstract class SortTest {
 
@@ -84,12 +85,12 @@ abstract class SortTest {
     fun testSortTime():Unit = runBlocking{
         val collection = database.collection<LargeTestModel>("SortTest_testSortTime")
         val items = listOf(
-            LargeTestModel(instant = Instant.now().minus(4, ChronoUnit.MINUTES)),
-            LargeTestModel(instant = Instant.now().minus(5, ChronoUnit.MINUTES)),
-            LargeTestModel(instant = Instant.now()),
-            LargeTestModel(instant = Instant.now().minus(2, ChronoUnit.MINUTES)),
-            LargeTestModel(instant = Instant.now().minus(6, ChronoUnit.MINUTES)),
-            LargeTestModel(instant = Instant.now().minus(3, ChronoUnit.MINUTES)),
+            LargeTestModel(instant = Clock.System.now().minus(4.minutes)),
+            LargeTestModel(instant = Clock.System.now().minus(5.minutes)),
+            LargeTestModel(instant = Clock.System.now()),
+            LargeTestModel(instant = Clock.System.now().minus(2.minutes)),
+            LargeTestModel(instant = Clock.System.now().minus(6.minutes)),
+            LargeTestModel(instant = Clock.System.now().minus(3.minutes)),
         )
         val sortedPosts = items.sortedBy { it.instant }
         val reversePosts = items.sortedByDescending { it.instant }

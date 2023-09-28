@@ -5,21 +5,23 @@ import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.encryption.Encryptor
 import com.lightningkite.lightningserver.encryption.TokenException
 import com.lightningkite.lightningserver.serialization.Serialization
-import java.time.Duration
-import java.time.Instant
+import kotlinx.datetime.Clock
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 import java.util.Base64
 import javax.crypto.AEADBadTagException
+import kotlin.time.Duration.Companion.minutes
 
 class PrivateTinyTokenFormat(
     val encryptor: () -> Encryptor,
-    val expiration: Duration = Duration.ofMinutes(5),
+    val expiration: Duration = 5.minutes,
 ): TokenFormat {
     override fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         handler: Authentication.SubjectHandler<SUBJECT, ID>,
         auth: RequestAuth<SUBJECT>
     ): String = handler.name + "/" + run {
         encryptor().encrypt(Serialization.javaData.encodeToByteArray(RequestAuthSerializable.serializer(), auth.serializable(
-            Instant.now().plus(expiration))))
+            Clock.System.now().plus(expiration))))
     }.let { Base64.getUrlEncoder().encodeToString(it) }
 
     override fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> read(

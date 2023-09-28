@@ -4,7 +4,8 @@ import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.typed.typed
-import java.time.Instant
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 
 /**
  * An ExceptionReporter implementation that logs all reports out to a logger using debug and stores the most recent 100 exceptions.
@@ -21,7 +22,7 @@ Exception Reported:
         ${t.stackTraceToString()}
 """.trimIndent()
         )
-        previousErrors.add(Triple(Instant.now(), t, context))
+        previousErrors.add(Triple(Clock.System.now(), t, context))
         while (previousErrors.size > 100) previousErrors.removeAt(0)
         return true
     }

@@ -2,7 +2,7 @@ package com.lightningkite.lightningdb.test
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
-import java.time.Instant
+import kotlinx.datetime.Instant
 import kotlin.test.assertEquals
 import com.lightningkite.lightningdb.*
 
@@ -383,18 +383,18 @@ abstract class ModificationTests() {
     }
     @Test fun test_Instant_set() = runBlocking {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Instant_set")
-        val item = LargeTestModel(instant = Instant.ofEpochMilli(10000L))
+        val item = LargeTestModel(instant = Instant.fromEpochMilliseconds(10000L))
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.instant assign Instant.ofEpochMilli(15000L) }
+        val modification = modification<LargeTestModel> { it.instant assign Instant.fromEpochMilliseconds(15000L) }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
-        assertEquals(Instant.ofEpochMilli(15000L), result.instant)
+        assertEquals(Instant.fromEpochMilliseconds(15000L), result.instant)
         assertEquals(modification(item), result)
         Unit
     }
     @Test fun test_Instant_set_nullable() = runBlocking {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Instant_set_nullable")
-        val item = LargeTestModel(instantNullable = Instant.ofEpochMilli(10000L))
+        val item = LargeTestModel(instantNullable = Instant.fromEpochMilliseconds(10000L))
         collection.insertOne(item)
         val modification = modification<LargeTestModel> { it.instantNullable assign null }
         collection.updateOneById(item._id, modification)
@@ -405,12 +405,12 @@ abstract class ModificationTests() {
     }
     @Test fun test_Instant_set_nullable2() = runBlocking {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Instant_set_nullable2")
-        val item = LargeTestModel(instantNullable = Instant.ofEpochMilli(10000L))
+        val item = LargeTestModel(instantNullable = Instant.fromEpochMilliseconds(10000L))
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.instantNullable assign Instant.ofEpochMilli(15000L) }
+        val modification = modification<LargeTestModel> { it.instantNullable assign Instant.fromEpochMilliseconds(15000L) }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
-        assertEquals(Instant.ofEpochMilli(15000L), result.instantNullable)
+        assertEquals(Instant.fromEpochMilliseconds(15000L), result.instantNullable)
         assertEquals(modification(item), result)
         Unit
     }
@@ -724,45 +724,45 @@ abstract class ModificationTests() {
     }
     @Test fun test_Instant_coerceAtMost() = runBlocking {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Instant_coerceAtMost")
-        val item = LargeTestModel(instant = Instant.ofEpochMilli(10000L))
+        val item = LargeTestModel(instant = Instant.fromEpochMilliseconds(10000L))
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.instant coerceAtMost Instant.ofEpochMilli(5000L) }
+        val modification = modification<LargeTestModel> { it.instant coerceAtMost Instant.fromEpochMilliseconds(5000L) }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
-        assertEquals(Instant.ofEpochMilli(5000L), result.instant)
+        assertEquals(Instant.fromEpochMilliseconds(5000L), result.instant)
         assertEquals(modification(item), result)
         Unit
     }
     @Test fun test_Instant_coerceAtMost_miss() = runBlocking {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Instant_coerceAtMost_miss")
-        val item = LargeTestModel(instant = Instant.ofEpochMilli(10000L))
+        val item = LargeTestModel(instant = Instant.fromEpochMilliseconds(10000L))
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.instant coerceAtMost Instant.ofEpochMilli(15000L) }
+        val modification = modification<LargeTestModel> { it.instant coerceAtMost Instant.fromEpochMilliseconds(15000L) }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
-        assertEquals(Instant.ofEpochMilli(10000L), result.instant)
+        assertEquals(Instant.fromEpochMilliseconds(10000L), result.instant)
         assertEquals(modification(item), result)
         Unit
     }
     @Test fun test_Instant_coerceAtLeast() = runBlocking {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Instant_coerceAtLeast")
-        val item = LargeTestModel(instant = Instant.ofEpochMilli(10000L))
+        val item = LargeTestModel(instant = Instant.fromEpochMilliseconds(10000L))
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.instant coerceAtLeast Instant.ofEpochMilli(15000L) }
+        val modification = modification<LargeTestModel> { it.instant coerceAtLeast Instant.fromEpochMilliseconds(15000L) }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
-        assertEquals(Instant.ofEpochMilli(15000L), result.instant)
+        assertEquals(Instant.fromEpochMilliseconds(15000L), result.instant)
         assertEquals(modification(item), result)
         Unit
     }
     @Test fun test_Instant_coerceAtLeast_miss() = runBlocking {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Instant_coerceAtLeast_miss")
-        val item = LargeTestModel(instant = Instant.ofEpochMilli(10000L))
+        val item = LargeTestModel(instant = Instant.fromEpochMilliseconds(10000L))
         collection.insertOne(item)
-        val modification = modification<LargeTestModel> { it.instant coerceAtLeast Instant.ofEpochMilli(5000L) }
+        val modification = modification<LargeTestModel> { it.instant coerceAtLeast Instant.fromEpochMilliseconds(5000L) }
         collection.updateOneById(item._id, modification)
         val result = collection.get(item._id)!!
-        assertEquals(Instant.ofEpochMilli(10000L), result.instant)
+        assertEquals(Instant.fromEpochMilliseconds(10000L), result.instant)
         assertEquals(modification(item), result)
         Unit
     }

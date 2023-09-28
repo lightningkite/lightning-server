@@ -11,8 +11,10 @@ import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import java.time.Duration
-import java.time.Instant
+import kotlinx.datetime.Clock
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
+import kotlin.time.Duration.Companion.days
 
 class UploadEarlyEndpoint(
     path: ServerPath,
@@ -20,7 +22,7 @@ class UploadEarlyEndpoint(
     val database: () -> Database,
     val signer: () -> SecureHasher,
     val filePath: String = ExternalServerFileSerializer.uploadPath,
-    val expiration: Duration = Duration.ofDays(1)
+    val expiration: Duration = 1.days
 ) : ServerPathGroup(path) {
 
     companion object {
@@ -41,20 +43,20 @@ class UploadEarlyEndpoint(
         implementation = { user: Unit, nothing: Unit ->
             val newFile = files().root.resolve(filePath).resolveRandom("file", "file")
             val newItem = UploadForNextRequest(
-                expires = Instant.now().plus(expiration),
+                expires = Clock.System.now().plus(expiration),
                 file = ServerFile(newFile.url)
             )
             database().collection<UploadForNextRequest>().insertOne(newItem)
             UploadInformation(
                 uploadUrl = newFile.uploadUrl(expiration),
-                futureCallToken = newFile.url.plus("?useUntil=${Instant.now().plus(expiration).toEpochMilli()}").let {
+                futureCallToken = newFile.url.plus("?useUntil=${Clock.System.now().plus(expiration).toEpochMilliseconds()}").let {
                     it + "&token=" + signer().sign(it)
                 }
             )
         }
     )
-    val cleanupSchedule = schedule("cleanupUploads", Duration.ofDays(1)) {
-        database().collection<UploadForNextRequest>().deleteMany(condition { it.expires lt Instant.now() }).forEach {
+    val cleanupSchedule = schedule("cleanupUploads", 1.days) {
+        database().collection<UploadForNextRequest>().deleteMany(condition { it.expires lt Clock.System.now() }).forEach {
             try {
                 it.file.fileObject.delete()
             } catch (e: Exception) {

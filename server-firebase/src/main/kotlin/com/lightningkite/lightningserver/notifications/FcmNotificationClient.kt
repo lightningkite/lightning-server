@@ -57,7 +57,7 @@ object FcmNotificationClient : NotificationClient {
             setApnsConfig(
                 with(ApnsConfig.builder()) {
                     data.timeToLive?.let {
-                        this.putHeader("apns-expiration", it.seconds.toString())
+                        this.putHeader("apns-expiration", it.toString())
                     }
                     if (notification != null) {
                         setFcmOptions(
@@ -93,7 +93,7 @@ object FcmNotificationClient : NotificationClient {
                     with(AndroidConfig.builder()) {
                         setPriority(android.priority.toAndroid())
                         data.timeToLive?.let {
-                            setTtl(it.seconds)
+                            setTtl(it.inWholeSeconds)
                         }
                         setNotification(
                             AndroidNotification.builder()

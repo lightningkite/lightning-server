@@ -54,10 +54,11 @@ import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.URI
-import java.time.Duration
+import kotlin.time.Duration
 import java.util.*
 import org.crac.Resource
 import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.hours
 
 
 abstract class AwsAdapter : RequestStreamHandler, Resource {
@@ -454,7 +455,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         val lkEvent = WebSockets.DisconnectEvent(WebSocketIdentifier(wsType, id), wsCache)
         return try {
             // Ensure it only runs once
-            if (cache().setIfNotExists("${lkEvent.id}-closed", true, timeToLive = Duration.ofHours(1))) {
+            if (cache().setIfNotExists("${lkEvent.id}-closed", true, timeToLive = 1.hours)) {
                 rootWs.disconnect(lkEvent)
             }
             APIGatewayV2HTTPResponse(200)

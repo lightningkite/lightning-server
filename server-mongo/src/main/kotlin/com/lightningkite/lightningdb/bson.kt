@@ -21,7 +21,7 @@ import org.bson.Document
 import org.bson.types.Binary
 import org.bson.types.ObjectId
 import java.math.BigDecimal
-import java.time.*
+import kotlinx.datetime.*
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
@@ -210,12 +210,9 @@ fun SerialDescriptor.bsonType(): BsonType = when(kind) {
         Calendar::class -> BsonType.DATE_TIME
         GregorianCalendar::class -> BsonType.DATE_TIME
         Instant::class -> BsonType.DATE_TIME
-        ZonedDateTime::class -> BsonType.DATE_TIME
-        OffsetDateTime::class -> BsonType.DATE_TIME
         LocalDate::class -> BsonType.DATE_TIME
         LocalDateTime::class -> BsonType.DATE_TIME
         LocalTime::class -> BsonType.DATE_TIME
-        OffsetTime::class -> BsonType.DATE_TIME
         BsonTimestamp::class -> BsonType.DATE_TIME
         Locale::class -> BsonType.STRING
         Binary::class -> BsonType.BINARY

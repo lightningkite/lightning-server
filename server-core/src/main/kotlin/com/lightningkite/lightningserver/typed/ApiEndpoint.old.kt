@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
-import java.time.Duration
+import kotlin.time.Duration
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.*

@@ -15,7 +15,8 @@ import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.typed
-import java.time.Instant
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import java.util.*
 
 abstract class PinBasedProofEndpoints(
@@ -59,7 +60,7 @@ abstract class PinBasedProofEndpoints(
     override val prove = path("prove").post.api(
         authOptions = noAuth,
         summary = "Prove $validates ownership",
-        description = "Logs in to the given account with a PIN that was sent earlier and the key from that request.  Note that the PIN expires in ${pin.expiration.toMinutes()} minutes, and you are only permitted ${pin.maxAttempts} attempts.",
+        description = "Logs in to the given account with a PIN that was sent earlier and the key from that request.  Note that the PIN expires in ${pin.expiration.inWholeMinutes} minutes, and you are only permitted ${pin.maxAttempts} attempts.",
         errorCases = listOf(),
         examples = listOf(
             ApiExample(
@@ -69,7 +70,7 @@ abstract class PinBasedProofEndpoints(
                     of = validates,
                     strength = strength,
                     value = exampleTarget,
-                    at = Instant.now(),
+                    at = Clock.System.now(),
                     signature = "opaquesignaturevalue"
                 )
             )
@@ -79,7 +80,7 @@ abstract class PinBasedProofEndpoints(
             proofHasher().makeProof(
                 info = info,
                 value = pin.assert(input.value, input.secret),
-                at = Instant.now()
+                at = Clock.System.now()
             )
         }
     )

@@ -1,20 +1,22 @@
 package com.lightningkite.lightningserver.serialization
 
+import com.lightningkite.lightningserver.metrics.roundTo
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import org.junit.Assert.*
 import org.junit.Test
-import java.time.Instant
-import java.time.temporal.ChronoUnit
-import java.time.temporal.TemporalUnit
+import kotlinx.datetime.Instant
 import java.util.*
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 @Serializable
 data class BsonSerTest(
     val x: Int = 42,
-    @Contextual val y: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    @Contextual val y: Instant = Clock.System.now().roundTo(1.milliseconds),
     @Contextual val z: UUID = UUID.randomUUID()
 )
 

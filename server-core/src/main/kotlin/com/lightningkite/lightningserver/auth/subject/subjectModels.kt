@@ -6,11 +6,13 @@ import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.References
 import com.lightningkite.lightningserver.auth.oauth.OauthClient
 import com.lightningkite.lightningserver.auth.proof.ProofOption
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 import java.util.*
+import kotlin.time.Duration.Companion.minutes
 
 @Serializable
 data class SubSessionRequest(
@@ -28,8 +30,8 @@ data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     val derivedFrom: UUID? = null,
     val label: String? = null,
     val subjectId: ID,
-    val createdAt: Instant = Instant.now(),
-    val lastUsed: Instant = Instant.now(),
+    val createdAt: Instant = Clock.System.now(),
+    val lastUsed: Instant = Clock.System.now(),
     val expires: Instant? = null,
     val terminated: Instant? = null,
     val ips: Set<String> = setOf(),
@@ -51,7 +53,7 @@ data class IdAndAuthMethods<ID>(
 data class FutureSession<ID>(
     val subjectId: ID,
     val scopes: Set<String>? = null,
-    val expires: Instant = Instant.now().plus(Duration.ofMinutes(5)),
+    val expires: Instant = Clock.System.now().plus(5.minutes),
     val originalSessionId: UUID?,
     @References(OauthClient::class) val oauthClient: String? = null
 )

@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.cache
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
-import java.time.Duration
+import kotlin.time.Duration
 
 /**
  * A class that handles and manipulates a single key in a cache.

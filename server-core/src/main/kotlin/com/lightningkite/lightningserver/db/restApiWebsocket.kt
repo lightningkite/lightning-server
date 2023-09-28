@@ -18,9 +18,13 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import java.time.Instant
-import java.time.Duration
+import kotlinx.datetime.Instant
+import kotlin.time.Duration
 import com.lightningkite.lightningdb.SerializableProperty
+import kotlinx.datetime.Clock
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 @LightningServerDsl
 fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
@@ -42,7 +46,7 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebs
         errorCases = listOf(),
         connect = {
             val auth = this.authOrNull
-            val user = auth?.serializable(Instant.now().plus(Duration.ofDays(1)))
+            val user = auth?.serializable(Clock.System.now().plus(1.days))
             val collection = info.collection(this)
             helper.subscriptionDb().insertOne(
                 __WebSocketDatabaseChangeSubscription(
@@ -55,7 +59,7 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebs
                         collection.mask()
                     ),
                     relevant = setOf(),
-                    establishedAt = Instant.now()
+                    establishedAt = Clock.System.now()
                 )
             )
         },
@@ -150,14 +154,14 @@ class RestApiWebsocketHelper private constructor(val database: ()->Database) {
 
     fun subscriptionDb() = database().collection<__WebSocketDatabaseChangeSubscription>()
 
-    val schedule = schedule("WebsocketDatabaseChangeSubscriptionCleanup", Duration.ofMinutes(5)) {
-        val now = Instant.now()
+    val schedule = schedule("WebsocketDatabaseChangeSubscriptionCleanup", 5.minutes) {
+        val now = Clock.System.now()
         val db =
             subscriptionDb().deleteMany(condition {
                 it.condition eq ""
-                it.establishedAt lt now.minus(Duration.ofMinutes(5))
+                it.establishedAt lt now.minus(5.minutes)
             } or condition {
-                it.establishedAt lt now.minus(Duration.ofHours(1))
+                it.establishedAt lt now.minus(1.hours)
             })
 
         for (changeSub in db) {

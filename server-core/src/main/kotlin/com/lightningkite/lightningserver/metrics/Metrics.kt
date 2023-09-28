@@ -9,12 +9,14 @@ import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.coroutines.coroutineContext
+import kotlin.time.Duration.Companion.hours
 
 interface Metrics: HealthCheckable {
     val settings: MetricSettings
@@ -28,7 +30,7 @@ interface Metrics: HealthCheckable {
                     MetricEvent(
                         metricType = healthCheckMetric,
                         entryPoint = serverEntryPoint().toString(),
-                        time = Instant.now(),
+                        time = Clock.System.now(),
                         value = 1.0
                     )
                 )
@@ -66,13 +68,13 @@ interface Metrics: HealthCheckable {
         fun report(type: MetricType, value: Double) {
             if (!Settings.sealed) return
             if (type.name in metricsSettings().settings.tracked)
-                toReport.add(MetricEvent(type, null, Instant.now(), value))
+                toReport.add(MetricEvent(type, null, Clock.System.now(), value))
         }
 
         suspend fun reportPerHandler(type: MetricType, value: Double) {
             if (!Settings.sealed) return
             if (type.name in metricsSettings().settings.tracked)
-                toReport.add(MetricEvent(type, serverEntryPoint()?.toString() ?: "Unknown", Instant.now(), value))
+                toReport.add(MetricEvent(type, serverEntryPoint()?.toString() ?: "Unknown", Clock.System.now(), value))
         }
 
         suspend fun addToSumPerHandler(type: MetricType, value: Double) {
@@ -111,7 +113,7 @@ interface Metrics: HealthCheckable {
 }
 
 val metricsSettings = setting("metrics", MetricSettings())
-val metricsCleanSchedule = schedule("clearOldMetrics", Duration.ofHours(1)) {
+val metricsCleanSchedule = schedule("clearOldMetrics", 1.hours) {
     metricsSettings().clean()
 }
 

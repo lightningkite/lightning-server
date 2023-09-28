@@ -9,7 +9,7 @@ val KSClassDeclaration.usesSub: Boolean
         val packageName = this.packageName.asString()
         return when {
             packageName.startsWith("org.litote.kmongo") ||
-                    packageName.startsWith("java.time") ||
+                    packageName.startsWith("kotlinx.datetime") ||
                     packageName.startsWith("java.util") ||
                     packageName.startsWith("kotlin") -> false
             packageName == "com.lightningkite.lightningdb" && (

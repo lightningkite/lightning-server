@@ -53,10 +53,12 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import java.lang.IllegalStateException
-import java.time.Duration
-import java.time.temporal.ChronoUnit
+import kotlin.time.Duration
 import java.util.*
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 object Server : ServerPathGroup(ServerPath.root) {
 
@@ -137,13 +139,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         val emailAccess = userInfo.userEmailAccess { User(email = it) }
         val passAccess =
             userInfo.userPasswordAccess { username, hashed -> User(email = username, hashedPassword = hashed) }
-        val baseAuth = BaseAuthEndpoints(
-            path,
-            emailAccess,
-            jwtSigner,
-            expiration = Duration.ofDays(365),
-            emailExpiration = Duration.ofHours(1)
-        )
+        val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner, expiration = 365.days, emailExpiration = 1.hours)
         val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
         val passAuth = PasswordAuthEndpoints(baseAuth, passAccess)
     }
@@ -154,7 +150,7 @@ object Server : ServerPathGroup(ServerPath.root) {
 //            forUser = { this }
 //        )
 //        val emailAccess = info.userEmailAccess { UserAlt(email = it) }
-//        val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner, expiration = Duration.ofDays(365), emailExpiration = Duration.ofHours(1))
+//        val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner, expiration = 365.days, emailExpiration = 1.hours)
 //        val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
 //
 //        init {
@@ -216,10 +212,10 @@ object Server : ServerPathGroup(ServerPath.root) {
         HttpResponse.plainText(database().collection<User>()::class.qualifiedName ?: "???")
     }
 
-    val testSchedule = schedule("test-schedule", Duration.ofMinutes(1)) {
+    val testSchedule = schedule("test-schedule", 1.minutes) {
         println("Hello schedule!")
     }
-    val testSchedule2 = schedule("test-schedule2", Duration.ofMinutes(1)) {
+    val testSchedule2 = schedule("test-schedule2", 1.minutes) {
         println("Hello schedule 2!")
     }
 
@@ -306,7 +302,6 @@ object EmailCacheKey : RequestAuth.CacheKey<User, UUID, String>() {
     override val serializer: KSerializer<String>
         get() = String.serializer()
     override val validFor: Duration
-        get() = Duration.of(5, ChronoUnit.MINUTES)
-
+        get() = 5.minutes
     override suspend fun calculate(auth: RequestAuth<User>): String = auth.get().email
 }

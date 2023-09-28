@@ -6,12 +6,14 @@ import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 import java.util.*
+import kotlin.time.Duration.Companion.seconds
 
 class PublicTinyTokenFormatTest: TokenFormatTest() {
     override fun format(expiration: Duration): TokenFormat = PublicTinyTokenFormat(SecureHasherSettings(), expiration)
@@ -19,7 +21,7 @@ class PublicTinyTokenFormatTest: TokenFormatTest() {
     init { TestSettings }
 
     @Test fun encodeData() {
-        val data = CacheKeyMap(mapOf(TestSettings.TestCacheKey to RequestAuth.ExpiringValue(UUID.randomUUID(), Instant.now().plusSeconds(60))))
+        val data = CacheKeyMap(mapOf(TestSettings.TestCacheKey to RequestAuth.ExpiringValue(UUID.randomUUID(), Clock.System.now().plus(60.seconds))))
         println(data)
         val hex = Serialization.javaData.encodeToHexString(CacheKeyMapSerializer, data)
         println(hex)
@@ -33,8 +35,8 @@ class PublicTinyTokenFormatTest: TokenFormatTest() {
     }
     @Test fun encodeData2(): Unit = runBlocking {
         println(sampleAuth.await())
-        println(Serialization.javaData.encodeToHexStringDebug(RequestAuthSerializable.serializer(), sampleAuth.await().serializable(Instant.now().plusSeconds(10))))
-        val hex = Serialization.javaData.encodeToHexString(RequestAuthSerializable.serializer(), sampleAuth.await().serializable(Instant.now().plusSeconds(10)))
+        println(Serialization.javaData.encodeToHexStringDebug(RequestAuthSerializable.serializer(), sampleAuth.await().serializable(Clock.System.now().plus(10.seconds))))
+        val hex = Serialization.javaData.encodeToHexString(RequestAuthSerializable.serializer(), sampleAuth.await().serializable(Clock.System.now().plus(10.seconds)))
         println(hex)
         println(Serialization.javaData.decodeFromHexString(RequestAuthSerializable.serializer(), hex))
     }

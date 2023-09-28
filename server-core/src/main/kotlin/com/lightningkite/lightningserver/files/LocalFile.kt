@@ -5,9 +5,10 @@ import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.settings.generalSettings
+import kotlinx.datetime.Clock
 import java.io.File
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 
 val File.unixPath: String get() = path.replace("\\", "/")
 
@@ -41,7 +42,7 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
         return FileInfo(type = contentTypeFile.takeIf { it.exists() }?.readText()?.let { ContentType(it) }
             ?: ContentType.fromExtension(file.extension),
             size = file.length(),
-            lastModified = Instant.ofEpochMilli(file.lastModified()))
+            lastModified = Instant.fromEpochMilliseconds(file.lastModified()))
     }
 
     override suspend fun put(content: HttpContent) {
@@ -85,11 +86,11 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
         ).unixPath
 
     override val signedUrl: String
-        get() = if(system.signedUrlExpiration == null) url else url.plus("?readUntil=${Instant.now().plus(system.signedUrlExpiration).toEpochMilli()}").let {
+        get() = if(system.signedUrlExpiration == null) url else url.plus("?readUntil=${Clock.System.now().plus(system.signedUrlExpiration).toEpochMilliseconds()}").let {
             it + "&signature=" + system.signer.sign(it)
         }
 
-    override fun uploadUrl(timeout: Duration): String = url.plus("?writeUntil=${Instant.now().plus(timeout).toEpochMilli()}").let {
+    override fun uploadUrl(timeout: Duration): String = url.plus("?writeUntil=${Clock.System.now().plus(timeout).toEpochMilliseconds()}").let {
         it + "&signature=" + system.signer.sign(it)
     }
 

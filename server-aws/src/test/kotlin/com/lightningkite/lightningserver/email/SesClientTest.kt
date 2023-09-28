@@ -12,7 +12,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
-import java.time.Duration
+import kotlin.time.Duration
 import kotlin.test.assertContains
 
 class SesClientTest {

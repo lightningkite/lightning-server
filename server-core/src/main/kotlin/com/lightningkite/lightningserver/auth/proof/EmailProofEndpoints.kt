@@ -14,7 +14,7 @@ import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.typed
-import java.time.Instant
+import kotlinx.datetime.Instant
 import java.util.*
 
 class EmailProofEndpoints(

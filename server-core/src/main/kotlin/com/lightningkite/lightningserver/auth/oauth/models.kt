@@ -5,9 +5,10 @@ import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.References
 import com.lightningkite.lightningdb.ServerFile
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import java.time.Instant
+import kotlinx.datetime.Instant
 import java.util.UUID
 
 @GenerateDataClassPaths
@@ -26,7 +27,7 @@ data class OauthClient(
 @GenerateDataClassPaths
 @Serializable
 data class OauthClientSecret(
-    val createdAt: Instant = Instant.now(),
+    val createdAt: Instant = Clock.System.now(),
     val masked: String,
     val secretHash: String,
     val disabledAt: Instant? = null,

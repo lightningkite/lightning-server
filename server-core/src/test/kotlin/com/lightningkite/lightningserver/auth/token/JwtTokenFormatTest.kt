@@ -15,10 +15,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import org.junit.Assert.*
 import org.junit.Test
-import java.time.Duration
-import java.time.Instant
-import java.time.temporal.ChronoUnit
-import java.time.temporal.TemporalUnit
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 import java.util.*
 
 class JwtTokenFormatTest: TokenFormatTest() {

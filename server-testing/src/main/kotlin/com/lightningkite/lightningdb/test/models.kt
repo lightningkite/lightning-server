@@ -6,7 +6,7 @@ import com.lightningkite.lightningdb.HasId
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import java.time.Instant
+import kotlinx.datetime.Instant
 import java.util.*
 import com.lightningkite.lightningdb.*
 
@@ -96,7 +96,7 @@ data class LargeTestModel(
     var double: Double = 0.0,
     var char: Char = ' ',
     var string: String = "",
-    var instant: Instant = Instant.ofEpochMilli(0L),
+    var instant: Instant = Instant.fromEpochMilliseconds(0L),
     var list: List<Int> = listOf(),
     var listEmbedded: List<ClassUsedForEmbedding> = listOf(),
     var set: Set<Int> = setOf(),

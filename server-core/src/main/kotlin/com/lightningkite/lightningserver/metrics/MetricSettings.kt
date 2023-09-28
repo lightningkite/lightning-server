@@ -11,7 +11,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.UseContextualSerialization
 import org.slf4j.LoggerFactory
-import java.time.Duration
+import kotlin.time.Duration
 
 @Serializable
 data class MetricSettings(

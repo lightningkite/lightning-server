@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.serialization.json.JsonNames
 import java.io.File
-import java.time.Duration
+import kotlin.time.Duration
 import java.util.Base64
 import kotlin.random.Random
 

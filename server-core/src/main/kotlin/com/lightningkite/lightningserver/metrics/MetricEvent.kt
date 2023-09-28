@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.metrics
 
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 @Serializable
 data class MetricEvent(

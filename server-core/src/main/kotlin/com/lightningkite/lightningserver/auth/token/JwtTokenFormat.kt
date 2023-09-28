@@ -8,14 +8,16 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.decodeUnwrappingString
 import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import com.lightningkite.lightningserver.settings.generalSettings
+import kotlinx.datetime.Clock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
+import kotlin.time.Duration.Companion.minutes
 
 class JwtTokenFormat(
     val hasher: () -> SecureHasher,
-    val expiration: Duration = Duration.ofMinutes(5),
+    val expiration: Duration = 5.minutes,
     val issuerOverride: String? = null,
     val audienceOverride: String? = null,
 ): TokenFormat {
@@ -32,9 +34,9 @@ class JwtTokenFormat(
                 sid = auth.sessionId,
                 sub = "${handler.name}|${Serialization.json.encodeUnwrappingString<ID>(handler.idSerializer, auth.id)}",
                 aud = audience,
-                exp = Instant.now().plus(expiration).epochSecond,
-                iat = auth.issuedAt.epochSecond,
-                nbf = Instant.now().epochSecond,
+                exp = Clock.System.now().plus(expiration).epochSeconds,
+                iat = auth.issuedAt.epochSeconds,
+                nbf = Clock.System.now().epochSeconds,
                 scope = auth.scopes?.joinToString(" "),
                 thp = auth.thirdParty,
                 cache = Serialization.json.encodeToString(auth.cacheKeyMap())
@@ -50,12 +52,12 @@ class JwtTokenFormat(
         val claims = hasher().verifyJwt(value, audience) ?: return null
         val rawSub = claims.sub!!
         val sub = if(rawSub.startsWith(prefix)) rawSub.removePrefix(prefix) else return null
-        if(Instant.now() > Instant.ofEpochSecond(claims.exp)) throw TokenException("Token has expired")
-        if(claims.nbf?.let { Instant.now() < Instant.ofEpochSecond(it) } == true) throw TokenException("Token not valid yet")
+        if(Clock.System.now() > Instant.fromEpochSeconds(claims.exp)) throw TokenException("Token has expired")
+        if(claims.nbf?.let { Clock.System.now() < Instant.fromEpochSeconds(it) } == true) throw TokenException("Token not valid yet")
         return RequestAuth(
             subject = handler,
             rawId = Serialization.json.decodeUnwrappingString(handler.idSerializer, sub),
-            issuedAt = Instant.ofEpochSecond(claims.iat),
+            issuedAt = Instant.fromEpochSeconds(claims.iat),
             scopes = claims.scope?.split(' ')?.toSet(),
             thirdParty = claims.thp,
             sessionId = claims.sid

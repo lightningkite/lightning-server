@@ -11,9 +11,15 @@ import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import org.bouncycastle.util.encoders.Base32
-import java.time.Duration
-import java.time.temporal.ChronoUnit
+import kotlin.time.Duration
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.microseconds
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.Duration.Companion.seconds
 
 @Serializable
 @GenerateDataClassPaths
@@ -38,18 +44,16 @@ data class OtpSecret<ID : Comparable<ID>>(
         digits = config.codeDigits,
         label = label,
         issuer = issuer,
-        period = Duration.of(
-            config.timeStep, when (config.timeStepUnit) {
-                TimeUnit.NANOSECONDS -> ChronoUnit.NANOS
-                TimeUnit.MICROSECONDS -> ChronoUnit.MICROS
-                TimeUnit.MILLISECONDS -> ChronoUnit.MILLIS
-                TimeUnit.SECONDS -> ChronoUnit.SECONDS
-                TimeUnit.MINUTES -> ChronoUnit.MINUTES
-                TimeUnit.HOURS -> ChronoUnit.HOURS
-                TimeUnit.DAYS -> ChronoUnit.DAYS
-                else -> throw IllegalArgumentException()
-            }
-        ),
+        period = when (config.timeStepUnit) {
+            TimeUnit.NANOSECONDS -> config.timeStep.nanoseconds
+            TimeUnit.MICROSECONDS -> config.timeStep.microseconds
+            TimeUnit.MILLISECONDS -> config.timeStep.milliseconds
+            TimeUnit.SECONDS -> config.timeStep.seconds
+            TimeUnit.MINUTES -> config.timeStep.minutes
+            TimeUnit.HOURS -> config.timeStep.hours
+            TimeUnit.DAYS -> config.timeStep.days
+            else -> throw IllegalArgumentException()
+        },
         algorithm = when (config.hmacAlgorithm) {
             HmacAlgorithm.SHA1 -> OtpHashAlgorithm.SHA1
             HmacAlgorithm.SHA256 -> OtpHashAlgorithm.SHA256
@@ -63,7 +67,7 @@ data class OtpSecret<ID : Comparable<ID>>(
             .label(label, issuer)
             .issuer(issuer)
             .digits(digits)
-            .period(period.toMillis(), TimeUnit.MILLISECONDS)
+            .period(period.inWholeMilliseconds, TimeUnit.MILLISECONDS)
             .algorithm(when (algorithm) {
                 OtpHashAlgorithm.SHA1 -> HmacAlgorithm.SHA1
                 OtpHashAlgorithm.SHA256 -> HmacAlgorithm.SHA256
@@ -74,7 +78,7 @@ data class OtpSecret<ID : Comparable<ID>>(
             .replace("/?", "?")
     val config: TimeBasedOneTimePasswordConfig
         get() = TimeBasedOneTimePasswordConfig(
-            timeStep = period.toMillis(),
+            timeStep = period.inWholeMilliseconds,
             timeStepUnit = TimeUnit.MILLISECONDS,
             codeDigits = digits,
             hmacAlgorithm = when (algorithm) {

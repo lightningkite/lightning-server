@@ -2,11 +2,13 @@ package com.lightningkite.lightningserver.auth.proof
 
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
+import kotlinx.datetime.Clock
 import org.bouncycastle.util.encoders.Base32
 import org.junit.Assert.*
 import org.junit.Test
 import java.security.SecureRandom
-import java.time.Instant
+import kotlinx.datetime.Instant
+import kotlinx.datetime.toJavaInstant
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertContentEquals
 
@@ -25,9 +27,9 @@ class OtpSecretTest {
         println(secret.url)
         println(secret.secretBase32)
         repeat(20) {
-            val time = Instant.now().plusSeconds(it * secret.period.toSeconds())
-            val code = secret.generator.generate(time)
-            assertTrue(secret.generator.isValid(code, time))
+            val time = Clock.System.now() + secret.period
+            val code = secret.generator.generate(time.toJavaInstant())
+            assertTrue(secret.generator.isValid(code, time.toJavaInstant()))
             println(code)
         }
     }

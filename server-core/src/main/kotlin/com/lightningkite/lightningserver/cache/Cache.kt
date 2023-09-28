@@ -6,7 +6,7 @@ import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
-import java.time.Duration
+import kotlin.time.Duration
 
 @Deprecated("Renamed to just 'cache'", ReplaceWith("Cache", "com.lightningkite.lightningserver.cache.Cache"))
 typealias CacheInterface = Cache

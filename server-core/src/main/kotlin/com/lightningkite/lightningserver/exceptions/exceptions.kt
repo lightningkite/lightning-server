@@ -7,7 +7,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.toHttpContent
 import com.lightningkite.lightningserver.settings.generalSettings
 import io.ktor.util.*
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 
 /**
@@ -82,7 +82,7 @@ class UnauthorizedException(
     data: String = "",
     cause: Throwable? = null,
     headers: HttpHeaders = HttpHeaders {
-        setCookie(HttpHeader.Authorization, "REMOVED", expiresAt = Instant.EPOCH)
+        setCookie(HttpHeader.Authorization, "REMOVED", expiresAt = Instant.fromEpochSeconds(0))
     }
 ) : HttpStatusException(HttpStatus.Unauthorized, detail, message, data, headers, cause)
 
