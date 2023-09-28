@@ -26,7 +26,7 @@ import nl.adaptivity.xmlutil.XmlDeclMode
 import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
 import nl.adaptivity.xmlutil.serialization.XML
 import java.math.BigDecimal
-import java.time.*
+import kotlinx.datetime.*
 import java.util.*
 import kotlin.collections.HashMap
 

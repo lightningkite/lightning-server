@@ -4,7 +4,7 @@ import com.lightningkite.lightningserver.metrics.MetricType
 import com.lightningkite.lightningserver.metrics.MetricUnit
 import com.lightningkite.lightningserver.metrics.Metrics
 import kotlinx.serialization.KSerializer
-import java.time.Duration
+import kotlin.time.Duration
 
 class MetricsCache(val wraps: Cache, metricsKeyName: String): Cache by wraps {
     val metricKey = MetricType("$metricsKeyName Wait Time", MetricUnit.Milliseconds)

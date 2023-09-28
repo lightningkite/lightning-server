@@ -10,11 +10,13 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.*
 import org.bson.BsonType
 import java.math.BigDecimal
-import java.time.*
+import kotlinx.datetime.*
+import kotlinx.datetime.TimeZone
 import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 import kotlin.reflect.KProperty
+import kotlin.time.Duration
 
 val BsonOverrides = SerializersModule {
     contextual(Duration::class, DurationMsSerializer)
@@ -78,52 +80,42 @@ abstract class TemporalExtendedJsonSerializer<T> : KSerializer<T> {
     }
 }
 
-//@Serializer(forClass = Calendar::class)
-object MongoCalendarSerializer : TemporalExtendedJsonSerializer<Calendar>() {
-    override fun epochMillis(temporal: Calendar): Long = temporal.timeInMillis
-
-    override fun instantiate(date: Long): Calendar =
-        Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-            time = Date(date)
-        }
-}
-
 //@Serializer(forClass = Instant::class)
 object MongoInstantSerializer : TemporalExtendedJsonSerializer<Instant>() {
 
-    override fun epochMillis(temporal: Instant): Long = temporal.toEpochMilli()
+    override fun epochMillis(temporal: Instant): Long = temporal.toEpochMilliseconds()
 
-    override fun instantiate(date: Long): Instant = Instant.ofEpochMilli(date)
+    override fun instantiate(date: Long): Instant = Instant.fromEpochMilliseconds(date)
 }
 
 //@Serializer(forClass = LocalDate::class)
 object MongoLocalDateSerializer : TemporalExtendedJsonSerializer<LocalDate>() {
 
     override fun epochMillis(temporal: LocalDate): Long =
-        MongoInstantSerializer.epochMillis(temporal.atStartOfDay(ZoneOffset.UTC).toInstant())
+        MongoInstantSerializer.epochMillis(temporal.atStartOfDayIn(TimeZone.UTC))
 
     override fun instantiate(date: Long): LocalDate =
-        MongoLocalDateTimeSerializer.instantiate(date).toLocalDate()
+        MongoLocalDateTimeSerializer.instantiate(date).date
 }
 
 //@Serializer(forClass = LocalDateTime::class)
 object MongoLocalDateTimeSerializer : TemporalExtendedJsonSerializer<LocalDateTime>() {
 
     override fun epochMillis(temporal: LocalDateTime): Long =
-        MongoInstantSerializer.epochMillis(temporal.atZone(ZoneOffset.UTC).toInstant())
+        MongoInstantSerializer.epochMillis(temporal.toInstant(TimeZone.UTC))
 
     override fun instantiate(date: Long): LocalDateTime =
-        LocalDateTime.ofInstant(MongoInstantSerializer.instantiate(date), ZoneOffset.UTC)
+        MongoInstantSerializer.instantiate(date).toLocalDateTime(TimeZone.UTC)
 }
 
 //@Serializer(forClass = LocalTime::class)
 object MongoLocalTimeSerializer : TemporalExtendedJsonSerializer<LocalTime>() {
 
     override fun epochMillis(temporal: LocalTime): Long =
-        MongoLocalDateTimeSerializer.epochMillis(temporal.atDate(LocalDate.ofEpochDay(0)))
+        MongoLocalDateTimeSerializer.epochMillis(temporal.atDate(LocalDate.fromEpochDays(0)))
 
     override fun instantiate(date: Long): LocalTime =
-        MongoLocalDateTimeSerializer.instantiate(date).toLocalTime()
+        MongoLocalDateTimeSerializer.instantiate(date).time
 }
 
 //@Serializer(forClass = Locale::class)

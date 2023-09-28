@@ -20,13 +20,16 @@ import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.*
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
+import kotlinx.datetime.Clock
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.serializer
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 import java.util.*
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 
 class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
     path: ServerPath,
@@ -35,8 +38,8 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
     val resultSerializer: KSerializer<RESULT>,
     val database: () -> Database,
     val api: () -> Api<REQUEST, RESPONSE, RESULT>,
-    val checkFrequency: Duration = Duration.ofMinutes(15),
-    val taskTimeout: Duration = Duration.ofMinutes(2),
+    val checkFrequency: Duration = 15.minutes,
+    val taskTimeout: Duration = 2.minutes,
     val checkChunking: Int = 15,
     val name: String = path.segments.lastOrNull()?.toString() ?: "Task",
     val idempotentBasedOnOurData: Boolean = false,
@@ -58,7 +61,7 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
         defaultItem = {
             ExternalAsyncTaskRequest(
                 _id = "",
-                expiresAt = Instant.now().plus(Duration.ofDays(7)),
+                expiresAt = Clock.System.now().plus(7.days),
                 ourData = ""
             )
         },
@@ -90,7 +93,7 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
                 _id = response._id,
                 response = Serialization.Internal.json.encodeToString(responseSerializer, response),
                 ourData = ourDataString,
-                expiresAt = Instant.now().plus(action.expiration),
+                expiresAt = Clock.System.now().plus(action.expiration),
                 action = action.key
             )
         )
@@ -101,7 +104,7 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
     data class ResultAction<OURDATA, RESULT> internal constructor(
         val key: String,
         val ourDataSerialization: KSerializer<OURDATA>,
-        val expiration: Duration = Duration.ofDays(1),
+        val expiration: Duration = 1.days,
         val expired: suspend (OURDATA) -> Unit = {},
         val action: suspend (OURDATA, RESULT) -> Unit,
     )
@@ -110,7 +113,7 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
     fun <OURDATA> resultAction(
         key: String,
         ourDataSerializer: KSerializer<OURDATA>,
-        expiration: Duration = Duration.ofDays(1),
+        expiration: Duration = 1.days,
         expired: suspend (OURDATA) -> Unit = {},
         action: suspend (OURDATA, RESULT) -> Unit,
     ): ResultAction<OURDATA, RESULT> {
@@ -121,7 +124,7 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
 
     inline fun <reified OURDATA> resultAction(
         key: String,
-        expiration: Duration = Duration.ofDays(1),
+        expiration: Duration = 1.days,
         noinline expired: suspend (OURDATA) -> Unit = {},
         noinline action: suspend (OURDATA, RESULT) -> Unit,
     ): ResultAction<OURDATA, RESULT> =
@@ -138,14 +141,14 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
                             sig._id,
                             modification {
                                 it.processingError assign "No such handler '${sig.action}'"
-                                it.lastAttempt assign Instant.now()
+                                it.lastAttempt assign Clock.System.now()
                             })
                     return@task
                 }
             } ?: return@task
             try {
                 info.collection().updateOneById(sig._id, modification {
-                    it.lastAttempt assign Instant.now()
+                    it.lastAttempt assign Clock.System.now()
                 })
                 val result = sig.result?.let { Serialization.Internal.json.decodeFromString(resultSerializer, it) }
                 val ourData = Serialization.Internal.json.decodeFromString(task.ourDataSerialization, sig.ourData)
@@ -204,13 +207,13 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
 
     val recheck = schedule("$path/recheck", checkFrequency) {
         info.collection().find(condition {
-            (it.result neq null) and (it.expiresAt lt Instant.now()) and (it.lastAttempt lt Instant.now()
+            (it.result neq null) and (it.expiresAt lt Clock.System.now()) and (it.lastAttempt lt Clock.System.now()
                 .minus(taskTimeout))
         }).collect {
             runActionResult(it)
         }
         info.collection().find(condition {
-            val notLocked = it.lastAttempt.lte(Instant.now().minus(taskTimeout))
+            val notLocked = it.lastAttempt.lte(Clock.System.now().minus(taskTimeout))
             val noError = it.processingError eq null
             val hasResult = it.result neq null
             notLocked and noError and hasResult

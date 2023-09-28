@@ -1,7 +1,7 @@
 package com.lightningkite.lightningdb.test
 
 import org.junit.Test
-import java.time.Instant
+import kotlinx.datetime.Instant
 import kotlin.test.assertEquals
 import com.lightningkite.lightningdb.*
 import kotlinx.coroutines.*

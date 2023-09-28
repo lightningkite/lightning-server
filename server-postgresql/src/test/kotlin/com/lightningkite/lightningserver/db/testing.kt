@@ -5,6 +5,7 @@ import com.lightningkite.lightningdb.test.*
 import io.zonky.test.db.postgres.junit.EmbeddedPostgresRules
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.*
@@ -13,8 +14,7 @@ import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransacti
 import org.junit.*
 import org.postgresql.util.PGobject
 import java.sql.ResultSet
-import java.time.Instant
-import java.time.ZonedDateTime
+import kotlinx.datetime.Instant
 import java.util.*
 import kotlin.collections.LinkedHashMap
 import kotlin.test.assertEquals
@@ -115,7 +115,6 @@ class CodingTest() {
     data class TestModel(
         @Contextual val uuid: UUID = UUID.randomUUID(),
         @Contextual val time: Instant,
-        @Contextual val timeZoned: ZonedDateTime,
         val x: String?,
         val y: Int,
         val z: ClassUsedForEmbedding?,
@@ -132,8 +131,7 @@ class CodingTest() {
         format.encode(
             TestModel.serializer(),
             TestModel(
-                time = Instant.now(),
-                timeZoned = ZonedDateTime.now(),
+                time = Clock.System.now(),
                 x = "test",
                 y = 1,
                 z = ClassUsedForEmbedding("def", 2),

@@ -18,8 +18,9 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.io.File
-import java.time.Duration
+import kotlin.time.Duration
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.hours
 
 class RamAggregationsTest: AggregationsTest() {
     override val database: Database = InMemoryDatabase()
@@ -90,7 +91,7 @@ class LocalFilesTest: FileSystemTests() {
         runBlocking {
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
-            val signed = testFile.uploadUrl(Duration.ofHours(1))
+            val signed = testFile.uploadUrl(1.hours)
             val response = system.upload.test(
                 wildcard = signed.substringAfterLast("hosted-files").substringBefore('?'),
                 queryParameters = signed.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=') },

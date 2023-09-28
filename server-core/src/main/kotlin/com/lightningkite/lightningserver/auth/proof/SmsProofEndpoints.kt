@@ -16,7 +16,7 @@ import com.lightningkite.lightningserver.sms.SMSClient
 import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.typed
-import java.time.Instant
+import kotlinx.datetime.Instant
 import java.util.*
 
 class SmsProofEndpoints(

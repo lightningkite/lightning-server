@@ -3,14 +3,19 @@
 package com.lightningkite.lightningserver.serverhealth
 
 import com.lightningkite.khrysalis.SharedCode
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import java.lang.management.ManagementFactory
 import java.net.NetworkInterface
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 @Serializable
-data class HealthStatus(val level: Level, val checkedAt: Instant = Instant.now(), val additionalMessage: String? = null) {
+data class HealthStatus(
+    val level: Level,
+    val checkedAt: Instant = Clock.System.now(),
+    val additionalMessage: String? = null
+) {
     @Serializable
     enum class Level(val color: String) {
         OK("green"),

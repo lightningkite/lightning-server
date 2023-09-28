@@ -10,9 +10,10 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.time.delay
+import kotlinx.coroutines.delay
 import org.slf4j.LoggerFactory
-import java.time.Duration
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * An abstraction layer meant to make async tasks in each environment configurable.
@@ -23,7 +24,7 @@ interface Engine {
     fun backgroundReportingAction(action: suspend ()->Unit) {
         GlobalScope.launch {
             while (true) {
-                delay(Duration.ofMinutes(5))
+                delay(5.minutes)
                 try {
                     action()
                 } catch(e: Exception) {

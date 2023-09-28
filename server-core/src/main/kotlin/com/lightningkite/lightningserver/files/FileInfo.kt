@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningserver.core.ContentType
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * Holds common information about files.

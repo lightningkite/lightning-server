@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.cache
 
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.serialization.KSerializer
-import java.time.Duration
+import kotlin.time.Duration
 
 class PrefixCache(val cache: Cache, val prefix: String): Cache {
     override suspend fun <T> get(key: String, serializer: KSerializer<T>): T? = cache.get(prefix + key, serializer)

@@ -13,9 +13,12 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.encodeToString
 import org.junit.Assert.*
 import org.junit.Test
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
+import java.time.Clock
 import kotlin.test.assertContains
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 
 abstract class FileSystemTests {
     abstract val system: FileSystem?
@@ -54,7 +57,7 @@ abstract class FileSystemTests {
         runBlocking {
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
-            val beforeModify = Instant.now().minusSeconds(120L)
+            val beforeModify = kotlinx.datetime.Clock.System.now().minus(120.seconds)
             testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
             val info = testFile.head()
             assertNotNull(info)
@@ -111,7 +114,7 @@ abstract class FileSystemTests {
         runBlocking {
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
-            assert(client.put(testFile.uploadUrl(Duration.ofHours(1))) {
+            assert(client.put(testFile.uploadUrl(1.hours)) {
                 uploadHeaders(this)
                 setBody(TextContent(message, io.ktor.http.ContentType.Text.Plain))
             }.status.isSuccess())

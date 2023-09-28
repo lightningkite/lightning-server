@@ -15,7 +15,7 @@ import com.lightningkite.lightningserver.settings.loadSettings
 import com.lightningkite.lightningserver.typed.*
 import kotlinx.serialization.*
 import java.io.File
-import java.time.Instant
+import kotlinx.datetime.Instant
 import java.util.*
 
 fun setup() {

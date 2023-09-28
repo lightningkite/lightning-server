@@ -23,8 +23,10 @@ import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.sms.SMSSettings
-import java.time.Duration
+import kotlin.time.Duration
 import java.util.*
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 object TestSettings {
     val database = setting("database", DatabaseSettings("ram"))
@@ -47,7 +49,7 @@ object TestSettings {
     )
     val emailAccess: UserEmailAccess<User, UUID> = info.userEmailAccess { User(email = it, phoneNumber = it) }
     val path = ServerPath("auth")
-    val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner, Duration.ofHours(1), Duration.ofMinutes(5))
+    val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner, 1.hours, 5.minutes)
     val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
 
     init {

@@ -29,13 +29,14 @@ import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.AuthAndPathParts
 import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.auth
+import kotlinx.datetime.Clock
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import java.security.SecureRandom
-import java.time.Instant
+import kotlinx.datetime.Instant
 import java.util.*
 import kotlin.math.min
 
@@ -152,7 +153,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         scopes: Set<String>? = null,
         oauthClient: String? = null,
         derivedFrom: UUID? = null,
-    ): Pair<Session<SUBJECT, ID>, String> {
+    ): Pair<Session<SUBJECT, ID>, RefreshToken> {
         val secret = Base64.getEncoder().encodeToString(ByteArray(24) { 0 }.apply {
             SecureRandom.getInstanceStrong().nextBytes(this)
         })
@@ -164,7 +165,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             scopes = scopes,
             oauthClient = oauthClient,
         ).also { info.collection().insertOne(it) }.let {
-            it to RefreshToken(handler.name, it._id, secret).string
+            it to RefreshToken(handler.name, it._id, secret)
         }
     }
 
@@ -195,7 +196,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     subjectId = result.id!!,
                     scopes = null,
                     label = "Root Session",
-                ).second else null,
+                ).second.string else null,
                 id = result.id,
                 options = result.options.filter { it.method.via !in used },
                 strengthRequired = actStrenReq
@@ -218,7 +219,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 scopes = request.scopes,
                 expires = request.expires,
                 oauthClient = request.oauthClient,
-            ).second
+            ).second.string
         }
     )
 
@@ -274,7 +275,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         oauthClient = future.oauthClient
                     )
                     info.collection().insertOne(s)
-                    generatedRefresh = RefreshToken(handler.name, s._id, secret)
+                    generatedRefresh = secret
                     s
                 }
                 else -> throw BadRequestException("No authentication provided")
@@ -336,7 +337,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         if (!plainTextSecret.checkHash(session.secretHash)) return null
         if (session.terminated != null) return null
         info.collection().updateOneById(_id, modification(dataClassPath) {
-            it.lastUsed assign Instant.now()
+            it.lastUsed assign Clock.System.now()
             it.userAgents addAll setOf(request?.headers?.get(HttpHeader.UserAgent) ?: "")
             it.ips addAll setOf(request?.sourceIp ?: "test")
         })
@@ -350,7 +351,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         val signature = it.sliceArray(it.size - hashSize until it.size)
         if(!proofHasher().verify(content, signature)) throw TokenException("Could not verify hash.")
         Serialization.javaData.decodeFromByteArray(FutureSession.serializer(handler.idSerializer), content).also {
-            if(Instant.now() > it.expires) throw TokenException("Token expired.")
+            if(Clock.System.now() > it.expires) throw TokenException("Token expired.")
         }
     }
 
@@ -378,7 +379,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 }
 
 @JvmInline
-private value class RefreshToken(val string: String) {
+value class RefreshToken(val string: String) {
     companion object {
         val prefix = "refresh/"
     }

@@ -24,13 +24,16 @@ import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.*
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
+import kotlinx.datetime.Clock
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
+import kotlinx.datetime.toJavaInstant
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.hours
 
 @OptIn(InternalSerializationApi::class)
 class OneTimePasswordProofEndpoints(
@@ -143,28 +146,28 @@ class OneTimePasswordProofEndpoints(
                     of = validates,
                     strength = strength,
                     value = "some-id",
-                    at = Instant.now(),
+                    at = Clock.System.now(),
                     signature = "opaquesignaturevalue"
                 )
             )
         ),
         successCode = HttpStatus.OK,
         implementation = { input: ProofEvidence ->
-            val postedAt = Instant.now()
+            val postedAt = Clock.System.now()
             val cacheKey = "otp-count-${input.value}"
-            cache().add(cacheKey, 1, Duration.ofHours(1))
+            cache().add(cacheKey, 1, 1.hours)
             val ct = (cache().get<Int>(cacheKey) ?: 0)
             if (ct > 5) throw BadRequestException("Too many attempts; please wait.")
             val (subject, id) = key(input.value)
             @Suppress("UNCHECKED_CAST")
             val secret = table(subject).get(id as Comparable<Any>)
                 ?: throw BadRequestException("User ID and code do not match")
-            if (!secret.generator.isValid(input.secret, postedAt)) throw BadRequestException("User ID and code do not match")
+            if (!secret.generator.isValid(input.secret, postedAt.toJavaInstant())) throw BadRequestException("User ID and code do not match")
             cache().remove(cacheKey)
             proofHasher().makeProof(
                 info = info,
                 value = input.value,
-                at = Instant.now()
+                at = Clock.System.now()
             )
         }
     )

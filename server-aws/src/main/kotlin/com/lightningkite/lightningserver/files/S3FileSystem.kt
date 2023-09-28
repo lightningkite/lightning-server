@@ -9,12 +9,13 @@ import software.amazon.awssdk.services.s3.S3AsyncClient
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 import java.io.File
+import kotlin.time.Duration
 
 class S3FileSystem(
     val region: Region,
     val credentialProvider: AwsCredentialsProvider,
     val bucket: String,
-    val signedUrlExpirationSeconds: Int? = null
+    val signedUrlDuration: Duration? = null
 ) : FileSystem {
     override val rootUrls: List<String> = listOf(
         "https://${bucket}.s3.${region.id()}.amazonaws.com/",
@@ -55,7 +56,7 @@ class S3FileSystem(
                             })
                         } else DefaultCredentialsProvider.create(),
                         match.groups["bucket"]!!.value,
-                        it.signedUrlExpiration?.toSeconds()?.toInt()
+                        it.signedUrlExpiration
                     )
                 }
                     ?: throw IllegalStateException("Invalid S3 storageUrl. The URL should match the pattern: s3://[user]:[password]@[bucket].[region].amazonaws.com/")

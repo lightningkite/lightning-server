@@ -48,7 +48,7 @@ fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(
     imports.add("com.lightningkite.lightningdb.live.*")
     imports.add("java.util.UUID")
     imports.add("java.util.Optional")
-    imports.add("java.time.*")
+    imports.add("kotlinx.datetime.*")
     val byGroup = safeDocumentables
         .distinctBy { it.docGroup.toString() + "/" + it.summary }.groupBy { it.docGroup }
     val groups = byGroup.keys.filterNotNull()
@@ -82,7 +82,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
     imports.add("com.lightningkite.lightningdb.live.*")
     imports.add("java.util.UUID")
     imports.add("java.util.Optional")
-    imports.add("java.time.*")
+    imports.add("kotlinx.datetime.*")
     run {
         val sessionClassName = "AbstractAnonymousSession"
         val byGroup = safeDocumentables
@@ -160,7 +160,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
     imports.add("com.lightningkite.lightningdb.live.*")
     imports.add("java.util.UUID")
     imports.add("java.util.Optional")
-    imports.add("java.time.*")
+    imports.add("kotlinx.datetime.*")
     val byGroup = safeDocumentables.groupBy { it.docGroup }
     val groups = byGroup.keys.filterNotNull()
     appendLine("class LiveApi(val httpUrl: String, val socketUrl: String): Api {")

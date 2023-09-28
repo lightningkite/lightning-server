@@ -9,9 +9,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Test
 import java.io.File
-import java.time.Duration
+import kotlin.time.Duration
 import kotlin.random.Random
 import kotlin.test.assertContains
+import kotlin.time.Duration.Companion.hours
 
 class LocalFileTest {
     @Test
@@ -31,7 +32,7 @@ class LocalFileTest {
     @Test fun signTest() {
         TestSettings
         runBlocking {
-            val system = LocalFileSystem(File("./build/test-files").absoluteFile, "local-file-test", Duration.ofHours(1), signer = SecureHasher.HS256(Random.nextBytes(16)))
+            val system = LocalFileSystem(File("./build/test-files").absoluteFile, "local-file-test", 1.hours, signer = SecureHasher.HS256(Random.nextBytes(16)))
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
             testFile.put(HttpContent.Text(message, ContentType.Text.Plain))

@@ -16,10 +16,12 @@ import kotlinx.serialization.modules.SerializersModule
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.javatime.*
 import org.jetbrains.exposed.sql.statements.UpdateBuilder
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.ZonedDateTime
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.serializers.InstantIso8601Serializer
+import kotlinx.datetime.serializers.LocalDateIso8601Serializer
+import kotlinx.datetime.serializers.LocalDateTimeIso8601Serializer
+import kotlinx.datetime.serializers.LocalTimeIso8601Serializer
 import java.util.*
 
 class SerialDescriptorTable(name: String, val descriptor: SerialDescriptor) : Table(name.replace(".", "__")) {
@@ -223,7 +225,7 @@ internal fun SerialDescriptor.columnType(): List<ColumnTypeInfo> = when (this.un
         )
     )
 
-    LocalDateSerializer.descriptor -> listOf(
+    LocalDateIso8601Serializer.descriptor -> listOf(
         ColumnTypeInfo(
             listOf<String>(),
             JavaLocalDateColumnType().also { it.nullable = this.isNullable },
@@ -231,7 +233,7 @@ internal fun SerialDescriptor.columnType(): List<ColumnTypeInfo> = when (this.un
         )
     )
 
-    InstantSerializer.descriptor -> listOf(
+    InstantIso8601Serializer.descriptor -> listOf(
         ColumnTypeInfo(
             listOf<String>(),
             JavaInstantColumnType().also { it.nullable = this.isNullable },
@@ -246,18 +248,19 @@ internal fun SerialDescriptor.columnType(): List<ColumnTypeInfo> = when (this.un
             listOf()
         )
     )
-    //LocalDateTimeSerializer.descriptor -> listOf(listOf<String>() to JavaLocalDateTimeColumnType().also { it.nullable = this.isNullable })
-    LocalTimeSerializer.descriptor -> listOf(
+    LocalDateTimeIso8601Serializer.descriptor -> listOf(
+        ColumnTypeInfo(
+            listOf<String>(),
+            JavaLocalDateTimeColumnType().also { it.nullable = this.isNullable },
+            listOf()
+        )
+    )
+    LocalTimeIso8601Serializer.descriptor -> listOf(
         ColumnTypeInfo(
             listOf<String>(),
             JavaLocalTimeColumnType().also { it.nullable = this.isNullable },
             listOf()
         )
-    )
-
-    ZonedDateTimeSerializer.descriptor -> listOf(
-        ColumnTypeInfo(listOf<String>(), JavaInstantColumnType().also { it.nullable = this.isNullable }, listOf()),
-        ColumnTypeInfo(listOf<String>("zone"), VarCharColumnType(32).also { it.nullable = this.isNullable }, listOf()),
     )
 
     else -> when (kind) {

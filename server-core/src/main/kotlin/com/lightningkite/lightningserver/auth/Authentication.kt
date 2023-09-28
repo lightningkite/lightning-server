@@ -14,7 +14,7 @@ import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.TypedServerPath0
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.UseContextualSerialization
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 object Authentication {
 

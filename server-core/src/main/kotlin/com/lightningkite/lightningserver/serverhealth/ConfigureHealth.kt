@@ -11,10 +11,11 @@ import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.datetime.Clock
 import kotlinx.serialization.builtins.serializer
 import java.lang.management.ManagementFactory
 import java.net.NetworkInterface
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * A route for accessing status of features, external service connections, and general server information.
@@ -28,7 +29,7 @@ fun ServerPath.healthCheck() = get.api(
     description = "Gets the current status of the server",
     errorCases = listOf(),
     implementation = { _: Unit ->
-        val now = Instant.now()
+        val now = Clock.System.now()
         serverHealth(
             features = Settings.requirements.mapValues { it.value() }.entries.mapNotNull {
                 val checkable =
@@ -37,7 +38,7 @@ fun ServerPath.healthCheck() = get.api(
             }
                 .associate {
                     healthCache[it.second]?.takeIf {
-                        now.toEpochMilli() - it.checkedAt.toEpochMilli() < 60_000 && it.level <= HealthStatus.Level.WARNING
+                        now.toEpochMilliseconds() - it.checkedAt.toEpochMilliseconds() < 60_000 && it.level <= HealthStatus.Level.WARNING
                     }?.let { s -> return@associate it.first to s }
                     val result = withTimeoutOrNull(10_000L) { it.second.healthCheck() }
                         ?: HealthStatus(HealthStatus.Level.ERROR, additionalMessage = "Timed out after 10 seconds.")

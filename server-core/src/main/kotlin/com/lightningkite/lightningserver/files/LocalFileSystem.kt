@@ -9,7 +9,7 @@ import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.*
 import java.io.File
 import java.io.RandomAccessFile
-import java.time.Duration
+import kotlin.time.Duration
 
 /**
  * A FileSystem implementation that uses the environments local file system as it's storage solution.

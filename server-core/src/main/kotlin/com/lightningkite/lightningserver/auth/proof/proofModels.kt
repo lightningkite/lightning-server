@@ -10,7 +10,7 @@ import kotlinx.serialization.UseContextualSerialization
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 import java.security.SecureRandom
-import java.time.Instant
+import kotlinx.datetime.Instant
 import java.util.*
 
 
@@ -26,7 +26,7 @@ private fun signingInfo(
         it.writeUTF(of)
         it.writeUTF(value)
         it.writeInt(strength)
-        it.writeLong(at.toEpochMilli())
+        it.writeLong(at.toEpochMilliseconds())
     }
     it.toByteArray()
 }

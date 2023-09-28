@@ -12,13 +12,12 @@ import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.settings.Settings
+import kotlinx.datetime.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import java.io.File
-import java.time.LocalDate
-import java.time.ZonedDateTime
 import java.util.Properties
 
 @Serializable
@@ -1337,7 +1336,7 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
         val safeName = it.name.filter { it.isLetterOrDigit() || it == '_' }
         when (val s = it.schedule) {
             is Schedule.Daily -> {
-                val utcTime = ZonedDateTime.of(LocalDate.now(), s.time, s.zone)
+                val utcTime = LocalDateTime(LocalDate(2001, 1, 1), s.time).toInstant(s.zone).toLocalDateTime(TimeZone.UTC)
                 TerraformSection(
                     name = "schedule_${it.name}",
                     emit = {
@@ -1376,7 +1375,7 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                             """
                     resource "aws_cloudwatch_event_rule" "scheduled_task_${safeName}" {
                       name                = "${namePrefix}_${safeName}"
-                      schedule_expression = "rate(${s.gap.toMinutes()} minute${if (s.gap.toMinutes() > 1) "s" else ""})"
+                      schedule_expression = "rate(${s.gap.inWholeMinutes} minute${if (s.gap.inWholeMinutes > 1) "s" else ""})"
                     }
                     resource "aws_cloudwatch_event_target" "scheduled_task_${safeName}" {
                       rule      = aws_cloudwatch_event_rule.scheduled_task_${safeName}.name

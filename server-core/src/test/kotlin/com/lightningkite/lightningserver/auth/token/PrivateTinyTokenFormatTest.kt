@@ -10,8 +10,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
 import org.junit.Test
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 import java.util.*
 
 class PrivateTinyTokenFormatTest: TokenFormatTest() {

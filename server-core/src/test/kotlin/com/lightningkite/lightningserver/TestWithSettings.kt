@@ -40,8 +40,9 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
-import java.time.Duration
+import kotlin.time.Duration
 import java.util.*
+import kotlin.time.Duration.Companion.minutes
 
 object TestSettings: ServerPathGroup(ServerPath.root) {
     val database = setting("database", DatabaseSettings("ram"))
@@ -167,7 +168,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
             get() = "email"
         override val serializer: KSerializer<String> = String.serializer()
         override val validFor: Duration
-            get() = Duration.ofMinutes(5)
+            get() = 5.minutes
         override suspend fun calculate(auth: RequestAuth<TestUser>): String = auth.get().email
     }
     object TestCacheKey: RequestAuth.CacheKey<TestUser, UUID, UUID>() {
@@ -176,7 +177,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         override val serializer: KSerializer<UUID>
             get() = ContextualSerializer(UUID::class)
         override val validFor: Duration
-            get() = Duration.ofMinutes(5)
+            get() = 5.minutes
         override suspend fun calculate(auth: RequestAuth<TestUser>): UUID = UUID.randomUUID()
     }
 

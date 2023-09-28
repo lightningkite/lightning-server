@@ -20,8 +20,9 @@ import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.AuthAndPathParts
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
-import java.time.Duration
+import kotlin.time.Duration
 import java.util.*
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Endpoints for authenticating via email magic link / sent PINs.
@@ -35,7 +36,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
     private val email: () -> EmailClient,
     val pinAvailableCharacters: List<Char> = ('0'..'9').toList(),
     val pinLength: Int = 6,
-    val pinExpiration: Duration = Duration.ofMinutes(15),
+    val pinExpiration: Duration = 15.minutes,
     val pinMaxAttempts: Int = 5,
     private val emailSubject: () -> String = { "${generalSettings().projectName} Log In" },
     private val template: (suspend (email: String, link: String, pin: String) -> String) = { email, link, pin ->
@@ -105,7 +106,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
     )
     val loginEmailPin = path("login-email-pin").post.typed(
         summary = "Email PIN Login",
-        description = "Logs in to the given account with a PIN that was provided in an email sent earlier.  Note that the PIN expires in ${pinExpiration.toMinutes()} minutes, and you are only permitted ${pinMaxAttempts} attempts.",
+        description = "Logs in to the given account with a PIN that was provided in an email sent earlier.  Note that the PIN expires in ${pinExpiration.inWholeMinutes} minutes, and you are only permitted ${pinMaxAttempts} attempts.",
         errorCases = listOf(),
         examples = listOf(ApiExample(input = EmailPinLogin("test@test.com", pin.generate()), output = "jwt.jwt.jwt")),
         successCode = HttpStatus.OK,
@@ -138,7 +139,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
             ) { response, uuid ->
                 val profile = it.first.getProfile(response)
                 val user = emailAccess.asExternal().byExternalService(profile)
-                val token = base.token(user, Duration.ofMinutes(1))
+                val token = base.token(user, 1.minutes)
                 HttpResponse.redirectToGet("${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$token")
             }
             val loginRedirect = path("oauth/${it.first}/login").get.handler {

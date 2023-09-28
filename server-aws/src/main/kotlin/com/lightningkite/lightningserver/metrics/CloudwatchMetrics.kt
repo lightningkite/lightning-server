@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.files.S3FileSystem
 import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
+import kotlinx.datetime.toJavaInstant
 import org.slf4j.LoggerFactory
 import software.amazon.awssdk.auth.credentials.AwsCredentials
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
@@ -100,7 +101,7 @@ class CloudwatchMetrics(
                             MetricDatum.builder()
                                 .metricName(it.metricType.name)
                                 .unit(unit)
-                                .timestamp(it.time)
+                                .timestamp(it.time.toJavaInstant())
                                 .value(it.value)
                                 .build(),
                         )
@@ -109,7 +110,7 @@ class CloudwatchMetrics(
                             MetricDatum.builder()
                                 .metricName(it.metricType.name)
                                 .unit(unit)
-                                .timestamp(it.time)
+                                .timestamp(it.time.toJavaInstant())
                                 .value(it.value)
                                 .dimensions(
                                     Dimension.builder().name("Entry Point").value(it.entryPoint).build()
@@ -118,7 +119,7 @@ class CloudwatchMetrics(
                             MetricDatum.builder()
                                 .metricName(it.metricType.name)
                                 .unit(unit)
-                                .timestamp(it.time)
+                                .timestamp(it.time.toJavaInstant())
                                 .value(it.value)
                                 .dimensions(
                                     Dimension.builder().name("Entry Point").value("All").build()

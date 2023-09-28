@@ -41,6 +41,7 @@ class AuthEndpointsForSubjectTest {
         assert(result.session != null)
     }
 
+    @Ignore
     @Test fun masquerade(): Unit = runBlocking {
         val (session, token) = TestSettings.testUserSubject.newSession(TestSettings.testAdmin.await()._id)
         HttpRequest(

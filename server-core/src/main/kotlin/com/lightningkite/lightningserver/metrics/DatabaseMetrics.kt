@@ -23,8 +23,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
-import java.time.Duration
-import java.time.Instant
+import kotlinx.datetime.Clock
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 class DatabaseMetrics(override val settings: MetricSettings, val database: () -> Database) :
     ServerPathGroup(ServerPath.root.path("meta/metrics")), Metrics {
@@ -33,9 +37,9 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
     }
 
     val keepFor: Map<Duration, Duration> = mapOf(
-        Duration.ofDays(1) to Duration.ofDays(7),
-        Duration.ofHours(2) to Duration.ofDays(1),
-        Duration.ofMinutes(10) to Duration.ofHours(2),
+        1.days to 7.days,
+        2.hours to 1.days,
+        10.minutes to 2.hours,
     )
 
     val collection by lazy { database().collection<MetricSpanStats>() }
@@ -83,7 +87,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         keepFor.entries.forEach { entry ->
             collection.deleteManyIgnoringOld(condition {
                 (it.timeSpan eq entry.key) and
-                        (it.timeStamp lt Instant.now().minus(entry.value))
+                        (it.timeStamp lt Clock.System.now().minus(entry.value))
             })
         }
     }

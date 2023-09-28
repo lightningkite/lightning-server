@@ -1,10 +1,11 @@
 package com.lightningkite.lightningserver.metrics
 
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
 import org.junit.Assert.*
 import org.junit.Ignore
 import org.junit.Test
-import java.time.Instant
+import kotlinx.datetime.Instant
 import kotlin.random.Random
 
 class CloudwatchMetricsTest {
@@ -19,7 +20,7 @@ class CloudwatchMetricsTest {
             MetricEvent(
                 testMetric,
                 entryPoint = "GET /",
-                time = Instant.now(),
+                time = Clock.System.now(),
                 value = Random.nextDouble()
             )
         })

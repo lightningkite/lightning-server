@@ -72,7 +72,7 @@ data class MongoFields(
                     "kotlinx.serialization.*",
                     "kotlinx.serialization.builtins.*",
                     "kotlinx.serialization.internal.GeneratedSerializer",
-                    "java.time.*",
+                    "kotlinx.datetime.*",
                     "java.util.*",
                 )
             )
@@ -122,7 +122,7 @@ private val KSType.useCustomType: Boolean
             "kotlin.Pair",
             "com.lightningkite.lightningdb.UUIDFor",
             "java.util.UUID",
-            "java.time.Instant",
+            "kotlinx.datetime.Instant",
             "org.litote.kmongo.Id" -> false
             else -> true
         }
@@ -140,7 +140,7 @@ private val KSType.conditionType: String
             "kotlin.Float",
             "kotlin.Double",
             "java.util.UUID",
-            "java.time.Instant",
+            "kotlinx.datetime.Instant",
             "com.lightningkite.lightningdb.UUIDFor",
             "kotlin.Char" -> "ComparableCondition" + "<${this.makeNotNullable().toKotlin(annotations)}>"
             "kotlin.collections.List" -> "ArrayCondition" + "<${
@@ -183,7 +183,7 @@ private val KSType.modificationType: String
             "kotlin.Double" -> "NumberModification" + "<${this.makeNotNullable().toKotlin(annotations)}>"
             "java.util.UUID",
             "com.lightningkite.lightningdb.UUIDFor",
-            "java.time.Instant",
+            "kotlinx.datetime.Instant",
             "kotlin.String", "kotlin.Char" -> "ComparableModification" + "<${
                 this.makeNotNullable().toKotlin(annotations)
             }>"

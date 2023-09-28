@@ -9,14 +9,15 @@ import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.utils.BadWordList
 import java.security.SecureRandom
-import java.time.Duration
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 open class PinHandler(
     private val cache: () -> Cache,
     val keyPrefix: String,
     val availableCharacters: List<Char> = ('0'..'9').toList(),
     val length: Int = 6,
-    val expiration: Duration = Duration.ofMinutes(15),
+    val expiration: Duration = 15.minutes,
     val maxAttempts: Int = 5
 ) {
     private val mixedCaseMode = availableCharacters.filter { it.isLetter() }.let {

@@ -4,10 +4,11 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.files.serverFile
 import com.lightningkite.lightningserver.serialization.Serialization
+import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.properties.encodeToStringMap
 import org.junit.Test
-import java.time.Instant
+import kotlinx.datetime.Instant
 import kotlin.system.measureTimeMillis
 import kotlin.test.assertEquals
 import kotlin.test.fail
@@ -157,7 +158,7 @@ class ConditionSimplifyKtTest {
             double = 1.0,
             char = 'a',
             string = "hi",
-            instant = Instant.now(),
+            instant = Clock.System.now(),
             list = listOf(1, 2)
         ),
         LargeTestModel(
@@ -170,7 +171,7 @@ class ConditionSimplifyKtTest {
             double = 2.0,
             char = 'b',
             string = "hi2",
-            instant = Instant.now(),
+            instant = Clock.System.now(),
             list = listOf(2, 3)
         ),
         LargeTestModel(
@@ -183,7 +184,7 @@ class ConditionSimplifyKtTest {
             double = 2.0,
             char = 'b',
             string = "hi2",
-            instant = Instant.now(),
+            instant = Clock.System.now(),
             list = listOf(2, 3)
         ),
         LargeTestModel(
@@ -196,7 +197,7 @@ class ConditionSimplifyKtTest {
             double = 2.0,
             char = 'b',
             string = "hi2",
-            instant = Instant.now(),
+            instant = Clock.System.now(),
             list = listOf(2, 3)
         ),
     )

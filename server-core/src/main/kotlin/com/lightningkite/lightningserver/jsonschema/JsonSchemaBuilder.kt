@@ -285,7 +285,7 @@ class JsonSchemaBuilder(
                 pattern = "^[0-9a-fA-F]{8}\\b-[0-9a-fA-F]{4}\\b-[0-9a-fA-F]{4}\\b-[0-9a-fA-F]{4}\\b-[0-9a-fA-F]{12}\$"
             )
         }
-        override("java.time.LocalDate") {
+        override("kotlinx.datetime.LocalDate") {
             JsonSchemaType(
                 title = "Local Date",
                 type = JsonType3(JsonType2.STRING),
@@ -293,7 +293,7 @@ class JsonSchemaBuilder(
                 pattern = "^\\d\\d\\d\\d-\\d\\d-\\d\\d$"
             )
         }
-        override("java.time.LocalTime") {
+        override("kotlinx.datetime.LocalTime") {
             JsonSchemaType(
                 title = "Local Time",
                 type = JsonType3(JsonType2.STRING),
@@ -301,7 +301,7 @@ class JsonSchemaBuilder(
                 pattern = "^\\d\\d:\\d\\d(:\\d\\d(\\.\\d+)?)?$"
             )
         }
-        override("java.time.ZonedDateTime") {
+        override("kotlinx.datetime.ZonedDateTime") {
             JsonSchemaType(
                 title = "Zoned Date Time",
                 type = JsonType3(JsonType2.STRING),
@@ -309,7 +309,7 @@ class JsonSchemaBuilder(
                 pattern = "^\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d(:\\d\\d(\\.\\d+)?)?(([+-]\\d\\d:\\d\\d(\\[[^\\]+]\\])?)|Z)$"
             )
         }
-        override("java.time.Instant") {
+        override("kotlinx.datetime.Instant") {
             JsonSchemaType(
                 title = "Instant",
                 type = JsonType3(JsonType2.STRING),

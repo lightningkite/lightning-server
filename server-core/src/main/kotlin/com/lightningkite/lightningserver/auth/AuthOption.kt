@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningdb.Description
 import com.lightningkite.lightningdb.HasId
-import java.time.Duration
+import kotlin.time.Duration
 import kotlin.reflect.typeOf
 
 class AuthOption(

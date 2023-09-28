@@ -14,7 +14,8 @@ import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.AuthAndPathParts
 import com.lightningkite.lightningserver.typed.typed
 import java.net.URLDecoder
-import java.time.Duration
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Authentication endpoints for logging in with SMS PINs.
@@ -26,7 +27,7 @@ open class SmsAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
     private val sms: () -> SMSClient,
     val pinAvailableCharacters: List<Char> = ('0'..'9').toList(),
     val pinLength: Int = 6,
-    val pinExpiration: Duration = Duration.ofMinutes(15),
+    val pinExpiration: Duration = 15.minutes,
     val pinMaxAttempts: Int = 5,
     private val template: suspend (code: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." }
 ) : ServerPathGroup(base.path) {
@@ -68,7 +69,7 @@ open class SmsAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
     )
     val loginSmsPin = path("login-sms-pin").post.typed(
         summary = "SMS PIN Login",
-        description = "Logs in to the given account with a PIN that was provided in a text sent earlier.  Note that the PIN expires in ${pinExpiration.toMinutes()} minutes, and you are only permitted ${pinMaxAttempts} attempts.",
+        description = "Logs in to the given account with a PIN that was provided in a text sent earlier.  Note that the PIN expires in ${pinExpiration.inWholeMinutes} minutes, and you are only permitted ${pinMaxAttempts} attempts.",
         errorCases = listOf(),
         examples = listOf(ApiExample(PhonePinLogin("801-369-3729", pin.generate()), "jwt.jwt.jwt")),
         successCode = HttpStatus.OK,

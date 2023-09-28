@@ -7,11 +7,13 @@ import com.lightningkite.khrysalis.SharedCode
 import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.ServerFile
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 import java.util.*
+import kotlin.time.Duration.Companion.minutes
 
 
 @GenerateDataClassPaths
@@ -19,7 +21,7 @@ import java.util.*
 data class UploadForNextRequest(
     override val _id: UUID = UUID.randomUUID(),
     val file: ServerFile,
-    val expires: Instant = Instant.now().plus(Duration.ofMinutes(15))
+    val expires: Instant = Clock.System.now().plus(15.minutes)
 ) : HasId<UUID>
 
 @Serializable

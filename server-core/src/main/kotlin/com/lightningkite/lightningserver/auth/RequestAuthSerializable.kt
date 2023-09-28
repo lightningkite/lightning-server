@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.serialization.decodeUnwrappingString
 import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.SettingsSerializer
+import kotlinx.datetime.Clock
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -17,7 +18,7 @@ import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.*
 import kotlinx.serialization.json.JsonObject
 import java.io.File
-import java.time.Instant
+import kotlinx.datetime.Instant
 import java.util.*
 
 @Serializable
@@ -49,7 +50,7 @@ fun RequestAuthSerializable.real(subjectHandler: Authentication.SubjectHandler<*
     val subject = subjectHandler ?: Authentication.subjects.values.find { it.name == this.subjectType } as? Authentication.SubjectHandler<HasId<Comparable<Any>>, Comparable<Any>>
         ?: throw TokenException("Auth type ${subjectType} not known.")
     if(subjectHandler != null && this.subjectType != subjectHandler.name) throw TokenException("Subject type mismatch")
-    if(this.expiresAt < Instant.now()) throw TokenException("Authorization has expired.")
+    if(this.expiresAt < Clock.System.now()) throw TokenException("Authorization has expired.")
     return RequestAuth(
         subject = subject,
         rawId = Serialization.json.decodeUnwrappingString(subject.idSerializer, id),
