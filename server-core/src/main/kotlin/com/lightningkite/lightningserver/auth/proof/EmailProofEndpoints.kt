@@ -22,7 +22,7 @@ class EmailProofEndpoints(
     proofHasher: () -> SecureHasher,
     pin: PinHandler,
     val email: () -> EmailClient,
-    val emailTemplate: Email
+    val emailTemplate: (String, String) -> Email
 ) : PinBasedProofEndpoints(path, proofHasher, pin) {
     init {
         if(path.docName == null) path.docName = "EmailProof"
@@ -40,9 +40,6 @@ class EmailProofEndpoints(
         get() = "test@test.com"
 
     override suspend fun send(to: String, pin: String) {
-        email().send(EmailPersonalization(
-            to = listOf(EmailLabeledValue(to)),
-            substitutions = mapOf("{{PIN}}" to pin)
-        )(emailTemplate))
+        email().send(emailTemplate(to, pin))
     }
 }

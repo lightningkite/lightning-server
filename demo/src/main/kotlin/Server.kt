@@ -19,6 +19,7 @@ import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.*
 import com.lightningkite.lightningserver.email.Email
+import com.lightningkite.lightningserver.email.EmailLabeledValue
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.email.SesClient
 import com.lightningkite.lightningserver.encryption.Encryptor
@@ -53,6 +54,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import java.lang.IllegalStateException
 import java.time.Duration
+import java.time.temporal.ChronoUnit
 import java.util.*
 import kotlin.random.Random
 
@@ -135,11 +137,18 @@ object Server : ServerPathGroup(ServerPath.root) {
         val emailAccess = userInfo.userEmailAccess { User(email = it) }
         val passAccess =
             userInfo.userPasswordAccess { username, hashed -> User(email = username, hashedPassword = hashed) }
-        val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner, expiration = Duration.ofDays(365), emailExpiration = Duration.ofHours(1))
+        val baseAuth = BaseAuthEndpoints(
+            path,
+            emailAccess,
+            jwtSigner,
+            expiration = Duration.ofDays(365),
+            emailExpiration = Duration.ofHours(1)
+        )
         val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
         val passAuth = PasswordAuthEndpoints(baseAuth, passAccess)
     }
-//    val auth2 = object : ServerPathGroup(path("auth2")) {
+
+    //    val auth2 = object : ServerPathGroup(path("auth2")) {
 //        val info = ModelInfo<UserAlt, UserAlt, UUID>(
 //            getCollection = { database().collection<UserAlt>() },
 //            forUser = { this }
@@ -239,15 +248,19 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     val pins = PinHandler(cache, "pins")
     val proofPhone = SmsProofEndpoints(path("proof/phone"), jwtSigner, pins, sms)
-    val proofEmail = EmailProofEndpoints(path("proof/email"), jwtSigner, pins, email, Email(
-        subject = "Log In Code",
-        to = listOf(),
-        plainText = "Your PIN is {{PIN}}."
-    ))
+    val proofEmail = EmailProofEndpoints(path("proof/email"), jwtSigner, pins, email, { to, pin ->
+        Email(
+            subject = "Log In Code",
+            to = listOf(EmailLabeledValue(to)),
+            plainText = "Your PIN is $pin."
+        )
+    }
+    )
+
     val proofOtp = OneTimePasswordProofEndpoints(path("proof/otp"), jwtSigner, database, cache)
     val subjects = AuthEndpointsForSubject(
         path("subject"),
-        object: Authentication.SubjectHandler<User, UUID> {
+        object : Authentication.SubjectHandler<User, UUID> {
             override val name: String get() = "User"
             override val idProofs: Set<Authentication.ProofMethod> = setOf(proofEmail)
             override val authType: AuthType get() = AuthType<User>()
@@ -255,9 +268,11 @@ object Server : ServerPathGroup(ServerPath.root) {
             override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<User, UUID>? {
                 val emailIdentifier = proofs.find { it.of == "email" } ?: return null
                 val user = userInfo.collection().findOne(condition { it.email eq emailIdentifier.value }) ?: run {
-                    userInfo.collection().insertOne(User(
-                        email = emailIdentifier.value
-                    ))
+                    userInfo.collection().insertOne(
+                        User(
+                            email = emailIdentifier.value
+                        )
+                    )
                 } ?: return null
                 val options = listOfNotNull(
                     ProofOption(proofEmail.info, user.email),
@@ -285,10 +300,13 @@ object Server : ServerPathGroup(ServerPath.root) {
     )
 }
 
-object EmailCacheKey: RequestAuth.CacheKey<User, UUID, String>() {
+object EmailCacheKey : RequestAuth.CacheKey<User, UUID, String>() {
     override val name: String
         get() = "email"
     override val serializer: KSerializer<String>
         get() = String.serializer()
+    override val validFor: Duration
+        get() = Duration.of(5, ChronoUnit.MINUTES)
+
     override suspend fun calculate(auth: RequestAuth<User>): String = auth.get().email
 }

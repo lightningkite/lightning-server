@@ -118,8 +118,6 @@ open class ModelRestEndpoints<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID
         }
     )
 
-    private fun <R, I, O> lambda(action: suspend R.(I) -> O): suspend R.(I) -> O = action
-
     // This is used to GET a list objects, but rather than the query being in the parameter
     // it's in the POST body.
     val query = wholePath.path("query").post.api(
