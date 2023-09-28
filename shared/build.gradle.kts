@@ -2,7 +2,7 @@ import com.lightningkite.deployhelpers.*
 import com.lightningkite.khrysalis.gradle.*
 
 plugins {
-    kotlin("jvm")
+    kotlin("multiplatform")
     id("com.google.devtools.ksp")
     kotlin("plugin.serialization")
     id("com.lightningkite.khrysalis")
@@ -13,38 +13,57 @@ plugins {
 
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
-val kotlinXSerialization:String by project
-dependencies {
-
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinXSerialization")
-    api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
-    api("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
-
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
-    api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
-
-    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
-    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
-
-    equivalents("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion:equivalents")
-
-    ksp(project(":processor"))
-    kspTest(project(":processor"))
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
-
-}
+val kotlinXSerialization: String by project
 
 ksp {
     arg("generateFields", "true")
 }
 
 kotlin {
-    sourceSets.test {
-        kotlin.srcDir("build/generated/ksp/test/kotlin")
+    targetHierarchy.default()
+
+    jvm()
+    js(IR) {
+        browser()
     }
-    sourceSets.main {
-        kotlin.srcDir("build/generated/ksp/main/kotlin")
+    ios()
+//    androidTarget()
+
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinXSerialization")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
+
+                implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
+                implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
+                api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
+            }
+        }
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+        val jvmMain by getting {
+            dependencies {
+                api("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
+            }
+        }
+        val jvmTest by getting {
+            dependsOn(commonTest)
+        }
+    }
+}
+
+dependencies {
+    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
+    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
+
+    equivalents("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion:equivalents")
+
+    configurations.filter { it.name.startsWith("ksp") && it.name != "ksp" }.forEach {
+        add(it.name, project(":processor"))
     }
 }
 
@@ -60,6 +79,11 @@ khrysalis {
 }
 
 tasks.getByName("equivalentsJar").dependsOn("kspKotlin")
+tasks.create("kspAll") {
+    tasks.filter { it.name.startsWith("ksp") && it != this }.forEach {
+        dependsOn(it)
+    }
+}
 
 standardPublishing {
     name.set("Lightning-server-Shared")

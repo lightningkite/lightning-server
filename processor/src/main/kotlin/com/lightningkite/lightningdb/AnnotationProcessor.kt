@@ -58,7 +58,8 @@ class TableGenerator(
                         it.writeSwift(TabAppendable(out))
                     }
                 } catch (e: Exception) {
-                    throw Exception("Failed to generate fields for ${it.declaration.qualifiedName?.asString()}", e)
+                    Exception("Failed to generate fields for ${it.declaration.qualifiedName?.asString()}", e).printStackTrace()
+//                    throw Exception("Failed to generate fields for ${it.declaration.qualifiedName?.asString()}", e)
                 }
             }
 

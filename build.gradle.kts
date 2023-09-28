@@ -28,6 +28,3 @@ allprojects {
     }
     tasks.withType<Jar> { duplicatesStrategy = DuplicatesStrategy.EXCLUDE }
 }
-tasks.create("clean", Delete::class.java) {
-    delete(rootProject.buildDir)
-}

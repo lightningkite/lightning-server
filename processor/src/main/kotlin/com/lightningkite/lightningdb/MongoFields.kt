@@ -74,7 +74,7 @@ data class MongoFields(
                     "kotlinx.serialization.builtins.*",
                     "kotlinx.serialization.internal.GeneratedSerializer",
                     "kotlinx.datetime.*",
-                    "java.util.*",
+                    "com.lightningkite.*",
                 )
             )
             ?.distinct()
@@ -85,7 +85,7 @@ data class MongoFields(
             ?.let { it as? List<KSType> }
             ?.map { it.declaration }
             ?: listOf()
-        appendLine("// Contextual types: ${contextualTypes}")
+        appendLine("// Contextual types: ${contextualTypes.joinToString { it.qualifiedName?.asString() ?: "-" }}")
         if(declaration.typeParameters.isEmpty()) {
             appendLine("fun prepare${simpleName}Fields() {")
             tab {
@@ -179,6 +179,7 @@ private val KSType.useCustomType: Boolean
             "kotlin.Pair",
             "com.lightningkite.lightningdb.UUIDFor",
             "java.util.UUID",
+            "com.lightningkite.UUID",
             "kotlinx.datetime.Instant",
             "org.litote.kmongo.Id" -> false
             else -> true
@@ -197,6 +198,7 @@ private val KSType.conditionType: String
             "kotlin.Float",
             "kotlin.Double",
             "java.util.UUID",
+            "com.lightningkite.UUID",
             "kotlinx.datetime.Instant",
             "com.lightningkite.lightningdb.UUIDFor",
             "kotlin.Char" -> "ComparableCondition" + "<${this.makeNotNullable().toKotlin(annotations)}>"
@@ -239,6 +241,7 @@ private val KSType.modificationType: String
             "kotlin.Float",
             "kotlin.Double" -> "NumberModification" + "<${this.makeNotNullable().toKotlin(annotations)}>"
             "java.util.UUID",
+            "com.lightningkite.UUID",
             "com.lightningkite.lightningdb.UUIDFor",
             "kotlinx.datetime.Instant",
             "kotlin.String", "kotlin.Char" -> "ComparableModification" + "<${
