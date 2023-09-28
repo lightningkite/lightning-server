@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.auth.RequestAuth
+import com.lightningkite.lightningserver.auth.test
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -13,6 +14,10 @@ open class AuthAccessor<USER: HasId<*>?>(
     val authOrNull: RequestAuth<USER & Any>?,
     val rawRequest: Request?,
 ) {
+    companion object {
+        val testUnauthorized = AuthAccessor<HasId<*>?>(null, null)
+        fun <USER: HasId<*>?> test(user: USER, scopes: Set<String>? = null, thirdParty: String? = null) = AuthAccessor(RequestAuth.test(user, scopes, thirdParty), null)
+    }
     @Suppress("UNCHECKED_CAST")
     suspend fun user() = authOrNull?.get() as USER
 }
@@ -22,7 +27,13 @@ open class AuthAndPathParts<USER: HasId<*>?, PATH: TypedServerPath>(
     rawRequest: Request?,
     val parts: Array<Any?>
 ): AuthAccessor<USER>(authOrNull, rawRequest) {
+    companion object {
+        fun <USER: HasId<*>?> test(path: TypedServerPath0, user: USER, scopes: Set<String>? = null, thirdParty: String? = null) = AuthAndPathParts<USER, TypedServerPath0>(RequestAuth.test(user, scopes, thirdParty), null, arrayOf())
+        fun <USER: HasId<*>?, P1> test(path: TypedServerPath1<P1>, user: USER, path1: P1, scopes: Set<String>? = null, thirdParty: String? = null) = AuthAndPathParts<USER, TypedServerPath1<P1>>(RequestAuth.test(user, scopes, thirdParty), null, arrayOf(path1))
+        fun <USER: HasId<*>?, P1, P2> test(path: TypedServerPath2<P1, P2>, user: USER, path1: P1, path2: P2, scopes: Set<String>? = null, thirdParty: String? = null) = AuthAndPathParts<USER, TypedServerPath2<P1, P2>>(RequestAuth.test(user, scopes, thirdParty), null, arrayOf(path1, path2))
+    }
 }
+
 
 open class AuthPathPartsAndConnect<USER: HasId<*>?, PATH: TypedServerPath, OUTPUT>(
     authOrNull: RequestAuth<USER & Any>?,

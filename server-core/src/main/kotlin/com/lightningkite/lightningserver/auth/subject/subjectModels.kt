@@ -3,10 +3,12 @@ package com.lightningkite.lightningserver.auth.subject
 
 import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningdb.References
+import com.lightningkite.lightningserver.auth.oauth.OauthClient
 import com.lightningkite.lightningserver.auth.proof.ProofOption
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import java.security.SecureRandom
+import java.time.Duration
 import java.time.Instant
 import java.util.*
 
@@ -33,7 +35,7 @@ data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     val ips: Set<String> = setOf(),
     val userAgents: Set<String> = setOf(),
     val scopes: Set<String>? = null,
-    val oauthClient: String? = null,
+    @References(OauthClient::class) val oauthClient: String? = null,
 ) : HasId<UUID>
 
 
@@ -43,4 +45,13 @@ data class IdAndAuthMethods<ID>(
     val options: List<ProofOption> = listOf(),
     val strengthRequired: Int = 1,
     val session: String? = null,
+)
+
+@Serializable
+data class FutureSession<ID>(
+    val subjectId: ID,
+    val scopes: Set<String>? = null,
+    val expires: Instant = Instant.now().plus(Duration.ofMinutes(5)),
+    val originalSessionId: UUID?,
+    @References(OauthClient::class) val oauthClient: String? = null
 )

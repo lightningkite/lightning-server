@@ -11,4 +11,8 @@ import java.util.*
 
 @GenerateDataClassPaths
 @Serializable
-data class TestUser(override val _id: UUID = UUID.randomUUID(), override val email: String) : HasId<UUID>, HasEmail
+data class TestUser(
+    override val _id: UUID = UUID.randomUUID(),
+    override val email: String,
+    val isSuperAdmin: Boolean = false,
+) : HasId<UUID>, HasEmail

@@ -2,6 +2,8 @@ package com.lightningkite.lightningserver.auth.proof
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.auth.subject.Session
+import com.lightningkite.lightningserver.auth.subject.Session_secretHash
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.core.ServerPath
@@ -69,10 +71,24 @@ class OneTimePasswordProofEndpoints(
         prepareModels()
         Tasks.onSettingsReady {
             Authentication.subjects.forEach {
+                @Suppress("UNCHECKED_CAST")
                 ModelRestEndpoints<HasId<*>, OtpSecret<Comparable<Any>>, Comparable<Any>>(path("secrets/${it.value.name.lowercase()}"), modelInfo< HasId<*>, OtpSecret<Comparable<Any>>, Comparable<Any>>(
                     serialization = ModelSerializationInfo(OtpSecret.serializer(it.value.idSerializer as KSerializer<Comparable<Any>>), it.value.idSerializer as KSerializer<Comparable<Any>>),
                     authOptions = Authentication.isSuperUser as AuthOptions<HasId<*>>,
-                    getCollection = { table(it.value) as FieldCollection<OtpSecret<Comparable<Any>>> },
+                    getCollection = { table(it.value).withPermissions(ModelPermissions(
+                        create = Condition.Always(),
+                        read = Condition.Always(),
+                        readMask = Mask(
+                            listOf(
+                                Condition.Never<OtpSecret<Comparable<Any>>>() to Modification.OnField(
+                                    OtpSecret_secretBase32(it.value.idSerializer as KSerializer<Comparable<Any>>),
+                                    Modification.Assign("")
+                                )
+                            )
+                        ),
+                        update = Condition.Always(),
+                        delete = Condition.Always(),
+                    )) as FieldCollection<OtpSecret<Comparable<Any>>> },
                     modelName = "OtpSecret For ${it.value.name}"
                 ))
             }

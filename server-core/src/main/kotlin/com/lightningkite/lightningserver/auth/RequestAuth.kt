@@ -30,13 +30,13 @@ data class RequestAuth<SUBJECT : HasId<*>>(
             for (reader in Authentication.readers) {
                 return reader.request(request)?.let {
                     request.headers[HttpHeader.XMasquerade]?.let { m ->
-                        val otherType = m.substringBefore('.')
+                        val otherType = m.substringBefore('/')
                         val otherHandler = Authentication.subjects.values.find { it.name == otherType } ?: throw BadRequestException("No subject type ${otherType} known")
-                        val otherId = m.substringAfter('.')
+                        val otherId = Serialization.fromString(m.substringAfter('/'), otherHandler.idSerializer)
                         @Suppress("UNCHECKED_CAST")
                         if(it.permitMasquerade(
                             otherHandler as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>,
-                            Serialization.fromString(otherId, otherHandler.idSerializer)
+                            otherId
                         )) {
                             RequestAuth(
                                 subject = otherHandler,
@@ -49,7 +49,7 @@ data class RequestAuth<SUBJECT : HasId<*>>(
                         } else {
                             throw ForbiddenException()
                         }
-                    }
+                    } ?: it
                 } ?: continue
             }
             return null
@@ -65,7 +65,7 @@ data class RequestAuth<SUBJECT : HasId<*>>(
         abstract val name: String
         abstract suspend fun calculate(auth: RequestAuth<SUBJECT>): VALUE
         abstract val serializer: KSerializer<VALUE>
-        open val validFor: Duration get() = Duration.ofMinutes(5)
+        abstract val validFor: Duration
         companion object {
             private val _allCacheKeys = ArrayList<CacheKey<*, *, *>>()
             private var used: Boolean = false
@@ -113,6 +113,8 @@ data class RequestAuth<SUBJECT : HasId<*>>(
         cache.clear()
         return this
     }
+
+    companion object
 }
 
 @Suppress("UNCHECKED_CAST")
@@ -129,7 +131,7 @@ suspend fun <SUBJECT : HasId<*>> Request.auth(type: AuthType): RequestAuth<SUBJE
 @Suppress("UNCHECKED_CAST")
 suspend fun <USER : HasId<*>?> Request.authChecked(authOptions: AuthOptions<USER>): RequestAuth<USER & Any>? {
     val raw = authAny()
-        ?: if (authOptions.options.any { it == null }) return null else throw UnauthorizedException("You must be authorized as a ${authOptions.options.joinToString { it!!.type.authName ?: "???" }}")
+        ?: if (authOptions.options.any { it == null }) return null else throw UnauthorizedException("You must be authorized as a ${authOptions.options.joinToString { it!!.type.authName ?: "???" }}, but you are not authorized at all.")
     if (authOptions.options.any { it == null || it.accepts(raw) }) return raw as RequestAuth<USER & Any>
     else throw ForbiddenException("You do not match the authorization criteria.")
 }
@@ -145,3 +147,12 @@ suspend inline fun <reified T> Request.user(): T = authAny()?.get() as T
 suspend fun <USER : HasId<*>?> AuthOptions<USER>.accepts(auth: RequestAuth<*>?): Boolean =
     null in this.options || (auth != null && this.options.any { it?.accepts(auth) ?: false })
 
+@Suppress("UNCHECKED_CAST")
+fun <USER: HasId<*>?> RequestAuth.Companion.test(item: USER, scopes: Set<String>? = null, thirdParty: String? = null) = if(item == null) null else RequestAuth<USER & Any>(
+    subject = Authentication.subjects[AuthType(item!!::class, listOf())] as? Authentication.SubjectHandler<USER & Any, *> ?: throw IllegalStateException("Type ${item!!::class.qualifiedName} has no registered subject handler.  Subject handlers: ${Authentication.subjects.keys.joinToString()}"),
+    sessionId = null,
+    rawId = item._id,
+    issuedAt = Instant.now(),
+    scopes = scopes,
+    thirdParty = thirdParty
+)

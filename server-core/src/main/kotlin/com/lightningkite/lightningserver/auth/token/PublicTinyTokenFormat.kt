@@ -19,7 +19,7 @@ class PublicTinyTokenFormat(
     override fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         handler: Authentication.SubjectHandler<SUBJECT, ID>,
         auth: RequestAuth<SUBJECT>
-    ): String = handler.name + "/" + run {
+    ): String = "tt/" + handler.name + "/" + run {
         val out = ByteArrayOutputStream()
         out.write(Serialization.javaData.encodeToByteArray(RequestAuthSerializable.serializer(), auth.serializable(
             Instant.now().plus(expiration))))
@@ -38,8 +38,9 @@ class PublicTinyTokenFormat(
         handler: Authentication.SubjectHandler<SUBJECT, ID>,
         value: String
     ): RequestAuth<SUBJECT>? {
-        if(!value.startsWith(handler.name + "/")) return null
-        val decoded = Base64.getUrlDecoder().decode(value.substringAfter('/'))
+        val prefix = "tt/" +handler.name + "/"
+        if(!value.startsWith(prefix)) return null
+        val decoded = Base64.getUrlDecoder().decode(value.drop(prefix.length))
         val signature = decoded.sliceArray(0 until resultSize)
         val data = decoded.sliceArray(resultSize until decoded.size)
         if(!hasher().verify(data, signature)) throw TokenException("Incorrect signature")

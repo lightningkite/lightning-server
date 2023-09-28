@@ -108,7 +108,7 @@ open class ModelRestEndpoints<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID
         examples = exampleItem()?.let {
             val sampleSorts = sampleSorts()
             sampleConditions().map {
-                ApiExample(Query(it, sampleSorts.random()), List(10) { exampleItem()!! })
+                ApiExample(Query(it, sampleSorts.randomOrNull() ?: listOf()), List(10) { exampleItem()!! })
             }
         } ?: listOf(),
         implementation = { input: Query<T> ->
@@ -132,7 +132,7 @@ open class ModelRestEndpoints<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID
         examples = exampleItem()?.let {
             val sampleSorts = sampleSorts()
             sampleConditions().map {
-                ApiExample(Query(it, sampleSorts.random()), List(10) { exampleItem()!! })
+                ApiExample(Query(it, sampleSorts.randomOrNull() ?: listOf()), List(10) { exampleItem()!! })
             }
         } ?: listOf(),
         implementation = { input: Query<T> ->
@@ -161,7 +161,7 @@ open class ModelRestEndpoints<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID
                         QueryPartial(
                             paths,
                             condition = cond,
-                            orderBy = sampleSorts.random()
+                            orderBy = sampleSorts.randomOrNull() ?: listOf()
                         ),
                         List(10) { Partial(exampleItem()!!, paths) }
                     )
