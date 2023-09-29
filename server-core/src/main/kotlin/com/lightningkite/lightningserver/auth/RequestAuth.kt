@@ -15,7 +15,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlin.time.Duration
 import kotlinx.datetime.Instant
-import java.util.UUID
+import com.lightningkite.UUID
+import com.lightningkite.uuid
 
 data class RequestAuth<SUBJECT : HasId<*>>(
     val subject: Authentication.SubjectHandler<SUBJECT, *>,

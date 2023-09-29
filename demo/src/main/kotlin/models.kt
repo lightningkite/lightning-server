@@ -7,13 +7,15 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
 import java.util.*
+import com.lightningkite.UUID
+import com.lightningkite.uuid
 
 @Serializable
 @GenerateDataClassPaths
 @AdminTableColumns(["name", "number", "status"])
 @Description("A model for testing Lightning Server.")
 data class TestModel(
-    override val _id: UUID = UUID.randomUUID(),
+    override val _id: UUID = uuid(),
     val timestamp: Instant = Clock.System.now(),
     val name: String = "No Name",
     @Description("The number") val number: Int = 3123,
@@ -35,7 +37,7 @@ enum class Status {
 @Serializable
 @GenerateDataClassPaths
 data class User(
-    override val _id: UUID = UUID.randomUUID(),
+    override val _id: UUID = uuid(),
     override val email: String,
     override val hashedPassword: String = "",
     val isSuperUser: Boolean = false,
@@ -44,6 +46,6 @@ data class User(
 @Serializable
 @GenerateDataClassPaths
 data class UserAlt(
-    override val _id: UUID = UUID.randomUUID(),
+    override val _id: UUID = uuid(),
     override val email: String
 ) : HasId<UUID>, HasEmail

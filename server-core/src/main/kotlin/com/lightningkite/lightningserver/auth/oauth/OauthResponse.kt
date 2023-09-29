@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.auth.oauth
 
+import com.lightningkite.uuid
 import kotlinx.serialization.Serializable
 import java.util.*
 
@@ -35,7 +36,7 @@ data class OauthCodeRequest(
     val scope: String,
     val redirect_uri: String,
     val client_id: String,
-    val state: String = UUID.randomUUID().toString(),
+    val state: String = uuid().toString(),
     val response_mode: OauthResponseMode = OauthResponseMode.form_post,
     val access_type: OauthAccessType? = null,
     val include_granted_scopes: Boolean? = null,

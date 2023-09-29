@@ -17,7 +17,8 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.*
 import java.net.URI
-import java.util.UUID
+import com.lightningkite.UUID
+import com.lightningkite.uuid
 
 class DynamoDBTests() {
     @Test
@@ -50,6 +51,6 @@ class DynamoDBTests() {
 
 @GenerateDataClassPaths
 @Serializable data class TestData(
-    val _id: UUID = UUID.randomUUID(),
+    val _id: UUID = uuid(),
     @Index val value: Int = 42
 )

@@ -11,12 +11,14 @@ import java.util.*
 import kotlin.test.assertContains
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import com.lightningkite.UUID
+import com.lightningkite.uuid
 
 @Serializable
 @GenerateDataClassPaths
 @TextIndex(["string"])
 data class ModelWithTextIndex(
-    override val _id: UUID = UUID.randomUUID(),
+    override val _id: UUID = uuid(),
     val string: String
 ): HasId<UUID>
 

@@ -70,6 +70,6 @@ suspend fun <T> T.toHttpContent(acceptedTypes: List<ContentType>, serializer: KS
             return it(contentType, serializer, this)
         }
     }
-    fatalError()
+    throw Error()
 }
 

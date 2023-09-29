@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.utils.MutableMapWithChangeHandler
+import com.lightningkite.uuid
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
@@ -82,7 +83,7 @@ suspend fun ServerPath.test(
     test: suspend VirtualSocket.() -> Unit,
 ) {
     val cache = LocalCache()
-    val id = WebSocketIdentifier(UUID.randomUUID().toString(), "TEST")
+    val id = WebSocketIdentifier(uuid().toString(), "TEST")
     val req = WebSockets.ConnectEvent(
         path = this,
         parts = parts,

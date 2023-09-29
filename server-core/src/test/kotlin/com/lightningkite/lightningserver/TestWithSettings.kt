@@ -33,6 +33,7 @@ import com.lightningkite.lightningserver.sms.SMSSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.testmodels.TestUser
 import com.lightningkite.lightningserver.testmodels.email
+import com.lightningkite.uuid
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
@@ -95,7 +96,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     )
 
     val proofEmail = EmailProofEndpoints(
-        ServerPath(UUID.randomUUID().toString()),
+        ServerPath(uuid().toString()),
         jwtSigner,
         PinHandler(cache, "pin"),
         email,
@@ -107,7 +108,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     )
 
     //    val proofOtp = OneTimePasswordProofEndpoints(
-//        ServerPath(UUID.randomUUID().toString()),
+//        ServerPath(uuid().toString()),
 //        TestSettings.jwtSigner,
 //        TestSettings.database,
 //        TestSettings.cache
@@ -156,7 +157,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         override fun toString(): String = name
     }
     val testUserSubject = AuthEndpointsForSubject(
-        path = ServerPath(UUID.randomUUID().toString()),
+        path = ServerPath(uuid().toString()),
         handler = subjectHandler,
         database = database,
         proofHasher = jwtSigner,
@@ -178,7 +179,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
             get() = ContextualSerializer(UUID::class)
         override val validFor: Duration
             get() = 5.minutes
-        override suspend fun calculate(auth: RequestAuth<TestUser>): UUID = UUID.randomUUID()
+        override suspend fun calculate(auth: RequestAuth<TestUser>): UUID = uuid()
     }
 
     suspend fun RequestAuth<TestUser>.email() = this.get(EmailCacheKey)

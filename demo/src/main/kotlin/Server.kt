@@ -58,6 +58,8 @@ import kotlin.random.Random
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import com.lightningkite.UUID
+import com.lightningkite.uuid
 
 object Server : ServerPathGroup(ServerPath.root) {
 
@@ -175,7 +177,7 @@ object Server : ServerPathGroup(ServerPath.root) {
     )
 
     val task = task("Sample Task") { it: Int ->
-        val id = UUID.randomUUID()
+        val id = uuid()
         println("Got input $it in the sample task $id")
         var value = cache().get<Int>("key")
         println("From cache is $value for task $id")

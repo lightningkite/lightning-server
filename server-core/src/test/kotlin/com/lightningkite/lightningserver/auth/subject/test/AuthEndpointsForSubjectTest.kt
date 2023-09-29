@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.typed.AuthAndPathParts
 import com.lightningkite.lightningserver.typed.test
+import com.lightningkite.uuid
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.UseContextualSerialization
 import org.junit.Test
@@ -59,7 +60,7 @@ class AuthEndpointsForSubjectTest {
 
     @Test fun testOauth(): Unit = runBlocking {
         val oauthClient = TestSettings.oauthClients.rest.insert.test(TestSettings.testAdmin.await(), OauthClient(
-            _id = UUID.randomUUID().toString(),
+            _id = uuid().toString(),
             niceName = "Test",
             scopes = TestSettings.testUserSubject.self.authOptions.options.first()!!.scopes ?: setOf(),
             redirectUris = setOf("https://test.com")

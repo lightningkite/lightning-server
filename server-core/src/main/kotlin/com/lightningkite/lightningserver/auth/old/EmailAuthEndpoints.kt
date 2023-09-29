@@ -19,6 +19,7 @@ import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.AuthAndPathParts
 import com.lightningkite.lightningserver.typed.typed
+import com.lightningkite.uuid
 import java.net.URLDecoder
 import kotlin.time.Duration
 import java.util.*
@@ -143,7 +144,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
                 HttpResponse.redirectToGet("${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$token")
             }
             val loginRedirect = path("oauth/${it.first}/login").get.handler {
-                HttpResponse.redirectToGet(callback.loginUrl(UUID.randomUUID()))
+                HttpResponse.redirectToGet(callback.loginUrl(uuid()))
             }
             val loginApi = path("oauth/${it.first}/login").get.typed(
                 summary = "Log In via ${it.first.niceName}",
@@ -156,7 +157,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
                     )
                 ),
                 implementation = { anon: Unit, _: Unit ->
-                    callback.loginUrl(UUID.randomUUID())
+                    callback.loginUrl(uuid())
                 }
             )
             OauthEndpointSet(

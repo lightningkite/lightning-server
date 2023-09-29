@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.utils.BadWordList
+import com.lightningkite.uuid
 import java.security.SecureRandom
 import kotlin.time.Duration
 import java.util.UUID
@@ -32,7 +33,7 @@ open class PinHandler(
 
     suspend fun establish(identifier: String): PinAndKey {
         val pin = generate()
-        val key = UUID.randomUUID().toString()
+        val key = uuid().toString()
         val fixedPin = if (mixedCaseMode) pin else pin.lowercase()
         cache().set(cacheKey(key), fixedPin.secureHash(), expiration)
         cache().set(attemptCacheKey(key), 0, expiration)

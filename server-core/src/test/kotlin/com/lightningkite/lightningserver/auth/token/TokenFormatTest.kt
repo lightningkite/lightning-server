@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.encryption.TokenException
 import com.lightningkite.lightningserver.metrics.roundTo
 import com.lightningkite.lightningserver.testmodels.TestUser
+import com.lightningkite.uuid
 import kotlinx.coroutines.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.UseContextualSerialization
@@ -27,7 +28,7 @@ abstract class TokenFormatTest {
     val sampleAuth = GlobalScope.async(start = CoroutineStart.LAZY) {
         RequestAuth<TestUser>(
             TestSettings.subjectHandler,
-            UUID.randomUUID(),
+            uuid(),
             TestSettings.testUser.await()._id,
             Clock.System.now().roundTo(1.seconds),
             setOf("test", "test2"),

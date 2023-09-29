@@ -6,11 +6,13 @@ import com.lightningkite.lightningdb.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import java.util.*
+import com.lightningkite.UUID
+import com.lightningkite.uuid
 
 
 @GenerateDataClassPaths
 @Serializable
-data class TestThing(override val _id: UUID = UUID.randomUUID(), val value: Int = 0) : HasId<UUID>
+data class TestThing(override val _id: UUID = uuid(), val value: Int = 0) : HasId<UUID>
 
 @GenerateDataClassPaths
 @Serializable

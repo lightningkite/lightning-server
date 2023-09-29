@@ -18,6 +18,8 @@ import kotlinx.datetime.Instant
 import java.util.*
 import kotlin.collections.LinkedHashMap
 import kotlin.test.assertEquals
+import com.lightningkite.UUID
+import com.lightningkite.uuid
 
 class BasicTest() {
     @Rule
@@ -113,7 +115,7 @@ class BasicTest() {
 class CodingTest() {
     @Serializable
     data class TestModel(
-        @Contextual val uuid: UUID = UUID.randomUUID(),
+        @Contextual val uuid: UUID = uuid(),
         @Contextual val time: Instant,
         val x: String?,
         val y: Int,

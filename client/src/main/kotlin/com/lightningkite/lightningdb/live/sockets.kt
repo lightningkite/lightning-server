@@ -5,6 +5,7 @@ import com.lightningkite.khrysalis.*
 import com.lightningkite.lightningdb.MultiplexMessage
 import com.lightningkite.rx.mapNotNull
 import com.lightningkite.rx.okhttp.*
+import com.lightningkite.uuid
 import io.reactivex.rxjava3.core.Completable
 import io.reactivex.rxjava3.core.Observable
 import kotlinx.serialization.KSerializer
@@ -106,7 +107,7 @@ fun multiplexedSocketRaw(
     queryParams: Map<String, List<String>> = mapOf()
 ): Observable<WebSocketIsh<String, String>> {
     val shortUrl = url.substringBefore('?')
-    val channel = UUID.randomUUID().toString()
+    val channel = uuid().toString()
     var lastSocket: WebSocketInterface? = null
     return sharedSocket(url)
         .switchMapSingle {

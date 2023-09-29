@@ -18,6 +18,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.uuid
 import io.ktor.http.*
 import kotlin.time.Duration
 import kotlinx.datetime.*
@@ -54,7 +55,7 @@ class OauthProofEndpoints(
         )).encodeURLQueryComponent()}")
     }
     override val indirectLink: ServerPath = path("open").get.handler {
-        HttpResponse.redirectToGet(callback.loginUrl(UUID.randomUUID()))
+        HttpResponse.redirectToGet(callback.loginUrl(uuid()))
     }.path
     val loginApi = path("login").get.api(
         summary = "Log In via ${provider.niceName}",
@@ -68,7 +69,7 @@ class OauthProofEndpoints(
             )
         ),
         implementation = { _: Unit ->
-            callback.loginUrl(UUID.randomUUID())
+            callback.loginUrl(uuid())
         }
     )
     override val start = path("start").get.api(
@@ -84,7 +85,7 @@ class OauthProofEndpoints(
         ),
         implementation = { ensureEmail: String ->
             // TODO: Ensure the passed email
-            callback.loginUrl(UUID.randomUUID())
+            callback.loginUrl(uuid())
         }
     )
 }

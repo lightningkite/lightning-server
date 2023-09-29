@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.uuid
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.serialization.*
@@ -21,7 +22,7 @@ class PublicTinyTokenFormatTest: TokenFormatTest() {
     init { TestSettings }
 
     @Test fun encodeData() {
-        val data = CacheKeyMap(mapOf(TestSettings.TestCacheKey to RequestAuth.ExpiringValue(UUID.randomUUID(), Clock.System.now().plus(60.seconds))))
+        val data = CacheKeyMap(mapOf(TestSettings.TestCacheKey to RequestAuth.ExpiringValue(uuid(), Clock.System.now().plus(60.seconds))))
         println(data)
         val hex = Serialization.javaData.encodeToHexString(CacheKeyMapSerializer, data)
         println(hex)

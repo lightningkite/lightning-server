@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.encodeToFormData
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.statusFailing
+import com.lightningkite.uuid
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -47,7 +48,7 @@ class OauthProviderInfo(
     fun loginUrl(
         credentials: () -> OauthProviderCredentials,
         callback: HttpEndpoint,
-        state: String = UUID.randomUUID().toString(),
+        state: String = uuid().toString(),
         scope: String = scopeForProfile,
         accessType: OauthAccessType = OauthAccessType.online,
     ): String {
