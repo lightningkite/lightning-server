@@ -6,7 +6,7 @@ import org.junit.Test
 
 class EncryptorTest {
     @Test fun sign() {
-        val encryptor = EncryptorSettings()()
+        val encryptor = SecretBasis().encryptor("test")
         encryptor.decrypt(encryptor.encrypt(ByteArray(255) { it.toByte() }))
     }
 }

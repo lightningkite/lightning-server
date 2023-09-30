@@ -13,11 +13,14 @@ import com.lightningkite.lightningserver.email.EmailClient
 import com.lightningkite.lightningserver.email.EmailLabeledValue
 import com.lightningkite.lightningserver.email.EmailPersonalization
 import com.lightningkite.lightningserver.encryption.SecureHasher
+import com.lightningkite.lightningserver.encryption.hasher
+import com.lightningkite.lightningserver.encryption.secretBasis
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.now
 import com.lightningkite.uuid
 import io.ktor.http.*
 import kotlin.time.Duration
@@ -26,7 +29,7 @@ import java.util.*
 
 class OauthProofEndpoints(
     path: ServerPath,
-    proofHasher: () -> SecureHasher,
+    proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val provider: OauthProviderInfo,
     val credentials: () -> OauthProviderCredentials,
     val continueUiAuthUrl: ()->String
@@ -51,7 +54,7 @@ class OauthProofEndpoints(
         HttpResponse.redirectToGet(continueUiAuthUrl() + "?proof=${Serialization.json.encodeToString(Proof.serializer(), proofHasher().makeProof(
             info = info,
             value = email,
-            at = Clock.System.now()
+            at = now()
         )).encodeURLQueryComponent()}")
     }
     override val indirectLink: ServerPath = path("open").get.handler {
@@ -84,8 +87,7 @@ class OauthProofEndpoints(
             )
         ),
         implementation = { ensureEmail: String ->
-            // TODO: Ensure the passed email
-            callback.loginUrl(uuid())
+            callback.loginUrl(uuid(), loginHint = ensureEmail)
         }
     )
 }

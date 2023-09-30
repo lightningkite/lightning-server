@@ -8,6 +8,7 @@ import com.lightningkite.khrysalis.SharedCode
 import kotlinx.serialization.Serializable
 
 
+// TODO: Deprecate
 @Serializable
 data class CollectionChanges<T: IsCodableAndHashable>(
     val changes: List<EntryChange<T>> = listOf()

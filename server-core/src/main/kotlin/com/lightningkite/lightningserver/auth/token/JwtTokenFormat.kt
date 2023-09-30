@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.serialization.decodeUnwrappingString
 import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlin.time.Duration
@@ -34,9 +35,9 @@ class JwtTokenFormat(
                 sid = auth.sessionId,
                 sub = "${handler.name}|${Serialization.json.encodeUnwrappingString<ID>(handler.idSerializer, auth.id)}",
                 aud = audience,
-                exp = Clock.System.now().plus(expiration).epochSeconds,
+                exp = now().plus(expiration).epochSeconds,
                 iat = auth.issuedAt.epochSeconds,
-                nbf = Clock.System.now().epochSeconds,
+                nbf = now().epochSeconds,
                 scope = auth.scopes?.joinToString(" "),
                 thp = auth.thirdParty,
                 cache = Serialization.json.encodeToString(auth.cacheKeyMap())
@@ -52,13 +53,13 @@ class JwtTokenFormat(
         val claims = hasher().verifyJwt(value, audience) ?: return null
         val rawSub = claims.sub!!
         val sub = if(rawSub.startsWith(prefix)) rawSub.removePrefix(prefix) else return null
-        if(Clock.System.now() > Instant.fromEpochSeconds(claims.exp)) throw TokenException("Token has expired")
-        if(claims.nbf?.let { Clock.System.now() < Instant.fromEpochSeconds(it) } == true) throw TokenException("Token not valid yet")
+        if(now() > Instant.fromEpochSeconds(claims.exp)) throw TokenException("Token has expired")
+        if(claims.nbf?.let { now() < Instant.fromEpochSeconds(it) } == true) throw TokenException("Token not valid yet")
         return RequestAuth(
             subject = handler,
             rawId = Serialization.json.decodeUnwrappingString(handler.idSerializer, sub),
             issuedAt = Instant.fromEpochSeconds(claims.iat),
-            scopes = claims.scope?.split(' ')?.toSet(),
+            scopes = claims.scope?.split(' ')?.toSet() ?: setOf("*"),
             thirdParty = claims.thp,
             sessionId = claims.sid
         ).also {

@@ -12,6 +12,7 @@ import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.builtins.serializer
 import java.lang.management.ManagementFactory
 import java.net.NetworkInterface
@@ -29,7 +30,7 @@ fun ServerPath.healthCheck() = get.api(
     description = "Gets the current status of the server",
     errorCases = listOf(),
     implementation = { _: Unit ->
-        val now = Clock.System.now()
+        val now = now()
         serverHealth(
             features = Settings.requirements.mapValues { it.value() }.entries.mapNotNull {
                 val checkable =

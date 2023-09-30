@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.auth.old
 
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.HtmlDefaults
-import com.lightningkite.lightningserver.auth.PasswordLogin
 import com.lightningkite.lightningserver.encryption.checkHash
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.core.ContentType

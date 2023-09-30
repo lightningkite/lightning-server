@@ -16,7 +16,6 @@ import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.email.EmailSettings
-import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.engine.LocalEngine
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.files.FilesSettings
@@ -32,7 +31,6 @@ object TestSettings {
     val database = setting("database", DatabaseSettings("ram"))
     val email = setting("email", EmailSettings("test"))
     val sms = setting("sms", SMSSettings("test"))
-    val jwtSigner = setting("jwt", SecureHasherSettings())
     val cache = setting("cache", CacheSettings())
     val files = setting("files", FilesSettings())
     val oauthGoogle = setting<OauthProviderCredentials?>("oauth_google", null)
@@ -49,7 +47,7 @@ object TestSettings {
     )
     val emailAccess: UserEmailAccess<User, UUID> = info.userEmailAccess { User(email = it, phoneNumber = it) }
     val path = ServerPath("auth")
-    val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner, 1.hours, 5.minutes)
+    val baseAuth = BaseAuthEndpoints(path, emailAccess, 1.hours, 5.minutes)
     val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
 
     init {

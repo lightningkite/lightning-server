@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.auth.old
 
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.HtmlDefaults
-import com.lightningkite.lightningserver.auth.EmailPinLogin
 import com.lightningkite.lightningserver.auth.oauth.OauthCallbackEndpoint
 import com.lightningkite.lightningserver.auth.oauth.OauthProviderInfo
 import com.lightningkite.lightningserver.auth.oauth.oauthCallback

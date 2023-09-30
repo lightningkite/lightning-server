@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.now
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -57,7 +58,7 @@ abstract class FileSystemTests {
         runBlocking {
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
-            val beforeModify = kotlinx.datetime.Clock.System.now().minus(120.seconds)
+            val beforeModify = now().minus(120.seconds)
             testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
             val info = testFile.head()
             assertNotNull(info)

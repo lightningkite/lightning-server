@@ -6,6 +6,7 @@ import kotlinx.serialization.SerialInfo
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialKind
 import kotlin.reflect.KClass
+import kotlin.time.ExperimentalTime
 
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.FUNCTION)
@@ -59,13 +60,6 @@ annotation class Multiline()
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 annotation class UiWidget(val type: String)
 
-/**
- * Format, passed onto schema
- */
-@SerialInfo
-@Retention(AnnotationRetention.BINARY)
-@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
-annotation class JsonSchemaOptions(val json: String)
 
 /**
  * Format, passed onto schema
@@ -107,24 +101,6 @@ annotation class FloatRange(val min: Double, val max: Double)
 annotation class ExpectedPattern(val pattern: String)
 
 /**
- * Should this property be a definition and be referenced using [id]?
- *
- * @param id The id for this definition, this will be referenced by '#/definitions/$[id]'
- */
-@SerialInfo
-@Retention(AnnotationRetention.BINARY)
-@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
-annotation class JsonSchemaDefinition(val id: String)
-
-/**
- * This property will not create definitions
- */
-@SerialInfo
-@Retention(AnnotationRetention.BINARY)
-@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
-annotation class JsonSchemaNoDefinition
-
-/**
  * A display name of the item in question.
  */
 @SerialInfo
@@ -138,7 +114,7 @@ annotation class DisplayName(val text: String)
 @SerialInfo
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
-annotation class MimeType(val mime: String)
+annotation class MimeType(vararg val types: String)
 
 /**
  * A description of the item in question.
@@ -156,22 +132,6 @@ annotation class DatabaseModel
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
 annotation class GenerateDataClassPaths
-
-@Retention(AnnotationRetention.BINARY)
-@Target(AnnotationTarget.CLASS)
-annotation class DoNotGenerateFields
-
-
-@SerialInfo
-@Retention(AnnotationRetention.BINARY)
-@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
-annotation class AllowedTypes(vararg val types: String)
-
-
-@SerialInfo
-@Retention(AnnotationRetention.BINARY)
-@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
-annotation class StoragePrefix(val prefix: String)
 
 
 @SerialInfo
@@ -301,3 +261,21 @@ annotation class NamedUniqueSet(val fields: Array<String>, val indexName: String
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
 annotation class NamedUniqueSetJankPatch(val fields: Array<String>, val indexNames: String)
+
+@RequiresOptIn(level = RequiresOptIn.Level.WARNING)
+@MustBeDocumented
+@Retention(AnnotationRetention.BINARY)
+@Target(
+    AnnotationTarget.CLASS,
+    AnnotationTarget.ANNOTATION_CLASS,
+    AnnotationTarget.PROPERTY,
+    AnnotationTarget.FIELD,
+    AnnotationTarget.LOCAL_VARIABLE,
+    AnnotationTarget.VALUE_PARAMETER,
+    AnnotationTarget.CONSTRUCTOR,
+    AnnotationTarget.FUNCTION,
+    AnnotationTarget.PROPERTY_GETTER,
+    AnnotationTarget.PROPERTY_SETTER,
+    AnnotationTarget.TYPEALIAS
+)
+public annotation class ExperimentalLightningServer(val explanation: String)

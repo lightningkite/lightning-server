@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
@@ -23,15 +24,19 @@ data class RequestAuth<SUBJECT : HasId<*>>(
     val sessionId: UUID?,
     val rawId: Comparable<*>,
     val issuedAt: Instant,
-    @Description("The scopes permitted.  Null indicates root access.")
-    val scopes: Set<String>? = null,
+    @Description("The scopes permitted.  * indicates root access.")
+    val scopes: Set<String> = setOf("*"),
     val thirdParty: String? = null,
+    val fromMasquerade: RequestAuth<*>? = null,
 ) {
     object Key : Request.CacheKey<RequestAuth<*>?> {
         override suspend fun calculate(request: Request): RequestAuth<*>? {
             for (reader in Authentication.readers) {
+                println("Check read $reader")
                 return reader.request(request)?.let {
+                    println("REQ RES: $it")
                     request.headers[HttpHeader.XMasquerade]?.let { m ->
+                        println("CHECK THE MASQ")
                         val otherType = m.substringBefore('/')
                         val otherHandler = Authentication.subjects.values.find { it.name == otherType } ?: throw BadRequestException("No subject type ${otherType} known")
                         val otherId = Serialization.fromString(m.substringAfter('/'), otherHandler.idSerializer)
@@ -40,13 +45,15 @@ data class RequestAuth<SUBJECT : HasId<*>>(
                             otherHandler as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>,
                             otherId
                         )) {
+                            println("DO THE MASQ")
                             RequestAuth(
                                 subject = otherHandler,
                                 sessionId = it.sessionId,
                                 rawId = otherId,
                                 issuedAt = it.issuedAt,
                                 scopes = it.scopes,
-                                thirdParty = "${it.subject.name} ${it.rawId} masquerading"
+                                thirdParty = "${it.subject.name} ${it.rawId} masquerading",
+                                fromMasquerade = it
                             )
                         } else {
                             throw ForbiddenException()
@@ -94,11 +101,11 @@ data class RequestAuth<SUBJECT : HasId<*>>(
     @Suppress("UNCHECKED_CAST")
     suspend fun <T> get(key: CacheKey<SUBJECT, *, T>): T {
         cache.get(key)?.let {
-            if(Clock.System.now() > it.expiresAt) cache.remove(key)
+            if(now() > it.expiresAt) cache.remove(key)
             else return it.value as T
         }
         val c = key.calculate(this)
-        cache.put(key, ExpiringValue(c, Clock.System.now().plus(key.validFor)))
+        cache.put(key, ExpiringValue(c, now().plus(key.validFor)))
         return c
     }
 
@@ -140,8 +147,8 @@ suspend fun <USER : HasId<*>?> Request.authChecked(authOptions: AuthOptions<USER
 
 suspend fun AuthOption.accepts(auth: RequestAuth<*>): Boolean =
     (this.type == auth.subject.authType || this.type == AuthType.any) &&
-            (auth.scopes == null || (this.scopes != null && auth.scopes.containsAll(this.scopes))) &&
-            (maxAge == null || Clock.System.now() - auth.issuedAt < maxAge) &&
+            (this.scopes == null || "*" in auth.scopes || auth.scopes.containsAll(this.scopes)) &&
+            (maxAge == null || now() - auth.issuedAt < maxAge) &&
             (this.additionalRequirement(auth))
 
 suspend inline fun <reified T> Request.user(): T = authAny()?.get() as T
@@ -150,11 +157,11 @@ suspend fun <USER : HasId<*>?> AuthOptions<USER>.accepts(auth: RequestAuth<*>?):
     null in this.options || (auth != null && this.options.any { it?.accepts(auth) ?: false })
 
 @Suppress("UNCHECKED_CAST")
-fun <USER: HasId<*>?> RequestAuth.Companion.test(item: USER, scopes: Set<String>? = null, thirdParty: String? = null) = if(item == null) null else RequestAuth<USER & Any>(
+fun <USER: HasId<*>?> RequestAuth.Companion.test(item: USER, scopes: Set<String> = setOf("*"), thirdParty: String? = null) = if(item == null) null else RequestAuth<USER & Any>(
     subject = Authentication.subjects[AuthType(item!!::class, listOf())] as? Authentication.SubjectHandler<USER & Any, *> ?: throw IllegalStateException("Type ${item!!::class.qualifiedName} has no registered subject handler.  Subject handlers: ${Authentication.subjects.keys.joinToString()}"),
     sessionId = null,
     rawId = item._id,
-    issuedAt = Clock.System.now(),
+    issuedAt = now(),
     scopes = scopes,
     thirdParty = thirdParty
 )

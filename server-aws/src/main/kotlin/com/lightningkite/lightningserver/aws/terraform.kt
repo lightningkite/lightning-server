@@ -1,9 +1,9 @@
 package com.lightningkite.lightningserver.aws
 
-import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.email.EmailSettings
+import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.metrics.MetricSettings
 import com.lightningkite.lightningserver.metrics.MetricType
@@ -718,7 +718,7 @@ internal fun handlers() {
             """.trimIndent()
         }
     )
-    TerraformHandler.handler<SecureHasherSettings>(
+    TerraformHandler.handler<SecretBasis>(
         inputs = { key ->
             listOf(
             )
@@ -736,34 +736,7 @@ internal fun handlers() {
         },
         settingOutput = { key ->
             """
-                {
-                    rawStringSecret = random_password.${key}.result
-                }
-            """.trimIndent()
-        }
-    )
-    TerraformHandler.handler<SecureHasherSettings>(
-        name = "Randomly Generated Secret",
-        inputs = { key ->
-            listOf(
-            )
-        },
-        emit = {
-            appendLine(
-                """
-                resource "random_password" "${key}" {
-                  length           = 48
-                  special          = true
-                  override_special = "+/"
-                }
-            """.trimIndent()
-            )
-        },
-        settingOutput = { key ->
-            """
-                {
-                    secret = random_password.${key}.result
-                }
+                random_password.${key}.result
             """.trimIndent()
         }
     )

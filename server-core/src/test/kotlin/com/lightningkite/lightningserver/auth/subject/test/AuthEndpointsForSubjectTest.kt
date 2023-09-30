@@ -2,7 +2,6 @@
 
 package com.lightningkite.lightningserver.auth.subject.test
 
-import com.lightningkite.lightningdb.insertOne
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.auth.oauth.OauthAccessType
@@ -10,7 +9,6 @@ import com.lightningkite.lightningserver.auth.oauth.OauthClient
 import com.lightningkite.lightningserver.auth.oauth.OauthCodeRequest
 import com.lightningkite.lightningserver.auth.oauth.OauthTokenRequest
 import com.lightningkite.lightningserver.auth.proof.*
-import com.lightningkite.lightningserver.auth.subject.Session
 import com.lightningkite.lightningserver.email.TestEmailClient
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -29,20 +27,19 @@ class AuthEndpointsForSubjectTest {
     @Test
     fun test(): Unit = runBlocking {
         val info = TestSettings.proofEmail.start.implementation(AuthAndPathParts(null, null, arrayOf()), "test@test.com")
-        val pinRegex = Regex("[0-9][0-9][0-9][0-9][0-9][0-9]")
-        val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.plainText?.let {
+        val pinRegex = Regex("[A-Z][A-Z][A-Z][A-Z][A-Z][A-Z]")
+        val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.also { println(it) }?.plainText?.let {
             pinRegex.find(it)?.value
         }!!
         val proof1 = TestSettings.proofEmail.prove.implementation(AuthAndPathParts(null, null, arrayOf()), ProofEvidence(
-            value = info,
-            secret = pin
+            key = info,
+            password = pin
         ))
         val result = TestSettings.testUserSubject.login.implementation(AuthAndPathParts(null, null, arrayOf()), listOf(proof1))
         println(result)
         assert(result.session != null)
     }
 
-    @Ignore
     @Test fun masquerade(): Unit = runBlocking {
         val (session, token) = TestSettings.testUserSubject.newSession(TestSettings.testAdmin.await()._id)
         HttpRequest(

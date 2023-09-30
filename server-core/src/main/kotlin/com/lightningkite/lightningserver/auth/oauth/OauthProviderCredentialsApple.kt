@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.auth.oauth
 
 import com.lightningkite.lightningserver.encryption.SecureHasher
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -52,7 +53,7 @@ data class OauthProviderCredentialsApple(
                 }).toByteArray())
             )
             append('.')
-            val issuedAt = Clock.System.now().minus(1.days)
+            val issuedAt = now().minus(1.days)
             append(
                 Base64.getUrlEncoder().withoutPadding().encodeToString(
                     withDefaults.encodeToString(

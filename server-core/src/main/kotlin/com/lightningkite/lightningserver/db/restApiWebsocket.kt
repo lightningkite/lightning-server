@@ -22,6 +22,7 @@ import kotlinx.datetime.Instant
 import kotlin.time.Duration
 import com.lightningkite.lightningdb.SerializableProperty
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -46,7 +47,7 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebs
         errorCases = listOf(),
         connect = {
             val auth = this.authOrNull
-            val user = auth?.serializable(Clock.System.now().plus(1.days))
+            val user = auth?.serializable(now().plus(1.days))
             val collection = info.collection(this)
             helper.subscriptionDb().insertOne(
                 __WebSocketDatabaseChangeSubscription(
@@ -59,7 +60,7 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebs
                         collection.mask()
                     ),
                     relevant = setOf(),
-                    establishedAt = Clock.System.now()
+                    establishedAt = now()
                 )
             )
         },
@@ -155,7 +156,7 @@ class RestApiWebsocketHelper private constructor(val database: ()->Database) {
     fun subscriptionDb() = database().collection<__WebSocketDatabaseChangeSubscription>()
 
     val schedule = schedule("WebsocketDatabaseChangeSubscriptionCleanup", 5.minutes) {
-        val now = Clock.System.now()
+        val now = now()
         val db =
             subscriptionDb().deleteMany(condition {
                 it.condition eq ""

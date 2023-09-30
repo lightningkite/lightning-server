@@ -18,7 +18,6 @@ import com.lightningkite.lightningserver.testmodels.TestThing
 import com.lightningkite.lightningserver.testmodels.TestThing__id
 import com.lightningkite.lightningserver.email.Email
 import com.lightningkite.lightningserver.email.EmailSettings
-import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.engine.UnitTestEngine
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.exceptions.NotFoundException
@@ -49,7 +48,6 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     val database = setting("database", DatabaseSettings("ram"))
     val email = setting("email", EmailSettings("test"))
     val sms = setting("sms", SMSSettings("test"))
-    val jwtSigner = setting("jwt", SecureHasherSettings())
     val cache = setting("cache", CacheSettings())
     val files = setting("files", FilesSettings())
 
@@ -97,7 +95,6 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
 
     val proofEmail = EmailProofEndpoints(
         ServerPath(uuid().toString()),
-        jwtSigner,
         PinHandler(cache, "pin"),
         email,
         Email(
@@ -160,8 +157,6 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         path = ServerPath(uuid().toString()),
         handler = subjectHandler,
         database = database,
-        proofHasher = jwtSigner,
-        tokenFormat = { PublicTinyTokenFormat(jwtSigner) }
     )
 
     object EmailCacheKey : RequestAuth.CacheKey<TestUser, UUID, String>() {

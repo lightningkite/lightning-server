@@ -6,6 +6,7 @@ import io.zonky.test.db.postgres.junit.EmbeddedPostgresRules
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.*
@@ -133,7 +134,7 @@ class CodingTest() {
         format.encode(
             TestModel.serializer(),
             TestModel(
-                time = Clock.System.now(),
+                time = now(),
                 x = "test",
                 y = 1,
                 z = ClassUsedForEmbedding("def", 2),

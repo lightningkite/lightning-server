@@ -18,13 +18,6 @@ import kotlinx.datetime.Instant
 
 object Authentication {
 
-    // TODO: Link back up to old auth system
-    //   TODO: Parse sessions as authentication
-    //   TODO: Parse tokens as authentication
-    //   TODO: Generate tokens
-    // TODO: Fix up old auth system
-    // TODO: Easier SubjectHandler impl
-    // TODO: Implement Methods
     init {
         com.lightningkite.lightningserver.auth.proof.prepareModels()
     }

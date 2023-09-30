@@ -10,6 +10,7 @@ import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.uuid
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlin.time.Duration
@@ -23,7 +24,7 @@ import kotlin.time.Duration.Companion.minutes
 data class UploadForNextRequest(
     override val _id: UUID = uuid(),
     val file: ServerFile,
-    val expires: Instant = Clock.System.now().plus(15.minutes)
+    val expires: Instant = now().plus(15.minutes)
 ) : HasId<UUID>
 
 @Serializable

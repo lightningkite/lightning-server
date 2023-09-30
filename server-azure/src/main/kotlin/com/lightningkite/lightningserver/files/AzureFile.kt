@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.http.HttpContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toKotlinInstant
 import java.io.File
@@ -92,12 +93,12 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
         get() = client.blobUrl
 
     override val signedUrl: String get() {
-        val offsetDateTime = Clock.System.now().plus(system.signedUrlExpirationSeconds.seconds)
+        val offsetDateTime = now().plus(system.signedUrlExpirationSeconds.seconds)
         val sasPermission = BlobSasPermission().setReadPermission(true)
 
         val signatureValues = BlobServiceSasSignatureValues(offsetDateTime.toJavaInstant().atOffset(ZoneOffset.UTC), sasPermission)
 
-        signatureValues.startTime = Clock.System.now().minus(10.minutes).toJavaInstant().atOffset(ZoneOffset.UTC)
+        signatureValues.startTime = now().minus(10.minutes).toJavaInstant().atOffset(ZoneOffset.UTC)
         signatureValues.protocol = SasProtocol.HTTPS_ONLY
 
         // Sign the url for this object
@@ -105,12 +106,12 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
     }
 
     override fun uploadUrl(timeout: Duration): String {
-        val offsetDateTime = Clock.System.now().plus(timeout)
+        val offsetDateTime = now().plus(timeout)
         val sasPermission = BlobSasPermission().setWritePermission(true).setCreatePermission(true).setAddPermission(true)
 
         val signatureValues = BlobServiceSasSignatureValues(offsetDateTime.toJavaInstant().atOffset(ZoneOffset.UTC), sasPermission)
 
-        signatureValues.startTime = Clock.System.now().minus(10.minutes).toJavaInstant().atOffset(ZoneOffset.UTC)
+        signatureValues.startTime = now().minus(10.minutes).toJavaInstant().atOffset(ZoneOffset.UTC)
         signatureValues.protocol = SasProtocol.HTTPS_ONLY
 
         // Sign the url for this object

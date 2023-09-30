@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
@@ -65,13 +66,13 @@ suspend fun doOnce(
     val a = database().collection<ActionHasOccurred>()
     val existing = a.get(name)
     if (existing == null) {
-        a.insertOne(ActionHasOccurred(_id = name, started = Clock.System.now()))
+        a.insertOne(ActionHasOccurred(_id = name, started = now()))
     } else {
         val lock = a.updateOne(
             condition {
-                it._id eq name and (it.completed eq null) and (it.started eq null or (it.started.notNull lt (Clock.System.now() - maxDuration)))
+                it._id eq name and (it.completed eq null) and (it.started eq null or (it.started.notNull lt (now() - maxDuration)))
             },
-            modification { it.started assign Clock.System.now() }
+            modification { it.started assign now() }
         )
         if (lock.new == null) return
     }
@@ -80,7 +81,7 @@ suspend fun doOnce(
         a.updateOneById(
             name,
             modification {
-                it.completed assign Clock.System.now()
+                it.completed assign now()
                 it.errorMessage assign null
             }
         )

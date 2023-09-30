@@ -104,18 +104,20 @@ operator fun <T> Condition<T>.invoke(map: Partial<T>): Boolean? {
             else true
         }
         is Condition.Not -> condition(map)?.not()
-        is Condition.OnField<*, *> -> if(map.parts.containsKey(key.name)) map.parts[key.name].let {
+        is Condition.OnField<*, *> -> if(map.parts.containsKey(key)) map.parts[key].let {
+            @Suppress("UNCHECKED_CAST")
             if(it is Partial<*>) (condition as Condition<Any?>).invoke(map = it as Partial<Any?>)
             else (condition as Condition<Any?>)(it)
         } else null
         else -> null
     }
 }
+@Suppress("UNCHECKED_CAST")
 operator fun <T> Modification<T>.invoke(map: Partial<T>): Partial<T> {
     return when(this) {
-        is Modification.OnField<*, *> -> if(map.parts.containsKey(key.name)) {
+        is Modification.OnField<*, *> -> if(map.parts.containsKey(key)) {
             val newPartial = Partial<T>(map.parts.toMutableMap())
-            newPartial.parts[key.name] = map.parts[key.name].let {
+            newPartial.parts[key as SerializableProperty<T, *>] = map.parts[key].let {
                 if (it is Partial<*>) (modification as Modification<Any?>)(it as Partial<Any?>)
                 else (modification as Modification<Any?>)(it)
             }

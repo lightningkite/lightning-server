@@ -2,8 +2,6 @@ package com.lightningkite.lightningserver.auth.proof
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.auth.subject.Session
-import com.lightningkite.lightningserver.auth.subject.Session_secretHash
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.core.ServerPath
@@ -12,6 +10,8 @@ import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.encryption.SecureHasher
+import com.lightningkite.lightningserver.encryption.hasher
+import com.lightningkite.lightningserver.encryption.secretBasis
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
@@ -24,13 +24,11 @@ import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.*
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
-import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
-import kotlin.time.Duration
-import kotlinx.datetime.Instant
 import kotlinx.datetime.toJavaInstant
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.hours
@@ -38,7 +36,6 @@ import kotlin.time.Duration.Companion.hours
 @OptIn(InternalSerializationApi::class)
 class OneTimePasswordProofEndpoints(
     path: ServerPath,
-    val proofHasher: () -> SecureHasher,
     val database: () -> Database,
     val cache: () -> Cache,
     val config: TimeBasedOneTimePasswordConfig = TimeBasedOneTimePasswordConfig(
@@ -46,7 +43,8 @@ class OneTimePasswordProofEndpoints(
         timeStepUnit = TimeUnit.SECONDS,
         codeDigits = 6,
         hmacAlgorithm = HmacAlgorithm.SHA1
-    )
+    ),
+    val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
 ) : ServerPathGroup(path), Authentication.DirectProofMethod {
     init {
         if(path.docName == null) path.docName = "OneTimePasswordProof"
@@ -146,28 +144,28 @@ class OneTimePasswordProofEndpoints(
                     of = validates,
                     strength = strength,
                     value = "some-id",
-                    at = Clock.System.now(),
+                    at = now(),
                     signature = "opaquesignaturevalue"
                 )
             )
         ),
         successCode = HttpStatus.OK,
         implementation = { input: ProofEvidence ->
-            val postedAt = Clock.System.now()
-            val cacheKey = "otp-count-${input.value}"
+            val postedAt = now()
+            val cacheKey = "otp-count-${input.key}"
             cache().add(cacheKey, 1, 1.hours)
             val ct = (cache().get<Int>(cacheKey) ?: 0)
             if (ct > 5) throw BadRequestException("Too many attempts; please wait.")
-            val (subject, id) = key(input.value)
+            val (subject, id) = key(input.key)
             @Suppress("UNCHECKED_CAST")
             val secret = table(subject).get(id as Comparable<Any>)
                 ?: throw BadRequestException("User ID and code do not match")
-            if (!secret.generator.isValid(input.secret, postedAt.toJavaInstant())) throw BadRequestException("User ID and code do not match")
+            if (!secret.generator.isValid(input.password, postedAt.toJavaInstant())) throw BadRequestException("User ID and code do not match")
             cache().remove(cacheKey)
             proofHasher().makeProof(
                 info = info,
-                value = input.value,
-                at = Clock.System.now()
+                value = input.key,
+                at = now()
             )
         }
     )

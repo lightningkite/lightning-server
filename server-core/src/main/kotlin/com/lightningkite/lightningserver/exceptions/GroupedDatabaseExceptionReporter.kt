@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.AuthAccessor
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.serializer
 import java.net.NetworkInterface
 import kotlinx.datetime.Instant
@@ -34,7 +35,7 @@ class GroupedDatabaseExceptionReporter(val packageName: String, val database: Da
                     .firstOrNull()?.hardwareAddress?.sumOf { it.hashCode() }?.toString(16) ?: "?"
             val message = t.message ?: "No message"
             val trace = t.stackTraceToString()
-            val now = Clock.System.now()
+            val now = now()
             modelInfo.collection().upsertOneIgnoringResult(
                 condition { it._id eq id },
                 modification {

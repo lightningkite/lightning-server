@@ -22,12 +22,14 @@ class OauthCallbackEndpoint<STATE>(
         state: STATE,
         scope: String = defaultScope,
         accessType: OauthAccessType = defaultAccessType,
+        loginHint: String? = null,
     ) = oauthProviderInfo.loginUrl(
         credentials = credentials,
         callback = callback,
         scope = scope,
         state = Serialization.json.encodeToString(stateSerializer, state),
-        accessType = accessType
+        accessType = accessType,
+        loginHint = loginHint,
     )
 
     val callback: HttpEndpoint = when (oauthProviderInfo.mode) {

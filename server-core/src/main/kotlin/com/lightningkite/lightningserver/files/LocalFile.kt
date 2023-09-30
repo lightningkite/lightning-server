@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import java.io.File
 import kotlin.time.Duration
 import kotlinx.datetime.Instant
@@ -86,11 +87,11 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
         ).unixPath
 
     override val signedUrl: String
-        get() = if(system.signedUrlExpiration == null) url else url.plus("?readUntil=${Clock.System.now().plus(system.signedUrlExpiration).toEpochMilliseconds()}").let {
+        get() = if(system.signedUrlExpiration == null) url else url.plus("?readUntil=${now().plus(system.signedUrlExpiration).toEpochMilliseconds()}").let {
             it + "&signature=" + system.signer.sign(it)
         }
 
-    override fun uploadUrl(timeout: Duration): String = url.plus("?writeUntil=${Clock.System.now().plus(timeout).toEpochMilliseconds()}").let {
+    override fun uploadUrl(timeout: Duration): String = url.plus("?writeUntil=${now().plus(timeout).toEpochMilliseconds()}").let {
         it + "&signature=" + system.signer.sign(it)
     }
 

@@ -51,13 +51,13 @@ class OauthClientEndpoints(
     }
 
     val rest = ModelRestEndpoints(path, modelInfo)
-    val createSecret = path.arg<String>("_id").path("reset-secret").post.api(
+    val createSecret = path.arg<String>("_id").path("create-secret").post.api(
         authOptions = Authentication.isSuperUser,
         summary = "Create Secret",
         implementation = { _: Unit ->
             val newSecret = Base64.getEncoder().encodeToString(Random.nextBytes(24))
             modelInfo.collection().updateOneById(path1, modification {
-                it.secrets += OauthClientSecret(masked = newSecret.take(3) + "*".repeat(newSecret.length), secretHash = newSecret.secureHash())
+                it.secrets += OauthClientSecret(masked = newSecret.take(3) + "*".repeat(newSecret.length-3), secretHash = newSecret.secureHash())
             }).new ?: NotFoundException()
             newSecret
         }

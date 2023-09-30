@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.files.serverFile
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.properties.encodeToStringMap
 import org.junit.Test
@@ -158,7 +159,7 @@ class ConditionSimplifyKtTest {
             double = 1.0,
             char = 'a',
             string = "hi",
-            instant = Clock.System.now(),
+            instant = now(),
             list = listOf(1, 2)
         ),
         LargeTestModel(
@@ -171,7 +172,7 @@ class ConditionSimplifyKtTest {
             double = 2.0,
             char = 'b',
             string = "hi2",
-            instant = Clock.System.now(),
+            instant = now(),
             list = listOf(2, 3)
         ),
         LargeTestModel(
@@ -184,7 +185,7 @@ class ConditionSimplifyKtTest {
             double = 2.0,
             char = 'b',
             string = "hi2",
-            instant = Clock.System.now(),
+            instant = now(),
             list = listOf(2, 3)
         ),
         LargeTestModel(
@@ -197,7 +198,7 @@ class ConditionSimplifyKtTest {
             double = 2.0,
             char = 'b',
             string = "hi2",
-            instant = Clock.System.now(),
+            instant = now(),
             list = listOf(2, 3)
         ),
     )

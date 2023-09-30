@@ -4,35 +4,6 @@ import com.google.devtools.ksp.symbol.*
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.decapitalizeAsciiOnly
 import kotlin.math.min
 
-val KSTypeReference.usesSub: Boolean get() = (this.resolve().declaration as? KSClassDeclaration)?.usesSub ?: false
-val KSClassDeclaration.usesSub: Boolean
-    get() {
-        val packageName = this.packageName.asString()
-        return when {
-            packageName.startsWith("org.litote.kmongo") ||
-                    packageName.startsWith("kotlinx.datetime") ||
-                    packageName.startsWith("java.util") ||
-                    packageName.startsWith("kotlin") -> false
-            packageName == "com.lightningkite.lightningdb" && (
-                    this.simpleName.asString() == "Condition" ||
-                    this.simpleName.asString() == "Modification"
-            ) -> false
-            packageName == "com.lightningkite.lightningserver.websocket" && (
-                    this.simpleName.asString() == "WebSocketIdentifier"
-            ) -> false
-//            packageName.startsWith("kotlin.Byte") ||
-//            packageName.startsWith("kotlin.Short") ||
-//            packageName.startsWith("kotlin.Int") ||
-//            packageName.startsWith("kotlin.Long") ||
-//            packageName.startsWith("kotlin.Float") ||
-//            packageName.startsWith("kotlin.Double") ||
-//            packageName.startsWith("kotlin.String") ||
-//            packageName.startsWith("kotlin.collections") ||
-//            packageName.startsWith("kotlin.Boolean") -> false
-            else -> this.annotations.any { it.shortName.asString() == "Serializable" } && this.annotations.none { it.shortName.asString() == "DoNotGenerateFields" }
-        }
-    }
-
 data class ResolvedAnnotation(
     val type: KSClassDeclaration,
     val arguments: Map<String, Any?>

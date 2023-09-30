@@ -57,9 +57,6 @@ private val stringOptions: List<MySealedClassSerializer.Option<Condition<String>
     MySealedClassSerializer.Option(Condition.StringContains.serializer(), setOf("Search")) { it is Condition.StringContains },
     MySealedClassSerializer.Option(Condition.RegexMatches.serializer()) { it is Condition.RegexMatches },
 )
-//private fun <T: Any> classOptions(inner: KSerializer<T>, fields: List<SerializableProperty<T, *>>): List<MySealedClassSerializer.Option<Condition<T>, *>> = commonOptions(inner) + fields.map { prop ->
-//    MySealedClassSerializer.Option(ConditionOnFieldSerializer(prop)) { it is Condition.OnField<*, *> && it.key.name == prop.name }
-//}
 private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> = commonOptions(inner) + inner.serializableProperties!!.let {
     it.mapIndexed { index, ser ->
         MySealedClassSerializer.Option(ConditionOnFieldSerializer(

@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.SettingsSerializer
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -28,8 +29,8 @@ data class RequestAuthSerializable(
     val id: String,
     val issuedAt: Instant,
     val expiresAt: Instant,
-    @Description("The scopes permitted.  Null indicates root access.")
-    val scopes: Set<String>? = null,
+    @Description("The scopes permitted.  * indicates root access.")
+    val scopes: Set<String>,
     val cache: CacheKeyMap = CacheKeyMap(mapOf()),
     val thirdParty: String? = null,
 )
@@ -50,7 +51,7 @@ fun RequestAuthSerializable.real(subjectHandler: Authentication.SubjectHandler<*
     val subject = subjectHandler ?: Authentication.subjects.values.find { it.name == this.subjectType } as? Authentication.SubjectHandler<HasId<Comparable<Any>>, Comparable<Any>>
         ?: throw TokenException("Auth type ${subjectType} not known.")
     if(subjectHandler != null && this.subjectType != subjectHandler.name) throw TokenException("Subject type mismatch")
-    if(this.expiresAt < Clock.System.now()) throw TokenException("Authorization has expired.")
+    if(this.expiresAt < now()) throw TokenException("Authorization has expired.")
     return RequestAuth(
         subject = subject,
         rawId = Serialization.json.decodeUnwrappingString(subject.idSerializer, id),

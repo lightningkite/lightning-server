@@ -6,7 +6,7 @@ import org.junit.Test
 
 class SecureHasherKtTest {
     @Test fun sign() {
-        val hasher = SecureHasherSettings()()
+        val hasher = SecretBasis().hasher("test")
         assertTrue(hasher.verify("TEST", hasher.sign("TEST")))
         val claims = JwtClaims(
             iss = "test",

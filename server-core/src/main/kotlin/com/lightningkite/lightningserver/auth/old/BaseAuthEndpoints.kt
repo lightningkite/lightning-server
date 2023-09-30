@@ -18,6 +18,7 @@ import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.typed
+import com.lightningkite.now
 import io.ktor.http.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
@@ -36,7 +37,6 @@ import kotlin.time.Duration.Companion.minutes
 open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
     path: ServerPath,
     val userAccess: UserAccess<USER, ID>,
-    val hasher: () -> SecureHasher,
     val expiration: Duration,
     val emailExpiration: Duration,
     val landing: String = "/",
@@ -49,7 +49,8 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
                 setCookie(HttpHeader.Authorization, token, maxAge = 31536000)
             }
         )
-    }
+    },
+    val hasher: () -> SecureHasher = secretBasis.hasher("old-auth"),
 ) : ServerPathGroup(path) {
 
     val typeName = userAccess.authType.classifier?.toString()?.substringAfterLast('.') ?: "Unknown"
@@ -118,7 +119,7 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
      */
     suspend fun refreshToken(token: String, expireDuration: Duration = expiration): String = hasher().signJwt(
         hasher().verifyJwt(token)!!.copy(
-            exp = Clock.System.now().plus(expireDuration).epochSeconds,
+            exp = now().plus(expireDuration).epochSeconds,
         )
     )
 
@@ -136,9 +137,9 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
             iss = generalSettings().publicUrl,
             aud = generalSettings().publicUrl,
             sub = jwtPrefix + Serialization.json.encodeUnwrappingString(userAccess.idSerializer, id),
-            exp = Clock.System.now().plus(expireDuration).epochSeconds,
-            iat = Clock.System.now().epochSeconds,
-            nbf = Clock.System.now().epochSeconds,
+            exp = now().plus(expireDuration).epochSeconds,
+            iat = now().epochSeconds,
+            nbf = now().epochSeconds,
         )
     )
 

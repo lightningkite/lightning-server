@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.azure
 
-import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.db.DatabaseSettings
+import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
@@ -289,11 +289,11 @@ fun terraformAzure(projectName: String = "project", appendable: Appendable) {
                     databaseNumber = var.${setting.key}_databaseNumber
                 }""".trimIndent())
             }
-            serializer<SecureHasherSettings>() -> {
+            serializer<SecretBasis>() -> {
                 appendable.appendLine("""
                     
                     ####
-                    # ${setting.key}: SecureHasherSettings
+                    # ${setting.key}: SecretBasis
                     ####
                     resource "random_password" "${setting.key}" {
                       length           = 32

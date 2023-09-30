@@ -1,17 +1,16 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.encryption.SecureHasher
-import com.lightningkite.lightningserver.encryption.sign
-import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
+import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlin.time.Duration
 import kotlinx.datetime.Instant
 import kotlin.time.Duration.Companion.days
@@ -20,7 +19,7 @@ class UploadEarlyEndpoint(
     path: ServerPath,
     val files: () -> FileSystem,
     val database: () -> Database,
-    val signer: () -> SecureHasher,
+    val signer: () -> SecureHasher = secretBasis.hasher("upload-early"),
     val filePath: String = ExternalServerFileSerializer.uploadPath,
     val expiration: Duration = 1.days
 ) : ServerPathGroup(path) {
@@ -43,20 +42,20 @@ class UploadEarlyEndpoint(
         implementation = { user: Unit, nothing: Unit ->
             val newFile = files().root.resolve(filePath).resolveRandom("file", "file")
             val newItem = UploadForNextRequest(
-                expires = Clock.System.now().plus(expiration),
+                expires = now().plus(expiration),
                 file = ServerFile(newFile.url)
             )
             database().collection<UploadForNextRequest>().insertOne(newItem)
             UploadInformation(
                 uploadUrl = newFile.uploadUrl(expiration),
-                futureCallToken = newFile.url.plus("?useUntil=${Clock.System.now().plus(expiration).toEpochMilliseconds()}").let {
+                futureCallToken = newFile.url.plus("?useUntil=${now().plus(expiration).toEpochMilliseconds()}").let {
                     it + "&token=" + signer().sign(it)
                 }
             )
         }
     )
     val cleanupSchedule = schedule("cleanupUploads", 1.days) {
-        database().collection<UploadForNextRequest>().deleteMany(condition { it.expires lt Clock.System.now() }).forEach {
+        database().collection<UploadForNextRequest>().deleteMany(condition { it.expires lt now() }).forEach {
             try {
                 it.file.fileObject.delete()
             } catch (e: Exception) {

@@ -13,14 +13,6 @@ data class MongoFields(
     val fields by lazy { declaration.fields() }
     val hasId by lazy { declaration.superTypes.any { it.resolve().declaration.qualifiedName?.asString() == "com.lightningkite.lightningdb.HasId" } }
 
-    fun allSubs(handled: MutableSet<KSClassDeclaration>): Sequence<MongoFields> = sequenceOf(this) + fields
-        .flatMap { it.kotlinType.resolve().allClassDeclarations() }
-        .filter { it.usesSub && it.classKind != ClassKind.ENUM_CLASS }
-        .filter { handled.add(it) }
-        .asSequence()
-        .map { MongoFields(it) }
-        .flatMap { it.allSubs(handled) }
-
     fun write(out: TabAppendable) = with(out) {
         var useContextualFor = listOf<String>()
         declaration.containingFile?.annotations?.forEach {

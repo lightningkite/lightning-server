@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.exceptions
 
 import com.lightningkite.lightningdb.*
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
@@ -15,7 +16,7 @@ import kotlinx.datetime.Instant
 @GenerateDataClassPaths
 data class ReportedExceptionGroup(
     override val _id: Int,
-    val lastOccurredAt: Instant = Clock.System.now(),
+    val lastOccurredAt: Instant = now(),
     val count: Int = 1,
     val context: String,
     val server: String,

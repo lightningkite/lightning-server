@@ -48,7 +48,6 @@ object DurationSerializer : KSerializer<Duration> {
 
 val ClientModule = SerializersModule {
     contextual(UUID::class, UUIDSerializer)
-
     contextual(Instant::class, InstantIso8601Serializer)
     contextual(LocalDate::class, LocalDateIso8601Serializer)
     contextual(LocalTime::class, LocalTimeIso8601Serializer)

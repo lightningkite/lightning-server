@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.serialization
 import com.lightningkite.lightningserver.metrics.roundTo
 import com.lightningkite.uuid
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromByteArray
@@ -19,7 +20,7 @@ import com.lightningkite.uuid
 @Serializable
 data class BsonSerTest(
     val x: Int = 42,
-    @Contextual val y: Instant = Clock.System.now().roundTo(1.milliseconds),
+    @Contextual val y: Instant = now().roundTo(1.milliseconds),
     @Contextual val z: UUID = uuid()
 )
 

@@ -2,20 +2,15 @@
 package com.lightningkite.lightningserver.auth.token
 
 import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.auth.*
-import com.lightningkite.lightningserver.encryption.EncryptorSettings
-import com.lightningkite.lightningserver.encryption.SecureHasherSettings
-import com.lightningkite.lightningserver.serialization.Serialization
-import kotlinx.coroutines.runBlocking
+import com.lightningkite.lightningserver.encryption.SecretBasis
+import com.lightningkite.lightningserver.encryption.encryptor
+import com.lightningkite.lightningserver.encryption.secretBasis
 import kotlinx.serialization.*
-import kotlinx.serialization.builtins.serializer
-import org.junit.Test
 import kotlin.time.Duration
-import kotlinx.datetime.Instant
 import java.util.*
 
 class PrivateTinyTokenFormatTest: TokenFormatTest() {
-    override fun format(expiration: Duration): TokenFormat = PrivateTinyTokenFormat(EncryptorSettings(), expiration)
+    override fun format(expiration: Duration): TokenFormat = PrivateTinyTokenFormat(SecretBasis().let{{it}}.encryptor("tinytoken"), expiration)
 
     init { TestSettings }
 }

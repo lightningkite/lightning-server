@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.settings
 
+import com.lightningkite.lightningserver.encryption.secretBasis
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.logging.loggingSettings
@@ -46,6 +47,7 @@ object Settings {
         exceptionSettings
         metricsSettings
         metricsCleanSchedule
+        secretBasis
     }
 
     fun populateDefaults(map: Map<String, Any?> = mapOf()) {

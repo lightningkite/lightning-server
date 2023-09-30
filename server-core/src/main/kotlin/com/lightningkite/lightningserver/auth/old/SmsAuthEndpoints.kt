@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.auth.old
 
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.HtmlDefaults
-import com.lightningkite.lightningserver.auth.PhonePinLogin
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathGroup

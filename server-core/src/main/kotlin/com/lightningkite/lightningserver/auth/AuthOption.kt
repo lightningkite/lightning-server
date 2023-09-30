@@ -7,8 +7,8 @@ import kotlin.reflect.typeOf
 
 class AuthOption(
     val type: AuthType,
-    @Description("The required scopes.  Null indicates root access.")
-    val scopes: Set<String>? = null,
+    @Description("The required scopes.  Null indicates no special scope is required.  * indicates root access.")
+    val scopes: Set<String>? = setOf("*"),
     val maxAge: Duration? = null,
     val limitationDescription: String? = null,
     val additionalRequirement: suspend (RequestAuth<*>) -> Boolean = { true }
@@ -77,4 +77,4 @@ inline fun <reified USER : HasId<*>?> authOptions(
 }
 
 val noAuth: AuthOptions<HasId<*>?> = AuthOptions(setOf(null))
-val anyAuth: AuthOptions<HasId<*>> = AuthOptions(setOf(AuthOption(AuthType.any)))
+val anyAuth: AuthOptions<HasId<*>> = AuthOptions(setOf(AuthOption(AuthType.any, scopes = setOf())))

@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.tasks.Tasks
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import kotlin.time.Duration
@@ -30,7 +31,7 @@ interface Metrics: HealthCheckable {
                     MetricEvent(
                         metricType = healthCheckMetric,
                         entryPoint = serverEntryPoint().toString(),
-                        time = Clock.System.now(),
+                        time = now(),
                         value = 1.0
                     )
                 )
@@ -68,13 +69,13 @@ interface Metrics: HealthCheckable {
         fun report(type: MetricType, value: Double) {
             if (!Settings.sealed) return
             if (type.name in metricsSettings().settings.tracked)
-                toReport.add(MetricEvent(type, null, Clock.System.now(), value))
+                toReport.add(MetricEvent(type, null, now(), value))
         }
 
         suspend fun reportPerHandler(type: MetricType, value: Double) {
             if (!Settings.sealed) return
             if (type.name in metricsSettings().settings.tracked)
-                toReport.add(MetricEvent(type, serverEntryPoint()?.toString() ?: "Unknown", Clock.System.now(), value))
+                toReport.add(MetricEvent(type, serverEntryPoint()?.toString() ?: "Unknown", now(), value))
         }
 
         suspend fun addToSumPerHandler(type: MetricType, value: Double) {

@@ -262,7 +262,7 @@ class JsonSchemaBuilder(
                 )
             )
         }
-        annotation { it: MimeType -> copy(mimeType = it.mime) }
+        annotation { it: MimeType -> copy(mimeType = it.types.joinToString(", ")) }
         override("com.lightningkite.lightningdb.ServerFile") {
             JsonSchemaType(
                 title = "Server File",

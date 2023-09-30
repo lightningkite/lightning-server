@@ -51,6 +51,7 @@ class OauthProviderInfo(
         state: String = uuid().toString(),
         scope: String = scopeForProfile,
         accessType: OauthAccessType = OauthAccessType.online,
+        loginHint: String? = null,
     ): String {
         val params = OauthCodeRequest(
             response_type = "code",
@@ -61,6 +62,7 @@ class OauthProviderInfo(
             response_mode = mode,
             access_type = accessType,
             prompt = if(accessType == OauthAccessType.offline) OauthPromptType.consent else null,
+            login_hint = loginHint,
         ).let { Serialization.properties.encodeToFormData(it) }
         return "$loginUrl?$params"
     }

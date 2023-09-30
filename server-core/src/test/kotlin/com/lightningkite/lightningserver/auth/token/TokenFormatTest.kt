@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.testmodels.TestUser
 import com.lightningkite.uuid
 import kotlinx.coroutines.*
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.UseContextualSerialization
 import org.junit.Assert
 import org.junit.Test
@@ -30,7 +31,7 @@ abstract class TokenFormatTest {
             TestSettings.subjectHandler,
             uuid(),
             TestSettings.testUser.await()._id,
-            Clock.System.now().roundTo(1.seconds),
+            now().roundTo(1.seconds),
             setOf("test", "test2"),
             thirdParty = "thirdparty"
         ).precache(listOf(TestSettings.EmailCacheKey))

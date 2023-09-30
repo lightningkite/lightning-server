@@ -22,8 +22,6 @@ import com.lightningkite.lightningserver.email.Email
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.email.SesClient
 import com.lightningkite.lightningserver.encryption.Encryptor
-import com.lightningkite.lightningserver.encryption.EncryptorSettings
-import com.lightningkite.lightningserver.encryption.SecureHasherSettings
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.SentryExceptionReporter
@@ -66,8 +64,6 @@ object Server : ServerPathGroup(ServerPath.root) {
     val database = setting("database", DatabaseSettings())
     val email = setting("email", EmailSettings())
     val sms = setting("sms", SMSSettings())
-    val jwtSigner = setting("jwt", SecureHasherSettings())
-    val encryptor = setting("encryptor", EncryptorSettings())
     val files = setting("files", FilesSettings())
     val cache = setting("cache", CacheSettings())
 
@@ -140,7 +136,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         val emailAccess = userInfo.userEmailAccess { User(email = it) }
         val passAccess =
             userInfo.userPasswordAccess { username, hashed -> User(email = username, hashedPassword = hashed) }
-        val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner, expiration = 365.days, emailExpiration = 1.hours)
+        val baseAuth = BaseAuthEndpoints(path, emailAccess, expiration = 365.days, emailExpiration = 1.hours)
         val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
         val passAuth = PasswordAuthEndpoints(baseAuth, passAccess)
     }
@@ -157,7 +153,7 @@ object Server : ServerPathGroup(ServerPath.root) {
 //            path.docName = "auth2"
 //        }
 //    }
-    val uploadEarly = UploadEarlyEndpoint(path("upload"), files, database, jwtSigner)
+    val uploadEarly = UploadEarlyEndpoint(path("upload"), files, database)
     val testModel = TestModelEndpoints(path("test-model"))
 
     val root = path.get.handler {
@@ -243,13 +239,13 @@ object Server : ServerPathGroup(ServerPath.root) {
     )
 
     val pins = PinHandler(cache, "pins")
-    val proofPhone = SmsProofEndpoints(path("proof/phone"), jwtSigner, pins, sms)
-    val proofEmail = EmailProofEndpoints(path("proof/email"), jwtSigner, pins, email, Email(
+    val proofPhone = SmsProofEndpoints(path("proof/phone"), pins, sms)
+    val proofEmail = EmailProofEndpoints(path("proof/email"), pins, email, Email(
         subject = "Log In Code",
         to = listOf(),
         plainText = "Your PIN is {{PIN}}."
     ))
-    val proofOtp = OneTimePasswordProofEndpoints(path("proof/otp"), jwtSigner, database, cache)
+    val proofOtp = OneTimePasswordProofEndpoints(path("proof/otp"), database, cache)
     val subjects = AuthEndpointsForSubject(
         path("subject"),
         object: Authentication.SubjectHandler<User, UUID> {
@@ -284,9 +280,7 @@ object Server : ServerPathGroup(ServerPath.root) {
             override suspend fun fetch(id: UUID): User = userInfo.collection().get(id) ?: throw NotFoundException()
             override val knownCacheTypes: List<RequestAuth.CacheKey<User, UUID, *>> = listOf(EmailCacheKey)
         },
-        database = database,
-        proofHasher = jwtSigner,
-        tokenFormat = { PrivateTinyTokenFormat(encryptor) }
+        database = database
     )
 }
 

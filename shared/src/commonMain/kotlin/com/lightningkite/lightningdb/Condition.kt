@@ -7,8 +7,7 @@ import kotlinx.serialization.*
 import com.lightningkite.lightningdb.SerializableProperty
 
 @Serializable(ConditionSerializer::class)
-// Why is this class open instead of sealed?  See https://github.com/Kotlin/kotlinx.serialization/issues/1843
-open class Condition<T : IsCodableAndHashable> protected constructor() {
+sealed class Condition<T : IsCodableAndHashable> {
     open override fun hashCode(): Int {
         fatalError()
     }
@@ -158,6 +157,7 @@ open class Condition<T : IsCodableAndHashable> protected constructor() {
         override fun invoke(on: Int): Boolean = on and mask > 0
     }
 
+    // TODO: Merge collection operations once Khrysalis is fully deprecated
     @Serializable(ConditionListAllElementsSerializer::class)
     @SerialName("ListAllElements")
     data class ListAllElements<E : IsCodableAndHashable>(val condition: Condition<E>) : Condition<List<E>>() {
@@ -170,6 +170,7 @@ open class Condition<T : IsCodableAndHashable> protected constructor() {
         override fun invoke(on: List<E>): Boolean = on.any { condition(it) }
     }
 
+    // TODO: Change to empty check
     @Serializable(ConditionListSizesEqualsSerializer::class)
     @SerialName("ListSizesEquals")
     data class ListSizesEquals<E : IsCodableAndHashable>(val count: Int) : Condition<List<E>>() {
@@ -188,12 +189,14 @@ open class Condition<T : IsCodableAndHashable> protected constructor() {
         override fun invoke(on: Set<E>): Boolean = on.any { condition(it) }
     }
 
+    // TODO: Change to empty check
     @Serializable(ConditionSetSizesEqualsSerializer::class)
     @SerialName("SetSizesEquals")
     data class SetSizesEquals<E : IsCodableAndHashable>(val count: Int) : Condition<Set<E>>() {
         override fun invoke(on: Set<E>): Boolean = on.size == count
     }
 
+    // TODO: Allow alternate keys once Khrysalis is fully deprecated
     @Serializable(ConditionExistsSerializer::class)
     @SerialName("Exists")
     data class Exists<V : IsCodableAndHashable>(val key: String) : Condition<Map<String, V>>() {

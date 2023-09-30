@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.serverhealth
 
 import com.lightningkite.khrysalis.SharedCode
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
@@ -11,7 +12,7 @@ import kotlinx.datetime.Instant
 @Serializable
 data class HealthStatus(
     val level: Level,
-    val checkedAt: Instant = Clock.System.now(),
+    val checkedAt: Instant = now(),
     val additionalMessage: String? = null
 ) {
     @Serializable

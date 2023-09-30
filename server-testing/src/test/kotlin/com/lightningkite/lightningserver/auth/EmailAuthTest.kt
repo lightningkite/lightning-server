@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.TestSettings
+import com.lightningkite.lightningserver.auth.old.EmailPinLogin
 import com.lightningkite.lightningserver.email.TestEmailClient
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpHeader

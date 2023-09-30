@@ -4,6 +4,7 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.uuid
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -44,10 +45,10 @@ class SerializationTest {
 
     @Test fun partial() {
         val serializer = PartialSerializer(User.serializer())
-        val part = partialOf<User>(
-            "_id" to uuid(),
-            "email" to "test@test.com"
-        )
+        val part = partialOf<User>{
+            it._id assign uuid()
+            it.email assign "test@test.com"
+        }
         val asText = myJson.encodeToString(serializer, part)
         println(asText)
         println(myJson.decodeFromString(serializer, asText))
@@ -56,12 +57,13 @@ class SerializationTest {
 
     @Test fun partial2() {
         val serializer = PartialSerializer(LargeTestModel.serializer())
-        val part = partialOf<LargeTestModel>(
-            "embedded" to partialOf<ClassUsedForEmbedding>(
-                "value2" to 4
-            ),
-            "int" to 5
-        )
+        val part = partialOf<LargeTestModel> {
+            it.embedded {
+                it.value2 assign 4
+            }
+            it.int assign 5
+
+        }
         val asText = myJson.encodeToString(serializer, part)
         println(asText)
         println(myJson.decodeFromString(serializer, asText))
@@ -147,7 +149,7 @@ class SerializationTest {
         Condition.NotEqual(sampleInstance).cycle()
         Condition.Inside(listOf(sampleInstance)).cycle()
         Condition.NotInside(listOf(sampleInstance)).cycle()
-        (path<LargeTestModel>().instant gt Clock.System.now()).cycle()
+        (path<LargeTestModel>().instant gt now()).cycle()
         (path<LargeTestModel>().int gt 2).cycle()
         (path<LargeTestModel>().int lt 2).cycle()
         (path<LargeTestModel>().int gte 2).cycle()

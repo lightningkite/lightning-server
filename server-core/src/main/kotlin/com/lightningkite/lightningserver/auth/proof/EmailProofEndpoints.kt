@@ -8,6 +8,8 @@ import com.lightningkite.lightningserver.email.EmailClient
 import com.lightningkite.lightningserver.email.EmailLabeledValue
 import com.lightningkite.lightningserver.email.EmailPersonalization
 import com.lightningkite.lightningserver.encryption.SecureHasher
+import com.lightningkite.lightningserver.encryption.hasher
+import com.lightningkite.lightningserver.encryption.secretBasis
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.routes.docName
@@ -19,10 +21,10 @@ import java.util.*
 
 class EmailProofEndpoints(
     path: ServerPath,
-    proofHasher: () -> SecureHasher,
     pin: PinHandler,
     val email: () -> EmailClient,
-    val emailTemplate: Email
+    val emailTemplate: Email,
+    proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
 ) : PinBasedProofEndpoints(path, proofHasher, pin) {
     init {
         if(path.docName == null) path.docName = "EmailProof"

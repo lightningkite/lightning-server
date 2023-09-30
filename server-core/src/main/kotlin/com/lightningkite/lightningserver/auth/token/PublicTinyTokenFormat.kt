@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.encryption.TokenException
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import java.io.ByteArrayOutputStream
 import kotlin.time.Duration
 import kotlinx.datetime.Instant
@@ -24,7 +25,7 @@ class PublicTinyTokenFormat(
     ): String = "tt/" + handler.name + "/" + run {
         val out = ByteArrayOutputStream()
         out.write(Serialization.javaData.encodeToByteArray(RequestAuthSerializable.serializer(), auth.serializable(
-            Clock.System.now().plus(expiration))))
+            now().plus(expiration))))
         val r = out.toByteArray()
         hasher().sign(r) + r
     }.let { Base64.getUrlEncoder().encodeToString(it) }

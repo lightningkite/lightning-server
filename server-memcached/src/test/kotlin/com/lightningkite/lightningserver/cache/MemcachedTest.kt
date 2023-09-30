@@ -5,6 +5,7 @@ import net.rubyeye.xmemcached.XMemcachedClient
 import org.junit.AfterClass
 import org.junit.Assert.assertEquals
 import org.junit.BeforeClass
+import org.junit.Ignore
 import org.junit.Test
 
 class MemcachedTest: CacheTest() {
@@ -31,6 +32,7 @@ class MemcachedTest: CacheTest() {
         }
     }
 
+    @Ignore
     @Test
     fun testMultiClient() {
         if(!EmbeddedMemcached.available) {

@@ -24,6 +24,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlin.time.Duration
 import kotlinx.datetime.Instant
 import kotlin.time.Duration.Companion.days
@@ -87,7 +88,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         keepFor.entries.forEach { entry ->
             collection.deleteManyIgnoringOld(condition {
                 (it.timeSpan eq entry.key) and
-                        (it.timeStamp lt Clock.System.now().minus(entry.value))
+                        (it.timeStamp lt now().minus(entry.value))
             })
         }
     }

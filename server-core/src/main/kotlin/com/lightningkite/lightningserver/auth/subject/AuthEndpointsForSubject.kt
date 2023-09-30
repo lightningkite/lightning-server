@@ -1,21 +1,22 @@
 package com.lightningkite.lightningserver.auth.subject
 
+import com.lightningkite.UUID
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.oauth.*
-import com.lightningkite.lightningserver.auth.proof.*
+import com.lightningkite.lightningserver.auth.proof.Proof
+import com.lightningkite.lightningserver.auth.proof.verify
+import com.lightningkite.lightningserver.auth.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.auth.token.TokenFormat
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
-import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
-import com.lightningkite.lightningserver.encryption.SecureHasher
-import com.lightningkite.lightningserver.encryption.TokenException
-import com.lightningkite.lightningserver.encryption.checkHash
-import com.lightningkite.lightningserver.encryption.secureHash
+import com.lightningkite.lightningserver.db.modelInfo
+import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.exceptions.BadRequestException
+import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.HttpHeader
@@ -26,26 +27,26 @@ import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
-import com.lightningkite.lightningserver.typed.AuthAndPathParts
-import com.lightningkite.lightningserver.typed.api
-import com.lightningkite.lightningserver.typed.auth
-import kotlinx.datetime.Clock
+import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.now
+import kotlinx.datetime.Instant
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
+import org.jetbrains.annotations.TestOnly
 import java.security.SecureRandom
-import kotlinx.datetime.Instant
 import java.util.*
 import kotlin.math.min
+import kotlin.time.Duration.Companion.hours
 
 class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     path: ServerPath,
     val handler: Authentication.SubjectHandler<SUBJECT, ID>,
     val database: () -> Database,
-    val proofHasher: () -> SecureHasher,
-    val tokenFormat: () -> TokenFormat,
+    val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
+    val tokenFormat: () -> TokenFormat = { PrivateTinyTokenFormat() },
 ) : ServerPathGroup(path), Authentication.Reader {
 
     init {
@@ -53,16 +54,16 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         if(path.docName == null) path.docName = "${handler.name}Auth"
     }
 
-    val sessionSerializer = Session.serializer(handler.subjectSerializer, handler.idSerializer)
-    val dataClassPath = DataClassPathSelf(sessionSerializer)
+    private val sessionSerializer = Session.serializer(handler.subjectSerializer, handler.idSerializer)
+    private val dataClassPath = DataClassPathSelf(sessionSerializer)
 
-    val info = modelInfo<HasId<*>?, Session<SUBJECT, ID>, UUID>(
+    val sessionInfo = modelInfo<HasId<*>?, Session<SUBJECT, ID>, UUID>(
         modelName = "${handler.name}Session",
         serialization = ModelSerializationInfo(
             sessionSerializer,
             idSerializer = ContextualSerializer(UUID::class)
         ),
-        authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType))) + Authentication.isSuperUser,
+        authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType, scopes = setOf("sessions")))) + Authentication.isSuperUser,
         getCollection = {
             database().collection(
                 sessionSerializer,
@@ -93,24 +94,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                             )
                         )
                     ),
-                    update = canUse,
-                    updateRestrictions = UpdateRestrictions(
-                        listOf(
-                            UpdateRestrictions.Part(dataClassPath._id, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(dataClassPath.derivedFrom, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(dataClassPath.secretHash, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(dataClassPath.label, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(dataClassPath.subjectId, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(dataClassPath.createdAt, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(dataClassPath.lastUsed, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(dataClassPath.expires, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(dataClassPath.terminated, canUse, Condition.Always()),
-                            UpdateRestrictions.Part(dataClassPath.ips, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(dataClassPath.userAgents, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(dataClassPath.scopes, isAdmin, Condition.Always()),
-                            UpdateRestrictions.Part(dataClassPath.oauthClient, isAdmin, Condition.Always()),
-                        )
-                    ),
+                    update = isAdmin,
                     delete = isAdmin,
                 )
             )
@@ -123,6 +107,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     }
 
     override suspend fun request(request: Request): RequestAuth<*>? {
+        // TODO: Read JWT from query params, remove and redirect
         try {
             val token =
                 request.headers[HttpHeader.Authorization]?.removePrefix("bearer ")?.removePrefix("Bearer ")
@@ -145,12 +130,34 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         detail = "invalid-proof",
         message = "A given proof was invalid."
     )
+    val errorExpiredProof = LSError(
+        400,
+        detail = "expired-proof",
+        message = "A given proof expired."
+    )
 
+    @TestOnly
     suspend fun newSession(
+        subjectId: ID,
+        scopes: Set<String> = setOf("*"),
+        label: String? = null,
+        expires: Instant? = null,
+        oauthClient: String? = null,
+        derivedFrom: UUID? = null,
+    ): Pair<Session<SUBJECT, ID>, RefreshToken> = newSessionPrivate(
+        subjectId = subjectId,
+        label = label,
+        expires = expires,
+        scopes = scopes,
+        oauthClient = oauthClient,
+        derivedFrom = derivedFrom
+    )
+
+    private suspend fun newSessionPrivate(
         subjectId: ID,
         label: String? = null,
         expires: Instant? = null,
-        scopes: Set<String>? = null,
+        scopes: Set<String>,
         oauthClient: String? = null,
         derivedFrom: UUID? = null,
     ): Pair<Session<SUBJECT, ID>, RefreshToken> {
@@ -164,7 +171,8 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             expires = expires,
             scopes = scopes,
             oauthClient = oauthClient,
-        ).also { info.collection().insertOne(it) }.let {
+            derivedFrom = derivedFrom,
+        ).also { sessionInfo.collection().insertOne(it) }.let {
             it to RefreshToken(handler.name, it._id, secret)
         }
     }
@@ -183,7 +191,8 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         errorCases = listOf(errorNoSingleUser, errorInvalidProof),
         implementation = { proofs: List<Proof> ->
             proofs.forEach {
-                if (!proofHasher().verify(it)) throw HttpStatusException(errorInvalidProof)
+                if (!proofHasher().verify(it)) throw HttpStatusException(errorInvalidProof.copy(data = it.via))
+                if(now() > it.at + 1.hours) throw HttpStatusException(errorExpiredProof.copy(data = it.via))
             }
             val used = proofs.map { it.via }.toSet()
             val result =
@@ -192,9 +201,9 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             val maxStrengthPossible = result.options.sumOf { it.method.strength }
             val actStrenReq = min(result.strengthRequired, maxStrengthPossible)
             IdAndAuthMethods(
-                session = if (strength >= actStrenReq) newSession(
+                session = if (strength >= actStrenReq) newSessionPrivate(
                     subjectId = result.id!!,
-                    scopes = null,
+                    scopes = setOf("*"),
                     label = "Root Session",
                 ).second.string else null,
                 id = result.id,
@@ -212,7 +221,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         description = "Creates a session with more limited authorization",
         errorCases = listOf(),
         implementation = { request: SubSessionRequest ->
-            newSession(
+            newSessionPrivate(
                 label = request.label,
                 subjectId = user()._id,
                 derivedFrom = auth.sessionId,
@@ -223,7 +232,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    suspend fun Session<SUBJECT, ID>.toAuth(): RequestAuth<SUBJECT> = RequestAuth(
+    private fun Session<SUBJECT, ID>.toAuth(): RequestAuth<SUBJECT> = RequestAuth(
         subject = handler,
         rawId = this.subjectId,
         issuedAt = this.createdAt,
@@ -266,7 +275,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     val client = OauthClientEndpoints.instance?.modelInfo?.collection()?.get(input.client_id) ?: throw BadRequestException("Client ID/Secret mismatch")
                     if(client.secrets.none { input.client_secret.checkHash(it.secretHash) }) throw BadRequestException("Client ID/Secret mismatch")
                     val future = FutureSession.fromToken(input.code!!)
-                    val (s, secret) = newSession(
+                    val (s, secret) = newSessionPrivate(
                         label = "Oauth with ${client.niceName}",
                         subjectId = future.subjectId,
                         derivedFrom = future.originalSessionId,
@@ -274,7 +283,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         expires = null,
                         oauthClient = future.oauthClient
                     )
-                    info.collection().insertOne(s)
+                    sessionInfo.collection().insertOne(s)
                     generatedRefresh = secret
                     s
                 }
@@ -327,31 +336,57 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     val sessions = ModelRestEndpoints(
         path = path("sessions"),
-        info = info
+        info = sessionInfo
+    )
+
+    val sessionTerminate = sessions.path("terminate").post.api(
+        authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType, scopes = null))),
+        inputType = Unit.serializer(),
+        outputType = Unit.serializer(),
+        summary = "Terminate session",
+        errorCases = listOf(),
+        implementation = { _ ->
+            sessionInfo.collection().updateOneById(this.auth.sessionId!!, modification(dataClassPath) {
+                it.terminated assign now()
+            })
+        }
+    )
+    val otherSessionTerminate = sessions.path.arg<UUID>("sessionId").path("terminate").post.api(
+        authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType, scopes = null))),
+        inputType = Unit.serializer(),
+        outputType = Unit.serializer(),
+        summary = "Terminate session",
+        errorCases = listOf(),
+        implementation = { _ ->
+            if(sessionInfo.collection().get(path1)?.subjectId != auth.id) throw ForbiddenException()
+            sessionInfo.collection().updateOneById(path1, modification(dataClassPath) {
+                it.terminated assign now()
+            })
+        }
     )
 
     private suspend fun RefreshToken.session(request: Request?): Session<SUBJECT, ID>? {
         if(!valid) return null
         if(type != handler.name) return null
-        val session = info.collection().get(_id) ?: return null
+        val session = sessionInfo.collection().get(_id) ?: return null
         if (!plainTextSecret.checkHash(session.secretHash)) return null
         if (session.terminated != null) return null
-        info.collection().updateOneById(_id, modification(dataClassPath) {
-            it.lastUsed assign Clock.System.now()
+        sessionInfo.collection().updateOneById(_id, modification(dataClassPath) {
+            it.lastUsed assign now()
             it.userAgents addAll setOf(request?.headers?.get(HttpHeader.UserAgent) ?: "")
             it.ips addAll setOf(request?.sourceIp ?: "test")
         })
         return session
     }
 
-    val hashSize by lazy { proofHasher().sign(byteArrayOf(1, 2, 3)).size }
+    private val hashSize by lazy { proofHasher().sign(byteArrayOf(1, 2, 3)).size }
     private fun FutureSession<ID>.asToken(): String = Base64.getEncoder().encodeToString(Serialization.javaData.encodeToByteArray(FutureSession.serializer(handler.idSerializer), this).let { it + proofHasher().sign(it) })
     private fun FutureSession.Companion.fromToken(token: String): FutureSession<ID> = Base64.getDecoder().decode(token).let {
         val content = it.sliceArray(0 until it.size - hashSize)
         val signature = it.sliceArray(it.size - hashSize until it.size)
         if(!proofHasher().verify(content, signature)) throw TokenException("Could not verify hash.")
         Serialization.javaData.decodeFromByteArray(FutureSession.serializer(handler.idSerializer), content).also {
-            if(Clock.System.now() > it.expires) throw TokenException("Token expired.")
+            if(now() > it.expires) throw TokenException("Token expired.")
         }
     }
 
@@ -378,15 +413,3 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     }
 }
 
-@JvmInline
-value class RefreshToken(val string: String) {
-    companion object {
-        val prefix = "refresh/"
-    }
-    constructor(type: String, _id: UUID, secret: String) : this("$prefix$type/$_id:$secret")
-
-    val valid: Boolean get() = string.startsWith(prefix)
-    val type: String get() = string.drop(prefix.length).substringBefore('/')
-    val _id: UUID get() = UUID.fromString(string.drop(prefix.length).substringAfter('/').substringBefore(':', ""))
-    val plainTextSecret: String get() = string.drop(prefix.length).substringAfter('/').substringAfter(':', "")
-}

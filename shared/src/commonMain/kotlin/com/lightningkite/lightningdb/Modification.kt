@@ -7,8 +7,7 @@ import kotlinx.serialization.*
 import com.lightningkite.lightningdb.SerializableProperty
 
 @Serializable(ModificationSerializer::class)
-// Why is this class open instead of sealed?  See https://github.com/Kotlin/kotlinx.serialization/issues/1843
-open class Modification<T: IsCodableAndHashable> protected constructor()  {
+sealed class Modification<T: IsCodableAndHashable>  {
     open override fun hashCode(): Int { fatalError() }
     open override fun equals(other: Any?): Boolean { fatalError() }
     open operator fun invoke(on: T): T { fatalError() }

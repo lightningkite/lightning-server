@@ -16,6 +16,7 @@ import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.websocket.QueryParamWebSocketHandler
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifierPubSub
 import com.lightningkite.lightningserver.websocket.WebSockets
+import com.lightningkite.now
 import io.ktor.http.*
 import io.ktor.http.HttpMethod
 import io.ktor.http.content.*
@@ -243,7 +244,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                     val upcomingRun = cache.get<Long>(it.name + "-nextRun") ?: run {
                         val time = when (val s = it.schedule) {
                             is Schedule.Daily -> {
-                                val now = Clock.System.now()
+                                val now = now()
                                 val runTimeToday = now.toLocalDateTime(s.zone).date.atTime(s.time).toInstant(s.zone)
                                 if (now > runTimeToday) runTimeToday.plus(1.days).toEpochMilliseconds()
                                 else runTimeToday.toEpochMilliseconds()
@@ -267,7 +268,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                             exceptionSettings().report(t)
                         }
                         val nextRun = when (val s = it.schedule) {
-                            is Schedule.Daily -> LocalDateTime(Clock.System.now().toLocalDateTime(s.zone).date.plus(DatePeriod(days = 1)), s.time).toInstant(s.zone)
+                            is Schedule.Daily -> LocalDateTime(now().toLocalDateTime(s.zone).date.plus(DatePeriod(days = 1)), s.time).toInstant(s.zone)
                                 .toEpochMilliseconds()
 
                             is Schedule.Frequency -> upcomingRun + s.gap.inWholeMilliseconds

@@ -4,24 +4,19 @@ import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.email.Email
-import com.lightningkite.lightningserver.email.EmailClient
-import com.lightningkite.lightningserver.email.EmailLabeledValue
-import com.lightningkite.lightningserver.email.EmailPersonalization
 import com.lightningkite.lightningserver.encryption.SecureHasher
+import com.lightningkite.lightningserver.encryption.hasher
+import com.lightningkite.lightningserver.encryption.secretBasis
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.api
-import com.lightningkite.lightningserver.typed.typed
 import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
-import java.util.*
+import com.lightningkite.now
 
 abstract class PinBasedProofEndpoints(
     path: ServerPath,
-    val proofHasher: () -> SecureHasher,
+    val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val pin: PinHandler,
 ) : ServerPathGroup(path), Authentication.StartedProofMethod {
 
@@ -70,7 +65,7 @@ abstract class PinBasedProofEndpoints(
                     of = validates,
                     strength = strength,
                     value = exampleTarget,
-                    at = Clock.System.now(),
+                    at = now(),
                     signature = "opaquesignaturevalue"
                 )
             )
@@ -79,8 +74,8 @@ abstract class PinBasedProofEndpoints(
         implementation = { input: ProofEvidence ->
             proofHasher().makeProof(
                 info = info,
-                value = pin.assert(input.value, input.secret),
-                at = Clock.System.now()
+                value = pin.assert(input.key, input.password),
+                at = now()
             )
         }
     )

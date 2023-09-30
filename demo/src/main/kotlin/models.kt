@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningdb.*
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
@@ -16,7 +17,7 @@ import com.lightningkite.uuid
 @Description("A model for testing Lightning Server.")
 data class TestModel(
     override val _id: UUID = uuid(),
-    val timestamp: Instant = Clock.System.now(),
+    val timestamp: Instant = now(),
     val name: String = "No Name",
     @Description("The number") val number: Int = 3123,
     @MimeType("text/html") @Multiline val content: String = "",

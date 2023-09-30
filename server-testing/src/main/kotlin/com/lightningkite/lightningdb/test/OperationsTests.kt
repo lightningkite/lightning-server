@@ -23,7 +23,7 @@ abstract class OperationsTests() {
             fields = setOf(path<LargeTestModel>().int),
             condition = Condition.Always()
         ).toList()
-        assertEquals(partialOf<LargeTestModel>("int" to m.int), result.first())
+        assertEquals(partialOf { it.int assign m.int }, result.first())
     }
 
     @Test fun test_massUpdate(): Unit = runBlocking {

@@ -16,7 +16,7 @@ open class AuthAccessor<USER: HasId<*>?>(
 ) {
     companion object {
         val testUnauthorized = AuthAccessor<HasId<*>?>(null, null)
-        fun <USER: HasId<*>?> test(user: USER, scopes: Set<String>? = null, thirdParty: String? = null) = AuthAccessor(RequestAuth.test(user, scopes, thirdParty), null)
+        fun <USER: HasId<*>?> test(user: USER, scopes: Set<String> = setOf("*"), thirdParty: String? = null) = AuthAccessor(RequestAuth.test(user, scopes, thirdParty), null)
     }
     @Suppress("UNCHECKED_CAST")
     suspend fun user() = authOrNull?.get() as USER
@@ -28,9 +28,9 @@ open class AuthAndPathParts<USER: HasId<*>?, PATH: TypedServerPath>(
     val parts: Array<Any?>
 ): AuthAccessor<USER>(authOrNull, rawRequest) {
     companion object {
-        fun <USER: HasId<*>?> test(path: TypedServerPath0, user: USER, scopes: Set<String>? = null, thirdParty: String? = null) = AuthAndPathParts<USER, TypedServerPath0>(RequestAuth.test(user, scopes, thirdParty), null, arrayOf())
-        fun <USER: HasId<*>?, P1> test(path: TypedServerPath1<P1>, user: USER, path1: P1, scopes: Set<String>? = null, thirdParty: String? = null) = AuthAndPathParts<USER, TypedServerPath1<P1>>(RequestAuth.test(user, scopes, thirdParty), null, arrayOf(path1))
-        fun <USER: HasId<*>?, P1, P2> test(path: TypedServerPath2<P1, P2>, user: USER, path1: P1, path2: P2, scopes: Set<String>? = null, thirdParty: String? = null) = AuthAndPathParts<USER, TypedServerPath2<P1, P2>>(RequestAuth.test(user, scopes, thirdParty), null, arrayOf(path1, path2))
+        fun <USER: HasId<*>?> test(path: TypedServerPath0, user: USER, scopes: Set<String> = setOf("*"), thirdParty: String? = null) = AuthAndPathParts<USER, TypedServerPath0>(RequestAuth.test(user, scopes, thirdParty), null, arrayOf())
+        fun <USER: HasId<*>?, P1> test(path: TypedServerPath1<P1>, user: USER, path1: P1, scopes: Set<String> = setOf("*"), thirdParty: String? = null) = AuthAndPathParts<USER, TypedServerPath1<P1>>(RequestAuth.test(user, scopes, thirdParty), null, arrayOf(path1))
+        fun <USER: HasId<*>?, P1, P2> test(path: TypedServerPath2<P1, P2>, user: USER, path1: P1, path2: P2, scopes: Set<String> = setOf("*"), thirdParty: String? = null) = AuthAndPathParts<USER, TypedServerPath2<P1, P2>>(RequestAuth.test(user, scopes, thirdParty), null, arrayOf(path1, path2))
     }
 }
 

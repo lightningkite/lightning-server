@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.datetime.Instant
 
 /**
@@ -22,7 +23,7 @@ Exception Reported:
         ${t.stackTraceToString()}
 """.trimIndent()
         )
-        previousErrors.add(Triple(Clock.System.now(), t, context))
+        previousErrors.add(Triple(now(), t, context))
         while (previousErrors.size > 100) previousErrors.removeAt(0)
         return true
     }

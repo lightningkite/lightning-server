@@ -26,15 +26,14 @@ class MaskTest {
         }
         mask(model).also(::println)
         val also = mask(
-            Partial<LargeTestModel>(
-                mutableMapOf(
-                    "byte" to 1.toByte(),
-                    "short" to 1.toShort(),
-                    "int" to 1.toInt(),
-                    "long" to 1.toLong(),
-                    "float" to 1f,
-                )
-            )
+            partialOf<LargeTestModel>{
+                it.byte.assign(1)
+                it.byte assign 1.toByte()
+                it.short assign 1.toShort()
+                it.int assign 1.toInt()
+                it.long assign 1.toLong()
+                it.float assign 1f
+            }
         ).also(::println)
     }
 

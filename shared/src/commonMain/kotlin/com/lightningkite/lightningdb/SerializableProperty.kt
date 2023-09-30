@@ -3,6 +3,7 @@ package com.lightningkite.lightningdb
 import kotlinx.serialization.KSerializer
 import kotlin.reflect.KClass
 
+// TODO: Replace with a simpler serializer / index pair?
 interface SerializableProperty<A, B> {
     val name: String
     fun get(receiver: A): B

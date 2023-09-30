@@ -4,10 +4,9 @@ import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningdb.test.User
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.auth.old.*
 import com.lightningkite.lightningserver.auth.old.BaseAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.SmsAuthEndpoints
-import com.lightningkite.lightningserver.auth.old.UserPhoneAccess
-import com.lightningkite.lightningserver.auth.old.userPhoneAccess
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.modelInfo
@@ -41,7 +40,7 @@ class SmsAuthTest {
         )
         val phoneAccess: UserPhoneAccess<User, UUID> = info.userPhoneAccess { User(email = "$it@phone", phoneNumber = it) }
         val path = ServerPath("auth")
-        val baseAuth = BaseAuthEndpoints(path, phoneAccess, TestSettings.jwtSigner, expiration = 1.hours, emailExpiration = 5.minutes)
+        val baseAuth = BaseAuthEndpoints(path, phoneAccess, expiration = 1.hours, emailExpiration = 5.minutes)
         val phoneAuth = SmsAuthEndpoints(baseAuth, phoneAccess, TestSettings.cache, TestSettings.sms)
         runBlocking {
             phoneAuth.loginSms.implementation(AuthAndPathParts(null, null, arrayOf()), "8013693729")
@@ -66,7 +65,7 @@ class SmsAuthTest {
         )
         val phoneAccess: UserPhoneAccess<User, UUID> = info.userPhoneAccess { User(email = "$it@phone", phoneNumber = it) }
         val path = ServerPath("auth")
-        val baseAuth = BaseAuthEndpoints(path, phoneAccess, TestSettings.jwtSigner, expiration = 1.hours, emailExpiration = 5.minutes)
+        val baseAuth = BaseAuthEndpoints(path, phoneAccess, expiration = 1.hours, emailExpiration = 5.minutes)
         val phoneAuth = SmsAuthEndpoints(baseAuth, phoneAccess, TestSettings.cache, TestSettings.sms)
         runBlocking {
             phoneAuth.loginSms.implementation(AuthAndPathParts(null, null, arrayOf()), "8013693729")

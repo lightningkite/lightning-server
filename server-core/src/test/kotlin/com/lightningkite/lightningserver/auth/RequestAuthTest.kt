@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.testmodels.TestUser
 import com.lightningkite.uuid
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import org.junit.Assert.assertFalse
@@ -20,7 +21,7 @@ class RequestAuthTest {
     @Serializable
     data class Sample2(override val _id: UUID = uuid()): HasId<UUID>
     @Test fun test(): Unit = runBlocking {
-        val sample = RequestAuth(TestSettings.subjectHandler, uuid(), rawId = uuid(), issuedAt = Clock.System.now())
+        val sample = RequestAuth(TestSettings.subjectHandler, uuid(), rawId = uuid(), issuedAt = now())
         val myAuth = AuthOption(AuthType<TestUser>())
         val otherAuth = AuthOption(AuthType<Sample2>())
         AuthOption(AuthType.any).accepts(sample)

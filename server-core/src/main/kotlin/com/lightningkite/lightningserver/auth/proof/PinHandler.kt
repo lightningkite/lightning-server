@@ -17,7 +17,7 @@ import kotlin.time.Duration.Companion.minutes
 open class PinHandler(
     private val cache: () -> Cache,
     val keyPrefix: String,
-    val availableCharacters: List<Char> = ('0'..'9').toList(),
+    val availableCharacters: List<Char> = ('A'..'Z').toList() - setOf('I', 'O'),
     val length: Int = 6,
     val expiration: Duration = 15.minutes,
     val maxAttempts: Int = 5

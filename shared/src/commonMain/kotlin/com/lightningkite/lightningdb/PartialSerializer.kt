@@ -44,12 +44,12 @@ class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> 
         }
 
     override fun deserialize(decoder: Decoder): Partial<T> = decoder.decodeStructure(descriptor) {
-        val out = HashMap<String, Any?>()
+        val out = HashMap<SerializableProperty<T, *>, Any?>()
         while (true) {
             when (val index = decodeElementIndex(descriptor)) {
                 CompositeDecoder.DECODE_DONE -> break
                 CompositeDecoder.UNKNOWN_NAME -> continue
-                else -> out[descriptor.getElementName(index)] = decodeSerializableElement(descriptor, index, childSerializers[index])
+                else -> out[source.serializableProperties!!.find { it.name == descriptor.getElementName(index) }!!] = decodeSerializableElement(descriptor, index, childSerializers[index])
             }
         }
         Partial(out)
@@ -57,7 +57,7 @@ class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> 
 
     override fun serialize(encoder: Encoder, value: Partial<T>) = encoder.encodeStructure(descriptor) {
         for((key, v) in value.parts) {
-            val index = descriptor.getElementIndex(key)
+            val index = descriptor.getElementIndex(key.name)
             encodeSerializableElement(descriptor, index, childSerializers[index] as KSerializer<Any?>, v)
         }
     }
@@ -67,7 +67,7 @@ fun <K> DataClassPathPartial<K>.setMap(key: K, out: Partial<K>) {
     if(properties.isEmpty()) throw IllegalStateException("Path ${this} cannot be set for partial")
     var current = out as Partial<Any?>
     for (prop in properties.dropLast(1)) {
-        current = current.parts.getOrPut(prop.name) { Partial<Any?>() } as Partial<Any?>
+        current = current.parts.getOrPut(prop as SerializableProperty<Any?, *>) { Partial<Any?>() } as Partial<Any?>
     }
-    current.parts[properties.last().name] = getAny(key)
+    current.parts[properties.last() as SerializableProperty<Any?, *>] = getAny(key)
 }

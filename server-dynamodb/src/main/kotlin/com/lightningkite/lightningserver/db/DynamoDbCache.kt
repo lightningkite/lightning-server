@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.cache.CacheSettings
 import kotlinx.coroutines.*
 import kotlinx.coroutines.future.await
 import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.KSerializer
 import software.amazon.awssdk.auth.credentials.AwsCredentials
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
@@ -121,7 +122,7 @@ class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: St
                 "key" to AttributeValue.fromS(key),
                 "value" to serializer.toDynamo(value),
             ) + (timeToLive?.let {
-                mapOf("expires" to AttributeValue.fromN(Clock.System.now().plus(it).epochSeconds.toString()))
+                mapOf("expires" to AttributeValue.fromN(now().plus(it).epochSeconds.toString()))
             } ?: mapOf()))
         }.await()
     }
@@ -143,7 +144,7 @@ class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: St
                         "key" to AttributeValue.fromS(key),
                         "value" to serializer.toDynamo(value),
                     ) + (timeToLive?.let {
-                        mapOf("expires" to AttributeValue.fromN(Clock.System.now().plus(it).epochSeconds.toString()))
+                        mapOf("expires" to AttributeValue.fromN(now().plus(it).epochSeconds.toString()))
                     } ?: mapOf())
                 )
             }.await()
@@ -163,7 +164,7 @@ class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: St
             it.expressionAttributeValues(
                 mapOf(
                     ":v" to AttributeValue.fromN(value.toString()),
-                    ":exp" to (timeToLive?.let { AttributeValue.fromN(Clock.System.now().plus(it).epochSeconds.toString()) }
+                    ":exp" to (timeToLive?.let { AttributeValue.fromN(now().plus(it).epochSeconds.toString()) }
                         ?: AttributeValue.fromNul(true))
                 )
             )

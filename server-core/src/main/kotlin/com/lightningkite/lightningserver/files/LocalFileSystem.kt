@@ -3,6 +3,8 @@ package com.lightningkite.lightningserver.files
 import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.encryption.hasher
+import com.lightningkite.lightningserver.encryption.secretBasis
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
@@ -23,7 +25,7 @@ class LocalFileSystem(
     rootFile: File,
     val serveDirectory: String,
     val signedUrlExpiration: Duration?,
-    val signer: SecureHasher,
+    val signer: SecureHasher = secretBasis().hasher(serveDirectory),
 ) : FileSystem {
     val rootFile: File = rootFile.absoluteFile
     override val root: FileObject = LocalFile(this, rootFile)
