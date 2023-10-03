@@ -19,6 +19,7 @@ import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.*
 import com.lightningkite.lightningserver.email.Email
+import com.lightningkite.lightningserver.email.EmailLabeledValue
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.email.SesClient
 import com.lightningkite.lightningserver.encryption.Encryptor
@@ -140,7 +141,8 @@ object Server : ServerPathGroup(ServerPath.root) {
         val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
         val passAuth = PasswordAuthEndpoints(baseAuth, passAccess)
     }
-//    val auth2 = object : ServerPathGroup(path("auth2")) {
+
+    //    val auth2 = object : ServerPathGroup(path("auth2")) {
 //        val info = ModelInfo<UserAlt, UserAlt, UUID>(
 //            getCollection = { database().collection<UserAlt>() },
 //            forUser = { this }
@@ -240,15 +242,16 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     val pins = PinHandler(cache, "pins")
     val proofPhone = SmsProofEndpoints(path("proof/phone"), pins, sms)
-    val proofEmail = EmailProofEndpoints(path("proof/email"), pins, email, Email(
+    val proofEmail = EmailProofEndpoints(path("proof/email"), pins, email,{ to, pin ->
+        Email(
         subject = "Log In Code",
         to = listOf(),
         plainText = "Your PIN is {{PIN}}."
-    ))
+    )})
     val proofOtp = OneTimePasswordProofEndpoints(path("proof/otp"), database, cache)
     val subjects = AuthEndpointsForSubject(
         path("subject"),
-        object: Authentication.SubjectHandler<User, UUID> {
+        object : Authentication.SubjectHandler<User, UUID> {
             override val name: String get() = "User"
             override val idProofs: Set<Authentication.ProofMethod> = setOf(proofEmail)
             override val authType: AuthType get() = AuthType<User>()
@@ -256,9 +259,11 @@ object Server : ServerPathGroup(ServerPath.root) {
             override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<User, UUID>? {
                 val emailIdentifier = proofs.find { it.of == "email" } ?: return null
                 val user = userInfo.collection().findOne(condition { it.email eq emailIdentifier.value }) ?: run {
-                    userInfo.collection().insertOne(User(
-                        email = emailIdentifier.value
-                    ))
+                    userInfo.collection().insertOne(
+                        User(
+                            email = emailIdentifier.value
+                        )
+                    )
                 } ?: return null
                 val options = listOfNotNull(
                     ProofOption(proofEmail.info, user.email),
@@ -284,7 +289,7 @@ object Server : ServerPathGroup(ServerPath.root) {
     )
 }
 
-object EmailCacheKey: RequestAuth.CacheKey<User, UUID, String>() {
+object EmailCacheKey : RequestAuth.CacheKey<User, UUID, String>() {
     override val name: String
         get() = "email"
     override val serializer: KSerializer<String>

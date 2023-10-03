@@ -27,12 +27,12 @@ object Settings {
         if (requirements.filter { it.key in missing }.any { !it.value.optional }) {
             throw SerializationException("Settings for ${missing.joinToString()} are missing.")
         }
+        sealed = true
         if (!lazyLoadResources)
             requirements.values.forEach {
                 logger.debug("Loading setting ${it.name}...")
                 it()
             }
-        sealed = true
     }
 
     private data class Box<T>(val item: T)
@@ -74,6 +74,7 @@ object Settings {
             getter(it)
         }
         private val value by lazy<Goal> {
+            if(!sealed) throw IllegalStateException()
             @Suppress("UNCHECKED_CAST")
             getter(values[name]?.item as? Serializable ?: default)
         }

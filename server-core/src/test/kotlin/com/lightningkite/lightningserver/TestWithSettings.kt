@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.db.*
 import com.lightningkite.lightningserver.testmodels.TestThing
 import com.lightningkite.lightningserver.testmodels.TestThing__id
 import com.lightningkite.lightningserver.email.Email
+import com.lightningkite.lightningserver.email.EmailLabeledValue
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.engine.UnitTestEngine
 import com.lightningkite.lightningserver.engine.engine
@@ -97,11 +98,13 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         ServerPath(uuid().toString()),
         PinHandler(cache, "pin"),
         email,
-        Email(
-            subject = "Log In Code",
-            to = listOf(),
-            plainText = "Your PIN is {{PIN}}."
-        )
+        { to, pin ->
+            Email(
+                subject = "Log In Code",
+                to = listOf(EmailLabeledValue(to)),
+                plainText = "Your PIN is $pin."
+            )
+        }
     )
 
     //    val proofOtp = OneTimePasswordProofEndpoints(
@@ -167,7 +170,8 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
             get() = 5.minutes
         override suspend fun calculate(auth: RequestAuth<TestUser>): String = auth.get().email
     }
-    object TestCacheKey: RequestAuth.CacheKey<TestUser, UUID, UUID>() {
+
+    object TestCacheKey : RequestAuth.CacheKey<TestUser, UUID, UUID>() {
         override val name: String
             get() = "uuid"
         override val serializer: KSerializer<UUID>

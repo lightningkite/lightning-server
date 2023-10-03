@@ -10,6 +10,8 @@ import com.lightningkite.lightningserver.email.EmailPersonalization
 import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.encryption.hasher
 import com.lightningkite.lightningserver.encryption.secretBasis
+import com.lightningkite.lightningserver.encryption.hasher
+import com.lightningkite.lightningserver.encryption.secretBasis
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.routes.docName
@@ -23,7 +25,7 @@ class EmailProofEndpoints(
     path: ServerPath,
     pin: PinHandler,
     val email: () -> EmailClient,
-    val emailTemplate: Email,
+    val emailTemplate: (String, String) -> Email,
     proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
 ) : PinBasedProofEndpoints(path, proofHasher, pin) {
     init {
@@ -42,9 +44,6 @@ class EmailProofEndpoints(
         get() = "test@test.com"
 
     override suspend fun send(to: String, pin: String) {
-        email().send(EmailPersonalization(
-            to = listOf(EmailLabeledValue(to)),
-            substitutions = mapOf("{{PIN}}" to pin)
-        )(emailTemplate))
+        email().send(emailTemplate(to, pin))
     }
 }
