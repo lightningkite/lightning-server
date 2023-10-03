@@ -47,8 +47,9 @@ class OneTimePasswordProofEndpoints(
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
 ) : ServerPathGroup(path), Authentication.DirectProofMethod {
     init {
-        if(path.docName == null) path.docName = "OneTimePasswordProof"
+        if (path.docName == null) path.docName = "OneTimePasswordProof"
     }
+
     override val name: String
         get() = "otp"
     override val humanName: String
@@ -170,12 +171,13 @@ class OneTimePasswordProofEndpoints(
         }
     )
 
-    suspend fun <ID: Comparable<ID>> established(handler: Authentication.SubjectHandler<*, ID>, id: ID): Boolean {
+    suspend fun <ID : Comparable<ID>> established(handler: Authentication.SubjectHandler<*, ID>, id: ID): Boolean {
         @Suppress("UNCHECKED_CAST")
         return table(handler).get(id as Comparable<Any>) != null
     }
-    suspend fun <ID: Comparable<ID>> proofOption(handler: Authentication.SubjectHandler<*, ID>, id: ID): ProofOption? {
-        return if(established(handler, id)) {
+
+    suspend fun <ID : Comparable<ID>> proofOption(handler: Authentication.SubjectHandler<*, ID>, id: ID): ProofOption? {
+        return if (established(handler, id)) {
             ProofOption(info, key(handler, id))
         } else {
             null

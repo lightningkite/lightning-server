@@ -242,12 +242,13 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     val pins = PinHandler(cache, "pins")
     val proofPhone = SmsProofEndpoints(path("proof/phone"), pins, sms)
-    val proofEmail = EmailProofEndpoints(path("proof/email"), pins, email,{ to, pin ->
+    val proofEmail = EmailProofEndpoints(path("proof/email"), pins, email, { to, pin ->
         Email(
-        subject = "Log In Code",
-        to = listOf(),
-        plainText = "Your PIN is {{PIN}}."
-    )})
+            subject = "Log In Code",
+            to = listOf(),
+            plainText = "Your PIN is {{PIN}}."
+        )
+    })
     val proofOtp = OneTimePasswordProofEndpoints(path("proof/otp"), database, cache)
     val subjects = AuthEndpointsForSubject(
         path("subject"),
@@ -296,5 +297,6 @@ object EmailCacheKey : RequestAuth.CacheKey<User, UUID, String>() {
         get() = String.serializer()
     override val validFor: Duration
         get() = 5.minutes
+
     override suspend fun calculate(auth: RequestAuth<User>): String = auth.get().email
 }
