@@ -1,3 +1,4 @@
+@file:UseContextualSerialization(UUID::class)
 package com.lightningkite.lightningserver
 
 import com.lightningkite.lightningdb.*
@@ -25,6 +26,7 @@ import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.logging.LoggingSettings
 import com.lightningkite.lightningserver.logging.loggingSettings
+import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.generalSettings
@@ -40,6 +42,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseContextualSerialization
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration
 import java.util.*
@@ -153,7 +157,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
             get() = userInfo.serialization.serializer
 
         override suspend fun fetch(id: UUID): TestUser = userInfo.collection().get(id) ?: throw NotFoundException()
-        override val knownCacheTypes: List<RequestAuth.CacheKey<TestUser, UUID, *>> = listOf(EmailCacheKey)
+        override val knownCacheTypes: List<RequestAuth.CacheKey<TestUser, UUID, *>> = listOf(EmailCacheKey, TestCacheKey, TestCacheKey2)
         override fun toString(): String = name
     }
     val testUserSubject = AuthEndpointsForSubject(
@@ -178,7 +182,16 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
             get() = ContextualSerializer(UUID::class)
         override val validFor: Duration
             get() = 5.minutes
-        override suspend fun calculate(auth: RequestAuth<TestUser>): UUID = uuid()
+        override suspend fun calculate(auth: RequestAuth<TestUser>): UUID = auth.id
+    }
+    object TestCacheKey2: RequestAuth.CacheKey<TestUser, UUID, CompletePermissions>() {
+        override val name: String
+            get() = "permissions"
+        override val serializer: KSerializer<CompletePermissions>
+            get() = CompletePermissions.serializer()
+        override val validFor: Duration
+            get() = 5.minutes
+        override suspend fun calculate(auth: RequestAuth<TestUser>): CompletePermissions = CompletePermissions.sample
     }
 
     suspend fun RequestAuth<TestUser>.email() = this.get(EmailCacheKey)
@@ -207,4 +220,148 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         }
     }
 
+}
+
+
+
+
+interface Permissions<Whole, Crud> {
+    val manageBalance: Whole
+    val minimalMemberRead: Whole
+    val notifications: Whole
+    val sds: Whole
+    val subscriptions: Whole
+
+    // Access Based Permissions
+    val associates: Crud
+    val applicants: Crud
+    val billing: Crud
+    val content: Crud
+    val documents: Crud
+    val exclusionMatches: Crud
+    val memberDocuments: Crud
+    val members: Crud
+    val organizations: Crud
+    val policies: Crud
+    val policyAnswers: Crud
+    val roles: Crud
+    val tags: Crud
+    val tasks: Crud
+    val taskSchedules: Crud
+}
+
+interface ServicePermissions<Whole, Crud> {
+    val forms: Crud
+    val content: Crud
+    val policies: Crud
+    val policyQuestions: Crud
+    val products: Crud
+    val roles: Crud
+    val sds: Crud
+    val tags: Crud
+}
+
+@Serializable
+data class FinalServicePermissions(
+    override val forms: Access = Access.None,
+    override val content: Access = Access.None,
+    override val policies: Access = Access.None,
+    override val policyQuestions: Access = Access.None,
+    override val products: Access = Access.None,
+    override val roles: Access = Access.None,
+    override val sds: Access = Access.None,
+    override val tags: Access = Access.None,
+) : ServicePermissions<Boolean, Access>
+
+@Serializable
+enum class Access {
+    None,
+    View,
+    Edit,
+    Full,
+    Delegate,
+    Administrate,
+}
+
+@Serializable
+data class FinalPermissions(
+    val directOwner: UUID,
+    val owners: Set<UUID>,
+    val member: UUID,
+    override val manageBalance: Boolean,
+    override val minimalMemberRead: Boolean,
+    override val notifications: Boolean,
+    override val sds: Boolean,
+    override val subscriptions: Boolean,
+    override val associates: Access,
+    override val applicants: Access,
+    override val billing: Access,
+    override val content: Access,
+    override val documents: Access,
+    override val exclusionMatches: Access,
+    override val organizations: Access,
+    override val policies: Access,
+    override val policyAnswers: Access,
+    override val roles: Access,
+    override val tags: Access,
+    override val tasks: Access,
+    override val taskSchedules: Access,
+    override val memberDocuments: Access,
+    override val members: Access,
+) : Permissions<Boolean, Access>
+
+@Serializable
+data class CompletePermissions(
+    val organizations: Set<FinalPermissions>,
+    val services: FinalServicePermissions,
+) {
+    companion object {
+        val sample by lazy {
+            Serialization.json.decodeFromString(
+                serializer(), """
+            {
+            	"organizations": [
+            		{
+            			"directOwner": "85ee13e4-71ac-4474-bc21-1bcd392f889a",
+            			"owners": [
+            				"85ee13e4-71ac-4474-bc21-1bcd392f889a"
+            			],
+            			"member": "3a8a8f0e-845d-4783-b5bb-d56c68fa8f2d",
+            			"manageBalance": false,
+            			"minimalMemberRead": false,
+            			"notifications": false,
+            			"sds": false,
+            			"subscriptions": false,
+            			"associates": "None",
+            			"applicants": "None",
+            			"billing": "None",
+            			"content": "None",
+            			"documents": "None",
+            			"exclusionMatches": "None",
+            			"organizations": "None",
+            			"policies": "None",
+            			"policyAnswers": "None",
+            			"roles": "None",
+            			"tags": "None",
+            			"tasks": "None",
+            			"taskSchedules": "None",
+            			"memberDocuments": "None",
+            			"members": "None"
+            		}
+            	],
+            	"services": {
+            		"forms": "None",
+            		"content": "None",
+            		"policies": "None",
+            		"policyQuestions": "None",
+            		"products": "None",
+            		"roles": "None",
+            		"sds": "None",
+            		"tags": "None"
+            	}
+            }
+        """.trimIndent()
+            )
+        }
+    }
 }

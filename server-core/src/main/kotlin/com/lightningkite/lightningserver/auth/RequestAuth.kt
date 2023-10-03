@@ -9,7 +9,6 @@ import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.serialization.Serialization
-import kotlinx.datetime.Clock
 import com.lightningkite.now
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -17,7 +16,6 @@ import kotlinx.serialization.UseContextualSerialization
 import kotlin.time.Duration
 import kotlinx.datetime.Instant
 import com.lightningkite.UUID
-import com.lightningkite.uuid
 
 data class RequestAuth<SUBJECT : HasId<*>>(
     val subject: Authentication.SubjectHandler<SUBJECT, *>,
@@ -75,6 +73,8 @@ data class RequestAuth<SUBJECT : HasId<*>>(
         abstract suspend fun calculate(auth: RequestAuth<SUBJECT>): VALUE
         abstract val serializer: KSerializer<VALUE>
         abstract val validFor: Duration
+        var serializationIndex: Int = -1
+            private set
         companion object {
             private val _allCacheKeys = ArrayList<CacheKey<*, *, *>>()
             private var used: Boolean = false
@@ -82,6 +82,7 @@ data class RequestAuth<SUBJECT : HasId<*>>(
                 if(!used) {
                     used = true
                     _allCacheKeys.sortBy { it.name }
+                    _allCacheKeys.forEachIndexed { index, cacheKey -> cacheKey.serializationIndex = index }
                 }
                 return _allCacheKeys
             }

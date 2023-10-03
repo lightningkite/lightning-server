@@ -1,10 +1,12 @@
 package com.lightningkite.lightningserver.db
 
+import com.lightningkite.lightningdb.Database
 import com.lightningkite.lightningdb.FieldCollection
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.AuthAccessor
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 
 @Deprecated("User newer version with auth accessor instead, as it enables more potential optimizations.")
@@ -52,6 +54,17 @@ fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> modelInfo(
 
     override val collectionName: String = modelName
 }
+
+/*
+T.serializer().modelInfo(database(), "collectionName") {
+    forAuth<User> {
+        it.withPermissions(ModelPermission(
+
+        ))
+    }
+    forAuth<Admin> { it }
+}
+ */
 
 interface ModelInfo<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> {
     val serialization: ModelSerializationInfo<T, ID>

@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.encryptor
 import com.lightningkite.lightningserver.encryption.secretBasis
 import kotlinx.serialization.*
+import org.junit.Test
 import kotlin.time.Duration
 import java.util.*
 
