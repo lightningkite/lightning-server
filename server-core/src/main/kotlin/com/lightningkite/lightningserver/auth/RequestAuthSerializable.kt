@@ -1,4 +1,5 @@
 @file:UseContextualSerialization(Instant::class, UUID::class)
+
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningdb.Description
@@ -48,10 +49,11 @@ fun RequestAuth<*>.serializable(expiresAt: Instant) = RequestAuthSerializable(
 )
 
 fun RequestAuthSerializable.real(subjectHandler: Authentication.SubjectHandler<*, *>? = null): RequestAuth<*> {
-    val subject = subjectHandler ?: Authentication.subjects.values.find { it.name == this.subjectType } as? Authentication.SubjectHandler<HasId<Comparable<Any>>, Comparable<Any>>
+    val subject = subjectHandler
+        ?: Authentication.subjects.values.find { it.name == this.subjectType } as? Authentication.SubjectHandler<HasId<Comparable<Any>>, Comparable<Any>>
         ?: throw TokenException("Auth type ${subjectType} not known.")
-    if(subjectHandler != null && this.subjectType != subjectHandler.name) throw TokenException("Subject type mismatch")
-    if(this.expiresAt < now()) throw TokenException("Authorization has expired.")
+    if (subjectHandler != null && this.subjectType != subjectHandler.name) throw TokenException("Subject type mismatch")
+    if (this.expiresAt < now()) throw TokenException("Authorization has expired.")
     return RequestAuth(
         subject = subject,
         rawId = Serialization.json.decodeUnwrappingString(subject.idSerializer, id),
@@ -63,14 +65,16 @@ fun RequestAuthSerializable.real(subjectHandler: Authentication.SubjectHandler<*
 }
 
 @Suppress("UNCHECKED_CAST")
-fun RequestAuth<*>.cacheKeyMap() = CacheKeyMap(cache as Map<RequestAuth.CacheKey<*, *, *>, RequestAuth.ExpiringValue<*>>)
+fun RequestAuth<*>.cacheKeyMap() =
+    CacheKeyMap(cache as Map<RequestAuth.CacheKey<*, *, *>, RequestAuth.ExpiringValue<*>>)
+
 fun RequestAuth<*>.cacheKeyMap(cache: CacheKeyMap): RequestAuth<*> {
     @Suppress("UNCHECKED_CAST")
     (this as RequestAuth<HasId<Comparable<Any>>>).cache.putAll(cache.map as Map<RequestAuth.CacheKey<HasId<Comparable<Any>>, *, *>, RequestAuth.ExpiringValue<*>>)
     return this
 }
 
-object CacheKeyMapSerializer: KSerializer<CacheKeyMap> {
+object CacheKeyMapSerializer : KSerializer<CacheKeyMap> {
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("CacheKeyMap") {
         for (key in RequestAuth.CacheKey.allCacheKeys) {
             element(key.name, RequestAuth.ExpiringValue.serializer(key.serializer).descriptor, isOptional = true)
@@ -85,7 +89,8 @@ object CacheKeyMapSerializer: KSerializer<CacheKeyMap> {
                 if (index == CompositeDecoder.DECODE_DONE) break
                 if (index == CompositeDecoder.UNKNOWN_NAME) throw SerializationException()
                 val key = RequestAuth.CacheKey.allCacheKeys[index]
-                map[key] = decodeSerializableElement(descriptor, index, RequestAuth.ExpiringValue.serializer(key.serializer))
+                map[key] =
+                    decodeSerializableElement(descriptor, index, RequestAuth.ExpiringValue.serializer(key.serializer))
             }
         }
         return CacheKeyMap(map)
@@ -93,20 +98,18 @@ object CacheKeyMapSerializer: KSerializer<CacheKeyMap> {
 
     override fun serialize(encoder: Encoder, value: CacheKeyMap) {
         encoder.encodeStructure(descriptor) {
-            for ((key, value) in value.map) {
-                val index = RequestAuth.CacheKey.allCacheKeys.indexOf(key)
-                if(index == -1) {
-                    println("WARNING: Key not registered!")
-                    continue
+            value.map.entries
+                .filter { it.key.serializationIndex >= 0 }
+                .sortedBy { it.key.serializationIndex }
+                .forEach { (key, value) ->
+                    @Suppress("UNCHECKED_CAST")
+                    encodeSerializableElement(
+                        descriptor,
+                        key.serializationIndex,
+                        RequestAuth.ExpiringValue.serializer(key.serializer as KSerializer<Any?>),
+                        value as RequestAuth.ExpiringValue<Any?>
+                    )
                 }
-                @Suppress("UNCHECKED_CAST")
-                encodeSerializableElement(
-                    descriptor,
-                    index,
-                    RequestAuth.ExpiringValue.serializer(key.serializer as KSerializer<Any?>),
-                    value as RequestAuth.ExpiringValue<Any?>
-                )
-            }
         }
     }
 }

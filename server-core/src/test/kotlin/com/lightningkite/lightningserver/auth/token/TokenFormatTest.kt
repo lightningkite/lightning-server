@@ -34,7 +34,7 @@ abstract class TokenFormatTest {
             now().roundTo(1.seconds),
             setOf("test", "test2"),
             thirdParty = "thirdparty"
-        ).precache(listOf(TestSettings.EmailCacheKey))
+        ).precache(TestSettings.subjectHandler.knownCacheTypes)
     }
 
     @Test
@@ -46,6 +46,16 @@ abstract class TokenFormatTest {
     fun testDifferentHashFails(): Unit = runBlocking {
         assertFailsWith<TokenException> {
             format().read(TestSettings.subjectHandler, format().create(TestSettings.subjectHandler, sampleAuth.await()))
+        }
+    }
+    @Test
+    fun testMulticache(): Unit = runBlocking {
+        val format = format()
+        var auth = sampleAuth.await()
+        Assert.assertEquals(auth, format.read(TestSettings.subjectHandler, format.create(TestSettings.subjectHandler, auth).also { println(it) }))
+        repeat(100) {
+            auth = auth.precache(TestSettings.subjectHandler.knownCacheTypes)
+            Assert.assertEquals(auth, format.read(TestSettings.subjectHandler, format.create(TestSettings.subjectHandler, auth).also { println(it) }))
         }
     }
 
