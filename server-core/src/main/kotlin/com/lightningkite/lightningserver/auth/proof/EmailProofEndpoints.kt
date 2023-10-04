@@ -25,11 +25,12 @@ class EmailProofEndpoints(
     path: ServerPath,
     pin: PinHandler,
     val email: () -> EmailClient,
-    val emailTemplate: (String, String) -> Email,
+    val emailTemplate: suspend (String, String) -> Email,
     proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
+    val verifyEmail: suspend (String) -> Boolean = { true },
 ) : PinBasedProofEndpoints(path, proofHasher, pin) {
     init {
-        if(path.docName == null) path.docName = "EmailProof"
+        if (path.docName == null) path.docName = "EmailProof"
     }
 
     override val name: String
@@ -44,6 +45,7 @@ class EmailProofEndpoints(
         get() = "test@test.com"
 
     override suspend fun send(to: String, pin: String) {
-        email().send(emailTemplate(to, pin))
+        if(verifyEmail(to))
+            email().send(emailTemplate(to, pin))
     }
 }

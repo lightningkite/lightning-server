@@ -25,11 +25,12 @@ class SmsProofEndpoints(
     path: ServerPath,
     pin: PinHandler,
     val sms: () -> SMSClient,
-    val smsTemplate: (pin: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." },
+    val smsTemplate: suspend (pin: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." },
     proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
+    val verifyPhone: suspend (String) -> Boolean = { true },
 ) : PinBasedProofEndpoints(path, proofHasher, pin) {
     init {
-        if(path.docName == null) path.docName = "SmsProof"
+        if (path.docName == null) path.docName = "SmsProof"
     }
 
     override val name: String
@@ -44,6 +45,7 @@ class SmsProofEndpoints(
         get() = "800-1000-100"
 
     override suspend fun send(to: String, pin: String) {
-        sms().send(to, smsTemplate(pin))
+        if (verifyPhone(to))
+            sms().send(to, smsTemplate(pin))
     }
 }
