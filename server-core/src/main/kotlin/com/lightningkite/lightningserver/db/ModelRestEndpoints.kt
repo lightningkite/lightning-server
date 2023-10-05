@@ -22,7 +22,7 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.serializer
 import kotlin.random.Random
 
-open class ModelRestEndpoints<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
+open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     path: ServerPath,
     val info: ModelInfo<USER, T, ID>
 ) : ServerPathGroup(path) {
@@ -35,6 +35,10 @@ open class ModelRestEndpoints<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID
 
     init {
         if (path.docName == null) path.docName = collectionName
+            .replace(Regex("""[^0-9a-zA-Z]+(?<following>.)?""")) { match ->
+                match.groups["following"]?.value?.uppercase() ?: ""
+            }
+            .replaceFirstChar { it.lowercase() }
         all.add(this)
     }
 
@@ -76,7 +80,14 @@ open class ModelRestEndpoints<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID
             info.serialization.serializer.serializableProperties!!
                 .filter { it.serializer.descriptor.kind is PrimitiveKind }
                 .let {
-                    (1..3).map { _ -> it.shuffled().take(2).map { SortPart(DataClassPathAccess(DataClassPathSelf(info.serialization.serializer), it), Random.nextBoolean()) } }
+                    (1..3).map { _ ->
+                        it.shuffled().take(2).map {
+                            SortPart(
+                                DataClassPathAccess(DataClassPathSelf(info.serialization.serializer), it),
+                                Random.nextBoolean()
+                            )
+                        }
+                    }
                 }
         } catch (e: Exception) {
             listOf()

@@ -57,7 +57,9 @@ val Documentable.functionName: String
         }
         .replaceFirstChar { it.lowercase() }
 
-internal fun KSerializer<*>.subSerializers(): Array<KSerializer<*>> = listElement()?.let { arrayOf(it) }
+internal fun KSerializer<*>.subSerializers(): Array<KSerializer<*>> = nullElement()?.let { arrayOf(it) }
+    ?: serializableProperties?.map { it.serializer }?.toTypedArray()
+    ?: listElement()?.let { arrayOf(it) }
     ?: mapValueElement()?.let { arrayOf(it) }
     ?: (this as? GeneratedSerializer<*>)?.typeParametersSerializers()
     ?: (this as? ConditionSerializer<*>)?.inner?.let { arrayOf(it) }
@@ -67,7 +69,9 @@ internal fun KSerializer<*>.subSerializers(): Array<KSerializer<*>> = listElemen
     ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: arrayOf()
 
-internal fun KSerializer<*>.subAndChildSerializers(): Array<KSerializer<*>> = listElement()?.let { arrayOf(it) }
+internal fun KSerializer<*>.subAndChildSerializers(): Array<KSerializer<*>> = nullElement()?.let { arrayOf(it) }
+    ?: serializableProperties?.map { it.serializer }?.toTypedArray()
+    ?: listElement()?.let { arrayOf(it) }
     ?: mapValueElement()?.let { arrayOf(it) }
     ?: (this as? GeneratedSerializer<*>)?.run { childSerializers() + typeParametersSerializers() }
     ?: (this as? ConditionSerializer<*>)?.inner?.let { arrayOf(it) }

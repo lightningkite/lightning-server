@@ -28,7 +28,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
                     append("export interface ")
                     it.write().let { out.append(it) }
                     appendLine(" {")
-                    (it as? GeneratedSerializer<*>)?.childSerializers()?.forEachIndexed { index, sub ->
+                    (it.serializableProperties?.map { it.serializer } ?: it.tryChildSerializers()?.toList() ?: listOf()).forEachIndexed { index, sub ->
                         append("    ")
                         append(it.descriptor.getElementName(index))
                         append(": ")
@@ -373,60 +373,62 @@ private fun arguments(
 }
 
 
-private fun KSerializer<*>.write(): String = if (this == Unit.serializer()) "void" else StringBuilder().also { out ->
-    when (descriptor.kind) {
-        PrimitiveKind.BOOLEAN -> out.append("boolean")
-        PrimitiveKind.BYTE,
-        PrimitiveKind.SHORT,
-        PrimitiveKind.INT,
-        PrimitiveKind.LONG,
-        PrimitiveKind.FLOAT,
-        PrimitiveKind.DOUBLE -> out.append("number")
+private fun KSerializer<*>.write(): String = nullElement()?.let { it.write() + " | null | undefined" } ?: when {
+    this == Unit.serializer() -> "void"
+    else -> StringBuilder().also { out ->
+        when (descriptor.kind) {
+            PrimitiveKind.BOOLEAN -> out.append("boolean")
+            PrimitiveKind.BYTE,
+            PrimitiveKind.SHORT,
+            PrimitiveKind.INT,
+            PrimitiveKind.LONG,
+            PrimitiveKind.FLOAT,
+            PrimitiveKind.DOUBLE -> out.append("number")
 
-        PrimitiveKind.CHAR,
-        PrimitiveKind.STRING -> {
-            val cleanName = this.descriptor.simpleSerialName
-            if (cleanName != "String") {
-                out.append(cleanName)
-                this.subSerializers().takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.write() }?.let {
+            PrimitiveKind.CHAR,
+            PrimitiveKind.STRING -> {
+                val cleanName = this.descriptor.simpleSerialName
+                if (cleanName != "String") {
+                    out.append(cleanName)
+                    this.subSerializers().takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.write() }?.let {
+                        out.append(it)
+                    }
+                } else {
+                    out.append("string")
+                }
+            }
+
+            StructureKind.LIST -> {
+                out.append("Array<${this.listElement()!!.write()}>")
+            }
+
+            StructureKind.MAP -> {
+                out.append("Record")
+                listOf("string", this.mapValueElement()!!.write()).joinToString(", ", "<", ">").let {
                     out.append(it)
                 }
-            } else {
-                out.append("string")
+            }
+
+            SerialKind.CONTEXTUAL -> {
+                this.uncontextualize().write().let { out.append(it) }
+            }
+
+            is PolymorphicKind,
+            StructureKind.OBJECT,
+            SerialKind.ENUM,
+            StructureKind.CLASS -> {
+                if(descriptor.serialName == "com.lightningkite.lightningdb.Partial") {
+                    out.append("DeepPartial")
+                } else {
+                    out.append(descriptor.simpleSerialName)
+                }
+                this.tryTypeParameterSerializers()?.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.write() }?.let {
+                    out.append(it)
+                }
             }
         }
-
-        StructureKind.LIST -> {
-            out.append("Array<${this.listElement()!!.write()}>")
-        }
-
-        StructureKind.MAP -> {
-            out.append("Record")
-            listOf("string", this.mapValueElement()!!.write()).joinToString(", ", "<", ">").let {
-                out.append(it)
-            }
-        }
-
-        SerialKind.CONTEXTUAL -> {
-            this.uncontextualize().write().let { out.append(it) }
-        }
-
-        is PolymorphicKind,
-        StructureKind.OBJECT,
-        SerialKind.ENUM,
-        StructureKind.CLASS -> {
-            if(descriptor.serialName == "com.lightningkite.lightningdb.Partial") {
-                out.append("DeepPartial")
-            } else {
-                out.append(descriptor.simpleSerialName)
-            }
-            this.subSerializers().takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.write() }?.let {
-                out.append(it)
-            }
-        }
-    }
-    if (descriptor.isNullable) out.append(" | null | undefined")
-}.toString()
+    }.toString()
+}
 
 private val SerialDescriptor.simpleSerialName: String
     get() = serialName.substringBefore('<').substringAfterLast('.').removeSuffix("?")

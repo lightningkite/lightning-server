@@ -5,6 +5,7 @@ package com.lightningkite.lightningserver.typed
 import com.lightningkite.lightningdb.MySealedClassSerializer
 import com.lightningkite.lightningdb.listElement
 import com.lightningkite.lightningdb.mapValueElement
+import com.lightningkite.lightningdb.nullElement
 import com.lightningkite.lightningserver.camelCase
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.HttpMethod
@@ -350,7 +351,7 @@ private fun arguments(
 }
 
 
-private fun KSerializer<*>.write(): String = if (this == Unit.serializer()) "void" else StringBuilder().also { out ->
+private fun KSerializer<*>.write(): String = nullElement()?.let { it.write() + "?" } ?: if (this == Unit.serializer()) "void" else StringBuilder().also { out ->
     when (descriptor.kind) {
         PrimitiveKind.BOOLEAN -> out.append("bool")
         PrimitiveKind.BYTE,
@@ -400,7 +401,6 @@ private fun KSerializer<*>.write(): String = if (this == Unit.serializer()) "voi
             }
         }
     }
-    if (descriptor.isNullable) out.append("?")
 }.toString()
 
 private fun KSerializer<*>.writeSerialize(on: String): String = StringBuilder().also { out ->
@@ -419,6 +419,7 @@ private fun KSerializer<*>.writeSerialize(on: String): String = StringBuilder().
         PrimitiveKind.CHAR,
         PrimitiveKind.STRING -> out.append(on)
 
+        // TODO
         StructureKind.LIST -> {
             out.append(on)
             if (descriptor.isNullable) out.append("?.") else out.append(".")

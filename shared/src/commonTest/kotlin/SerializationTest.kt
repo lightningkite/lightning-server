@@ -23,6 +23,7 @@ import kotlinx.serialization.properties.encodeToStringMap
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 
 class SerializationTest {
@@ -120,6 +121,7 @@ class SerializationTest {
     @Test fun hackTest() {
         println((Cursed.Inside.serializer(Int.serializer()) as GeneratedSerializer<*>).childSerializers().joinToString())
         println(serializer<List<Int>>().listElement())
+        assertNull(serializer<Unit>().listElement())
         println(serializer<Map<String, Int>>().mapValueElement())
         println(serializer<Int?>().nullElement())
     }

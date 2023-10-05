@@ -5,6 +5,7 @@ package com.lightningkite.lightningdb
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.encoding.AbstractDecoder
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.encoding.Decoder
@@ -133,7 +134,7 @@ private class CheatingBastardDecoder(var count: Int = 0) : AbstractDecoder() {
 fun KSerializer<*>.innerElement(): KSerializer<*> = try {
     if (this is WrappingSerializer<*, *>) this.to.innerElement() else {
         this.deserialize(CheatingBastardDecoder(0))
-        throw Exception()
+        throw Exception("${this.descriptor.serialName} ($this) did not have an inner element")
     }
 } catch (e: FoundSerializerSignal) {
     e.serializer
@@ -142,14 +143,14 @@ fun KSerializer<*>.innerElement(): KSerializer<*> = try {
 fun KSerializer<*>.innerElement2(): KSerializer<*> = try {
     if (this is WrappingSerializer<*, *>) this.to.innerElement2() else {
         this.deserialize(CheatingBastardDecoder(1))
-        throw Exception()
+        throw Exception("${this.descriptor.serialName} ($this) did not have a second inner element")
     }
 } catch (e: FoundSerializerSignal) {
     e.serializer
 }
-fun KSerializer<*>.listElement(): KSerializer<*>? = this.innerElement()
-fun KSerializer<*>.mapKeyElement(): KSerializer<*>? = this.innerElement()
-fun KSerializer<*>.mapValueElement(): KSerializer<*>? = this.innerElement2()
+fun KSerializer<*>.listElement(): KSerializer<*>? = if(descriptor.kind == StructureKind.LIST) this.innerElement() else null
+fun KSerializer<*>.mapKeyElement(): KSerializer<*>? = if(descriptor.kind == StructureKind.MAP) this.innerElement() else null
+fun KSerializer<*>.mapValueElement(): KSerializer<*>? = if(descriptor.kind == StructureKind.MAP) this.innerElement2() else null
 @OptIn(ExperimentalSerializationApi::class)
 fun KSerializer<*>.nullElement(): KSerializer<*>? {
     return if (this.descriptor.isNullable) this.innerElement()
