@@ -161,6 +161,15 @@ fun KSerializer<*>.nullElement(): KSerializer<*>? {
 fun KSerializer<*>.tryTypeParameterSerializers(): Array<KSerializer<*>>? = (this as? GeneratedSerializer<*>)?.typeParametersSerializers()
 
 @OptIn(InternalSerializationApi::class)
+fun KSerializer<*>.tryTypeParameterSerializers2(): Array<KSerializer<*>>? = tryTypeParameterSerializers()
+    ?: (this as? GeneratedSerializer<*>)?.typeParametersSerializers()
+    ?: (this as? ConditionSerializer<*>)?.inner?.let { arrayOf(it) }
+    ?: (this as? ModificationSerializer<*>)?.inner?.let { arrayOf(it) }
+    ?: (this as? PartialSerializer<*>)?.source?.let { arrayOf(it) }
+    ?: (this as? SortPartSerializer<*>)?.inner?.let { arrayOf(it) }
+    ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
+
+@OptIn(InternalSerializationApi::class)
 fun KSerializer<*>.tryChildSerializers(): Array<KSerializer<*>>? = (this as? GeneratedSerializer<*>)?.childSerializers()
 
 @Suppress("UNCHECKED_CAST")

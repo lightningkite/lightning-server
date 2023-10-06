@@ -422,7 +422,7 @@ private fun KSerializer<*>.write(): String = nullElement()?.let { it.write() + "
                 } else {
                     out.append(descriptor.simpleSerialName)
                 }
-                this.tryTypeParameterSerializers()?.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.write() }?.let {
+                this.tryTypeParameterSerializers2()?.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.write() }?.let {
                     out.append(it)
                 }
             }
