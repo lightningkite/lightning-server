@@ -230,7 +230,7 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     val multiplex = path("multiplex").websocket(MultiplexWebSocketHandler(cache))
 
-    val meta = path("meta").metaEndpoints<Unit> { true }
+    val meta = path("meta").metaEndpoints<Unit>()
 
     val weirdAuth = path("weird-auth").get.typed(
         summary = "Get weird auth",
@@ -246,7 +246,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         Email(
             subject = "Log In Code",
             to = listOf(),
-            plainText = "Your PIN is {{PIN}}."
+            plainText = "Your PIN is $pin."
         )
     })
     val proofOtp = OneTimePasswordProofEndpoints(path("proof/otp"), database, cache)
@@ -256,7 +256,7 @@ object Server : ServerPathGroup(ServerPath.root) {
             override val name: String get() = "User"
             override val idProofs: Set<Authentication.ProofMethod> = setOf(proofEmail)
             override val authType: AuthType get() = AuthType<User>()
-            override val applicableProofs: Set<Authentication.ProofMethod> = setOf(proofOtp)
+            override val additionalProofs: Set<Authentication.ProofMethod> = setOf(proofOtp)
             override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<User, UUID>? {
                 val emailIdentifier = proofs.find { it.of == "email" } ?: return null
                 val user = userInfo.collection().findOne(condition { it.email eq emailIdentifier.value }) ?: run {

@@ -38,7 +38,8 @@ object Authentication {
         val name: String
         val idProofs: Set<ProofMethod>
         val authType: AuthType
-        val applicableProofs: Set<ProofMethod>
+        val additionalProofs: Set<ProofMethod>
+        val applicableProofs: Set<ProofMethod> get() = idProofs + additionalProofs
         suspend fun authenticate(vararg proofs: Proof): AuthenticateResult<SUBJECT, ID>?
         suspend fun permitMasquerade(
             other: SubjectHandler<*, *>,
@@ -65,17 +66,19 @@ object Authentication {
         val info: ProofMethodInfo get() = ProofMethodInfo(name, validates, strength)
     }
 
-    interface DirectProofMethod : ProofMethod {
-        val prove: ApiEndpoint<*, TypedServerPath0, ProofEvidence, Proof>
+    interface EndsWithStringProofMethod : ProofMethod {
+        val prove: ApiEndpoint<HasId<*>?, TypedServerPath0, ProofEvidence, Proof>
     }
 
-    interface StartedProofMethod : ProofMethod {
-        val start: ApiEndpoint<*, TypedServerPath0, String, String>
-        val prove: ApiEndpoint<*, TypedServerPath0, ProofEvidence, Proof>
+    interface DirectProofMethod : EndsWithStringProofMethod {
+    }
+
+    interface StartedProofMethod : EndsWithStringProofMethod {
+        val start: ApiEndpoint<HasId<*>?, TypedServerPath0, String, String>
     }
 
     interface ExternalProofMethod : ProofMethod {
-        val start: ApiEndpoint<*, TypedServerPath0, String, String>
+        val start: ApiEndpoint<HasId<*>?, TypedServerPath0, String, String>
         val indirectLink: ServerPath
     }
 

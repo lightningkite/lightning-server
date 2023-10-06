@@ -2,35 +2,34 @@ package com.lightningkite.lightningserver.auth.subject
 
 import com.lightningkite.UUID
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.oauth.*
 import com.lightningkite.lightningserver.auth.proof.Proof
+import com.lightningkite.lightningserver.auth.proof.ProofEvidence
 import com.lightningkite.lightningserver.auth.proof.verify
 import com.lightningkite.lightningserver.auth.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.auth.token.TokenFormat
+import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.encryption.*
-import com.lightningkite.lightningserver.exceptions.BadRequestException
-import com.lightningkite.lightningserver.exceptions.ForbiddenException
-import com.lightningkite.lightningserver.exceptions.HttpStatusException
-import com.lightningkite.lightningserver.exceptions.UnauthorizedException
-import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.Request
-import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.exceptions.*
+import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.routes.fullUrl
-import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.serialization.*
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.now
+import io.ktor.http.*
 import kotlinx.datetime.Instant
 import kotlinx.serialization.ContextualSerializer
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonPrimitive
@@ -51,7 +50,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     init {
         prepareModels()
-        if(path.docName == null) path.docName = "${handler.name}Auth"
+        if (path.docName == null) path.docName = "${handler.name}Auth"
     }
 
     private val sessionSerializer = Session.serializer(handler.subjectSerializer, handler.idSerializer)
@@ -63,7 +62,14 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             sessionSerializer,
             idSerializer = ContextualSerializer(UUID::class)
         ),
-        authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType, scopes = setOf("sessions")))) + Authentication.isSuperUser,
+        authOptions = AuthOptions<SUBJECT>(
+            setOf(
+                AuthOption(
+                    handler.authType,
+                    scopes = setOf("sessions")
+                )
+            )
+        ) + Authentication.isSuperUser,
         getCollection = {
             database().collection(
                 sessionSerializer,
@@ -185,14 +191,14 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         summary = "Log In",
         description = "Attempt to log in as a ${handler.name} using various proofs.  Valid proofs types are ${
             handler.idProofs.plus(
-                handler.applicableProofs
+                handler.additionalProofs
             ).joinToString()
         }",
         errorCases = listOf(errorNoSingleUser, errorInvalidProof),
         implementation = { proofs: List<Proof> ->
             proofs.forEach {
                 if (!proofHasher().verify(it)) throw HttpStatusException(errorInvalidProof.copy(data = it.via))
-                if(now() > it.at + 1.hours) throw HttpStatusException(errorExpiredProof.copy(data = it.via))
+                if (now() > it.at + 1.hours) throw HttpStatusException(errorExpiredProof.copy(data = it.via))
             }
             val used = proofs.map { it.via }.toSet()
             val result =
@@ -246,9 +252,10 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         summary = "Generate Oauth Code",
         errorCases = listOf(),
         implementation = { input: OauthCodeRequest ->
-            val client = OauthClientEndpoints.instance?.modelInfo?.collection()?.get(input.client_id) ?: throw BadRequestException("No client ID found")
+            val client = OauthClientEndpoints.instance?.modelInfo?.collection()?.get(input.client_id)
+                ?: throw BadRequestException("No client ID found")
             val baseUrl = input.redirect_uri.substringBefore('#').substringBefore('?')
-            if(baseUrl !in client.redirectUris) throw BadRequestException("Redirect URI ${baseUrl} not valid.  Valid URIs: ${client.redirectUris.joinToString()}")
+            if (baseUrl !in client.redirectUris) throw BadRequestException("Redirect URI ${baseUrl} not valid.  Valid URIs: ${client.redirectUris.joinToString()}")
             OauthCode(
                 code = FutureSession(
                     scopes = client.scopes intersect input.scope.split(' ').toSet(),
@@ -271,9 +278,13 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 input.refresh_token != null -> RefreshToken(input.refresh_token).session(
                     this.rawRequest
                 ) ?: throw BadRequestException("Refresh token not recognized")
+
                 input.code != null -> {
-                    val client = OauthClientEndpoints.instance?.modelInfo?.collection()?.get(input.client_id) ?: throw BadRequestException("Client ID/Secret mismatch")
-                    if(client.secrets.none { input.client_secret.checkHash(it.secretHash) }) throw BadRequestException("Client ID/Secret mismatch")
+                    val client = OauthClientEndpoints.instance?.modelInfo?.collection()?.get(input.client_id)
+                        ?: throw BadRequestException("Client ID/Secret mismatch")
+                    if (client.secrets.none { input.client_secret.checkHash(it.secretHash) }) throw BadRequestException(
+                        "Client ID/Secret mismatch"
+                    )
                     val future = FutureSession.fromToken(input.code!!)
                     val (s, secret) = newSessionPrivate(
                         label = "Oauth with ${client.niceName}",
@@ -287,6 +298,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     generatedRefresh = secret
                     s
                 }
+
                 else -> throw BadRequestException("No authentication provided")
             }
             val auth: RequestAuth<SUBJECT> = session.toAuth().precache(handler.knownCacheTypes)
@@ -307,6 +319,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         refresh_token = generatedRefresh?.string
                     )
                 }
+
                 else -> throw BadRequestException("Grant type ${input.grant_type} unsupported")
             }
         }
@@ -358,7 +371,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         summary = "Terminate session",
         errorCases = listOf(),
         implementation = { _ ->
-            if(sessionInfo.collection().get(path1)?.subjectId != auth.id) throw ForbiddenException()
+            if (sessionInfo.collection().get(path1)?.subjectId != auth.id) throw ForbiddenException()
             sessionInfo.collection().updateOneById(path1, modification(dataClassPath) {
                 it.terminated assign now()
             })
@@ -366,8 +379,8 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     )
 
     private suspend fun RefreshToken.session(request: Request?): Session<SUBJECT, ID>? {
-        if(!valid) return null
-        if(type != handler.name) return null
+        if (!valid) return null
+        if (type != handler.name) return null
         val session = sessionInfo.collection().get(_id) ?: return null
         if (!plainTextSecret.checkHash(session.secretHash)) return null
         if (session.terminated != null) return null
@@ -380,15 +393,19 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     }
 
     private val hashSize by lazy { proofHasher().sign(byteArrayOf(1, 2, 3)).size }
-    private fun FutureSession<ID>.asToken(): String = Base64.getEncoder().encodeToString(Serialization.javaData.encodeToByteArray(FutureSession.serializer(handler.idSerializer), this).let { it + proofHasher().sign(it) })
-    private fun FutureSession.Companion.fromToken(token: String): FutureSession<ID> = Base64.getDecoder().decode(token).let {
-        val content = it.sliceArray(0 until it.size - hashSize)
-        val signature = it.sliceArray(it.size - hashSize until it.size)
-        if(!proofHasher().verify(content, signature)) throw TokenException("Could not verify hash.")
-        Serialization.javaData.decodeFromByteArray(FutureSession.serializer(handler.idSerializer), content).also {
-            if(now() > it.expires) throw TokenException("Token expired.")
+    private fun FutureSession<ID>.asToken(): String = Base64.getEncoder().encodeToString(
+        Serialization.javaData.encodeToByteArray(FutureSession.serializer(handler.idSerializer), this)
+            .let { it + proofHasher().sign(it) })
+
+    private fun FutureSession.Companion.fromToken(token: String): FutureSession<ID> =
+        Base64.getDecoder().decode(token).let {
+            val content = it.sliceArray(0 until it.size - hashSize)
+            val signature = it.sliceArray(it.size - hashSize until it.size)
+            if (!proofHasher().verify(content, signature)) throw TokenException("Could not verify hash.")
+            Serialization.javaData.decodeFromByteArray(FutureSession.serializer(handler.idSerializer), content).also {
+                if (now() > it.expires) throw TokenException("Token expired.")
+            }
         }
-    }
 
     val oauthInfo by lazy {
         OauthProviderInfo(
@@ -400,16 +417,160 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             mode = OauthResponseMode.form_post,
             scopeForProfile = "self",
             getProfile = {
-                val me = self.implementation(AuthAndPathParts(tokenFormat().read(handler, it.access_token)!!, null, arrayOf()), Unit)
+                val me = self.implementation(
+                    AuthAndPathParts(
+                        tokenFormat().read(handler, it.access_token)!!,
+                        null,
+                        arrayOf()
+                    ), Unit
+                )
                 val json = Serialization.json.encodeToJsonElement(handler.subjectSerializer, me).jsonObject
                 ExternalProfile(
-                    email = json["email"]?.let{ it as? JsonPrimitive }?.content,
-                    username = json["username"]?.let{ it as? JsonPrimitive }?.content ?: json["screenName"]?.let{ it as? JsonPrimitive }?.content ?: json["email"]?.let{ it as? JsonPrimitive }?.content,
-                    name = json["name"]?.let{ it as? JsonPrimitive }?.content ?: json["fullName"]?.let{ it as? JsonPrimitive }?.content ?: json["firstName"]?.let{ it as? JsonPrimitive }?.content,
-                    image = json["image"]?.let{ it as? JsonPrimitive }?.content ?: json["profilePicture"]?.let{ it as? JsonPrimitive }?.content,
+                    email = json["email"]?.let { it as? JsonPrimitive }?.content,
+                    username = json["username"]?.let { it as? JsonPrimitive }?.content
+                        ?: json["screenName"]?.let { it as? JsonPrimitive }?.content
+                        ?: json["email"]?.let { it as? JsonPrimitive }?.content,
+                    name = json["name"]?.let { it as? JsonPrimitive }?.content
+                        ?: json["fullName"]?.let { it as? JsonPrimitive }?.content
+                        ?: json["firstName"]?.let { it as? JsonPrimitive }?.content,
+                    image = json["image"]?.let { it as? JsonPrimitive }?.content
+                        ?: json["profilePicture"]?.let { it as? JsonPrimitive }?.content,
                 )
             }
         )
     }
+
+    @Serializable
+    private data class HtmlProofStartReq(val method: String, val value: String)
+    @Serializable
+    private data class HtmlProofFinish(val password: String)
+
+    /**
+     * A quick and dirty set of endpoints for logging in via HTML.
+     */
+    inner class HtmlEndpoints {
+
+        // Raw HTML side
+        val html0 = path("start/html/").get.handler { request ->
+            val otherProofs = request.queryParameter("proofs")?.let { Serialization.javaData.decodeFromBase64Url<List<Proof>>(it) } ?: listOf()
+            request.queryParameter("method")?.decodeURLPart()?.let { methodName ->
+                request.queryParameter("value")?.decodeURLPart()?.let { methodValue ->
+                    return@handler htmlContinue(HtmlProofStartReq(methodName, methodValue), request, otherProofs)
+                }
+            }
+            HttpResponse(
+                body = HttpContent.Text(
+                    string = HtmlDefaults.basePage(
+                        """
+                    <form action='.?proofs=${Serialization.javaData.encodeToBase64Url(otherProofs)}' enctype='application/x-www-form-urlencoded' method='post'>
+                        <p>Enter your login key</p>
+                        <select name='method'>
+                        ${handler.applicableProofs.joinToString() { "<option value='${it.name}'>${it.name}</option>" }}
+                        </select>
+                        <input type='value' name='value'/>
+                        <button type='submit'>Submit</button>
+                    </form>
+                """.trimIndent()
+                    ),
+                    type = ContentType.Text.Html
+                )
+            )
+        }
+
+        val html1 = path("start/html/").post.handler { request ->
+            val otherProofs = request.queryParameter("proofs")?.let { Serialization.javaData.decodeFromBase64Url<List<Proof>>(it) } ?: listOf()
+            val input = request.body!!.parse<HtmlProofStartReq>()
+            htmlContinue(input, request, otherProofs)
+        }
+
+        private suspend fun htmlContinue(
+            input: HtmlProofStartReq,
+            request: HttpRequest,
+            otherProofs: List<Proof>
+        ): HttpResponse {
+            val method = handler.applicableProofs.find { it.name == input.method }
+                ?: throw NotFoundException("No method ${input.method} known")
+            val aapp = AuthAndPathParts<HasId<*>?, TypedServerPath0>(null, request, arrayOf())
+            return when (method) {
+                is Authentication.StartedProofMethod -> {
+                    val key = method.start.implementation(aapp, input.value!!)
+                    HttpResponse(
+                        body = HttpContent.Text(
+                            string = HtmlDefaults.basePage(
+                                """
+                        <form action='./${input.method}/${key.encodeURLPathPart()}?proofs=${Serialization.javaData.encodeToBase64Url(
+                                    otherProofs
+                                )}' enctype='application/x-www-form-urlencoded' method='post'>
+                            <p>Enter your password for ${method.name}</p>
+                            <input type='password' name='password'/>
+                            <button type='submit'>Submit</button>
+                        </form>
+                    """.trimIndent()
+                            ),
+                            type = ContentType.Text.Html
+                        )
+                    )
+                }
+
+                is Authentication.DirectProofMethod -> {
+                    HttpResponse(
+                        body = HttpContent.Text(
+                            string = HtmlDefaults.basePage(
+                                """
+                        <form action='./${input.method}/${input.value.encodeURLPathPart()}?proofs=${
+                                    Serialization.javaData.encodeToBase64Url(
+                                        otherProofs
+                                    )
+                                }' enctype='application/x-www-form-urlencoded' method='post'>
+                            <p>Enter your password for ${method.name}</p>
+                            <input type='password' name='password'/>
+                            <button type='submit'>Submit</button>
+                        </form>
+                    """.trimIndent()
+                            ),
+                            type = ContentType.Text.Html
+                        )
+                    )
+                }
+
+                else ->
+                    HttpResponse(
+                        body = HttpContent.Text(
+                            string = HtmlDefaults.basePage(
+                                """
+                                    Sorry, we do not now how to display this method for testing.
+                                """.trimIndent()
+                            ),
+                            type = ContentType.Text.Html
+                        )
+                    )
+            }
+        }
+
+        val html2 = path("start/html/{method}/{key}").post.handler { request ->
+            val otherProofs = request.queryParameter("proofs")?.let { Serialization.javaData.decodeFromBase64Url<List<Proof>>(it) } ?: listOf()
+            val methodName = request.parts["method"]!!
+            val key = request.parts["key"]!!
+            val input = request.body!!.parse<HtmlProofFinish>()
+            val method = handler.applicableProofs.find { it.name == methodName }
+                    as? Authentication.EndsWithStringProofMethod
+                ?: throw NotFoundException("No method ${methodName} known")
+            val aapp = AuthAndPathParts<HasId<*>?, TypedServerPath0>(null, request, arrayOf())
+            val proof = method.prove.implementation(aapp, ProofEvidence(
+                key = key!!,
+                password = input.password
+            ))
+            val l = login.implementation(aapp, (otherProofs + proof))
+            l.session?.let {
+                HttpResponse.redirectToGet("/") {
+                    setCookie(HttpHeader.Authorization, it)
+                }
+            } ?: run {
+                val nextMethodInfo = l.options.first()
+                HttpResponse.redirectToGet(html0.path.toString() + "?proofs=${Serialization.javaData.encodeToBase64Url(otherProofs + proof)}&method=${nextMethodInfo.method.via}&value=${nextMethodInfo.value}")
+            }
+        }
+    }
+    val html = HtmlEndpoints()
 }
 

@@ -30,11 +30,8 @@ data class RequestAuth<SUBJECT : HasId<*>>(
     object Key : Request.CacheKey<RequestAuth<*>?> {
         override suspend fun calculate(request: Request): RequestAuth<*>? {
             for (reader in Authentication.readers) {
-                println("Check read $reader")
                 return reader.request(request)?.let {
-                    println("REQ RES: $it")
                     request.headers[HttpHeader.XMasquerade]?.let { m ->
-                        println("CHECK THE MASQ")
                         val otherType = m.substringBefore('/')
                         val otherHandler = Authentication.subjects.values.find { it.name == otherType } ?: throw BadRequestException("No subject type ${otherType} known")
                         val otherId = Serialization.fromString(m.substringAfter('/'), otherHandler.idSerializer)
@@ -43,7 +40,6 @@ data class RequestAuth<SUBJECT : HasId<*>>(
                             otherHandler as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>,
                             otherId
                         )) {
-                            println("DO THE MASQ")
                             RequestAuth(
                                 subject = otherHandler,
                                 sessionId = it.sessionId,

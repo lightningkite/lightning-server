@@ -28,7 +28,6 @@ import kotlinx.serialization.json.put
 class MetaEndpoints<USER>(
     path: ServerPath,
     packageName: String = "com.mypackage",
-    isAdmin: suspend (USER) -> Boolean,
 ) : ServerPathGroup(path) {
 
     val root = get.handler {
@@ -47,10 +46,16 @@ class MetaEndpoints<USER>(
     val health = path("health").healthCheck()
     val isOnline = path("online").get.handler { HttpResponse.plainText("Server is running.") }
 
-    private suspend fun openAdmin(): HttpResponse {
+    private suspend fun openAdmin(request: HttpRequest): HttpResponse {
         val inject = buildJsonObject {
             put("url", generalSettings().publicUrl)
             put("basePage", path("admin/").toString())
+            (request.headers[HttpHeader.Authorization] ?: request.headers.cookies[HttpHeader.Authorization])
+                ?.removePrefix("Bearer ")
+                ?.removePrefix("bearer ")
+                ?.let {
+                    put("jwt", it)
+                }
         }
         val original = client.get("https://lightning-server-admin.s3.us-west-2.amazonaws.com/index.html").bodyAsText()
         val page = (original.substringBeforeLast("</body>") + """
@@ -67,13 +72,13 @@ class MetaEndpoints<USER>(
     }
 
     val admin = path("admin/").get.handler {
-        openAdmin()
+        openAdmin(it)
     }
     val adminResources = path("admin/{...}").get.handler {
         if (it.wildcard?.contains(".") == true)
             HttpResponse.pathMovedOld("https://lightning-server-admin.s3.us-west-2.amazonaws.com/${it.wildcard}")
         else
-            openAdmin()
+            openAdmin(it)
     }
     val schema = path("schema").get.handler {
         HttpResponse(
@@ -262,6 +267,5 @@ class MetaEndpoints<USER>(
 }
 
 inline fun <reified USER> ServerPath.metaEndpoints(
-    packageName: String = "com.mypackage",
-    noinline isAdmin: suspend (USER) -> Boolean,
-): MetaEndpoints<USER> = MetaEndpoints(this, packageName, isAdmin)
+    packageName: String = "com.mypackage"
+): MetaEndpoints<USER> = MetaEndpoints(this, packageName)

@@ -21,7 +21,7 @@ data class ProofMethodInfo(
 @Serializable
 data class ProofOption(
     val method: ProofMethodInfo,
-    val key: String? = null,
+    val value: String? = null,
 )
 
 @Serializable

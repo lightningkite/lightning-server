@@ -121,7 +121,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         override val name: String get() = "TestUser"
         override val idProofs: Set<Authentication.ProofMethod> = setOf(proofEmail)
         override val authType: AuthType get() = AuthType<TestUser>()
-        override val applicableProofs: Set<Authentication.ProofMethod> = setOf()
+        override val additionalProofs: Set<Authentication.ProofMethod> = setOf()
         override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<TestUser, UUID>? {
             val emailIdentifier = proofs.find { it.of == "email" } ?: return null
             val user = userInfo.collection().findOne(condition { it.email eq emailIdentifier.value }) ?: run {

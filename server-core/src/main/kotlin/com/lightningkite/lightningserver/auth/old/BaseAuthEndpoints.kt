@@ -63,7 +63,7 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
         override suspend fun fetch(id: ID): USER = userAccess.byId(id)
 
         override val idProofs: Set<Authentication.ProofMethod> get() = setOf()
-        override val applicableProofs: Set<Authentication.ProofMethod> get() = setOf()
+        override val additionalProofs: Set<Authentication.ProofMethod> get() = setOf()
         override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<USER, ID>? = null
 
     }
@@ -104,7 +104,7 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
                         sessionId = null
                     )
                 } catch (e: JwtException) {
-                    throw UnauthorizedException(e.message ?: "JWT issue")
+                    return null
                 }
             }
         }

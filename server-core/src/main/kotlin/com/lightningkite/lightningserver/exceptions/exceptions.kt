@@ -81,9 +81,7 @@ class UnauthorizedException(
     message: String = "",
     data: String = "",
     cause: Throwable? = null,
-    headers: HttpHeaders = HttpHeaders {
-        setCookie(HttpHeader.Authorization, "REMOVED", expiresAt = Instant.fromEpochSeconds(0))
-    }
+    headers: HttpHeaders = HttpHeaders.EMPTY
 ) : HttpStatusException(HttpStatus.Unauthorized, detail, message, data, headers, cause)
 
 /**
