@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.listElement
 import com.lightningkite.lightningdb.mapValueElement
+import com.lightningkite.lightningdb.tryTypeParameterSerializers2
 import com.lightningkite.lightningserver.auth.AuthType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.Http
@@ -308,7 +309,7 @@ private fun KSerializer<*>.kotlinTypeString(emitter: CodeEmitter): String {
             descriptor.serialName.substringBefore('<').removeSuffix("?").takeIf { it.contains('.') }
                 ?.let { emitter.imports.add(it) }
             descriptor.serialName.substringBefore('<')
-                .substringAfterLast('.') + (subSerializers().takeUnless { it.isEmpty() }
+                .substringAfterLast('.') + (tryTypeParameterSerializers2()?.takeUnless { it.isEmpty() }
                 ?.joinToString(", ", "<", ">") { it.kotlinTypeString(emitter) } ?: "")
         }
     }
