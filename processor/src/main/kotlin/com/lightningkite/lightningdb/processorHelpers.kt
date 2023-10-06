@@ -42,7 +42,7 @@ fun KSType.toKotlinSerializer(contextualTypes: List<KSDeclaration>): String {
     if(this.declaration in contextualTypes) return "ContextualSerializer(${this.makeNotNullable().toKotlin(sequenceOf())}::class)" + if (isMarkedNullable) ".nullable" else ""
     if((this.declaration as? KSTypeAlias)?.type?.tryResolve()?.declaration in contextualTypes) return "ContextualSerializer(${this.makeNotNullable().toKotlin(sequenceOf())}::class)" + if (isMarkedNullable) ".nullable" else ""
     val typeArgsAndEnding = arguments.joinToString(", ", "(", ")") { it.type?.resolve()?.toKotlinSerializer(contextualTypes) ?: "*" } + if (isMarkedNullable) ".nullable" else ""
-    when(this.declaration.qualifiedName?.asString()?.also(::println)) {
+    when(this.declaration.qualifiedName?.asString()) {
         "kotlin.collections.List" -> return "ListSerializer$typeArgsAndEnding"
         "kotlin.collections.Set" -> return "SetSerializer$typeArgsAndEnding"
         "kotlin.collections.Map" -> return "MapSerializer$typeArgsAndEnding"
