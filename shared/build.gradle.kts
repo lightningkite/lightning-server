@@ -78,7 +78,7 @@ khrysalis {
     additionalEquivalentDirectories = listOf(project.file("build/generated/ksp/main/resources"))
 }
 
-tasks.getByName("equivalentsJar").dependsOn("kspKotlin")
+tasks.getByName("equivalentsJar").dependsOn("kspKotlinJvm")
 tasks.create("kspAll") {
     tasks.filter { it.name.startsWith("ksp") && it != this }.forEach {
         dependsOn(it)
