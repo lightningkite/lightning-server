@@ -2,9 +2,8 @@
 
 package com.lightningkite.lightningdb
 
-import com.lightningkite.uuid
+import com.lightningkite.*
 import kotlinx.datetime.Clock
-import com.lightningkite.now
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -42,6 +41,15 @@ class SerializationTest {
         LargeTestModel.path.embeddedNullable.notNull.value1
             .setMap(LargeTestModel(embeddedNullable = ClassUsedForEmbedding()), out)
         println(out)
+    }
+
+    @Test fun time() {
+        nowLocal().let {
+            assertEquals(it, myJson.decodeFromString<ZonedDateTime>(myJson.encodeToString(it)))
+        }
+        nowLocal().toOffsetDateTime().let {
+            assertEquals(it, myJson.decodeFromString<OffsetDateTime>(myJson.encodeToString(it)))
+        }
     }
 
     @Test fun partial() {

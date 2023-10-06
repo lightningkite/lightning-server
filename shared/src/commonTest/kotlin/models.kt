@@ -3,12 +3,15 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.UUID
+import com.lightningkite.ZonedDateTime
 import com.lightningkite.khrysalis.SharedCode
 import com.lightningkite.uuid
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
 
 
 @GenerateDataClassPaths()
@@ -93,6 +96,7 @@ data class LargeTestModel(
     var char: Char = ' ',
     var string: String = "",
     var instant: Instant = Instant.DISTANT_PAST,
+    val zonedDateTime: ZonedDateTime = ZonedDateTime(LocalDateTime(2000, 1, 1, 0, 0), TimeZone.currentSystemDefault()),
     var list: List<Int> = listOf(),
     var listEmbedded: List<ClassUsedForEmbedding> = listOf(),
     var set: Set<Int> = setOf(),

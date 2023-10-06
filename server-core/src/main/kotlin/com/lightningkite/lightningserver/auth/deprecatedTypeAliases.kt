@@ -15,3 +15,4 @@ typealias EmailAuthEndpoints<USER, ID> = EmailAuthEndpoints<USER, ID>
 typealias SmsAuthEndpoints<USER, ID> = SmsAuthEndpoints<USER, ID>
 @Deprecated("New import; use not recommended.  Please use the newer auth system.  It will require refactors.")
 typealias PasswordAuthEndpoints<USER, ID> = PasswordAuthEndpoints<USER, ID>
+

@@ -24,6 +24,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration
 import kotlinx.datetime.*
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 
 /**
@@ -37,8 +38,8 @@ import kotlin.time.Duration.Companion.minutes
 open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
     path: ServerPath,
     val userAccess: UserAccess<USER, ID>,
-    val expiration: Duration,
-    val emailExpiration: Duration,
+    val expiration: Duration = 365.days,
+    val emailExpiration: Duration = 30.minutes,
     val landing: String = "/",
     val handleToken: suspend HttpRequest.(token: String) -> HttpResponse = { token ->
         val dest = queryParameter("destination") ?: landing

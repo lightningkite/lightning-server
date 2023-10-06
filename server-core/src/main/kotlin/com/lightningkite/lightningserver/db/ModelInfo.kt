@@ -74,6 +74,7 @@ interface ModelInfo<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> {
 
     fun collection(): FieldCollection<T>
     suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<T>
+    suspend fun collection(user: USER): FieldCollection<T> = collection(AuthAccessor.test(user))
 }
 
 

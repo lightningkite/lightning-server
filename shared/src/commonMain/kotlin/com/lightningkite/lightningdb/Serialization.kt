@@ -1,7 +1,6 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.UUID
-import com.lightningkite.uuid
+import com.lightningkite.*
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
@@ -52,6 +51,8 @@ val ClientModule = SerializersModule {
     contextual(LocalDate::class, LocalDateIso8601Serializer)
     contextual(LocalTime::class, LocalTimeIso8601Serializer)
     contextual(LocalDateTime::class, LocalDateTimeIso8601Serializer)
+    contextual(ZonedDateTime::class, ZonedDateTimeIso8601Serializer)
+    contextual(OffsetDateTime::class, OffsetDateTimeIso8601Serializer)
     contextual(Duration::class, DurationSerializer)
     contextual(ServerFile::class, ServerFileSerialization)
 }

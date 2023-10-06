@@ -25,7 +25,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-class MetaEndpoints<USER>(
+class MetaEndpoints(
     path: ServerPath,
     packageName: String = "com.mypackage",
 ) : ServerPathGroup(path) {
@@ -266,6 +266,6 @@ class MetaEndpoints<USER>(
     )
 }
 
-inline fun <reified USER> ServerPath.metaEndpoints(
+inline fun ServerPath.metaEndpoints(
     packageName: String = "com.mypackage"
-): MetaEndpoints<USER> = MetaEndpoints(this, packageName)
+): MetaEndpoints = MetaEndpoints(this, packageName)
