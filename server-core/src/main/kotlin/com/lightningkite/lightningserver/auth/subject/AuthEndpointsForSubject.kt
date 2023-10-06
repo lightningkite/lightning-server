@@ -327,7 +327,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     val tokenSimple = path("token/simple").post.api(
         authOptions = noAuth,
-        summary = "Get Token",
+        summary = "Get Token Simple",
         errorCases = listOf(),
         implementation = { refresh: String ->
             val session = RefreshToken(refresh).session(this.rawRequest ?: throw BadRequestException())
@@ -356,7 +356,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType, scopes = null))),
         inputType = Unit.serializer(),
         outputType = Unit.serializer(),
-        summary = "Terminate session",
+        summary = "Terminate Session",
         errorCases = listOf(),
         implementation = { _ ->
             sessionInfo.collection().updateOneById(this.auth.sessionId!!, modification(dataClassPath) {
@@ -368,7 +368,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType, scopes = null))),
         inputType = Unit.serializer(),
         outputType = Unit.serializer(),
-        summary = "Terminate session",
+        summary = "Terminate Other Session",
         errorCases = listOf(),
         implementation = { _ ->
             if (sessionInfo.collection().get(path1)?.subjectId != auth.id) throw ForbiddenException()
