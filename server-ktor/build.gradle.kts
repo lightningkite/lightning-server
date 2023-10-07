@@ -14,14 +14,13 @@ plugins {
 
 val ktorVersion: String by project
 val kotlinVersion: String by project
-val khrysalisVersion: String by project
 dependencies {
     api(project(":server-core"))
     api("io.ktor:ktor-server-websockets-jvm:$ktorVersion")
     api("io.ktor:ktor-server-core-jvm:$ktorVersion")
     api("io.ktor:ktor-server-cio-jvm:$ktorVersion")
     api("io.ktor:ktor-server-netty-jvm:$ktorVersion")
-    api("io.ktor:ktor-server-cors:$ktorVersion")
+    api("io.ktor:ktor-server-cors-jvm:$ktorVersion")
 
     testImplementation("io.ktor:ktor-server-test-host-jvm:$ktorVersion")
 

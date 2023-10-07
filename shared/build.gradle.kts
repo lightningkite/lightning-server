@@ -59,6 +59,7 @@ khrysalis {
     additionalEquivalentDirectories = listOf(project.file("build/generated/ksp/main/resources"))
 }
 
+tasks.getByName("equivalentsJar").published = true
 tasks.getByName("equivalentsJar").dependsOn("kspKotlin")
 
 standardPublishing {
