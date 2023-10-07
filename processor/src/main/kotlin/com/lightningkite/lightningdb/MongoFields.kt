@@ -14,7 +14,6 @@ data class MongoFields(
     val hasId by lazy { declaration.superTypes.any { it.resolve().declaration.qualifiedName?.asString() == "com.lightningkite.lightningdb.HasId" } }
 
     fun write(out: TabAppendable) = with(out) {
-        var useContextualFor = listOf<String>()
         declaration.containingFile?.annotations?.forEach {
             when (it.shortName.asString()) {
                 "UseContextualSerialization" -> {
@@ -27,7 +26,6 @@ data class MongoFields(
                                     ?.removePrefix("[")
                                     ?.removeSuffix("]")
                                     ?.split(", ")
-                                    ?.also { useContextualFor = it }
                                     ?.joinToString { "$it::class" }
                             }
                         })"

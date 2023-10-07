@@ -33,15 +33,15 @@ dependencies {
 
     implementation("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
 
-    api("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    api("io.ktor:ktor-client-content-negotiation-jvm:$ktorVersion")
     api("io.ktor:ktor-client-cio-jvm:$ktorVersion")
+    api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines")
     api("org.jetbrains.kotlinx:kotlinx-html-jvm:0.8.0")
 
     api("dev.turingcomplete:kotlin-onetimepassword:2.4.0")
-    api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     api("com.lightningkite:kotlinx-serialization-csv:2.1.0-SNAPSHOT")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
     api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$kotlinXSerialization")

@@ -64,6 +64,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         }
     }
 
+    @Deprecated("Use get instead", replaceWith = ReplaceWith("get().stream()"))
     override suspend fun read(): InputStream = withContext(Dispatchers.IO) {
         system.s3.getObject(
             GetObjectRequest.builder().also {
