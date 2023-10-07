@@ -21,7 +21,6 @@ data class MongoFields(
         .flatMap { it.allSubs(handled) }
 
     fun write(out: TabAppendable) = with(out) {
-        var useContextualFor = listOf<String>()
         declaration.containingFile?.annotations?.forEach {
             when (it.shortName.asString()) {
                 "UseContextualSerialization" -> {
@@ -34,7 +33,6 @@ data class MongoFields(
                                     ?.removePrefix("[")
                                     ?.removeSuffix("]")
                                     ?.split(", ")
-                                    ?.also { useContextualFor = it }
                                     ?.joinToString { "$it::class" }
                             }
                         })"
