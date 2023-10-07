@@ -26,7 +26,7 @@ kotlin {
     js(IR) {
         browser()
     }
-    ios()
+//    ios()
 //    androidTarget()
 
     sourceSets {
