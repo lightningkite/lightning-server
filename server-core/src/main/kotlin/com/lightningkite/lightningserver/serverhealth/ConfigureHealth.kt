@@ -1,29 +1,22 @@
 package com.lightningkite.lightningserver.serverhealth
 
-import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.settings.Settings
-import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.api
-import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.datetime.Clock
 import com.lightningkite.now
 import kotlinx.serialization.builtins.serializer
 import java.lang.management.ManagementFactory
 import java.net.NetworkInterface
-import kotlinx.datetime.Instant
 
 /**
  * A route for accessing status of features, external service connections, and general server information.
  * Examples of features that can be checked on are Email, Database, and Exception Reporting.
  */
 fun ServerPath.healthCheck() = get.api(
-    authOptions = Authentication.isSuperUser,
+    authOptions = Authentication.isDeveloper,
     inputType = Unit.serializer(),
     outputType = ServerHealth.serializer(),
     summary = "Get Server Health",

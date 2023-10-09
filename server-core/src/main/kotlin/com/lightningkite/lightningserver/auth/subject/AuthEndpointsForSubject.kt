@@ -70,7 +70,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     scopes = setOf("sessions")
                 )
             )
-        ) + Authentication.isSuperUser,
+        ) + Authentication.isAdmin + Authentication.isSuperUser,
         getCollection = {
             database().collection(
                 sessionSerializer,
@@ -81,17 +81,18 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             val requestAuth = this.authOrNull
             val canUse: Condition<Session<SUBJECT, ID>> = when {
                 Authentication.isSuperUser.accepts(requestAuth) -> Condition.Always()
+                Authentication.isAdmin.accepts(requestAuth) -> Condition.Always()
                 requestAuth == null -> Condition.Never()
                 else -> Condition.OnField(
                     Session_subjectId(handler.subjectSerializer, handler.idSerializer),
                     Condition.Equal(requestAuth.rawId as ID)
                 )
             }
-            val isAdmin: Condition<Session<SUBJECT, ID>> =
+            val isRoot: Condition<Session<SUBJECT, ID>> =
                 if (Authentication.isSuperUser.accepts(requestAuth)) Condition.Always() else Condition.Never()
             collection.withPermissions(
                 permissions = ModelPermissions(
-                    create = isAdmin,
+                    create = isRoot,
                     read = canUse,
                     readMask = Mask(
                         listOf(
@@ -101,8 +102,8 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                             )
                         )
                     ),
-                    update = isAdmin,
-                    delete = isAdmin,
+                    update = isRoot,
+                    delete = isRoot,
                 )
             )
         }
@@ -331,7 +332,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 OauthGrantTypes.refreshToken -> {
                     OauthResponse(
                         access_token = tokenFormat().create(handler, auth),
-                        scope = auth.scopes?.joinToString(" ") ?: "*",
+                        scope = auth.scopes.joinToString(" "),
                         token_type = tokenFormat().type
                     )
                 }
@@ -339,7 +340,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 OauthGrantTypes.authorizationCode -> {
                     OauthResponse(
                         access_token = tokenFormat().create(handler, auth),
-                        scope = auth.scopes?.joinToString(" ") ?: "*",
+                        scope = auth.scopes.joinToString(" "),
                         token_type = tokenFormat().type,
                         refresh_token = generatedRefresh?.string
                     )

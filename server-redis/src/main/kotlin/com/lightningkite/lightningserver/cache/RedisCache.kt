@@ -42,7 +42,8 @@ class RedisCache(val client: RedisClient) : Cache {
         connection.set(
             key,
             Serialization.Internal.json.encodeToString(serializer, value),
-            SetArgs().let { timeToLive?.inWholeMilliseconds?.let { t -> it.ex(t) } ?: it }).collect {}
+            SetArgs().let { timeToLive?.inWholeMilliseconds?.let { t -> it.ex(t) } ?: it }
+        ).collect {}
     }
 
     override suspend fun <T> setIfNotExists(

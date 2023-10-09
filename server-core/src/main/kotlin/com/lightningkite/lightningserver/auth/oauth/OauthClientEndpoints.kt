@@ -20,6 +20,7 @@ import kotlin.random.Random
 class OauthClientEndpoints(
     path: ServerPath,
     val database: () -> Database,
+    val maintainPermissions: AuthOptions<*> = Authentication.isSuperUser
 ): ServerPathGroup(path) {
 
     companion object {
@@ -36,7 +37,7 @@ class OauthClientEndpoints(
             serializer = Serialization.module.serializer(),
             idSerializer = Serialization.module.serializer()
         )
-        override val authOptions: AuthOptions<HasId<*>> get() = Authentication.isSuperUser as AuthOptions<HasId<*>>
+        override val authOptions: AuthOptions<HasId<*>> get() = maintainPermissions as AuthOptions<HasId<*>>
         override fun collection(): FieldCollection<OauthClient> = database().collection<OauthClient>()
 
         override suspend fun collection(auth: AuthAccessor<HasId<*>>): FieldCollection<OauthClient> = collection()
@@ -52,7 +53,7 @@ class OauthClientEndpoints(
 
     val rest = ModelRestEndpoints(path, modelInfo)
     val createSecret = path.arg<String>("_id").path("create-secret").post.api(
-        authOptions = Authentication.isSuperUser,
+        authOptions = maintainPermissions,
         summary = "Create Secret",
         implementation = { _: Unit ->
             val newSecret = Base64.getEncoder().encodeToString(Random.nextBytes(24))

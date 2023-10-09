@@ -13,6 +13,7 @@ import kotlinx.serialization.UseContextualSerialization
 import kotlin.time.Duration
 import kotlinx.datetime.Instant
 import com.lightningkite.UUID
+import com.lightningkite.lightningdb.AdminTableColumns
 import com.lightningkite.uuid
 import java.util.*
 import kotlin.time.Duration.Companion.minutes
@@ -27,6 +28,7 @@ data class SubSessionRequest(
 
 @GenerateDataClassPaths
 @Serializable
+@AdminTableColumns(["label", "subjectId", "scopes"])
 data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     override val _id: UUID = uuid(),
     val secretHash: String,

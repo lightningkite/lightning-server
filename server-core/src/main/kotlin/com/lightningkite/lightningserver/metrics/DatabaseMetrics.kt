@@ -12,7 +12,6 @@ import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.handler
-import com.lightningkite.lightningserver.meta.MetaEndpoints
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.queryParameters
@@ -23,10 +22,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
 import com.lightningkite.now
 import kotlin.time.Duration
-import kotlinx.datetime.Instant
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -94,7 +91,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
     }
 
     val dashboard = get.handler { req ->
-        if (!Authentication.isSuperUser.accepts(req.authAny())) throw ForbiddenException()
+        if (!Authentication.isDeveloper.accepts(req.authAny())) throw ForbiddenException()
         HttpResponse.html(
             content = HtmlDefaults.basePage(
                 buildString {
@@ -116,14 +113,14 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         )
     }
     val reportEndpoint = get("raw").handler { it ->
-        if (!Authentication.isSuperUser.accepts(it.authAny())) throw ForbiddenException()
+        if (!Authentication.isDeveloper.accepts(it.authAny())) throw ForbiddenException()
         val result = collection.query(it.queryParameters()).toList()
         HttpResponse(
             body = result.toHttpContent(it.headers.accept)
         )
     }
     val visualizeIndexA = get("visual").handler {
-        if (!Authentication.isSuperUser.accepts(it.authAny())) throw ForbiddenException()
+        if (!Authentication.isDeveloper.accepts(it.authAny())) throw ForbiddenException()
         HttpResponse.html(content = HtmlDefaults.basePage(buildString {
             appendLine("<ul>")
             for (metric in settings.trackingByEntryPoint) {
@@ -141,7 +138,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         }))
     }
     val visualizeIndexB = get("visual/{metric}").handler {
-        if (!Authentication.isSuperUser.accepts(it.authAny())) throw ForbiddenException()
+        if (!Authentication.isDeveloper.accepts(it.authAny())) throw ForbiddenException()
         HttpResponse.html(content = HtmlDefaults.basePage(buildString {
             appendLine("<ul>")
             val endpoints =
@@ -169,7 +166,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         }))
     }
     val visualizeIndexC = get("visual/{metric}/{endpoint}").handler {
-        if (!Authentication.isSuperUser.accepts(it.authAny())) throw ForbiddenException()
+        if (!Authentication.isDeveloper.accepts(it.authAny())) throw ForbiddenException()
         HttpResponse.html(content = HtmlDefaults.basePage(buildString {
             appendLine("<ul>")
             val metric = it.parts["metric"]!!
@@ -194,7 +191,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         }))
     }
     val visualizeSpecific = get("visual/{metric}/{endpoint}/{span}/{summary}").handler {
-        if (!Authentication.isSuperUser.accepts(it.authAny())) throw ForbiddenException()
+        if (!Authentication.isDeveloper.accepts(it.authAny())) throw ForbiddenException()
         val metric = it.parts.getValue("metric")
         val endpoint = it.parts.getValue("endpoint")
         val span = Serialization.fromString(it.parts.getValue("span"), DurationSerializer)

@@ -82,5 +82,7 @@ object Authentication {
         val indirectLink: ServerPath
     }
 
+    var isAdmin: AuthOptions<*> by SetOnce { isSuperUser }
+    var isDeveloper: AuthOptions<*> by SetOnce { isSuperUser }
     var isSuperUser: AuthOptions<*> by SetOnce { AuthOptions<HasId<*>>(setOf()) }
 }

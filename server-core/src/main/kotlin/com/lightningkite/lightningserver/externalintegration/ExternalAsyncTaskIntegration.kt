@@ -26,14 +26,13 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.serializer
 import kotlin.time.Duration
-import kotlinx.datetime.Instant
 import java.util.*
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 
 class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
     path: ServerPath,
-    val authOptions: AuthOptions<*> = Authentication.isSuperUser,
+    val authOptions: AuthOptions<*> = Authentication.isDeveloper,
     val responseSerializer: KSerializer<RESPONSE>,
     val resultSerializer: KSerializer<RESULT>,
     val database: () -> Database,

@@ -10,11 +10,9 @@ import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.AuthAccessor
-import kotlinx.datetime.Clock
 import com.lightningkite.now
 import kotlinx.serialization.serializer
 import java.net.NetworkInterface
-import kotlinx.datetime.Instant
 
 class GroupedDatabaseExceptionReporter(val packageName: String, val database: Database): ExceptionReporter {
     init {
@@ -67,7 +65,7 @@ class GroupedDatabaseExceptionReporter(val packageName: String, val database: Da
             serializer = Serialization.module.serializer(),
             idSerializer = Serialization.module.serializer()
         )
-        override val authOptions: AuthOptions<HasId<*>> get() = Authentication.isSuperUser as AuthOptions<HasId<*>>
+        override val authOptions: AuthOptions<HasId<*>> get() = Authentication.isDeveloper as AuthOptions<HasId<*>>
         override fun collection(): FieldCollection<ReportedExceptionGroup> = database.collection<ReportedExceptionGroup>()
 
         override suspend fun collection(auth: AuthAccessor<HasId<*>>): FieldCollection<ReportedExceptionGroup> = collection()

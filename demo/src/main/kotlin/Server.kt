@@ -9,8 +9,6 @@ import com.lightningkite.lightningserver.auth.old.PasswordAuthEndpoints
 import com.lightningkite.lightningserver.auth.proof.*
 import com.lightningkite.lightningserver.auth.proof.PinHandler
 import com.lightningkite.lightningserver.auth.subject.AuthEndpointsForSubject
-import com.lightningkite.lightningserver.auth.token.JwtTokenFormat
-import com.lightningkite.lightningserver.auth.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.MemcachedCache
 import com.lightningkite.lightningserver.cache.get
@@ -22,7 +20,6 @@ import com.lightningkite.lightningserver.email.Email
 import com.lightningkite.lightningserver.email.EmailLabeledValue
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.email.SesClient
-import com.lightningkite.lightningserver.encryption.Encryptor
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.SentryExceptionReporter
@@ -52,10 +49,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import java.lang.IllegalStateException
 import kotlin.time.Duration
-import java.util.*
 import kotlin.random.Random
-import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import com.lightningkite.UUID
 import com.lightningkite.uuid
@@ -92,7 +86,7 @@ object Server : ServerPathGroup(ServerPath.root) {
                 )
             )
         }
-        Authentication.isSuperUser = authRequired<User> {
+        Authentication.isDeveloper = authRequired<User> {
             (it.get() as User).isSuperUser
         }
     }
