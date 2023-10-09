@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.aws
 
+import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.email.EmailSettings
@@ -714,6 +715,34 @@ internal fun handlers() {
             """
                 {
                     url = "dynamodb://${'$'}{var.deployment_location}/${namePrefixUnderscores}"
+                }
+            """.trimIndent()
+        }
+    )
+    TerraformHandler.handler<JwtSigner>(
+        inputs = { key ->
+            listOf(
+                TerraformInput.string("${key}_expiration", "PT8760H"),
+                TerraformInput.string("${key}_emailExpiration", "PT1H"),
+            )
+        },
+        emit = {
+            appendLine(
+                """
+                resource "random_password" "${key}" {
+                  length           = 32
+                  special          = true
+                  override_special = "!#${'$'}%&*()-_=+[]{}<>:?"
+                }
+            """.trimIndent()
+            )
+        },
+        settingOutput = { key ->
+            """
+                {
+                    expiration = var.${key}_expiration 
+                    emailExpiration = var.${key}_emailExpiration 
+                    secret = random_password.${key}.result
                 }
             """.trimIndent()
         }
