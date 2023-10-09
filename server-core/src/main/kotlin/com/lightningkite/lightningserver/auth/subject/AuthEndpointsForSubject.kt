@@ -39,6 +39,7 @@ import java.security.SecureRandom
 import java.util.*
 import kotlin.math.min
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     path: ServerPath,
@@ -219,6 +220,28 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
+    val openSession = path("open-session").post.api(
+        authOptions = noAuth,
+        summary = "Open Session",
+        description = "Exchanges a future session token for a full session token.",
+        inputType = String.serializer(),
+        outputType = String.serializer(),
+        errorCases = listOf(),
+        implementation = { futureSessionToken: String ->
+            val future = FutureSession.fromToken(futureSessionToken)
+            val (s, secret) = newSessionPrivate(
+                label = future.label,
+                subjectId = future.subjectId,
+                derivedFrom = future.originalSessionId,
+                scopes = future.scopes,
+                expires = null,
+                oauthClient = future.oauthClient
+            )
+            sessionInfo.collection().insertOne(s)
+            secret.string
+        }
+    )
+
     val createSubSession = path("sub-session").post.api(
         authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType))),
         inputType = SubSessionRequest.serializer(),
@@ -286,8 +309,9 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         "Client ID/Secret mismatch"
                     )
                     val future = FutureSession.fromToken(input.code!!)
+                    if (future.oauthClient != client._id) throw BadRequestException("Client/Token mismatch")
                     val (s, secret) = newSessionPrivate(
-                        label = "Oauth with ${client.niceName}",
+                        label = future.label ?: "Oauth with ${client.niceName}",
                         subjectId = future.subjectId,
                         derivedFrom = future.originalSessionId,
                         scopes = future.scopes,
@@ -346,6 +370,22 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             auth.get()
         }
     )
+
+    suspend fun futureSessionToken(
+        subjectId: ID,
+        scopes: Set<String> = setOf("*"),
+        label: String? = null,
+        expires: Instant = now() + 5.minutes,
+        oauthClient: String? = null,
+        derivedFrom: UUID? = null,
+    ): String = FutureSession(
+        scopes = scopes,
+        subjectId = subjectId,
+        label = label,
+        expires = expires,
+        oauthClient = oauthClient,
+        originalSessionId = derivedFrom,
+    ).asToken()
 
     val sessions = ModelRestEndpoints(
         path = path("sessions"),

@@ -48,4 +48,12 @@ class EmailProofEndpoints(
         if(verifyEmail(to))
             email().send(emailTemplate(to, pin))
     }
+
+    suspend fun send(destination: String, content: (Proof)->Email) {
+        email().send(content(issueProof(destination)).also {
+            if(it.to.singleOrNull()?.value?.equals(destination, true) != true) {
+                throw IllegalArgumentException("Email mismatch")
+            }
+        })
+    }
 }

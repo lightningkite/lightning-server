@@ -52,6 +52,13 @@ abstract class PinBasedProofEndpoints(
             p.key
         }
     )
+    protected fun issueProof(destination: String): Proof {
+        return proofHasher().makeProof(
+            info = info,
+            value = destination,
+            at = now()
+        )
+    }
     override val prove = path("prove").post.api(
         authOptions = noAuth,
         summary = "Prove $validates ownership",

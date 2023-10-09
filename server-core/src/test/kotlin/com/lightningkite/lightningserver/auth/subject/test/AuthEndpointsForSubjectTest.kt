@@ -40,6 +40,14 @@ class AuthEndpointsForSubjectTest {
         assert(result.session != null)
     }
 
+    @Test
+    fun testFutureToken(): Unit = runBlocking {
+        val future = TestSettings.testUserSubject.futureSessionToken(
+            TestSettings.testUser.await()._id
+        )
+        TestSettings.testUserSubject.openSession.implementation(AuthAndPathParts(null, null, arrayOf()), future)
+    }
+
     @Test fun masquerade(): Unit = runBlocking {
         val (session, token) = TestSettings.testUserSubject.newSession(TestSettings.testAdmin.await()._id)
         HttpRequest(

@@ -58,5 +58,6 @@ internal data class FutureSession<ID>(
     val scopes: Set<String>,
     val expires: Instant = now().plus(5.minutes),
     val originalSessionId: UUID?,
+    val label: String? = null,
     @References(OauthClient::class) val oauthClient: String? = null
 )

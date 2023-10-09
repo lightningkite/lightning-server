@@ -48,4 +48,8 @@ class SmsProofEndpoints(
         if (verifyPhone(to))
             sms().send(to, smsTemplate(pin))
     }
+
+    suspend fun send(destination: String, content: (Proof)->String) {
+        sms().send(destination, content(issueProof(destination)))
+    }
 }
