@@ -230,7 +230,7 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     val multiplex = path("multiplex").websocket(MultiplexWebSocketHandler(cache))
 
-    val meta = path("meta").metaEndpoints<Unit>()
+    val meta = path("meta").metaEndpoints()
 
     val weirdAuth = path("weird-auth").get.typed(
         summary = "Get weird auth",

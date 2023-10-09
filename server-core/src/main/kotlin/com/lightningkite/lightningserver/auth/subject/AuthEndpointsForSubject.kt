@@ -229,6 +229,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         errorCases = listOf(),
         implementation = { futureSessionToken: String ->
             val future = FutureSession.fromToken(futureSessionToken)
+            if(future.oauthClient != null) throw ForbiddenException("Please use the token endpoint for OAuth instead, so we can check your secret.")
             val (s, secret) = newSessionPrivate(
                 label = future.label,
                 subjectId = future.subjectId,
