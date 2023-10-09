@@ -96,7 +96,7 @@ class MemcachedCache(val client: MemcachedClient) : Cache, HealthCheckable {
     }
 
     override suspend fun add(key: String, value: Int, timeToLive: Duration?) = withContext(Dispatchers.IO) {
-        client.incr(key, value.toLong())
+        client.incr(key, value.toLong(), value.toLong())
         timeToLive?.let {
             //TODO
         }

@@ -38,6 +38,9 @@ abstract class CacheTest {
 
             cache.remove(key)
             cache.add(key, 1)
+            assertEquals(1, cache.get<Int>(key))
+            cache.add(key, 1)
+            assertEquals(2, cache.get<Int>(key))
         }
     }
 
