@@ -64,6 +64,7 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     val database = setting("database", DatabaseSettings())
     val email = setting("email", EmailSettings())
+    val jwtSigner = setting("jwt", JwtSigner())
     val sms = setting("sms", SMSSettings())
     val files = setting("files", FilesSettings())
     val cache = setting("cache", CacheSettings())
@@ -137,7 +138,7 @@ object Server : ServerPathGroup(ServerPath.root) {
         val emailAccess = userInfo.userEmailAccess { User(email = it) }
         val passAccess =
             userInfo.userPasswordAccess { username, hashed -> User(email = username, hashedPassword = hashed) }
-        val baseAuth = BaseAuthEndpoints(path, emailAccess, expiration = 365.days, emailExpiration = 1.hours)
+        val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner)
         val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
         val passAuth = PasswordAuthEndpoints(baseAuth, passAccess)
     }

@@ -35,9 +35,11 @@ import kotlin.time.Duration.Companion.minutes
  * @param landing The landing page for after a user is authenticated.  Defaults to the root.
  * @param handleToken The action to perform upon obtaining the token.  Defaults to redirecting to [landing], but respects paths given in the `destination` query parameter.
  */
+@Deprecated("Move to new auth")
 open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
     path: ServerPath,
     val userAccess: UserAccess<USER, ID>,
+    val jwtSigner: () -> JwtSigner,
     val expiration: Duration = 365.days,
     val emailExpiration: Duration = 30.minutes,
     val landing: String = "/",
@@ -51,7 +53,6 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
             }
         )
     },
-    val hasher: () -> SecureHasher = secretBasis.hasher("old-auth"),
 ) : ServerPathGroup(path) {
 
     val typeName = userAccess.authType.classifier?.toString()?.substringAfterLast('.') ?: "Unknown"
@@ -93,7 +94,7 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
                         request.headers[HttpHeader.Authorization] ?: request.headers.cookies[HttpHeader.Authorization]
                         ?: return null
                     token = token.removePrefix("Bearer ")
-                    val claims = hasher().verifyJwt(token) ?: return null
+                    val claims = jwtSigner().hasher.verifyJwt(token) ?: return null
                     val sub = claims.sub ?: return null
                     if (!sub.startsWith(jwtPrefix)) return null
                     val id =
@@ -118,8 +119,8 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
     /**
      * Creates a JWT representing the given [user].
      */
-    suspend fun refreshToken(token: String, expireDuration: Duration = expiration): String = hasher().signJwt(
-        hasher().verifyJwt(token)!!.copy(
+    suspend fun refreshToken(token: String, expireDuration: Duration = expiration): String = jwtSigner().hasher.signJwt(
+        jwtSigner().hasher.verifyJwt(token)!!.copy(
             exp = now().plus(expireDuration).epochSeconds,
         )
     )
@@ -133,7 +134,7 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
     /**
      * Creates a JWT representing the given user by [id].
      */
-    suspend fun tokenById(id: ID, expireDuration: Duration = expiration): String = hasher().signJwt(
+    suspend fun tokenById(id: ID, expireDuration: Duration = expiration): String = jwtSigner().hasher.signJwt(
         JwtClaims(
             iss = generalSettings().publicUrl,
             aud = generalSettings().publicUrl,

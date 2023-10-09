@@ -16,6 +16,7 @@ import java.net.URLDecoder
  * Authentication via password.
  * Strongly not recommended.
  */
+@Deprecated("Move to new auth")
 open class PasswordAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
     val base: BaseAuthEndpoints<USER, ID>,
     val info: UserPasswordAccess<USER, ID>

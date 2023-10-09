@@ -19,6 +19,7 @@ import kotlin.time.Duration.Companion.minutes
 /**
  * Authentication endpoints for logging in with SMS PINs.
  */
+@Deprecated("Move to new auth")
 open class SmsAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
     val base: BaseAuthEndpoints<USER, ID>,
     val phoneAccess: UserPhoneAccess<USER, ID>,

@@ -12,6 +12,7 @@ import java.security.SecureRandom
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
+@Deprecated("Move to new auth")
 open class PinHandler(
     private val cache: () -> Cache,
     val keyPrefix: String,
