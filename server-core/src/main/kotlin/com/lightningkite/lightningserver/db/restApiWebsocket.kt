@@ -160,7 +160,7 @@ class RestApiWebsocketHelper private constructor(val database: () -> Database) {
         val db =
             subscriptionDb().deleteMany(condition {
                 (it.condition eq "") and
-                        (it.establishedAt lt now.minus(5.minutes)
+                        (it.establishedAt lt now.minus(5.minutes))
             } or condition {
                 it.establishedAt lt now.minus(1.hours)
             })
