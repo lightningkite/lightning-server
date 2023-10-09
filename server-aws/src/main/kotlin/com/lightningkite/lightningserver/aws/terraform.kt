@@ -756,9 +756,9 @@ internal fun handlers() {
             appendLine(
                 """
                 resource "random_password" "${key}" {
-                  length           = 32
+                  length           = 88
                   special          = true
-                  override_special = "!#${'$'}%&*()-_=+[]{}<>:?"
+                  override_special = "+/"
                 }
             """.trimIndent()
             )

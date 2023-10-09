@@ -83,3 +83,6 @@ interface Encryptor {
         override fun decryptSize(size: Int): Int = size - GCM_IV_LENGTH - GCM_TAG_LENGTH
     }
 }
+
+fun Encryptor.encrypt(string: String): String = Base64.getEncoder().encodeToString(encrypt(string.toByteArray(Charsets.UTF_8)))
+fun Encryptor.decrypt(string: String): String = decrypt(Base64.getDecoder().decode(string)).toString(Charsets.UTF_8)

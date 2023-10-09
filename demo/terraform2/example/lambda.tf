@@ -162,6 +162,7 @@ resource "local_sensitive_file" "settings_raw" {
     cache = {
         url = "dynamodb://${var.deployment_location}/demo_example"
     }
+    secretBasis = random_password.secretBasis.result
     jwt = {
         expiration = var.jwt_expiration 
         emailExpiration = var.jwt_emailExpiration 
@@ -180,6 +181,7 @@ resource "local_sensitive_file" "settings_raw" {
     database = {
       url = "mongodb+srv://demoexampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_serverless_instance.database.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
     }
+    sms = var.sms
     logging = var.logging
     files = {
         storageUrl = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"

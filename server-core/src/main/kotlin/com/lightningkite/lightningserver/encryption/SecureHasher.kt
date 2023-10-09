@@ -43,6 +43,19 @@ interface SecureHasher {
         }
     }
 
+    class HS512(val secret: ByteArray) : SecureHasher {
+        init {
+            SecureHasher
+        }
+
+        override val name: String = "HS512"
+        override fun sign(bytes: ByteArray): ByteArray {
+            return Mac.getInstance("HmacSHA512").apply {
+                init(SecretKeySpec(secret, "HmacSHA512"))
+            }.doFinal(bytes)
+        }
+    }
+
     class ECDSA256(privateKey: String) : SecureHasher {
         init {
             SecureHasher
