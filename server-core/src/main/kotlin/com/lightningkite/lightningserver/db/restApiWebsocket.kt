@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -73,7 +74,7 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebs
                 condition = condition { it._id eq socketId },
                 modification = modification {
                     it.condition assign c
-                    if(key != null)
+                    if (key != null)
                         it.relevant assign q.condition.relevantHashCodesForKey(key)
                     else
                         it.relevant assign null
@@ -90,7 +91,7 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebs
             CollectionChanges.serializer(info.serialization.serializer)
         ) { changes: CollectionChanges<T> ->
             val jobs = ArrayList<Job>()
-            val targets = if(key != null) {
+            val targets = if (key != null) {
                 val relevantValues = changes.changes.asSequence().flatMap { listOfNotNull(it.old, it.new) }
                     .map { key.get(it).hashCode() }
                     .toSet()
@@ -145,11 +146,11 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebs
     }
 }
 
-class RestApiWebsocketHelper private constructor(val database: ()->Database) {
+class RestApiWebsocketHelper private constructor(val database: () -> Database) {
 
     companion object {
-        private val existing = HashMap<()->Database, RestApiWebsocketHelper>()
-        operator fun get(database: ()->Database) = existing.getOrPut(database) { RestApiWebsocketHelper(database) }
+        private val existing = HashMap<() -> Database, RestApiWebsocketHelper>()
+        operator fun get(database: () -> Database) = existing.getOrPut(database) { RestApiWebsocketHelper(database) }
     }
 
     fun subscriptionDb() = database().collection<__WebSocketDatabaseChangeSubscription>()
@@ -158,14 +159,14 @@ class RestApiWebsocketHelper private constructor(val database: ()->Database) {
         val now = Clock.System.now()
         val db =
             subscriptionDb().deleteMany(condition {
-                it.condition eq ""
-                it.establishedAt lt now.minus(5.minutes)
+                (it.condition eq "") and
+                        (it.establishedAt lt now.minus(5.minutes)
             } or condition {
                 it.establishedAt lt now.minus(1.hours)
             })
 
         for (changeSub in db) {
-            try{
+            try {
                 changeSub._id.close()
             } catch (e: Exception) {
                 // We don't really care.  We just want to shut down as many of these as we can.
@@ -195,22 +196,27 @@ fun <T, V> Condition<T>.relevantHashCodesForKey(key: SerializableProperty<T, V>)
         .asSequence()
         .mapNotNull { it.relevantHashCodesForKey(key) }
         .reduceOrNull { a, b -> a.intersect(b) }
+
     is Condition.Or<T> -> conditions
         .asSequence()
         .map { it.relevantHashCodesForKey(key) }
-        .reduceOrNull { a, b -> if(a == null || b == null) null else a.union(b) }
-    is Condition.OnField<*, *> -> if(this.key == key) condition.relevantHashCodes() else null
+        .reduceOrNull { a, b -> if (a == null || b == null) null else a.union(b) }
+
+    is Condition.OnField<*, *> -> if (this.key == key) condition.relevantHashCodes() else null
     else -> null
 }
-fun <T> Condition<T>.relevantHashCodes(): Set<Int>? = when(this) {
+
+fun <T> Condition<T>.relevantHashCodes(): Set<Int>? = when (this) {
     is Condition.And<T> -> conditions
         .asSequence()
         .mapNotNull { it.relevantHashCodes() }
         .reduceOrNull { a, b -> a.intersect(b) }
+
     is Condition.Or<T> -> conditions
         .asSequence()
         .map { it.relevantHashCodes() }
-        .reduceOrNull { a, b -> if(a == null || b == null) null else a.union(b) }
+        .reduceOrNull { a, b -> if (a == null || b == null) null else a.union(b) }
+
     is Condition.Equal -> setOf(value.hashCode())
     is Condition.Inside -> values.map { it.hashCode() }.toSet()
     else -> null
