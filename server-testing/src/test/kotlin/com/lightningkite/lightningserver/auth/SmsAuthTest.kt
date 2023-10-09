@@ -40,7 +40,7 @@ class SmsAuthTest {
         )
         val phoneAccess: UserPhoneAccess<User, UUID> = info.userPhoneAccess { User(email = "$it@phone", phoneNumber = it) }
         val path = ServerPath("auth")
-        val baseAuth = BaseAuthEndpoints(path, phoneAccess, expiration = 1.hours, emailExpiration = 5.minutes)
+        val baseAuth = BaseAuthEndpoints(path, phoneAccess, TestSettings.jwtSigner, expiration = 1.hours, emailExpiration = 5.minutes)
         val phoneAuth = SmsAuthEndpoints(baseAuth, phoneAccess, TestSettings.cache, TestSettings.sms)
         runBlocking {
             phoneAuth.loginSms.implementation(AuthAndPathParts(null, null, arrayOf()), "8013693729")
@@ -65,7 +65,7 @@ class SmsAuthTest {
         )
         val phoneAccess: UserPhoneAccess<User, UUID> = info.userPhoneAccess { User(email = "$it@phone", phoneNumber = it) }
         val path = ServerPath("auth")
-        val baseAuth = BaseAuthEndpoints(path, phoneAccess, expiration = 1.hours, emailExpiration = 5.minutes)
+        val baseAuth = BaseAuthEndpoints(path, phoneAccess, TestSettings.jwtSigner, expiration = 1.hours, emailExpiration = 5.minutes)
         val phoneAuth = SmsAuthEndpoints(baseAuth, phoneAccess, TestSettings.cache, TestSettings.sms)
         runBlocking {
             phoneAuth.loginSms.implementation(AuthAndPathParts(null, null, arrayOf()), "8013693729")

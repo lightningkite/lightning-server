@@ -159,10 +159,11 @@ class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: St
         client.updateItem {
             it.tableName(tableName)
             it.key(mapOf("key" to AttributeValue.fromS(key)))
-            it.updateExpression("SET #exp = :exp, #v = #v + :v")
+            it.updateExpression("SET #exp = :exp, #v = if_not_exists(#v, :z) + :v")
             it.expressionAttributeNames(mapOf("#v" to "value", "#exp" to "expiration"))
             it.expressionAttributeValues(
                 mapOf(
+                    ":z" to AttributeValue.fromN("0"),
                     ":v" to AttributeValue.fromN(value.toString()),
                     ":exp" to (timeToLive?.let { AttributeValue.fromN(now().plus(it).epochSeconds.toString()) }
                         ?: AttributeValue.fromNul(true))

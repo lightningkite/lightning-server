@@ -246,7 +246,7 @@ object Server : ServerPathGroup(ServerPath.root) {
     val proofEmail = EmailProofEndpoints(path("proof/email"), pins, email, { to, pin ->
         Email(
             subject = "Log In Code",
-            to = listOf(),
+            to = listOf(EmailLabeledValue(to)),
             plainText = "Your PIN is $pin."
         )
     })

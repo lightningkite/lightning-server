@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver
 
 import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningdb.test.User
+import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.auth.authOptions
 import com.lightningkite.lightningserver.auth.oauth.OauthProviderCredentials
 import com.lightningkite.lightningserver.auth.oauth.OauthProviderCredentialsApple
@@ -33,6 +34,7 @@ object TestSettings {
     val sms = setting("sms", SMSSettings("test"))
     val cache = setting("cache", CacheSettings())
     val files = setting("files", FilesSettings())
+    val jwtSigner = setting("jwtSigner", JwtSigner())
     val oauthGoogle = setting<OauthProviderCredentials?>("oauth_google", null)
     val oauthApple = setting<OauthProviderCredentialsApple?>("oauth_apple", null)
     val oauthGithub = setting<OauthProviderCredentials?>("oauth_github", null)
@@ -47,7 +49,7 @@ object TestSettings {
     )
     val emailAccess: UserEmailAccess<User, UUID> = info.userEmailAccess { User(email = it, phoneNumber = it) }
     val path = ServerPath("auth")
-    val baseAuth = BaseAuthEndpoints(path, emailAccess, 1.hours, 5.minutes)
+    val baseAuth = BaseAuthEndpoints(path, emailAccess, jwtSigner, 1.hours, 5.minutes)
     val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
 
     init {
