@@ -1,7 +1,5 @@
 package com.lightningkite.lightningserver.encryption
 
-import com.lightningkite.lightningserver.encryption.checkHash
-import com.lightningkite.lightningserver.encryption.secureHash
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,10 +11,10 @@ class SecureHashKtTest {
         val hash = "asdf".secureHash()
         println("Hash is $hash")
         measureTimeMillis {
-            assertTrue("asdf".checkHash(hash))
+            assertTrue("asdf".checkAgainstHash(hash))
         }.also { println(it) }
         measureTimeMillis {
-            assertFalse("asdff".checkHash(hash))
+            assertFalse("asdff".checkAgainstHash(hash))
         }.also { println(it) }
     }
 }

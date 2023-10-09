@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.auth.old
 
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.HtmlDefaults
-import com.lightningkite.lightningserver.encryption.checkHash
+import com.lightningkite.lightningserver.encryption.checkAgainstHash
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathGroup
@@ -27,7 +27,7 @@ open class PasswordAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
         errorCases = listOf(),
         implementation = { anon: Unit, input: PasswordLogin ->
             val user = info.byUsername(input.username, input.password)
-            if (!input.password.checkHash(info.hashedPassword(user)))
+            if (!input.password.checkAgainstHash(info.hashedPassword(user)))
                 throw BadRequestException(
                     detail = "password-incorrect",
                     message = "Password does not match the account."

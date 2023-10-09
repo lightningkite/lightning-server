@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.auth.old
 
-import com.lightningkite.lightningserver.encryption.checkHash
+import com.lightningkite.lightningserver.encryption.checkAgainstHash
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.get
@@ -54,7 +54,7 @@ open class PinHandler(
         }
         cache().add(attemptCacheKey(uniqueIdentifier), 1)
         val fixedPin = if(mixedCaseMode) pin else pin.lowercase()
-        if (!fixedPin.checkHash(hashedPin)) throw BadRequestException(
+        if (!fixedPin.checkAgainstHash(hashedPin)) throw BadRequestException(
             detail = "pin-incorrect",
             message = "Incorrect PIN.  ${maxAttempts - attempts} attempts remain."
         )

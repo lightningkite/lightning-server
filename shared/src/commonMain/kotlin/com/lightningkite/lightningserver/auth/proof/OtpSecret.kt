@@ -4,6 +4,8 @@ package com.lightningkite.lightningserver.auth.proof
 import com.lightningkite.lightningdb.ExperimentalLightningServer
 import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
+import com.lightningkite.now
+import kotlinx.datetime.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
@@ -20,4 +22,12 @@ data class OtpSecret<ID : Comparable<ID>>(
     val period: Duration,
     val digits: Int,
     val algorithm: OtpHashAlgorithm
+) : HasId<ID>
+
+@Serializable
+@GenerateDataClassPaths
+data class PasswordSecret<ID : Comparable<ID>>(
+    @Contextual override val _id: ID,
+    val hash: String,
+    val establishedAt: Instant = now()
 ) : HasId<ID>

@@ -306,7 +306,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 input.code != null -> {
                     val client = OauthClientEndpoints.instance?.modelInfo?.collection()?.get(input.client_id)
                         ?: throw BadRequestException("Client ID/Secret mismatch")
-                    if (client.secrets.none { input.client_secret.checkHash(it.secretHash) }) throw BadRequestException(
+                    if (client.secrets.none { input.client_secret.checkAgainstHash(it.secretHash) }) throw BadRequestException(
                         "Client ID/Secret mismatch"
                     )
                     val future = FutureSession.fromToken(input.code!!)
@@ -423,7 +423,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         if (!valid) return null
         if (type != handler.name) return null
         val session = sessionInfo.collection().get(_id) ?: return null
-        if (!plainTextSecret.checkHash(session.secretHash)) return null
+        if (!plainTextSecret.checkAgainstHash(session.secretHash)) return null
         if (session.terminated != null) return null
         sessionInfo.collection().updateOneById(_id, modification(dataClassPath) {
             it.lastUsed assign now()

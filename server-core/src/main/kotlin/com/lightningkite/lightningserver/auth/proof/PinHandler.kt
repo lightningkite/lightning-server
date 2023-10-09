@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.auth.proof
 
-import com.lightningkite.lightningserver.encryption.checkHash
+import com.lightningkite.lightningserver.encryption.checkAgainstHash
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.get
@@ -11,7 +11,6 @@ import com.lightningkite.lightningserver.utils.BadWordList
 import com.lightningkite.uuid
 import java.security.SecureRandom
 import kotlin.time.Duration
-import java.util.UUID
 import kotlin.time.Duration.Companion.minutes
 
 open class PinHandler(
@@ -61,7 +60,7 @@ open class PinHandler(
         }
         cache().add(attemptCacheKey(key), 1)
         val fixedPin = if(mixedCaseMode) pin else pin.lowercase()
-        if (!fixedPin.checkHash(hashedPin)) throw BadRequestException(
+        if (!fixedPin.checkAgainstHash(hashedPin)) throw BadRequestException(
             detail = "pin-incorrect",
             message = "Incorrect PIN.  ${maxAttempts - attempts} attempts remain."
         )
