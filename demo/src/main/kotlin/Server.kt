@@ -251,13 +251,14 @@ object Server : ServerPathGroup(ServerPath.root) {
         )
     })
     val proofOtp = OneTimePasswordProofEndpoints(path("proof/otp"), database, cache)
+    val proofPassword = PasswordProofEndpoints(path("proof/password"), database, cache)
     val subjects = AuthEndpointsForSubject(
         path("subject"),
         object : Authentication.SubjectHandler<User, UUID> {
             override val name: String get() = "User"
             override val idProofs: Set<Authentication.ProofMethod> = setOf(proofEmail)
             override val authType: AuthType get() = AuthType<User>()
-            override val additionalProofs: Set<Authentication.ProofMethod> = setOf(proofOtp)
+            override val additionalProofs: Set<Authentication.ProofMethod> = setOf(proofOtp, proofPassword)
             override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<User, UUID>? {
                 val emailIdentifier = proofs.find { it.of == "email" } ?: return null
                 val user = userInfo.collection().findOne(condition { it.email eq emailIdentifier.value }) ?: run {
@@ -270,12 +271,13 @@ object Server : ServerPathGroup(ServerPath.root) {
                 val options = listOfNotNull(
                     ProofOption(proofEmail.info, user.email),
                     proofOtp.proofOption(this, user._id),
+                    proofPassword.proofOption(this, user._id),
                 )
                 return Authentication.AuthenticateResult(
                     id = user._id,
                     subjectCopy = user,
                     options = options,
-                    strengthRequired = 15
+                    strengthRequired = 20
                 )
             }
 
