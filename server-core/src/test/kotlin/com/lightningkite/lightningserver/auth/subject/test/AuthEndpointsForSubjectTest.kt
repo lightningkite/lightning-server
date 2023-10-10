@@ -69,6 +69,10 @@ class AuthEndpointsForSubjectTest {
         TestSettings.proofOtp.establish.implementation(AuthAndPathParts(auth as RequestAuth<HasId<*>>, null, arrayOf()), EstablishOtp("Test Label"))
         @Suppress("UNCHECKED_CAST") var secret = TestSettings.proofOtp.table(TestSettings.subjectHandler).get(self._id as Comparable<Any>)!!
         assertFalse(secret.active)
+        run {
+            // Can still log in with email pin only before confirmation
+            assertNotNull(TestSettings.testUserSubject.login.implementation(AuthAndPathParts(null, null, arrayOf()), listOf(proof1)).session)
+        }
         TestSettings.proofOtp.confirm.implementation(AuthAndPathParts(auth as RequestAuth<HasId<*>>, null, arrayOf()), secret.generator.generate())
         secret = TestSettings.proofOtp.table(TestSettings.subjectHandler).get(self._id as Comparable<Any>)!!
         assertTrue(secret.active)
