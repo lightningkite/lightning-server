@@ -28,7 +28,8 @@ fun <ID: Comparable<ID>> OtpSecret(
     secret: ByteArray,
     label: String,
     issuer: String,
-    config: TimeBasedOneTimePasswordConfig
+    config: TimeBasedOneTimePasswordConfig,
+    active: Boolean,
 ) = OtpSecret<ID>(
     _id = _id,
     Base32.encode(secret).toString(Charsets.UTF_8),
@@ -49,7 +50,8 @@ fun <ID: Comparable<ID>> OtpSecret(
         HmacAlgorithm.SHA1 -> OtpHashAlgorithm.SHA1
         HmacAlgorithm.SHA256 -> OtpHashAlgorithm.SHA256
         HmacAlgorithm.SHA512 -> OtpHashAlgorithm.SHA512
-    }
+    },
+    active = active,
 )
 
 val OtpSecret<*>.secret: ByteArray get() = Base32.decode(secretBase32)

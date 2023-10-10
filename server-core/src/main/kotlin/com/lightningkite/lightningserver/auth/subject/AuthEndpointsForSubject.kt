@@ -116,11 +116,15 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     override suspend fun request(request: Request): RequestAuth<*>? {
         // TODO: Read JWT from query params, remove and redirect
+        val token =
+            request.headers[HttpHeader.Authorization]?.removePrefix("bearer ")?.removePrefix("Bearer ")
+                ?: request.headers.cookies[HttpHeader.Authorization]
+                ?: return null
+        return tokenToAuth(token, request)
+    }
+
+    suspend fun tokenToAuth(token: String, request: Request?): RequestAuth<SUBJECT>? {
         try {
-            val token =
-                request.headers[HttpHeader.Authorization]?.removePrefix("bearer ")?.removePrefix("Bearer ")
-                    ?: request.headers.cookies[HttpHeader.Authorization]
-                    ?: return null
             return (tokenFormat().read(handler, token)
                 ?: RefreshToken(token).session(request)?.toAuth())
         } catch (e: TokenException) {

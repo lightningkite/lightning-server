@@ -2,7 +2,11 @@
 
 package com.lightningkite.lightningserver.auth.subject.test
 
+import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningdb.get
 import com.lightningkite.lightningserver.TestSettings
+import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.auth.oauth.OauthAccessType
 import com.lightningkite.lightningserver.auth.oauth.OauthClient
@@ -13,7 +17,9 @@ import com.lightningkite.lightningserver.email.TestEmailClient
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.testmodels.TestUser
 import com.lightningkite.lightningserver.typed.AuthAndPathParts
+import com.lightningkite.lightningserver.typed.TypedServerPath0
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.uuid
 import kotlinx.coroutines.runBlocking
@@ -38,6 +44,53 @@ class AuthEndpointsForSubjectTest {
         val result = TestSettings.testUserSubject.login.implementation(AuthAndPathParts(null, null, arrayOf()), listOf(proof1))
         println(result)
         assert(result.session != null)
+        val auth = TestSettings.testUserSubject.tokenToAuth(result.session!!, null)!!
+        TestSettings.testUserSubject.self.implementation(AuthAndPathParts(auth, null, arrayOf()), Unit)
+    }
+
+    @Test
+    fun testEmailOtpPassword(): Unit = runBlocking {
+        val info = TestSettings.proofEmail.start.implementation(AuthAndPathParts(null, null, arrayOf()), "testwithotp@test.com")
+        val pinRegex = Regex("[A-Z][A-Z][A-Z][A-Z][A-Z][A-Z]")
+        val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.also { println(it) }?.plainText?.let {
+            pinRegex.find(it)?.value
+        }!!
+        val proof1 = TestSettings.proofEmail.prove.implementation(AuthAndPathParts(null, null, arrayOf()), ProofEvidence(
+            key = info,
+            password = pin
+        ))
+        val result = TestSettings.testUserSubject.login.implementation(AuthAndPathParts(null, null, arrayOf()), listOf(proof1))
+        println(result)
+        assert(result.session != null)
+        val auth = TestSettings.testUserSubject.tokenToAuth(result.session!!, null)!!
+        val self = TestSettings.testUserSubject.self.implementation(AuthAndPathParts(auth, null, arrayOf()), Unit)
+
+        // Set up OTP
+        TestSettings.proofOtp.establish.implementation(AuthAndPathParts(auth as RequestAuth<HasId<*>>, null, arrayOf()), EstablishOtp("Test Label"))
+        @Suppress("UNCHECKED_CAST") var secret = TestSettings.proofOtp.table(TestSettings.subjectHandler).get(self._id as Comparable<Any>)!!
+        assertFalse(secret.active)
+        TestSettings.proofOtp.confirm.implementation(AuthAndPathParts(auth as RequestAuth<HasId<*>>, null, arrayOf()), secret.generator.generate())
+        secret = TestSettings.proofOtp.table(TestSettings.subjectHandler).get(self._id as Comparable<Any>)!!
+        assertTrue(secret.active)
+
+        // Set up Password
+        TestSettings.proofPassword.establish.implementation(AuthAndPathParts(auth as RequestAuth<HasId<*>>, null, arrayOf()), EstablishPassword("test"))
+
+        // Re-log in requires all
+        val r1 = TestSettings.testUserSubject.login.implementation(AuthAndPathParts(null, null, arrayOf()), listOf(proof1))
+        assertNull(r1.session)
+        assertTrue(r1.options.any { it.method == TestSettings.proofOtp.info })
+        assertTrue(r1.options.any { it.method == TestSettings.proofPassword.info })
+        val proof2 = TestSettings.proofOtp.prove.implementation(AuthAndPathParts(null, null, arrayOf()), ProofEvidence(
+            r1.options.find { it.method == TestSettings.proofOtp.info }!!.value!!,
+            secret.generator.generate()
+        ))
+        val proof3 = TestSettings.proofPassword.prove.implementation(AuthAndPathParts(null, null, arrayOf()), ProofEvidence(
+            r1.options.find { it.method == TestSettings.proofPassword.info }!!.value!!,
+            "test"
+        ))
+        val r2 = TestSettings.testUserSubject.login.implementation(AuthAndPathParts(null, null, arrayOf()), listOf(proof1, proof2, proof3))
+        assertNotNull(r2.session)
     }
 
     @Test

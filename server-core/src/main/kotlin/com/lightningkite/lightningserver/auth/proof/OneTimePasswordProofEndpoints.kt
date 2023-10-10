@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.encryption.hasher
 import com.lightningkite.lightningserver.encryption.secretBasis
 import com.lightningkite.lightningserver.exceptions.BadRequestException
+import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.delete
 import com.lightningkite.lightningserver.http.get
@@ -77,25 +78,35 @@ class OneTimePasswordProofEndpoints(
         Tasks.onSettingsReady {
             Authentication.subjects.forEach {
                 @Suppress("UNCHECKED_CAST")
-                ModelRestEndpoints<HasId<*>, OtpSecret<Comparable<Any>>, Comparable<Any>>(path("secrets/${it.value.name.lowercase()}"), modelInfo< HasId<*>, OtpSecret<Comparable<Any>>, Comparable<Any>>(
-                    serialization = ModelSerializationInfo(OtpSecret.serializer(it.value.idSerializer as KSerializer<Comparable<Any>>), it.value.idSerializer as KSerializer<Comparable<Any>>),
-                    authOptions = Authentication.isAdmin as AuthOptions<HasId<*>>,
-                    getCollection = { table(it.value).withPermissions(ModelPermissions(
-                        create = Condition.Always(),
-                        read = Condition.Always(),
-                        readMask = Mask(
-                            listOf(
-                                Condition.Never<OtpSecret<Comparable<Any>>>() to Modification.OnField(
-                                    OtpSecret_secretBase32(it.value.idSerializer as KSerializer<Comparable<Any>>),
-                                    Modification.Assign("")
-                                )
-                            )
+                ModelRestEndpoints<HasId<*>, OtpSecret<Comparable<Any>>, Comparable<Any>>(
+                    path("secrets/${it.value.name.lowercase()}"),
+                    modelInfo<HasId<*>, OtpSecret<Comparable<Any>>, Comparable<Any>>(
+                        serialization = ModelSerializationInfo(
+                            OtpSecret.serializer(it.value.idSerializer as KSerializer<Comparable<Any>>),
+                            it.value.idSerializer as KSerializer<Comparable<Any>>
                         ),
-                        update = Condition.Always(),
-                        delete = Condition.Always(),
-                    )) as FieldCollection<OtpSecret<Comparable<Any>>> },
-                    modelName = "OtpSecret For ${it.value.name}"
-                ))
+                        authOptions = Authentication.isAdmin as AuthOptions<HasId<*>>,
+                        getCollection = {
+                            table(it.value).withPermissions(
+                                ModelPermissions(
+                                    create = Condition.Always(),
+                                    read = Condition.Always(),
+                                    readMask = Mask(
+                                        listOf(
+                                            Condition.Never<OtpSecret<Comparable<Any>>>() to Modification.OnField(
+                                                OtpSecret_secretBase32(it.value.idSerializer as KSerializer<Comparable<Any>>),
+                                                Modification.Assign("")
+                                            )
+                                        )
+                                    ),
+                                    update = Condition.Always(),
+                                    delete = Condition.Always(),
+                                )
+                            ) as FieldCollection<OtpSecret<Comparable<Any>>>
+                        },
+                        modelName = "OtpSecret For ${it.value.name}"
+                    )
+                )
             }
         }
     }
@@ -124,10 +135,35 @@ class OneTimePasswordProofEndpoints(
                 secret = ByteArray(32).also { SecureRandom.getInstanceStrong().nextBytes(it) },
                 label = input.label ?: "",
                 issuer = generalSettings().projectName,
-                config = config
+                config = config,
+                active = false,
             )
             table(auth.subject).insertOne(secret)
             secret.url
+        }
+    )
+
+    val confirm = path("existing").post.api(
+        summary = "Confirm One Time Password",
+        inputType = String.serializer(),
+        outputType = Unit.serializer(),
+        description = "Confirms your OTP, making it fully active",
+        authOptions = anyAuthRoot,
+        errorCases = listOf(),
+        examples = listOf(),
+        implementation = { code: String ->
+            val existing = table(auth.subject).get(auth.rawId as Comparable<Any>) ?: throw NotFoundException()
+            @Suppress("UNCHECKED_CAST")
+            prove.implementation(
+                AuthAndPathParts(null, null, arrayOf()),
+                ProofEvidence(
+                    key(
+                        auth.subject as Authentication.SubjectHandler<*, Comparable<Any?>>,
+                        auth.rawId as Comparable<Any?>
+                    ), code
+                )
+            )
+            Unit
         }
     )
 
@@ -194,7 +230,17 @@ class OneTimePasswordProofEndpoints(
             @Suppress("UNCHECKED_CAST")
             val secret = table(subject).get(id as Comparable<Any>)
                 ?: throw BadRequestException("User ID and code do not match")
-            if (!secret.generator.isValid(input.password, postedAt.toJavaInstant())) throw BadRequestException("User ID and code do not match")
+            if (!secret.generator.isValid(
+                    input.password,
+                    postedAt.toJavaInstant()
+                )
+            ) throw BadRequestException("User ID and code do not match")
+            if (!secret.active) {
+                val table = table(subject)
+                table.updateOneById(id, modification(DataClassPathSelf(table.serializer)) {
+                    it.active assign true
+                })
+            }
             cache().remove(cacheKey)
             proofHasher().makeProof(
                 info = info,
@@ -206,7 +252,7 @@ class OneTimePasswordProofEndpoints(
 
     suspend fun <ID : Comparable<ID>> established(handler: Authentication.SubjectHandler<*, ID>, id: ID): Boolean {
         @Suppress("UNCHECKED_CAST")
-        return table(handler).get(id as Comparable<Any>) != null
+        return table(handler).get(id as Comparable<Any>)?.active == true
     }
 
     suspend fun <ID : Comparable<ID>> proofOption(handler: Authentication.SubjectHandler<*, ID>, id: ID): ProofOption? {

@@ -5,10 +5,7 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningdb.prepareModels
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.oauth.OauthClientEndpoints
-import com.lightningkite.lightningserver.auth.proof.EmailProofEndpoints
-import com.lightningkite.lightningserver.auth.proof.PinHandler
-import com.lightningkite.lightningserver.auth.proof.Proof
-import com.lightningkite.lightningserver.auth.proof.ProofOption
+import com.lightningkite.lightningserver.auth.proof.*
 import com.lightningkite.lightningserver.auth.subject.AuthEndpointsForSubject
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.core.ServerPath
@@ -110,17 +107,21 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         }
     )
 
-    //    val proofOtp = OneTimePasswordProofEndpoints(
-//        ServerPath(uuid().toString()),
-//        TestSettings.jwtSigner,
-//        TestSettings.database,
-//        TestSettings.cache
-//    )
+    val proofPassword = PasswordProofEndpoints(
+        ServerPath(uuid().toString()),
+        database,
+        cache
+    )
+    val proofOtp = OneTimePasswordProofEndpoints(
+        ServerPath(uuid().toString()),
+        database,
+        cache
+    )
     val subjectHandler = object : Authentication.SubjectHandler<TestUser, UUID> {
         override val name: String get() = "TestUser"
         override val idProofs: Set<Authentication.ProofMethod> = setOf(proofEmail)
         override val authType: AuthType get() = AuthType<TestUser>()
-        override val additionalProofs: Set<Authentication.ProofMethod> = setOf()
+        override val additionalProofs: Set<Authentication.ProofMethod> = setOf(proofPassword, proofOtp)
         override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<TestUser, UUID>? {
             val emailIdentifier = proofs.find { it.of == "email" } ?: return null
             val user = userInfo.collection().findOne(condition { it.email eq emailIdentifier.value }) ?: run {
@@ -132,13 +133,14 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
             } ?: return null
             val options = listOfNotNull(
                 ProofOption(proofEmail.info, user.email),
-//                proofOtp.proofOption(this, user._id),
+                proofOtp.proofOption(this, user._id),
+                proofPassword.proofOption(this, user._id),
             )
             return Authentication.AuthenticateResult(
                 id = user._id,
                 subjectCopy = user,
                 options = options,
-                strengthRequired = 15
+                strengthRequired = 20
             )
         }
 

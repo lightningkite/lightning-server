@@ -21,7 +21,8 @@ class OtpSecretTest {
             secret = ByteArray(32).also { SecureRandom.getInstanceStrong().nextBytes(it) },
             label = "test",
             issuer = "test",
-            config = TimeBasedOneTimePasswordConfig(30_000, TimeUnit.MILLISECONDS, 6, HmacAlgorithm.SHA1)
+            config = TimeBasedOneTimePasswordConfig(30_000, TimeUnit.MILLISECONDS, 6, HmacAlgorithm.SHA1),
+            active = true
         )
         assertContentEquals(Base32.decode(secret.secretBase32), secret.secret)
         assertEquals(Base32.encode(secret.secret).toString(Charsets.UTF_8), secret.secretBase32)
