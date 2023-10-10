@@ -32,16 +32,16 @@ class AuthEndpointsForSubjectTest {
 
     @Test
     fun test(): Unit = runBlocking {
-        val info = TestSettings.proofEmail.start.implementation(AuthAndPathParts(null, null, arrayOf()), "test@test.com")
+        val info = TestSettings.proofEmail.start.test(null, "test@test.com")
         val pinRegex = Regex("[A-Z][A-Z][A-Z][A-Z][A-Z][A-Z]")
         val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.also { println(it) }?.plainText?.let {
             pinRegex.find(it)?.value
         }!!
-        val proof1 = TestSettings.proofEmail.prove.implementation(AuthAndPathParts(null, null, arrayOf()), ProofEvidence(
+        val proof1 = TestSettings.proofEmail.prove.test(null, ProofEvidence(
             key = info,
             password = pin
         ))
-        val result = TestSettings.testUserSubject.login.implementation(AuthAndPathParts(null, null, arrayOf()), listOf(proof1))
+        val result = TestSettings.testUserSubject.login.test(null, listOf(proof1))
         println(result)
         assert(result.session != null)
         val auth = TestSettings.testUserSubject.tokenToAuth(result.session!!, null)!!
@@ -50,50 +50,50 @@ class AuthEndpointsForSubjectTest {
 
     @Test
     fun testEmailOtpPassword(): Unit = runBlocking {
-        val info = TestSettings.proofEmail.start.implementation(AuthAndPathParts(null, null, arrayOf()), "testwithotp@test.com")
+        val info = TestSettings.proofEmail.start.test(null, "testwithotp@test.com")
         val pinRegex = Regex("[A-Z][A-Z][A-Z][A-Z][A-Z][A-Z]")
         val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.also { println(it) }?.plainText?.let {
             pinRegex.find(it)?.value
         }!!
-        val proof1 = TestSettings.proofEmail.prove.implementation(AuthAndPathParts(null, null, arrayOf()), ProofEvidence(
+        val proof1 = TestSettings.proofEmail.prove.test(null, ProofEvidence(
             key = info,
             password = pin
         ))
-        val result = TestSettings.testUserSubject.login.implementation(AuthAndPathParts(null, null, arrayOf()), listOf(proof1))
+        val result = TestSettings.testUserSubject.login.test(null, listOf(proof1))
         println(result)
         assert(result.session != null)
         val auth = TestSettings.testUserSubject.tokenToAuth(result.session!!, null)!!
         val self = TestSettings.testUserSubject.self.implementation(AuthAndPathParts(auth, null, arrayOf()), Unit)
 
         // Set up OTP
-        TestSettings.proofOtp.establish.implementation(AuthAndPathParts(auth as RequestAuth<HasId<*>>, null, arrayOf()), EstablishOtp("Test Label"))
+        TestSettings.proofOtp.establish.test(self, EstablishOtp("Test Label"))
         @Suppress("UNCHECKED_CAST") var secret = TestSettings.proofOtp.table(TestSettings.subjectHandler).get(self._id as Comparable<Any>)!!
         assertFalse(secret.active)
         run {
             // Can still log in with email pin only before confirmation
-            assertNotNull(TestSettings.testUserSubject.login.implementation(AuthAndPathParts(null, null, arrayOf()), listOf(proof1)).session)
+            assertNotNull(TestSettings.testUserSubject.login.test(null, listOf(proof1)).session)
         }
-        TestSettings.proofOtp.confirm.implementation(AuthAndPathParts(auth as RequestAuth<HasId<*>>, null, arrayOf()), secret.generator.generate())
+        TestSettings.proofOtp.confirm.test(self, secret.generator.generate())
         secret = TestSettings.proofOtp.table(TestSettings.subjectHandler).get(self._id as Comparable<Any>)!!
         assertTrue(secret.active)
 
         // Set up Password
-        TestSettings.proofPassword.establish.implementation(AuthAndPathParts(auth as RequestAuth<HasId<*>>, null, arrayOf()), EstablishPassword("test"))
+        TestSettings.proofPassword.establish.test(self, EstablishPassword("test"))
 
         // Re-log in requires all
-        val r1 = TestSettings.testUserSubject.login.implementation(AuthAndPathParts(null, null, arrayOf()), listOf(proof1))
+        val r1 = TestSettings.testUserSubject.login.test(null, listOf(proof1))
         assertNull(r1.session)
         assertTrue(r1.options.any { it.method == TestSettings.proofOtp.info })
         assertTrue(r1.options.any { it.method == TestSettings.proofPassword.info })
-        val proof2 = TestSettings.proofOtp.prove.implementation(AuthAndPathParts(null, null, arrayOf()), ProofEvidence(
+        val proof2 = TestSettings.proofOtp.prove.test(null, ProofEvidence(
             r1.options.find { it.method == TestSettings.proofOtp.info }!!.value!!,
             secret.generator.generate()
         ))
-        val proof3 = TestSettings.proofPassword.prove.implementation(AuthAndPathParts(null, null, arrayOf()), ProofEvidence(
+        val proof3 = TestSettings.proofPassword.prove.test(null, ProofEvidence(
             r1.options.find { it.method == TestSettings.proofPassword.info }!!.value!!,
             "test"
         ))
-        val r2 = TestSettings.testUserSubject.login.implementation(AuthAndPathParts(null, null, arrayOf()), listOf(proof1, proof2, proof3))
+        val r2 = TestSettings.testUserSubject.login.test(null, listOf(proof1, proof2, proof3))
         assertNotNull(r2.session)
     }
 
@@ -102,7 +102,7 @@ class AuthEndpointsForSubjectTest {
         val future = TestSettings.testUserSubject.futureSessionToken(
             TestSettings.testUser.await()._id
         )
-        TestSettings.testUserSubject.openSession.implementation(AuthAndPathParts(null, null, arrayOf()), future)
+        TestSettings.testUserSubject.openSession.test(null, future)
     }
 
     @Test fun masquerade(): Unit = runBlocking {
