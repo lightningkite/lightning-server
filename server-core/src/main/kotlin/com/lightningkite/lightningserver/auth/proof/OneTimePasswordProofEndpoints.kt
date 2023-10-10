@@ -14,6 +14,8 @@ import com.lightningkite.lightningserver.encryption.hasher
 import com.lightningkite.lightningserver.encryption.secretBasis
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.http.delete
+import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -30,6 +32,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import kotlinx.datetime.toJavaInstant
+import kotlinx.serialization.builtins.nullable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.hours
 
@@ -109,23 +112,53 @@ class OneTimePasswordProofEndpoints(
 
     val establish = path("establish").post.api(
         summary = "Establish an One Time Password",
-        inputType = String.serializer(),
+        inputType = EstablishOtp.serializer(),
         outputType = String.serializer(),
         description = "Generates a new One Time Password configuration.",
-        authOptions = anyAuth,
+        authOptions = anyAuthRoot,
         errorCases = listOf(),
         examples = listOf(),
-        implementation = { label: String ->
+        implementation = { input: EstablishOtp ->
             val secret = OtpSecret(
                 _id = auth.rawId as Comparable<Any>,
                 secret = ByteArray(32).also { SecureRandom.getInstanceStrong().nextBytes(it) },
-                label = label,
+                label = input.label ?: "",
                 issuer = generalSettings().projectName,
                 config = config
             )
-            table(auth.subject).deleteOneById(auth.rawId as Comparable<Any>)
             table(auth.subject).insertOne(secret)
             secret.url
+        }
+    )
+
+    val disable = path("existing").delete.api(
+        summary = "Disable One Time Password",
+        inputType = Unit.serializer(),
+        outputType = Boolean.serializer(),
+        description = "Disables your one-time password.",
+        authOptions = anyAuthRoot,
+        errorCases = listOf(),
+        examples = listOf(),
+        implementation = { _: Unit ->
+            table(auth.subject).deleteOneById(auth.rawId as Comparable<Any>)
+        }
+    )
+
+    val check = path("existing").get.api(
+        summary = "Check One Time Password",
+        inputType = Unit.serializer(),
+        outputType = SecretMetadata.serializer().nullable,
+        description = "Returns information about your OTP, if one exists.",
+        authOptions = anyAuthRoot,
+        errorCases = listOf(),
+        examples = listOf(),
+        implementation = { _: Unit ->
+            table(auth.subject).get(auth.rawId as Comparable<Any>)?.let {
+                SecretMetadata(
+                    establishedAt = it.establishedAt,
+                    label = it.label
+                )
+            }
         }
     )
 

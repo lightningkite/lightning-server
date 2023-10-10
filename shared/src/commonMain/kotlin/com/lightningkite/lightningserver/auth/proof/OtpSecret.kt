@@ -21,7 +21,9 @@ data class OtpSecret<ID : Comparable<ID>>(
     val issuer: String,
     val period: Duration,
     val digits: Int,
-    val algorithm: OtpHashAlgorithm
+    val algorithm: OtpHashAlgorithm,
+    val active: Boolean = true,
+    val establishedAt: Instant = now()
 ) : HasId<ID>
 
 @Serializable
@@ -29,5 +31,23 @@ data class OtpSecret<ID : Comparable<ID>>(
 data class PasswordSecret<ID : Comparable<ID>>(
     @Contextual override val _id: ID,
     val hash: String,
+    val hint: String? = null,
     val establishedAt: Instant = now()
 ) : HasId<ID>
+
+@Serializable
+data class SecretMetadata(
+    val establishedAt: Instant = now(),
+    val label: String,
+)
+
+@Serializable
+data class EstablishPassword(
+    val password: String,
+    val hint: String? = null
+)
+
+@Serializable
+data class EstablishOtp(
+    val label: String? = null
+)

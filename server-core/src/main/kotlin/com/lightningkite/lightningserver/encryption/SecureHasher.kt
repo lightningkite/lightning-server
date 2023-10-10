@@ -112,7 +112,11 @@ fun SecureHasher.verify(string: String, base64Signature: String): Boolean =
 fun SecureHasher.signJwt(claims: JwtClaims): String = buildString {
     val withDefaults = Json(Serialization.json) { encodeDefaults = true; explicitNulls = false }
     append(
-        Base64.getUrlEncoder().withoutPadding().encodeToString(withDefaults.encodeToString(JwtHeader()).toByteArray())
+        Base64.getUrlEncoder().withoutPadding().encodeToString(withDefaults.encodeToString(JwtHeader(alg = when(this@signJwt) {
+            is SecureHasher.HS256 -> "HS256"
+            is SecureHasher.HS512 -> "HS512"
+            else -> this@signJwt.toString()
+        })).toByteArray())
     )
     append('.')
     @Suppress("UNCHECKED_CAST")

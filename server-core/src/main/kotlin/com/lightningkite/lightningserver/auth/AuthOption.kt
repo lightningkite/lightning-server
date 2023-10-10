@@ -78,3 +78,4 @@ inline fun <reified USER : HasId<*>?> authOptions(
 
 val noAuth: AuthOptions<HasId<*>?> = AuthOptions(setOf(null))
 val anyAuth: AuthOptions<HasId<*>> = AuthOptions(setOf(AuthOption(AuthType.any, scopes = setOf())))
+val anyAuthRoot: AuthOptions<HasId<*>> = AuthOptions(setOf(AuthOption(AuthType.any)))

@@ -12,6 +12,8 @@ import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.http.delete
+import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -22,6 +24,7 @@ import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.now
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration.Companion.hours
 
@@ -96,21 +99,54 @@ class PasswordProofEndpoints(
 
     val establish = path("establish").post.api(
         summary = "Establish a Password",
-        inputType = String.serializer(),
+        inputType = EstablishPassword.serializer(),
         outputType = Unit.serializer(),
         description = "Generates a new One Time Password configuration.",
-        authOptions = anyAuth,
+        authOptions = anyAuthRoot,
         errorCases = listOf(),
         examples = listOf(),
-        implementation = { value: String ->
-            evaluatePassword(value)
+        implementation = { value: EstablishPassword ->
+            evaluatePassword(value.password)
+            if(value.hint?.contains(value.password, true) == true) throw BadRequestException("Hint cannot contain the password itself!")
             val secret = PasswordSecret(
                 _id = auth.rawId as Comparable<Any>,
-                hash = value.secureHash()
+                hash = value.password.secureHash(),
+                hint = value.hint,
             )
             table(auth.subject).deleteOneById(auth.rawId as Comparable<Any>)
             table(auth.subject).insertOne(secret)
             Unit
+        }
+    )
+
+    val disable = path("existing").delete.api(
+        summary = "Disable Password",
+        inputType = Unit.serializer(),
+        outputType = Boolean.serializer(),
+        description = "Disables your password.",
+        authOptions = anyAuthRoot,
+        errorCases = listOf(),
+        examples = listOf(),
+        implementation = { _: Unit ->
+            table(auth.subject).deleteOneById(auth.rawId as Comparable<Any>)
+        }
+    )
+
+    val check = path("existing").get.api(
+        summary = "Check Password",
+        inputType = Unit.serializer(),
+        outputType = SecretMetadata.serializer().nullable,
+        description = "Returns information about your password, if you have one.",
+        authOptions = anyAuthRoot,
+        errorCases = listOf(),
+        examples = listOf(),
+        implementation = { _: Unit ->
+            table(auth.subject).get(auth.rawId as Comparable<Any>)?.let {
+                SecretMetadata(
+                    establishedAt = it.establishedAt,
+                    label = it.hint ?: "-"
+                )
+            }
         }
     )
 
