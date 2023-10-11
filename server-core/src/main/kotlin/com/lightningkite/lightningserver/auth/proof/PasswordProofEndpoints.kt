@@ -40,14 +40,15 @@ class PasswordProofEndpoints(
         if (path.docName == null) path.docName = "PasswordProof"
     }
 
-    override val name: String
-        get() = "password"
-    override val humanName: String
-        get() = "Password"
-    override val validates: String
-        get() = "password"
-    override val strength: Int
-        get() = 5
+    override val info: ProofMethodInfo = ProofMethodInfo(
+        via = "password",
+        property = null,
+        strength = 10
+    )
+
+    init {
+        Authentication.register(this)
+    }
 
     private val tables = HashMap<String, FieldCollection<PasswordSecret<Comparable<Any>>>>()
 
@@ -152,46 +153,62 @@ class PasswordProofEndpoints(
 
     override val prove = path("prove").post.api(
         authOptions = noAuth,
-        summary = "Prove $validates ownership",
+        summary = "Prove password ownership",
         description = "Logs in to the given account with a password.  Limits to 10 attempts per hour.",
         errorCases = listOf(),
         examples = listOf(
             ApiExample(
-                input = ProofEvidence(
-                    "User|id",
-                    "my password"
+                input = IdentificationAndPassword(
+                    "User",
+                    "_id",
+                    "some-id",
+                    "password"
                 ),
                 output = Proof(
-                    via = name,
-                    of = validates,
-                    strength = strength,
-                    value = "User|id",
+                    via = info.via,
+                    property = "_id",
+                    strength = info.strength,
+                    value = "some-id",
                     at = now(),
                     signature = "opaquesignaturevalue"
                 )
             )
         ),
         successCode = HttpStatus.OK,
-        implementation = { input: ProofEvidence ->
+        implementation = { input: IdentificationAndPassword ->
             val postedAt = now()
-            val cacheKey = "otp-count-${input.key}"
+            val cacheKey = "otp-count-${input.property}-${input.value}"
             cache().add(cacheKey, 1, 1.hours)
             val ct = (cache().get<Int>(cacheKey) ?: 0)
             if (ct > 5) throw BadRequestException("Too many attempts; please wait.")
-            val (subject, id) = key(input.key)
+            val subject = input.type
+            val handler = Authentication.subjects.values.find { it.name == subject }
+                ?: throw IllegalArgumentException("No subject $subject recognized")
+            val item = handler.findUser(input.property, input.value)
+                ?: throw BadRequestException("User ID and code do not match")
+            val id = item._id
+
             @Suppress("UNCHECKED_CAST")
-            val secret = table(subject).get(id as Comparable<Any>)
+            val secret = table(handler).get(id as Comparable<Any>)
                 ?: throw BadRequestException("User ID and code do not match")
             if (!input.password.checkAgainstHash(secret.hash)) throw BadRequestException("User ID and code do not match")
             cache().remove(cacheKey)
             proofHasher().makeProof(
                 info = info,
-                value = input.key,
+                property = input.property,
+                value = input.value,
                 at = now()
             )
         }
     )
 
+    override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
+        handler: Authentication.SubjectHandler<SUBJECT, ID>,
+        item: SUBJECT
+    ): Boolean {
+        @Suppress("UNCHECKED_CAST")
+        return table(handler).get(item._id as Comparable<Any>) != null
+    }
     suspend fun <ID : Comparable<ID>> established(handler: Authentication.SubjectHandler<*, ID>, id: ID): Boolean {
         @Suppress("UNCHECKED_CAST")
         return table(handler).get(id as Comparable<Any>) != null

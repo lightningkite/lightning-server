@@ -8,7 +8,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import com.lightningkite.UUID
 import com.lightningkite.uuid
-import java.util.*
 
 
 @GenerateDataClassPaths
@@ -16,5 +15,6 @@ import java.util.*
 data class TestUser(
     override val _id: UUID = uuid(),
     override val email: String,
+    val phoneNumber: String? = null,
     val isSuperAdmin: Boolean = false,
 ) : HasId<UUID>, HasEmail

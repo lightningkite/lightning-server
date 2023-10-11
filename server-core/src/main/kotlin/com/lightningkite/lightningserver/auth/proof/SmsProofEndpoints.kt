@@ -28,19 +28,15 @@ class SmsProofEndpoints(
     val smsTemplate: suspend (pin: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." },
     proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val verifyPhone: suspend (String) -> Boolean = { true },
-) : PinBasedProofEndpoints(path, proofHasher, pin) {
+) : PinBasedProofEndpoints(path, "sms", "phone", proofHasher, pin) {
     init {
         if (path.docName == null) path.docName = "SmsProof"
     }
 
-    override val name: String
-        get() = "phone"
-    override val humanName: String
-        get() = "Phone"
-    override val strength: Int
-        get() = 10
-    override val validates: String
-        get() = "phone"
+    init {
+        Authentication.register(this)
+    }
+
     override val exampleTarget: String
         get() = "800-1000-100"
 

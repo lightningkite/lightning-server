@@ -6,9 +6,7 @@ import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.oauth.*
-import com.lightningkite.lightningserver.auth.proof.Proof
-import com.lightningkite.lightningserver.auth.proof.ProofEvidence
-import com.lightningkite.lightningserver.auth.proof.verify
+import com.lightningkite.lightningserver.auth.proof.*
 import com.lightningkite.lightningserver.auth.token.PrivateTinyTokenFormat
 import com.lightningkite.lightningserver.auth.token.TokenFormat
 import com.lightningkite.lightningserver.core.ContentType
@@ -195,11 +193,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         inputType = ListSerializer(Proof.serializer()),
         outputType = IdAndAuthMethods.serializer(handler.idSerializer),
         summary = "Log In",
-        description = "Attempt to log in as a ${handler.name} using various proofs.  Valid proofs types are ${
-            handler.idProofs.plus(
-                handler.additionalProofs
-            ).joinToString()
-        }",
+        description = "Attempt to log in as a ${handler.name} using various proofs.",
         errorCases = listOf(errorNoSingleUser, errorInvalidProof),
         implementation = { proofs: List<Proof> ->
             proofs.forEach {
@@ -207,19 +201,30 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 if (now() > it.at + 1.hours) throw HttpStatusException(errorExpiredProof.copy(data = it.via))
             }
             val used = proofs.map { it.via }.toSet()
-            val result =
-                handler.authenticate(*proofs.toTypedArray()) ?: throw HttpStatusException(errorNoSingleUser)
+            val users = proofs.mapNotNull { handler.findUser(it.property, it.value) }.distinctBy { it._id }
+            val subject = users.singleOrNull() ?: throw HttpStatusException(errorNoSingleUser)
             val strength = proofs.sumOf { it.strength }
-            val maxStrengthPossible = result.options.sumOf { it.method.strength }
-            val actStrenReq = min(result.strengthRequired, maxStrengthPossible)
+            val proofMethods = handler.proofMethods
+                .filter { it.established(handler, subject) }
+            val maxStrengthPossible = proofMethods.sumOf { it.info.strength }
+            val actStrenReq = min(handler.desiredStrengthFor(subject), maxStrengthPossible)
             IdAndAuthMethods(
                 session = if (strength >= actStrenReq) newSessionPrivate(
-                    subjectId = result.id!!,
+                    subjectId = subject._id,
                     scopes = setOf("*"),
                     label = "Root Session",
                 ).second.string else null,
-                id = result.id,
-                options = result.options.filter { it.method.via !in used },
+                id = subject._id,
+                options = proofMethods
+                    .filter { it.info.via !in used }
+                    .map {
+                        ProofOption(
+                            method = it.info,
+                            value = it.info.property?.let { p ->
+                                handler.get(subject, p)
+                            }
+                        )
+                    },
                 strengthRequired = actStrenReq
             )
         }
@@ -234,7 +239,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         errorCases = listOf(),
         implementation = { futureSessionToken: String ->
             val future = FutureSession.fromToken(futureSessionToken)
-            if(future.oauthClient != null) throw ForbiddenException("Please use the token endpoint for OAuth instead, so we can check your secret.")
+            if (future.oauthClient != null) throw ForbiddenException("Please use the token endpoint for OAuth instead, so we can check your secret.")
             val (s, secret) = newSessionPrivate(
                 label = future.label,
                 subjectId = future.subjectId,
@@ -487,21 +492,24 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     }
 
     @Serializable
-    private data class HtmlProofStartReq(val method: String, val value: String)
+    private data class HtmlProofStartReq(val method: String, val property: String, val value: String)
+
     @Serializable
     private data class HtmlProofFinish(val password: String)
 
     /**
      * A quick and dirty set of endpoints for logging in via HTML.
      */
-    inner class HtmlEndpoints {
+    inner class DebuggingHtmlEndpoints {
 
         // Raw HTML side
         val html0 = path("start/html/").get.handler { request ->
-            val otherProofs = request.queryParameter("proofs")?.let { Serialization.javaData.decodeFromBase64Url<List<Proof>>(it) } ?: listOf()
+            val otherProofs =
+                request.queryParameter("proofs")?.let { Serialization.javaData.decodeFromBase64Url<List<Proof>>(it) }
+                    ?: listOf()
             request.queryParameter("method")?.decodeURLPart()?.let { methodName ->
                 request.queryParameter("value")?.decodeURLPart()?.let { methodValue ->
-                    return@handler htmlContinue(HtmlProofStartReq(methodName, methodValue), request, otherProofs)
+                    return@handler htmlContinue(HtmlProofStartReq(methodName, request.queryParameter("property")?.decodeURLPart() ?: "", methodValue), request, otherProofs)
                 }
             }
             HttpResponse(
@@ -511,9 +519,10 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     <form action='.?proofs=${Serialization.javaData.encodeToBase64Url(otherProofs)}' enctype='application/x-www-form-urlencoded' method='post'>
                         <p>Enter your login key</p>
                         <select name='method'>
-                        ${handler.applicableProofs.joinToString() { "<option value='${it.name}'>${it.name}</option>" }}
+                        ${handler.proofMethods.joinToString() { "<option value='${it.info.via}'>${it.info.via}</option>" }}
                         </select>
-                        <input type='value' name='value'/>
+                        <input name='property', value='email'/>
+                        <input name='value'/>
                         <button type='submit'>Submit</button>
                     </form>
                 """.trimIndent()
@@ -524,7 +533,9 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
 
         val html1 = path("start/html/").post.handler { request ->
-            val otherProofs = request.queryParameter("proofs")?.let { Serialization.javaData.decodeFromBase64Url<List<Proof>>(it) } ?: listOf()
+            val otherProofs =
+                request.queryParameter("proofs")?.let { Serialization.javaData.decodeFromBase64Url<List<Proof>>(it) }
+                    ?: listOf()
             val input = request.body!!.parse<HtmlProofStartReq>()
             htmlContinue(input, request, otherProofs)
         }
@@ -534,7 +545,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             request: HttpRequest,
             otherProofs: List<Proof>
         ): HttpResponse {
-            val method = handler.applicableProofs.find { it.name == input.method }
+            val method = handler.proofMethods.find { it.info.via == input.method }
                 ?: throw NotFoundException("No method ${input.method} known")
             val aapp = AuthAndPathParts<HasId<*>?, TypedServerPath0>(null, request, arrayOf())
             return when (method) {
@@ -544,10 +555,12 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         body = HttpContent.Text(
                             string = HtmlDefaults.basePage(
                                 """
-                        <form action='./${input.method}/${key.encodeURLPathPart()}?proofs=${Serialization.javaData.encodeToBase64Url(
-                                    otherProofs
-                                )}' enctype='application/x-www-form-urlencoded' method='post'>
-                            <p>Enter your password for ${method.name}</p>
+                        <form action='./${input.method}/${key.encodeURLPathPart()}?proofs=${
+                                    Serialization.javaData.encodeToBase64Url(
+                                        otherProofs
+                                    )
+                                }' enctype='application/x-www-form-urlencoded' method='post'>
+                            <p>Enter your password for ${method.info.via}</p>
                             <input type='password' name='password'/>
                             <button type='submit'>Submit</button>
                         </form>
@@ -563,12 +576,12 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         body = HttpContent.Text(
                             string = HtmlDefaults.basePage(
                                 """
-                        <form action='./${input.method}/${input.value.encodeURLPathPart()}?proofs=${
+                        <form action='./${input.method}/${input.property.encodeURLPathPart()}---${input.value.encodeURLPathPart()}?proofs=${
                                     Serialization.javaData.encodeToBase64Url(
                                         otherProofs
                                     )
                                 }' enctype='application/x-www-form-urlencoded' method='post'>
-                            <p>Enter your password for ${method.name}</p>
+                            <p>Enter your password for ${method.info.via}</p>
                             <input type='password' name='password'/>
                             <button type='submit'>Submit</button>
                         </form>
@@ -594,18 +607,32 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
 
         val html2 = path("start/html/{method}/{key}").post.handler { request ->
-            val otherProofs = request.queryParameter("proofs")?.let { Serialization.javaData.decodeFromBase64Url<List<Proof>>(it) } ?: listOf()
+            val otherProofs =
+                request.queryParameter("proofs")?.let { Serialization.javaData.decodeFromBase64Url<List<Proof>>(it) }
+                    ?: listOf()
             val methodName = request.parts["method"]!!
             val key = request.parts["key"]!!
             val input = request.body!!.parse<HtmlProofFinish>()
-            val method = handler.applicableProofs.find { it.name == methodName }
-                    as? Authentication.EndsWithStringProofMethod
+            val method = handler.proofMethods.find { it.info.via == methodName }
                 ?: throw NotFoundException("No method ${methodName} known")
             val aapp = AuthAndPathParts<HasId<*>?, TypedServerPath0>(null, request, arrayOf())
-            val proof = method.prove.implementation(aapp, ProofEvidence(
-                key = key!!,
-                password = input.password
-            ))
+            val proof = when(method) {
+                is Authentication.StartedProofMethod -> method.prove.implementation(
+                    aapp, FinishProof(
+                        key = key,
+                        password = input.password
+                    )
+                )
+                is Authentication.DirectProofMethod -> method.prove.implementation(
+                    aapp, IdentificationAndPassword(
+                        type = handler.name,
+                        property = key.substringBefore("---"),
+                        value = key.substringAfter("---"),
+                        password = input.password
+                    )
+                )
+                else -> throw BadRequestException()
+            }
             val l = login.implementation(aapp, (otherProofs + proof))
             l.session?.let {
                 HttpResponse.redirectToGet("/") {
@@ -613,10 +640,17 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 }
             } ?: run {
                 val nextMethodInfo = l.options.first()
-                HttpResponse.redirectToGet(html0.path.toString() + "?proofs=${Serialization.javaData.encodeToBase64Url(otherProofs + proof)}&method=${nextMethodInfo.method.via}&value=${nextMethodInfo.value}")
+                HttpResponse.redirectToGet(
+                    html0.path.toString() + "?proofs=${
+                        Serialization.javaData.encodeToBase64Url(
+                            otherProofs + proof
+                        )
+                    }&method=${nextMethodInfo.method.via}&value=${nextMethodInfo.value ?: l.id}&property=${nextMethodInfo.method.property ?: "_id"}"
+                )
             }
         }
     }
-    val html = HtmlEndpoints()
+
+    val html = DebuggingHtmlEndpoints()
 }
 

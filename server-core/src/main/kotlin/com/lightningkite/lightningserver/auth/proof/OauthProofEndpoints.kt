@@ -35,14 +35,15 @@ class OauthProofEndpoints(
     val continueUiAuthUrl: ()->String
 ) : ServerPathGroup(path), Authentication.ExternalProofMethod {
 
-    override val name: String
-        get() = provider.identifierName
-    override val humanName: String
-        get() = provider.niceName
-    override val strength: Int
-        get() = 10
-    override val validates: String
-        get() = "email"
+    init {
+        Authentication.register(this)
+    }
+
+    override val info: ProofMethodInfo = ProofMethodInfo(
+        via = provider.identifierName,
+        property = "email",
+        strength = 10
+    )
 
     @Suppress("UNCHECKED_CAST")
     val callback = path("callback").oauthCallback<UUID>(
@@ -53,6 +54,7 @@ class OauthProofEndpoints(
         val email = profile.email ?: throw BadRequestException("No email was found for this profile.")
         HttpResponse.redirectToGet(continueUiAuthUrl() + "?proof=${Serialization.json.encodeToString(Proof.serializer(), proofHasher().makeProof(
             info = info,
+            property = "email",
             value = email,
             at = now()
         )).encodeURLQueryComponent()}")

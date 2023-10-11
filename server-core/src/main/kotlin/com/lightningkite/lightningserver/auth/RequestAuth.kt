@@ -16,6 +16,7 @@ import kotlinx.serialization.UseContextualSerialization
 import kotlin.time.Duration
 import kotlinx.datetime.Instant
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 
 data class RequestAuth<SUBJECT : HasId<*>>(
     val subject: Authentication.SubjectHandler<SUBJECT, *>,
@@ -125,6 +126,8 @@ data class RequestAuth<SUBJECT : HasId<*>>(
 
 @Suppress("UNCHECKED_CAST")
 inline val <SUBJECT : HasId<ID>, ID : Comparable<ID>> RequestAuth<SUBJECT>.id get() = rawId as ID
+@Suppress("UNCHECKED_CAST")
+val <SUBJECT : HasId<*>> RequestAuth<SUBJECT>.idString: String get() = Serialization.json.encodeUnwrappingString(subject.idSerializer as KSerializer<Any?>, rawId)
 
 suspend fun Request.authAny(): RequestAuth<*>? = this.cache(RequestAuth.Key)
 suspend fun <SUBJECT : HasId<*>> Request.auth(type: AuthType): RequestAuth<SUBJECT>? {

@@ -250,38 +250,21 @@ object Server : ServerPathGroup(ServerPath.root) {
         path("subject"),
         object : Authentication.SubjectHandler<User, UUID> {
             override val name: String get() = "User"
-            override val idProofs: Set<Authentication.ProofMethod> = setOf(proofEmail)
             override val authType: AuthType get() = AuthType<User>()
-            override val additionalProofs: Set<Authentication.ProofMethod> = setOf(proofOtp, proofPassword)
-            override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<User, UUID>? {
-                val emailIdentifier = proofs.find { it.of == "email" } ?: return null
-                val user = userInfo.collection().findOne(condition { it.email eq emailIdentifier.value }) ?: run {
-                    userInfo.collection().insertOne(
-                        User(
-                            email = emailIdentifier.value
-                        )
-                    )
-                } ?: return null
-                val options = listOfNotNull(
-                    ProofOption(proofEmail.info, user.email),
-                    proofOtp.proofOption(this, user._id),
-                    proofPassword.proofOption(this, user._id),
-                )
-                return Authentication.AuthenticateResult(
-                    id = user._id,
-                    subjectCopy = user,
-                    options = options,
-                    strengthRequired = 20
-                )
-            }
-
             override val idSerializer: KSerializer<UUID>
                 get() = userInfo.serialization.idSerializer
             override val subjectSerializer: KSerializer<User>
                 get() = userInfo.serialization.serializer
 
             override suspend fun fetch(id: UUID): User = userInfo.collection().get(id) ?: throw NotFoundException()
+            override suspend fun findUser(property: String, value: String): User? = when(property) {
+                "email" -> userInfo.collection().findOne(condition { it.email eq value })
+                "_id" -> userInfo.collection().get(uuid(value))
+                else -> null
+            }
             override val knownCacheTypes: List<RequestAuth.CacheKey<User, UUID, *>> = listOf(EmailCacheKey)
+
+            override suspend fun desiredStrengthFor(result: User): Int = if(result.isSuperUser) Int.MAX_VALUE else 5
         },
         database = database
     )

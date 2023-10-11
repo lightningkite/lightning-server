@@ -11,8 +11,6 @@ import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.*
-import com.lightningkite.lightningserver.testmodels.TestThing
-import com.lightningkite.lightningserver.testmodels.TestThing__id
 import com.lightningkite.lightningserver.email.Email
 import com.lightningkite.lightningserver.email.EmailLabeledValue
 import com.lightningkite.lightningserver.email.EmailSettings
@@ -29,12 +27,12 @@ import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.sms.SMSSettings
 import com.lightningkite.lightningserver.tasks.Tasks
-import com.lightningkite.lightningserver.testmodels.TestUser
-import com.lightningkite.lightningserver.testmodels.email
+import com.lightningkite.lightningserver.testmodels.*
 import com.lightningkite.uuid
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.KSerializer
@@ -117,32 +115,35 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         database,
         cache
     )
+    val proofSms = SmsProofEndpoints(
+        ServerPath(uuid().toString()),
+        PinHandler(cache, "pin2"),
+        sms,
+    )
     val subjectHandler = object : Authentication.SubjectHandler<TestUser, UUID> {
         override val name: String get() = "TestUser"
-        override val idProofs: Set<Authentication.ProofMethod> = setOf(proofEmail)
         override val authType: AuthType get() = AuthType<TestUser>()
-        override val additionalProofs: Set<Authentication.ProofMethod> = setOf(proofPassword, proofOtp)
-        override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<TestUser, UUID>? {
-            val emailIdentifier = proofs.find { it.of == "email" } ?: return null
-            val user = userInfo.collection().findOne(condition { it.email eq emailIdentifier.value }) ?: run {
-                userInfo.collection().insertOne(
-                    TestUser(
-                        email = emailIdentifier.value
-                    )
-                )
-            } ?: return null
-            val options = listOfNotNull(
-                ProofOption(proofEmail.info, user.email),
-                proofOtp.proofOption(this, user._id),
-                proofPassword.proofOption(this, user._id),
-            )
-            return Authentication.AuthenticateResult(
-                id = user._id,
-                subjectCopy = user,
-                options = options,
-                strengthRequired = 20
-            )
+
+        override suspend fun findUser(property: String, value: String): TestUser? {
+            return when(property) {
+                "email" -> userInfo.collection().findOne(condition { it.email eq value }) ?: run {
+                    userInfo.collection().insertOne(TestUser(email = value))
+                }
+                "phone" -> userInfo.collection().find(condition { it.phoneNumber eq value }).toList().singleOrNull()
+                "_id" -> userInfo.collection().get(uuid(value))
+                else -> null
+            }
         }
+
+        override fun get(property: String): Boolean = super.get(property) || property == "phoneNumber"
+        override fun get(subject: TestUser, property: String): String? {
+            return when(property) {
+                "phone" -> subject.phoneNumber
+                else -> super.get(subject, property)
+            }
+        }
+
+        override suspend fun desiredStrengthFor(result: TestUser): Int = if(result.isSuperAdmin) 20 else 5
 
         override suspend fun permitMasquerade(
             other: Authentication.SubjectHandler<*, *>,

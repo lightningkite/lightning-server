@@ -20,7 +20,6 @@ import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.serialization.decodeUnwrappingString
 import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
@@ -54,14 +53,15 @@ class OneTimePasswordProofEndpoints(
         if (path.docName == null) path.docName = "OneTimePasswordProof"
     }
 
-    override val name: String
-        get() = "otp"
-    override val humanName: String
-        get() = "One-time Password"
-    override val validates: String
-        get() = "otp"
-    override val strength: Int
-        get() = 5
+    override val info: ProofMethodInfo = ProofMethodInfo(
+        via = "otp",
+        property = null,
+        strength = 10
+    )
+
+    init {
+        Authentication.register(this)
+    }
 
     private val tables = HashMap<String, FieldCollection<OtpSecret<Comparable<Any>>>>()
 
@@ -114,13 +114,6 @@ class OneTimePasswordProofEndpoints(
     fun <ID : Comparable<ID>> key(subjectHandler: Authentication.SubjectHandler<*, ID>, id: ID): String =
         subjectHandler.name + "|" + Serialization.json.encodeUnwrappingString(subjectHandler.idSerializer, id)
 
-    fun key(id: String): Pair<Authentication.SubjectHandler<*, *>, Any?> {
-        val subject = id.substringBefore('|', "")
-        val handler = Authentication.subjects.values.find { it.name == subject }
-            ?: throw IllegalArgumentException("No subject $subject recognized")
-        return handler to Serialization.json.decodeUnwrappingString(handler.idSerializer, id.substringAfter('|'))
-    }
-
     val establish = path("establish").post.api(
         summary = "Establish an One Time Password",
         inputType = EstablishOtp.serializer(),
@@ -156,11 +149,11 @@ class OneTimePasswordProofEndpoints(
             @Suppress("UNCHECKED_CAST")
             prove.implementation(
                 AuthAndPathParts(null, null, arrayOf()),
-                ProofEvidence(
-                    key(
-                        auth.subject as Authentication.SubjectHandler<*, Comparable<Any?>>,
-                        auth.rawId as Comparable<Any?>
-                    ), code
+                IdentificationAndPassword(
+                    auth.subject.name,
+                    "_id",
+                    auth.idString,
+                    code
                 )
             )
             Unit
@@ -200,19 +193,21 @@ class OneTimePasswordProofEndpoints(
 
     override val prove = path("prove").post.api(
         authOptions = noAuth,
-        summary = "Prove $validates ownership",
+        summary = "Prove OTP",
         description = "Logs in to the given account with an OTP code.  Limits to 10 attempts per hour.",
         errorCases = listOf(),
         examples = listOf(
             ApiExample(
-                input = ProofEvidence(
+                input = IdentificationAndPassword(
+                    "User",
+                    "_id",
                     "some-id",
                     "000000"
                 ),
                 output = Proof(
-                    via = name,
-                    of = validates,
-                    strength = strength,
+                    via = info.via,
+                    property = "_id",
+                    strength = info.strength,
                     value = "some-id",
                     at = now(),
                     signature = "opaquesignaturevalue"
@@ -220,15 +215,21 @@ class OneTimePasswordProofEndpoints(
             )
         ),
         successCode = HttpStatus.OK,
-        implementation = { input: ProofEvidence ->
+        implementation = { input: IdentificationAndPassword ->
             val postedAt = now()
-            val cacheKey = "otp-count-${input.key}"
+            val cacheKey = "otp-count-${input.property}-${input.value}"
             cache().add(cacheKey, 1, 1.hours)
             val ct = (cache().get<Int>(cacheKey) ?: 0)
             if (ct > 5) throw BadRequestException("Too many attempts; please wait.")
-            val (subject, id) = key(input.key)
+            val subject = input.type
+            val handler = Authentication.subjects.values.find { it.name == subject }
+                ?: throw IllegalArgumentException("No subject $subject recognized")
+            val item = handler.findUser(input.property, input.value)
+                ?: throw BadRequestException("User ID and code do not match")
+            val id = item._id
+
             @Suppress("UNCHECKED_CAST")
-            val secret = table(subject).get(id as Comparable<Any>)
+            val secret = table(handler).get(id as Comparable<Any>)
                 ?: throw BadRequestException("User ID and code do not match")
             if (!secret.generator.isValid(
                     input.password,
@@ -236,7 +237,7 @@ class OneTimePasswordProofEndpoints(
                 )
             ) throw BadRequestException("User ID and code do not match")
             if (!secret.active) {
-                val table = table(subject)
+                val table = table(handler)
                 table.updateOneById(id, modification(DataClassPathSelf(table.serializer)) {
                     it.active assign true
                 })
@@ -244,12 +245,20 @@ class OneTimePasswordProofEndpoints(
             cache().remove(cacheKey)
             proofHasher().makeProof(
                 info = info,
-                value = input.key,
+                property = input.property,
+                value = input.value,
                 at = now()
             )
         }
     )
 
+    override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
+        handler: Authentication.SubjectHandler<SUBJECT, ID>,
+        item: SUBJECT
+    ): Boolean {
+        @Suppress("UNCHECKED_CAST")
+        return table(handler).get(item._id as Comparable<Any>)?.active == true
+    }
     suspend fun <ID : Comparable<ID>> established(handler: Authentication.SubjectHandler<*, ID>, id: ID): Boolean {
         @Suppress("UNCHECKED_CAST")
         return table(handler).get(id as Comparable<Any>)?.active == true

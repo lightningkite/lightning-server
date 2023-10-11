@@ -88,14 +88,14 @@ val OtpSecret<*>.code: String get() = generator.generate()
 
 private fun signingInfo(
     via: String,
-    of: String,
+    property: String,
     value: String,
     strength: Int = 1,
     at: Instant,
 ): ByteArray = ByteArrayOutputStream().use {
     DataOutputStream(it).use {
         it.writeUTF(via)
-        it.writeUTF(of)
+        it.writeUTF(property)
         it.writeUTF(value)
         it.writeInt(strength)
         it.writeLong(at.toEpochMilliseconds())
@@ -105,17 +105,18 @@ private fun signingInfo(
 
 fun SecureHasher.makeProof(
     info: ProofMethodInfo,
+    property: String,
     value: String,
     at: Instant,
 ): Proof = Proof(
     via = info.via,
-    of = info.of,
+    property = property,
     strength = info.strength,
     value = value,
     at = at,
-    signature = Base64.getEncoder().encodeToString(sign(signingInfo(info.via, info.of, value, info.strength, at)))
+    signature = Base64.getEncoder().encodeToString(sign(signingInfo(info.via, property, value, info.strength, at)))
 )
 
 fun SecureHasher.verify(proof: Proof): Boolean {
-    return verify(proof.run { signingInfo(via, of, value, strength, at) }, Base64.getDecoder().decode(proof.signature))
+    return verify(proof.run { signingInfo(via, property, value, strength, at) }, Base64.getDecoder().decode(proof.signature))
 }

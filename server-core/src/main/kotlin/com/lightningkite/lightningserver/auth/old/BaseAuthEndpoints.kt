@@ -63,11 +63,6 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
         override val idSerializer: KSerializer<ID> get() = userAccess.idSerializer
         override val subjectSerializer: KSerializer<USER> get() = userAccess.serializer
         override suspend fun fetch(id: ID): USER = userAccess.byId(id)
-
-        override val idProofs: Set<Authentication.ProofMethod> get() = setOf()
-        override val additionalProofs: Set<Authentication.ProofMethod> get() = setOf()
-        override suspend fun authenticate(vararg proofs: Proof): Authentication.AuthenticateResult<USER, ID>? = null
-
     }
 
     init {

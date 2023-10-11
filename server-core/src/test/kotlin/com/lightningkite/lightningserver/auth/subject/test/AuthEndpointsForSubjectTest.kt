@@ -2,11 +2,10 @@
 
 package com.lightningkite.lightningserver.auth.subject.test
 
-import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.get
+import com.lightningkite.lightningdb.modification
+import com.lightningkite.lightningdb.updateOneById
 import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.auth.oauth.OauthAccessType
 import com.lightningkite.lightningserver.auth.oauth.OauthClient
@@ -17,9 +16,9 @@ import com.lightningkite.lightningserver.email.TestEmailClient
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
-import com.lightningkite.lightningserver.testmodels.TestUser
+import com.lightningkite.lightningserver.sms.TestSMSClient
+import com.lightningkite.lightningserver.testmodels.phoneNumber
 import com.lightningkite.lightningserver.typed.AuthAndPathParts
-import com.lightningkite.lightningserver.typed.TypedServerPath0
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.uuid
 import kotlinx.coroutines.runBlocking
@@ -37,7 +36,7 @@ class AuthEndpointsForSubjectTest {
         val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.also { println(it) }?.plainText?.let {
             pinRegex.find(it)?.value
         }!!
-        val proof1 = TestSettings.proofEmail.prove.test(null, ProofEvidence(
+        val proof1 = TestSettings.proofEmail.prove.test(null, FinishProof(
             key = info,
             password = pin
         ))
@@ -49,16 +48,17 @@ class AuthEndpointsForSubjectTest {
     }
 
     @Test
-    fun testEmailOtpPassword(): Unit = runBlocking {
-        val info = TestSettings.proofEmail.start.test(null, "testwithotp@test.com")
+    fun testEmailOtpPasswordAll(): Unit = runBlocking {
+        val info = TestSettings.proofEmail.start.test(null, TestSettings.testAdmin.await().email)
         val pinRegex = Regex("[A-Z][A-Z][A-Z][A-Z][A-Z][A-Z]")
         val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.also { println(it) }?.plainText?.let {
             pinRegex.find(it)?.value
         }!!
-        val proof1 = TestSettings.proofEmail.prove.test(null, ProofEvidence(
+        val proof1 = TestSettings.proofEmail.prove.test(null, FinishProof(
             key = info,
             password = pin
-        ))
+        )
+        )
         val result = TestSettings.testUserSubject.login.test(null, listOf(proof1))
         println(result)
         assert(result.session != null)
@@ -85,16 +85,88 @@ class AuthEndpointsForSubjectTest {
         assertNull(r1.session)
         assertTrue(r1.options.any { it.method == TestSettings.proofOtp.info })
         assertTrue(r1.options.any { it.method == TestSettings.proofPassword.info })
-        val proof2 = TestSettings.proofOtp.prove.test(null, ProofEvidence(
-            r1.options.find { it.method == TestSettings.proofOtp.info }!!.value!!,
-            secret.generator.generate()
+        val proof2 = TestSettings.proofOtp.prove.test(null, IdentificationAndPassword(
+            type = TestSettings.subjectHandler.name,
+            property = "_id",
+            value = r1.id.toString(),
+            password = secret.generator.generate()
         ))
-        val proof3 = TestSettings.proofPassword.prove.test(null, ProofEvidence(
-            r1.options.find { it.method == TestSettings.proofPassword.info }!!.value!!,
-            "test"
+        assert(TestSettings.testUserSubject.proofHasher().verify(proof2))
+        val proof3 = TestSettings.proofPassword.prove.test(null, IdentificationAndPassword(
+            type = TestSettings.subjectHandler.name,
+            property = "_id",
+            value = r1.id.toString(),
+            password = "test"
         ))
+        assert(TestSettings.testUserSubject.proofHasher().verify(proof3))
         val r2 = TestSettings.testUserSubject.login.test(null, listOf(proof1, proof2, proof3))
         assertNotNull(r2.session)
+    }
+
+    @Test
+    fun testEmailOtpPasswordAny(): Unit = runBlocking {
+        val info = TestSettings.proofEmail.start.test(null, "notadmin@test.com")
+        val pinRegex = Regex("[A-Z][A-Z][A-Z][A-Z][A-Z][A-Z]")
+        val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.also { println(it) }?.plainText?.let {
+            pinRegex.find(it)?.value
+        }!!
+        val proof1 = TestSettings.proofEmail.prove.test(null, FinishProof(
+            key = info,
+            password = pin
+        ))
+        val result = TestSettings.testUserSubject.login.test(null, listOf(proof1))
+        println(result)
+        assert(result.session != null)
+        val auth = TestSettings.testUserSubject.tokenToAuth(result.session!!, null)!!
+        val self = TestSettings.testUserSubject.self.implementation(AuthAndPathParts(auth, null, arrayOf()), Unit)
+
+        // Set up OTP
+        TestSettings.proofOtp.establish.test(self, EstablishOtp("Test Label"))
+        @Suppress("UNCHECKED_CAST") var secret = TestSettings.proofOtp.table(TestSettings.subjectHandler).get(self._id as Comparable<Any>)!!
+        assertFalse(secret.active)
+        run {
+            // Can still log in with email pin only before confirmation
+            assertNotNull(TestSettings.testUserSubject.login.test(null, listOf(proof1)).session)
+        }
+        TestSettings.proofOtp.confirm.test(self, secret.generator.generate())
+        secret = TestSettings.proofOtp.table(TestSettings.subjectHandler).get(self._id as Comparable<Any>)!!
+        assertTrue(secret.active)
+
+        // Set up Password
+        TestSettings.proofPassword.establish.test(self, EstablishPassword("test"))
+
+        // Set up phone
+        TestSettings.userInfo.collection().updateOneById(self._id, modification { it.phoneNumber assign "8001002000" })
+
+        // Can still log in with just an email
+        run {
+            val result = TestSettings.testUserSubject.login.test(null, listOf(proof1))
+            println(result)
+            assert(result.session != null)
+        }
+
+        // Can log in with phone
+        run {
+            val key = TestSettings.proofSms.start.test(null, "8001002000")
+            val pin = pinRegex.find(TestSMSClient.lastMessageSent?.message ?: "")!!.value
+            val proof = TestSettings.proofSms.prove.test(null, FinishProof(key, pin))
+            val result = TestSettings.testUserSubject.login.test(null, listOf(proof))
+            assert(result.session != null)
+        }
+
+        // Can log in with password alone
+        run {
+            val proof = TestSettings.proofPassword.prove.test(null, IdentificationAndPassword(TestSettings.subjectHandler.name, "email", self.email, "test"))
+            val result = TestSettings.testUserSubject.login.test(null, listOf(proof))
+            assert(result.session != null)
+        }
+
+        // Can log in with otp alone
+        run {
+            val proof = TestSettings.proofOtp.prove.test(null, IdentificationAndPassword(TestSettings.subjectHandler.name, "email", self.email, secret.generator.generate()))
+            val result = TestSettings.testUserSubject.login.test(null, listOf(proof))
+            assert(result.session != null)
+        }
     }
 
     @Test

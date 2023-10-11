@@ -6,15 +6,23 @@ import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
 
 @Serializable
-data class ProofEvidence(
+data class FinishProof(
     val key: String,
+    val password: String
+)
+
+@Serializable
+data class IdentificationAndPassword(
+    val type: String,
+    val property: String,
+    val value: String,
     val password: String
 )
 
 @Serializable
 data class ProofMethodInfo(
     val via: String,
-    val of: String,
+    val property: String?,
     val strength: Int = 1,
 )
 
@@ -27,8 +35,8 @@ data class ProofOption(
 @Serializable
 data class Proof(
     val via: String,
-    val of: String,
     val strength: Int = 1,
+    val property: String,
     val value: String,
     val at: Instant,
     val signature: String,

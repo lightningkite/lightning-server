@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.auth.proof
 
+import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
@@ -28,19 +29,12 @@ class EmailProofEndpoints(
     val emailTemplate: suspend (String, String) -> Email,
     proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val verifyEmail: suspend (String) -> Boolean = { true },
-) : PinBasedProofEndpoints(path, proofHasher, pin) {
+) : PinBasedProofEndpoints(path, "email", "email", proofHasher, pin) {
     init {
         if (path.docName == null) path.docName = "EmailProof"
+        Authentication.register(this)
     }
 
-    override val name: String
-        get() = "email"
-    override val humanName: String
-        get() = "Email"
-    override val strength: Int
-        get() = 10
-    override val validates: String
-        get() = "email"
     override val exampleTarget: String
         get() = "test@test.com"
 
