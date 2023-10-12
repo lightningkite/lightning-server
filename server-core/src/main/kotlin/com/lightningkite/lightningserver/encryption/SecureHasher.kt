@@ -108,6 +108,9 @@ interface SecureHasher {
 fun SecureHasher.sign(string: String): String = Base64.getEncoder().encodeToString(sign(string.toByteArray()))
 fun SecureHasher.verify(string: String, base64Signature: String): Boolean =
     verify(string.toByteArray(), Base64.getDecoder().decode(base64Signature))
+fun SecureHasher.signUrl(string: String): String = Base64.getUrlEncoder().encodeToString(sign(string.toByteArray()))
+fun SecureHasher.verifyUrl(string: String, base64Signature: String): Boolean =
+    verify(string.toByteArray(), Base64.getUrlDecoder().decode(base64Signature))
 
 fun SecureHasher.signJwt(claims: JwtClaims): String = buildString {
     val withDefaults = Json(Serialization.json) { encodeDefaults = true; explicitNulls = false }

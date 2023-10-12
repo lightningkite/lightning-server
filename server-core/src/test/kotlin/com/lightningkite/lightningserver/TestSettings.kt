@@ -18,6 +18,7 @@ import com.lightningkite.lightningserver.engine.UnitTestEngine
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.files.FilesSettings
+import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.logging.LoggingSettings
 import com.lightningkite.lightningserver.logging.loggingSettings
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -50,11 +51,14 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     val cache = setting("cache", CacheSettings())
     val files = setting("files", FilesSettings())
 
+
     val authPath = ServerPath("auth")
 
     init {
         Authentication.isDeveloper = authRequired<TestUser> { it.get().isSuperAdmin }
     }
+
+    val earlyUpload = UploadEarlyEndpoint(path("upload"), files, database)
 
     val ws = ServerPath("test").restApiWebsocket<HasId<*>?, TestThing, UUID>(
         database,

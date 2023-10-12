@@ -11,8 +11,10 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import com.lightningkite.now
+import io.ktor.http.*
 import kotlin.time.Duration
 import kotlinx.datetime.Instant
+import org.jetbrains.annotations.TestOnly
 import kotlin.time.Duration.Companion.days
 
 class UploadEarlyEndpoint(
@@ -48,12 +50,12 @@ class UploadEarlyEndpoint(
             database().collection<UploadForNextRequest>().insertOne(newItem)
             UploadInformation(
                 uploadUrl = newFile.uploadUrl(expiration),
-                futureCallToken = newFile.url.plus("?useUntil=${now().plus(expiration).toEpochMilliseconds()}").let {
-                    it + "&token=" + signer().sign(it)
-                }
+                futureCallToken = signUrl(newFile.url)
             )
         }
     )
+
+
     val cleanupSchedule = schedule("cleanupUploads", 1.days) {
         database().collection<UploadForNextRequest>().deleteMany(condition { it.expires lt now() }).forEach {
             try {
@@ -68,14 +70,30 @@ class UploadEarlyEndpoint(
     fun validateFile(url: String, params: Map<String, String>): Boolean {
         val token = params["token"] ?: return false
         val exp = params["useUntil"]?.toLongOrNull() ?: return false
-        if(System.currentTimeMillis() > exp) return false
+        if(now().toEpochMilliseconds() > exp) return false
         val file = ServerFile(url)
-        if(!signer().verify(url.substringBefore('?') + "?useUntil=$exp", token)) return false
+        if(!verifyUrl(url, exp, token)) return false
         GlobalScope.launch {
             database().collection<UploadForNextRequest>()
                 .deleteMany(condition { it.file eq ServerFile(url) })
         }
         return true
+    }
+
+    @TestOnly
+    internal fun signUrl(url: String): String {
+        return url.plus("?useUntil=${now().plus(expiration).toEpochMilliseconds()}").let {
+            it + "&token=" + signer().signUrl(it)
+        }
+    }
+    @TestOnly
+    internal fun verifyUrl(url: String): Boolean {
+        val params = url.substringAfter('?').split('&').associate { it.substringBefore('=') to it.substringAfter('=').decodeURLQueryComponent() }
+        return verifyUrl(url.substringBefore('?'), params["useUntil"]!!.toLong(), params["token"]!!)
+    }
+    @TestOnly
+    internal fun verifyUrl(url: String, exp: Long, token: String): Boolean {
+        return signer().verifyUrl(url.substringBefore('?') + "?useUntil=$exp", token)
     }
 
 }

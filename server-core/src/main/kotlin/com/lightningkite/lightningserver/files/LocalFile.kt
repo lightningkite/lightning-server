@@ -3,6 +3,8 @@ package com.lightningkite.lightningserver.files
 import com.lightningkite.lightningserver.encryption.sign
 import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.encryption.signUrl
+import com.lightningkite.lightningserver.encryption.verifyUrl
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.datetime.Clock
@@ -73,7 +75,7 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
                 val readUntil = qp["readUntil"]?.toLongOrNull() ?: return false
                 if(System.currentTimeMillis() > readUntil) return false
                 val signedUrlStart = "$url?readUntil=$readUntil"
-                system.signer.verify(signedUrlStart, qp["signature"] ?: "")
+                system.signer.verifyUrl(signedUrlStart, qp["signature"] ?: "")
             } ?: true
         } catch (e: Exception) {
             false
@@ -88,11 +90,11 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
 
     override val signedUrl: String
         get() = if(system.signedUrlExpiration == null) url else url.plus("?readUntil=${now().plus(system.signedUrlExpiration).toEpochMilliseconds()}").let {
-            it + "&signature=" + system.signer.sign(it)
+            it + "&signature=" + system.signer.signUrl(it)
         }
 
     override fun uploadUrl(timeout: Duration): String = url.plus("?writeUntil=${now().plus(timeout).toEpochMilliseconds()}").let {
-        it + "&signature=" + system.signer.sign(it)
+        it + "&signature=" + system.signer.signUrl(it)
     }
 
     internal fun checkSignatureWrite(queryParams: List<Pair<String, String>>): Boolean {
@@ -101,7 +103,7 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
             val writeUntil = qp["writeUntil"]?.toLongOrNull() ?: return false
             val signedUrlStart = "$url?writeUntil=$writeUntil"
             if(System.currentTimeMillis() > writeUntil) return false
-            system.signer.verify(signedUrlStart, qp["signature"] ?: "")
+            system.signer.verifyUrl(signedUrlStart, qp["signature"] ?: "")
         } catch (e: Exception) {
             false
         }
