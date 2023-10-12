@@ -101,7 +101,7 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
     appendLine()
     appendLine()
 
-    val byGroup = safeDocumentables.groupBy { it.docGroup }
+    val byGroup = safeDocumentables.groupBy { it.docGroupIdentifier }
     val groups = byGroup.keys.filterNotNull()
 
     for (group in groups) {

@@ -34,11 +34,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     val collectionName get() = info.collectionName
 
     init {
-        if (path.docName == null) path.docName = collectionName
-            .replace(Regex("""[^0-9a-zA-Z]+(?<following>.)?""")) { match ->
-                match.groups["following"]?.value?.uppercase() ?: ""
-            }
-            .replaceFirstChar { it.lowercase() }
+        path.docName = collectionName
         all.add(this)
     }
 

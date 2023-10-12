@@ -37,7 +37,7 @@ class PasswordProofEndpoints(
     val evaluatePassword: (String) -> Unit = { it }
 ) : ServerPathGroup(path), Authentication.DirectProofMethod {
     init {
-        if (path.docName == null) path.docName = "PasswordProof"
+        path.docName = "PasswordProof"
     }
 
     override val info: ProofMethodInfo = ProofMethodInfo(

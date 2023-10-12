@@ -30,7 +30,7 @@ class SmsProofEndpoints(
     val verifyPhone: suspend (String) -> Boolean = { true },
 ) : PinBasedProofEndpoints(path, "sms", "phone", proofHasher, pin) {
     init {
-        if (path.docName == null) path.docName = "SmsProof"
+        path.docName = "SmsProof"
     }
 
     init {

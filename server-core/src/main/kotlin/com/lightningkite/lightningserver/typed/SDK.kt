@@ -51,7 +51,7 @@ fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(
     imports.add("java.util.Optional")
     imports.add("kotlinx.datetime.*")
     val byGroup = safeDocumentables
-        .distinctBy { it.docGroup.toString() + "/" + it.summary }.groupBy { it.docGroup }
+        .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }.groupBy { it.docGroupIdentifier }
     val groups = byGroup.keys.filterNotNull()
     appendLine("interface Api {")
     for (group in groups) {
@@ -87,7 +87,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
     run {
         val sessionClassName = "AbstractAnonymousSession"
         val byGroup = safeDocumentables
-            .distinctBy { it.docGroup.toString() + "/" + it.summary }.groupBy { it.docGroup }
+            .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }.groupBy { it.docGroupIdentifier }
             .mapValues { it.value.filter { !it.authOptions.options.contains(null).not() } }
         val groups = byGroup.keys.filterNotNull()
         appendLine("open class $sessionClassName(val api: Api) {")
@@ -118,7 +118,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
     val userTypes = safeDocumentables.groupBy { it.primaryAuthName }.keys.filterNotNull()
     userTypes.forEach { userType ->
         val byGroup = safeDocumentables
-            .distinctBy { it.docGroup.toString() + "/" + it.summary }.groupBy { it.docGroup }
+            .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }.groupBy { it.docGroupIdentifier }
             .mapValues { it.value.filter { !it.authOptions.options.contains(null).not() || it.primaryAuthName == null || it.primaryAuthName == userType } }
         val groups = byGroup.keys.filterNotNull()
         val sessionClassName = "${userType.substringAfterLast('.')}Session"
@@ -162,7 +162,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
     imports.add("java.util.UUID")
     imports.add("java.util.Optional")
     imports.add("kotlinx.datetime.*")
-    val byGroup = safeDocumentables.groupBy { it.docGroup }
+    val byGroup = safeDocumentables.groupBy { it.docGroupIdentifier }
     val groups = byGroup.keys.filterNotNull()
     appendLine("class LiveApi(val httpUrl: String, val socketUrl: String): Api {")
     for (group in groups) {
@@ -259,7 +259,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
 private val Documentable.Companion.safeDocumentables
     get() = (Http.endpoints.values.filterIsInstance<ApiEndpoint<*, *, *, *>>()
         .filter { it.route.method != HttpMethod.GET || it.inputType == Unit.serializer() } + WebSockets.handlers.values.filterIsInstance<ApiWebsocket<*, *, *, *>>())
-        .distinctBy { it.docGroup.toString() + "/" + it.summary }
+        .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }
 
 private class CodeEmitter(val packageName: String, val body: StringBuilder = StringBuilder()) : Appendable by body {
     val imports = mutableSetOf<String>("com.lightningkite.khrysalis.SharedCode")

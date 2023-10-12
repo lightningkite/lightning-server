@@ -31,7 +31,7 @@ class EmailProofEndpoints(
     val verifyEmail: suspend (String) -> Boolean = { true },
 ) : PinBasedProofEndpoints(path, "email", "email", proofHasher, pin) {
     init {
-        if (path.docName == null) path.docName = "EmailProof"
+        path.docName = "EmailProof"
         Authentication.register(this)
     }
 

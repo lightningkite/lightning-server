@@ -50,6 +50,11 @@ interface Documentable {
 }
 
 val Documentable.docGroup: String? get() = generateSequence(path.path) { it.parent }.mapNotNull { it.docName }.firstOrNull()
+val Documentable.docGroupIdentifier: String? get() = docGroup
+    ?.replace(Regex("""[^0-9a-zA-Z]+(?<following>.)?""")) { match ->
+        match.groups["following"]?.value?.uppercase() ?: ""
+    }
+    ?.replaceFirstChar { it.lowercase() }
 val Documentable.functionName: String
     get() = summary
         .replace(Regex("""[^0-9a-zA-Z]+(?<following>.)?""")) { match ->

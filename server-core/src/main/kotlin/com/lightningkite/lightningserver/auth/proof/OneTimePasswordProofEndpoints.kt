@@ -50,7 +50,7 @@ class OneTimePasswordProofEndpoints(
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
 ) : ServerPathGroup(path), Authentication.DirectProofMethod {
     init {
-        if (path.docName == null) path.docName = "OneTimePasswordProof"
+        path.docName = "OneTimePasswordProof"
     }
 
     override val info: ProofMethodInfo = ProofMethodInfo(

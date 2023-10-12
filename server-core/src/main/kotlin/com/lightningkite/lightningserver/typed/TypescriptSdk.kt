@@ -69,7 +69,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     appendLine()
     appendLine()
 
-    val byGroup = safeDocumentables.groupBy { it.docGroup }
+    val byGroup = safeDocumentables.groupBy { it.docGroupIdentifier }
     val groups = byGroup.keys.filterNotNull().sortedBy { it.groupToPartName() }
     appendLine("export interface Api {")
     for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
@@ -110,7 +110,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     val userTypes = byUserType.keys.filterNotNull()
     userTypes.forEach { userType ->
         @Suppress("NAME_SHADOWING") val byGroup =
-            ((byUserType[userType] ?: listOf()) + (byUserType[null] ?: listOf())).groupBy { it.docGroup }
+            ((byUserType[userType] ?: listOf()) + (byUserType[null] ?: listOf())).groupBy { it.docGroupIdentifier }
         @Suppress("NAME_SHADOWING") val groups = byGroup.keys.filterNotNull().sortedBy { it.groupToPartName() }
         val sessionClassName = "${userType.substringAfterLast('.')}Session"
         appendLine("export class $sessionClassName {")

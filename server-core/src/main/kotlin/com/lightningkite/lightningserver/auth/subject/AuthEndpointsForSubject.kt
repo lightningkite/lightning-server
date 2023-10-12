@@ -49,7 +49,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     init {
         prepareModels()
-        if (path.docName == null) path.docName = "${handler.name}Auth"
+        path.docName = "${handler.name}Auth"
     }
 
     private val sessionSerializer = Session.serializer(handler.subjectSerializer, handler.idSerializer)
