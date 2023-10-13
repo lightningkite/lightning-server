@@ -101,13 +101,5 @@ abstract class PinBasedProofEndpoints(
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
         handler: Authentication.SubjectHandler<SUBJECT, ID>,
         item: SUBJECT
-    ): Boolean {
-        val index = handler.subjectSerializer.descriptor.getElementIndex(info.property!!)
-        if(index == CompositeDecoder.UNKNOWN_NAME) return false
-        if(handler.subjectSerializer.descriptor.getElementDescriptor(index).isNullable) {
-            return Serialization.json.encodeToJsonElement(handler.subjectSerializer, item).jsonObject.get(info.property!!)?.let { it !is JsonNull } ?: false
-        } else {
-            return true
-        }
-    }
+    ): Boolean = handler.get(item, info.property!!) != null
 }
