@@ -32,14 +32,14 @@ private fun <T: Comparable<T>> comparableOptions(inner: KSerializer<T>): List<My
     MySealedClassSerializer.Option(Condition.LessThanOrEqual.serializer(inner)) { it is Condition.LessThanOrEqual },
 )
 private fun <T> listOptions(element: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<List<T>>, *>>  = commonOptions(ListSerializer(element)) + listOf(
-    MySealedClassSerializer.Option(Condition.ListAllElements.serializer(element), setOf("AllElements")) { it is Condition.ListAllElements },
-    MySealedClassSerializer.Option(Condition.ListAnyElements.serializer(element), setOf("AnyElements")) { it is Condition.ListAnyElements },
-    MySealedClassSerializer.Option(Condition.ListSizesEquals.serializer(element), setOf("SizesEquals")) { it is Condition.ListSizesEquals },
+    MySealedClassSerializer.Option(Condition.ListAllElements.serializer(element), setOf("SetAllElements", "AllElements")) { it is Condition.ListAllElements },
+    MySealedClassSerializer.Option(Condition.ListAnyElements.serializer(element), setOf("SetAnyElements", "AnyElements")) { it is Condition.ListAnyElements },
+    MySealedClassSerializer.Option(Condition.ListSizesEquals.serializer(element), setOf("SetSizesEquals", "SizesEquals")) { it is Condition.ListSizesEquals },
 )
 private fun <T> setOptions(element: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<Set<T>>, *>>  = commonOptions(SetSerializer(element)) + listOf(
-    MySealedClassSerializer.Option(Condition.SetAllElements.serializer(element)) { it is Condition.SetAllElements },
-    MySealedClassSerializer.Option(Condition.SetAnyElements.serializer(element)) { it is Condition.SetAnyElements },
-    MySealedClassSerializer.Option(Condition.SetSizesEquals.serializer(element)) { it is Condition.SetSizesEquals },
+    MySealedClassSerializer.Option(Condition.SetAllElements.serializer(element), setOf("ListAllElements", "AllElements")) { it is Condition.SetAllElements },
+    MySealedClassSerializer.Option(Condition.SetAnyElements.serializer(element), setOf("ListAnyElements", "AnyElements")) { it is Condition.SetAnyElements },
+    MySealedClassSerializer.Option(Condition.SetSizesEquals.serializer(element), setOf("ListSizesEquals", "SizesEquals")) { it is Condition.SetSizesEquals },
 )
 private fun <T> stringMapOptions(element: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<Map<String, T>>, *>>  = commonOptions(
     MapSerializer(String.serializer(), element)
