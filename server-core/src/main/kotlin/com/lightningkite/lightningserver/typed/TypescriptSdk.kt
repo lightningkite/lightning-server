@@ -7,7 +7,6 @@ import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.*
-import kotlinx.serialization.internal.GeneratedSerializer
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
@@ -28,7 +27,8 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
                     append("export interface ")
                     it.write().let { out.append(it) }
                     appendLine(" {")
-                    (it.serializableProperties?.map { it.serializer } ?: it.tryChildSerializers()?.toList() ?: listOf()).forEachIndexed { index, sub ->
+                    (it.serializableProperties?.map { it.serializer } ?: it.tryChildSerializers()?.toList()
+                    ?: listOf()).forEachIndexed { index, sub ->
                         append("    ")
                         append(it.descriptor.getElementName(index))
                         append(": ")
@@ -114,7 +114,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         @Suppress("NAME_SHADOWING") val groups = byGroup.keys.filterNotNull().sortedBy { it.groupToPartName() }
         val sessionClassName = "${userType.substringAfterLast('.')}Session"
         appendLine("export class $sessionClassName {")
-        appendLine("    constructor(public api: Api, public ${userType.userTypeTokenName()}: string) {}")
+        appendLine("    constructor(public api: Api, public ${userType.userTypeTokenName()}: ()=>string) {}")
         for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
             appendLine("    ")
             appendLine("    /**")
@@ -318,9 +318,10 @@ private fun Appendable.functionCall(
         if (argComma) append(", ")
         else argComma = true
         if (it.name == documentable.primaryAuthName?.userTypeTokenName() && authUsesThis) {
-            append("this.")
+            append("this.${it.name}()")
+        } else {
+            append(it.name)
         }
-        append(it.name)
     }
     append(")")
 }
@@ -390,9 +391,10 @@ private fun KSerializer<*>.write(): String = nullElement()?.let { it.write() + "
                 val cleanName = this.descriptor.simpleSerialName
                 if (cleanName != "String") {
                     out.append(cleanName)
-                    this.subSerializers().takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.write() }?.let {
-                        out.append(it)
-                    }
+                    this.subSerializers().takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.write() }
+                        ?.let {
+                            out.append(it)
+                        }
                 } else {
                     out.append("string")
                 }
@@ -417,12 +419,13 @@ private fun KSerializer<*>.write(): String = nullElement()?.let { it.write() + "
             StructureKind.OBJECT,
             SerialKind.ENUM,
             StructureKind.CLASS -> {
-                if(descriptor.serialName == "com.lightningkite.lightningdb.Partial") {
+                if (descriptor.serialName == "com.lightningkite.lightningdb.Partial") {
                     out.append("DeepPartial")
                 } else {
                     out.append(descriptor.simpleSerialName)
                 }
-                this.tryTypeParameterSerializers2()?.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.write() }?.let {
+                this.tryTypeParameterSerializers2()?.takeUnless { it.isEmpty() }
+                    ?.joinToString(", ", "<", ">") { it.write() }?.let {
                     out.append(it)
                 }
             }
