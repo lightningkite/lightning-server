@@ -135,10 +135,10 @@ open class EmailAuthEndpoints<USER : Any, ID>(
                 val token = base.token(user, Duration.ofMinutes(1))
                 HttpResponse.redirectToGet("${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$token")
             }
-            val loginRedirect = path("oauth/${it.first}/login").get.handler {
+            val loginRedirect = path("oauth/${it.first.pathName}/login").get.handler {
                 HttpResponse.redirectToGet(callback.loginUrl(UUID.randomUUID()))
             }
-            val loginApi = path("oauth/${it.first}/login").get.typed(
+            val loginApi = path("oauth/${it.first.pathName}/login-api").get.typed(
                 summary = "Log In via ${it.first.niceName}",
                 description = "Returns a URL which, when opened in a browser, will allow you to log into the system with ${it.first.niceName}.",
                 errorCases = listOf(),

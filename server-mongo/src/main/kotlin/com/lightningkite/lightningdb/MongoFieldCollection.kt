@@ -2,11 +2,7 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.mongodb.ErrorCategory
-import com.mongodb.MongoBulkWriteException
-import com.mongodb.MongoCommandException
-import com.mongodb.MongoException
-import com.mongodb.MongoQueryException
+import com.mongodb.*
 import com.mongodb.client.model.*
 import com.mongodb.client.model.Aggregates.group
 import com.mongodb.client.model.Aggregates.match
@@ -18,6 +14,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import org.bson.BsonDocument
 import org.bson.conversions.Bson
+import java.nio.channels.ClosedChannelException
 import java.util.concurrent.TimeUnit
 import kotlin.reflect.KProperty1
 
@@ -27,6 +24,7 @@ import kotlin.reflect.KProperty1
 class MongoFieldCollection<Model : Any>(
     val serializer: KSerializer<Model>,
     private val getMongo: () -> MongoCollection<BsonDocument>,
+    private val onConnectionError: ()->Unit,
 ) : AbstractSignalFieldCollection<Model>() {
     val mongo: MongoCollection<BsonDocument> get() = getMongo()
 
@@ -53,6 +51,11 @@ class MongoFieldCollection<Model : Any>(
 
             e is MongoException && ErrorCategory.fromErrorCode(e.code) == ErrorCategory.DUPLICATE_KEY -> {
                 throw UniqueViolationException(cause = e, collection = mongo.namespace.collectionName)
+            }
+
+            e is MongoSocketWriteException && e.cause is ClosedChannelException -> {
+                onConnectionError()
+                throw e
             }
 
             else -> throw e

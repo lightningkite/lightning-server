@@ -187,29 +187,36 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
     }
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context) {
+        var handleKey: String = "unknown"
         try {
             val asJson = Serialization.json.parseToJsonElement(input.reader().readText()) as JsonObject
             val response: APIGatewayV2HTTPResponse = blockingTimeout(context.remainingTimeInMillis - 5_000L) {
                 when {
-                    asJson.containsKey("taskName") -> handleTask(
-                        Serialization.json.decodeFromJsonElement(
-                            TaskInvoke.serializer(),
-                            asJson
+                    asJson.containsKey("taskName") -> {
+                        handleTask(
+                            Serialization.json.decodeFromJsonElement(
+                                TaskInvoke.serializer(),
+                                asJson
+                            ).also { handleKey = it.taskName }
                         )
-                    )
+                    }
 
                     asJson.containsKey("httpMethod") -> handleHttp(
                         Serialization.json.decodeFromJsonElement<APIGatewayV2HTTPEvent>(
                             asJson
-                        )
+                        ).also { handleKey = it.httpMethod + " " + it.path }
                     )
 
                     asJson["requestContext"]?.jsonObject?.containsKey("connectionId") == true -> handleWebsocket(
-                        Serialization.json.decodeFromJsonElement<APIGatewayV2WebsocketRequest>(asJson)
+                        Serialization.json.decodeFromJsonElement<APIGatewayV2WebsocketRequest>(asJson).also {
+                            handleKey = "WS " + it.requestContext?.routeKey
+                        }
                     )
 
                     asJson.containsKey("scheduled") -> {
-                        val parsed: Scheduled = Serialization.json.decodeFromJsonElement(asJson)
+                        val parsed: Scheduled = Serialization.json.decodeFromJsonElement<Scheduled>(asJson).also {
+                            handleKey = "Schedule " + it.scheduled
+                        }
                         val schedule =
                             Scheduler.schedules[parsed.scheduled]
                                 ?: return@blockingTimeout APIGatewayV2HTTPResponse(
@@ -274,7 +281,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             val ex = Exception("Full lambda failure", e)
             ex.printStackTrace()
             runBlocking {
-                ex.report()
+                ex.report(handleKey)
             }
             if (preventLambdaTimeoutReuse) {
                 println("Killing self to prevent potentially broken reuse.  To disable this, set AwsAdapter.preventLambdaTimeoutReuse to false.")

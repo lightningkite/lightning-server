@@ -27,6 +27,9 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
     val database get() = databaseLazy.value
     private var coroutineCollections = ConcurrentHashMap<Pair<KType, String>, Lazy<MongoCollection<BsonDocument>>>()
     override suspend fun disconnect() {
+        disconnectImmediate()
+    }
+    fun disconnectImmediate() {
         if (client.isInitialized()) client.value.close()
         client = lazy(makeClient)
         databaseLazy = lazy { client.value.getDatabase(databaseName) }
@@ -125,15 +128,19 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
         (collections.getOrPut(type to name) {
             lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
                 MongoFieldCollection(
-                    Serialization.Internal.bson.serializersModule.serializer(type) as KSerializer<T>
-                ) {
-                    (coroutineCollections.getOrPut(type to name) {
-                        lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-                            databaseLazy.value
-                                .getCollection(name, BsonDocument::class.java)
-                        }
-                    } as Lazy<MongoCollection<BsonDocument>>).value
-                }
+                    Serialization.Internal.bson.serializersModule.serializer(type) as KSerializer<T>,
+                    getMongo = {
+                        (coroutineCollections.getOrPut(type to name) {
+                            lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+                                databaseLazy.value
+                                    .getCollection(name, BsonDocument::class.java)
+                            }
+                        } as Lazy<MongoCollection<BsonDocument>>).value
+                    },
+                    onConnectionError = {
+                        disconnectImmediate()
+                    }
+                )
             }
         } as Lazy<MongoFieldCollection<T>>).value
 }
