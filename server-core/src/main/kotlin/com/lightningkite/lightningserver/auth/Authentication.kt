@@ -15,6 +15,8 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
 import kotlinx.serialization.encoding.CompositeDecoder
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 object Authentication {
 
@@ -61,6 +63,8 @@ object Authentication {
 
         val idSerializer: KSerializer<ID>
         val subjectSerializer: KSerializer<SUBJECT>
+
+        val subjectCacheExpiration: Duration get() = 5.minutes
     }
     private val _subjects: MutableMap<AuthType, SubjectHandler<*, *>> = HashMap()
     val subjects: Map<AuthType, SubjectHandler<*, *>> get() = _subjects

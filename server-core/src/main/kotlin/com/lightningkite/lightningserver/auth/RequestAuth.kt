@@ -1,4 +1,5 @@
 @file:UseContextualSerialization(Instant::class)
+
 package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningdb.Description
@@ -34,13 +35,15 @@ data class RequestAuth<SUBJECT : HasId<*>>(
                 return reader.request(request)?.let {
                     request.headers[HttpHeader.XMasquerade]?.let { m ->
                         val otherType = m.substringBefore('/')
-                        val otherHandler = Authentication.subjects.values.find { it.name == otherType } ?: throw BadRequestException("No subject type ${otherType} known")
+                        val otherHandler = Authentication.subjects.values.find { it.name == otherType }
+                            ?: throw BadRequestException("No subject type ${otherType} known")
                         val otherId = Serialization.fromString(m.substringAfter('/'), otherHandler.idSerializer)
                         @Suppress("UNCHECKED_CAST")
-                        if(it.permitMasquerade(
-                            otherHandler as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>,
-                            otherId
-                        )) {
+                        if (it.permitMasquerade(
+                                otherHandler as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>,
+                                otherId
+                            )
+                        ) {
                             RequestAuth(
                                 subject = otherHandler,
                                 sessionId = it.sessionId,
@@ -62,7 +65,11 @@ data class RequestAuth<SUBJECT : HasId<*>>(
 
     private suspend fun permitMasquerade(other: Authentication.SubjectHandler<*, *>, otherId: Comparable<*>): Boolean {
         @Suppress("UNCHECKED_CAST")
-        return (subject as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>).permitMasquerade(other, rawId as Comparable<Any?>, otherId)
+        return (subject as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>).permitMasquerade(
+            other,
+            rawId as Comparable<Any?>,
+            otherId
+        )
     }
 
     abstract class CacheKey<SUBJECT : HasId<ID>, ID : Comparable<ID>, VALUE> {
@@ -72,20 +79,23 @@ data class RequestAuth<SUBJECT : HasId<*>>(
         abstract val validFor: Duration
         var serializationIndex: Int = -1
             private set
+
         companion object {
             private val _allCacheKeys = ArrayList<CacheKey<*, *, *>>()
             private var used: Boolean = false
-            val allCacheKeys: List<CacheKey<*, *, *>> get() {
-                if(!used) {
-                    used = true
-                    _allCacheKeys.sortBy { it.name }
-                    _allCacheKeys.forEachIndexed { index, cacheKey -> cacheKey.serializationIndex = index }
+            val allCacheKeys: List<CacheKey<*, *, *>>
+                get() {
+                    if (!used) {
+                        used = true
+                        _allCacheKeys.sortBy { it.name }
+                        _allCacheKeys.forEachIndexed { index, cacheKey -> cacheKey.serializationIndex = index }
+                    }
+                    return _allCacheKeys
                 }
-                return _allCacheKeys
-            }
         }
+
         init {
-            if(used) println("WARN: Cache key not added!")
+            if (used) println("WARN: Cache key not added!")
             else _allCacheKeys.add(this)
         }
 
@@ -94,12 +104,13 @@ data class RequestAuth<SUBJECT : HasId<*>>(
 
     @Serializable
     data class ExpiringValue<T>(val value: T, val expiresAt: Instant)
+
     val cache = HashMap<CacheKey<SUBJECT, *, *>, ExpiringValue<*>>()
 
     @Suppress("UNCHECKED_CAST")
     suspend fun <T> get(key: CacheKey<SUBJECT, *, T>): T {
         cache.get(key)?.let {
-            if(now() > it.expiresAt) cache.remove(key)
+            if (now() > it.expiresAt) cache.remove(key)
             else return it.value as T
         }
         val c = key.calculate(this)
@@ -112,9 +123,20 @@ data class RequestAuth<SUBJECT : HasId<*>>(
         return this
     }
 
+    private lateinit var rawSubject: SUBJECT
+    private var rawExpiresAt: Instant = Instant.DISTANT_PAST
+
+    private suspend fun getRawSubject(): SUBJECT {
+        if (now() > rawExpiresAt) {
+            rawSubject =
+                (subject as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>).fetch(rawId as Comparable<Any?>) as SUBJECT
+            rawExpiresAt = now().plus(subject.subjectCacheExpiration)
+        }
+        return rawSubject
+    }
+
     @Suppress("UNCHECKED_CAST")
-    suspend fun get() =
-        (subject as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>).fetch(rawId as Comparable<Any?>) as SUBJECT
+    suspend fun get() = getRawSubject()
 
     fun clearCache(): RequestAuth<SUBJECT> {
         cache.clear()
@@ -126,8 +148,13 @@ data class RequestAuth<SUBJECT : HasId<*>>(
 
 @Suppress("UNCHECKED_CAST")
 inline val <SUBJECT : HasId<ID>, ID : Comparable<ID>> RequestAuth<SUBJECT>.id get() = rawId as ID
+
 @Suppress("UNCHECKED_CAST")
-val <SUBJECT : HasId<*>> RequestAuth<SUBJECT>.idString: String get() = Serialization.json.encodeUnwrappingString(subject.idSerializer as KSerializer<Any?>, rawId)
+val <SUBJECT : HasId<*>> RequestAuth<SUBJECT>.idString: String
+    get() = Serialization.json.encodeUnwrappingString(
+        subject.idSerializer as KSerializer<Any?>,
+        rawId
+    )
 
 suspend fun Request.authAny(): RequestAuth<*>? = this.cache(RequestAuth.Key)
 suspend fun <SUBJECT : HasId<*>> Request.auth(type: AuthType): RequestAuth<SUBJECT>? {
@@ -157,8 +184,16 @@ suspend fun <USER : HasId<*>?> AuthOptions<USER>.accepts(auth: RequestAuth<*>?):
     null in this.options || (auth != null && this.options.any { it?.accepts(auth) ?: false })
 
 @Suppress("UNCHECKED_CAST")
-fun <USER: HasId<*>?> RequestAuth.Companion.test(item: USER, scopes: Set<String> = setOf("*"), thirdParty: String? = null) = if(item == null) null else RequestAuth<USER & Any>(
-    subject = Authentication.subjects[AuthType(item!!::class, listOf())] as? Authentication.SubjectHandler<USER & Any, *> ?: throw IllegalStateException("Type ${item!!::class.qualifiedName} has no registered subject handler.  Subject handlers: ${Authentication.subjects.keys.joinToString()}"),
+fun <USER : HasId<*>?> RequestAuth.Companion.test(
+    item: USER,
+    scopes: Set<String> = setOf("*"),
+    thirdParty: String? = null
+) = if (item == null) null else RequestAuth<USER & Any>(
+    subject = Authentication.subjects[AuthType(
+        item!!::class,
+        listOf()
+    )] as? Authentication.SubjectHandler<USER & Any, *>
+        ?: throw IllegalStateException("Type ${item!!::class.qualifiedName} has no registered subject handler.  Subject handlers: ${Authentication.subjects.keys.joinToString()}"),
     sessionId = null,
     rawId = item._id,
     issuedAt = now(),

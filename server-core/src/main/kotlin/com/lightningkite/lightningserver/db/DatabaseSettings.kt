@@ -41,7 +41,7 @@ data class DatabaseSettings(
                 val x = it.url.substringAfter("://")
                 val delay = x.substringBefore("/").toLong()
                 val wraps = x.substringAfter("/")
-                parse(wraps, DatabaseSettings(wraps)).delayed(delay)
+                parse(wraps.substringBefore("://"), DatabaseSettings(wraps)).delayed(delay)
             }
         }
     }

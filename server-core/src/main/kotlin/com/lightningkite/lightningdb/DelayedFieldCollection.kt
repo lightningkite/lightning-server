@@ -34,7 +34,8 @@ open class DelayedFieldCollection<Model : Any>(
         skip: Int,
         limit: Int,
         maxQueryMs: Long
-    ): Flow<Partial<Model>> = wraps.findPartial(fields, condition, orderBy, skip, limit, maxQueryMs)
+    ): Flow<Partial<Model>> =
+        wraps.findPartial(fields, condition, orderBy, skip, limit, maxQueryMs).onStart { delay(milliseconds) }
 
     override suspend fun count(condition: Condition<Model>): Int {
         delay(milliseconds)
@@ -165,8 +166,11 @@ open class DelayedFieldCollection<Model : Any>(
 fun <Model : Any> FieldCollection<Model>.delayed(milliseconds: Long): FieldCollection<Model> =
     DelayedFieldCollection(this, milliseconds)
 
-fun Database.delayed(milliseconds: Long): Database = object : Database by this {
+fun Database.delayed(milliseconds: Long): Database = object : Database {
     override fun <T : Any> collection(serializer: KSerializer<T>, name: String): FieldCollection<T> {
         return this@delayed.collection<T>(serializer, name).delayed(milliseconds)
     }
+
+    override suspend fun connect() = this@delayed.connect()
+    override suspend fun disconnect() = this@delayed.disconnect()
 }
