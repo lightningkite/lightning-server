@@ -1,12 +1,10 @@
 package com.lightningkite.lightningserver.jsonschema
 
-import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.HttpMethod
-import com.lightningkite.lightningserver.humanize
+import com.lightningkite.lightningserver.titleCase
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.serialization.encodeToFormData
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.Documentable
@@ -16,10 +14,8 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 data class OpenApiRoot(
@@ -160,7 +156,7 @@ private fun <T> make(type: KSerializer<T>, item: T): Map<String, OpenApiExample>
 
 private fun ApiEndpoint<*, *, *, *>.openApi(builder: JsonSchemaBuilder): OpenApiOperation =
     OpenApiOperation(
-        summary = (this.docGroup?.let { it.humanize() + " " } ?: "") + " - " + summary,
+        summary = (this.docGroup?.let { it.titleCase() + " " } ?: "") + " - " + summary,
         description = description,
         tags = listOfNotNull(this.docGroup),
         operationId = (this.docGroup ?: "") + "_" + this.functionName,

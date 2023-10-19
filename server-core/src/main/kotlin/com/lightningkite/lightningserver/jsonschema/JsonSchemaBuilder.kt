@@ -4,13 +4,12 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
-import com.lightningkite.lightningserver.humanize
+import com.lightningkite.lightningserver.titleCase
 import com.lightningkite.lightningserver.kabobCase
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.docGroup
-import com.lightningkite.lightningserver.typed.uncontextualize
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ArraySerializer
 import kotlinx.serialization.descriptors.*
@@ -88,7 +87,7 @@ val lightningServerSchema: LightningServerSchema by lazy {
         }.toList(),
         models = ModelRestEndpoints.all.associate {
             it.collectionName.kabobCase() to LightningServerSchemaModel(
-                collectionName = it.collectionName.humanize(),
+                collectionName = it.collectionName.titleCase(),
                 url = it.path.fullUrl(),
                 ref = builder.refString(it.info.serialization.serializer),
                 conditionRef = builder.refString(Condition.serializer(it.info.serialization.serializer)),
@@ -431,7 +430,7 @@ class JsonSchemaBuilder(
 
                 SerialKind.ENUM -> defining(serializer) {
                     JsonSchemaType(
-                        title = ser.descriptor.serialName.substringBefore('<').substringAfterLast('.').humanize(),
+                        title = ser.descriptor.serialName.substringBefore('<').substringAfterLast('.').titleCase(),
                         type = JsonType3(JsonType2.STRING),
                         oneOf = (0 until ser.descriptor.elementsCount)
                             .map {
@@ -439,7 +438,7 @@ class JsonSchemaBuilder(
                                 JsonSchemaType(
                                     title = ser.descriptor.getElementAnnotations(it).filterIsInstance<DisplayName>()
                                         .firstOrNull()?.text
-                                        ?: value.humanize(),
+                                        ?: value.titleCase(),
                                     const = value
                                 )
                             }
@@ -460,10 +459,10 @@ class JsonSchemaBuilder(
 
                 StructureKind.CLASS -> defining(serializer) {
                     JsonSchemaType(
-                        title = ser.descriptor.serialName.substringBefore('<').substringAfterLast('.').humanize(),
+                        title = ser.descriptor.serialName.substringBefore('<').substringAfterLast('.').titleCase(),
                         type = JsonType3(JsonType2.OBJECT),
                         properties = ser.serializableProperties?.associate {
-                            val propTitle = it.name.humanize()
+                            val propTitle = it.name.titleCase()
                             it.name to get(
                                 it.serializer,
                                 ser.descriptor.getElementIndex(it.name).takeUnless { it == -1 }?.let { ser.descriptor.getElementAnnotations(it) } ?: listOf(),
@@ -473,7 +472,7 @@ class JsonSchemaBuilder(
                             )
                         } ?: ser.tryChildSerializers()?.withIndex()?.associate {
                             val name = ser.descriptor.getElementName(it.index)
-                            val propTitle = name.humanize()
+                            val propTitle = name.titleCase()
                             name to get(
                                 it.value,
                                 ser.descriptor.getElementAnnotations(it.index),
