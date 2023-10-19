@@ -425,7 +425,7 @@ class JsonSchemaBuilder(
 
         val desc = serializer.unwrap()
         overrides[desc.serialName.substringBefore('<')]?.let {
-            return defining(desc) { it(desc).applyAnnotations(annos) }
+            return defining(desc) { it(desc) }.applyAnnotations(annos)
         }
         return when (desc.kind) {
             PrimitiveKind.BOOLEAN -> JsonSchemaType(type = JsonType3(JsonType2.BOOLEAN)).applyAnnotations(annos)
