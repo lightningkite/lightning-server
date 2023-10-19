@@ -16,8 +16,7 @@ import kotlin.concurrent.withLock
 open class InMemoryFieldCollection<Model : Any>(
     val data: MutableList<Model> = ArrayList(),
     override val serializer: KSerializer<Model>
-) :
-    AbstractSignalFieldCollection<Model>() {
+) : AbstractSignalFieldCollection<Model>() {
 
     private val lock = ReentrantLock()
 
@@ -27,7 +26,7 @@ open class InMemoryFieldCollection<Model : Any>(
     private fun uniqueCheck(changes: List<EntryChange<Model>>) = uniqueIndexChecks.forEach { it(changes) }
 
     init {
-        serializer.descriptor.indexes().forEach { index: NeededIndex ->
+        serializer.descriptor.indexes().plus(NeededIndex(fields = listOf("_id"), true, "primary key")).forEach { index: NeededIndex ->
             if (index.unique) {
                 val fields = serializer.serializableProperties!!.filter { index.fields.contains(it.name) }
                 uniqueIndexChecks.add { changes: List<EntryChange<Model>> ->

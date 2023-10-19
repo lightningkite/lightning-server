@@ -83,8 +83,8 @@ data class Mask<T>(
     }
 }
 
-inline fun <reified T> mask(builder: Mask.Builder<T>.()->Unit): Mask<T> {
-    return Mask.Builder<T>(serializerOrContextual()).apply(builder).build()
+inline fun <reified T> mask(builder: Mask.Builder<T>.(DataClassPath<T, T>)->Unit): Mask<T> {
+    return Mask.Builder<T>(serializerOrContextual()).apply { builder(path()) }.build()
 }
 
 operator fun <T> Condition<T>.invoke(map: Partial<T>): Boolean? {

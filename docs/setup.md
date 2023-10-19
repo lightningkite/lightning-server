@@ -12,13 +12,22 @@ If your project's `build.gradle.kts` was generated with this line, comment it ou
 
 ## Add Gradle Plugins
 
+```properties
+# gradle.properties
+kotlinVersion=1.9.10
+kspVersion=1.9.10-1.0.13
+lightningServerVersion=version-2-SNAPSHOT
+```
+
 ```kotlin
 // settings.gradle.kts
 pluginManagement {
+    val kotlinVersion: String by settings
+    val kspVersion: String by settings
     plugins {
-        kotlin("jvm") version "1.8.10"
-        kotlin("plugin.serialization") version "1.8.10"
-        id("com.google.devtools.ksp") version "1.8.10-1.0.9"
+        kotlin("jvm") version kotlinVersion
+        kotlin("plugin.serialization") version kotlinVersion
+        id("com.google.devtools.ksp") version kspVersion
     }
 }
 ```

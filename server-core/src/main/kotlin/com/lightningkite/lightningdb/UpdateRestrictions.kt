@@ -71,6 +71,6 @@ data class UpdateRestrictions<T>(
 /**
  * DSL for defining [UpdateRestrictions]
  */
-inline fun <reified T> updateRestrictions(builder: UpdateRestrictions.Builder<T>.()->Unit): UpdateRestrictions<T> {
-    return UpdateRestrictions.Builder<T>(serializerOrContextual()).apply(builder).build()
+inline fun <reified T> updateRestrictions(builder: UpdateRestrictions.Builder<T>.(DataClassPath<T, T>)->Unit): UpdateRestrictions<T> {
+    return UpdateRestrictions.Builder<T>(serializerOrContextual()).apply { builder(path<T>()) }.build()
 }

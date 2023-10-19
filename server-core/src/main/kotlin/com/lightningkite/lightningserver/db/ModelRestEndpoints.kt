@@ -509,8 +509,8 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
         description = "Gets the total number of ${collectionName}s matching the given condition divided by group.",
         errorCases = listOf(),
         examples = exampleItem()?.let {
-            sampleConditions().map { c ->
-                val f = sampleSorts().random().random().field
+            sampleConditions().mapNotNull { c ->
+                val f = sampleSorts().randomOrNull()?.randomOrNull()?.field ?: return@mapNotNull null
                 ApiExample(
                     GroupCountQuery(c, f),
                     mapOf(f.getAny(it).toString() to 3)
