@@ -412,7 +412,7 @@ class JsonSchemaBuilder(
 
             val ser = serializer.unwrap()
             overrides[ser.descriptor.serialName.substringBefore('<')]?.let {
-                return defining(ser) { it(ser).applyAnnotations(annos) }
+                return defining(ser) { it(ser) }.applyAnnotations(annos)
             }
             return when (ser.descriptor.kind) {
                 PrimitiveKind.BOOLEAN -> JsonSchemaType(type = JsonType3(JsonType2.BOOLEAN)).applyAnnotations(annos)
