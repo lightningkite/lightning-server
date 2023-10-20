@@ -13,9 +13,8 @@ inline fun String.caseAlter(crossinline update: (after: String) -> String): Stri
 private fun String.capitalize(): String = replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
 private fun String.decapitalize(): String = replaceFirstChar { if (it.isUpperCase()) it.lowercase(Locale.getDefault()) else it.toString() }
 
-fun String.titleCase() =
-    caseAlter { " " + it.capitalize() }.capitalize()
-
+fun String.titleCase() = caseAlter { " " + it.capitalize() }.capitalize()
+fun String.spaceCase() = caseAlter { " " + it }.decapitalize()
 fun String.kabobCase() = caseAlter { "-$it" }.lowercase()
 fun String.snakeCase() = caseAlter { "_$it" }.lowercase()
 fun String.screamingSnakeCase() = caseAlter { "_$it" }.uppercase()
