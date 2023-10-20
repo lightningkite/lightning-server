@@ -10,11 +10,13 @@ inline fun <reified T : IsCodableAndHashable> path(): DataClassPath<T, T> = Data
 
 inline fun <reified T : IsCodableAndHashable> condition(setup: (DataClassPath<T, T>) -> Condition<T>): Condition<T> =
     path<T>().let(setup)
+fun <T> condition(boolean: Boolean): Condition<T> = if(boolean) Condition.Always() else Condition.Never()
 
 val <K : IsCodableAndHashable> DataClassPath<K, K>.always: Condition<K> get() = Condition.Always<K>()
 val <K : IsCodableAndHashable> DataClassPath<K, K>.never: Condition<K> get() = Condition.Never<K>()
 
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> DataClassPath<K, T>.eq(value: T) = mapCondition(Condition.Equal(value))
+infix fun <K : IsCodableAndHashable, T : IsCodableAndHashableNotNull> DataClassPath<K, T>.eqNn(value: T?) = if(value == null) Condition.Never() else mapCondition(Condition.Equal(value))
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> DataClassPath<K, T>.neq(value: T) = mapCondition(Condition.NotEqual(value))
 @JsName("xDataClassPathNotInSet") infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> DataClassPath<K, T>.notInside(values: Set<T>) = mapCondition(Condition.NotInside(values.toList()))
 infix fun <K : IsCodableAndHashable, T : IsCodableAndHashable> DataClassPath<K, T>.notInside(values: List<T>) = mapCondition(Condition.NotInside(values))

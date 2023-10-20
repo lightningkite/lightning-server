@@ -44,6 +44,33 @@ data class ModelPermissions<Model>(
             delete = Condition.Always(),
         )
     }
+
+    constructor(
+        read: Condition<Model>,
+        readMask: Mask<Model> = Mask(),
+        manage: Condition<Model>,
+        updateRestriction: UpdateRestrictions<Model> = UpdateRestrictions(),
+    ) : this(
+        create = manage,
+        update = manage,
+        updateRestrictions = updateRestriction,
+        read = read,
+        readMask = readMask,
+        delete = manage
+    )
+    constructor(
+        all: Condition<Model>,
+        readMask: Mask<Model> = Mask(),
+        updateRestriction: UpdateRestrictions<Model> = UpdateRestrictions(),
+    ) : this(
+        create = all,
+        update = all,
+        updateRestrictions = updateRestriction,
+        read = all,
+        readMask = readMask,
+        delete = all
+    )
+
     /**
      * @return a condition defining under what circumstances the given [modification] is permitted in.
      */
