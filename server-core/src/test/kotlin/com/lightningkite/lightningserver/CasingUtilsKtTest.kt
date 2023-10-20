@@ -5,7 +5,7 @@ import org.junit.Test
 
 class CasingUtilsKtTest {
     @Test fun testQuick() {
-        val dumb = "as--d_f-_ XdcCase ID"
+        val dumb = "As--d_f-_ XdcCase ID"
         assertEquals("As D F Xdc Case ID", dumb.titleCase())
         assertEquals("as-d-f-xdc-case-id", dumb.kabobCase())
         assertEquals("as_d_f_xdc_case_id", dumb.snakeCase())
