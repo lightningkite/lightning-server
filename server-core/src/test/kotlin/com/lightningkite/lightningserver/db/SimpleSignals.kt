@@ -7,11 +7,15 @@ import com.lightningkite.lightningserver.testmodels.TempThing__id
 import com.lightningkite.lightningserver.testmodels._id
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
+// Bruh
+// You can't do modifications on the primary key this haphazardly.
+@Ignore
 class SimpleSignals {
 
     lateinit var collection: FieldCollection<TempThing>

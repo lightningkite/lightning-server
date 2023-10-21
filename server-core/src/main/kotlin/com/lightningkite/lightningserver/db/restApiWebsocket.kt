@@ -139,7 +139,7 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebs
         }
         startup {
             info.collection().registerRawSignal { changes ->
-                changes.changes.chunked(200).forEach {
+                changes.changes.chunked(50).forEach {
                     sendWsChanges(CollectionChanges(changes = it))
                 }
             }

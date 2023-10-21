@@ -108,7 +108,7 @@ class TestInMemoryFieldCollection {
         comboCollection.insertOne(UniqueComboClass(2,2,2,2))
         comboCollection.insertOne(UniqueComboClass(3,3,1,2))
         comboCollection.insertOne(UniqueComboClass(4,4,2,1))
-        comboCollection.insertOne(UniqueComboClass(1,5,3,3))
+        comboCollection.insertOne(UniqueComboClass(5,5,3,3))
         assertEquals(5, comboCollection.data.size)
 
         comboCollection.insert(listOf(UniqueComboClass(6,6,6,6), UniqueComboClass(7,7,7,7),))
@@ -138,17 +138,17 @@ class TestInMemoryFieldCollection {
         assertEquals(1, setJankCollection.data.size)
         assertFailsWith<UniqueViolationException> { setJankCollection.insertOne(UniqueSetJankClass(1,2,2, 1, 1)) }
 
-        setJankCollection.insertOne(UniqueSetJankClass(1,1,2, 1, 2))
-        setJankCollection.insertOne(UniqueSetJankClass(1,2,1, 2, 1))
+        setJankCollection.insertOne(UniqueSetJankClass(2,1,2, 1, 2))
+        setJankCollection.insertOne(UniqueSetJankClass(3,2,1, 2, 1))
         assertEquals(3, setJankCollection.data.size)
 
 
-        setJankCollection.insert(listOf(UniqueSetJankClass(1,2,2, 2, 2), UniqueSetJankClass(1,3,3, 3, 3),))
+        setJankCollection.insert(listOf(UniqueSetJankClass(4,2,2, 2, 2), UniqueSetJankClass(5,3,3, 3, 3),))
         assertEquals(5, setJankCollection.data.size)
 
-        assertFailsWith<UniqueViolationException> { setJankCollection.insert(listOf(UniqueSetJankClass(1,2,2, 2, 2), UniqueSetJankClass(1,3,3, 3, 3),)) }
+        assertFailsWith<UniqueViolationException> { setJankCollection.insert(listOf(UniqueSetJankClass(6,2,2, 2, 2), UniqueSetJankClass(1,3,3, 3, 3),)) }
         assertEquals(5, setJankCollection.data.size)
-        assertFailsWith<UniqueViolationException> { setJankCollection.insert(listOf(UniqueSetJankClass(4,4,4, 4,4 ), UniqueSetJankClass(1,1,1, 1, 1),)) }
+        assertFailsWith<UniqueViolationException> { setJankCollection.insert(listOf(UniqueSetJankClass(7,4,4, 4,4 ), UniqueSetJankClass(1,1,1, 1, 1),)) }
         assertEquals(5, setJankCollection.data.size)
 
     }
@@ -161,30 +161,30 @@ class TestInMemoryFieldCollection {
 
         comboJankCollection.insertOne(UniqueComboJankClass(1,1,1,1,1,1))
         assertEquals(1, comboJankCollection.data.size)
-        assertFailsWith<UniqueViolationException> { comboJankCollection.insertOne(UniqueComboJankClass(1,1,1,1,1,1)) }
-        assertEquals(1, comboJankCollection.data.size)
         assertFailsWith<UniqueViolationException> { comboJankCollection.insertOne(UniqueComboJankClass(2,1,1,1,1,1)) }
         assertEquals(1, comboJankCollection.data.size)
-        assertFailsWith<UniqueViolationException> { comboJankCollection.insertOne(UniqueComboJankClass(1,2,1,1,1,1)) }
+        assertFailsWith<UniqueViolationException> { comboJankCollection.insertOne(UniqueComboJankClass(3,1,1,1,1,1)) }
         assertEquals(1, comboJankCollection.data.size)
-        assertFailsWith<UniqueViolationException> { comboJankCollection.insertOne(UniqueComboJankClass(1,1,2,2,1,1)) }
+        assertFailsWith<UniqueViolationException> { comboJankCollection.insertOne(UniqueComboJankClass(4,2,1,1,1,1)) }
         assertEquals(1, comboJankCollection.data.size)
-        assertFailsWith<UniqueViolationException> { comboJankCollection.insertOne(UniqueComboJankClass(1,1,1,1,2,2)) }
+        assertFailsWith<UniqueViolationException> { comboJankCollection.insertOne(UniqueComboJankClass(5,1,2,2,1,1)) }
+        assertEquals(1, comboJankCollection.data.size)
+        assertFailsWith<UniqueViolationException> { comboJankCollection.insertOne(UniqueComboJankClass(6,1,1,1,2,2)) }
         assertEquals(1, comboJankCollection.data.size)
 
-        comboJankCollection.insertOne(UniqueComboJankClass(1,2,1,2,1,2))
-        comboJankCollection.insertOne(UniqueComboJankClass(1,3,2,1,2,1))
-        comboJankCollection.insertOne(UniqueComboJankClass(1,4,3,3,2,2))
+        comboJankCollection.insertOne(UniqueComboJankClass(6,2,1,2,1,2))
+        comboJankCollection.insertOne(UniqueComboJankClass(7,3,2,1,2,1))
+        comboJankCollection.insertOne(UniqueComboJankClass(8,4,3,3,2,2))
         assertEquals(4, comboJankCollection.data.size)
 
-        comboJankCollection.insert(listOf(UniqueComboJankClass(5,5,5,5,5,5), UniqueComboJankClass(6,6,6,6, 6, 6),))
+        comboJankCollection.insert(listOf(UniqueComboJankClass(9,5,5,5,5,5), UniqueComboJankClass(10,6,6,6, 6, 6),))
         assertEquals(6, comboJankCollection.data.size)
 
-        assertFailsWith<UniqueViolationException> { comboJankCollection.insert(listOf(UniqueComboJankClass(5,5,5,5,5,5), UniqueComboJankClass(6,6,6,6, 6, 6),)) }
+        assertFailsWith<UniqueViolationException> { comboJankCollection.insert(listOf(UniqueComboJankClass(11,5,5,5,5,5), UniqueComboJankClass(12,6,6,6, 6, 6),)) }
         assertEquals(6, comboJankCollection.data.size)
-        assertFailsWith<UniqueViolationException> { comboJankCollection.insert(listOf(UniqueComboJankClass(7,7,7,7, 7, 7), UniqueComboJankClass(1,1,1,1,1 ,1,),)) }
+        assertFailsWith<UniqueViolationException> { comboJankCollection.insert(listOf(UniqueComboJankClass(13,7,7,7, 7, 7), UniqueComboJankClass(14,1,1,1,1 ,1,),)) }
         assertEquals(6, comboJankCollection.data.size)
-        assertFailsWith<UniqueViolationException> { comboJankCollection.insert(listOf(UniqueComboJankClass(7,1,8,8,8, 8), UniqueComboJankClass(9,9,9,9,9 ,9,),)) }
+        assertFailsWith<UniqueViolationException> { comboJankCollection.insert(listOf(UniqueComboJankClass(15,1,8,8,8, 8), UniqueComboJankClass(16,9,9,9,9 ,9,),)) }
         assertEquals(6, comboJankCollection.data.size)
 
     }

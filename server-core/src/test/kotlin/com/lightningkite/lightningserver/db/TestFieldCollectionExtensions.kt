@@ -22,6 +22,7 @@ class TestFieldCollectionExtensions {
 
     @Test
     fun testAll():Unit = runBlocking {
+        collection.deleteMany(Condition.Always())
 
         collection.insertMany((0 until 100).toList().map { TempThing(it) })
 
@@ -32,10 +33,10 @@ class TestFieldCollectionExtensions {
             assertEquals(it, results[it]._id)
         }
 
-        collection.insertOne(TempThing(1))
+        collection.insertOne(TempThing(101))
         assertEquals(101, collection.all().count())
         results = collection.all().toList()
-        assertEquals(1, results[100]._id)
+        assertEquals(101, results[100]._id)
     }
 
 }

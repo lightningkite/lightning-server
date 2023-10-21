@@ -27,6 +27,7 @@ class TestAbstractSignalFieldCollection {
 
     @Test
     fun testInsert(): Unit = runBlocking {
+        collection.deleteMany(Condition.Always())
         collection.registerRawSignal {
             assertEquals(1, it.changes.size)
             assertEquals(EntryChange(null, thing1), it.changes.first())
@@ -40,18 +41,19 @@ class TestAbstractSignalFieldCollection {
 
         collection.signals.clear()
         collection.registerRawSignal {
-            assertEquals(listOf(EntryChange(null, thing1), EntryChange(null, thing2)), it.changes)
+            assertEquals(listOf(EntryChange(null, thing2)), it.changes)
             signalCalled = true
         }
 
         signalCalled = false
-        collection.insert(listOf(thing1, thing2))
+        collection.insert(listOf(thing2))
         assertTrue(signalCalled)
 
     }
 
     @Test
     fun testDelete(): Unit = runBlocking {
+        collection.deleteMany(Condition.Always())
 
 
         collection.insert(listOf(thing1, thing2))
@@ -135,6 +137,7 @@ class TestAbstractSignalFieldCollection {
 
     @Test
     fun testReplace(): Unit = runBlocking {
+        collection.deleteMany(Condition.Always())
 
         collection.insert(listOf(thing1, thing2))
         collection.registerRawSignal {
@@ -171,6 +174,7 @@ class TestAbstractSignalFieldCollection {
 
     @Test
     fun testUpdate(): Unit = runBlocking {
+        collection.deleteMany(Condition.Always())
 
 
         collection.drop()
@@ -237,6 +241,7 @@ class TestAbstractSignalFieldCollection {
 
     @Test
     fun testUpsert(): Unit = runBlocking {
+        collection.deleteMany(Condition.Always())
 
 
         collection.drop()

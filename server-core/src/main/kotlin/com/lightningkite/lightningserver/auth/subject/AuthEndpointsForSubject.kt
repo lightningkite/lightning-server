@@ -248,7 +248,6 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 expires = null,
                 oauthClient = future.oauthClient
             )
-            sessionInfo.collection().insertOne(s)
             secret.string
         }
     )
@@ -329,7 +328,6 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         expires = null,
                         oauthClient = future.oauthClient
                     )
-                    sessionInfo.collection().insertOne(s)
                     generatedRefresh = secret
                     s
                 }

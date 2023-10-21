@@ -319,7 +319,7 @@ class JsonSchemaBuilder(
         override("com.lightningkite.lightningdb.Condition") {
             val subtype = (it as ConditionSerializer<*>).inner
             JsonSchemaType(
-                title = "Condition for ${subtype}",
+                title = "Condition for ${subtype.descriptor.serialName.substringAfterLast('.')}",
                 type = JsonType3(JsonType2.OBJECT),
                 oneOf = it.options.map {
                     JsonSchemaType(
