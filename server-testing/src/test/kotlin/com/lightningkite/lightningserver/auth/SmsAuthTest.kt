@@ -33,7 +33,7 @@ class SmsAuthTest {
     @Test
     fun testPinCorrect() {
         val info = modelInfo<User, User, UUID>(
-            getCollection = { TestSettings.database().collection() },
+            getBaseCollection = { TestSettings.database().collection() },
             forUser = { it },
             authOptions = authOptions<User>(),
             serialization = ModelSerializationInfo()
@@ -58,7 +58,7 @@ class SmsAuthTest {
     @Test
     fun testPinIncorrect() {
         val info = modelInfo<User, User, UUID>(
-            getCollection = { TestSettings.database().collection() },
+            getBaseCollection = { TestSettings.database().collection() },
             forUser = { it },
             authOptions = authOptions<User>(),
             serialization = ModelSerializationInfo()

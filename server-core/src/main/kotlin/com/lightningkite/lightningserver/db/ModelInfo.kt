@@ -12,6 +12,7 @@ import kotlinx.serialization.serializer
 @Deprecated("User newer version with auth accessor instead, as it enables more potential optimizations.")
 inline fun <reified USER : HasId<*>, reified T : HasId<ID>, reified ID : Comparable<ID>> ModelInfo(
     noinline getCollection: () -> FieldCollection<T>,
+    noinline getBaseCollection: () -> FieldCollection<T> = { getCollection() },
     noinline forUser: suspend FieldCollection<T>.(principal: USER) -> FieldCollection<T>,
     modelName: String = Serialization.module.serializer<T>().descriptor.serialName.substringBefore('<')
         .substringAfterLast('.'),
@@ -19,6 +20,7 @@ inline fun <reified USER : HasId<*>, reified T : HasId<ID>, reified ID : Compara
     serialization = ModelSerializationInfo<T, ID>(),
     authOptions = com.lightningkite.lightningserver.auth.authOptions<USER>(),
     getCollection = getCollection,
+    getBaseCollection = getBaseCollection,
     forUser = forUser,
     modelName = modelName,
 )
@@ -28,11 +30,13 @@ fun <USER : HasId<*>, T : HasId<ID>, ID : Comparable<ID>> ModelInfo(
     serialization: ModelSerializationInfo<T, ID>,
     authOptions: AuthOptions<USER>,
     getCollection: () -> FieldCollection<T>,
+    getBaseCollection: () -> FieldCollection<T> = { getCollection() },
     forUser: suspend FieldCollection<T>.(principal: USER) -> FieldCollection<T>,
     modelName: String = serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
 ) = object : ModelInfo<USER, T, ID> {
     override val authOptions: AuthOptions<USER> = authOptions
     override val serialization: ModelSerializationInfo<T, ID> = serialization
+    override fun baseCollection(): FieldCollection<T> = getBaseCollection()
     override fun collection(): FieldCollection<T> = getCollection()
     override suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<T> = forUser(collection(), auth.user())
 
@@ -42,13 +46,15 @@ fun <USER : HasId<*>, T : HasId<ID>, ID : Comparable<ID>> ModelInfo(
 fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> modelInfo(
     serialization: ModelSerializationInfo<T, ID>,
     authOptions: AuthOptions<USER>,
-    getCollection: () -> FieldCollection<T>,
+    getBaseCollection: () -> FieldCollection<T>,
+    getCollection: (collection: FieldCollection<T>) -> FieldCollection<T> = { it },
     forUser: suspend AuthAccessor<USER>.(collection: FieldCollection<T>) -> FieldCollection<T> = { it },
     modelName: String = serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
 ) = object : ModelInfo<USER, T, ID> {
     override val authOptions: AuthOptions<USER> = authOptions
     override val serialization: ModelSerializationInfo<T, ID> = serialization
-    override fun collection(): FieldCollection<T> = getCollection()
+    override fun baseCollection(): FieldCollection<T> = getBaseCollection()
+    override fun collection(): FieldCollection<T> = getCollection(this.baseCollection())
     override suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<T> =
         auth.forUser(this.collection())
 
@@ -72,7 +78,8 @@ interface ModelInfo<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> {
     val collectionName: String
         get() = serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
 
-    fun collection(): FieldCollection<T>
+    fun baseCollection(): FieldCollection<T> = collection()
+    fun collection(): FieldCollection<T> = baseCollection()
     suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<T>
     suspend fun collection(user: USER): FieldCollection<T> = collection(AuthAccessor.test(user))
 }

@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils.statementsRequiredToActualizeScheme
@@ -25,7 +26,8 @@ class PostgresCollection<T : Any>(
 
     val table = SerialDescriptorTable(name, serializer.descriptor)
 
-    suspend inline fun <T> t(noinline action: suspend Transaction.()->T): T = newSuspendedTransaction(Dispatchers.IO, db = db, transactionIsolation = TRANSACTION_READ_COMMITTED, action)
+    suspend inline fun <T> t(noinline action: suspend Transaction.() -> T): T =
+        newSuspendedTransaction(Dispatchers.IO, db = db, transactionIsolation = TRANSACTION_READ_COMMITTED, action)
 
     @OptIn(DelicateCoroutinesApi::class, ExperimentalSerializationApi::class)
     val prepare = GlobalScope.async(Dispatchers.Unconfined, start = CoroutineStart.LAZY) {
@@ -47,7 +49,7 @@ class PostgresCollection<T : Any>(
         val items = t {
             table
                 .select { condition(condition, serializer, table).asOp() }
-                .orderBy(*orderBy.map { (if(it.ignoreCase) (table.col[it.field.colName]!! as Column<String>).lowerCase() else table.col[it.field.colName]!!) to if (it.ascending) SortOrder.ASC else SortOrder.DESC }
+                .orderBy(*orderBy.map { (if (it.ignoreCase && it.field.serializerAny.descriptor.kind == PrimitiveKind.STRING) (table.col[it.field.colName]!! as Column<String>).lowerCase() else table.col[it.field.colName]!!) to if (it.ascending) SortOrder.ASC else SortOrder.DESC }
                     .toTypedArray())
                 .limit(limit, skip.toLong())
 //                .prep
@@ -84,7 +86,7 @@ class PostgresCollection<T : Any>(
         prepare.await()
         return t {
             val valueCol = table.col[property.colName] as Column<Number>
-            val agg = when(aggregate) {
+            val agg = when (aggregate) {
                 Aggregate.Sum -> Sum(valueCol, DecimalColumnType(Int.MAX_VALUE, 8))
                 Aggregate.Average -> Avg<Double, Double>(valueCol, 8)
                 Aggregate.StandardDeviationSample -> StdDevSamp(valueCol, 8)
@@ -106,7 +108,7 @@ class PostgresCollection<T : Any>(
         return t {
             val groupCol = table.col[groupBy.colName] as Column<Key>
             val valueCol = table.col[property.colName] as Column<Number>
-            val agg = when(aggregate) {
+            val agg = when (aggregate) {
                 Aggregate.Sum -> Sum(valueCol, DoubleColumnType())
                 Aggregate.Average -> Avg<Double, Double>(valueCol, 8)
                 Aggregate.StandardDeviationSample -> StdDevSamp(valueCol, 8)
@@ -132,14 +134,22 @@ class PostgresCollection<T : Any>(
         return updateOneImpl(condition, Modification.Assign(model), orderBy)
     }
 
-    override suspend fun replaceOneIgnoringResultImpl(condition: Condition<T>, model: T, orderBy: List<SortPart<T>>): Boolean {
+    override suspend fun replaceOneIgnoringResultImpl(
+        condition: Condition<T>,
+        model: T,
+        orderBy: List<SortPart<T>>
+    ): Boolean {
         return updateOneIgnoringResultImpl(condition, Modification.Assign(model), orderBy)
     }
 
-    override suspend fun upsertOneImpl(condition: Condition<T>, modification: Modification<T>, model: T): EntryChange<T> {
+    override suspend fun upsertOneImpl(
+        condition: Condition<T>,
+        modification: Modification<T>,
+        model: T
+    ): EntryChange<T> {
         return newSuspendedTransaction(db = db, transactionIsolation = TRANSACTION_SERIALIZABLE) {
             val existing = findOne(condition)
-            if(existing == null) {
+            if (existing == null) {
                 EntryChange(null, insertImpl(listOf(model)).first())
             } else
                 updateOneImpl(condition, modification)
@@ -153,7 +163,7 @@ class PostgresCollection<T : Any>(
     ): Boolean {
         return newSuspendedTransaction(db = db, transactionIsolation = TRANSACTION_SERIALIZABLE) {
             val existing = findOne(condition)
-            if(existing == null) {
+            if (existing == null) {
                 insertImpl(listOf(model))
                 false
             } else
@@ -166,7 +176,7 @@ class PostgresCollection<T : Any>(
         modification: Modification<T>,
         orderBy: List<SortPart<T>>
     ): EntryChange<T> {
-        if(orderBy.isNotEmpty()) throw UnsupportedOperationException()
+        if (orderBy.isNotEmpty()) throw UnsupportedOperationException()
         return t {
             val old = table.updateReturningOld(
                 where = { condition(condition, serializer, table).asOp() },
@@ -186,7 +196,7 @@ class PostgresCollection<T : Any>(
         modification: Modification<T>,
         orderBy: List<SortPart<T>>
     ): Boolean {
-        if(orderBy.isNotEmpty()) throw UnsupportedOperationException()
+        if (orderBy.isNotEmpty()) throw UnsupportedOperationException()
         return t {
             table.update(
                 where = { condition(condition, serializer, table).asOp() },
@@ -226,7 +236,7 @@ class PostgresCollection<T : Any>(
     }
 
     override suspend fun deleteOneImpl(condition: Condition<T>, orderBy: List<SortPart<T>>): T? {
-        if(orderBy.isNotEmpty()) throw UnsupportedOperationException()
+        if (orderBy.isNotEmpty()) throw UnsupportedOperationException()
         return t {
             table.deleteReturningWhere(
                 limit = 1,
@@ -236,7 +246,7 @@ class PostgresCollection<T : Any>(
     }
 
     override suspend fun deleteOneIgnoringOldImpl(condition: Condition<T>, orderBy: List<SortPart<T>>): Boolean {
-        if(orderBy.isNotEmpty()) throw UnsupportedOperationException()
+        if (orderBy.isNotEmpty()) throw UnsupportedOperationException()
         return t {
             table.deleteWhere(
                 limit = 1,

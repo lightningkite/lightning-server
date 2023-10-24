@@ -68,7 +68,8 @@ class PasswordProofEndpoints(
                 ModelRestEndpoints<HasId<*>, PasswordSecret<Comparable<Any>>, Comparable<Any>>(path("secrets/${it.value.name.lowercase()}"), modelInfo< HasId<*>, PasswordSecret<Comparable<Any>>, Comparable<Any>>(
                     serialization = ModelSerializationInfo(PasswordSecret.serializer(it.value.idSerializer as KSerializer<Comparable<Any>>), it.value.idSerializer as KSerializer<Comparable<Any>>),
                     authOptions = Authentication.isAdmin as AuthOptions<HasId<*>>,
-                    getCollection = { table(it.value).withPermissions(ModelPermissions(
+                    getBaseCollection = { table(it.value) },
+                    getCollection = { c -> c.withPermissions(ModelPermissions(
                         create = Condition.Always(),
                         read = Condition.Always(),
                         readMask = Mask(

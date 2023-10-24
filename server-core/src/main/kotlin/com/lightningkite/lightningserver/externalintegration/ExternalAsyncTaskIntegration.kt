@@ -54,7 +54,7 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
             serializer = ExternalAsyncTaskRequest.serializer(),
             idSerializer = String.serializer()
         ),
-        getCollection = {
+        getBaseCollection = {
             database().collection<ExternalAsyncTaskRequest>(name = "$path/ExternalTaskRequest")
         },
         defaultItem = {

@@ -86,8 +86,9 @@ class OneTimePasswordProofEndpoints(
                             it.value.idSerializer as KSerializer<Comparable<Any>>
                         ),
                         authOptions = Authentication.isAdmin as AuthOptions<HasId<*>>,
-                        getCollection = {
-                            table(it.value).withPermissions(
+                        getBaseCollection = { table(it.value) },
+                        getCollection = { collection ->
+                            collection.withPermissions(
                                 ModelPermissions(
                                     create = Condition.Always(),
                                     read = Condition.Always(),

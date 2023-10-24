@@ -24,6 +24,8 @@ abstract class DataClassPathPartial<K : IsCodableAndHashable> : Hashable {
     abstract override fun hashCode(): Int
     abstract override fun toString(): String
     abstract override fun equals(other: Any?): Boolean
+
+    abstract val serializerAny: KSerializer<*>
 }
 
 abstract class DataClassPath<K : IsCodableAndHashable, V : IsCodableAndHashable> : DataClassPathPartial<K>() {
@@ -41,6 +43,7 @@ abstract class DataClassPath<K : IsCodableAndHashable, V : IsCodableAndHashable>
     @JsName("prop")
     operator fun <V2> get(prop: SerializableProperty<V, V2>) = DataClassPathAccess(this, prop)
 
+    override val serializerAny: KSerializer<*> get() = serializer
     abstract val serializer: KSerializer<V>
 }
 

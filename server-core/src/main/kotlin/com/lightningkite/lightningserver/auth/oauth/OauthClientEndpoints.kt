@@ -38,6 +38,7 @@ class OauthClientEndpoints(
             idSerializer = Serialization.module.serializer()
         )
         override val authOptions: AuthOptions<HasId<*>> get() = maintainPermissions as AuthOptions<HasId<*>>
+        override fun baseCollection(): FieldCollection<OauthClient> = database().collection<OauthClient>()
         override fun collection(): FieldCollection<OauthClient> = database().collection<OauthClient>()
 
         override suspend fun collection(auth: AuthAccessor<HasId<*>>): FieldCollection<OauthClient> = collection()

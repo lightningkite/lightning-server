@@ -285,6 +285,29 @@ inline fun <Model : Any> FieldCollection<Model>.interceptCreate(crossinline inte
     }
 
 /**
+ * Intercept all kinds of creates, including [FieldCollection.insert], [FieldCollection.upsertOne], and [FieldCollection.upsertOneIgnoringResult].
+ * Allows you to modify the object before it is actually created.
+ */
+inline fun <Model : Any> FieldCollection<Model>.interceptCreates(crossinline interceptor: suspend (Iterable<Model>) -> List<Model>): FieldCollection<Model> =
+    object : FieldCollection<Model> by this {
+        override val wraps = this@interceptCreates
+        override suspend fun insert(models: Iterable<Model>): List<Model> =
+            wraps.insertMany(models.let { interceptor(it) })
+
+        override suspend fun upsertOne(
+            condition: Condition<Model>,
+            modification: Modification<Model>,
+            model: Model
+        ): EntryChange<Model> = wraps.upsertOne(condition, modification, interceptor(listOf(model)).first())
+
+        override suspend fun upsertOneIgnoringResult(
+            condition: Condition<Model>,
+            modification: Modification<Model>,
+            model: Model
+        ): Boolean = wraps.upsertOneIgnoringResult(condition, modification, interceptor(listOf(model)).first())
+    }
+
+/**
  * Intercepts all kinds of replace operations.
  */
 inline fun <Model : Any> FieldCollection<Model>.interceptReplace(crossinline interceptor: suspend (Model) -> Model): FieldCollection<Model> =

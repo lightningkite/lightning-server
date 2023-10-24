@@ -4,6 +4,7 @@ package com.lightningkite.lightningdb
 import com.lightningkite.khrysalis.IsCodableAndHashable
 import com.lightningkite.khrysalis.SharedCode
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlin.reflect.KProperty1
 
 @Serializable(SortPartSerializer::class)
@@ -18,7 +19,7 @@ val <T: IsCodableAndHashable> List<SortPart<T>>.comparator: Comparator<T>? get()
     if(this.isEmpty()) return null
     return Comparator { a, b ->
         for(part in this) {
-            if (part.ignoreCase) {
+            if (part.ignoreCase && part.field.serializerAny.descriptor.kind == PrimitiveKind.STRING) {
                 val aString = part.field.getAny(a) as String
                 val bString = part.field.getAny(b) as String
                 val result = aString.compareTo(bString, true)

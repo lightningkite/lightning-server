@@ -65,7 +65,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         info = modelInfo(
             authOptions = noAuth,
             serialization = ModelSerializationInfo(),
-            getCollection = { database().collection() },
+            getBaseCollection = { database().collection() },
             forUser = { it },
         )
     )
@@ -74,7 +74,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         info = modelInfo(
             authOptions = noAuth,
             serialization = ModelSerializationInfo(),
-            getCollection = { database().collection() },
+            getBaseCollection = { database().collection() },
             forUser = { it },
         ),
         key = TestThing__id
@@ -87,7 +87,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     }
 
     val userInfo = modelInfoWithDefault<TestUser, TestUser, UUID>(
-        getCollection = {
+        getBaseCollection = {
             database().collection<TestUser>()
         },
         defaultItem = { TestUser(email = "") },

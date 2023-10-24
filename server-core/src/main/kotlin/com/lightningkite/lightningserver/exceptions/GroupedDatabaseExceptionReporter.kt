@@ -66,7 +66,8 @@ class GroupedDatabaseExceptionReporter(val packageName: String, val database: Da
             idSerializer = Serialization.module.serializer()
         )
         override val authOptions: AuthOptions<HasId<*>> get() = Authentication.isDeveloper as AuthOptions<HasId<*>>
-        override fun collection(): FieldCollection<ReportedExceptionGroup> = database.collection<ReportedExceptionGroup>()
+        override fun baseCollection(): FieldCollection<ReportedExceptionGroup> = database.collection<ReportedExceptionGroup>()
+        override fun collection(): FieldCollection<ReportedExceptionGroup> = baseCollection()
 
         override suspend fun collection(auth: AuthAccessor<HasId<*>>): FieldCollection<ReportedExceptionGroup> = collection()
 

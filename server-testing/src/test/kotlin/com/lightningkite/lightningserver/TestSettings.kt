@@ -42,7 +42,7 @@ object TestSettings {
 
 
     val info = modelInfo<User, User, UUID>(
-        getCollection = { database().collection() },
+        getBaseCollection = { database().collection() },
         forUser = { it },
         authOptions = authOptions(),
         serialization = ModelSerializationInfo()

@@ -148,4 +148,19 @@ abstract class SortTest {
         assertEquals(reversePosts.map { it._id }, results3.map { it._id })
     }
 
+
+    @Test
+    fun testSortCaseInsensitiveCrash():Unit = runBlocking{
+        val collection = database.collection<LargeTestModel>("SortTest_testSortCaseInsensitive")
+        val items = listOf(
+            LargeTestModel(string = "aa"),
+            LargeTestModel(string = "Ab"),
+            LargeTestModel(string = "ac"),
+            LargeTestModel(string = "Ad"),
+            LargeTestModel(string = "ae"),
+            LargeTestModel(string = "Af"),
+        )
+        collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().long, true, true))).toList()
+    }
+
 }

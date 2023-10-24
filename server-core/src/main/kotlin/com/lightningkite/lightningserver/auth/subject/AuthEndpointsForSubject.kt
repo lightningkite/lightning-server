@@ -69,12 +69,13 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 )
             )
         ) + Authentication.isAdmin + Authentication.isSuperUser,
-        getCollection = {
+        getBaseCollection = {
             database().collection(
                 sessionSerializer,
                 "${handler.name}Session"
             )
         },
+        getCollection = { it },
         forUser = { collection: FieldCollection<Session<SUBJECT, ID>> ->
             val requestAuth = this.authOrNull
             val canUse: Condition<Session<SUBJECT, ID>> = when {
