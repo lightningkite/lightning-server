@@ -518,7 +518,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     <form action='.?proofs=${Serialization.javaData.encodeToBase64Url(otherProofs)}' enctype='application/x-www-form-urlencoded' method='post'>
                         <p>Enter your login key</p>
                         <select name='method'>
-                        ${handler.proofMethods.joinToString() { "<option value='${it.info.via}'>${it.info.via}</option>" }}
+                        ${handler.proofMethods.joinToString() { "<option value='${it.info.via}' ${if(it is EmailProofEndpoints) "selected" else ""}>${it.info.via}</option>" }}
                         </select>
                         <input name='property', value='email'/>
                         <input name='value'/>
