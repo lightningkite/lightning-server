@@ -167,7 +167,7 @@ fun <Model : Any> FieldCollection<Model>.delayed(milliseconds: Long): FieldColle
     DelayedFieldCollection(this, milliseconds)
 
 fun Database.delayed(milliseconds: Long): Database = object : Database {
-    override fun <T : Any> collection(serializer: KSerializer<T>, name: String): FieldCollection<T> {
+    override fun <T : Any> collection(module: SerializersModule, serializer: KSerializer<T>, name: String): FieldCollection<T> {
         return this@delayed.collection<T>(serializer, name).delayed(milliseconds)
     }
 

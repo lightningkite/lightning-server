@@ -64,7 +64,7 @@ data class DatabaseSettings(
 class InMemoryDatabase(val premadeData: JsonObject? = null) : Database {
     val collections = HashMap<Pair<KSerializer<*>, String>, FieldCollection<*>>()
 
-    override fun <T : Any> collection(serializer: KSerializer<T>, name: String): FieldCollection<T> = collections.getOrPut(serializer to name) {
+    override fun <T : Any> collection(module: SerializersModule, serializer: KSerializer<T>, name: String): FieldCollection<T> = collections.getOrPut(serializer to name) {
         val made = InMemoryFieldCollection(serializer = serializer)
         premadeData?.get(name)?.let {
             val data = Serialization.Internal.json.decodeFromJsonElement(
@@ -95,7 +95,7 @@ class InMemoryUnsafePersistenceDatabase(val folder: File) : Database {
 
     val collections = HashMap<Pair<KSerializer<*>, String>, FieldCollection<*>>()
 
-    override fun <T : Any> collection(serializer: KSerializer<T>, name: String): FieldCollection<T> = synchronized(collections) {
+    override fun <T : Any> collection(module: SerializersModule, serializer: KSerializer<T>, name: String): FieldCollection<T> = synchronized(collections) {
         collections.getOrPut(serializer to name) {
             val fileName = name.filter { it.isLetterOrDigit() }
             val oldStyle = folder.resolve(fileName)

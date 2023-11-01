@@ -16,7 +16,7 @@ import kotlin.reflect.KType
 class DynamoDatabase(val dynamo: DynamoDbAsyncClient): Database {
     private val collections = ConcurrentHashMap<Pair<KSerializer<*>, String>, Lazy<DynamoDbCollection<*>>>()
 
-    override fun <T : Any> collection(serializer: KSerializer<T>, name: String): DynamoDbCollection<T> =
+    override fun <T : Any> collection(module: SerializersModule, serializer: KSerializer<T>, name: String): DynamoDbCollection<T> =
         (collections.getOrPut(serializer to name) {
             lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
                 DynamoDbCollection(

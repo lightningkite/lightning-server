@@ -3,9 +3,7 @@ package com.lightningkite.lightningserver.http
 import com.lightningkite.lightningserver.core.ServerPath
 
 interface Request {
-    val path: ServerPath
-    val parts: Map<String, String>
-    val wildcard: String?
+    val segments: List<String>
     val queryParameters: List<Pair<String, String>>
     val headers: HttpHeaders
     val domain: String

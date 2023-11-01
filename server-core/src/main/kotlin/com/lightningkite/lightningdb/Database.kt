@@ -19,7 +19,7 @@ interface Database : HealthCheckable, Metricable<Database> {
     /**
      * Returns a FieldCollection of type T that will access and manipulate data from a collection/table in the underlying database system.
      */
-    fun <T : Any> collection(serializer: KSerializer<T>, name: String): FieldCollection<T>
+    fun <T : Any> collection(module: SerializersModule, serializer: KSerializer<T>, name: String): FieldCollection<T>
     @Suppress("UNCHECKED_CAST")
     fun <T : Any> collection(type: KType, name: String): FieldCollection<T> = collection(Serialization.Internal.module.serializer(type) as KSerializer<T>, name)
 
