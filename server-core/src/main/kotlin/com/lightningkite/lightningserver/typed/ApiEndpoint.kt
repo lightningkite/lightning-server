@@ -36,7 +36,7 @@ data class ApiEndpoint<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
         val auth = it.authChecked<USER>(authOptions)
         @Suppress("UNCHECKED_CAST") val input: INPUT = when (route.method) {
             HttpMethod.GET, HttpMethod.HEAD -> it.queryParameters(inputType)
-            else -> if (inputType == Unit.serializer()) Unit as INPUT else it.body!!.parse(inputType)
+            else -> if (inputType == Unit.serializer()) Unit as INPUT else it.body?.parse(inputType) ?: throw BadRequestException("No request body provided")
         }
         @Suppress("UNCHECKED_CAST") val result = AuthAndPathParts<USER, PATH>(
             authOrNull = auth,
