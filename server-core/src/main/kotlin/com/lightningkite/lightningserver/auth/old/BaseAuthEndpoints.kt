@@ -115,7 +115,7 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
      * Creates a JWT representing the given [user].
      */
     suspend fun refreshToken(token: String, expireDuration: Duration = expiration): String = jwtSigner().hasher.signJwt(
-        jwtSigner().hasher.verifyJwt(token)!!.copy(
+        (jwtSigner().hasher.verifyJwt(token) ?: throw UnauthorizedException("Token not valid")).copy(
             exp = now().plus(expireDuration).epochSeconds,
         )
     )
