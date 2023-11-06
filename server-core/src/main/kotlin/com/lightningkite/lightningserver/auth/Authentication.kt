@@ -47,7 +47,7 @@ object Authentication {
         }
         suspend fun permitMasquerade(
             other: SubjectHandler<*, *>,
-            id: ID,
+            request: RequestAuth<SUBJECT>,
             otherId: Comparable<*>,
         ): Boolean = false
 
