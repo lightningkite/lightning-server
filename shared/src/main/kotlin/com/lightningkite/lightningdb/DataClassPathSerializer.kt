@@ -3,6 +3,7 @@ package com.lightningkite.lightningdb
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
@@ -22,13 +23,16 @@ private class KProperty1Parser<T>(val serializer: KSerializer<T>) {
             it.key to ((f[it.key] ?: return@mapNotNull null) to it.value)
         }.associate { it }
     }
+
     companion object {
         val existing = HashMap<KSerializer<*>, KProperty1Parser<*>>()
+
         @Suppress("UNCHECKED_CAST")
         operator fun <T> get(serializer: KSerializer<T>): KProperty1Parser<T> = existing.getOrPut(serializer) {
             KProperty1Parser(serializer)
         } as KProperty1Parser<T>
     }
+
     operator fun invoke(key: String): Pair<KProperty1<T, *>, KSerializer<*>> {
         @Suppress("UNCHECKED_CAST")
         return children[key]
@@ -36,9 +40,9 @@ private class KProperty1Parser<T>(val serializer: KSerializer<T>) {
     }
 }
 
-class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializer<DataClassPathPartial<T>> {
+class DataClassPathSerializer<T>(val inner: KSerializer<T>) : KSerializer<DataClassPathPartial<T>> {
     @OptIn(ExperimentalSerializationApi::class)
-    override val descriptor: SerialDescriptor = object: SerialDescriptor {
+    override val descriptor: SerialDescriptor = object : SerialDescriptor {
         override val kind: SerialKind = PrimitiveKind.STRING
         override val serialName: String = "com.lightningkite.lightningdb.DataClassPathPartial"
         override val elementsCount: Int get() = 0
@@ -64,16 +68,16 @@ class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializer<DataCla
     fun fromString(value: String): DataClassPathPartial<T> {
         var current: DataClassPathPartial<T>? = null
         var currentSerializer: KSerializer<*> = inner
-        for(part in value.split('.')) {
+        for (part in value.split('.')) {
             val name = part.removeSuffix("?")
-            if(name == "this") continue
-            val prop = KProperty1Parser[currentSerializer](name)
+            if (name == "this") continue
+            val prop = try { KProperty1Parser[currentSerializer](name) } catch (e: IllegalStateException) { throw SerializationException(message = e.message, cause = e) }
             currentSerializer = prop.second
             val c = current
             @Suppress("UNCHECKED_CAST")
-            current = if(c == null) DataClassPathAccess(DataClassPathSelf<T>(), prop.first as KProperty1<T, Any?>)
+            current = if (c == null) DataClassPathAccess(DataClassPathSelf<T>(), prop.first as KProperty1<T, Any?>)
             else DataClassPathAccess(c as DataClassPath<T, Any?>, prop.first as KProperty1<Any?, Any?>)
-            if(part.endsWith('?')) {
+            if (part.endsWith('?')) {
                 current = DataClassPathNotNull(current as DataClassPath<T, Any?>)
                 currentSerializer = currentSerializer.nullElement()!!
             }
