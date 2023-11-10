@@ -23,6 +23,7 @@ import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.*
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.lightningserver.websocket.WebSockets
 import com.lightningkite.now
 import io.ktor.http.*
 import kotlinx.datetime.Instant
@@ -118,6 +119,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         val token =
             request.headers[HttpHeader.Authorization]?.removePrefix("bearer ")?.removePrefix("Bearer ")
                 ?: request.headers.cookies[HttpHeader.Authorization]
+                ?: request.queryParameters.find { it.first == "authorization" }?.second?.takeIf { request is WebSockets.ConnectEvent }
                 ?: return null
         return tokenToAuth(token, request)
     }
