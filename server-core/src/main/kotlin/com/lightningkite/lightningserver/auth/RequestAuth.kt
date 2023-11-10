@@ -67,7 +67,7 @@ data class RequestAuth<SUBJECT : HasId<*>>(
         @Suppress("UNCHECKED_CAST")
         return (subject as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>).permitMasquerade(
             other,
-            rawId as Comparable<Any?>,
+            this as RequestAuth<HasId<Comparable<Any?>>>,
             otherId
         )
     }

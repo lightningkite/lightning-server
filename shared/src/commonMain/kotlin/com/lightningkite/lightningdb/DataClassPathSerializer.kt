@@ -11,6 +11,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.internal.GeneratedSerializer
 import com.lightningkite.lightningdb.SerializableProperty
+import kotlinx.serialization.SerializationException
 
 
 private class SerializablePropertyParser<T>(val serializer: KSerializer<T>) {
@@ -62,7 +63,7 @@ class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializer<DataCla
         for(part in value.split('.')) {
             val name = part.removeSuffix("?")
             if(name == "this") continue
-            val prop = SerializablePropertyParser[currentSerializer](name)
+            val prop = try{ SerializablePropertyParser[currentSerializer](name) } catch (e:IllegalStateException) { throw SerializationException(message = e.message, cause = e)}
             currentSerializer = prop.serializer
             val c = current
             @Suppress("UNCHECKED_CAST")
