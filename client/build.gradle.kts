@@ -26,7 +26,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api(project(":shared"))
-                api("com.lightningkite.rock:library:main-SNAPSHOT")
+                api("com.lightningkite.rock:library:lsr-SNAPSHOT")
             }
         }
         val commonTest by getting {

@@ -4,6 +4,12 @@ package com.lightningkite.lightningdb
 // import com.lightningkite.khrysalis.*
 import com.lightningkite.rock.*
 import com.lightningkite.rock.reactive.*
+import com.lightningkite.uuid
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 fun retryWebsocket(
     url: String
@@ -37,7 +43,7 @@ fun retryWebsocket(
         }
 
         override fun close(code: Short, reason: String) {
-            scope.clearScopeListeners()
+            scope.cancel()
             currentWebSocket?.close(code, reason)
             currentWebSocket = null
         }
@@ -57,6 +63,16 @@ fun retryWebsocket(
     }
 }
 
+interface TypedWebSocket<SEND, RECEIVE> {
+    val stayOpen: ResourceUse
+    fun close(code: Short, reason: String)
+    fun send(data: SEND)
+    fun onOpen(action: ()->Unit)
+    fun onMessage(action: (RECEIVE)->Unit)
+    fun onClose(action: (Short)->Unit)
+
+}
+
 interface RetryWebsocket: WebSocket {
     val stayOpen: ResourceUse
 }
@@ -68,7 +84,7 @@ wrap Pinging atLeast WebSocket {
 
  */
 
-class ResourceUseImpl(private val p: Property<Boolean> = Property(false)): Readable<Boolean> by p {
+class ResourceUseImpl(private val p: Property<Boolean> = Property(false)): Readable<Boolean> by p, OnRemoveHandler {
     var count = 0
     val use: ResourceUse = object: ResourceUse {
         override fun start(): () -> Unit {
@@ -78,11 +94,12 @@ class ResourceUseImpl(private val p: Property<Boolean> = Property(false)): Reada
             }
         }
     }
+
 }
 
 
-val WebSocket.mostRecentMessage: Readable<String?> get() = object: Readable<String?> {
-    override var once: String? = null
+val <RECEIVE> TypedWebSocket<*, RECEIVE>.mostRecentMessage: Readable<RECEIVE?> get() = object: Readable<RECEIVE?> {
+    override var once: RECEIVE? = null
         private set
 
     val listeners = HashSet<()->Unit>()
@@ -100,11 +117,111 @@ val WebSocket.mostRecentMessage: Readable<String?> get() = object: Readable<Stri
 }
 
 
-fun sample(): SharedReadable<List<String>> {
-    val ws = retryWebsocket("testurl")
-    ws.onOpen { ws.send("BULLSHIT I SAY") }
-    val fullList = ArrayList<String>()
-    return SharedReadable {
+fun <SEND, RECEIVE> RetryWebsocket.typed(json: Json, send: KSerializer<SEND>, receive: KSerializer<RECEIVE>): TypedWebSocket<SEND, RECEIVE> = object: TypedWebSocket<SEND, RECEIVE> {
+    override val stayOpen: ResourceUse get() = this@typed.stayOpen
+    override fun close(code: Short, reason: String) = this@typed.close(code, reason)
+    override fun onOpen(action: () -> Unit) = this@typed.onOpen(action)
+    override fun onClose(action: (Short) -> Unit) = this@typed.onClose(action)
+    override fun onMessage(action: (RECEIVE) -> Unit) {
+        this@typed.onMessage {
+            try {
+                action(json.decodeFromString(receive, it))
+            } catch(e: Exception) {
+                TODO("Figure out error handling")
+            }
+        }
+    }
+    override fun send(data: SEND) {
+        this@typed.send(json.encodeToString(send, data))
+    }
+}
+
+private val shared = HashMap<String, TypedWebSocket<MultiplexMessage, MultiplexMessage>>()
+fun multiplexSocket(url: String, path: String, params: Map<String, List<String>>, json: Json): RetryWebsocket {
+    val shared = shared.getOrPut(url) {
+        val s = retryWebsocket(url)
+        // TODO: Pings
+        s.typed(json, MultiplexMessage.serializer(), MultiplexMessage.serializer())
+    }
+    var channelOpen = false
+    val channel = uuid().toString()
+    return object: RetryWebsocket {
+        private val stayOpenP = ResourceUseImpl()
+        override val stayOpen: ResourceUse = stayOpenP.use
+        val scope = ReactiveScope {
+            val shouldBeOn = stayOpenP.current
+            val isOn = channelOpen
+            if(shouldBeOn && !isOn) {
+                shared.send(MultiplexMessage(
+                    channel = channel,
+                    path = path,
+                    queryParams = params,
+                    start = true
+                ))
+            } else if(!shouldBeOn && isOn) {
+                shared.send(MultiplexMessage(
+                    channel = channel,
+                    path = path,
+                    queryParams = params,
+                    end = true
+                ))
+            }
+        }
+
+        override fun close(code: Short, reason: String) {
+            shared.send(MultiplexMessage(
+                channel = channel,
+                path = path,
+                queryParams = params,
+                end = true
+            ))
+            scope.cancel()
+        }
+
+        override fun send(data: Blob) = throw UnsupportedOperationException()
+
+        override fun send(data: String) {
+            shared.send(
+                MultiplexMessage(
+                    channel = channel,
+                    data = data,
+                )
+            )
+        }
+
+        val onOpenList = ArrayList<()->Unit>()
+        val onMessageList = ArrayList<(String)->Unit>()
+        val onCloseList = ArrayList<(Short)->Unit>()
+        override fun onOpen(action: ()->Unit) { onOpenList.add(action) }
+        override fun onMessage(action: (String)->Unit) { onMessageList.add(action) }
+        override fun onBinaryMessage(action: (Blob)->Unit) = throw UnsupportedOperationException()
+        override fun onClose(action: (Short)->Unit) { onCloseList.add(action) }
+
+        init {
+            shared.onOpen {
+                channelOpen = false
+            }
+            shared.onMessage { message ->
+                if(message.channel == channel) {
+                    if(message.start) onOpenList.forEach { it() }
+                    message.data?.let { data ->
+                        onMessageList.forEach { it(data) }
+                    }
+                    if(message.end) onCloseList.forEach { it(-1) }
+                }
+            }
+            shared.onClose {
+                channelOpen = false
+            }
+        }
+    }
+}
+
+private fun sample(): SharedReadable<List<Int>> {
+    val ws = multiplexSocket("testurl", "rest/model", mapOf(), Json).typed(Json, Int.serializer(), Int.serializer())
+    ws.onOpen { ws.send(5) }
+    val fullList = ArrayList<Int>()
+    return shared {
         blockIfBackground()
         use(ws.stayOpen)
         ws.mostRecentMessage.current?.let {
@@ -113,180 +230,3 @@ fun sample(): SharedReadable<List<String>> {
         fullList
     }
 }
-
-
-//var sharedSocketShouldBeActive: Observable<Boolean> = Observable.just(true)
-//private var retryTime = 1000L
-//private var lastRetry = 0L
-//
-//var _overrideWebSocketProvider: ((url: String) -> Observable<WebSocketInterface>)? = null
-//private val sharedSocketCache = HashMap<String, Observable<WebSocketInterface>>()
-//fun sharedSocket(url: String): Observable<WebSocketInterface> {
-//    return sharedSocketCache.getOrPut(url) {
-//        sharedSocketShouldBeActive
-//            .distinctUntilChanged()
-//            .switchMap {
-//                val shortUrl = url.substringBefore('?')
-//                if (!it) Observable.never<WebSocketInterface>()
-//                else {
-//                    println("Creating socket to $url")
-//                    (_overrideWebSocketProvider?.invoke(url) ?: HttpClient.webSocket(url))
-//                        .switchMap {
-//                            lastRetry = System.currentTimeMillis()
-////                            println("Connection to $shortUrl established, starting pings")
-//                            // Only have this observable until it fails
-//
-//                            val pingMessages: Observable<WebSocketInterface> =
-//                                Observable.interval(30_000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!)
-//                                    .map { _ ->
-////                                        println("Sending ping to $url")
-//                                        it.write.onNext(WebSocketFrame(text = " "))
-//                                    }.switchMap { Observable.never() }
-//
-//                            val timeoutAfterSeconds: Observable<WebSocketInterface> = it.read
-//                                .doOnNext {
-////                                    println("Got message from $shortUrl: ${it}")
-//                                    if (System.currentTimeMillis() > lastRetry + 60_000L) {
-//                                        retryTime = 1000L
-//                                    }
-//                                }
-//                                .timeout(40_000L, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!)
-//                                .switchMap { Observable.never() }
-//
-//                            Observable.merge(
-//                                Observable.just(it),
-//                                pingMessages,
-//                                timeoutAfterSeconds
-//                            )
-//                        }
-//                        .doOnError { println("Socket to $shortUrl FAILED with $it") }
-//                        .retryWhen @SwiftReturnType("Observable<Error>") {
-//                            val temp = retryTime
-//                            retryTime = temp * 2L
-//                            it.delay(temp, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!)
-//                        }
-//                        .doOnDispose {
-//                            println("Disconnecting socket to $shortUrl")
-//                        }
-//                }
-//            }
-//            .replay(1)
-//            .refCount()
-//    }
-//}
-//
-//class WebSocketIsh<IN: Any, OUT>(val messages: Observable<IN>, val send: (OUT) -> Unit)
-//
-//@JsName("multiplexedSocketReified")
-//inline fun <reified IN, reified OUT> multiplexedSocket(
-//    url: String,
-//    path: String,
-//    queryParams: Map<String, List<String>> = mapOf()
-//): Observable<WebSocketIsh<IN, OUT>> = multiplexedSocket(url, path, queryParams, serializer<IN>(), serializer<OUT>())
-//
-//@JsName("multiplexedSocket")
-//fun <IN, OUT> multiplexedSocket(
-//    url: String,
-//    path: String,
-//    queryParams: Map<String, List<String>> = mapOf(),
-//    inType: KSerializer<IN>,
-//    outType: KSerializer<OUT>
-//): Observable<WebSocketIsh<IN, OUT>> = multiplexedSocketRaw(url, path, queryParams)
-//    .map {
-//        WebSocketIsh(
-//            messages = it.messages.mapNotNull { it.fromJsonString(inType) },
-//            send = { m -> it.send(m.toJsonString(outType)) }
-//        )
-//    }
-//
-//fun multiplexedSocketRaw(
-//    url: String,
-//    path: String,
-//    queryParams: Map<String, List<String>> = mapOf()
-//): Observable<WebSocketIsh<String, String>> {
-//    val shortUrl = url.substringBefore('?')
-//    val channel = uuid().toString()
-//    return sharedSocket(url)
-//        .switchMap { sharedSocket ->
-////            println("Setting up channel $channel to $shortUrl with $path")
-//            val multiplexedIn = sharedSocket.read.mapNotNull {
-//                val text = it.text ?: return@mapNotNull null
-//                if (text.isBlank()) return@mapNotNull null
-//                text.fromJsonString<MultiplexMessage>()
-//            }.filter { it.channel == channel }
-//            var current = PublishSubject.create<String>()
-//            multiplexedIn
-//                .mapNotNull { message ->
-//                    when {
-//                        message.start -> {
-////                            println("Channel ${message.channel} established with $sharedSocket")
-//                            WebSocketIsh<String, String>(
-//                                messages = current,
-//                                send = { message ->
-////                                    println("Sending $message to $channel")
-//                                    sharedSocket.write.onNext(
-//                                        WebSocketFrame(
-//                                            text = MultiplexMessage(
-//                                                channel = channel,
-//                                                data = message
-//                                            ).toJsonString()
-//                                        )
-//                                    )
-//                                }
-//                            )
-//                        }
-//                        message.data != null -> {
-////                            println("Got ${message.data} to ${message.channel}")
-//                            current.onNext(message.data)
-//                            null
-//                        }
-//                        message.end -> {
-////                            println("Channel ${message.channel} terminated")
-//                            current = PublishSubject.create()
-//                            sharedSocket.write.onNext(
-//                                WebSocketFrame(
-//                                    text = MultiplexMessage(
-//                                        channel = channel,
-//                                        path = path,
-//                                        queryParams = queryParams,
-//                                        start = true
-//                                    ).toJsonString()
-//                                )
-//                            )
-//                            null
-//                        }
-//                        else -> null
-//                    }
-//                }
-//                .doOnSubscribe { _ ->
-////                    println("Sending onSubscribe Startup Message")
-//                    sharedSocket.write.onNext(
-//                        WebSocketFrame(
-//                            text = MultiplexMessage(
-//                                channel = channel,
-//                                path = path,
-//                                queryParams = queryParams,
-//                                start = true
-//                            ).toJsonString()
-//                        )
-//                    )
-//                }
-//                .doOnDispose {
-////                    println("Disconnecting channel on socket to $shortUrl with $path")
-//                    sharedSocket?.write?.onNext(
-//                        WebSocketFrame(
-//                            text = MultiplexMessage(
-//                                channel = channel,
-//                                path = path,
-//                                end = true
-//                            ).toJsonString()
-//                        )
-//                    )
-//                }
-//                .retryWhen @SwiftReturnType("Observable<Error>") {
-//                    val temp = retryTime
-//                    retryTime = temp * 2L
-//                    it.delay(temp, TimeUnit.MILLISECONDS, HttpClient.responseScheduler!!)
-//                }
-//        }
-//}
