@@ -34,7 +34,6 @@ dependencies {
     implementation("com.lightningkite:kotliner-cli:1.0.3")
     implementation("io.ktor:ktor-server-call-logging:$ktorVersion")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
-    testImplementation(project(":client"))
 }
 
 kotlin {

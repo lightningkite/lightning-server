@@ -24,7 +24,6 @@ dependencies {
     api("org.mongodb:mongodb-driver-kotlin-coroutine:4.10.1")
 
     kspTest(project(":processor"))
-    testImplementation(project(":client"))
     testImplementation(project(":server-testing"))
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 }

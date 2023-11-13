@@ -42,13 +42,8 @@ fun Documentable.Companion.kotlinSdkLocal(packageName: String, root: File = File
 }
 
 fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(packageName).apply {
-    imports.add("io.reactivex.rxjava3.core.Single")
-    imports.add("io.reactivex.rxjava3.core.Observable")
-    imports.add("com.lightningkite.rx.okhttp.*")
+    imports.add("com.lightningkite.*")
     imports.add("com.lightningkite.lightningdb.*")
-    imports.add("com.lightningkite.lightningdb.live.*")
-    imports.add("java.util.UUID")
-    imports.add("java.util.Optional")
     imports.add("kotlinx.datetime.*")
     val byGroup = safeDocumentables
         .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }.groupBy { it.docGroupIdentifier }
@@ -76,13 +71,8 @@ fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(
 }.toString()
 
 fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmitter(packageName).apply {
-    imports.add("io.reactivex.rxjava3.core.Single")
-    imports.add("io.reactivex.rxjava3.core.Observable")
-    imports.add("com.lightningkite.rx.okhttp.*")
+    imports.add("com.lightningkite.*")
     imports.add("com.lightningkite.lightningdb.*")
-    imports.add("com.lightningkite.lightningdb.live.*")
-    imports.add("java.util.UUID")
-    imports.add("java.util.Optional")
     imports.add("kotlinx.datetime.*")
     run {
         val sessionClassName = "AbstractAnonymousSession"
@@ -152,15 +142,9 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
 }.toString()
 
 fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmitter(packageName).apply {
-    imports.add("io.reactivex.rxjava3.core.Single")
-    imports.add("io.reactivex.rxjava3.core.Observable")
-    imports.add("com.lightningkite.rx.android.resources.ImageReference")
-    imports.add("com.lightningkite.rx.kotlin")
-    imports.add("com.lightningkite.rx.okhttp.*")
+    imports.add("com.lightningkite.*")
     imports.add("com.lightningkite.lightningdb.*")
-    imports.add("com.lightningkite.lightningdb.live.*")
-    imports.add("java.util.UUID")
-    imports.add("java.util.Optional")
+    imports.add("com.lightningkite.rock.*")
     imports.add("kotlinx.datetime.*")
     val byGroup = safeDocumentables.groupBy { it.docGroupIdentifier }
     val groups = byGroup.keys.filterNotNull()
@@ -173,14 +157,14 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
         this.functionHeader(entry)
         when (entry) {
             is ApiEndpoint<*, *, *, *> -> {
-                appendLine(" = HttpClient.call(")
+                appendLine(" = fetch(")
                 appendLine("        url = \"\$httpUrl${entry.path.path.escaped}\",")
-                appendLine("        method = HttpClient.${entry.route.method},")
+                appendLine("        method = HttpMethod.${entry.route.method},")
                 entry.primaryAuthName?.let {
                     if (entry.authOptions.options.contains(null).not()) {
-                        appendLine("        headers = mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
+                        appendLine("        headers = httpHeaders(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
                     } else {
-                        appendLine("        headers = if(${it.userTypeTokenName()} != null) mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\") else mapOf(),")
+                        appendLine("        headers = if(${it.userTypeTokenName()} != null) httpHeaders(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\") else httpHeaders(),")
                     }
                 }
                 entry.inputType.takeUnless { it == Unit.serializer() }?.let {
@@ -215,14 +199,14 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
             this.functionHeader(entry)
             when (entry) {
                 is ApiEndpoint<*, *, *, *> -> {
-                    appendLine(" = HttpClient.call(")
+                    appendLine(" = fetch(")
                     appendLine("            url = \"\$httpUrl${entry.path.path.escaped}\",")
                     appendLine("            method = HttpClient.${entry.route.method},")
                     entry.primaryAuthName?.let {
                         if (entry.authOptions.options.contains(null).not()) {
-                            appendLine("            headers = mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
+                            appendLine("            headers = httpHeaders(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
                         } else {
-                            appendLine("            headers = if(${it.userTypeTokenName()} != null) mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\") else mapOf(),")
+                            appendLine("            headers = if(${it.userTypeTokenName()} != null) httpHeaders(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\") else mapOf(),")
                         }
                     }
                     entry.inputType.takeUnless { it == Unit.serializer() }?.let {

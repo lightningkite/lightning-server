@@ -1,40 +1,40 @@
 import com.lightningkite.deployhelpers.*
-import com.lightningkite.khrysalis.gradle.*
 
 plugins {
-    kotlin("jvm")
+    kotlin("multiplatform")
+    kotlin("plugin.serialization")
     id("org.jetbrains.dokka")
     id("signing")
-    id("com.lightningkite.khrysalis")
     `maven-publish`
 }
 
 val kotlinVersion: String by project
 val rxPlusVersion: String by project
 val khrysalisVersion: String by project
-dependencies {
-    api(project(":shared"))
-    api("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
-    api("com.lightningkite.rx:okhttp:$rxPlusVersion")
-    api("com.lightningkite.rx:rxplus:$rxPlusVersion")
 
-    equivalents("com.lightningkite.rx:rxplus:$rxPlusVersion:equivalents")
-    equivalents("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion:equivalents")
+kotlin {
+    targetHierarchy.default()
 
-    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
-    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
-}
+//    jvm()
+    js(IR) {
+        browser()
+    }
+//    ios()
+//    androidTarget()
 
-khrysalis {
-    iosProjectName = "LightningServer"
-    iosProjectFolder = rootDir.resolve("ios")
-    iosSourceFolder = rootDir.resolve("ios/LightningServer/Classes/client")
-    webProjectName = "@lightningkite/lightning-server"
-    webProjectFolder = rootDir.resolve("web")
-    webSourceFolder = rootDir.resolve("web/src")
-    libraryMode = true
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                api(project(":shared"))
+                api("com.lightningkite.rock:library:main-SNAPSHOT")
+            }
+        }
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+    }
 }
 
 standardPublishing {
@@ -59,5 +59,3 @@ standardPublishing {
         )
     }
 }
-tasks.getByName("equivalentsJar").published = true
-

@@ -1,11 +1,9 @@
 import com.lightningkite.deployhelpers.*
-import com.lightningkite.khrysalis.gradle.*
 
 plugins {
     kotlin("multiplatform")
     id("com.google.devtools.ksp")
     kotlin("plugin.serialization")
-    id("com.lightningkite.khrysalis")
     id("org.jetbrains.dokka")
     id("signing")
     `maven-publish`
@@ -47,7 +45,6 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                api("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
             }
         }
         val jvmTest by getting {
@@ -57,29 +54,11 @@ kotlin {
 }
 
 dependencies {
-    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
-    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
-
-    equivalents("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion:equivalents")
-
     configurations.filter { it.name.startsWith("ksp") && it.name != "ksp" }.forEach {
         add(it.name, project(":processor"))
     }
 }
 
-khrysalis {
-    iosProjectName = "LightningServer"
-    iosProjectFolder = rootDir.resolve("ios")
-    iosSourceFolder = rootDir.resolve("ios/LightningServer/Classes/shared")
-    webProjectName = "@lightningkite/lightning-server"
-    webProjectFolder = rootDir.resolve("web")
-    webSourceFolder = rootDir.resolve("web/src")
-    libraryMode = true
-    additionalEquivalentDirectories = listOf(project.file("build/generated/ksp/main/resources"))
-}
-
-tasks.getByName("equivalentsJar").published = true
-tasks.getByName("equivalentsJar").dependsOn("kspKotlinJvm")
 tasks.create("kspAll") {
     tasks.filter { it.name.startsWith("ksp") && it != this }.forEach {
         dependsOn(it)
@@ -108,4 +87,3 @@ standardPublishing {
         )
     }
 }
-tasks.getByName("equivalentsJar").published = true
