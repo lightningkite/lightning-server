@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.Description
 import com.lightningkite.lightningdb.nullElement
+import com.lightningkite.lightningdb.serializableProperties
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
@@ -75,7 +76,7 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                     h3 {
                         +(api.route.method.toString())
                         +" "
-                        +api.route.path.toString()
+                        +api.route.path.path.toString()
                         +" - "
                         +api.summary
                     }
@@ -161,15 +162,27 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                         when (desc.kind) {
                             StructureKind.CLASS -> {
                                 documentType(serializer) {
-                                    for ((index, part) in ((serializer as? GeneratedSerializer<*>)?.childSerializers()
-                                        ?: arrayOf()).withIndex()) {
+                                    serializer.serializableProperties?.toList()?.forEachIndexed { index, item ->
                                         p {
-                                            +desc.getElementName(index)
+                                            +item.name
                                             +": "
-                                            type(part)
+                                            type(item.serializer)
                                             desc.getElementAnnotations(index).filterIsInstance<Description>().firstOrNull()?.let {
                                                 +" - "
                                                 +it.text
+                                            }
+                                        }
+                                    } ?: run {
+                                        for ((index, part) in ((serializer as? GeneratedSerializer<*>)?.childSerializers()
+                                            ?: arrayOf()).withIndex()) {
+                                            p {
+                                                +desc.getElementName(index)
+                                                +": "
+                                                type(part)
+                                                desc.getElementAnnotations(index).filterIsInstance<Description>().firstOrNull()?.let {
+                                                    +" - "
+                                                    +it.text
+                                                }
                                             }
                                         }
                                     }
