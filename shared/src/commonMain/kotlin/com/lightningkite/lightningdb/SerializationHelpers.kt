@@ -62,10 +62,10 @@ internal fun defer(serialName: String, kind: SerialKind, deferred: () -> SerialD
 
 class KSerializerKey(val kSerializer: KSerializer<*>) {
     @OptIn(InternalSerializationApi::class)
-    private val tp = (kSerializer as? GeneratedSerializer<*>)?.typeParametersSerializers()?.fold(0) { a, b -> a hashWith b } ?: 0
+    private val tp = kSerializer.tryTypeParameterSerializers2()?.fold(0) { a, b -> a hashWith b } ?: 0
     val storedHashCode = kSerializer.descriptor.serialName.hashCode() hashWith tp
     @OptIn(InternalSerializationApi::class)
-    private val sub = (kSerializer as? GeneratedSerializer<*>)?.typeParametersSerializers()?.map { KSerializerKey(it) }
+    private val sub = kSerializer.tryTypeParameterSerializers2()?.map { KSerializerKey(it) }
     override fun hashCode(): Int = storedHashCode
 
     override fun equals(other: Any?): Boolean =
