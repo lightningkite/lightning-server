@@ -66,11 +66,12 @@ class KSerializerKey(val kSerializer: KSerializer<*>, val nullable: Boolean) {
         nullable = kSerializer.descriptor.isNullable
     )
     private val sub = kSerializer.tryTypeParameterSerializers2()?.map { KSerializerKey(it) } ?: listOf()
-    val storedHashCode = kSerializer::class.hashCode() + sub.hashCode()
+    val storedHashCode = kSerializer::class.hashCode() hashWith sub.hashCode() hashWith kSerializer.descriptor.serialName
     override fun hashCode(): Int = storedHashCode
 
     override fun equals(other: Any?): Boolean =
         other is KSerializerKey
+                && this.kSerializer.descriptor.serialName == other.kSerializer.descriptor.serialName
                 && this.nullable == other.nullable
                 && this.kSerializer::class == other.kSerializer::class
                 && this.sub == other.sub

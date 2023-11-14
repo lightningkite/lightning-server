@@ -1,5 +1,8 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.UUID
+import kotlinx.datetime.Instant
+import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.nullable
@@ -35,6 +38,10 @@ class KSerializerKeyTest {
             LargeTestModel.serializer(),
             EmbeddedMap.serializer(),
             Cursed.serializer(),
+            SampleA.serializer(),
+            SampleB.serializer(),
+            ContextualSerializer(UUID::class),
+            Instant.serializer(),
             String.serializer(),
             Char.serializer(),
             Byte.serializer(),

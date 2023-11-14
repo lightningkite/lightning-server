@@ -57,6 +57,10 @@ data class EmbeddedObjectTest(
     companion object
 }
 
+@Serializable
+enum class SampleA { A, B, C }
+@Serializable
+enum class SampleB { D, E, F }
 
 @GenerateDataClassPaths
 @Serializable
