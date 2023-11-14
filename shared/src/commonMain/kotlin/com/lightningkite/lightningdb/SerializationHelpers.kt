@@ -61,17 +61,11 @@ internal fun defer(serialName: String, kind: SerialKind, deferred: () -> SerialD
     }
 
 class KSerializerKey(val kSerializer: KSerializer<*>) {
-    @OptIn(InternalSerializationApi::class)
-    private val tp = kSerializer.tryTypeParameterSerializers2()?.fold(0) { a, b -> a hashWith b } ?: 0
-    val storedHashCode = kSerializer.descriptor.serialName.hashCode() hashWith tp
-    @OptIn(InternalSerializationApi::class)
-    private val sub = kSerializer.tryTypeParameterSerializers2()?.map { KSerializerKey(it) }
+    val storedHashCode = kSerializer.descriptor.contentHashCode()
     override fun hashCode(): Int = storedHashCode
 
     override fun equals(other: Any?): Boolean =
-        other is KSerializerKey && this.storedHashCode == other.storedHashCode
-                && this.kSerializer.descriptor.serialName == other.kSerializer.descriptor.serialName
-                && this.sub == other.sub
+        other is KSerializerKey && this.storedHashCode == other.storedHashCode && this.kSerializer.descriptor matches other.kSerializer.descriptor
 
     override fun toString(): String = kSerializer.toString()
 }
@@ -80,6 +74,27 @@ private inline infix fun Int.hashWith(other: Int): Int = this * 31 + other
 private inline infix fun Int.hashWith(other: Any): Int = this * 31 + other.hashCode()
 private inline infix fun Any.hashWith(other: Int): Int = this.hashCode() * 31 + other
 private inline infix fun Any.hashWith(other: Any): Int = this.hashCode() * 31 + other.hashCode()
+
+fun SerialDescriptor.contentHashCode(): Int {
+    return this.isNullable hashWith
+            this.kind hashWith
+            this.serialName hashWith
+            this.elementsCount hashWith
+            (0 until this.elementsCount).fold(0) { acc, it ->
+                acc hashWith this.getElementName(it) hashWith this.getElementDescriptor(it).contentHashCode()
+            }
+}
+
+infix fun SerialDescriptor.matches(other: SerialDescriptor): Boolean {
+    return this.isNullable == other.isNullable &&
+            this.kind == other.kind &&
+            this.serialName == other.serialName &&
+            this.elementsCount == other.elementsCount &&
+            (0 until this.elementsCount).all {
+                this.getElementName(it) == other.getElementName(it) &&
+                        this.getElementDescriptor(it) matches other.getElementDescriptor(it)
+            }
+}
 
 
 private class FoundSerializerSignal(val serializer: KSerializer<*>) : Throwable()
