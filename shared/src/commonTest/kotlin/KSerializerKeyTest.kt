@@ -58,9 +58,18 @@ class KSerializerKeyTest {
         val failures = serializers.groupBy { KSerializerKey(it) }.filterValues { it.size > 1 }
         failures.forEach { println(it) }
         assertEquals(0, failures.size)
-    }
 
-    @Test fun notUnique() {
-        assertEquals(KSerializerKey(ListSerializer(User.serializer())), KSerializerKey(ListSerializer(User.serializer())))
+        val secondSet = models.flatMap {
+            listOf(
+                it,
+                it.nullable,
+                ListSerializer(it),
+                MapSerializer(String.serializer(), it),
+                Condition.serializer(it),
+                Modification.serializer(it)
+            )
+        }
+
+        assertEquals(serializers.size, (serializers + secondSet).distinctBy { KSerializerKey(it) }.size)
     }
 }
