@@ -60,12 +60,20 @@ internal fun defer(serialName: String, kind: SerialKind, deferred: () -> SerialD
             get() = original.isNullable
     }
 
-class KSerializerKey(val kSerializer: KSerializer<*>) {
-    val storedHashCode = kSerializer.descriptor.contentHashCode()
+class KSerializerKey(val kSerializer: KSerializer<*>, val nullable: Boolean) {
+    constructor(kSerializer: KSerializer<*>):this(
+        kSerializer = if(kSerializer.descriptor.isNullable) kSerializer.innerElement() else kSerializer,
+        nullable = kSerializer.descriptor.isNullable
+    )
+    private val sub = kSerializer.tryTypeParameterSerializers2()?.map { KSerializerKey(it) } ?: listOf()
+    val storedHashCode = kSerializer::class.hashCode() + sub.hashCode()
     override fun hashCode(): Int = storedHashCode
 
     override fun equals(other: Any?): Boolean =
-        other is KSerializerKey && this.storedHashCode == other.storedHashCode && this.kSerializer.descriptor matches other.kSerializer.descriptor
+        other is KSerializerKey
+                && this.nullable == other.nullable
+                && this.kSerializer::class == other.kSerializer::class
+                && this.sub == other.sub
 
     override fun toString(): String = kSerializer.toString()
 }
@@ -74,27 +82,6 @@ private inline infix fun Int.hashWith(other: Int): Int = this * 31 + other
 private inline infix fun Int.hashWith(other: Any): Int = this * 31 + other.hashCode()
 private inline infix fun Any.hashWith(other: Int): Int = this.hashCode() * 31 + other
 private inline infix fun Any.hashWith(other: Any): Int = this.hashCode() * 31 + other.hashCode()
-
-fun SerialDescriptor.contentHashCode(): Int {
-    return this.isNullable hashWith
-            this.kind hashWith
-            this.serialName hashWith
-            this.elementsCount hashWith
-            (0 until this.elementsCount).fold(0) { acc, it ->
-                acc hashWith this.getElementName(it) hashWith this.getElementDescriptor(it).contentHashCode()
-            }
-}
-
-infix fun SerialDescriptor.matches(other: SerialDescriptor): Boolean {
-    return this.isNullable == other.isNullable &&
-            this.kind == other.kind &&
-            this.serialName == other.serialName &&
-            this.elementsCount == other.elementsCount &&
-            (0 until this.elementsCount).all {
-                this.getElementName(it) == other.getElementName(it) &&
-                        this.getElementDescriptor(it) matches other.getElementDescriptor(it)
-            }
-}
 
 
 private class FoundSerializerSignal(val serializer: KSerializer<*>) : Throwable()
@@ -161,13 +148,20 @@ fun KSerializer<*>.nullElement(): KSerializer<*>? {
 fun KSerializer<*>.tryTypeParameterSerializers(): Array<KSerializer<*>>? = (this as? GeneratedSerializer<*>)?.typeParametersSerializers()
 
 @OptIn(InternalSerializationApi::class)
-fun KSerializer<*>.tryTypeParameterSerializers2(): Array<KSerializer<*>>? = tryTypeParameterSerializers()
-    ?: (this as? GeneratedSerializer<*>)?.typeParametersSerializers()
-    ?: (this as? ConditionSerializer<*>)?.inner?.let { arrayOf(it) }
-    ?: (this as? ModificationSerializer<*>)?.inner?.let { arrayOf(it) }
-    ?: (this as? PartialSerializer<*>)?.source?.let { arrayOf(it) }
-    ?: (this as? SortPartSerializer<*>)?.inner?.let { arrayOf(it) }
-    ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
+fun KSerializer<*>.tryTypeParameterSerializers2(): Array<KSerializer<*>>? = when(descriptor.kind) {
+    is StructureKind.LIST -> arrayOf(innerElement())
+    is StructureKind.MAP -> arrayOf(innerElement2())
+    is StructureKind.CLASS -> {
+        tryTypeParameterSerializers()
+            ?: (this as? GeneratedSerializer<*>)?.typeParametersSerializers()
+            ?: (this as? ConditionSerializer<*>)?.inner?.let { arrayOf(it) }
+            ?: (this as? ModificationSerializer<*>)?.inner?.let { arrayOf(it) }
+            ?: (this as? PartialSerializer<*>)?.source?.let { arrayOf(it) }
+            ?: (this as? SortPartSerializer<*>)?.inner?.let { arrayOf(it) }
+            ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
+    }
+    else -> null
+}
 
 @OptIn(InternalSerializationApi::class)
 fun KSerializer<*>.tryChildSerializers(): Array<KSerializer<*>>? = (this as? GeneratedSerializer<*>)?.childSerializers()

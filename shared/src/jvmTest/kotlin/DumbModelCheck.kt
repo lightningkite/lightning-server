@@ -1,3 +1,4 @@
+import com.lightningkite.lightningdb.GenerateDataClassPaths
 import kotlinx.serialization.Serializable
 
 @Serializable
