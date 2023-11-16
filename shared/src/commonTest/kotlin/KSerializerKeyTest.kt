@@ -2,6 +2,7 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.UUID
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -41,7 +42,8 @@ class KSerializerKeyTest {
             SampleA.serializer(),
             SampleB.serializer(),
             ContextualSerializer(UUID::class),
-            Instant.serializer(),
+            ContextualSerializer(Instant::class),
+            LocalDate.serializer(),
             String.serializer(),
             Char.serializer(),
             Byte.serializer(),

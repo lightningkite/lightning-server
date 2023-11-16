@@ -50,7 +50,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 
 standardPublishing {
     name.set("Lightning-server-Server")
-    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
+    description.set("An implementation of LightningServer Engine using Ktor.")
     github("lightningkite", "lightning-server")
 
     licenses {

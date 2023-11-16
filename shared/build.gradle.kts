@@ -88,7 +88,7 @@ tasks.create("kspAll") {
 
 standardPublishing {
     name.set("Lightning-server-Shared")
-    description.set("A tool for communication between a server and a client built around Ktor servers.")
+    description.set("A tool for communication between a server using LightningServer and a client.")
     github("lightningkite", "lightning-server")
 
     licenses {
