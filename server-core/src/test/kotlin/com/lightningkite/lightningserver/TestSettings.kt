@@ -151,10 +151,10 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
 
         override suspend fun permitMasquerade(
             other: Authentication.SubjectHandler<*, *>,
-            id: UUID,
+            request: RequestAuth<TestUser>,
             otherId: Comparable<*>
         ): Boolean {
-            return other == this && fetch(id).isSuperAdmin && !fetch(otherId as UUID).isSuperAdmin
+            return other == this && request.get().isSuperAdmin && !fetch(otherId as UUID).isSuperAdmin
         }
 
         override val idSerializer: KSerializer<UUID>

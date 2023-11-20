@@ -71,7 +71,7 @@ val lightningServerSchema: LightningServerSchema by lazy {
     val builder = JsonSchemaBuilder(Serialization.json)
     Documentable.endpoints.flatMap {
         sequenceOf(it.inputType, it.outputType) + it.route.path.serializers.asSequence()
-    }.distinct().forEach { builder.get(it) }
+    }.distinctBy { KSerializerKey(it) }.forEach { builder.get(it) }
     LightningServerSchema(
         definitions = builder.definitions,
         uploadEarlyEndpoint = UploadEarlyEndpoint.default?.path?.fullUrl(),
@@ -354,17 +354,18 @@ class JsonSchemaBuilder(
         overrides[key] = { handler(it) }
     }
 
-    val existingKeys1 = HashMap<KSerializer<*>, String>()
-    val existingKeys2 = HashMap<String, KSerializer<*>>()
+    val existingKeys1 = HashMap<KSerializerKey, String>()
+    val existingKeys2 = HashMap<String, KSerializerKey>()
     fun key(serializer: KSerializer<*>): String {
-        existingKeys1[serializer]?.let { return it }
+        val key = KSerializerKey(serializer)
+        existingKeys1[key]?.let { return it }
         val baseName = serializer.descriptor.serialName
         var index = 0
         while (true) {
             val name = baseName + (if (index == 0) "" else index.toString())
             if (!existingKeys2.containsKey(name)) {
-                existingKeys1[serializer] = name
-                existingKeys2[name] = serializer
+                existingKeys1[key] = name
+                existingKeys2[name] = key
                 return name
             }
             index++

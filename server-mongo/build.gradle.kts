@@ -40,7 +40,7 @@ kotlin {
 
 standardPublishing {
     name.set("Lightning-server-Mongo")
-    description.set("A MongoDB implementation of Lightning-server-Databases.")
+    description.set("An implementation of LightningServer Database using MongoDB.")
     github("lightningkite", "lightning-server")
 
     licenses {
