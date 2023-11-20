@@ -29,21 +29,24 @@ fun retryWebsocket(
         }
     }
 
-    return object: RetryWebsocket {
+    return object: RetryWebsocket, CalculationContext {
         private val stayOpenP = ResourceUseImpl()
         override val stayOpen: ResourceUse = stayOpenP.use
-        val scope = ReactiveScope {
-            val shouldBeOn = stayOpenP.current
-            val isOn = connected.current
-            if(shouldBeOn && !isOn) {
-                reset()
-            } else if(!shouldBeOn && isOn) {
-                currentWebSocket?.close(1000, "OK")
+        init {
+            reactiveScope {
+                val shouldBeOn = stayOpenP.await()
+                val isOn = connected.await()
+                if (shouldBeOn && !isOn) {
+                    reset()
+                } else if (!shouldBeOn && isOn) {
+                    currentWebSocket?.close(1000, "OK")
+                }
             }
         }
 
         override fun close(code: Short, reason: String) {
-            scope.cancel()
+            onRemoveSet.forEach { it() }
+            onRemoveSet.clear()
             currentWebSocket?.close(code, reason)
             currentWebSocket = null
         }
@@ -60,6 +63,14 @@ fun retryWebsocket(
         override fun onMessage(action: (String)->Unit) { onMessageList.add(action) }
         override fun onBinaryMessage(action: (Blob)->Unit) { onBinaryMessageList.add(action) }
         override fun onClose(action: (Short)->Unit) { onCloseList.add(action) }
+
+        override fun notifyFailure() {}
+        override fun notifyStart() {}
+        override fun notifySuccess() {}
+        val onRemoveSet = HashSet<()->Unit>()
+        override fun onRemove(action: () -> Unit) {
+            onRemoveSet.add(action)
+        }
     }
 }
 
@@ -84,13 +95,13 @@ wrap Pinging atLeast WebSocket {
 
  */
 
-class ResourceUseImpl(private val p: Property<Boolean> = Property(false)): Readable<Boolean> by p, OnRemoveHandler {
+class ResourceUseImpl(private val p: Property<Boolean> = Property(false)): Readable<Boolean> by p {
     var count = 0
     val use: ResourceUse = object: ResourceUse {
         override fun start(): () -> Unit {
-            if(count++ == 0) p set true
+            if(count++ == 0) p.value = true
             return {
-                if(--count == 0) p set false
+                if(--count == 0) p.value = false
             }
         }
     }
@@ -99,16 +110,18 @@ class ResourceUseImpl(private val p: Property<Boolean> = Property(false)): Reada
 
 
 val <RECEIVE> TypedWebSocket<*, RECEIVE>.mostRecentMessage: Readable<RECEIVE?> get() = object: Readable<RECEIVE?> {
-    override var once: RECEIVE? = null
+    var value: RECEIVE? = null
         private set
 
     val listeners = HashSet<()->Unit>()
     init {
         onMessage {
-            once = it
+            value = it
             listeners.forEach { it() }
         }
     }
+
+    override suspend fun awaitRaw(): RECEIVE? = value
 
     override fun addListener(listener: () -> Unit): () -> Unit {
         listeners.add(listener)

@@ -73,9 +73,7 @@ class SerializationTest {
             it.int assign 5
 
         }
-        val asText = myJson.encodeToString(serializer, part)
-        println(asText)
-        println(myJson.decodeFromString(serializer, asText))
+        part.cycle()
         println(myJson.decodeFromString(serializer, """{"embedded": { "value1": "Test" }}"""))
     }
     @Test fun partial3() {
@@ -234,41 +232,19 @@ class SerializationTest {
         println("Query: ${recreated3}")
         assertEquals(inQuery, recreated3)
     }
-    private inline fun <reified T> Modification<T>.cycle() {
+    private inline fun <reified T> T.cycle() {
         println("----$this----")
         val asString = myJson.encodeToString(this)
         println(asString)
-        val recreated = myJson.decodeFromString<Modification<T>>(asString)
+        val recreated = myJson.decodeFromString<T>(asString)
         println(recreated)
         assertEquals(this, recreated)
 
         val asString2 = myProperties.encodeToStringMap(this)
         println(asString2)
-        val recreated2 = myProperties.decodeFromStringMap<Modification<T>>(asString2)
+        val recreated2 = myProperties.decodeFromStringMap<T>(asString2)
         println(recreated2)
         assertEquals(this, recreated2)
-    }
-    private inline fun <reified T> List<SortPart<T>>.cycle() {
-        println("----$this----")
-        val asString = myJson.encodeToString(this)
-        println(asString)
-        val recreated = myJson.decodeFromString<List<SortPart<T>>>(asString)
-        println(recreated)
-        assertEquals(this, recreated)
-
-        val asString2 = myProperties.encodeToStringMap(this)
-        println(asString2)
-        val recreated2 = myProperties.decodeFromStringMap<List<SortPart<T>>>(asString2)
-        println(recreated2)
-        assertEquals(this, recreated2)
-    }
-    private inline fun <reified T> DataClassPathPartial<T>.cycle() {
-        println("----$this----")
-        val asString = myJson.encodeToString(this)
-        println(asString)
-        val recreated = myJson.decodeFromString<DataClassPathPartial<T>>(asString)
-        println(recreated)
-        assertEquals(this, recreated)
     }
 
 
