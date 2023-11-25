@@ -74,7 +74,13 @@ class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> 
 fun <K> DataClassPathPartial<K>.setMap(key: K, out: Partial<K>) {
     if(properties.isEmpty()) throw IllegalStateException("Path ${this} cannot be set for partial")
     var current = out as Partial<Any?>
+    var value: Any? = key
     for (prop in properties.dropLast(1)) {
+        value = (prop as SerializableProperty<Any?, Any?>).get(value)
+        if(value == null) {
+            current.parts[prop] = null
+            return
+        }
         current = current.parts.getOrPut(prop as SerializableProperty<Any?, *>) { Partial<Any?>() } as Partial<Any?>
     }
     current.parts[properties.last() as SerializableProperty<Any?, *>] = getAny(key)

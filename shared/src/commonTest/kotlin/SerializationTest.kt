@@ -73,6 +73,7 @@ class SerializationTest {
                 it.value2 assign 4
             }
             it.int assign 5
+            it.intNullable assign null
         }
         val asText = myJson.encodeToString(serializer, part)
         println(asText)
@@ -81,6 +82,15 @@ class SerializationTest {
 
         println(restored)
         println(myJson.decodeFromString(serializer, """{"embedded": { "value1": "Test" }}"""))
+    }
+    @Test fun partial4() {
+        val serializer = PartialSerializer(LargeTestModel.serializer())
+        val part = Partial(LargeTestModel(), setOf(path<LargeTestModel>().embeddedNullable.notNull.value2))
+        val asText = myJson.encodeToString(serializer, part)
+        println(asText)
+        val restored = myJson.decodeFromString(serializer, asText)
+        assertEquals(part, restored)
+        println(restored)
     }
     @Test fun partial3() {
         val serializer = serializer<QueryPartial<LargeTestModel>>()
