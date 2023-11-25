@@ -20,6 +20,10 @@ class PartialBuilder<T>(val parts: MutableMap<SerializableProperty<T, *>, Any?> 
         if(this !is DataClassPathAccess<*, *, *>) throw IllegalArgumentException()
         parts[this.second as SerializableProperty<T, *>] = PartialBuilder<A>().apply { setup(DataClassPathSelf(second.serializer as KSerializer<A>)) }.let { Partial<A>(it.parts) }
     }
+    inline fun <A: Any> DataClassPath<T, A?>.notNull(setup: PartialBuilder<A>.(DataClassPathSelf<A>) -> Unit) {
+        if(this !is DataClassPathAccess<*, *, *>) throw IllegalArgumentException()
+        parts[this.second as SerializableProperty<T, *>] = PartialBuilder<A>().apply { setup(DataClassPathSelf(second.serializer as KSerializer<A>)) }.let { Partial<A>(it.parts) }
+    }
 
     inline infix fun <A> DataClassPath<T, A>.assign(value: Partial<A>) {
         if(this !is DataClassPathAccess<*, *, *>) throw IllegalArgumentException()

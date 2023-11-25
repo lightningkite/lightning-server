@@ -42,7 +42,7 @@ dependencies {
     api("org.jetbrains.kotlinx:kotlinx-html-jvm:0.8.0")
 
     api("dev.turingcomplete:kotlin-onetimepassword:2.4.0")
-    api("com.lightningkite:kotlinx-serialization-csv:2.1.0-SNAPSHOT")
+    api("com.lightningkite:kotlinx-serialization-csv:2.2.0-SNAPSHOT")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
     api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$kotlinXSerialization")
     api("io.github.pdvrieze.xmlutil:serialization-jvm:0.85.0")

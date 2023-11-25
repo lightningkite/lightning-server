@@ -4,15 +4,23 @@ package com.lightningkite.lightningdb
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.*
 
 class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> {
     private val childSerializers = this.source.serializableProperties!!.map {
-        if (it.serializer.serializableProperties != null) {
-            PartialSerializer(it.serializer)
-        } else it.serializer
+        if(it.serializer.descriptor.isNullable) {
+            val nn = it.serializer.nullElement()!!
+            if (nn.serializableProperties != null) {
+                PartialSerializer(nn).nullable
+            } else it.serializer
+        } else {
+            if (it.serializer.serializableProperties != null) {
+                PartialSerializer(it.serializer)
+            } else it.serializer
+        }
     }
     override val descriptor: SerialDescriptor
         get() {
