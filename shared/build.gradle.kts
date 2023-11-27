@@ -59,12 +59,6 @@ dependencies {
     }
 }
 
-tasks.create("kspAll") {
-    tasks.filter { it.name.startsWith("ksp") && it != this }.forEach {
-        dependsOn(it)
-    }
-}
-
 standardPublishing {
     name.set("Lightning-server-Shared")
     description.set("A tool for communication between a server using LightningServer and a client.")

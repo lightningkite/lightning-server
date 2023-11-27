@@ -26,7 +26,7 @@ object UUIDSerializer : KSerializer<UUID> {
     } catch (e: IllegalArgumentException) {
         throw SerializationException(e.message)
     }
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.util.UUID", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.UUID", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: UUID) = encoder.encodeString(value.toString())
 }
 

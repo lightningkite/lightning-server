@@ -15,7 +15,6 @@ import kotlinx.datetime.Instant
 import com.lightningkite.UUID
 import com.lightningkite.lightningdb.AdminTableColumns
 import com.lightningkite.uuid
-import java.util.*
 import kotlin.time.Duration.Companion.minutes
 
 @Serializable
@@ -52,14 +51,4 @@ data class IdAndAuthMethods<ID>(
     val options: List<ProofOption> = listOf(),
     val strengthRequired: Int = 1,
     val session: String? = null,
-)
-
-@Serializable
-internal data class FutureSession<ID>(
-    val subjectId: ID,
-    val scopes: Set<String>,
-    val expires: Instant = now().plus(5.minutes),
-    val originalSessionId: UUID?,
-    val label: String? = null,
-    @References(OauthClient::class) val oauthClient: String? = null
 )

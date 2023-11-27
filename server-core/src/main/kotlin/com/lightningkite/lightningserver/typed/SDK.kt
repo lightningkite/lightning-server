@@ -43,8 +43,12 @@ fun Documentable.Companion.kotlinSdkLocal(packageName: String, root: File = File
 
 fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(packageName).apply {
     imports.add("com.lightningkite.*")
+    imports.add("com.lightningkite.rock.*")
     imports.add("com.lightningkite.lightningdb.*")
     imports.add("kotlinx.datetime.*")
+    imports.add("com.lightningkite.lightningserver.auth.oauth.*")
+    imports.add("com.lightningkite.lightningserver.auth.proof.*")
+    imports.add("com.lightningkite.lightningserver.auth.subject.*")
     val byGroup = safeDocumentables
         .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }.groupBy { it.docGroupIdentifier }
     val groups = byGroup.keys.filterNotNull()
@@ -161,20 +165,12 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                 appendLine("        url = \"\$httpUrl${entry.path.path.escaped}\",")
                 appendLine("        method = HttpMethod.${entry.route.method},")
                 entry.primaryAuthName?.let {
-                    if (entry.authOptions.options.contains(null).not()) {
-                        appendLine("        headers = httpHeaders(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
-                    } else {
-                        appendLine("        headers = if(${it.userTypeTokenName()} != null) httpHeaders(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\") else httpHeaders(),")
-                    }
+                    appendLine("            token = ${it.userTypeTokenName()},")
                 }
                 entry.inputType.takeUnless { it == Unit.serializer() }?.let {
-                    appendLine("        body = input.toJsonRequestBody()")
+                    appendLine("        body = input")
                 }
-                entry.outputType.takeUnless { it == Unit.serializer() }?.let {
-                    appendLine("    ).readJson()")
-                } ?: run {
-                    appendLine("    ).discard()")
-                }
+                appendLine("    )")
             }
 
             is ApiWebsocket<*, *, *, *> -> {
@@ -183,9 +179,9 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                 appendLine("        path = \"${entry.path}\", ")
                 entry.primaryAuthName?.let {
                     if (entry.authOptions.options.contains(null).not()) {
-                        appendLine("        queryParams = mapOf(\"jwt\" to listOf(${it.userTypeTokenName()}))")
+                        appendLine("        queryParams = httpHeaders(\"jwt\" to listOf(${it.userTypeTokenName()}))")
                     } else {
-                        appendLine("        queryParams = if(${it.userTypeTokenName()} != null) mapOf(\"jwt\" to listOf(${it.userTypeTokenName()})) else mapOf()")
+                        appendLine("        queryParams = if(${it.userTypeTokenName()} != null) httpHeaders(\"jwt\" to listOf(${it.userTypeTokenName()})) else httpHeaders()")
                     }
                 }
                 appendLine("    )")
@@ -201,22 +197,14 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                 is ApiEndpoint<*, *, *, *> -> {
                     appendLine(" = fetch(")
                     appendLine("            url = \"\$httpUrl${entry.path.path.escaped}\",")
-                    appendLine("            method = HttpClient.${entry.route.method},")
+                    appendLine("            method = HttpMethod.${entry.route.method},")
                     entry.primaryAuthName?.let {
-                        if (entry.authOptions.options.contains(null).not()) {
-                            appendLine("            headers = httpHeaders(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
-                        } else {
-                            appendLine("            headers = if(${it.userTypeTokenName()} != null) httpHeaders(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\") else mapOf(),")
-                        }
+                        appendLine("            token = ${it.userTypeTokenName()},")
                     }
                     entry.inputType.takeUnless { it == Unit.serializer() }?.let {
-                        appendLine("            body = input.toJsonRequestBody()")
+                        appendLine("            body = input")
                     }
-                    entry.outputType.takeUnless { it == Unit.serializer() }?.let {
-                        appendLine("        ).readJson()")
-                    } ?: run {
-                        appendLine("        ).discard()")
-                    }
+                    appendLine("    )")
                 }
 
                 is ApiWebsocket<*, *, *, *> -> {
@@ -224,11 +212,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                     appendLine("            url = \"\$socketUrl?path=multiplex\", ")
                     appendLine("            path = \"${entry.path}\", ")
                     entry.primaryAuthName?.let {
-                        if (entry.authOptions.options.contains(null).not()) {
-                            appendLine("            queryParams = mapOf(\"jwt\" to listOf(${it.userTypeTokenName()}))")
-                        } else {
-                            appendLine("            queryParams = if(${it.userTypeTokenName()} != null) mapOf(\"jwt\" to listOf(${it.userTypeTokenName()})) else mapOf()")
-                        }
+                        appendLine("            token = ${it.userTypeTokenName()},")
                     }
                     appendLine("        )")
                 }
@@ -242,7 +226,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
 
 private val Documentable.Companion.safeDocumentables
     get() = (Http.endpoints.values.filterIsInstance<ApiEndpoint<*, *, *, *>>()
-        .filter { it.route.method != HttpMethod.GET || it.inputType == Unit.serializer() } + WebSockets.handlers.values.filterIsInstance<ApiWebsocket<*, *, *, *>>())
+        .filter { it.route.method != HttpMethod.GET || it.inputType == Unit.serializer() }/* + WebSockets.handlers.values.filterIsInstance<ApiWebsocket<*, *, *, *>>()*/)
         .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }
 
 private class CodeEmitter(val packageName: String, val body: StringBuilder = StringBuilder()) : Appendable by body {
@@ -300,7 +284,7 @@ private fun KSerializer<*>.kotlinTypeString(emitter: CodeEmitter): String {
 }
 
 private fun CodeEmitter.functionHeader(documentable: Documentable, skipAuth: Boolean = false) {
-    append("fun ${documentable.functionName}(")
+    append("suspend fun ${documentable.functionName}(")
     var argComma = false
     arguments(documentable, skipAuth).forEach {
         if (argComma) append(", ")
@@ -312,13 +296,7 @@ private fun CodeEmitter.functionHeader(documentable: Documentable, skipAuth: Boo
     append("): ")
     when (documentable) {
         is ApiEndpoint<*, *, *, *> -> {
-            append("Single<")
-            append(documentable.outputType.kotlinTypeString(this).let {
-                if (it.endsWith("?"))
-                    "Optional<${it.removeSuffix("?")}>"
-                else it
-            })
-            append(">")
+            append(documentable.outputType.kotlinTypeString(this))
         }
 
         is ApiWebsocket<*, *, *, *> -> {
