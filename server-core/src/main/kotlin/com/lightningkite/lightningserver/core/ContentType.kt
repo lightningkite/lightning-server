@@ -12,6 +12,7 @@ class ContentType(val type: String, val subtype: String, val parameters: Map<Str
         string.substringBefore('/'),
         string.substringAfter('/').takeWhile { !it.isWhitespace() && it != ';' },
         string.substringAfter(';', "").split(";")
+            .filter { it.isNotBlank() }
             .associate { it.substringBefore('=').trim() to it.substringAfter('=').trim() }
     )
 
