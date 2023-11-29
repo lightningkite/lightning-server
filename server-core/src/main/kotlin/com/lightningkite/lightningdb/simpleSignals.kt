@@ -537,9 +537,11 @@ inline fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.interc
         ): CollectionChanges<Model> {
             if(!includeMassUpdates) return wraps.updateMany(condition, modification)
             val all = ArrayList<EntryChange<Model>>()
+            val field = serializer._id()
             wraps.find(condition).collect {
                 val altMod = interceptor(it, modification)
-                all.add(wraps.updateOne(condition, altMod))
+                val id = field.get(it)
+                all.add(wraps.updateOne(DataClassPathSelf(serializer).get(field).eq(id), altMod))
             }
             return CollectionChanges(all)
         }
@@ -550,9 +552,11 @@ inline fun <Model : HasId<ID>, ID: Comparable<ID>> FieldCollection<Model>.interc
         ): Int {
             if(!includeMassUpdates) return wraps.updateManyIgnoringResult(condition, modification)
             var count = 0
+            val field = serializer._id()
             wraps.find(condition).collect {
                 val altMod = interceptor(it, modification)
-                if(wraps.updateOneIgnoringResult(condition, altMod)) count++
+                val id = field.get(it)
+                if(wraps.updateOneIgnoringResult(DataClassPathSelf(serializer).get(field).eq(id), altMod)) count++
             }
             return count
         }

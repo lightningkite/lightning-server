@@ -60,21 +60,37 @@ class SerializationTest {
         }
         val asText = myJson.encodeToString(serializer, part)
         println(asText)
-        println(myJson.decodeFromString(serializer, asText))
+        val restored = myJson.decodeFromString(serializer, asText)
+        assertEquals(part, restored)
+        println(restored)
         println(myJson.decodeFromString(serializer, """{"age": 23}"""))
     }
 
     @Test fun partial2() {
         val serializer = PartialSerializer(LargeTestModel.serializer())
         val part = partialOf<LargeTestModel> {
-            it.embedded {
+            it.embeddedNullable.notNull {
                 it.value2 assign 4
             }
             it.int assign 5
-
+            it.intNullable assign null
         }
-        part.cycle()
+        val asText = myJson.encodeToString(serializer, part)
+        println(asText)
+        val restored = myJson.decodeFromString(serializer, asText)
+        assertEquals(part, restored)
+
+        println(restored)
         println(myJson.decodeFromString(serializer, """{"embedded": { "value1": "Test" }}"""))
+    }
+    @Test fun partial4() {
+        val serializer = PartialSerializer(LargeTestModel.serializer())
+        val part = Partial(LargeTestModel(), setOf(path<LargeTestModel>().embeddedNullable.notNull.value2))
+        val asText = myJson.encodeToString(serializer, part)
+        println(asText)
+        val restored = myJson.decodeFromString(serializer, asText)
+        assertEquals(part, restored)
+        println(restored)
     }
     @Test fun partial3() {
         val serializer = serializer<QueryPartial<LargeTestModel>>()
@@ -232,19 +248,41 @@ class SerializationTest {
         println("Query: ${recreated3}")
         assertEquals(inQuery, recreated3)
     }
-    private inline fun <reified T> T.cycle() {
+    private inline fun <reified T> Modification<T>.cycle() {
         println("----$this----")
         val asString = myJson.encodeToString(this)
         println(asString)
-        val recreated = myJson.decodeFromString<T>(asString)
+        val recreated = myJson.decodeFromString<Modification<T>>(asString)
         println(recreated)
         assertEquals(this, recreated)
 
         val asString2 = myProperties.encodeToStringMap(this)
         println(asString2)
-        val recreated2 = myProperties.decodeFromStringMap<T>(asString2)
+        val recreated2 = myProperties.decodeFromStringMap<Modification<T>>(asString2)
         println(recreated2)
         assertEquals(this, recreated2)
+    }
+    private inline fun <reified T> List<SortPart<T>>.cycle() {
+        println("----$this----")
+        val asString = myJson.encodeToString(this)
+        println(asString)
+        val recreated = myJson.decodeFromString<List<SortPart<T>>>(asString)
+        println(recreated)
+        assertEquals(this, recreated)
+
+        val asString2 = myProperties.encodeToStringMap(this)
+        println(asString2)
+        val recreated2 = myProperties.decodeFromStringMap<List<SortPart<T>>>(asString2)
+        println(recreated2)
+        assertEquals(this, recreated2)
+    }
+    private inline fun <reified T> DataClassPathPartial<T>.cycle() {
+        println("----$this----")
+        val asString = myJson.encodeToString(this)
+        println(asString)
+        val recreated = myJson.decodeFromString<DataClassPathPartial<T>>(asString)
+        println(recreated)
+        assertEquals(this, recreated)
     }
 
 

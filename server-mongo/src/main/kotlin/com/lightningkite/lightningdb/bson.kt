@@ -26,6 +26,7 @@ import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
 import com.lightningkite.lightningdb.SerializableProperty
+import org.bson.BsonArray
 
 fun documentOf(): Document {
     return Document()
@@ -75,7 +76,10 @@ private fun <T> Condition<T>.dump(serializer: KSerializer<T>, into: Document = D
         is Condition.IntBitsAnySet -> into.sub(key)["\$bitsAllSet"] = mask
         is Condition.IntBitsClear -> into.sub(key)["\$bitsAnyClear"] = mask
         is Condition.IntBitsSet -> into.sub(key)["\$bitsAnySet"] = mask
-        is Condition.Not -> TODO("Condition inversion is not supported yet")
+        is Condition.Not -> {
+            into["\$nor"] = listOf(condition.dump(serializer, key = key))
+        }
+//        is Condition.Not -> condition.dump(serializer, into.sub(key)["\$not"], key)
         is Condition.OnKey<*> -> (condition as Condition<Any?>).dump(serializer.mapValueElement() as KSerializer<Any?>, into, if (key == null) this.key else "$key.${this.key}")
         is Condition.StringContains -> {
             into.sub(key).also {

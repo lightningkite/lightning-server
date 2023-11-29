@@ -385,9 +385,9 @@ class JsonSchemaBuilder(
                 if (useNullableProperty) {
                     return inner.copy(nullable = true)
                 } else {
-                    if (inner.type?.inner?.isPrimitive == true) {
-                        return inner.copy(type = inner.type.copy(nullable = true))
-                    }
+//                    if (inner.type?.inner?.isPrimitive == true) {
+//                        return inner.copy(type = inner.type.copy(nullable = true))
+//                    }
                     return JsonSchemaType(
                         oneOf = listOf(
                             inner.copy(title = title),

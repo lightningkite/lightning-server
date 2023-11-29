@@ -57,6 +57,11 @@ import java.net.URI
 import kotlin.time.Duration
 import java.util.*
 import org.crac.Resource
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.StringWriter
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.hours
 
@@ -67,7 +72,10 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
     }
 
     @Serializable
-    data class TaskInvoke(val taskName: String, val input: String)
+    data class TaskInvoke(val taskName: String, val input: String, val format: TaskDataFormat = TaskDataFormat.Json)
+
+    @Serializable
+    enum class TaskDataFormat { Json, JsonGzip }
 
     @Serializable
     data class Scheduled(val scheduled: String)
@@ -124,20 +132,47 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     .build()
 
                 override suspend fun launchTask(task: Task<Any?>, input: Any?) {
-                    lambdaClient.invoke {
-                        it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
-                        it.qualifier(System.getenv("AWS_LAMBDA_FUNCTION_VERSION"))
-                        it.invocationType(InvocationType.EVENT)
-                        it.payload(
-                            SdkBytes.fromUtf8String(
-                                Serialization.json.encodeToString(
-                                    TaskInvoke.serializer(),
-                                    TaskInvoke(task.name, Serialization.json.encodeToString(task.serializer, input))
+                    try {
+                        lambdaClient.invoke {
+                            it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+                            it.qualifier(System.getenv("AWS_LAMBDA_FUNCTION_VERSION"))
+                            it.invocationType(InvocationType.EVENT)
+                            val payload = Serialization.json.encodeToString(task.serializer, input)
+                            if (payload.length > 100_000) {
+                                val zipped = ByteArrayOutputStream().use {
+                                    GZIPOutputStream(it).use {
+                                        it.write(payload.toByteArray(Charsets.UTF_8))
+                                    }
+                                    it.flush()
+                                    it.toByteArray()
+                                }
+                                it.payload(
+                                    SdkBytes.fromUtf8String(
+                                        Serialization.json.encodeToString(
+                                            TaskInvoke.serializer(),
+                                            TaskInvoke(
+                                                task.name,
+                                                Base64.getEncoder().encodeToString(zipped),
+                                                format = TaskDataFormat.JsonGzip
+                                            )
+                                        )
+                                    )
                                 )
-                            )
-                        )
-                    }.await().let {
-                        it.logResult()
+                            } else {
+                                it.payload(
+                                    SdkBytes.fromUtf8String(
+                                        Serialization.json.encodeToString(
+                                            TaskInvoke.serializer(),
+                                            TaskInvoke(task.name, payload)
+                                        )
+                                    )
+                                )
+                            }
+                        }.await().let {
+                            it.logResult()
+                        }
+                    } catch(e: Exception) {
+                        throw Exception("Failed to call ${task.name}", e)
                     }
                 }
 
@@ -189,6 +224,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
     }
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context) {
+        var roughContext: String = "???"
         try {
             val asJson = Serialization.json.parseToJsonElement(input.reader().readText()) as JsonObject
             val response: APIGatewayV2HTTPResponse = blockingTimeout(context.remainingTimeInMillis - 5_000L) {
@@ -197,21 +233,23 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                         Serialization.json.decodeFromJsonElement(
                             TaskInvoke.serializer(),
                             asJson
-                        )
+                        ).also { roughContext = it.taskName }
                     )
 
                     asJson.containsKey("httpMethod") -> handleHttp(
                         Serialization.json.decodeFromJsonElement<APIGatewayV2HTTPEvent>(
                             asJson
-                        )
+                        ).also { roughContext = it.httpMethod + " " + it.path }
                     )
 
                     asJson["requestContext"]?.jsonObject?.containsKey("connectionId") == true -> handleWebsocket(
                         Serialization.json.decodeFromJsonElement<APIGatewayV2WebsocketRequest>(asJson)
+                            .also { roughContext = "Websocket" }
                     )
 
                     asJson.containsKey("scheduled") -> {
                         val parsed: Scheduled = Serialization.json.decodeFromJsonElement(asJson)
+                        roughContext = parsed.scheduled
                         val schedule =
                             Scheduler.schedules[parsed.scheduled]
                                 ?: return@blockingTimeout APIGatewayV2HTTPResponse(
@@ -225,24 +263,6 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                             APIGatewayV2HTTPResponse(statusCode = 200)
                         } catch (e: Exception) {
                             e.report(schedule)
-                            APIGatewayV2HTTPResponse(statusCode = 500)
-                        }
-                    }
-
-                    // The suicide function.  Exists to handle the panic handler to prevent cost issues.
-                    asJson.containsKey("panic") -> {
-                        try {
-                            logger.info("Activating the panic shutdown...")
-                            val result =
-                                LambdaAsyncClient.builder().region(region).build().putFunctionConcurrency {
-                                    it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
-                                    it.reservedConcurrentExecutions(0)
-                                }.await()
-                            logger.info("Panic got code ${result.sdkHttpResponse().statusCode()}")
-                            assert(result.sdkHttpResponse().isSuccessful)
-                            APIGatewayV2HTTPResponse(statusCode = 200)
-                        } catch (e: Exception) {
-                            e.report("Panic")
                             APIGatewayV2HTTPResponse(statusCode = 500)
                         }
                     }
@@ -276,7 +296,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             val ex = Exception("Full lambda failure", e)
             ex.printStackTrace()
             runBlocking {
-                ex.report()
+                ex.report(roughContext)
             }
             if (preventLambdaTimeoutReuse) {
                 println("Killing self to prevent potentially broken reuse.  To disable this, set AwsAdapter.preventLambdaTimeoutReuse to false.")
@@ -287,7 +307,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             val ex = Exception("Full lambda failure", e)
             ex.printStackTrace()
             runBlocking {
-                ex.report()
+                ex.report(roughContext)
             }
             if (preventLambdaTimeoutReuse) {
                 println("Killing self to prevent potentially broken reuse.  To disable this, set AwsAdapter.preventLambdaTimeoutReuse to false.")
@@ -298,7 +318,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             try {
                 e.printStackTrace()
                 runBlocking {
-                    e.report()
+                    e.report(roughContext)
                 }
             } catch (t: Throwable) { /*squish*/
             }
@@ -315,7 +335,16 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 APIGatewayV2HTTPResponse(statusCode = 404, body = "Task ${event.taskName} not found")
             } else try {
                 Metrics.handlerPerformance(task) {
-                    task.implementation(this, Serialization.json.decodeFromString(task.serializer, event.input))
+                    val payload = when(event.format) {
+                        TaskDataFormat.Json -> Serialization.json.decodeFromString(task.serializer, event.input)
+                        TaskDataFormat.JsonGzip -> {
+                            val data = ByteArrayInputStream(Base64.getDecoder().decode(event.input)).use {
+                                GZIPInputStream(it).readBytes()
+                            }.toString(Charsets.UTF_8)
+                            Serialization.json.decodeFromString(task.serializer, data)
+                        }
+                    }
+                    task.implementation(this, payload)
                 }
                 APIGatewayV2HTTPResponse(statusCode = 204)
             } catch (e: Exception) {

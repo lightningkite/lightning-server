@@ -4,15 +4,23 @@ package com.lightningkite.lightningdb
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.*
 
 class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> {
     private val childSerializers = this.source.serializableProperties!!.map {
-        if (it.serializer.serializableProperties != null) {
-            PartialSerializer(it.serializer)
-        } else it.serializer
+        if(it.serializer.descriptor.isNullable) {
+            val nn = it.serializer.nullElement()!!
+            if (nn.serializableProperties != null) {
+                PartialSerializer(nn).nullable
+            } else it.serializer
+        } else {
+            if (it.serializer.serializableProperties != null) {
+                PartialSerializer(it.serializer)
+            } else it.serializer
+        }
     }
     override val descriptor: SerialDescriptor
         get() {
@@ -66,7 +74,13 @@ class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> 
 fun <K> DataClassPathPartial<K>.setMap(key: K, out: Partial<K>) {
     if(properties.isEmpty()) throw IllegalStateException("Path ${this} cannot be set for partial")
     var current = out as Partial<Any?>
+    var value: Any? = key
     for (prop in properties.dropLast(1)) {
+        value = (prop as SerializableProperty<Any?, Any?>).get(value)
+        if(value == null) {
+            current.parts[prop] = null
+            return
+        }
         current = current.parts.getOrPut(prop as SerializableProperty<Any?, *>) { Partial<Any?>() } as Partial<Any?>
     }
     current.parts[properties.last() as SerializableProperty<Any?, *>] = getAny(key)
