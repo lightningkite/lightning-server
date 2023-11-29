@@ -240,7 +240,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                         Serialization.json.decodeFromJsonElement<APIGatewayV2HTTPEvent>(
                             asJson
                         ).also { roughContext = it.httpMethod + " " + it.path }
-                    )
+                    ){ roughContext = it }
 
                     asJson["requestContext"]?.jsonObject?.containsKey("connectionId") == true -> handleWebsocket(
                         Serialization.json.decodeFromJsonElement<APIGatewayV2WebsocketRequest>(asJson)
@@ -493,7 +493,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         }
     }
 
-    suspend fun handleHttp(event: APIGatewayV2HTTPEvent): APIGatewayV2HTTPResponse {
+    suspend fun handleHttp(event: APIGatewayV2HTTPEvent, setRoughContext: (String)->Unit): APIGatewayV2HTTPResponse {
         val method = HttpMethod(event.httpMethod)
         val path = event.path.removePrefix("/" + event.requestContext.stage)
         val headers = HttpHeaders(event.multiValueHeaders.entries.flatMap { it.value.map { v -> it.key to v } })
@@ -544,6 +544,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 wildcard = null
             )
         }
+        setRoughContext(match.endpoint.toString())
         val request = HttpRequest(
             endpoint = match.endpoint,
             parts = match.parts,
