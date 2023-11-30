@@ -24,7 +24,7 @@ import kotlin.random.Random
 
 open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     path: ServerPath,
-    val info: ModelInfo<USER, T, ID>
+    val info: ModelInfo<USER, T, ID>,
 ) : ServerPathGroup(path) {
 
     companion object {
@@ -41,6 +41,10 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     val detailPath = path.arg<ID>("id", info.serialization.idSerializer)
     val wholePath = TypedServerPath0(path)
     val bulkPath = TypedServerPath0(path).path("bulk")
+    val interfaceName = Documentable.InterfaceInfo("ModelRestEndpoints", listOf(
+        info.serialization.serializer,
+        info.serialization.idSerializer
+    ))
 
     private fun exampleItem(): T? = (info as? ModelInfoWithDefault<USER, T, ID>)?.exampleItem()
 
@@ -92,6 +96,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
 
     val default = (info as? ModelInfoWithDefault<USER, T, ID>)?.let {
         get("_default_").api<USER, Unit, T>(
+            belongsToInterface = interfaceName,
             authOptions = info.authOptions,
             inputType = Unit.serializer(),
             outputType = info.serialization.serializer,
@@ -106,6 +111,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     }
 
     val list = wholePath.get.api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
@@ -128,6 +134,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     // This is used to GET a list objects, but rather than the query being in the parameter
     // it's in the POST body.
     val query = wholePath.path("query").post.api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
@@ -150,6 +157,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     // This is used to GET a list objects, but rather than the query being in the parameter
     // it's in the POST body.
     val queryPartial = wholePath.path("query-partial").post.api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = QueryPartial.serializer(info.serialization.serializer),
         outputType = ListSerializer(PartialSerializer(info.serialization.serializer)),
@@ -184,6 +192,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
 
     // This is used get a single object with id of _id
     val detail = detailPath.get.api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = Unit.serializer(),
         outputType = info.serialization.serializer,
@@ -206,6 +215,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     )
 
     val insertBulk = bulkPath.post.api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = ListSerializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
@@ -228,6 +238,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     )
 
     val insert = wholePath.post.api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
@@ -248,6 +259,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     )
 
     val upsert = detailPath.post.api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
@@ -270,6 +282,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
 
     // This is used replace many objects at once. This does make individual calls to the database. Kmongo does not have a many replace option.
     val bulkReplace = wholePath.put.api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = ListSerializer(info.serialization.serializer),
         outputType = ListSerializer(info.serialization.serializer),
@@ -291,6 +304,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     )
 
     val replace = detailPath.put.api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
@@ -318,6 +332,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     )
 
     val bulkModify = bulkPath.patch.api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = MassModification.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
@@ -347,6 +362,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     )
 
     val modifyWithDiff = detailPath.path("delta").patch.api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = Modification.serializer(info.serialization.serializer),
         outputType = EntryChange.serializer(info.serialization.serializer),
@@ -380,6 +396,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     )
 
     val modify = detailPath.patch.api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = Modification.serializer(info.serialization.serializer),
         outputType = info.serialization.serializer,
@@ -414,6 +431,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     )
 
     val bulkDelete = post("bulk-delete").api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
@@ -435,6 +453,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     )
 
     val deleteItem = detailPath.delete.api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = Unit.serializer(),
         outputType = Unit.serializer(),
@@ -459,6 +478,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     )
 
     val countGet = get("count").api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
@@ -480,6 +500,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     )
 
     val count = post("count").api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = Condition.serializer(info.serialization.serializer),
         outputType = Int.serializer(),
@@ -502,6 +523,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     )
 
     val groupCount = post("group-count").api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = GroupCountQuery.serializer(info.serialization.serializer),
         outputType = MapSerializer(String.serializer(), Int.serializer()),
@@ -526,6 +548,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     )
 
     val aggregate = post("aggregate").api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = AggregateQuery.serializer(info.serialization.serializer),
         outputType = Double.serializer().nullable,
@@ -544,6 +567,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     )
 
     val groupAggregate = post("group-aggregate").api(
+        belongsToInterface = interfaceName,
         authOptions = info.authOptions,
         inputType = GroupAggregateQuery.serializer(info.serialization.serializer),
         outputType = MapSerializer(String.serializer(), Double.serializer().nullable),

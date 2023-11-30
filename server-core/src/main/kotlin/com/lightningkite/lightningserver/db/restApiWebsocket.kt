@@ -38,11 +38,16 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebs
     val modelName = info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
     val modelIdentifier = info.serialization.serializer.descriptor.serialName
     val helper = RestApiWebsocketHelper[database]
+    val interfaceName = Documentable.InterfaceInfo("ModelRestEndpointsPlusWs", listOf(
+        info.serialization.serializer,
+        info.serialization.idSerializer
+    ))
 
     return apiWebsocket<USER, Query<T>, ListChange<T>>(
         authOptions = info.authOptions,
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListChange.serializer(info.serialization.serializer),
+        belongsToInterface = interfaceName,
         summary = "Watch",
         description = "Gets a changing list of ${modelName}s that match the given query.",
         errorCases = listOf(),

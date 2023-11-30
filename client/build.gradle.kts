@@ -3,6 +3,7 @@ import com.lightningkite.deployhelpers.*
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
+    id("com.android.library")
     id("org.jetbrains.dokka")
     id("signing")
     `maven-publish`
@@ -20,7 +21,7 @@ kotlin {
         browser()
     }
 //    ios()
-//    androidTarget()
+    androidTarget()
 
     sourceSets {
         val commonMain by getting {
@@ -34,6 +35,14 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
+    }
+}
+
+android {
+    namespace = "com.lightningkite.lightningserver"
+    compileSdk = 34
+    defaultConfig {
+        minSdk = 24
     }
 }
 

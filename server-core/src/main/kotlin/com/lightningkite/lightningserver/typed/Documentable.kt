@@ -22,7 +22,9 @@ interface Documentable {
     val summary: String
     val description: String
     val authOptions: AuthOptions<*>
-    val belongsToInterface: String?
+    val belongsToInterface: InterfaceInfo?
+
+    data class InterfaceInfo(val name: String, val subtypes: List<KSerializer<*>>)
 
     companion object {
         val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *, *>>()
