@@ -52,7 +52,7 @@ repositories {
 
 ```kotlin
 // build.gradle.kts
-val lightningServerVersion = "master-SNAPSHOT"
+val lightningServerVersion = "version-2-SNAPSHOT"
 dependencies {
     //...
     
