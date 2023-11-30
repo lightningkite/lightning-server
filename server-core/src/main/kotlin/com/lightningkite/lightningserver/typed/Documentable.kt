@@ -22,6 +22,7 @@ interface Documentable {
     val summary: String
     val description: String
     val authOptions: AuthOptions<*>
+    val belongsToInterface: String?
 
     companion object {
         val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *, *>>()

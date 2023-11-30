@@ -26,6 +26,7 @@ data class ApiEndpoint<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
     val successCode: HttpStatus,
     val errorCases: List<LSError>,
     val examples: List<ApiExample<INPUT, OUTPUT>>,
+    override val belongsToInterface: String? = null,
     val implementation: suspend AuthAndPathParts<USER, PATH>.(INPUT)->OUTPUT,
 ) : Documentable, (suspend (HttpRequest) -> HttpResponse) {
     override val path: TypedServerPath
@@ -76,6 +77,7 @@ fun <USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT> TypedHttpEndpoint<PA
     description: String = summary,
     errorCases: List<LSError> = listOf(),
     examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
+    belongsToInterface: String? = null,
     successCode: HttpStatus = HttpStatus.OK,
     implementation: suspend AuthAndPathParts<USER, PATH>.(INPUT)->OUTPUT
 ): ApiEndpoint<USER, PATH, INPUT, OUTPUT> {
@@ -88,6 +90,7 @@ fun <USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT> TypedHttpEndpoint<PA
         description = description,
         errorCases = errorCases,
         examples = examples,
+        belongsToInterface = belongsToInterface,
         successCode = successCode,
         implementation = implementation,
     )
@@ -102,6 +105,7 @@ inline fun <USER: HasId<*>?, PATH: TypedServerPath, reified INPUT, reified OUTPU
     authOptions: AuthOptions<USER>,
     errorCases: List<LSError> = listOf(),
     examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
+    belongsToInterface: String? = null,
     successCode: HttpStatus = HttpStatus.OK,
     noinline implementation: suspend AuthAndPathParts<USER, PATH>.(INPUT)->OUTPUT
 ): ApiEndpoint<USER, PATH, INPUT, OUTPUT> {
@@ -114,6 +118,7 @@ inline fun <USER: HasId<*>?, PATH: TypedServerPath, reified INPUT, reified OUTPU
         description = description,
         errorCases = errorCases,
         examples = examples,
+        belongsToInterface = belongsToInterface,
         successCode = successCode,
         implementation = implementation,
     )
@@ -131,6 +136,7 @@ fun <USER: HasId<*>?, INPUT, OUTPUT> HttpEndpoint.api(
     description: String = summary,
     errorCases: List<LSError> = listOf(),
     examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
+    belongsToInterface: String? = null,
     successCode: HttpStatus = HttpStatus.OK,
     implementation: suspend AuthAndPathParts<USER, TypedServerPath0>.(INPUT)->OUTPUT
 ): ApiEndpoint<USER, TypedServerPath0, INPUT, OUTPUT> {
@@ -143,6 +149,7 @@ fun <USER: HasId<*>?, INPUT, OUTPUT> HttpEndpoint.api(
         description = description,
         errorCases = errorCases,
         examples = examples,
+        belongsToInterface = belongsToInterface,
         successCode = successCode,
         implementation = implementation,
     )
@@ -157,6 +164,7 @@ inline fun <USER: HasId<*>?, reified INPUT, reified OUTPUT> HttpEndpoint.api(
     authOptions: AuthOptions<USER>,
     errorCases: List<LSError> = listOf(),
     examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
+    belongsToInterface: String? = null,
     successCode: HttpStatus = HttpStatus.OK,
     noinline implementation: suspend AuthAndPathParts<USER, TypedServerPath0>.(INPUT)->OUTPUT
 ): ApiEndpoint<USER, TypedServerPath0, INPUT, OUTPUT> {
@@ -169,6 +177,7 @@ inline fun <USER: HasId<*>?, reified INPUT, reified OUTPUT> HttpEndpoint.api(
         description = description,
         errorCases = errorCases,
         examples = examples,
+        belongsToInterface = belongsToInterface,
         successCode = successCode,
         implementation = implementation,
     )

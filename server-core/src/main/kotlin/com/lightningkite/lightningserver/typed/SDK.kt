@@ -52,7 +52,14 @@ fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(
     val byGroup = safeDocumentables
         .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }.groupBy { it.docGroupIdentifier }
     val groups = byGroup.keys.filterNotNull()
-    appendLine("interface Api {")
+    append("    interface Api")
+    byGroup[null]!!.mapNotNull { it.belongsToInterface }.distinct().let {
+        if(it.isNotEmpty()) {
+            append(": ")
+            append(it.joinToString())
+        }
+    }
+    appendLine(" {")
     for (group in groups) {
         appendLine("    val ${group.groupToPartName()}: ${group.groupToInterfaceName()}")
     }
@@ -62,7 +69,14 @@ fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(
         appendLine()
     }
     for (group in groups) {
-        appendLine("    interface ${group.groupToInterfaceName()} {")
+        append("    interface ${group.groupToInterfaceName()}")
+        byGroup[group]!!.mapNotNull { it.belongsToInterface }.distinct().let {
+            if(it.isNotEmpty()) {
+                append(": ")
+                append(it.joinToString())
+            }
+        }
+        appendLine(" {")
         for (entry in byGroup[group]!!) {
             append("        ")
             this.functionHeader(entry)
@@ -158,7 +172,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
     }
     for (entry in byGroup[null] ?: listOf()) {
         append("    override ")
-        this.functionHeader(entry)
+        this.functionHeader(entry, skipOverride = true)
         when (entry) {
             is ApiEndpoint<*, *, *, *> -> {
                 appendLine(" = fetch(")
@@ -192,7 +206,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
         appendLine("    class Live${group.groupToInterfaceName()}(val httpUrl: String, val socketUrl: String): Api.${group.groupToInterfaceName()} {")
         for (entry in byGroup[group]!!) {
             append("        override ")
-            this.functionHeader(entry)
+            this.functionHeader(entry, skipOverride = true)
             when (entry) {
                 is ApiEndpoint<*, *, *, *> -> {
                     appendLine(" = fetch(")
@@ -283,7 +297,8 @@ private fun KSerializer<*>.kotlinTypeString(emitter: CodeEmitter): String {
     }
 }
 
-private fun CodeEmitter.functionHeader(documentable: Documentable, skipAuth: Boolean = false) {
+private fun CodeEmitter.functionHeader(documentable: Documentable, skipOverride: Boolean = false, skipAuth: Boolean = false) {
+    if(!skipOverride && documentable.belongsToInterface != null) { append("override ")}
     append("suspend fun ${documentable.functionName}(")
     var argComma = false
     arguments(documentable, skipAuth).forEach {
