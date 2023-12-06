@@ -81,7 +81,7 @@ public func multiplexedSocketRaw(url: String, path: String, queryParams: Diction
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return nil }
             return (text.fromJsonString() as MultiplexMessage?)
         }).filter { (it) -> Bool in it.channel == channel }
-        var current = PublishSubject()
+        var current: PublishSubject<String> = PublishSubject()
         return multiplexedIn
             .compactMap({ (message) -> WebSocketIsh<String, String>? in run { () -> WebSocketIsh<String, String>? in
             if message.start {
@@ -89,7 +89,7 @@ public func multiplexedSocketRaw(url: String, path: String, queryParams: Diction
                 return (WebSocketIsh(messages: current as Observable<String>, send: { (message) -> Void in sharedSocket.write.onNext(WebSocketFrame(text: MultiplexMessage(channel: channel, data: message).toJsonString())) } as (String) -> Void) as WebSocketIsh<String, String>)
             } else if message.data != nil {
                 //                            println("Got ${message.data} to ${message.channel}")
-                current.onNext(message.data)
+                current.onNext(message.data!)
                 return nil
             } else if message.end {
                 //                            println("Channel ${message.channel} terminated")
@@ -101,7 +101,7 @@ public func multiplexedSocketRaw(url: String, path: String, queryParams: Diction
             }
         } })
             .doOnSubscribe { (_) -> Void in sharedSocket.write.onNext(WebSocketFrame(text: MultiplexMessage(channel: channel, path: path, queryParams: queryParams, start: true).toJsonString())) }
-            .doOnDispose { () -> Void in sharedSocket?.write.onNext(WebSocketFrame(text: MultiplexMessage(channel: channel, path: path, end: true).toJsonString())) }
+            .doOnDispose { () -> Void in sharedSocket.write.onNext(WebSocketFrame(text: MultiplexMessage(channel: channel, path: path, end: true).toJsonString())) }
             .retry(when:  { (it) -> Observable<Error> in
             let temp = retryTime
             retryTime = temp * 2

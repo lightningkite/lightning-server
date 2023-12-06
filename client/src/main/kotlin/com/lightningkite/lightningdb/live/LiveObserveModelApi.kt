@@ -47,7 +47,7 @@ class LiveObserveModelApi<Model : HasId<UUID>>(
     }
 }
 
-fun <T : HasId<ID>, ID:Comparable<ID>> Observable<ListChange<T>>.toListObservable(ordering: Comparator<T>): Observable<List<T>> {
+fun <T : HasId<ID>, ID: Comparable<ID>> Observable<ListChange<T>>.toListObservable(ordering: Comparator<T>): Observable<List<T>> {
     val localList = ArrayList<T>()
     return map {
         it.wholeList?.let { localList.clear(); localList.addAll(it.sortedWith(ordering)) }
