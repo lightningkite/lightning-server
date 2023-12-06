@@ -112,7 +112,7 @@ fun multiplexedSocketRaw(
                 if (text.isBlank()) return@mapNotNull null
                 text.fromJsonString<MultiplexMessage>()
             }.filter { it.channel == channel }
-            var current = PublishSubject.create<String>()
+            var current: PublishSubject<String> = PublishSubject.create()
             multiplexedIn
                 .mapNotNull { message ->
                     when {
@@ -135,7 +135,7 @@ fun multiplexedSocketRaw(
                         }
                         message.data != null -> {
 //                            println("Got ${message.data} to ${message.channel}")
-                            current.onNext(message.data)
+                            current.onNext(message.data!!)
                             null
                         }
                         message.end -> {
@@ -171,7 +171,7 @@ fun multiplexedSocketRaw(
                 }
                 .doOnDispose {
 //                    println("Disconnecting channel on socket to $shortUrl with $path")
-                    sharedSocket?.write?.onNext(
+                    sharedSocket.write.onNext(
                         WebSocketFrame(
                             text = MultiplexMessage(
                                 channel = channel,
