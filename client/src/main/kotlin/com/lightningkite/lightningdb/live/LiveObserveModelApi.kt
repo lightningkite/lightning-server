@@ -47,7 +47,7 @@ class LiveObserveModelApi<Model : HasId<UUID>>(
     }
 }
 
-fun <T : HasId<*>> Observable<ListChange<T>>.toListObservable(ordering: Comparator<T>): Observable<List<T>> {
+fun <T : HasId<ID>, ID: Comparable<ID>> Observable<ListChange<T>>.toListObservable(ordering: Comparator<T>): Observable<List<T>> {
     val localList = ArrayList<T>()
     return map {
         it.wholeList?.let { localList.clear(); localList.addAll(it.sortedWith(ordering)) }
@@ -61,7 +61,7 @@ fun <T : HasId<*>> Observable<ListChange<T>>.toListObservable(ordering: Comparat
     }
 }
 
-fun <T : HasId<*>> Observable<WebSocketIsh<ListChange<T>, Query<T>>>.filter(query: Query<T>): Observable<List<T>> =
+fun <T : HasId<ID>, ID: Comparable<ID>> Observable<WebSocketIsh<ListChange<T>, Query<T>>>.filter(query: Query<T>): Observable<List<T>> =
     this
         .doOnNext {
             it.send(query)
