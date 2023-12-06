@@ -112,7 +112,7 @@ fun multiplexedSocketRaw(
                 if (text.isBlank()) return@mapNotNull null
                 text.fromJsonString<MultiplexMessage>()
             }.filter { it.channel == channel }
-            var current = PublishSubject.create<String>()
+            var current: PublishSubject<String> = PublishSubject.create()
             multiplexedIn
                 .mapNotNull { message ->
                     when {
