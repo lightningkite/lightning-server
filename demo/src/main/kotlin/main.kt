@@ -13,6 +13,8 @@ import com.lightningkite.lightningserver.ktor.runServer
 import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.settings.loadSettings
 import com.lightningkite.lightningserver.typed.*
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.*
 import java.io.File
 import kotlinx.datetime.Instant
@@ -41,6 +43,12 @@ fun main(vararg args: String) {
     cli(
         arguments = args,
         setup = ::setup,
-        available = listOf(::serve, ::terraform, ::tfMigrate),
+        available = listOf(::serve, ::terraform, ::tfMigrate, ::dbTest),
     )
+}
+
+fun dbTest(): Unit = runBlocking {
+    Server
+    loadSettings(File("settings.json"))
+    Server.testModel.collection().all().toList()
 }

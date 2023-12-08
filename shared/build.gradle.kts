@@ -37,10 +37,16 @@ kotlin {
                 implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
             }
+            kotlin {
+                srcDir(file("build/generated/ksp/common/commonMain/kotlin"))
+            }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
+            }
+            kotlin {
+                srcDir(file("build/generated/ksp/common/commonTest/kotlin"))
             }
         }
         val jvmMain by getting {

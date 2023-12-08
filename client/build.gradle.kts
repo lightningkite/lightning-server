@@ -16,7 +16,7 @@ val khrysalisVersion: String by project
 kotlin {
     targetHierarchy.default()
 
-    jvm()
+//    jvm()
     js(IR) {
         browser()
     }
@@ -29,10 +29,16 @@ kotlin {
                 api(project(":shared"))
                 api("com.lightningkite.rock:library:main-SNAPSHOT")
             }
+            kotlin {
+                srcDir(file("build/generated/ksp/common/commonMain/kotlin"))
+            }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
+            }
+            kotlin {
+                srcDir(file("build/generated/ksp/common/commonTest/kotlin"))
             }
         }
     }
