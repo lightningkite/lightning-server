@@ -57,13 +57,14 @@ private val stringOptions: List<MySealedClassSerializer.Option<Condition<String>
     MySealedClassSerializer.Option(Condition.StringContains.serializer(), setOf("Search")) { it is Condition.StringContains },
     MySealedClassSerializer.Option(Condition.RegexMatches.serializer()) { it is Condition.RegexMatches },
 )
-private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> = commonOptions(inner) + inner.serializableProperties!!.let {
-    it.mapIndexed { index, ser ->
-        MySealedClassSerializer.Option(ConditionOnFieldSerializer(
-            ser
-        )) { it is Condition.OnField<*, *> && it.key.name == inner.descriptor.getElementName(index) }
-    }
-}
+private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> =
+    (commonOptions(inner) + inner.serializableProperties!!.let {
+        it.mapIndexed { index, ser ->
+            MySealedClassSerializer.Option(ConditionOnFieldSerializer(
+                ser
+            )) { it is Condition.OnField<*, *> && it.key.name == inner.descriptor.getElementName(index) }
+        }
+    } + MySealedClassSerializer.Option(Condition.FullTextSearch.serializer(inner)) { it is Condition.FullTextSearch<*> }) as List<MySealedClassSerializer.Option<Condition<T>, *>>
 
 private val cache = HashMap<KSerializerKey, MySealedClassSerializerInterface<*>>()
 @Suppress("UNCHECKED_CAST")
