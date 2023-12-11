@@ -24,7 +24,7 @@ class TableGenerator(
             Dependencies(true),
             fileName = "test",
             extensionName = "txt",
-            packageName = "com.lightningkite.rock"
+            packageName = "com.lightningkite.lightningserver"
         ).writer().use { println("Will generate in common folder") }
         val outSample = codeGenerator.generatedFile.first().absoluteFile
         val projectFolder = generateSequence(outSample) { it.parentFile!! }
@@ -34,7 +34,9 @@ class TableGenerator(
             .dropWhile { it != "ksp" }
             .drop(2)
             .first()
-            .dropWhile { it.isLowerCase() }
+            .let {
+                it.substring(it.indexOfLast { it.isUpperCase() }.coerceAtLeast(0))
+            }
         val outFolder = projectFolder.resolve("build/generated/ksp/common/common$flavor/kotlin")
         outFolder.mkdirs()
         val manifest = outFolder.parentFile!!.resolve("ls-manifest.txt")
