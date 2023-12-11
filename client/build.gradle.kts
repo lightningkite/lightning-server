@@ -16,12 +16,12 @@ val khrysalisVersion: String by project
 kotlin {
     targetHierarchy.default()
 
-//    jvm()
+    jvm()
     js(IR) {
         browser()
     }
 //    ios()
-    androidTarget()
+//    androidTarget()
 
     sourceSets {
         val commonMain by getting {
