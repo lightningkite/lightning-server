@@ -1,4 +1,4 @@
-package com.lightningkite.rock
+package com.lightningkite.lightningdb
 
 import com.google.devtools.ksp.processing.*
 import com.google.devtools.ksp.symbol.KSAnnotated
