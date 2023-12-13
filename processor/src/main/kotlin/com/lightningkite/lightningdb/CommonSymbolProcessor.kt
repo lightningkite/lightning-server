@@ -18,7 +18,7 @@ abstract class CommonSymbolProcessor(
         invoked = true
 
         val stub = myCodeGenerator.createNewFile(
-            Dependencies(true),
+            Dependencies.ALL_FILES,
             fileName = "test",
             extensionName = "txt",
             packageName = "com.lightningkite.lightningserver"
