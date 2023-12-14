@@ -66,7 +66,6 @@ val Documentable.functionName: String
         .replaceFirstChar { it.lowercase() }
 
 internal fun KSerializer<*>.subSerializers(): Array<KSerializer<*>> = nullElement()?.let { arrayOf(it) }
-    ?: serializableProperties?.map { it.serializer }?.toTypedArray()
     ?: listElement()?.let { arrayOf(it) }
     ?: mapValueElement()?.let { arrayOf(it) }
     ?: (this as? GeneratedSerializer<*>)?.typeParametersSerializers()

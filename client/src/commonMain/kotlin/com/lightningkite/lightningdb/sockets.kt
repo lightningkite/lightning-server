@@ -74,7 +74,6 @@ fun retryWebsocket(
             onCloseList.add(action)
         }
 
-        override fun notifyFailure() {}
         override fun notifyStart() {}
         override fun notifySuccess() {}
         val onRemoveSet = HashSet<() -> Unit>()
