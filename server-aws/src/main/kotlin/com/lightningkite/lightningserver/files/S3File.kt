@@ -123,10 +123,10 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             val accessKey = system.credentialProvider.resolveCredentials().accessKeyId()
             val secretKey = system.credentialProvider.resolveCredentials().secretAccessKey()
             val objectPath = path.unixPath
-            val date = headers["X-Amz-Date"]!!
-            val algorithm = headers["X-Amz-Algorithm"]!!
-            val expires = headers["X-Amz-Expires"]!!
-            val credential = headers["X-Amz-Credential"]!!
+            val date = headers["X-Amz-Date"] ?: return false
+            val algorithm = headers["X-Amz-Algorithm"] ?: return false
+            val expires = headers["X-Amz-Expires"] ?: return false
+            val credential = headers["X-Amz-Credential"] ?: return false
             val scope = credential.substringAfter("/")
 
             val canonicalRequest = """
