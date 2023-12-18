@@ -19,7 +19,7 @@ data class ZonedDateTime(val dateTime: LocalDateTime, val zone: TimeZone) {
             var zoneNameIndex = string.lastIndexOf('[')
             if(zoneNameIndex == -1) {
                 val offsetStartIndex = max(string.lastIndexOf('+'), string.lastIndexOf('-'))
-                val offset = UtcOffset.parse(string.substring(offsetStartIndex, zoneNameIndex))
+                val offset = UtcOffset.parse(string.substring(offsetStartIndex, string.length))
                 return ZonedDateTime(
                     dateTime = LocalDateTime.parse(string.substring(0, offsetStartIndex)),
                     zone = FixedOffsetTimeZone(offset)
