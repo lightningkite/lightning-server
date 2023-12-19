@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.AuthOptions
+import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.core.ServerPath
@@ -28,4 +29,5 @@ class TestModelEndpoints(path: ServerPath): ServerPathGroup(path), ModelInfoWith
 
     val rest = ModelRestEndpoints(path("rest"), this)
     val restWebsocket = path("rest").restApiWebsocket(Server.database, this)
+    val dump = ModelDumpEndpoints(path("rest"), this, Authentication.isSuperUser, Server.files, Server.email)
 }

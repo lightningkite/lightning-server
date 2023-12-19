@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.serverhealth.healthCheck
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.apiDocs
+import com.lightningkite.lightningserver.typed.bulkRequestEndpoint
 import com.lightningkite.lightningserver.websocket.WebSockets
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -70,6 +71,8 @@ class MetaEndpoints(
             )
         })
     }
+
+    val bulk = path("bulk").bulkRequestEndpoint()
 
     val admin = path("admin/").get.handler {
         openAdmin(it)

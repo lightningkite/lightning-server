@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.BadRequestException
+import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.parse
@@ -33,21 +34,25 @@ data class ApiEndpoint<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
         get() = route.path
     private val wildcards = route.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
 
+    suspend fun authAndPathParts(auth: RequestAuth<USER & Any>?, request: HttpRequest) = AuthAndPathParts<USER, PATH>(
+        authOrNull = auth,
+        rawRequest = request,
+        parts = route.path.serializers.mapIndexed { idx, ser ->
+            val name = wildcards.get(idx).name
+            val str = request.parts[name] ?: throw BadRequestException("Route segment $name not found")
+            str.parseUrlPartOrBadRequest(route.path.serializers[idx])
+        }.toTypedArray()
+    ).also {
+        authOptions.assert(it.authOrNull)
+    }
+
     override suspend fun invoke(it: HttpRequest): HttpResponse {
         val auth = it.authChecked<USER>(authOptions)
         @Suppress("UNCHECKED_CAST") val input: INPUT = when (route.method) {
             HttpMethod.GET, HttpMethod.HEAD -> it.queryParameters(inputType)
             else -> if (inputType == Unit.serializer()) Unit as INPUT else it.body?.parse(inputType) ?: throw BadRequestException("No request body provided")
         }
-        @Suppress("UNCHECKED_CAST") val result = AuthAndPathParts<USER, PATH>(
-            authOrNull = auth,
-            rawRequest = it,
-            parts = route.path.serializers.mapIndexed { idx, ser ->
-                val name = wildcards.get(idx).name
-                val str = it.parts[name] ?: throw BadRequestException("Route segment $name not found")
-                str.parseUrlPartOrBadRequest(route.path.serializers[idx])
-            }.toTypedArray()
-        ).implementation(input)
+        @Suppress("UNCHECKED_CAST") val result = authAndPathParts(auth, it).implementation(input)
         return HttpResponse(
             body = result.toHttpContent(it.headers.accept, outputType),
             status = successCode

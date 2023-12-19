@@ -89,6 +89,9 @@ object Server : ServerPathGroup(ServerPath.root) {
         Authentication.isDeveloper = authRequired<User> {
             (it.get() as User).isSuperUser
         }
+        Authentication.isSuperUser = authRequired<User> {
+            (it.get() as User).isSuperUser
+        }
     }
 
     val userInfo = ModelInfoWithDefault<User, User, UUID>(

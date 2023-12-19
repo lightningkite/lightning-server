@@ -2,9 +2,11 @@ package com.lightningkite.lightningserver
 
 import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningdb.collection
+import com.lightningkite.lightningdb.insertOne
 import com.lightningkite.lightningdb.test.User
 import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.auth.authOptions
+import com.lightningkite.lightningserver.auth.authRequired
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.auth.oauth.OauthProviderCredentials
 import com.lightningkite.lightningserver.auth.oauth.OauthProviderCredentialsApple
@@ -30,6 +32,10 @@ import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.sms.SMSSettings
 import com.lightningkite.lightningserver.typed.api
+import com.lightningkite.lightningserver.typed.bulkRequestEndpoint
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
 import kotlin.time.Duration
 import java.util.*
 import kotlin.time.Duration.Companion.hours
@@ -64,10 +70,24 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         input.fileObject.signedUrl
     }
 
+    val sample1 = path("sample1").post.api(summary = "Test1", authOptions = authOptions<User>()) { input: Int -> input + 42 }
+    val sample2 = path("sample2").post.api(summary = "Test2", authOptions = noAuth) { input: Int -> input + 42 }
+    val sample3 = path("sample3").post.api(summary = "Test3", authOptions = authRequired<User> { false }) { input: Int -> input + 42 }
+    val bulk = path("bulk").bulkRequestEndpoint()
+
     init {
         com.lightningkite.lightningdb.test.prepareModels()
         com.lightningkite.lightningdb.prepareModels()
         Settings.populateDefaults()
         engine = LocalEngine(LocalCache)
+
+
+    }
+    val sampleUser = GlobalScope.async(start = CoroutineStart.LAZY) {
+        info.collection().insertOne(User(
+            email = "test@test.com",
+            phoneNumber = "1234567890",
+            age = 42
+        ))!!
     }
 }
