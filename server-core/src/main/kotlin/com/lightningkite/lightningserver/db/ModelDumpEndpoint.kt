@@ -20,6 +20,7 @@ import com.lightningkite.lightningserver.files.serverFile
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.kabobCase
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -36,8 +37,10 @@ import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.serializer
-import java.io.File
+import java.io.*
 import java.time.Instant
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -53,6 +56,11 @@ open class ModelDumpEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
 
     val collectionName get() = info.collectionName
 
+    fun DumpType.ext() = when(this) {
+        DumpType.CSV -> "csv"
+        DumpType.JSON_LINES -> "jsonl"
+    }
+
     val dump = path("dump").post.api(
         authOptions = authOptions,
         inputType = DumpRequest.serializer(info.serialization.serializer),
@@ -61,10 +69,7 @@ open class ModelDumpEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
         description = "Get a dump file of all the models.",
         errorCases = listOf(),
         implementation = { input: DumpRequest<T> ->
-            val file = file().root.resolve("temp-files-dump").resolveRandom("dump", when(input.type) {
-                DumpType.CSV -> "csv"
-                DumpType.JSON_LINES -> "jsonl"
-            })
+            val file = file().root.resolve("temp-files-dump").resolveRandom(info.collectionName.kabobCase(), input.type.ext() + ".zip")
             dumpTask(DumpTask(input, file.serverFile, authOrNull?.serializable(now().plus(10.minutes))))
             file.signedUrl
         }
@@ -74,8 +79,8 @@ open class ModelDumpEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     val dumpTask = task<DumpTask<T>>("$path/dumpTask", DumpTask.serializer(info.serialization.serializer)) {
         val auth = it.onBehalfOf?.real()
         val out = File.createTempFile("out", when(it.request.type) {
-            DumpType.CSV -> "csv"
-            DumpType.JSON_LINES -> "jsonl"
+            DumpType.CSV -> "csv.zip"
+            DumpType.JSON_LINES -> "jsonl.zip"
         })
         // Admin already required, no need for further limiting
         val flow = if(auth == null)
@@ -85,9 +90,14 @@ open class ModelDumpEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
         else
             info.collection().find(it.request.condition)
 
+        fun writer() = out.outputStream().buffered().let(::ZipOutputStream).let { z ->
+            z.putNextEntry(ZipEntry("${info.collectionName.kabobCase()}.${it.request.type.ext()}"))
+            z.bufferedWriter()
+        }
+
         when(it.request.type) {
             DumpType.CSV -> {
-                out.writer().use { out ->
+                writer().use { out ->
                     val emit = Serialization.csv.beginEncodingToAppendable(info.serialization.serializer, out)
                     flow.collect {
                         emit(it)
@@ -95,7 +105,7 @@ open class ModelDumpEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
                 }
             }
             DumpType.JSON_LINES -> {
-                out.writer().use { out ->
+                writer().use { out ->
                     flow.collect {
                         out.appendLine(Serialization.json.encodeToString(info.serialization.serializer, it))
                     }
@@ -103,16 +113,16 @@ open class ModelDumpEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
             }
         }
         it.file.fileObject.put(HttpContent.file(out, when(it.request.type) {
-            DumpType.CSV -> ContentType.Text.CSV
-            DumpType.JSON_LINES -> ContentType.Text.Plain
+            DumpType.CSV -> ContentType.Application.Zip
+            DumpType.JSON_LINES -> ContentType.Application.Zip
         }))
         it.request.email?.let { address ->
             email().send(
                 Email(
                     subject = "${info.collectionName} Dump from ${generalSettings().projectName}",
                     to = listOf(EmailLabeledValue(address)),
-                    plainText = "Your dump can be found at ${it.file.fileObject.signedUrl}",
-                    html = "Your dump can be found <a href='${it.file.fileObject.signedUrl}'>here</a>"
+                    plainText = "Your dump can be found at ${it.file.fileObject.signedUrl}.  Link will expire shortly.",
+                    html = "Your dump can be found <a href='${it.file.fileObject.signedUrl}'>here</a>.  Link will expire shortly."
                 )
             )
         }
@@ -122,6 +132,18 @@ open class ModelDumpEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
         file().root.resolve("temp-files-dump").list()?.forEach {
             if(it.head()!!.lastModified < now().minus(1.days)) {
                 it.delete()
+            }
+        }
+    }
+}
+
+private fun File.toZip(dest: File) {
+    ZipOutputStream(BufferedOutputStream(FileOutputStream(dest))).use { output ->
+        FileInputStream(this).use { input ->
+            BufferedInputStream(input).use { origin ->
+                val entry = ZipEntry(this.name)
+                output.putNextEntry(entry)
+                origin.copyTo(output, 1024)
             }
         }
     }
