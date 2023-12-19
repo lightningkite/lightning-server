@@ -21,6 +21,7 @@ import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.routes.docName
+import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.task
@@ -38,6 +39,8 @@ import kotlinx.serialization.serializer
 import java.io.File
 import java.time.Instant
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
 open class ModelDumpEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
@@ -112,6 +115,14 @@ open class ModelDumpEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
                     html = "Your dump can be found <a href='${it.file.fileObject.signedUrl}'>here</a>"
                 )
             )
+        }
+    }
+
+    val cleanDumps = schedule("$path/cleanDumps", 10.minutes) {
+        file().root.resolve("temp-files-dump").list()?.forEach {
+            if(it.head()!!.lastModified < now().minus(1.days)) {
+                it.delete()
+            }
         }
     }
 }
