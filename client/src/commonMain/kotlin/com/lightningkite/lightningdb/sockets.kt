@@ -34,9 +34,6 @@ fun multiplexSocket(url: String, path: String, params: Map<String, List<String>>
                 val shouldBeOn = shouldBeOn.await() > 0
                 val isOn = channelOpen.await()
                 val parentConnected = shared.connected.await()
-                println("shouldBeOn: $shouldBeOn")
-                println("isOn: $isOn")
-                println("parentConnected: $parentConnected")
                 if (shouldBeOn && parentConnected && !isOn) {
                     shared.send(
                         MultiplexMessage(
