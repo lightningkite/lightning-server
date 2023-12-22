@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.rock.TypedWebSocket
 import com.lightningkite.rock.reactive.Readable
 import com.lightningkite.rock.reactive.Writable
 

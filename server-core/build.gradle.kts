@@ -104,3 +104,5 @@ standardPublishing {
         )
     }
 }
+
+tasks.getByName("sourceJar").dependsOn("kspKotlin")

@@ -77,6 +77,7 @@ fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(
 
 fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmitter(packageName).apply {
     imports.add("com.lightningkite.*")
+    imports.add("com.lightningkite.rock.*")
     imports.add("com.lightningkite.lightningdb.*")
     imports.add("com.lightningkite.lightningserver.db.*")
     imports.add("kotlinx.datetime.*")
@@ -213,8 +214,8 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
 
             is ApiWebsocket<*, *, *, *> -> {
                 appendLine(" = multiplexedSocket(")
-                appendLine("        url = \"\$socketUrl?path=multiplex\", ")
-                appendLine("        path = \"${entry.path}\", ")
+                appendLine("        socketUrl = socketUrl, ")
+                appendLine("        path = \"${entry.path.path.escaped}\", ")
                 entry.primaryAuthName?.let {
                     if (entry.authOptions.options.contains(null).not()) {
                         appendLine("        queryParams = httpHeaders(\"jwt\" to listOf(${it.userTypeTokenName()}))")
@@ -247,8 +248,8 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
 
                 is ApiWebsocket<*, *, *, *> -> {
                     appendLine(" = multiplexedSocket(")
-                    appendLine("            url = socketUrl, ")
-                    appendLine("            path = \"${entry.path}\", ")
+                    appendLine("            socketUrl = socketUrl, ")
+                    appendLine("            path = \"${entry.path.path.escaped}\", ")
                     entry.primaryAuthName?.let {
                         appendLine("            token = ${it.userTypeTokenName()},")
                     }

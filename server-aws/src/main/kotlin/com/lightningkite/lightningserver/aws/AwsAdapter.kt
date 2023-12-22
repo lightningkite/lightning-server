@@ -137,7 +137,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                             it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
                             it.qualifier(System.getenv("AWS_LAMBDA_FUNCTION_VERSION"))
                             it.invocationType(InvocationType.EVENT)
-                            val payload = Serialization.json.encodeToString(task.serializer, input)
+                            val payload = Serialization.Internal.json.encodeToString(task.serializer, input)
                             if (payload.length > 100_000) {
                                 val zipped = ByteArrayOutputStream().use {
                                     GZIPOutputStream(it).use {
@@ -148,7 +148,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                                 }
                                 it.payload(
                                     SdkBytes.fromUtf8String(
-                                        Serialization.json.encodeToString(
+                                        Serialization.Internal.json.encodeToString(
                                             TaskInvoke.serializer(),
                                             TaskInvoke(
                                                 task.name,
@@ -161,7 +161,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                             } else {
                                 it.payload(
                                     SdkBytes.fromUtf8String(
-                                        Serialization.json.encodeToString(
+                                        Serialization.Internal.json.encodeToString(
                                             TaskInvoke.serializer(),
                                             TaskInvoke(task.name, payload)
                                         )
@@ -230,7 +230,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             val response: APIGatewayV2HTTPResponse = blockingTimeout(context.remainingTimeInMillis - 5_000L) {
                 when {
                     asJson.containsKey("taskName") -> handleTask(
-                        Serialization.json.decodeFromJsonElement(
+                        Serialization.Internal.json.decodeFromJsonElement(
                             TaskInvoke.serializer(),
                             asJson
                         ).also { roughContext = it.taskName }
@@ -336,12 +336,12 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             } else try {
                 Metrics.handlerPerformance(task) {
                     val payload = when(event.format) {
-                        TaskDataFormat.Json -> Serialization.json.decodeFromString(task.serializer, event.input)
+                        TaskDataFormat.Json -> Serialization.Internal.json.decodeFromString(task.serializer, event.input)
                         TaskDataFormat.JsonGzip -> {
                             val data = ByteArrayInputStream(Base64.getDecoder().decode(event.input)).use {
                                 GZIPInputStream(it).readBytes()
                             }.toString(Charsets.UTF_8)
-                            Serialization.json.decodeFromString(task.serializer, data)
+                            Serialization.Internal.json.decodeFromString(task.serializer, data)
                         }
                     }
                     task.implementation(this, payload)
