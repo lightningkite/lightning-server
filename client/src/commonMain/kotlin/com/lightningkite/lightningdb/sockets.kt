@@ -17,6 +17,27 @@ fun multiplexSocket(url: String, path: String, params: Map<String, List<String>>
     val channelOpen = Property(false)
     val channel = uuid().toString()
     return object : RetryWebsocket {
+        init {
+            shared.onMessage { message ->
+                if (message.channel == channel) {
+                    if (message.start) {
+                        channelOpen.value = true
+                        onOpenList.forEach { it() }
+                    }
+                    message.data?.let { data ->
+                        onMessageList.forEach { it(data) }
+                    }
+                    if (message.end) {
+                        channelOpen.value = false
+                        onCloseList.forEach { it(-1) }
+                    }
+                }
+            }
+            shared.onClose {
+                channelOpen.value = false
+            }
+        }
+
         override val connected: Readable<Boolean>
             get() = channelOpen
         val shouldBeOn = Property(0)
@@ -93,27 +114,6 @@ fun multiplexSocket(url: String, path: String, params: Map<String, List<String>>
         override fun onBinaryMessage(action: (Blob) -> Unit) = throw UnsupportedOperationException()
         override fun onClose(action: (Short) -> Unit) {
             onCloseList.add(action)
-        }
-
-        init {
-            shared.onMessage { message ->
-                if (message.channel == channel) {
-                    if (message.start) {
-                        channelOpen.value = true
-                        onOpenList.forEach { it() }
-                    }
-                    message.data?.let { data ->
-                        onMessageList.forEach { it(data) }
-                    }
-                    if (message.end) {
-                        channelOpen.value = false
-                        onCloseList.forEach { it(-1) }
-                    }
-                }
-            }
-            shared.onClose {
-                channelOpen.value = false
-            }
         }
     }
 }
