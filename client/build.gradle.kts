@@ -16,7 +16,11 @@ val khrysalisVersion: String by project
 kotlin {
     targetHierarchy.default()
 
-    jvm()
+    jvm {
+        compilations.all {
+            kotlinOptions.jvmTarget = "1.8"
+        }
+    }
     js(IR) {
         browser()
     }
