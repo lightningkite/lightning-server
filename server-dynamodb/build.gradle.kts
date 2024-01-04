@@ -27,9 +27,9 @@ val khrysalisVersion: String by project
 dependencies {
     api(project(":server-core"))
 //    api(platform("software.amazon.awssdk:s3:2.17.232"))
-    api("software.amazon.awssdk:dynamodb:2.17.276")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.6.4")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.4")
+    api("software.amazon.awssdk:dynamodb:2.20.68")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.7.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.7.2")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation(project(":server-testing"))
     ksp(project(":processor"))
