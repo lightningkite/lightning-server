@@ -24,7 +24,7 @@ data class NotificationSettings(
         }
     }
 
-    override fun invoke(): NotificationClient = parse(implementation.lowercase(), this)
+    override fun invoke(): NotificationClient = parse(implementation.substringBefore("://").lowercase(), this)
 
 }
 

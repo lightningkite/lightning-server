@@ -65,7 +65,7 @@ tasks.create("lambda", Sync::class.java) {
 tasks.create("proguardTest", ProGuardTask::class) {
     this.injars(tasks.getByName("shadowJar"))
     this.outjars("${buildDir}/outputs/proguarded.jar")
-    File("${System.getProperty("java.home")}/jmods").listFiles().filter { it.extension == "jmod" }.forEach {
+    File("${System.getProperty("java.home")}/jmods").listFiles()?.filter { it.extension == "jmod" }?.forEach {
         this.libraryjars(it)
     }
 //    this.libraryjars("${System.getProperty("java.home")}/lib/rt.jar".also { println("rt jar is ${it}") })

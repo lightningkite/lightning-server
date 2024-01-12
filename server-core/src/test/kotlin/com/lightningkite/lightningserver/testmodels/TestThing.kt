@@ -46,7 +46,8 @@ data class UniqueComboClass(
 
 @GenerateDataClassPaths
 @Serializable
-@UniqueSetJankPatch(["uniqueSet1", "uniqueSet2", ":", "uniqueSet3", "uniqueSet4"])
+@UniqueSet(["uniqueSet1", "uniqueSet2",])
+@UniqueSet(["uniqueSet3", "uniqueSet4"])
 data class UniqueSetJankClass(
     override val _id: Int,
     val uniqueSet1: Int,
@@ -57,7 +58,8 @@ data class UniqueSetJankClass(
 
 @GenerateDataClassPaths
 @Serializable
-@UniqueSetJankPatch(["uniqueSet1", "uniqueSet2", ":", "uniqueSet3", "uniqueSet4"])
+@UniqueSet(["uniqueSet1", "uniqueSet2"])
+@UniqueSet(["uniqueSet3", "uniqueSet4"])
 data class UniqueComboJankClass(
     override val _id: Int,
     @Unique val unique1: Int,

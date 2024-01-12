@@ -137,7 +137,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
             .mapValues { it.value.filter { !it.authOptions.options.contains(null).not() || it.primaryAuthName == null || it.primaryAuthName == userType } }
         val groups = byGroup.keys.filterNotNull()
         val sessionClassName = "${userType.substringAfterLast('.')}Session"
-        append("abstract class Abstract$sessionClassName(api: Api, ${userType.userTypeTokenName()}: String)")
+        append("abstract class Abstract$sessionClassName(api: Api, ${userType.userTypeTokenName()}: () -> String)")
         byGroup[null]!!.mapNotNull { it.belongsToInterface }.distinct().let {
             if(it.isNotEmpty()) {
                 append(": ")
@@ -148,7 +148,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
         }
         appendLine(" {")
         appendLine("    abstract val api: Api")
-        appendLine("    abstract val ${userType.userTypeTokenName()}: String")
+        appendLine("    abstract val ${userType.userTypeTokenName()}: () -> String")
         for (group in groups) {
             appendLine("    val ${group.groupToPartName()}: $sessionClassName${group.groupToInterfaceName()} = $sessionClassName${group.groupToInterfaceName()}(api.${group.groupToPartName()}, ${userType.userTypeTokenName()})")
         }
@@ -160,7 +160,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
             appendLine()
         }
         for (group in groups) {
-            append("    class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()}, val ${userType.userTypeTokenName()}: String)")
+            append("    class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()}, val ${userType.userTypeTokenName()}: () -> String)")
             byGroup[group]!!.mapNotNull { it.belongsToInterface }.distinct().let {
                 if(it.isNotEmpty()) {
                     append(": ")
@@ -385,9 +385,9 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false): Li
         }?.let(::listOf),
         documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
             if (documentable.authOptions.options.contains(null).not())
-                Arg(name = it.userTypeTokenName(), stringType = "String", isAuth = true)
+                Arg(name = it.userTypeTokenName(), stringType = "() -> String", isAuth = true)
             else
-                Arg(name = it.userTypeTokenName(), stringType = "String?", default = "null", isAuth = true)
+                Arg(name = it.userTypeTokenName(), stringType = "(() -> String)?", default = "null", isAuth = true)
         }?.let(::listOf),
     ).flatten()
 
@@ -398,9 +398,9 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false): Li
             },
         documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
             if (documentable.authOptions.options.contains(null).not())
-                Arg(name = it.userTypeTokenName(), stringType = "String", isAuth = true)
+                Arg(name = it.userTypeTokenName(), stringType = "() -> String", isAuth = true)
             else
-                Arg(name = it.userTypeTokenName(), stringType = "String?", default = "null", isAuth = true)
+                Arg(name = it.userTypeTokenName(), stringType = "(() -> String)?", default = "null", isAuth = true)
         }?.let(::listOf),
     ).flatten()
 

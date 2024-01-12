@@ -26,7 +26,7 @@ interface ModelRestEndpoints<T: HasId<ID>, ID: Comparable<ID>> {
     suspend fun groupAggregate(input: GroupAggregateQuery<T>): Map<String, Double?>
 }
 interface ModelRestEndpointsPlusWs<T: HasId<ID>, ID: Comparable<ID>>: ModelRestEndpoints<T, ID> {
-    fun watch(): TypedWebSocket<Query<T>, ListChange<T>>
+    suspend fun watch(): TypedWebSocket<Query<T>, ListChange<T>>
 }
 interface WritableModel<T>: Writable<T> {
     suspend fun modify(modification: Modification<T>): T
