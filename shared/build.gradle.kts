@@ -4,6 +4,7 @@ plugins {
     kotlin("multiplatform")
     id("com.google.devtools.ksp")
     kotlin("plugin.serialization")
+    id("com.android.library")
     id("org.jetbrains.dokka")
     id("signing")
     `maven-publish`
@@ -19,6 +20,14 @@ ksp {
 
 kotlin {
     targetHierarchy.default()
+    androidTarget {
+        publishLibraryVariants("release", "debug")
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
+    }
 
     jvm {
         compilations.all {
@@ -91,5 +100,22 @@ standardPublishing {
             name = "Brady Svedin",
             email = "brady@lightningkite.com",
         )
+    }
+}
+
+android {
+    namespace = "com.lightningkite.lightningserver"
+    compileSdk = 34
+
+    defaultConfig {
+        minSdk = 26
+    }
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    dependencies {
+        coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
     }
 }

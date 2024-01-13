@@ -32,7 +32,8 @@ abstract class CommonSymbolProcessor(
             .drop(2)
             .first()
             .let {
-                it.substring(it.indexOfLast { it.isUpperCase() }.coerceAtLeast(0))
+                if(it.contains("test", true)) "Test"
+                else "Main"
             }
         val outFolder = projectFolder.resolve("build/generated/ksp/common/common$flavor/kotlin")
         outFolder.mkdirs()
