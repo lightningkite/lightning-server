@@ -43,7 +43,6 @@ data class OauthProviderCredentialsApple(
             val withDefaults = Json { encodeDefaults = true; explicitNulls = false }
             append(
                 Base64.getUrlEncoder().withoutPadding().encodeToString(withDefaults.encodeToString(buildJsonObject {
-//                    put("typ", "JWT")
                     put("kid", keyId)
                     put("alg", "ES256")
                 }).toByteArray())

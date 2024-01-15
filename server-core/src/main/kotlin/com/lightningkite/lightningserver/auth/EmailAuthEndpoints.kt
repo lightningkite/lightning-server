@@ -2,17 +2,30 @@ package com.lightningkite.lightningserver.auth
 
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.cache.Cache
+import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.email.Email
 import com.lightningkite.lightningserver.email.EmailClient
 import com.lightningkite.lightningserver.email.EmailLabeledValue
+import com.lightningkite.lightningserver.exceptions.BadRequestException
+import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.ApiEndpoint0
 import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.typed
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.bouncycastle.util.encoders.Base64Encoder
 import java.net.URLDecoder
 import java.time.Duration
 import java.util.*
@@ -166,6 +179,44 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         }
     }
 
+    val appleAuthAuthCode = path("oauth/apple/auth_code").post.typed(
+        "Authenticate Apple Sign In",
+        "Sign in using apple auth code",
+        errorCases = listOf(),
+        implementation = { _: Unit, input: AppleAuthCodeCredentials ->
+            val authCode = input.authCode
+            val idToken = input.idToken
+            val tokenParts = idToken.split('.')
+            val payload = tokenParts[1]
+            val payloadString = String(Base64.getDecoder().decode(payload))
+            val payloadJson: JsonObject = Json.decodeFromString(payloadString)
+            val email: String = payloadJson["email"]!!.jsonPrimitive.toString()
+
+            val appleSettings = OauthProviderInfo.all.firstOrNull { it.identifierName.lowercase() == "apple" }
+            if (appleSettings == null) throw HttpStatusException(
+                HttpStatus.InternalServerError,
+                "Apple Oauth Init Failed.",
+                "Apple oauth not available on this server",
+            )
+            val info = OauthProviderInfo.SettingInfo.apple
+            val appleCredentials: OauthProviderCredentialsApple = info.read as OauthProviderCredentialsApple
+            val response = client.request("https://appleid.apple.com/auth/token") {
+                setBody(mapOf(
+                    "client_id" to appleCredentials.serviceId,
+                    "client_secret" to appleCredentials.generateJwt(),
+                    "code" to authCode,
+                    "grant_type" to "authorization_code"
+                ))
+            }
+
+            if (response.status.isSuccess()) {
+                base.token(emailAccess.byEmail(email))
+            } else {
+                throw BadRequestException("Error authenticating apple auth code.")
+            }
+        }
+    )
+
     val loginEmailHtml = path("login-email/").get.handler {
         HttpResponse(
             body = HttpContent.Text(
@@ -223,4 +274,7 @@ open class EmailAuthEndpoints<USER : Any, ID>(
         base.redirectToLanding(basis)
     }
 }
+
+@Serializable
+data class AppleAuthCodeCredentials(val idToken: String, val authCode: String)
 
