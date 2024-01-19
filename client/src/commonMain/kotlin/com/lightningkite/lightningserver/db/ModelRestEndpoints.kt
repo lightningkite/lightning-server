@@ -2,10 +2,10 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.rock.TypedWebSocket
-import com.lightningkite.rock.reactive.Readable
-import com.lightningkite.rock.reactive.Writable
+import com.lightningkite.rock.reactive.*
+import kotlinx.serialization.KSerializer
 
-interface ModelRestEndpoints<T: HasId<ID>, ID: Comparable<ID>> {
+interface ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>> {
     suspend fun default(): T = throw IllegalArgumentException()
     suspend fun query(input: Query<T>): List<T>
     suspend fun queryPartial(input: QueryPartial<T>): List<Partial<T>>
@@ -25,18 +25,29 @@ interface ModelRestEndpoints<T: HasId<ID>, ID: Comparable<ID>> {
     suspend fun aggregate(input: AggregateQuery<T>): Double?
     suspend fun groupAggregate(input: GroupAggregateQuery<T>): Map<String, Double?>
 }
-interface ModelRestEndpointsPlusWs<T: HasId<ID>, ID: Comparable<ID>>: ModelRestEndpoints<T, ID> {
+
+interface ModelRestEndpointsPlusWs<T : HasId<ID>, ID : Comparable<ID>> : ModelRestEndpoints<T, ID> {
     suspend fun watch(): TypedWebSocket<Query<T>, ListChange<T>>
 }
-interface WritableModel<T>: Writable<T> {
+
+interface WritableModel<T> : Writable<T> {
+    val serializer: KSerializer<T>
     suspend fun modify(modification: Modification<T>): T
     suspend fun delete(): Unit
 }
 
-interface CachingModelRestEndpoints<T: HasId<ID>, ID: Comparable<ID>> {
-    val skipCache: ModelRestEndpoints<T,  ID>
-    operator fun get(id: ID): Writable<T>
-    fun query(query: Query<T>): Readable<List<T>>
-    fun insert(item: T): T
-    fun insert(item: List<T>): T
+interface ModelCollection<T : HasId<ID>, ID : Comparable<ID>> {
+    operator fun get(id: ID): WritableModel<T>
+    suspend fun query(query: Query<T>): Readable<List<T>>
+    suspend fun watch(query: Query<T>): Readable<List<T>>
+    suspend fun watch(id: ID): WritableModel<T> = get(id)
+    suspend fun insert(item: T): WritableModel<T>
+    suspend fun insert(item: List<T>): List<T>
+    suspend fun upsert(item: T): WritableModel<T>
+    suspend fun bulkModify(bulkUpdate: MassModification<T>): Int
 }
+
+interface CachingModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>> : ModelCollection<T, ID> {
+    val skipCache: ModelRestEndpoints<T, ID>
+}
+
