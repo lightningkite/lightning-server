@@ -3,6 +3,7 @@ package com.lightningkite.lightningdb
 import com.lightningkite.khrysalis.JsName
 import com.lightningkite.lightningdb.SerializableProperty
 import kotlinx.serialization.KSerializer
+import kotlin.jvm.JvmName
 
 @Suppress("UNCHECKED_CAST")
 fun <Model: HasId<ID>, ID> KSerializer<Model>._id() = serializableProperties!!.find { it.name == "_id" }!! as SerializableProperty<Model, ID>

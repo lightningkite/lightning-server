@@ -2,6 +2,7 @@ import com.lightningkite.deployhelpers.*
 
 plugins {
     kotlin("multiplatform")
+    id("com.google.devtools.ksp")
     kotlin("plugin.serialization")
     id("com.android.library")
     id("org.jetbrains.dokka")
@@ -63,6 +64,12 @@ android {
     compileSdk = 34
     defaultConfig {
         minSdk = 24
+    }
+}
+
+dependencies {
+    configurations.filter { it.name.startsWith("ksp") && it.name != "ksp" }.forEach {
+        add(it.name, project(":processor"))
     }
 }
 
