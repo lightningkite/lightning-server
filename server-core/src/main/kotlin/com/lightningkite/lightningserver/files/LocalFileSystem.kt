@@ -34,6 +34,25 @@ class LocalFileSystem(
         FileSystem.register(this)
     }
 
+    val fetchHead = ServerPath("$serveDirectory/{...}").head.handler {
+        val wildcard = it.wildcard?.removePrefix("/") ?: throw BadRequestException("No file to look up")
+        if (wildcard.contains("..")) throw IllegalStateException()
+        val file = rootFile.resolve(wildcard)
+        val fileObject = LocalFile(this, file)
+        if(!fileObject.checkSignature(it.queryParameters.joinToString("&") { "${it.first}=${it.second}" }))
+            throw UnauthorizedException("Token invalid")
+        if (!file.exists()) throw NotFoundException("No file ${wildcard} found")
+        if (!file.absolutePath.startsWith(rootFile.absolutePath)) throw IllegalStateException()
+        val head = fileObject.head() ?: throw NotFoundException("No file ${wildcard} found")
+        HttpResponse(
+            body = null,
+            status = HttpStatus.NoContent,
+        ) {
+            set(HttpHeader.ContentType, head.type.toString())
+            set(HttpHeader.ContentLength, head.size.toString())
+        }
+    }
+
     val fetch = ServerPath("$serveDirectory/{...}").get.handler {
         val wildcard = it.wildcard?.removePrefix("/") ?: throw BadRequestException("No file to look up")
         if (wildcard.contains("..")) throw IllegalStateException()

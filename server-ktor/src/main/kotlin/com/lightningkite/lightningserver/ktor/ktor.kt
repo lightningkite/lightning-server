@@ -34,12 +34,14 @@ import io.ktor.server.websocket.*
 import io.ktor.util.*
 import io.ktor.utils.io.jvm.javaio.*
 import io.ktor.websocket.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
-import org.slf4j.LoggerFactory
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.*
-import kotlin.collections.HashMap
+import org.slf4j.LoggerFactory
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import com.lightningkite.lightningserver.core.ContentType as HttpContentType
@@ -171,13 +173,25 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                 route(routeString, HttpMethod.parse(entry.key.method.toString())) {
                     handle {
                         val request = call.adapt(entry.key)
-                        val result = Http.execute(request)
+                        val result: HttpResponse = Http.execute(request)
                         for (header in result.headers.entries) {
                             call.response.header(header.first, header.second)
                         }
                         call.response.status(HttpStatusCode.fromValue(result.status.code))
                         when (val b = result.body) {
-                            null -> call.respondText("")
+                            null -> {
+                                val contentType = call.response.headers[io.ktor.http.HttpHeaders.ContentType]
+                                val contentLength = call.response.headers[io.ktor.http.HttpHeaders.ContentLength]
+                                if (contentType != null && contentLength != null) {
+                                    call.response.call.respondOutputStream(
+                                        ContentType.parse(contentType),
+                                        HttpStatusCode.NoContent,
+                                        contentLength.toLong(),
+                                        {})
+                                } else
+                                    call.respondText("", contentType = null, status = null, configure = { })
+                            }
+
                             is HttpContent.Binary -> call.respondBytes(
                                 b.bytes,
                                 ContentType.parse(b.type.toString())
@@ -215,7 +229,19 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                     }
                     call.response.status(HttpStatusCode.fromValue(result.status.code))
                     when (val b = result.body) {
-                        null -> call.respondText("")
+                        null -> {
+                            val contentType = call.response.headers[io.ktor.http.HttpHeaders.ContentType]
+                            val contentLength = call.response.headers[io.ktor.http.HttpHeaders.ContentLength]
+                            if (contentType != null && contentLength != null) {
+                                call.response.headers
+                                call.response.call.respondOutputStream(
+                                    ContentType.parse(contentType),
+                                    HttpStatusCode.NoContent,
+                                    contentLength.toLong(),
+                                    {})
+                            } else
+                                call.respondText("", contentType = null, status = null, configure = { })
+                        }
                         is HttpContent.Binary -> call.respondBytes(
                             b.bytes,
                             ContentType.parse(b.type.toString())
@@ -268,7 +294,10 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                             exceptionSettings().report(t)
                         }
                         val nextRun = when (val s = it.schedule) {
-                            is Schedule.Daily -> LocalDateTime(now().toLocalDateTime(s.zone).date.plus(DatePeriod(days = 1)), s.time).toInstant(s.zone)
+                            is Schedule.Daily -> LocalDateTime(
+                                now().toLocalDateTime(s.zone).date.plus(DatePeriod(days = 1)),
+                                s.time
+                            ).toInstant(s.zone)
                                 .toEpochMilliseconds()
 
                             is Schedule.Frequency -> upcomingRun + s.gap.inWholeMilliseconds
