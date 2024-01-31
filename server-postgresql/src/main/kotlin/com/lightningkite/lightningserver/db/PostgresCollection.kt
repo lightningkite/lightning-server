@@ -19,7 +19,7 @@ class PostgresCollection<T : Any>(
     val db: Database,
     val name: String,
     override val serializer: KSerializer<T>,
-) : AbstractSignalFieldCollection<T>() {
+) : FieldCollection<T> {
     companion object {
         var format = DbMapLikeFormat(Serialization.module)
     }
@@ -120,7 +120,7 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun insertImpl(models: Iterable<T>): List<T> {
+    override suspend fun insert(models: Iterable<T>): List<T> {
         prepare.await()
         t {
             table.batchInsert(models) {
@@ -130,19 +130,19 @@ class PostgresCollection<T : Any>(
         return models.toList()
     }
 
-    override suspend fun replaceOneImpl(condition: Condition<T>, model: T, orderBy: List<SortPart<T>>): EntryChange<T> {
-        return updateOneImpl(condition, Modification.Assign(model), orderBy)
+    override suspend fun replaceOne(condition: Condition<T>, model: T, orderBy: List<SortPart<T>>): EntryChange<T> {
+        return updateOne(condition, Modification.Assign(model), orderBy)
     }
 
-    override suspend fun replaceOneIgnoringResultImpl(
+    override suspend fun replaceOneIgnoringResult(
         condition: Condition<T>,
         model: T,
         orderBy: List<SortPart<T>>
     ): Boolean {
-        return updateOneIgnoringResultImpl(condition, Modification.Assign(model), orderBy)
+        return updateOneIgnoringResult(condition, Modification.Assign(model), orderBy)
     }
 
-    override suspend fun upsertOneImpl(
+    override suspend fun upsertOne(
         condition: Condition<T>,
         modification: Modification<T>,
         model: T
@@ -150,13 +150,13 @@ class PostgresCollection<T : Any>(
         return newSuspendedTransaction(db = db, transactionIsolation = TRANSACTION_SERIALIZABLE) {
             val existing = findOne(condition)
             if (existing == null) {
-                EntryChange(null, insertImpl(listOf(model)).first())
+                EntryChange(null, insert(listOf(model)).first())
             } else
-                updateOneImpl(condition, modification)
+                updateOne(condition, modification)
         }
     }
 
-    override suspend fun upsertOneIgnoringResultImpl(
+    override suspend fun upsertOneIgnoringResult(
         condition: Condition<T>,
         modification: Modification<T>,
         model: T,
@@ -164,14 +164,14 @@ class PostgresCollection<T : Any>(
         return newSuspendedTransaction(db = db, transactionIsolation = TRANSACTION_SERIALIZABLE) {
             val existing = findOne(condition)
             if (existing == null) {
-                insertImpl(listOf(model))
+                insert(listOf(model))
                 false
             } else
-                updateOneIgnoringResultImpl(condition, modification, listOf())
+                updateOneIgnoringResult(condition, modification, listOf())
         }
     }
 
-    override suspend fun updateOneImpl(
+    override suspend fun updateOne(
         condition: Condition<T>,
         modification: Modification<T>,
         orderBy: List<SortPart<T>>
@@ -191,7 +191,7 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun updateOneIgnoringResultImpl(
+    override suspend fun updateOneIgnoringResult(
         condition: Condition<T>,
         modification: Modification<T>,
         orderBy: List<SortPart<T>>
@@ -208,7 +208,7 @@ class PostgresCollection<T : Any>(
         } > 0
     }
 
-    override suspend fun updateManyImpl(condition: Condition<T>, modification: Modification<T>): CollectionChanges<T> {
+    override suspend fun updateMany(condition: Condition<T>, modification: Modification<T>): CollectionChanges<T> {
         return t {
             val old = table.updateReturningOld(
                 where = { condition(condition, serializer, table).asOp() },
@@ -223,7 +223,7 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun updateManyIgnoringResultImpl(condition: Condition<T>, modification: Modification<T>): Int {
+    override suspend fun updateManyIgnoringResult(condition: Condition<T>, modification: Modification<T>): Int {
         return t {
             table.update(
                 where = { condition(condition, serializer, table).asOp() },
@@ -235,7 +235,7 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun deleteOneImpl(condition: Condition<T>, orderBy: List<SortPart<T>>): T? {
+    override suspend fun deleteOne(condition: Condition<T>, orderBy: List<SortPart<T>>): T? {
         if (orderBy.isNotEmpty()) throw UnsupportedOperationException()
         return t {
             table.deleteReturningWhere(
@@ -245,7 +245,7 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun deleteOneIgnoringOldImpl(condition: Condition<T>, orderBy: List<SortPart<T>>): Boolean {
+    override suspend fun deleteOneIgnoringOld(condition: Condition<T>, orderBy: List<SortPart<T>>): Boolean {
         if (orderBy.isNotEmpty()) throw UnsupportedOperationException()
         return t {
             table.deleteWhere(
@@ -255,7 +255,7 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun deleteManyImpl(condition: Condition<T>): List<T> {
+    override suspend fun deleteMany(condition: Condition<T>): List<T> {
         return t {
             table.deleteReturningWhere(
                 where = { condition(condition, serializer, table).asOp() }
@@ -263,7 +263,7 @@ class PostgresCollection<T : Any>(
         }
     }
 
-    override suspend fun deleteManyIgnoringOldImpl(condition: Condition<T>): Int {
+    override suspend fun deleteManyIgnoringOld(condition: Condition<T>): Int {
         return t {
             table.deleteWhere(
                 op = { condition(condition, serializer, table).asOp() }

@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit
 class MongoFieldCollection<Model : Any>(
     override val serializer: KSerializer<Model>,
     private val access: MongoCollectionAccess,
-) : AbstractSignalFieldCollection<Model>() {
+) : FieldCollection<Model> {
 
     private suspend inline fun <T> access(crossinline action: suspend MongoCollection<BsonDocument>.() -> T): T{
         return access.run {
@@ -28,27 +28,27 @@ class MongoFieldCollection<Model : Any>(
         }
     }
 
-    override suspend fun insertImpl(models: Iterable<Model>): List<Model> = access {
+    override suspend fun insert(models: Iterable<Model>): List<Model> = access {
         if (models.none()) return@access emptyList()
         val asList = models.toList()
         insertMany(asList.map { Serialization.Internal.bson.stringify(serializer, it) })
         return@access asList
     }
 
-    override suspend fun replaceOneImpl(
+    override suspend fun replaceOne(
         condition: Condition<Model>,
         model: Model,
         orderBy: List<SortPart<Model>>
     ): EntryChange<Model> = updateOne(condition, Modification.Assign(model), orderBy)
 
-    override suspend fun replaceOneIgnoringResultImpl(
+    override suspend fun replaceOneIgnoringResult(
         condition: Condition<Model>,
         model: Model,
         orderBy: List<SortPart<Model>>
     ): Boolean {
         val cs = condition.simplify()
         if (cs is Condition.Never) return false
-        if (orderBy.isNotEmpty()) return updateOneIgnoringResultImpl(cs, Modification.Assign(model), orderBy)
+        if (orderBy.isNotEmpty()) return updateOneIgnoringResult(cs, Modification.Assign(model), orderBy)
         return access {
             replaceOne(
                 cs.bson(serializer),
@@ -57,7 +57,7 @@ class MongoFieldCollection<Model : Any>(
         }
     }
 
-    override suspend fun upsertOneImpl(
+    override suspend fun upsertOne(
         condition: Condition<Model>,
         modification: Modification<Model>,
         model: Model
@@ -100,7 +100,7 @@ class MongoFieldCollection<Model : Any>(
         }
     }
 
-    override suspend fun upsertOneIgnoringResultImpl(
+    override suspend fun upsertOneIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>,
         model: Model
@@ -124,7 +124,7 @@ class MongoFieldCollection<Model : Any>(
         }
     }
 
-    override suspend fun updateOneImpl(
+    override suspend fun updateOne(
         condition: Condition<Model>,
         modification: Modification<Model>,
         orderBy: List<SortPart<Model>>
@@ -152,7 +152,7 @@ class MongoFieldCollection<Model : Any>(
         return EntryChange(before, after)
     }
 
-    override suspend fun updateOneIgnoringResultImpl(
+    override suspend fun updateOneIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>,
         orderBy: List<SortPart<Model>>
@@ -164,7 +164,7 @@ class MongoFieldCollection<Model : Any>(
         return access { updateOne(cs.bson(serializer), m.document, m.options).matchedCount != 0L }
     }
 
-    override suspend fun updateManyImpl(
+    override suspend fun updateMany(
         condition: Condition<Model>,
         modification: Modification<Model>
     ): CollectionChanges<Model> {
@@ -186,7 +186,7 @@ class MongoFieldCollection<Model : Any>(
         return CollectionChanges(changes = changes)
     }
 
-    override suspend fun updateManyIgnoringResultImpl(
+    override suspend fun updateManyIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>
     ): Int {
@@ -203,7 +203,7 @@ class MongoFieldCollection<Model : Any>(
         }
     }
 
-    override suspend fun deleteOneImpl(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? {
+    override suspend fun deleteOne(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? {
         val cs = condition.simplify()
         if (cs is Condition.Never) return null
         return access {
@@ -218,17 +218,17 @@ class MongoFieldCollection<Model : Any>(
         }
     }
 
-    override suspend fun deleteOneIgnoringOldImpl(
+    override suspend fun deleteOneIgnoringOld(
         condition: Condition<Model>,
         orderBy: List<SortPart<Model>>
     ): Boolean {
         val cs = condition.simplify()
         if (cs is Condition.Never) return false
-        if (orderBy.isNotEmpty()) return deleteOneImpl(condition, orderBy) != null
+        if (orderBy.isNotEmpty()) return deleteOne(condition, orderBy) != null
         return access { deleteOne(cs.bson(serializer)).deletedCount > 0 }
     }
 
-    override suspend fun deleteManyImpl(condition: Condition<Model>): List<Model> {
+    override suspend fun deleteMany(condition: Condition<Model>): List<Model> {
         val cs = condition.simplify()
         if (cs is Condition.Never) return listOf()
         val remove = ArrayList<Model>()
@@ -245,7 +245,7 @@ class MongoFieldCollection<Model : Any>(
         return remove
     }
 
-    override suspend fun deleteManyIgnoringOldImpl(condition: Condition<Model>): Int {
+    override suspend fun deleteManyIgnoringOld(condition: Condition<Model>): Int {
         val cs = condition.simplify()
         if (cs is Condition.Never) return 0
         return access { deleteMany(cs.bson(serializer)).deletedCount.toInt() }

@@ -126,8 +126,6 @@ class MetricsFieldCollection<M: Any>(override val wraps: FieldCollection<M>, met
     override suspend fun deleteManyIgnoringOld(condition: Condition<M>): Int = Metrics.addPerformanceToSumPerHandler(metricsKey, metricsCountKey) {
         wraps.deleteManyIgnoringOld(condition)
     }
-
-    override fun registerRawSignal(callback: suspend (CollectionChanges<M>) -> Unit) = wraps.registerRawSignal(callback)
 }
 
 fun <Model : Any> FieldCollection<Model>.metrics(metricsKeyName: String): FieldCollection<Model> =

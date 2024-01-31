@@ -174,8 +174,34 @@ internal class CacheImpl<T : HasId<ID>, ID : Comparable<ID>>(
 
     val cache = HashMap<ID, WritableModelImpl>()
     val queries = HashMap<Query<T>, ListImpl>()
-    val currentSocket: Async<TypedWebSocket<Query<T>, ListChange<T>>?> = asyncGlobal {
-        (skipCache as? ModelRestEndpointsPlusWs<T, ID>)?.watch()?.apply {
+    private interface LivingSocket<T> {
+        fun start(): ()->Unit
+        val connected: Readable<Boolean>
+        fun send(condition: Condition<T>)
+    }
+    private val currentSocket: Async<LivingSocket<T>?> = asyncGlobal {
+        (skipCache as? ModelRestEndpointsPlusUpdatesWebsocket<T, ID>)?.updates()?.apply {
+            onMessage {
+                it.updates.forEach { new ->
+                    cache.getOrPut(new._id) { WritableModelImpl(new._id) }.apply {
+                        value = new
+                    }
+                    queries.forEach { it.value.onAdded(new); it.value.refreshIfNeeded() }
+                }
+                it.remove.forEach { old ->
+                    cache[old]?.virtualDelete()
+                }
+            }
+            onOpen {
+                send(socketCondition)
+            }
+        }?.let {
+            object: LivingSocket<T> {
+                override fun start(): () -> Unit = it.start()
+                override val connected: Readable<Boolean> get() = it.connected
+                override fun send(condition: Condition<T>) = it.send(condition)
+            }
+        } ?: (skipCache as? ModelRestEndpointsPlusWs<T, ID>)?.watch()?.apply {
             onMessage {
                 val old = it.old
                 val new = it.new
@@ -194,6 +220,12 @@ internal class CacheImpl<T : HasId<ID>, ID : Comparable<ID>>(
             onOpen {
                 send(Query(socketCondition, limit = 0))
             }
+        }?.let {
+            object: LivingSocket<T> {
+                override fun start(): () -> Unit = it.start()
+                override val connected: Readable<Boolean> get() = it.connected
+                override fun send(condition: Condition<T>) = it.send(Query(condition, limit = 0))
+            }
         }
     }
     private var socketCondition: Condition<T> = Condition.Never()
@@ -202,7 +234,7 @@ internal class CacheImpl<T : HasId<ID>, ID : Comparable<ID>>(
         socketCondition = condition
         val socket = currentSocket.await() ?: return
         if(socket.connected.await()) {
-            socket.send(Query(condition, limit = 0))
+            socket.send(condition)
         }
         if(condition is Condition.Never) {
             if(socketEnder != null) {

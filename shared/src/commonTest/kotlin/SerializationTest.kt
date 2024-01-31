@@ -173,6 +173,7 @@ class SerializationTest {
         Condition.NotEqual(sampleInstance).cycle()
         Condition.Inside(listOf(sampleInstance)).cycle()
         Condition.NotInside(listOf(sampleInstance)).cycle()
+        Condition.FullTextSearch<LargeTestModel>("some text", true).cycle()
         (path<LargeTestModel>().instant gt now()).cycle()
         (path<LargeTestModel>().int gt 2).cycle()
         (path<LargeTestModel>().int lt 2).cycle()

@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.ModelInfoWithDefault
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
+import com.lightningkite.lightningserver.db.modelInfoWithDefault
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -31,26 +32,16 @@ class OauthClientEndpoints(
         prepareModels()
     }
 
-    @Suppress("UNCHECKED_CAST")
-    val modelInfo = object: ModelInfoWithDefault<HasId<*>, OauthClient, String> {
-        override val serialization = ModelSerializationInfo<OauthClient, String>(
+    val modelInfo = modelInfoWithDefault(
+        serialization = ModelSerializationInfo<OauthClient, String>(
             serializer = Serialization.module.serializer(),
             idSerializer = Serialization.module.serializer()
-        )
-        override val authOptions: AuthOptions<HasId<*>> get() = maintainPermissions as AuthOptions<HasId<*>>
-        override fun baseCollection(): FieldCollection<OauthClient> = database().collection<OauthClient>()
-        override fun collection(): FieldCollection<OauthClient> = database().collection<OauthClient>()
-
-        override suspend fun collection(auth: AuthAccessor<HasId<*>>): FieldCollection<OauthClient> = collection()
-
-        override suspend fun defaultItem(auth: RequestAuth<HasId<*>>?): OauthClient {
-            return OauthClient(_id = "", scopes = setOf(), redirectUris = setOf(), niceName = "")
-        }
-
-        override fun exampleItem(): OauthClient? {
-            return OauthClient(_id = "", scopes = setOf(), redirectUris = setOf(), niceName = "")
-        }
-    }
+        ),
+        authOptions = maintainPermissions as AuthOptions<HasId<*>>,
+        getBaseCollection = { database().collection<OauthClient>() },
+        exampleItem = { OauthClient(_id = "", scopes = setOf(), redirectUris = setOf(), niceName = "") },
+        defaultItem = { OauthClient(_id = "", scopes = setOf(), redirectUris = setOf(), niceName = "") }
+    )
 
     val rest = ModelRestEndpoints(path, modelInfo)
     val createSecret = path.arg<String>("_id").path("create-secret").post.api(

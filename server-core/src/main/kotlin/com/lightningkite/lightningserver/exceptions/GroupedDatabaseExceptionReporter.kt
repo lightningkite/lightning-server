@@ -4,10 +4,12 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.RequestAuth
+import com.lightningkite.lightningserver.auth.oauth.OauthClient
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelInfoWithDefault
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
+import com.lightningkite.lightningserver.db.modelInfoWithDefault
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.AuthAccessor
 import com.lightningkite.now
@@ -59,26 +61,17 @@ class GroupedDatabaseExceptionReporter(val packageName: String, val database: Da
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
-    val modelInfo = object: ModelInfoWithDefault<HasId<*>, ReportedExceptionGroup, Int> {
-        override val serialization = ModelSerializationInfo<ReportedExceptionGroup, Int>(
+
+    val modelInfo = modelInfoWithDefault(
+        serialization = ModelSerializationInfo<ReportedExceptionGroup, Int>(
             serializer = Serialization.module.serializer(),
             idSerializer = Serialization.module.serializer()
-        )
-        override val authOptions: AuthOptions<HasId<*>> get() = Authentication.isDeveloper as AuthOptions<HasId<*>>
-        override fun baseCollection(): FieldCollection<ReportedExceptionGroup> = database.collection<ReportedExceptionGroup>()
-        override fun collection(): FieldCollection<ReportedExceptionGroup> = baseCollection()
-
-        override suspend fun collection(auth: AuthAccessor<HasId<*>>): FieldCollection<ReportedExceptionGroup> = collection()
-
-        override suspend fun defaultItem(auth: RequestAuth<HasId<*>>?): ReportedExceptionGroup {
-            return ReportedExceptionGroup(_id = 0, context = "", server = "", message = "", trace = "")
-        }
-
-        override fun exampleItem(): ReportedExceptionGroup? {
-            return ReportedExceptionGroup(_id = 0, context = "", server = "", message = "", trace = "")
-        }
-    }
+        ),
+        authOptions = Authentication.isDeveloper as AuthOptions<HasId<*>>,
+        getBaseCollection = { database.collection<ReportedExceptionGroup>() },
+        exampleItem = { ReportedExceptionGroup(_id = 0, context = "", server = "", message = "", trace = "")},
+        defaultItem = { ReportedExceptionGroup(_id = 0, context = "", server = "", message = "", trace = "") }
+    )
 
     val rest = ModelRestEndpoints(ServerPath("meta/exceptions"), modelInfo)
 }

@@ -157,10 +157,6 @@ open class DelayedFieldCollection<Model : Any>(
         delay(milliseconds)
         return wraps.deleteManyIgnoringOld(condition)
     }
-
-    override fun registerRawSignal(callback: suspend (CollectionChanges<Model>) -> Unit) {
-        return wraps.registerRawSignal(callback)
-    }
 }
 
 fun <Model : Any> FieldCollection<Model>.delayed(milliseconds: Long): FieldCollection<Model> =

@@ -14,15 +14,12 @@ import com.lightningkite.lightningserver.tasks.task
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
-import kotlin.time.Duration
 import com.lightningkite.lightningdb.SerializableProperty
-import kotlinx.datetime.Clock
 import com.lightningkite.now
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -143,7 +140,7 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebs
             jobs.forEach { it.join() }
         }
         startup {
-            info.collection().registerRawSignal { changes ->
+            info.registerChangeListener { changes ->
                 changes.changes.chunked(50).forEach {
                     sendWsChanges(CollectionChanges(changes = it))
                 }
@@ -164,7 +161,7 @@ class RestApiWebsocketHelper private constructor(val database: () -> Database) {
     val schedule = schedule("WebsocketDatabaseChangeSubscriptionCleanup", 5.minutes) {
         val now = now()
         val db =
-            subscriptionDb().deleteMany(condition {
+            subscriptionDb().deleteMany(condition<__WebSocketDatabaseChangeSubscription> {
                 (it.condition eq "") and
                         (it.establishedAt lt now.minus(5.minutes))
             } or condition {
@@ -195,35 +192,3 @@ data class __WebSocketDatabaseChangeSubscription(
     val establishedAt: Instant,
     val relevant: Set<Int>? = null,
 ) : HasId<WebSocketIdentifier>
-
-
-fun <T, V> Condition<T>.relevantHashCodesForKey(key: SerializableProperty<T, V>): Set<Int>? = when(this) {
-    is Condition.And<T> -> conditions
-        .asSequence()
-        .mapNotNull { it.relevantHashCodesForKey(key) }
-        .reduceOrNull { a, b -> a.intersect(b) }
-
-    is Condition.Or<T> -> conditions
-        .asSequence()
-        .map { it.relevantHashCodesForKey(key) }
-        .reduceOrNull { a, b -> if (a == null || b == null) null else a.union(b) }
-
-    is Condition.OnField<*, *> -> if (this.key == key) condition.relevantHashCodes() else null
-    else -> null
-}
-
-fun <T> Condition<T>.relevantHashCodes(): Set<Int>? = when (this) {
-    is Condition.And<T> -> conditions
-        .asSequence()
-        .mapNotNull { it.relevantHashCodes() }
-        .reduceOrNull { a, b -> a.intersect(b) }
-
-    is Condition.Or<T> -> conditions
-        .asSequence()
-        .map { it.relevantHashCodes() }
-        .reduceOrNull { a, b -> if (a == null || b == null) null else a.union(b) }
-
-    is Condition.Equal -> setOf(value.hashCode())
-    is Condition.Inside -> values.map { it.hashCode() }.toSet()
-    else -> null
-}

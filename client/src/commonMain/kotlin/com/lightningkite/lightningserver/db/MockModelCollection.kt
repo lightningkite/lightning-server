@@ -8,6 +8,11 @@ import kotlinx.serialization.KSerializer
 class MockModelCollection<T : HasId<ID>, ID : Comparable<ID>>(val serializer: KSerializer<T>) : ModelCollection<T, ID> {
     val models = HashMap<ID, MockWritableModel>()
 
+    fun populate(item: T) {
+        val id = item._id
+        models.getOrPut(id) { MockWritableModel(id) }.property.value = item
+    }
+
     inner class MockWritableModel(val id: ID) : WritableModel<T> {
         override val serializer: KSerializer<T>
             get() = this@MockModelCollection.serializer
@@ -68,17 +73,17 @@ class MockModelCollection<T : HasId<ID>, ID : Comparable<ID>>(val serializer: KS
     override suspend fun watch(query: Query<T>): Readable<List<T>> = query(query)
 
     override suspend fun insert(item: T): WritableModel<T> {
-        return models.getOrPut(item._id) { MockWritableModel(item._id) }.also { it.property.value = item }
+        return models.getOrPut(item._id) { MockWritableModel(item._id) }.also { it.property.value = item }.also { actionPerformed() }
     }
 
     override suspend fun insert(item: List<T>): List<T> {
         return item.map { item ->
             models.getOrPut(item._id) { MockWritableModel(item._id) }.let { it.property.value = item; item }
-        }
+        }.also { actionPerformed() }
     }
 
     override suspend fun upsert(item: T): WritableModel<T> {
-        return models.getOrPut(item._id) { MockWritableModel(item._id) }.also { it.property.value = item }
+        return models.getOrPut(item._id) { MockWritableModel(item._id) }.also { it.property.value = item }.also { actionPerformed() }
     }
 
     override suspend fun bulkModify(bulkUpdate: MassModification<T>): Int {

@@ -121,7 +121,8 @@ sealed class Condition<T : IsCodableAndHashable> {
     data class FullTextSearch<T : IsCodableAndHashable>(val value: String, val ignoreCase: Boolean = false) :
         Condition<T>() {
         override fun invoke(on: T): Boolean {
-            fatalError("Not Implemented locally")
+            val asText = on.toString()
+            return value.split(' ').all { asText.contains(it, ignoreCase) }
         }
     }
 

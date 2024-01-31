@@ -30,6 +30,10 @@ interface ModelRestEndpointsPlusWs<T : HasId<ID>, ID : Comparable<ID>> : ModelRe
     suspend fun watch(): TypedWebSocket<Query<T>, ListChange<T>>
 }
 
+interface ModelRestEndpointsPlusUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>> : ModelRestEndpoints<T, ID> {
+    suspend fun updates(): TypedWebSocket<Condition<T>, CollectionUpdates<T, ID>>
+}
+
 interface WritableModel<T> : Writable<T> {
     val serializer: KSerializer<T>
     suspend fun modify(modification: Modification<T>): T

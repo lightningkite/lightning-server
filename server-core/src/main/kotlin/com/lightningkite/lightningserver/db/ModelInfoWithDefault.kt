@@ -1,7 +1,9 @@
 package com.lightningkite.lightningserver.db
 
+import com.lightningkite.lightningdb.CollectionChanges
 import com.lightningkite.lightningdb.FieldCollection
 import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningdb.withChangeListeners
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -41,7 +43,11 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfoWithDefault(
     override val authOptions: AuthOptions<USER> = authOptions
     override val serialization: ModelSerializationInfo<T, ID> = serialization
     override fun baseCollection(): FieldCollection<T> = getBaseCollection()
-    override fun collection(): FieldCollection<T> = getCollection()
+    override fun registerChangeListener(action: suspend (CollectionChanges<T>) -> Unit) {
+        changeListeners.add(action)
+    }
+    val changeListeners = ArrayList<suspend (CollectionChanges<T>)->Unit>()
+    override fun collection(): FieldCollection<T> = getCollection().withChangeListeners(changeListeners)
     override suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<T> = forUser(collection(), auth.user())
 
     override val collectionName: String = modelName
@@ -62,7 +68,11 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> modelInfoWithDefault(
     override val authOptions: AuthOptions<USER> = authOptions
     override val serialization: ModelSerializationInfo<T, ID> = serialization
     override fun baseCollection(): FieldCollection<T> = getBaseCollection()
-    override fun collection(): FieldCollection<T> = getCollection(this.baseCollection())
+    override fun registerChangeListener(action: suspend (CollectionChanges<T>) -> Unit) {
+        changeListeners.add(action)
+    }
+    val changeListeners = ArrayList<suspend (CollectionChanges<T>)->Unit>()
+    override fun collection(): FieldCollection<T> = getCollection(this.baseCollection().withChangeListeners(changeListeners))
     override suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<T> =
         auth.forUser(this.collection())
 

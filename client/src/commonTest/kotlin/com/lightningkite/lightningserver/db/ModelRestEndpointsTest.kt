@@ -29,6 +29,10 @@ class ModelRestEndpointsTest {
             MockModelCollection(SampleModel.serializer()),
             CacheImpl(MockModelRestEndpoints(::println), SampleModel.serializer()),
             CacheImpl(
+                object : ModelRestEndpointsPlusWs<SampleModel, UUID> by MockModelRestEndpoints(::println) {},
+                SampleModel.serializer()
+            ),
+            CacheImpl(
                 object : ModelRestEndpoints<SampleModel, UUID> by MockModelRestEndpoints(::println) {},
                 SampleModel.serializer()
             )
@@ -37,6 +41,11 @@ class ModelRestEndpointsTest {
             val test1 = SampleModel(title = "Test 1", body = "Test 1 body contents")
             val test2 = SampleModel(title = "Test 2", body = "Test 2 body contents")
             val test3 = SampleModel(title = "Test 3", body = "Test 3 body contents")
+
+            assertEquals(
+                listOf(test1, test2, test3).sortedBy { it.at },
+                listOf(test1, test2, test3).sortedWith(sort<SampleModel> { it.at.ascending() }.comparator!!)
+            )
 
             fun <Self : Readable<T>, T> Self.reportForTest(label: String): Self {
                 scope.reactiveScope(onLoad = { println("Loading...") }) {
@@ -47,9 +56,9 @@ class ModelRestEndpointsTest {
             }
 
             suspend fun regularly() = collectionsToTest.forEach { if (it is CacheImpl) it.regularly() }
-            val query1 = collectionsToTest.mapIndexed { index, it -> it.query(Query<SampleModel>(orderBy = sort { it._id })).reportForTest("query1$index") }
+            val query1 = collectionsToTest.mapIndexed { index, it -> it.query(Query<SampleModel>(orderBy = sort { it.at.ascending() })).reportForTest("query1$index") }
             val query2 = collectionsToTest.mapIndexed { index, it ->
-                it.query(Query<SampleModel>(condition { it.title eq "Test 1" }, orderBy = sort { it._id })).reportForTest("query2$index")
+                it.query(Query<SampleModel>(condition { it.title eq "Test 1" }, orderBy = sort { it.at.ascending() })).reportForTest("query2$index")
             }
             regularly()
             var rechecksExpected = 0
@@ -58,7 +67,9 @@ class ModelRestEndpointsTest {
                 regularly()
                 rechecksExpected++
                 query1.assertEqual { it.await() }
+                query1.forEach { assertEquals(it.await().sortedBy { it.at }, it.await()) }
                 query2.assertEqual { it.await() }
+                query2.forEach { assertEquals(it.await().sortedBy { it.at }, it.await()) }
                 rechecksFinished++
                 regularly()
             }
@@ -100,6 +111,8 @@ data class SampleModel(
 inline fun <T, V> List<T>.assertEqual(mapper: (T) -> V) {
     val first = first().let(mapper)
     for (item in drop(1)) {
-        assertEquals(first, item.let(mapper))
+        val other = item.let(mapper)
+        println("ASSERT EQUALS  $first vs $other")
+        assertEquals(first, other)
     }
 }

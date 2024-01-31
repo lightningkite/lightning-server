@@ -324,7 +324,7 @@ private fun KSerializer<*>.kotlinTypeString(emitter: CodeEmitter): String {
 
 private fun CodeEmitter.functionHeader(documentable: Documentable, skipAuth: Boolean = false) {
     if(skipAuth && documentable.belongsToInterface != null) { append("override ")}
-    if(documentable is ApiEndpoint<*, *, *, *>) append("suspend ")
+    append("suspend ")
     append("fun ${documentable.functionName}(")
     var argComma = false
     arguments(documentable, skipAuth).forEach {

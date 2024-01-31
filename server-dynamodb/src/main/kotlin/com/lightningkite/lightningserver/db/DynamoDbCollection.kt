@@ -16,7 +16,7 @@ class DynamoDbCollection<T : Any>(
     val client: DynamoDbAsyncClient,
     override val serializer: KSerializer<T>,
     val tableName: String,
-) : AbstractSignalFieldCollection<T>() {
+) : FieldCollection<T> {
 
     val idSerializer = serializer.serializableProperties!!.find { it.name == "_id" }!!.serializer as KSerializer<Any?>
 
@@ -61,7 +61,7 @@ class DynamoDbCollection<T : Any>(
         maxQueryMs: Long,
     ): Flow<T> = findRaw(condition, orderBy, skip, limit, maxQueryMs).map { it.second }
 
-    override suspend fun insertImpl(models: Iterable<T>): List<T> {
+    override suspend fun insert(models: Iterable<T>): List<T> {
         client.batchWriteItem {
             it.requestItems(mapOf(tableName to models.map {
                 WriteRequest.builder().putRequest(
@@ -72,11 +72,11 @@ class DynamoDbCollection<T : Any>(
         return models.toList()
     }
 
-    override suspend fun replaceOneImpl(condition: Condition<T>, model: T, orderBy: List<SortPart<T>>): EntryChange<T> {
+    override suspend fun replaceOne(condition: Condition<T>, model: T, orderBy: List<SortPart<T>>): EntryChange<T> {
         TODO("Not yet implemented")
     }
 
-    override suspend fun replaceOneIgnoringResultImpl(
+    override suspend fun replaceOneIgnoringResult(
         condition: Condition<T>,
         model: T,
         orderBy: List<SortPart<T>>,
@@ -84,7 +84,7 @@ class DynamoDbCollection<T : Any>(
         TODO("Not yet implemented")
     }
 
-    override suspend fun upsertOneImpl(
+    override suspend fun upsertOne(
         condition: Condition<T>,
         modification: Modification<T>,
         model: T,
@@ -92,7 +92,7 @@ class DynamoDbCollection<T : Any>(
         TODO("Not yet implemented")
     }
 
-    override suspend fun upsertOneIgnoringResultImpl(
+    override suspend fun upsertOneIgnoringResult(
         condition: Condition<T>,
         modification: Modification<T>,
         model: T,
@@ -117,7 +117,7 @@ class DynamoDbCollection<T : Any>(
         }
     }
 
-    override suspend fun updateOneImpl(condition: Condition<T>, modification: Modification<T>, orderBy: List<SortPart<T>>): EntryChange<T> {
+    override suspend fun updateOne(condition: Condition<T>, modification: Modification<T>, orderBy: List<SortPart<T>>): EntryChange<T> {
         val m = modification.dynamo(serializer)
         return perKey(condition, limit = 1) { c, key ->
             val result = client.updateItem {
@@ -134,7 +134,7 @@ class DynamoDbCollection<T : Any>(
         }.singleOrNull() ?: EntryChange(null, null)
     }
 
-    override suspend fun updateOneIgnoringResultImpl(condition: Condition<T>, modification: Modification<T>, orderBy: List<SortPart<T>>): Boolean {
+    override suspend fun updateOneIgnoringResult(condition: Condition<T>, modification: Modification<T>, orderBy: List<SortPart<T>>): Boolean {
         val m = modification.dynamo(serializer)
         return perKey(condition, limit = 1) { c, key ->
             client.updateItem {
@@ -146,7 +146,7 @@ class DynamoDbCollection<T : Any>(
         }.singleOrNull() ?: false
     }
 
-    override suspend fun updateManyImpl(condition: Condition<T>, modification: Modification<T>): CollectionChanges<T> {
+    override suspend fun updateMany(condition: Condition<T>, modification: Modification<T>): CollectionChanges<T> {
         val m = modification.dynamo(serializer)
         val changes = ArrayList<EntryChange<T>>()
         perKey(condition) { c, key ->
@@ -165,7 +165,7 @@ class DynamoDbCollection<T : Any>(
         return CollectionChanges(changes = changes)
     }
 
-    override suspend fun updateManyIgnoringResultImpl(condition: Condition<T>, modification: Modification<T>): Int {
+    override suspend fun updateManyIgnoringResult(condition: Condition<T>, modification: Modification<T>): Int {
         var changed = 0
         val m = modification.dynamo(serializer)
         perKey(condition) { c, key ->
@@ -179,7 +179,7 @@ class DynamoDbCollection<T : Any>(
         return changed
     }
 
-    override suspend fun deleteOneImpl(condition: Condition<T>, orderBy: List<SortPart<T>>): T? {
+    override suspend fun deleteOne(condition: Condition<T>, orderBy: List<SortPart<T>>): T? {
         return perKey(condition, limit = 1) { c, key ->
             val result = client.deleteItem {
                 it.tableName(tableName)
@@ -191,7 +191,7 @@ class DynamoDbCollection<T : Any>(
         }.singleOrNull()
     }
 
-    override suspend fun deleteOneIgnoringOldImpl(condition: Condition<T>, orderBy: List<SortPart<T>>): Boolean {
+    override suspend fun deleteOneIgnoringOld(condition: Condition<T>, orderBy: List<SortPart<T>>): Boolean {
         return perKey(condition, limit = 1) { c, key ->
             client.deleteItem {
                 it.tableName(tableName)
@@ -202,7 +202,7 @@ class DynamoDbCollection<T : Any>(
         }.singleOrNull() ?: false
     }
 
-    override suspend fun deleteManyImpl(condition: Condition<T>): List<T> {
+    override suspend fun deleteMany(condition: Condition<T>): List<T> {
         return perKey(condition) { c, key ->
             val result = client.deleteItem {
                 it.tableName(tableName)
@@ -215,7 +215,7 @@ class DynamoDbCollection<T : Any>(
         }.toList()
     }
 
-    override suspend fun deleteManyIgnoringOldImpl(condition: Condition<T>): Int {
+    override suspend fun deleteManyIgnoringOld(condition: Condition<T>): Int {
         var changed = 0
         perKey(condition) { c, key ->
             val result = client.deleteItem {

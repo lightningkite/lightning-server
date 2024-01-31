@@ -7,7 +7,7 @@ import com.lightningkite.rock.reactive.Constant
 import com.lightningkite.rock.reactive.Readable
 
 class MockModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(val log: (String) -> Unit) :
-    ModelRestEndpointsPlusWs<T, ID> {
+    ModelRestEndpointsPlusWs<T, ID>, ModelRestEndpointsPlusUpdatesWebsocket<T, ID> {
     val items = HashMap<ID, T>()
     val watchers = ArrayList<(changes: List<EntryChange<T>>) -> Unit>()
     override suspend fun query(input: Query<T>): List<T> {
@@ -183,6 +183,7 @@ class MockModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(val log: (Strin
                             new = it.new?.takeIf { lastQuery.condition(it) },
                         ).takeUnless { it.old == null && it.new == null }
                     }
+                    .forEach { onMessage.forEach { l -> l(it) } }
                 Unit
             }
             var count = 0
@@ -200,4 +201,47 @@ class MockModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(val log: (Strin
         }
     }
 
+    override suspend fun updates(): TypedWebSocket<Condition<T>, CollectionUpdates<T, ID>> {
+        return object : TypedWebSocket<Condition<T>, CollectionUpdates<T, ID>> {
+            override val connected: Readable<Boolean> get() = Constant(true)
+            override fun close(code: Short, reason: String) {}
+            override fun onClose(action: (Short) -> Unit) {
+            }
+
+            override fun onOpen(action: () -> Unit) {
+                action()
+            }
+
+            override fun send(data: Condition<T>) {
+                lastCondition = data
+            }
+
+            var lastCondition: Condition<T> = Condition.Never()
+            val onMessage = ArrayList<(CollectionUpdates<T, ID>) -> Unit>()
+            override fun onMessage(action: (CollectionUpdates<T, ID>) -> Unit) {
+                onMessage.add(action)
+            }
+
+            val myListener = { list: List<EntryChange<T>> ->
+                val changes = CollectionUpdates<T, ID>(
+                    updates = list.mapNotNull { it.new }.toSet(),
+                    remove = list.mapNotNull { it.old.takeIf { _ -> it.new == null }?._id }.toSet()
+                )
+                onMessage.forEach { it(changes) }
+                Unit
+            }
+            var count = 0
+            override fun start(): () -> Unit {
+                if (count++ == 0) {
+                    watchers.add(myListener)
+                }
+                return {
+                    if (--count == 0) {
+                        watchers.remove(myListener)
+                    }
+                }
+            }
+
+        }
+    }
 }
