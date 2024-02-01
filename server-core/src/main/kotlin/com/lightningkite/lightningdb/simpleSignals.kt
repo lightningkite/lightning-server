@@ -312,31 +312,31 @@ fun <Model : HasId<ID>, ID : Comparable<ID>> FieldCollection<Model>.withChangeLi
         condition: Condition<Model>,
         model: Model,
         orderBy: List<SortPart<Model>>
-    ): Boolean = if(changeListeners.isEmpty()) replaceOneIgnoringResult(condition, model, orderBy) else replaceOne(condition, model, orderBy).new != null
+    ): Boolean = if(changeListeners.isEmpty()) wraps.replaceOneIgnoringResult(condition, model, orderBy) else replaceOne(condition, model, orderBy).new != null
 
     override suspend fun upsertOneIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>,
         model: Model
-    ): Boolean = if(changeListeners.isEmpty()) upsertOneIgnoringResult(condition, modification, model) else upsertOne(condition, modification, model).old != null
+    ): Boolean = if(changeListeners.isEmpty()) wraps.upsertOneIgnoringResult(condition, modification, model) else upsertOne(condition, modification, model).old != null
 
     override suspend fun updateOneIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>,
         orderBy: List<SortPart<Model>>
-    ): Boolean = if(changeListeners.isEmpty()) updateOneIgnoringResult(condition, modification, orderBy) else updateOne(condition, modification, orderBy).new != null
+    ): Boolean = if(changeListeners.isEmpty()) wraps.updateOneIgnoringResult(condition, modification, orderBy) else updateOne(condition, modification, orderBy).new != null
 
     override suspend fun updateManyIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>
-    ): Int = if(changeListeners.isEmpty()) updateManyIgnoringResult(condition, modification) else updateMany(condition, modification).changes.size
+    ): Int = if(changeListeners.isEmpty()) wraps.updateManyIgnoringResult(condition, modification) else updateMany(condition, modification).changes.size
 
     override suspend fun deleteOneIgnoringOld(
         condition: Condition<Model>,
         orderBy: List<SortPart<Model>>
-    ): Boolean = if(changeListeners.isEmpty()) deleteOneIgnoringOld(condition, orderBy) else deleteOne(condition, orderBy) != null
+    ): Boolean = if(changeListeners.isEmpty()) wraps.deleteOneIgnoringOld(condition, orderBy) else deleteOne(condition, orderBy) != null
 
-    override suspend fun deleteManyIgnoringOld(condition: Condition<Model>): Int = if(changeListeners.isEmpty()) deleteManyIgnoringOld(condition) else deleteMany(condition).size
+    override suspend fun deleteManyIgnoringOld(condition: Condition<Model>): Int = if(changeListeners.isEmpty()) wraps.deleteManyIgnoringOld(condition) else deleteMany(condition).size
 
 }
 

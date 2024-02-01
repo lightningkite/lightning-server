@@ -137,7 +137,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
             .mapValues { it.value.filter { !it.authOptions.options.contains(null).not() || it.primaryAuthName == null || it.primaryAuthName == userType } }
         val groups = byGroup.keys.filterNotNull()
         val sessionClassName = "${userType.substringAfterLast('.')}Session"
-        append("abstract class Abstract$sessionClassName(api: Api, ${userType.userTypeTokenName()}: suspend () -> String)")
+        append("abstract class Abstract$sessionClassName(api: Api, ${userType.userTypeTokenName()}: String, ${userType.userTypeAccessTokenName()}: suspend () -> String)")
         byGroup[null]!!.mapNotNull { it.belongsToInterface }.distinct().let {
             if(it.isNotEmpty()) {
                 append(": ")
@@ -148,9 +148,10 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
         }
         appendLine(" {")
         appendLine("    abstract val api: Api")
-        appendLine("    abstract val ${userType.userTypeTokenName()}: suspend () -> String")
+        appendLine("    abstract val ${userType.userTypeTokenName()}: String")
+        appendLine("    abstract val ${userType.userTypeAccessTokenName()}: suspend () -> String")
         for (group in groups) {
-            appendLine("    val ${group.groupToPartName()}: $sessionClassName${group.groupToInterfaceName()} = $sessionClassName${group.groupToInterfaceName()}(api.${group.groupToPartName()}, ${userType.userTypeTokenName()})")
+            appendLine("    val ${group.groupToPartName()}: $sessionClassName${group.groupToInterfaceName()} = $sessionClassName${group.groupToInterfaceName()}(api.${group.groupToPartName()}, ${userType.userTypeTokenName()}, ${userType.userTypeAccessTokenName()})")
         }
         for (entry in byGroup[null] ?: listOf()) {
             append("    ")
@@ -160,7 +161,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
             appendLine()
         }
         for (group in groups) {
-            append("    class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()}, val ${userType.userTypeTokenName()}: suspend () -> String)")
+            append("    class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()},val ${userType.userTypeTokenName()}:String, val ${userType.userTypeAccessTokenName()}: suspend () -> String)")
             byGroup[group]!!.mapNotNull { it.belongsToInterface }.distinct().let {
                 if(it.isNotEmpty()) {
                     append(": ")
@@ -204,7 +205,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                 appendLine("        url = \"\$httpUrl${entry.path.path.escaped}\",")
                 appendLine("        method = HttpMethod.${entry.route.method},")
                 entry.primaryAuthName?.let {
-                    appendLine("            token = ${it.userTypeTokenName()},")
+                    appendLine("            token = ${it.userTypeAccessTokenName()},")
                 }
                 entry.inputType.takeUnless { it == Unit.serializer() }?.let {
                     appendLine("        body = input")
@@ -238,7 +239,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                     appendLine("            url = \"\$httpUrl${entry.path.path.escaped}\",")
                     appendLine("            method = HttpMethod.${entry.route.method},")
                     entry.primaryAuthName?.let {
-                        appendLine("            token = ${it.userTypeTokenName()},")
+                        appendLine("            token = ${it.userTypeAccessTokenName()},")
                     }
                     entry.inputType.takeUnless { it == Unit.serializer() }?.let {
                         appendLine("            body = input")
@@ -303,6 +304,8 @@ private fun String.groupToInterfaceName(): String = replaceFirstChar { it.upperc
 private fun String.groupToPartName(): String = replaceFirstChar { it.lowercase() }
 private fun String.userTypeTokenName(): String =
     this.substringAfterLast('.').replaceFirstChar { it.lowercase() }.plus("Token")
+private fun String.userTypeAccessTokenName(): String =
+    this.substringAfterLast('.').replaceFirstChar { it.lowercase() }.plus("AccessToken")
 
 private fun KSerializer<*>.kotlinTypeString(emitter: CodeEmitter): String {
     return when {
@@ -385,9 +388,9 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false): Li
         }?.let(::listOf),
         documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
             if (documentable.authOptions.options.contains(null).not())
-                Arg(name = it.userTypeTokenName(), stringType = "suspend () -> String", isAuth = true)
+                Arg(name = it.userTypeAccessTokenName(), stringType = "suspend () -> String", isAuth = true)
             else
-                Arg(name = it.userTypeTokenName(), stringType = "(suspend () -> String)?", default = "null", isAuth = true)
+                Arg(name = it.userTypeAccessTokenName(), stringType = "(suspend () -> String)?", default = "null", isAuth = true)
         }?.let(::listOf),
     ).flatten()
 
@@ -398,9 +401,9 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false): Li
             },
         documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
             if (documentable.authOptions.options.contains(null).not())
-                Arg(name = it.userTypeTokenName(), stringType = "suspend () -> String", isAuth = true)
+                Arg(name = it.userTypeTokenName(), stringType = "String", isAuth = true)
             else
-                Arg(name = it.userTypeTokenName(), stringType = "(suspend () -> String)?", default = "null", isAuth = true)
+                Arg(name = it.userTypeTokenName(), stringType = "String?", default = "null", isAuth = true)
         }?.let(::listOf),
     ).flatten()
 
