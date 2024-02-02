@@ -39,7 +39,9 @@ class SentryExceptionReporter(val dsn: String): ExceptionReporter {
         val ctx = Sentry.getContext()
         when (context) {
             is HttpRequest -> {
-                val p = context.rawUser()
+                val p = try {
+                    context.rawUser()
+                } catch(e: Exception) { null }
                 ctx.clear()
                 ctx.http = HttpInterface(
                     context.endpoint.path.toString(),
