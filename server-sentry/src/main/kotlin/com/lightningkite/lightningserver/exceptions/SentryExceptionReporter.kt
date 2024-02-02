@@ -75,7 +75,9 @@ class SentryExceptionReporter(val dsn: String): ExceptionReporter {
             }
             is WebSockets.ConnectEvent -> {
                 ctx.clear()
-                val p = context.rawUser()
+                val p = try {
+                    context.rawUser()
+                } catch (e: Exception) { null }
                 ctx.http = HttpInterface(
                     context.path.toString(),
                     "WS",
