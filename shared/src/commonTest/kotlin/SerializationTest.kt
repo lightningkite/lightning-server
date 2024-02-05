@@ -303,4 +303,11 @@ class SerializationTest {
 
         println(Cursed.Inside.serializer(ListSerializer(Int.serializer().nullable)).serializableProperties?.joinToString { "${it.name}: ${it.serializer.descriptor.serialName}" })
     }
+
+    @Test fun geo() {
+        val geo = GeoCoordinate(41.727019, -111.8443002)
+        assertEquals(geo, myJson.decodeFromString(myJson.encodeToString(geo).also { println(it) }))
+        assertEquals(geo, myJson.decodeFromString(GeoCoordinateArraySerializer, myJson.encodeToString(GeoCoordinateArraySerializer, geo)))
+        assertEquals(geo, myJson.decodeFromString(GeoCoordinateGeoJsonSerializer, myJson.encodeToString(GeoCoordinateGeoJsonSerializer, geo)))
+    }
 }

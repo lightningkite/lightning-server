@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningdb
 
+import com.lightningkite.GeoCoordinate
 import com.lightningkite.khrysalis.*
 import kotlinx.serialization.*
 import com.lightningkite.lightningdb.SerializableProperty
@@ -114,6 +115,12 @@ sealed class Condition<T : IsCodableAndHashable> {
     @SerialName("StringContains")
     data class StringContains(val value: String, val ignoreCase: Boolean = false) : Condition<String>() {
         override fun invoke(on: String): Boolean = on.contains(value, ignoreCase)
+    }
+
+    @Serializable
+    @SerialName("GeoDistance")
+    data class GeoDistance(val value: GeoCoordinate, val greaterThanKilometers: Double = 0.0, val lessThanKilometers: Double = 100_000.0) : Condition<GeoCoordinate>() {
+        override fun invoke(on: GeoCoordinate): Boolean = on.distanceToKilometers(value) in greaterThanKilometers..lessThanKilometers
     }
 
     @Serializable

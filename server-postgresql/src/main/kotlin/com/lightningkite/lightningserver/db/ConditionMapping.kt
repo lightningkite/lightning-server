@@ -188,6 +188,7 @@ private fun <T> ISqlExpressionBuilder.condition(
         }
 
         is Condition.Not -> NotOp(condition(condition.condition, fieldSet))
+        is Condition.GeoDistance -> TODO()
         is Condition.StringContains -> {
             val col = fieldSet.single
             if (condition.ignoreCase)

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.GeoCoordinateGeoJsonSerializer
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.mongodb.MongoCommandException
 import com.mongodb.client.model.*
@@ -12,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.elementDescriptors
 import org.bson.BsonDocument
 import org.bson.conversions.Bson
 import java.util.concurrent.TimeUnit
@@ -21,7 +23,7 @@ class MongoFieldCollection<Model : Any>(
     private val access: MongoCollectionAccess,
 ) : FieldCollection<Model> {
 
-    private suspend inline fun <T> access(crossinline action: suspend MongoCollection<BsonDocument>.() -> T): T{
+    private suspend inline fun <T> access(crossinline action: suspend MongoCollection<BsonDocument>.() -> T): T {
         return access.run {
             prepare()
             action()
@@ -95,7 +97,12 @@ class MongoFieldCollection<Model : Any>(
                         .hint(m.options.hint)
                         .hintString(m.options.hintString)
                 )?.let { Serialization.Internal.bson.load(serializer, it) }?.let { EntryChange(it, modification(it)) }
-                    ?: run { insertOne(Serialization.Internal.bson.stringify(serializer, model)); EntryChange(null, model) }
+                    ?: run {
+                        insertOne(Serialization.Internal.bson.stringify(serializer, model)); EntryChange(
+                        null,
+                        model
+                    )
+                    }
             }
         }
     }
@@ -146,7 +153,7 @@ class MongoFieldCollection<Model : Any>(
                     .arrayFilters(m.options.arrayFilters)
                     .hint(m.options.hint)
                     .hintString(m.options.hintString)
-            )?.let { Serialization.Internal.bson.load(serializer,it) }
+            )?.let { Serialization.Internal.bson.load(serializer, it) }
         } ?: return EntryChange(null, null)
         val after = modification(before)
         return EntryChange(before, after)
@@ -337,10 +344,12 @@ class MongoFieldCollection<Model : Any>(
         val cs = condition.simplify()
         if (cs is Condition.Never) return null
         return access {
-            aggregate(listOf(
-                Aggregates.match(cs.bson(serializer)),
-                Aggregates.group(null, aggregate.asValueBson(property.mongo))
-            ))
+            aggregate(
+                listOf(
+                    Aggregates.match(cs.bson(serializer)),
+                    Aggregates.group(null, aggregate.asValueBson(property.mongo))
+                )
+            )
                 .toList()
                 .map {
                     if (it.isNull("value")) null
@@ -376,9 +385,10 @@ class MongoFieldCollection<Model : Any>(
     }
 
     private var preparedAlready = false
+
     @OptIn(DelicateCoroutinesApi::class, ExperimentalSerializationApi::class)
     private suspend fun MongoCollection<BsonDocument>.prepare() {
-        if(preparedAlready) return
+        if (preparedAlready) return
         coroutineScope {
             val requireCompletion = ArrayList<Job>()
 
@@ -426,6 +436,25 @@ class MongoFieldCollection<Model : Any>(
                             if (e.errorCode == 85) {
                                 dropIndex(keys)
                                 createIndex(keys, options)
+                            }
+                        }
+                    }
+                }
+            }
+            serializer.descriptor.let {
+                (0..<it.elementsCount).forEach { index ->
+                    val name = it.getElementName(index)
+                    val type = it.getElementDescriptor(index)
+                    if (type.serialName == GeoCoordinateGeoJsonSerializer.descriptor.serialName) {
+                        requireCompletion += launch {
+                            try {
+                                createIndex(Indexes.geo2dsphere(name), IndexOptions().name(name + "_geo"))
+                            } catch (e: MongoCommandException) {
+                                // Reform index if it already exists but with some difference in options
+                                if (e.errorCode == 85) {
+                                    dropIndex(name + "_geo")
+                                    createIndex(Indexes.geo2dsphere(name), IndexOptions().name(name + "_geo"))
+                                }
                             }
                         }
                     }

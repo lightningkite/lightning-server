@@ -60,23 +60,19 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
 
     val earlyUpload = UploadEarlyEndpoint(path("upload"), files, database)
 
+    val wsModelInfo = modelInfo<HasId<*>?, TestThing, UUID>(
+        authOptions = noAuth,
+        serialization = ModelSerializationInfo(),
+        getBaseCollection = { database().collection() },
+        forUser = { it },
+    )
     val ws = ServerPath("test").restApiWebsocket<HasId<*>?, TestThing, UUID>(
         database,
-        info = modelInfo(
-            authOptions = noAuth,
-            serialization = ModelSerializationInfo(),
-            getBaseCollection = { database().collection() },
-            forUser = { it },
-        )
+        info = wsModelInfo
     )
     val ws2 = ServerPath("test2").restApiWebsocket<HasId<*>?, TestThing, UUID>(
         database,
-        info = modelInfo(
-            authOptions = noAuth,
-            serialization = ModelSerializationInfo(),
-            getBaseCollection = { database().collection() },
-            forUser = { it },
-        ),
+        info = wsModelInfo,
         key = TestThing__id
     )
 

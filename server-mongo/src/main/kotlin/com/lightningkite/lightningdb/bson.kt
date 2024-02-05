@@ -1,6 +1,8 @@
 package com.lightningkite.lightningdb
 
 import com.github.jershell.kbson.*
+import com.lightningkite.GeoCoordinate
+import com.lightningkite.GeoCoordinateGeoJsonSerializer
 import com.lightningkite.khrysalis.IsCodableAndHashable
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -81,6 +83,11 @@ private fun <T> Condition<T>.dump(serializer: KSerializer<T>, into: Document = D
         }
 //        is Condition.Not -> condition.dump(serializer, into.sub(key)["\$not"], key)
         is Condition.OnKey<*> -> (condition as Condition<Any?>).dump(serializer.mapValueElement() as KSerializer<Any?>, into, if (key == null) this.key else "$key.${this.key}")
+        is Condition.GeoDistance -> into.sub(key)["\$near"] = documentOf(
+            "\$maxDistance" to this.lessThanKilometers * 1000,
+            "\$minDistance" to this.greaterThanKilometers * 1000,
+            "\$geometry" to Serialization.Internal.bson.stringifyAny(GeoCoordinateGeoJsonSerializer, this.value),
+        )
         is Condition.StringContains -> {
             into.sub(key).also {
                 it["\$regex"] = Regex.escape(this.value)

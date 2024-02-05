@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningdb
 
+import com.lightningkite.GeoCoordinate
 import com.lightningkite.khrysalis.IsEquatable
 import com.lightningkite.khrysalis.fatalError
 import kotlinx.serialization.*
@@ -53,6 +54,9 @@ private val intOptions: List<MySealedClassSerializer.Option<Condition<Int>, *>> 
     MySealedClassSerializer.Option(Condition.IntBitsAnyClear.serializer()) { it is Condition.IntBitsAnyClear },
     MySealedClassSerializer.Option(Condition.IntBitsAnySet.serializer()) { it is Condition.IntBitsAnySet },
 )
+private val geocoordinateOptions: List<MySealedClassSerializer.Option<Condition<GeoCoordinate>, *>> = commonOptions(ContextualSerializer(GeoCoordinate::class)) + listOf(
+    MySealedClassSerializer.Option(Condition.GeoDistance.serializer()) { it is Condition.GeoDistance },
+)
 private val stringOptions: List<MySealedClassSerializer.Option<Condition<String>, *>>  = comparableOptions(String.serializer()) + listOf(
     MySealedClassSerializer.Option(Condition.StringContains.serializer(), setOf("Search")) { it is Condition.StringContains },
     MySealedClassSerializer.Option(Condition.RegexMatches.serializer()) { it is Condition.RegexMatches },
@@ -74,6 +78,7 @@ class ConditionSerializer<T>(val inner: KSerializer<T>): MySealedClassSerializer
             inner.descriptor.isNullable -> nullableOptions(inner.innerElement() as KSerializer<Any>)
             inner.descriptor.serialName == "kotlin.String" -> stringOptions
             inner.descriptor.serialName == "kotlin.Int" -> intOptions
+            inner.descriptor.serialName == "com.lightningkite.GeoCoordinate" -> geocoordinateOptions
             inner.descriptor.kind == StructureKind.MAP -> stringMapOptions(inner.innerElement2())
             inner.descriptor.kind == StructureKind.LIST -> {
                 if(inner.descriptor.serialName.contains("Set")) setOptions(inner.innerElement())

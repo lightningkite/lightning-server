@@ -1,6 +1,7 @@
 @file:UseContextualSerialization(UUID::class, Instant::class, ServerFile::class)
 package com.lightningkite.lightningdb.test
 
+import com.lightningkite.GeoCoordinate
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningdb.HasId
 import kotlinx.serialization.Contextual
@@ -118,6 +119,15 @@ data class LargeTestModel(
     var listNullable: List<Int>? = null,
     var mapNullable: Map<String, Int>? = null,
     var embeddedNullable: ClassUsedForEmbedding? = null,
+) : HasId<UUID> {
+    companion object
+}
+
+@GenerateDataClassPaths
+@Serializable
+data class GeoTest(
+    override val _id: UUID = uuid(),
+    val geo: GeoCoordinate = GeoCoordinate(41.727019, -111.8443002)
 ) : HasId<UUID> {
     companion object
 }

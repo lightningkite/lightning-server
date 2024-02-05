@@ -50,5 +50,4 @@ fun main(vararg args: String) {
 fun dbTest(): Unit = runBlocking {
     Server
     loadSettings(File("settings.json"))
-    Server.testModel.collection().all().toList()
 }
