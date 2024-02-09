@@ -9,15 +9,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.serializer
 import java.time.Instant
 
 @LightningServerDsl
-inline fun <reified INPUT> task(name: String, noinline implementation: suspend CoroutineScope.(INPUT) -> Unit) =
+inline fun <reified INPUT> task(name: String, noinline implementation: suspend Task.RunningTask<INPUT>.(INPUT) -> Unit) =
     task(name, Serialization.module.serializer<INPUT>(), implementation)
 
 @LightningServerDsl
-fun <INPUT> task(name: String, serializer: KSerializer<INPUT>, implementation: suspend CoroutineScope.(INPUT) -> Unit) =
+fun <INPUT> task(name: String, serializer: KSerializer<INPUT>, implementation: suspend Task.RunningTask<INPUT>.(INPUT) -> Unit): Task<INPUT> =
     Task(name, serializer, implementation)
 
 @LightningServerDsl

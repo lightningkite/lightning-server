@@ -18,7 +18,6 @@ import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpMethod
-import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -36,8 +35,12 @@ import kotlinx.coroutines.future.await
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToStream
+import kotlinx.serialization.json.jsonObject
 import org.crac.Core
+import org.crac.Resource
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import software.amazon.awssdk.core.SdkBytes
@@ -55,7 +58,6 @@ import java.io.OutputStream
 import java.net.URI
 import java.time.Duration
 import java.util.*
-import org.crac.Resource
 import kotlin.system.exitProcess
 
 
@@ -320,7 +322,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 APIGatewayV2HTTPResponse(statusCode = 404, body = "Task ${event.taskName} not found")
             } else try {
                 Metrics.handlerPerformance(task) {
-                    task.implementation(this, Serialization.json.decodeFromString(task.serializer, event.input))
+                    task.invokeImmediate(this, Serialization.json.decodeFromString(task.serializer, event.input))
                 }
                 APIGatewayV2HTTPResponse(statusCode = 204)
             } catch (e: Exception) {

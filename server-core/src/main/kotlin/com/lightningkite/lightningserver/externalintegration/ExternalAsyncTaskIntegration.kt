@@ -186,7 +186,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
     }
 
     suspend fun check(ids: List<String>) = coroutineScope {
-        recheckSet.implementation(
+        recheckSet.invokeImmediate(
             this, info.collection().find(
                 condition { it._id inside ids }).toList()
         )
@@ -213,7 +213,7 @@ class ExternalAsyncTaskIntegration<USER, REQUEST, RESPONSE : HasId<String>, RESU
         implementation = { user: USER, id: String, _: Unit ->
             if (!isAdmin(user)) throw ForbiddenException()
             coroutineScope {
-                recheckSet.implementation(this, listOf(info.collection().get(id) ?: throw NotFoundException()))
+                recheckSet.invokeImmediate(this, listOf(info.collection().get(id) ?: throw NotFoundException()))
             }
         }
     )

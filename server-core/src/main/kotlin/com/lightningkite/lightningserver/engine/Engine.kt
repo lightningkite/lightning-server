@@ -48,7 +48,7 @@ object LocalEngine : Engine {
     override suspend fun launchTask(task: Task<Any?>, input: Any?) {
         GlobalScope.launch {
             Metrics.handlerPerformance(task) {
-                task.implementation(this, input)
+                task.invokeImmediate(this, input)
             }
         }
     }
@@ -66,7 +66,7 @@ object UnitTestEngine : Engine {
     override suspend fun launchTask(task: Task<Any?>, input: Any?) {
         coroutineScope {
             Metrics.handlerPerformance(task) {
-                task.implementation(this, input)
+                task.invokeImmediate(this, input)
             }
         }
     }
