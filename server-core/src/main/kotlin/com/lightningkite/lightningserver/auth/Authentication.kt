@@ -57,6 +57,8 @@ object Authentication {
             return Serialization.properties.encodeToStringMap(subjectSerializer, subject)[property]
         }
 
+        fun getSessionExpiration(subject: SUBJECT): Instant? = null
+
         val proofMethods: Set<ProofMethod> get() = Authentication.proofMethods.values.filter {
             it.info.property == null || get(it.info.property!!)
         }.toSet()
