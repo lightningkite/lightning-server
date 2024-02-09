@@ -219,6 +219,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     subjectId = subject._id,
                     scopes = setOf("*"),
                     label = "Root Session",
+                    expires = handler.getSessionExpiration(subject),
                 ).second.string else null,
                 id = subject._id,
                 options = proofMethods
@@ -251,7 +252,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 subjectId = future.subjectId,
                 derivedFrom = future.originalSessionId,
                 scopes = future.scopes,
-                expires = null,
+                expires = future.sessionExpiration,
                 oauthClient = future.oauthClient
             )
             secret.string
@@ -266,12 +267,16 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         description = "Creates a session with more limited authorization",
         errorCases = listOf(),
         implementation = { request: SubSessionRequest ->
+            val session = sessionInfo.collection().get(this.auth.sessionId ?: throw UnauthorizedException())
+                ?: throw UnauthorizedException()
+
             newSessionPrivate(
                 label = request.label,
                 subjectId = user()._id,
                 derivedFrom = auth.sessionId,
                 scopes = request.scopes,
-                expires = request.expires,
+                expires = session.expires?.let { minOf(it, request.expires ?: Instant.DISTANT_FUTURE) }
+                    ?: request.expires,
                 oauthClient = request.oauthClient,
             ).second.string
         }
@@ -301,6 +306,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     subjectId = auth.id,
                     oauthClient = client._id,
                     originalSessionId = auth.sessionId,
+                    sessionExpiration = input.sessionExpiration,
                 ).asToken(),
                 state = input.state
             )
@@ -331,7 +337,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         subjectId = future.subjectId,
                         derivedFrom = future.originalSessionId,
                         scopes = future.scopes,
-                        expires = null,
+                        expires = future.sessionExpiration,
                         oauthClient = future.oauthClient
                     )
                     generatedRefresh = secret
@@ -398,6 +404,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         subjectId = subjectId,
         label = label,
         expires = expires,
+        sessionExpiration = handler.fetch(subjectId).let { handler.getSessionExpiration(it) },
         oauthClient = oauthClient,
         originalSessionId = derivedFrom,
     ).asToken()
@@ -438,7 +445,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         if (type != handler.name) return null
         val session = sessionInfo.collection().get(_id) ?: return null
         if (!plainTextSecret.checkAgainstHash(session.secretHash)) return null
-        if (session.terminated != null) return null
+        if (session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()) return null
         sessionInfo.collection().updateOneById(_id, modification(dataClassPath) {
             it.lastUsed assign now()
             it.userAgents addAll setOf(request?.headers?.get(HttpHeader.UserAgent) ?: "")
@@ -513,7 +520,13 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     ?: listOf()
             request.queryParameter("method")?.decodeURLPart()?.let { methodName ->
                 request.queryParameter("value")?.decodeURLPart()?.let { methodValue ->
-                    return@handler htmlContinue(HtmlProofStartReq(methodName, request.queryParameter("property")?.decodeURLPart() ?: "", methodValue), request, otherProofs)
+                    return@handler htmlContinue(
+                        HtmlProofStartReq(
+                            methodName,
+                            request.queryParameter("property")?.decodeURLPart() ?: "",
+                            methodValue
+                        ), request, otherProofs
+                    )
                 }
             }
             HttpResponse(
@@ -523,7 +536,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     <form action='.?proofs=${Serialization.javaData.encodeToBase64Url(otherProofs)}' enctype='application/x-www-form-urlencoded' method='post'>
                         <p>Enter your login key</p>
                         <select name='method'>
-                        ${handler.proofMethods.joinToString() { "<option value='${it.info.via}' ${if(it is EmailProofEndpoints) "selected" else ""}>${it.info.via}</option>" }}
+                        ${handler.proofMethods.joinToString() { "<option value='${it.info.via}' ${if (it is EmailProofEndpoints) "selected" else ""}>${it.info.via}</option>" }}
                         </select>
                         <input name='property', value='email'/>
                         <input name='value'/>
@@ -547,7 +560,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         private suspend fun htmlContinue(
             input: HtmlProofStartReq,
             request: HttpRequest,
-            otherProofs: List<Proof>
+            otherProofs: List<Proof>,
         ): HttpResponse {
             val method = handler.proofMethods.find { it.info.via == input.method }
                 ?: throw NotFoundException("No method ${input.method} known")
@@ -620,13 +633,14 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             val method = handler.proofMethods.find { it.info.via == methodName }
                 ?: throw NotFoundException("No method ${methodName} known")
             val aapp = AuthAndPathParts<HasId<*>?, TypedServerPath0>(null, request, arrayOf())
-            val proof = when(method) {
+            val proof = when (method) {
                 is Authentication.StartedProofMethod -> method.prove.implementation(
                     aapp, FinishProof(
                         key = key,
                         password = input.password
                     )
                 )
+
                 is Authentication.DirectProofMethod -> method.prove.implementation(
                     aapp, IdentificationAndPassword(
                         type = handler.name,
@@ -635,6 +649,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         password = input.password
                     )
                 )
+
                 else -> throw BadRequestException()
             }
             val l = login.implementation(aapp, (otherProofs + proof))

@@ -72,6 +72,7 @@ data class OauthCodeRequest(
     val include_granted_scopes: Boolean? = null,
     val prompt: OauthPromptType? = null,
     val login_hint: String? = null,
+    val sessionExpiration: Instant? = null,
 )
 
 @Serializable enum class OauthPromptType {

@@ -17,5 +17,6 @@ internal data class FutureSession<ID>(
     val expires: Instant = now().plus(5.minutes),
     val originalSessionId: UUID?,
     val label: String? = null,
+    val sessionExpiration: Instant? = null,
     @References(OauthClient::class) val oauthClient: String? = null
 )
