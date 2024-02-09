@@ -11,3 +11,4 @@ data class ListChange<T: IsCodableAndHashable>(
     val old: T? = null,
     val new: T? = null
 )
+

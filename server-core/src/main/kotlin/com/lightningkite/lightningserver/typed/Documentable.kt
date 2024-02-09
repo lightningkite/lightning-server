@@ -22,6 +22,9 @@ interface Documentable {
     val summary: String
     val description: String
     val authOptions: AuthOptions<*>
+    val belongsToInterface: InterfaceInfo?
+
+    data class InterfaceInfo(val name: String, val subtypes: List<KSerializer<*>>)
 
     companion object {
         val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *, *>>()
@@ -63,7 +66,6 @@ val Documentable.functionName: String
         .replaceFirstChar { it.lowercase() }
 
 internal fun KSerializer<*>.subSerializers(): Array<KSerializer<*>> = nullElement()?.let { arrayOf(it) }
-    ?: serializableProperties?.map { it.serializer }?.toTypedArray()
     ?: listElement()?.let { arrayOf(it) }
     ?: mapValueElement()?.let { arrayOf(it) }
     ?: (this as? GeneratedSerializer<*>)?.typeParametersSerializers()

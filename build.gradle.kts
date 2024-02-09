@@ -15,6 +15,7 @@ buildscript {
         classpath("org.jetbrains.dokka:dokka-gradle-plugin:1.9.0")
         classpath("com.lightningkite:deploy-helpers:master-SNAPSHOT")
         classpath("com.lightningkite.khrysalis:plugin:$khrysalisVersion")
+        classpath("com.android.tools.build:gradle:7.4.2")
     }
 }
 allprojects {
@@ -23,6 +24,7 @@ allprojects {
         mavenLocal()
         maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
         maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
+        google()
         mavenCentral()
 
     }

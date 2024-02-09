@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb.test
 
+import com.lightningkite.GeoCoordinate
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -13,6 +14,34 @@ abstract class ConditionTests() {
 
     init { prepareModels() }
     abstract val database: Database
+
+    @Test open fun test_geodistance_1() = runBlocking {
+        val collection = database.collection<GeoTest>("test_geodistance_1")
+        val lk = GeoCoordinate(41.727019, -111.8443002)
+        val lower = GeoTest(geo = lk)
+        val higher = GeoTest(geo = lk.copy(latitude = lk.latitude - 1.0))
+        val manualList = listOf(lower, higher)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        val condition = condition<GeoTest>() { it.geo.distanceToKilometersBetween(lk, lessThanKilometers = 50.0) }
+        val results = collection.find(condition).toList()
+        assertEquals(listOf(lower), results)
+        Unit
+    }
+
+    @Test open fun test_geodistance_2() = runBlocking {
+        val collection = database.collection<GeoTest>("test_geodistance_2")
+        val lk = GeoCoordinate(41.727019, -111.8443002)
+        val lower = GeoTest(geo = lk)
+        val higher = GeoTest(geo = lk.copy(latitude = lk.latitude - 1.0))
+        val manualList = listOf(lower, higher)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        val condition = condition<GeoTest>() { it.geo.distanceToKilometersBetween(lk, greaterThanKilometers = 50.0) }
+        val results = collection.find(condition).toList()
+        assertEquals(listOf(higher), results)
+        Unit
+    }
 
     @Test fun test_and_3() = runBlocking {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_and_3")

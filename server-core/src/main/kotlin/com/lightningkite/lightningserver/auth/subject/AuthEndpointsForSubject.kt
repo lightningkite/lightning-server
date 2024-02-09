@@ -20,7 +20,10 @@ import com.lightningkite.lightningserver.exceptions.*
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.routes.fullUrl
-import com.lightningkite.lightningserver.serialization.*
+import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.serialization.decodeFromBase64Url
+import com.lightningkite.lightningserver.serialization.encodeToBase64Url
+import com.lightningkite.lightningserver.serialization.parse
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.websocket.WebSockets
@@ -311,7 +314,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         implementation = { input: OauthTokenRequest ->
             var generatedRefresh: RefreshToken? = null
             val session = when {
-                input.refresh_token != null -> RefreshToken(input.refresh_token).session(
+                input.refresh_token != null -> RefreshToken(input.refresh_token!!).session(
                     this.rawRequest
                 ) ?: throw BadRequestException("Refresh token not recognized")
 
@@ -654,4 +657,5 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     val html = DebuggingHtmlEndpoints()
 }
+
 

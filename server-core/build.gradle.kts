@@ -45,18 +45,18 @@ dependencies {
     api("com.lightningkite:kotlinx-serialization-csv:2.2.0-SNAPSHOT")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
     api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$kotlinXSerialization")
-    api("io.github.pdvrieze.xmlutil:serialization-jvm:0.85.0")
-    api("org.mongodb:bson:4.10.0")
-    api("com.github.jershell:kbson:0.4.5")
-    api("com.charleskorn.kaml:kaml:0.49.0")
+    api("io.github.pdvrieze.xmlutil:serialization-jvm:0.86.3")
+    api("org.mongodb:bson:4.10.1")
+    api("com.github.jershell:kbson:0.5.0")
+    api("com.charleskorn.kaml:kaml:0.56.0")
     api(kotlin("reflect"))
 
-    implementation("org.bouncycastle:bcprov-jdk18on:1.71.1")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.72")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.77")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.77")
 
     api("org.apache.commons:commons-email:1.5")
 
-    testImplementation("com.auth0:java-jwt:4.0.0")
+    testImplementation("com.auth0:java-jwt:4.3.0")
 
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 
@@ -76,9 +76,13 @@ kotlin {
         kotlin.srcDir("build/generated/ksp/test/kotlin")
     }
 }
+tasks.withType<JavaCompile>().configureEach {
+    this.targetCompatibility = "11"
+}
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlinx.serialization.ExperimentalSerializationApi"
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
+    kotlinOptions.jvmTarget = JavaVersion.VERSION_11.toString()
 }
 
 
@@ -104,3 +108,5 @@ standardPublishing {
         )
     }
 }
+
+tasks.getByName("sourceJar").dependsOn("kspKotlin")

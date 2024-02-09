@@ -215,12 +215,4 @@ interface FieldCollection<Model : Any> {
     suspend fun deleteManyIgnoringOld(
         condition: Condition<Model>
     ): Int
-
-    /**
-     * Registers a raw signal for the collection.
-     * This skips over any security rules and goes straight to the root of the database.
-     * Useful for handling change signals that absolutely cannot be skipped under any circumstances.
-     * Currently only used for websocket change watching.
-     */
-    fun registerRawSignal(callback: suspend (CollectionChanges<Model>) -> Unit)
 }

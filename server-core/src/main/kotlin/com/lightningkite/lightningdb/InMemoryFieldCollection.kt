@@ -16,7 +16,7 @@ import kotlin.concurrent.withLock
 open class InMemoryFieldCollection<Model : Any>(
     val data: MutableList<Model> = ArrayList(),
     override val serializer: KSerializer<Model>
-) : AbstractSignalFieldCollection<Model>() {
+) : FieldCollection<Model> {
 
     private val lock = ReentrantLock()
 
@@ -106,13 +106,13 @@ open class InMemoryFieldCollection<Model : Any>(
             (groupBy.get(it) ?: return@mapNotNull null) to (property.get(it)?.toDouble() ?: return@mapNotNull null)
         }.aggregate(aggregate)
 
-    override suspend fun insertImpl(models: Iterable<Model>): List<Model> = lock.withLock {
+    override suspend fun insert(models: Iterable<Model>): List<Model> = lock.withLock {
         uniqueCheck(models.map { EntryChange(null, it) })
         data.addAll(models)
         return models.toList()
     }
 
-    override suspend fun replaceOneImpl(
+    override suspend fun replaceOne(
         condition: Condition<Model>,
         model: Model,
         orderBy: List<SortPart<Model>>,
@@ -137,7 +137,7 @@ open class InMemoryFieldCollection<Model : Any>(
         }
     }
 
-    override suspend fun upsertOneImpl(
+    override suspend fun upsertOne(
         condition: Condition<Model>,
         modification: Modification<Model>,
         model: Model,
@@ -156,7 +156,7 @@ open class InMemoryFieldCollection<Model : Any>(
         return EntryChange(null, model)
     }
 
-    override suspend fun updateOneImpl(
+    override suspend fun updateOne(
         condition: Condition<Model>,
         modification: Modification<Model>,
         orderBy: List<SortPart<Model>>,
@@ -174,7 +174,7 @@ open class InMemoryFieldCollection<Model : Any>(
         return EntryChange(null, null)
     }
 
-    override suspend fun updateManyImpl(
+    override suspend fun updateMany(
         condition: Condition<Model>,
         modification: Modification<Model>,
     ): CollectionChanges<Model> = lock.withLock {
@@ -194,7 +194,7 @@ open class InMemoryFieldCollection<Model : Any>(
             }
     }
 
-    override suspend fun deleteOneImpl(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? =
+    override suspend fun deleteOne(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? =
         lock.withLock {
             for (it in sortIndices(orderBy)) {
                 val old = data[it]
@@ -206,7 +206,7 @@ open class InMemoryFieldCollection<Model : Any>(
             return null
         }
 
-    override suspend fun deleteManyImpl(condition: Condition<Model>): List<Model> = lock.withLock {
+    override suspend fun deleteMany(condition: Condition<Model>): List<Model> = lock.withLock {
         val removed = ArrayList<Model>()
         data.removeAll {
             if (condition(it)) {
@@ -219,7 +219,7 @@ open class InMemoryFieldCollection<Model : Any>(
         return removed
     }
 
-    override suspend fun replaceOneIgnoringResultImpl(
+    override suspend fun replaceOneIgnoringResult(
         condition: Condition<Model>,
         model: Model,
         orderBy: List<SortPart<Model>>,
@@ -229,29 +229,29 @@ open class InMemoryFieldCollection<Model : Any>(
         orderBy
     ).new != null
 
-    override suspend fun upsertOneIgnoringResultImpl(
+    override suspend fun upsertOneIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>,
         model: Model,
     ): Boolean = upsertOne(condition, modification, model).old != null
 
-    override suspend fun updateOneIgnoringResultImpl(
+    override suspend fun updateOneIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>,
         orderBy: List<SortPart<Model>>,
     ): Boolean = updateOne(condition, modification, orderBy).new != null
 
-    override suspend fun updateManyIgnoringResultImpl(
+    override suspend fun updateManyIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>,
     ): Int = updateMany(condition, modification).changes.size
 
-    override suspend fun deleteOneIgnoringOldImpl(
+    override suspend fun deleteOneIgnoringOld(
         condition: Condition<Model>,
         orderBy: List<SortPart<Model>>,
     ): Boolean = deleteOne(condition, orderBy) != null
 
-    override suspend fun deleteManyIgnoringOldImpl(condition: Condition<Model>): Int = deleteMany(condition).size
+    override suspend fun deleteManyIgnoringOld(condition: Condition<Model>): Int = deleteMany(condition).size
 
     fun drop() {
         data.clear()

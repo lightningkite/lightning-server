@@ -12,9 +12,8 @@ import kotlin.math.min
 import kotlin.time.Duration.Companion.minutes
 
 @GenerateDataClassPaths
-@IndexSetJankPatch(["type", "endpoint", "timeSpan", "timeStamp", ":", "timeSpan", "timeStamp"])
-//@IndexSet(["type", "endpoint", "timeSpan", "timeStamp"])
-//@IndexSet(["timeSpan", "timeStamp"])
+@IndexSet(["type", "endpoint", "timeSpan", "timeStamp"])
+@IndexSet(["timeSpan", "timeStamp"])
 @Serializable
 data class MetricSpanStats(
     override val _id: String,

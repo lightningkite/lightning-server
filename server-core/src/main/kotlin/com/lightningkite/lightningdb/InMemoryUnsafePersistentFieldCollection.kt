@@ -42,9 +42,6 @@ class InMemoryUnsafePersistentFieldCollection<Model : Any>(
             handleCollectionDump()
         }
         Runtime.getRuntime().addShutdownHook(shutdownHook)
-        this.signals.add {
-            close()
-        }
     }
 
     override fun close() {

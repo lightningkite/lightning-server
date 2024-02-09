@@ -63,7 +63,6 @@ class MySealedClassSerializer<T : Any>(
 
     override fun serialize(encoder: Encoder, value: T) {
         encoder.encodeStructure(descriptor) {
-            println("$this Serializing ${value}, options are ${options.joinToString { it.serializer.descriptor.serialName }}.  Source seems to be ${options.find { it.serializer.descriptor.serialName == "Equal" }?.serializer?.descriptor?.kind}")
             val index = getIndex(value)
             @Suppress("UNCHECKED_CAST")
             this.encodeSerializableElement<Any?>(descriptor, index, options[index].serializer as KSerializer<Any?>, value)

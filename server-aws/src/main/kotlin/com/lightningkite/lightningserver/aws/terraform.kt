@@ -1507,7 +1507,7 @@ internal fun awsLambdaHandler(
           s3_bucket = aws_s3_bucket.lambda_bucket.id
           s3_key    = aws_s3_object.app_storage.key
 
-          runtime = "java11"
+          runtime = "java17"
           handler = "$handlerFqn"
           
           memory_size = "${'$'}{var.lambda_memory_size}"

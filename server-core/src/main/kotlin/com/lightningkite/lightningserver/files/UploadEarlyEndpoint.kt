@@ -41,7 +41,7 @@ class UploadEarlyEndpoint(
         summary = "Upload File for Request",
         description = "Upload a file to make a request later.  Times out in around 10 minutes.",
         errorCases = listOf(),
-        implementation = { user: Unit, nothing: Unit ->
+        implementation = { _: Unit, _: Unit ->
             val newFile = files().root.resolve(filePath).resolveRandom("file", "file")
             val newItem = UploadForNextRequest(
                 expires = now().plus(expiration),

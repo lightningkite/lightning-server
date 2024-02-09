@@ -56,7 +56,9 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
                 it.key(path.toString())
             }.await().let {
                 FileInfo(
-                    type = ContentType(it.contentType()), size = it.contentLength(), lastModified = it.lastModified().toKotlinInstant()
+                    type = ContentType(it.contentType()),
+                    size = it.contentLength(),
+                    lastModified = it.lastModified().toKotlinInstant()
                 )
             }
         } catch (e: NoSuchKeyException) {
@@ -113,46 +115,50 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
 
     override fun checkSignature(queryParams: String): Boolean {
         if (system.signedUrlDuration != null) {
-            val headers = queryParams.split('&').associate {
-                URLDecoder.decode(it.substringBefore('='), Charsets.UTF_8) to URLDecoder.decode(
-                    it.substringAfter(
-                        '=', ""
-                    ), Charsets.UTF_8
-                )
+            try {
+                val headers = queryParams.split('&').associate {
+                    URLDecoder.decode(it.substringBefore('='), Charsets.UTF_8) to URLDecoder.decode(
+                        it.substringAfter(
+                            '=', ""
+                        ), Charsets.UTF_8
+                    )
+                }
+                val accessKey = system.credentialProvider.resolveCredentials().accessKeyId()
+                val secretKey = system.credentialProvider.resolveCredentials().secretAccessKey()
+                val objectPath = path.unixPath
+                val date = headers["X-Amz-Date"] ?: return false
+                val algorithm = headers["X-Amz-Algorithm"] ?: return false
+                val expires = headers["X-Amz-Expires"] ?: return false
+                val credential = headers["X-Amz-Credential"] ?: return false
+                val scope = credential.substringAfter("/")
+
+                val canonicalRequest = """
+                GET
+                ${"/" + objectPath.removePrefix("/")}
+                ${queryParams.substringBefore("&X-Amz-Signature=").split('&').sorted().joinToString("&")}
+                host:${system.bucket}.s3.${system.region.id()}.amazonaws.com
+                
+                host
+                UNSIGNED-PAYLOAD
+                """.trimIndent()
+
+                val toSignString = """
+                $algorithm
+                $date
+                $scope
+                ${canonicalRequest.sha256()}
+                """.trimIndent()
+
+                val signingKey = "AWS4$secretKey".toByteArray().let { date.substringBefore('T').toByteArray().mac(it) }
+                    .let { system.region.id().toByteArray().mac(it) }.let { "s3".toByteArray().mac(it) }
+                    .let { "aws4_request".toByteArray().mac(it) }
+
+                val regeneratedSig = toSignString.toByteArray().mac(signingKey).toHex()
+
+                if (regeneratedSig == headers["X-Amz-Signature"]!!) return true
+            } catch (e: Exception) {
+                /* squish */
             }
-            val accessKey = system.credentialProvider.resolveCredentials().accessKeyId()
-            val secretKey = system.credentialProvider.resolveCredentials().secretAccessKey()
-            val objectPath = path.unixPath
-            val date = headers["X-Amz-Date"]!!
-            val algorithm = headers["X-Amz-Algorithm"]!!
-            val expires = headers["X-Amz-Expires"]!!
-            val credential = headers["X-Amz-Credential"]!!
-            val scope = credential.substringAfter("/")
-
-            val canonicalRequest = """
-        GET
-        ${"/" + objectPath.removePrefix("/")}
-        ${queryParams.substringBefore("&X-Amz-Signature=").split('&').sorted().joinToString("&")}
-        host:${system.bucket}.s3.${system.region.id()}.amazonaws.com
-        
-        host
-        UNSIGNED-PAYLOAD
-        """.trimIndent()
-
-            val toSignString = """
-        $algorithm
-        $date
-        $scope
-        ${canonicalRequest.sha256()}
-        """.trimIndent()
-
-            val signingKey = "AWS4$secretKey".toByteArray().let { date.substringBefore('T').toByteArray().mac(it) }
-                .let { system.region.id().toByteArray().mac(it) }.let { "s3".toByteArray().mac(it) }
-                .let { "aws4_request".toByteArray().mac(it) }
-
-            val regeneratedSig = toSignString.toByteArray().mac(signingKey).toHex()
-
-            if (regeneratedSig == headers["X-Amz-Signature"]!!) return true
             return super.checkSignature(queryParams)
         } else return true
     }

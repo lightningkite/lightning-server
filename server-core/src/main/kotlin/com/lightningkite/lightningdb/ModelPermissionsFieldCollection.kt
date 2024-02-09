@@ -12,9 +12,6 @@ open class ModelPermissionsFieldCollection<Model : Any>(
     val permissions: ModelPermissions<Model>
 ) : FieldCollection<Model> {
     override val serializer: KSerializer<Model> get() = wraps.serializer
-    override fun registerRawSignal(callback: suspend (CollectionChanges<Model>) -> Unit) {
-        wraps.registerRawSignal(callback)
-    }
 
     override suspend fun find(
         condition: Condition<Model>,

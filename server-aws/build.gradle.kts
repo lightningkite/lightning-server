@@ -27,8 +27,8 @@ dependencies {
     api("software.amazon.awssdk:apigatewaymanagementapi:$awsVersion")
     api("software.amazon.awssdk:cloudwatch:$awsVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:$coroutines")
-    api("com.amazonaws:aws-lambda-java-core:1.2.1")
-    api("com.amazonaws:aws-lambda-java-events:3.11.0")
+    api("com.amazonaws:aws-lambda-java-core:1.2.2")
+    api("com.amazonaws:aws-lambda-java-events:3.11.1")
     runtimeOnly("com.amazonaws:aws-lambda-java-log4j2:1.5.1")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation(project(":server-testing"))
@@ -49,9 +49,14 @@ kotlin {
         kotlin.srcDir("build/generated/ksp/test/kotlin")
     }
 }
+
+tasks.withType<JavaCompile>().configureEach {
+    this.targetCompatibility = "11"
+}
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlinx.serialization.ExperimentalSerializationApi"
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
+    kotlinOptions.jvmTarget = JavaVersion.VERSION_11.toString()
 }
 
 
@@ -77,3 +82,4 @@ standardPublishing {
         )
     }
 }
+tasks.getByName("sourceJar").dependsOn("kspKotlin")

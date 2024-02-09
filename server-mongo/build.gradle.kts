@@ -24,7 +24,6 @@ dependencies {
     api("org.mongodb:mongodb-driver-kotlin-coroutine:4.10.1")
 
     kspTest(project(":processor"))
-    testImplementation(project(":client"))
     testImplementation(project(":server-testing"))
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 }
@@ -37,6 +36,15 @@ kotlin {
     sourceSets.test {
         kotlin.srcDir("build/generated/ksp/test/kotlin")
     }
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    this.targetCompatibility = "11"
+}
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    kotlinOptions.freeCompilerArgs += "-opt-in=kotlinx.serialization.ExperimentalSerializationApi"
+    kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
+    kotlinOptions.jvmTarget = JavaVersion.VERSION_11.toString()
 }
 
 standardPublishing {
@@ -62,3 +70,5 @@ standardPublishing {
     }
 }
 
+
+//tasks.getByName("sourceJar").dependsOn("kspKotlin")

@@ -21,21 +21,21 @@ class ChangeSocketTest {
         val database = TestSettings.database
         runBlocking {
             com.lightningkite.lightningserver.testmodels.prepareModels()
-            database().collection<TestThing>().deleteMany(Condition.Always())
+            TestSettings.wsModelInfo.collection().deleteMany(Condition.Always())
             TestSettings.ws.test {
 
                 suspend fun assertSent(
                     inserted: TestThing
                 ) {
                     while(incoming.tryReceive().isSuccess) {}
-                    database().collection<TestThing>().insertOne(inserted)
+                    TestSettings.wsModelInfo.collection().insertOne(inserted)
                     assertEquals(ListChange(new = inserted), incoming.receive().also { println("Got $it") })
                 }
                 suspend fun assertNotSent(
                     inserted: TestThing
                 ) {
                     while(incoming.tryReceive().isSuccess) {}
-                    database().collection<TestThing>().insertOne(inserted)
+                    TestSettings.wsModelInfo.collection().insertOne(inserted)
                     assertTrue(incoming.tryReceive().isFailure)
                 }
 
@@ -68,21 +68,21 @@ class ChangeSocketTest {
     fun test2() {
         val database = TestSettings.database
         runBlocking {
-            database().collection<TestThing>().deleteMany(Condition.Always())
+            TestSettings.wsModelInfo.collection().deleteMany(Condition.Always())
             TestSettings.ws2.test {
 
                 suspend fun assertSent(
                     inserted: TestThing
                 ) {
                     while(incoming.tryReceive().isSuccess) {}
-                    database().collection<TestThing>().insertOne(inserted)
+                    TestSettings.wsModelInfo.collection().insertOne(inserted)
                     assertEquals(ListChange(new = inserted), incoming.receive().also { println("Got $it") })
                 }
                 suspend fun assertNotSent(
                     inserted: TestThing
                 ) {
                     while(incoming.tryReceive().isSuccess) {}
-                    database().collection<TestThing>().insertOne(inserted)
+                    TestSettings.wsModelInfo.collection().insertOne(inserted)
                     assertTrue(incoming.tryReceive().isFailure)
                 }
 

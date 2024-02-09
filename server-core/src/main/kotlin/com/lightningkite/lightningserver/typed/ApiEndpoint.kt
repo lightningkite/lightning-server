@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.BadRequestException
+import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.parse
@@ -26,11 +27,24 @@ data class ApiEndpoint<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
     val successCode: HttpStatus,
     val errorCases: List<LSError>,
     val examples: List<ApiExample<INPUT, OUTPUT>>,
+    override val belongsToInterface: Documentable.InterfaceInfo? = null,
     val implementation: suspend AuthAndPathParts<USER, PATH>.(INPUT)->OUTPUT,
 ) : Documentable, (suspend (HttpRequest) -> HttpResponse) {
     override val path: TypedServerPath
         get() = route.path
     private val wildcards = route.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
+
+    suspend fun authAndPathParts(auth: RequestAuth<USER & Any>?, request: HttpRequest) = AuthAndPathParts<USER, PATH>(
+        authOrNull = auth,
+        rawRequest = request,
+        parts = route.path.serializers.mapIndexed { idx, ser ->
+            val name = wildcards.get(idx).name
+            val str = request.parts[name] ?: throw BadRequestException("Route segment $name not found")
+            str.parseUrlPartOrBadRequest(route.path.serializers[idx])
+        }.toTypedArray()
+    ).also {
+        authOptions.assert(it.authOrNull)
+    }
 
     override suspend fun invoke(it: HttpRequest): HttpResponse {
         val auth = it.authChecked<USER>(authOptions)
@@ -38,15 +52,7 @@ data class ApiEndpoint<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
             HttpMethod.GET, HttpMethod.HEAD -> it.queryParameters(inputType)
             else -> if (inputType == Unit.serializer()) Unit as INPUT else it.body?.parse(inputType) ?: throw BadRequestException("No request body provided")
         }
-        @Suppress("UNCHECKED_CAST") val result = AuthAndPathParts<USER, PATH>(
-            authOrNull = auth,
-            rawRequest = it,
-            parts = route.path.serializers.mapIndexed { idx, ser ->
-                val name = wildcards.get(idx).name
-                val str = it.parts[name] ?: throw BadRequestException("Route segment $name not found")
-                str.parseUrlPartOrBadRequest(route.path.serializers[idx])
-            }.toTypedArray()
-        ).implementation(input)
+        @Suppress("UNCHECKED_CAST") val result = authAndPathParts(auth, it).implementation(input)
         return HttpResponse(
             body = result.toHttpContent(it.headers.accept, outputType),
             status = successCode
@@ -76,6 +82,7 @@ fun <USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT> TypedHttpEndpoint<PA
     description: String = summary,
     errorCases: List<LSError> = listOf(),
     examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
+    belongsToInterface: Documentable.InterfaceInfo? = null,
     successCode: HttpStatus = HttpStatus.OK,
     implementation: suspend AuthAndPathParts<USER, PATH>.(INPUT)->OUTPUT
 ): ApiEndpoint<USER, PATH, INPUT, OUTPUT> {
@@ -88,6 +95,7 @@ fun <USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT> TypedHttpEndpoint<PA
         description = description,
         errorCases = errorCases,
         examples = examples,
+        belongsToInterface = belongsToInterface,
         successCode = successCode,
         implementation = implementation,
     )
@@ -102,6 +110,7 @@ inline fun <USER: HasId<*>?, PATH: TypedServerPath, reified INPUT, reified OUTPU
     authOptions: AuthOptions<USER>,
     errorCases: List<LSError> = listOf(),
     examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
+    belongsToInterface: Documentable.InterfaceInfo? = null,
     successCode: HttpStatus = HttpStatus.OK,
     noinline implementation: suspend AuthAndPathParts<USER, PATH>.(INPUT)->OUTPUT
 ): ApiEndpoint<USER, PATH, INPUT, OUTPUT> {
@@ -114,6 +123,7 @@ inline fun <USER: HasId<*>?, PATH: TypedServerPath, reified INPUT, reified OUTPU
         description = description,
         errorCases = errorCases,
         examples = examples,
+        belongsToInterface = belongsToInterface,
         successCode = successCode,
         implementation = implementation,
     )
@@ -131,6 +141,7 @@ fun <USER: HasId<*>?, INPUT, OUTPUT> HttpEndpoint.api(
     description: String = summary,
     errorCases: List<LSError> = listOf(),
     examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
+    belongsToInterface: Documentable.InterfaceInfo? = null,
     successCode: HttpStatus = HttpStatus.OK,
     implementation: suspend AuthAndPathParts<USER, TypedServerPath0>.(INPUT)->OUTPUT
 ): ApiEndpoint<USER, TypedServerPath0, INPUT, OUTPUT> {
@@ -143,6 +154,7 @@ fun <USER: HasId<*>?, INPUT, OUTPUT> HttpEndpoint.api(
         description = description,
         errorCases = errorCases,
         examples = examples,
+        belongsToInterface = belongsToInterface,
         successCode = successCode,
         implementation = implementation,
     )
@@ -157,6 +169,7 @@ inline fun <USER: HasId<*>?, reified INPUT, reified OUTPUT> HttpEndpoint.api(
     authOptions: AuthOptions<USER>,
     errorCases: List<LSError> = listOf(),
     examples: List<ApiExample<INPUT, OUTPUT>> = listOf(),
+    belongsToInterface: Documentable.InterfaceInfo? = null,
     successCode: HttpStatus = HttpStatus.OK,
     noinline implementation: suspend AuthAndPathParts<USER, TypedServerPath0>.(INPUT)->OUTPUT
 ): ApiEndpoint<USER, TypedServerPath0, INPUT, OUTPUT> {
@@ -169,6 +182,7 @@ inline fun <USER: HasId<*>?, reified INPUT, reified OUTPUT> HttpEndpoint.api(
         description = description,
         errorCases = errorCases,
         examples = examples,
+        belongsToInterface = belongsToInterface,
         successCode = successCode,
         implementation = implementation,
     )

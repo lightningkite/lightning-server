@@ -1,11 +1,10 @@
 import com.lightningkite.deployhelpers.*
-import com.lightningkite.khrysalis.gradle.*
 
 plugins {
     kotlin("multiplatform")
     id("com.google.devtools.ksp")
     kotlin("plugin.serialization")
-    id("com.lightningkite.khrysalis")
+    id("com.android.library")
     id("org.jetbrains.dokka")
     id("signing")
     `maven-publish`
@@ -21,12 +20,26 @@ ksp {
 
 kotlin {
     targetHierarchy.default()
+    androidTarget {
+        publishLibraryVariants("release", "debug")
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
+    }
 
-    jvm()
+    jvm {
+        compilations.all {
+            kotlinOptions.jvmTarget = "1.8"
+        }
+    }
     js(IR) {
         browser()
     }
-    ios()
+    iosX64()
+    iosArm64()
+    iosSimulatorArm64()
 //    androidTarget()
 
     sourceSets {
@@ -39,15 +52,20 @@ kotlin {
                 implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
             }
+            kotlin {
+                srcDir(file("build/generated/ksp/common/commonMain/kotlin"))
+            }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
             }
+            kotlin {
+                srcDir(file("build/generated/ksp/common/commonTest/kotlin"))
+            }
         }
         val jvmMain by getting {
             dependencies {
-                api("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
             }
         }
         val jvmTest by getting {
@@ -57,32 +75,8 @@ kotlin {
 }
 
 dependencies {
-    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
-    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
-
-    equivalents("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion:equivalents")
-
     configurations.filter { it.name.startsWith("ksp") && it.name != "ksp" }.forEach {
         add(it.name, project(":processor"))
-    }
-}
-
-khrysalis {
-    iosProjectName = "LightningServer"
-    iosProjectFolder = rootDir.resolve("ios")
-    iosSourceFolder = rootDir.resolve("ios/LightningServer/Classes/shared")
-    webProjectName = "@lightningkite/lightning-server"
-    webProjectFolder = rootDir.resolve("web")
-    webSourceFolder = rootDir.resolve("web/src")
-    libraryMode = true
-    additionalEquivalentDirectories = listOf(project.file("build/generated/ksp/main/resources"))
-}
-
-tasks.getByName("equivalentsJar").published = true
-tasks.getByName("equivalentsJar").dependsOn("kspKotlinJvm")
-tasks.create("kspAll") {
-    tasks.filter { it.name.startsWith("ksp") && it != this }.forEach {
-        dependsOn(it)
     }
 }
 
@@ -108,4 +102,20 @@ standardPublishing {
         )
     }
 }
-tasks.getByName("equivalentsJar").published = true
+
+android {
+    namespace = "com.lightningkite.lightningserver"
+    compileSdk = 34
+
+    defaultConfig {
+        minSdk = 26
+    }
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    dependencies {
+        coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    }
+}

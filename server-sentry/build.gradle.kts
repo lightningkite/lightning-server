@@ -17,8 +17,7 @@ val khrysalisVersion: String by project
 val coroutines: String by project
 dependencies {
     api(project(":server-core"))
-    api("io.sentry:sentry:1.7.30")
-    api("io.sentry:sentry-logback:1.7.30")
+    api("io.sentry:sentry:7.2.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutines")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     ksp(project(":processor"))
@@ -37,9 +36,14 @@ kotlin {
         kotlin.srcDir("build/generated/ksp/test/kotlin")
     }
 }
+
+tasks.withType<JavaCompile>().configureEach {
+    this.targetCompatibility = "11"
+}
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlinx.serialization.ExperimentalSerializationApi"
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
+    kotlinOptions.jvmTarget = JavaVersion.VERSION_11.toString()
 }
 
 
@@ -65,3 +69,4 @@ standardPublishing {
         )
     }
 }
+tasks.getByName("sourceJar").dependsOn("kspKotlin")

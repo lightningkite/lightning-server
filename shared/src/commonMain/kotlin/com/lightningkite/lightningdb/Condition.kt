@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningdb
 
+import com.lightningkite.GeoCoordinate
 import com.lightningkite.khrysalis.*
 import kotlinx.serialization.*
 import com.lightningkite.lightningdb.SerializableProperty
@@ -117,11 +118,18 @@ sealed class Condition<T : IsCodableAndHashable> {
     }
 
     @Serializable
+    @SerialName("GeoDistance")
+    data class GeoDistance(val value: GeoCoordinate, val greaterThanKilometers: Double = 0.0, val lessThanKilometers: Double = 100_000.0) : Condition<GeoCoordinate>() {
+        override fun invoke(on: GeoCoordinate): Boolean = on.distanceToKilometers(value) in greaterThanKilometers..lessThanKilometers
+    }
+
+    @Serializable
     @SerialName("FullTextSearch")
     data class FullTextSearch<T : IsCodableAndHashable>(val value: String, val ignoreCase: Boolean = false) :
         Condition<T>() {
         override fun invoke(on: T): Boolean {
-            fatalError("Not Implemented locally")
+            val asText = on.toString()
+            return value.split(' ').all { asText.contains(it, ignoreCase) }
         }
     }
 

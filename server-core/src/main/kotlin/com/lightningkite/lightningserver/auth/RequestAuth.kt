@@ -172,6 +172,14 @@ suspend fun <USER : HasId<*>?> Request.authChecked(authOptions: AuthOptions<USER
     else throw ForbiddenException("You do not match the authorization criteria.")
 }
 
+@Suppress("UNCHECKED_CAST")
+suspend fun <USER : HasId<*>?> AuthOptions<USER>.assert(auth: RequestAuth<*>?): RequestAuth<USER & Any>? {
+    val raw = auth
+        ?: if (options.any { it == null }) return null else throw UnauthorizedException("You must be authorized as a ${options.joinToString { it!!.type.authName ?: "???" }}, but you are not authorized at all.")
+    if (options.any { it == null || it.accepts(raw) }) return raw as RequestAuth<USER & Any>
+    else throw ForbiddenException("You do not match the authorization criteria.")
+}
+
 suspend fun AuthOption.accepts(auth: RequestAuth<*>): Boolean =
     (this.type == auth.subject.authType || this.type == AuthType.any) &&
             (this.scopes == null || "*" in auth.scopes || auth.scopes.containsAll(this.scopes)) &&
