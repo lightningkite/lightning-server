@@ -19,7 +19,7 @@ ksp {
 }
 
 kotlin {
-    targetHierarchy.default()
+    applyDefaultHierarchyTemplate()
     androidTarget {
         publishLibraryVariants("release", "debug")
         compilations.all {
@@ -40,7 +40,6 @@ kotlin {
     iosX64()
     iosArm64()
     iosSimulatorArm64()
-//    androidTarget()
 
     sourceSets {
         val commonMain by getting {

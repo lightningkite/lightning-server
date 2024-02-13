@@ -14,7 +14,6 @@ plugins {
 
 val ktorVersion: String by project
 val kotlinVersion: String by project
-val khrysalisVersion: String by project
 val logBack: String by project
 val coroutines: String by project
 val kotlinXSerialization: String by project
@@ -31,7 +30,7 @@ dependencies {
 
     implementation("ch.qos.logback:logback-classic:$logBack")
 
-    implementation("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
+//    implementation("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
 
     api("io.ktor:ktor-client-content-negotiation-jvm:$ktorVersion")
     api("io.ktor:ktor-client-cio-jvm:$ktorVersion")
@@ -42,13 +41,13 @@ dependencies {
     api("org.jetbrains.kotlinx:kotlinx-html-jvm:0.8.0")
 
     api("dev.turingcomplete:kotlin-onetimepassword:2.4.0")
-    api("com.lightningkite:kotlinx-serialization-csv:2.2.0-SNAPSHOT")
+    api("com.lightningkite:kotlinx-serialization-csv:2.2.1")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
     api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$kotlinXSerialization")
     api("io.github.pdvrieze.xmlutil:serialization-jvm:0.86.3")
     api("org.mongodb:bson:4.10.1")
     api("com.github.jershell:kbson:0.5.0")
-    api("com.charleskorn.kaml:kaml:0.56.0")
+    api("com.charleskorn.kaml:kaml:0.57.0")
     api(kotlin("reflect"))
 
     implementation("org.bouncycastle:bcprov-jdk18on:1.77")

@@ -3,6 +3,7 @@ package com.lightningkite
 import kotlinx.datetime.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -43,7 +44,12 @@ data class ZonedDateTime(val dateTime: LocalDateTime, val zone: TimeZone) {
 }
 
 object ZonedDateTimeIso8601Serializer : KSerializer<ZonedDateTime> {
-    override fun deserialize(decoder: Decoder): ZonedDateTime = ZonedDateTime.parse(decoder.decodeString())
+    override fun deserialize(decoder: Decoder): ZonedDateTime =
+        try {
+            ZonedDateTime.parse(decoder.decodeString())
+        } catch (e: IllegalArgumentException) {
+            throw SerializationException(e.message)
+        }
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.ZonedDateTime", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: ZonedDateTime) = encoder.encodeString(value.toString())
 }
@@ -77,7 +83,12 @@ data class OffsetDateTime(val dateTime: LocalDateTime, val offset: UtcOffset) {
 }
 
 object OffsetDateTimeIso8601Serializer : KSerializer<OffsetDateTime> {
-    override fun deserialize(decoder: Decoder): OffsetDateTime = OffsetDateTime.parse(decoder.decodeString())
+    override fun deserialize(decoder: Decoder): OffsetDateTime =
+        try {
+            OffsetDateTime.parse(decoder.decodeString())
+        } catch (e: IllegalArgumentException) {
+            throw SerializationException(e.message)
+        }
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.OffsetDateTime", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: OffsetDateTime) = encoder.encodeString(value.toString())
 }

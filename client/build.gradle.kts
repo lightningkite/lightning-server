@@ -11,9 +11,6 @@ plugins {
 }
 
 val kotlinVersion: String by project
-val rxPlusVersion: String by project
-val khrysalisVersion: String by project
-
 kotlin {
     targetHierarchy.default()
     androidTarget {
