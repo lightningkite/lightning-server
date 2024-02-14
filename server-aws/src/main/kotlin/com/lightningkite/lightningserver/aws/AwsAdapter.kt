@@ -344,7 +344,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                             Serialization.Internal.json.decodeFromString(task.serializer, data)
                         }
                     }
-                    task.implementation(this, payload)
+                    task.invokeImmediate(this, payload)
                 }
                 APIGatewayV2HTTPResponse(statusCode = 204)
             } catch (e: Exception) {

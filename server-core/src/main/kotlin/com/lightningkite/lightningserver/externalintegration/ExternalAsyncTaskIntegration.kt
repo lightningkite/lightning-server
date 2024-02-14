@@ -175,7 +175,7 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
     }
 
     suspend fun check(ids: List<String>) = coroutineScope {
-        recheckSet.implementation(
+        recheckSet.invokeImmediate(
             this, info.collection().find(
                 condition { it._id inside ids }).toList()
         )
@@ -199,7 +199,7 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
         outputType = Unit.serializer(),
         implementation = { _: Unit ->
             coroutineScope {
-                recheckSet.implementation(this, listOf(info.collection().get(path1) ?: throw NotFoundException()))
+                recheckSet.invokeImmediate(this, listOf(info.collection().get(path1) ?: throw NotFoundException()))
             }
         }
     )
