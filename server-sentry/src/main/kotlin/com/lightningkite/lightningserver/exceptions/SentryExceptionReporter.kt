@@ -50,6 +50,7 @@ class SentryExceptionReporter(val dsn: String) : ExceptionReporter {
                         queryString = context.queryParameters.joinToString("&") { "${it.first}=${it.second}" }
                         cookies = context.headers.cookies.entries.joinToString { "${it.key}=${it.value}" }
                         headers = context.headers.normalizedEntries.mapValues { it.value.joinToString { it } }
+                        try{ data = context.body?.text() } catch (_:Exception){}
 
                         envs = mapOf(
                             "REMOTE_ADDR" to context.sourceIp,

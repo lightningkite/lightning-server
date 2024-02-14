@@ -148,7 +148,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                             if(tries >= 2) throw e
                             else {
                                 disconnect()
-                                run2(action, tries + 1)
+                                return run2(action, tries + 1)
                             }
                         } catch (e: MongoException) {
                             if (ErrorCategory.fromErrorCode(e.code) == ErrorCategory.DUPLICATE_KEY)
