@@ -17,11 +17,11 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 @LightningServerDsl
-inline fun <reified INPUT> task(name: String, noinline implementation: suspend CoroutineScope.(INPUT) -> Unit) =
+inline fun <reified INPUT> task(name: String, noinline implementation: suspend Task.RunningTask<INPUT>.(INPUT) -> Unit) =
     task(name, Serialization.module.serializer<INPUT>(), implementation)
 
 @LightningServerDsl
-fun <INPUT> task(name: String, serializer: KSerializer<INPUT>, implementation: suspend CoroutineScope.(INPUT) -> Unit) =
+fun <INPUT> task(name: String, serializer: KSerializer<INPUT>, implementation: suspend Task.RunningTask<INPUT>.(INPUT) -> Unit) =
     Task(name, serializer, implementation)
 
 @LightningServerDsl
