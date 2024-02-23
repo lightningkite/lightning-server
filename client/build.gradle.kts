@@ -10,6 +10,10 @@ plugins {
     `maven-publish`
 }
 
+repositories{
+    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
+}
+
 val kotlinVersion: String by project
 kotlin {
     targetHierarchy.default()
