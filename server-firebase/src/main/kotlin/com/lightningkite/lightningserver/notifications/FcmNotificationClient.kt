@@ -155,6 +155,7 @@ object FcmNotificationClient : NotificationClient {
                 withContext(Dispatchers.IO) {
                     val result = FirebaseMessaging.getInstance().sendEachForMulticast(it)
                     result.responses.forEachIndexed { index, sendResponse ->
+                        println("Send $index: ${sendResponse.messageId}")
                         results[targets[index]] = when(val it = sendResponse.exception?.messagingErrorCode) {
                             null -> NotificationSendResult.Success
                             MessagingErrorCode.UNREGISTERED -> NotificationSendResult.DeadToken
