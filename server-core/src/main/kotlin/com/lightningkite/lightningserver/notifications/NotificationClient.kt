@@ -24,6 +24,7 @@ data class Notification(
     val title: String? = null,
     val body: String? = null,
     val imageUrl: String? = null,
+    val link: String? = null,
 )
 
 @Deprecated("Use the new name", ReplaceWith("NotificationIos", "com.lightningkite.lightningserver.notifications"))
@@ -60,11 +61,12 @@ interface NotificationClient {
         data: Map<String, String>? = null,
         critical: Boolean = false,
         androidChannel: String? = null,
-        timeToLive: Duration? = null
+        timeToLive: Duration? = null,
+        link: String? = null
     ) = send(
         targets = targets,
         data = NotificationData(
-            notification = Notification(title, body, imageUrl),
+            notification = Notification(title, body, imageUrl, link = link),
             data = data,
             android = androidChannel?.let {
                 NotificationAndroid(
@@ -86,5 +88,12 @@ interface NotificationClient {
         web: NotificationWeb? = null,
     ) = send(targets, NotificationData(notification, data, android, ios, web))
 
-    suspend fun send(targets: List<String>, data: NotificationData)
+    /**
+     * @return Targets which successfully sent
+     */
+    suspend fun send(targets: List<String>, data: NotificationData): Map<String, NotificationSendResult>
+}
+
+enum class NotificationSendResult {
+    DeadToken, Failure, Success
 }

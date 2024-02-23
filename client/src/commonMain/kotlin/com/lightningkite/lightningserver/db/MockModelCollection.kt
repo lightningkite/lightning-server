@@ -73,7 +73,9 @@ class MockModelCollection<T : HasId<ID>, ID : Comparable<ID>>(val serializer: KS
     override suspend fun watch(query: Query<T>): Readable<List<T>> = query(query)
 
     override suspend fun insert(item: T): WritableModel<T> {
-        return models.getOrPut(item._id) { MockWritableModel(item._id) }.also { it.property.value = item }.also { actionPerformed() }
+        return models.getOrPut(item._id) { MockWritableModel(item._id) }.also { it.property.value = item }.also {
+            actionPerformed()
+        }
     }
 
     override suspend fun insert(item: List<T>): List<T> {

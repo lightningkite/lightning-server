@@ -8,7 +8,7 @@ object ConsoleNotificationClient : NotificationClient {
     override suspend fun send(
         targets: List<String>,
         data: NotificationData
-    ) {
+    ): Map<String, NotificationSendResult> {
 
         println(buildString {
             appendLine("-----NOTIFICATION-----")
@@ -24,6 +24,8 @@ object ConsoleNotificationClient : NotificationClient {
             if (data.data?.isNotEmpty() == true)
                 appendLine("Data: {${data.data.entries.joinToString { "${it.key}: ${it.value} " }}}")
         })
+
+        return targets.associateWith { NotificationSendResult.Success }
     }
 
 }

@@ -5,7 +5,6 @@ package com.lightningkite.lightningserver.db
 import com.lightningkite.UUID
 import com.lightningkite.lightningdb.*
 import com.lightningkite.now
-import com.lightningkite.rock.delay
 import com.lightningkite.rock.launchGlobal
 import com.lightningkite.rock.reactive.CalculationContext
 import com.lightningkite.rock.reactive.Readable
@@ -27,12 +26,12 @@ class ModelRestEndpointsTest {
         prepareModels()
         val collectionsToTest = listOf(
             MockModelCollection(SampleModel.serializer()),
-            CacheImpl(MockModelRestEndpoints(::println), SampleModel.serializer()),
-            CacheImpl(
+            ModelCache(MockModelRestEndpoints(::println), SampleModel.serializer()),
+            ModelCache(
                 object : ModelRestEndpointsPlusWs<SampleModel, UUID> by MockModelRestEndpoints(::println) {},
                 SampleModel.serializer()
             ),
-            CacheImpl(
+            ModelCache(
                 object : ModelRestEndpoints<SampleModel, UUID> by MockModelRestEndpoints(::println) {},
                 SampleModel.serializer()
             )
@@ -55,7 +54,7 @@ class ModelRestEndpointsTest {
                 return this
             }
 
-            suspend fun regularly() = collectionsToTest.forEach { if (it is CacheImpl) it.regularly() }
+            suspend fun regularly() = collectionsToTest.forEach { if (it is ModelCache) it.regularly() }
             val query1 = collectionsToTest.mapIndexed { index, it -> it.query(Query<SampleModel>(orderBy = sort { it.at.ascending() })).reportForTest("query1$index") }
             val query2 = collectionsToTest.mapIndexed { index, it ->
                 it.query(Query<SampleModel>(condition { it.title eq "Test 1" }, orderBy = sort { it.at.ascending() })).reportForTest("query2$index")

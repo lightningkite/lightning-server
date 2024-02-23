@@ -7,6 +7,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.encoding.*
 
 class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> {
@@ -27,6 +28,9 @@ class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> 
             try {
                 val sourceDescriptor = source.descriptor
                 return buildClassSerialDescriptor("com.lightningkite.lightningdb.Partial", sourceDescriptor) {
+                    if(sourceDescriptor.elementsCount != childSerializers.size) {
+                        throw IllegalStateException("Mismatch in child serializer count; ${sourceDescriptor.elementsCount} vs ${childSerializers.size}; ${sourceDescriptor.elementNames.joinToString()} vs ${childSerializers.joinToString { it.descriptor.serialName }}")
+                    }
                     for (index in 0 until sourceDescriptor.elementsCount) {
                         val s = childSerializers[index]
                         if (s is PartialSerializer<*>) {

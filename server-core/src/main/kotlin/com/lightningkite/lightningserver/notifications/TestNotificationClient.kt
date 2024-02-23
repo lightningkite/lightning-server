@@ -18,12 +18,13 @@ object TestNotificationClient : NotificationClient {
     override suspend fun send(
         targets: List<String>,
         data: NotificationData
-    ) {
+    ): Map<String, NotificationSendResult> {
         val m = Message(targets, data)
         lastMessageSent = m
         onMesasgeSent?.invoke(m)
         if(printToConsole)
             ConsoleNotificationClient.send(targets, data)
+        return targets.associateWith { NotificationSendResult.Success }
     }
 
 }

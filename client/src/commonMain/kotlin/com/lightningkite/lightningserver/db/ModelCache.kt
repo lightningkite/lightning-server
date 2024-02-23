@@ -10,7 +10,7 @@ import kotlin.coroutines.resume
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
-internal class CacheImpl<T : HasId<ID>, ID : Comparable<ID>>(
+class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
     override val skipCache: ModelRestEndpoints<T, ID>,
     val serializer: KSerializer<T>,
     cacheTime: Duration = 5.minutes,
@@ -22,7 +22,7 @@ internal class CacheImpl<T : HasId<ID>, ID : Comparable<ID>>(
     inner class WritableModelImpl(val id: ID) : WritableModel<T> {
         var live: Int = 0
         override val serializer: KSerializer<T>
-            get() = this@CacheImpl.serializer
+            get() = this@ModelCache.serializer
         private val listeners = ArrayList<() -> Unit>()
         private val awaiting = ArrayList<Continuation<T>>()
         val inUse: Boolean get() = listeners.isNotEmpty() || awaiting.isNotEmpty()
@@ -117,6 +117,7 @@ internal class CacheImpl<T : HasId<ID>, ID : Comparable<ID>>(
         var unreportedChanges = false
         fun refreshIfNeeded() {
             if (unreportedChanges) {
+                println("Reporting changes")
                 unreportedChanges = false
                 listeners.toList().forEach { it() }
             }
@@ -307,6 +308,7 @@ internal class CacheImpl<T : HasId<ID>, ID : Comparable<ID>>(
             impl.value = new
         }
         queries.forEach {
+            println("Updating query ${it.key}")
             for (item in newItems) it.value.onAdded(item)
             it.value.refreshIfNeeded()
         }
@@ -363,6 +365,15 @@ internal class CacheImpl<T : HasId<ID>, ID : Comparable<ID>>(
             ).forEach {
                 val id = it._id
                 cache.getOrPut(id) { WritableModelImpl(id) }.value = it
+            }
+        }
+    }
+
+    init {
+        launchGlobal {
+            while(true) {
+                delay(50)
+                regularly()
             }
         }
     }

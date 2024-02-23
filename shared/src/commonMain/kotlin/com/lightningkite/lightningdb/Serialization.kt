@@ -19,4 +19,5 @@ val ClientModule = SerializersModule {
     contextual(ZonedDateTime::class, ZonedDateTimeIso8601Serializer)
     contextual(Duration::class, DurationSerializer)
     contextual(ServerFile::class, ServerFileSerialization)
+    contextual(GeoCoordinate::class, GeoCoordinateArraySerializer)
 }

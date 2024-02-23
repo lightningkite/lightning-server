@@ -209,10 +209,10 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             val used = proofs.map { it.via }.toSet()
             val users = proofs.mapNotNull { handler.findUser(it.property, it.value) }.distinctBy { it._id }
             val subject = users.singleOrNull() ?: throw HttpStatusException(errorNoSingleUser)
-            val strength = proofs.sumOf { it.strength }
+            val strength = proofs.groupBy { it.property }.values.sumOf { it.maxOf { it.strength } }
             val proofMethods = handler.proofMethods
                 .filter { it.established(handler, subject) }
-            val maxStrengthPossible = proofMethods.sumOf { it.info.strength }
+            val maxStrengthPossible = proofMethods.groupBy { it.info.property }.values.sumOf { it.maxOf { it.info.strength } }
             val actStrenReq = min(handler.desiredStrengthFor(subject), maxStrengthPossible)
             IdAndAuthMethods(
                 session = if (strength >= actStrenReq) newSessionPrivate(

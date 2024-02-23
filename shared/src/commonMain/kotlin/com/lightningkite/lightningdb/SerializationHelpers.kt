@@ -3,6 +3,7 @@
 package com.lightningkite.lightningdb
 
 import kotlinx.serialization.*
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
@@ -104,7 +105,7 @@ private object FakerDecoder : AbstractDecoder() {
 }
 
 private class CheatingBastardDecoder(var count: Int = 0) : AbstractDecoder() {
-    override val serializersModule: SerializersModule = EmptySerializersModule()
+    override val serializersModule: SerializersModule = com.lightningkite.lightningdb.ClientModule
     var counter = 0
     override fun decodeElementIndex(descriptor: SerialDescriptor): Int {
         return counter++.let {
@@ -116,6 +117,33 @@ private class CheatingBastardDecoder(var count: Int = 0) : AbstractDecoder() {
         if (count == 0) throw FoundSerializerSignal(deserializer as KSerializer<*>)
         count--
         return FakerDecoder.decodeSerializableValue(deserializer)
+    }
+    override fun decodeBoolean(): Boolean {
+        throw FoundSerializerSignal(Boolean.serializer())
+    }
+    override fun decodeByte(): Byte {
+        throw FoundSerializerSignal(Byte.serializer())
+    }
+    override fun decodeShort(): Short {
+        throw FoundSerializerSignal(Short.serializer())
+    }
+    override fun decodeInt(): Int {
+        throw FoundSerializerSignal(Int.serializer())
+    }
+    override fun decodeLong(): Long {
+        throw FoundSerializerSignal(Long.serializer())
+    }
+    override fun decodeFloat(): Float {
+        throw FoundSerializerSignal(Float.serializer())
+    }
+    override fun decodeDouble(): Double {
+        throw FoundSerializerSignal(Double.serializer())
+    }
+    override fun decodeChar(): Char {
+        throw FoundSerializerSignal(Char.serializer())
+    }
+    override fun decodeString(): String {
+        throw FoundSerializerSignal(String.serializer())
     }
 }
 

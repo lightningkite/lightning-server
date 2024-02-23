@@ -4,6 +4,7 @@ import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.*
+import com.lightningkite.lightningserver.exceptions.report
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -45,15 +46,16 @@ object FcmNotificationClient : NotificationClient {
     override suspend fun send(
         targets: List<String>,
         data: NotificationData
-    ) {
+    ): Map<String, NotificationSendResult> {
         val notification = data.notification
         val android = data.android
         val ios = data.ios
         val web = data.web
         val programmaticData = data.data
-        val builder = with(MulticastMessage.builder()) {
+        fun builder() = with(MulticastMessage.builder()) {
             if (programmaticData != null)
                 putAllData(programmaticData)
+            notification?.link?.let { putData("link", it) }
             setApnsConfig(
                 with(ApnsConfig.builder()) {
                     data.timeToLive?.let {
@@ -99,6 +101,7 @@ object FcmNotificationClient : NotificationClient {
                             AndroidNotification.builder()
                                 .setChannelId(android.channel)
                                 .setSound(android.sound)
+                                .setClickAction(data.notification?.link)
                                 .build()
                         )
                         build()
@@ -112,7 +115,10 @@ object FcmNotificationClient : NotificationClient {
                     if (web != null) {
                         putAllData(web.data)
                     }
-                    if (notification != null)
+                    if (notification != null) {
+                        notification.link?.let {
+                            setFcmOptions(WebpushFcmOptions.withLink(it))
+                        }
                         setNotification(
                             WebpushNotification.builder()
                                 .setTitle(notification.title)
@@ -120,6 +126,7 @@ object FcmNotificationClient : NotificationClient {
                                 .setImage(notification.imageUrl)
                                 .build()
                         )
+                    }
                     build()
                 }
             )
@@ -135,19 +142,35 @@ object FcmNotificationClient : NotificationClient {
             this
         }
 
+        val results = HashMap<String, NotificationSendResult>()
+        val errorCodes = HashSet<MessagingErrorCode>()
         targets
             .chunked(500)
             .map {
-                builder
+                builder()
                     .addAllTokens(it)
                     .build()
             }
             .forEach {
                 withContext(Dispatchers.IO) {
-                    FirebaseMessaging.getInstance().sendMulticast(it)
+                    val result = FirebaseMessaging.getInstance().sendEachForMulticast(it)
+                    result.responses.forEachIndexed { index, sendResponse ->
+                        results[targets[index]] = when(val it = sendResponse.exception?.messagingErrorCode) {
+                            null -> NotificationSendResult.Success
+                            MessagingErrorCode.UNREGISTERED -> NotificationSendResult.DeadToken
+                            else -> {
+                                errorCodes.add(it)
+                                NotificationSendResult.Failure
+                            }
+                        }
+                    }
                 }
             }
-
+        if(errorCodes.isNotEmpty()) {
+            Exception("Some notifications failed to send.  Error codes received: ${errorCodes.joinToString()}")
+                .report()
+        }
+        return results
     }
 
 }

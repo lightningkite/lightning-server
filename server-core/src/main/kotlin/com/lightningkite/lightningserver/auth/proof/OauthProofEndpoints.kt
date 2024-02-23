@@ -35,15 +35,15 @@ class OauthProofEndpoints(
     val continueUiAuthUrl: ()->String
 ) : ServerPathGroup(path), Authentication.ExternalProofMethod {
 
-    init {
-        Authentication.register(this)
-    }
-
     override val info: ProofMethodInfo = ProofMethodInfo(
         via = provider.identifierName,
         property = "email",
         strength = 10
     )
+
+    init {
+        Authentication.register(this)
+    }
 
     @Suppress("UNCHECKED_CAST")
     val callback = path("callback").oauthCallback<UUID>(
