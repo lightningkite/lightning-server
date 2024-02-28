@@ -86,7 +86,7 @@ export function evaluateCondition<T>(condition: Condition<T>, model: T): boolean
                 ignoreCase: boolean;
             }
             if (v.ignoreCase)
-                return ((model as unknown as string).toLowerCase().indexOf(v.value) !== -1)
+                return ((model as unknown as string).toLowerCase().indexOf(v.value.toLowerCase()) !== -1)
             else
                 return ((model as unknown as string).indexOf(v.value) !== -1)
         case "FullTextSearch":
@@ -95,7 +95,7 @@ export function evaluateCondition<T>(condition: Condition<T>, model: T): boolean
                 ignoreCase: boolean;
             }
             if (v2.ignoreCase)
-                return ((model as unknown as string).toLowerCase().indexOf(v2.value) !== -1)
+                return ((model as unknown as string).toLowerCase().indexOf(v2.value.toLowerCase()) !== -1)
             else
                 return ((model as unknown as string).indexOf(v2.value) !== -1)
         case "IntBitsClear":
