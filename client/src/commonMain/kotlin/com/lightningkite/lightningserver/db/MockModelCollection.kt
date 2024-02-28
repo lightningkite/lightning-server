@@ -16,11 +16,11 @@ class MockModelCollection<T : HasId<ID>, ID : Comparable<ID>>(val serializer: KS
     inner class MockWritableModel(val id: ID) : WritableModel<T> {
         override val serializer: KSerializer<T>
             get() = this@MockModelCollection.serializer
-        val property = LateInitProperty<T>()
+        val property = LateInitProperty<T?>()
         val value: T? get() = if (property.ready) property.value else null
 
-        override suspend fun modify(modification: Modification<T>): T {
-            property.value = modification(property.value)
+        override suspend fun modify(modification: Modification<T>): T? {
+            property.value = property.value?.let { modification(it) }
             actionPerformed()
             return property.value
         }
@@ -32,10 +32,13 @@ class MockModelCollection<T : HasId<ID>, ID : Comparable<ID>>(val serializer: KS
         }
 
         override fun addListener(listener: () -> Unit): () -> Unit = property.addListener(listener)
-        override suspend fun awaitRaw(): T = property.awaitRaw()
-        override suspend fun set(value: T) {
-            property.set(value)
-            actionPerformed()
+        override suspend fun awaitRaw(): T? = property.awaitRaw()
+        override suspend fun set(value: T?) {
+            if(value == null) delete()
+            else {
+                property.set(value)
+                actionPerformed()
+            }
         }
     }
 

@@ -414,7 +414,7 @@ internal val ServerPath.escaped: String
     get() = "/" + segments.joinToString("/") {
         when (it) {
             is ServerPath.Segment.Constant -> it.value
-            is ServerPath.Segment.Wildcard -> "\${${it.name}}"
+            is ServerPath.Segment.Wildcard -> "\${${it.name}.urlify()}"
         }
     } + when (after) {
         ServerPath.Afterwards.None -> ""

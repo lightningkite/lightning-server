@@ -34,9 +34,9 @@ interface ModelRestEndpointsPlusUpdatesWebsocket<T : HasId<ID>, ID : Comparable<
     suspend fun updates(): TypedWebSocket<Condition<T>, CollectionUpdates<T, ID>>
 }
 
-interface WritableModel<T> : Writable<T> {
+interface WritableModel<T> : Writable<T?> {
     val serializer: KSerializer<T>
-    suspend fun modify(modification: Modification<T>): T
+    suspend fun modify(modification: Modification<T>): T?
     suspend fun delete(): Unit
 }
 

@@ -25,6 +25,24 @@ data class User(
     companion object
 }
 
+@GenerateDataClassPaths
+@Serializable
+data class CompoundKeyTestModel(
+    override val _id: CompoundTestKey = CompoundTestKey("first", "second")
+): HasId<CompoundTestKey>
+
+@GenerateDataClassPaths
+@Serializable
+data class CompoundTestKey(
+    val first: String,
+    val second: String,
+): Comparable<CompoundTestKey> {
+    companion object {
+        val comparator = compareBy<CompoundTestKey> { it.first }.thenBy { it.second }
+    }
+    override fun compareTo(other: CompoundTestKey): Int = comparator.compare(this, other)
+}
+
 @GenerateDataClassPaths()
 @Serializable
 data class Post(

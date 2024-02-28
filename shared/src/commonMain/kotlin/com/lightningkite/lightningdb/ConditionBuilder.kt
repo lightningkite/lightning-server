@@ -2,9 +2,11 @@
 
 package com.lightningkite.lightningdb
 
+import com.lightningkite.Distance
 import com.lightningkite.GeoCoordinate
 import com.lightningkite.khrysalis.*
 import com.lightningkite.lightningdb.SerializableProperty
+import com.lightningkite.miles
 import kotlin.jvm.JvmName
 
 inline fun <reified T : IsCodableAndHashable> path(): DataClassPath<T, T> = DataClassPathSelf(serializerOrContextual<T>())
@@ -30,7 +32,7 @@ infix fun <K : IsCodableAndHashable> DataClassPath<K, Int>.allSet(mask: Int) = m
 infix fun <K : IsCodableAndHashable> DataClassPath<K, Int>.anyClear(mask: Int) = mapCondition(Condition.IntBitsAnyClear(mask))
 infix fun <K : IsCodableAndHashable> DataClassPath<K, Int>.anySet(mask: Int) = mapCondition(Condition.IntBitsAnySet(mask))
 infix fun <K : IsCodableAndHashable> DataClassPath<K, String>.contains(value: String) = mapCondition(Condition.StringContains(value, ignoreCase = true))
-fun <K : IsCodableAndHashable> DataClassPath<K, GeoCoordinate>.distanceToKilometersBetween(value: GeoCoordinate, greaterThanKilometers: Double = 0.0, lessThanKilometers: Double = 100_000.0) = mapCondition(Condition.GeoDistance(value, greaterThanKilometers, lessThanKilometers))
+fun <K : IsCodableAndHashable> DataClassPath<K, GeoCoordinate>.distanceBetween(value: GeoCoordinate, greaterThan: Distance = 0.0.miles, lessThan: Distance = 100_000.0.miles) = mapCondition(Condition.GeoDistance(value, greaterThan.kilometers, lessThan.kilometers))
 @JsName("xDataClassPathContainsCased") fun <K : IsCodableAndHashable> DataClassPath<K, String>.contains(value: String, ignoreCase: Boolean) = mapCondition(Condition.StringContains(value, ignoreCase = ignoreCase))
 fun <K : IsCodableAndHashable, V : IsCodableAndHashable> DataClassPath<K, V>.fullTextSearch(value: String, ignoreCase: Boolean, ) = mapCondition(Condition.FullTextSearch<V>(value, ignoreCase = ignoreCase))
 @JsName("xDataClassPathListAll") @JvmName("listAll") inline infix fun <K : IsCodableAndHashable, reified T : IsCodableAndHashable> DataClassPath<K, List<T>>.all(condition: (DataClassPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAllElements(path<T>().let(condition)))

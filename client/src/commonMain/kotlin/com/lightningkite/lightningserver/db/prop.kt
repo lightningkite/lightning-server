@@ -16,7 +16,7 @@ fun <O, T> WritableModel<O>.prop(
     val override = Property<Any?>(NotInUse)
     var lastWriteRequest: Int = 0
     return shared {
-        val original = this@prop.await().let { property.get(it) as T }
+        val original = this@prop.awaitNotNull().let { property.get(it) as T }
         val o = override.await()
         if (o != NotInUse) o as T
         else original

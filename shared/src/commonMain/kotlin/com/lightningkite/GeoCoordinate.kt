@@ -8,6 +8,7 @@ import kotlinx.serialization.builtins.IntArraySerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
+import kotlin.jvm.JvmInline
 import kotlin.math.PI
 import kotlin.math.acos
 import kotlin.math.cos
@@ -15,8 +16,9 @@ import kotlin.math.sin
 
 @Serializable(GeoCoordinateGeoJsonSerializer::class)
 data class GeoCoordinate(val latitude: Double, val longitude: Double) {
-    infix fun distanceToKilometers(other: GeoCoordinate): Double = this.distanceToMiles(other) * 1.609344
-    infix fun distanceToMiles(other: GeoCoordinate): Double {
+    infix fun distanceToKilometers(other: GeoCoordinate): Double = distanceTo(other).kilometers
+    infix fun distanceToMiles(other: GeoCoordinate): Double = distanceTo(other).miles
+    infix fun distanceTo(other: GeoCoordinate): Distance {
         val theta: Double = this.longitude - other.longitude
         var dist: Double = (sin(deg2rad(this.latitude))
                 * sin(deg2rad(other.latitude))
@@ -26,9 +28,19 @@ data class GeoCoordinate(val latitude: Double, val longitude: Double) {
         dist = acos(dist)
         dist = rad2deg(dist)
         dist *= 60 * 1.1515
-        return dist
+        return dist.miles
     }
 }
+
+@JvmInline
+@Serializable
+value class Distance(val kilometers: Double) {
+    val miles: Double get() = kilometers / 1.609344
+}
+val Double.miles get() = Distance(kilometers = this * 1.609344)
+val Double.kilometers get() = Distance(kilometers = this)
+val Int.miles get() = Distance(kilometers = this * 1.609344)
+val Int.kilometers get() = Distance(kilometers = this.toDouble())
 
 object GeoCoordinateGeoJsonSerializer: KSerializer<GeoCoordinate> {
 
