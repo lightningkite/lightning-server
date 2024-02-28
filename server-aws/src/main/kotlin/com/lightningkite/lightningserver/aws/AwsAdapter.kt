@@ -15,6 +15,7 @@ import com.lightningkite.lightningserver.db.DynamoDbCache
 import com.lightningkite.lightningserver.encryption.OpenSsl
 import com.lightningkite.lightningserver.engine.Engine
 import com.lightningkite.lightningserver.engine.engine
+import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -327,10 +328,13 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         }
     }
 
+    private class AwsTaskInvokeException(message: String? = null, cause: Exception? = null): Exception(message, cause)
+
     suspend fun handleTask(event: TaskInvoke): APIGatewayV2HTTPResponse {
         return coroutineScope {
             @Suppress("UNCHECKED_CAST") val task = Tasks.tasks[event.taskName] as Task<Any?>?
             if (task == null) {
+                exceptionSettings().report(AwsTaskInvokeException("Task ${event.taskName} not found"))
                 logger.error("Task ${event.taskName} not found")
                 APIGatewayV2HTTPResponse(statusCode = 404, body = "Task ${event.taskName} not found")
             } else try {
