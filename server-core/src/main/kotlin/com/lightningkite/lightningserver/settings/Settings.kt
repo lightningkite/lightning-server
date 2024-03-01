@@ -76,7 +76,11 @@ object Settings {
         private val value by lazy<Goal> {
             if(!sealed) throw IllegalStateException()
             @Suppress("UNCHECKED_CAST")
-            getter(values[name]?.item as? Serializable ?: default)
+            if(values.containsKey(name)) {
+                getter(values[name]?.item as Serializable)
+            } else {
+                getter(default)
+            }
         }
         override fun invoke(): Goal = value
     }
