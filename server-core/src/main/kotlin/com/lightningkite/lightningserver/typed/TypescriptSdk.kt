@@ -438,3 +438,16 @@ private val SerialDescriptor.simpleSerialName: String
 
 private fun String.userTypeTokenName(): String =
     this.substringAfterLast('.').replaceFirstChar { it.lowercase() }.plus("Token")
+
+
+private val ServerPath.escaped: String
+    get() = "/" + segments.joinToString("/") {
+        when (it) {
+            is ServerPath.Segment.Constant -> it.value
+            is ServerPath.Segment.Wildcard -> "\${${it.name}}"
+        }
+    } + when (after) {
+        ServerPath.Afterwards.None -> ""
+        ServerPath.Afterwards.TrailingSlash -> "/"
+        ServerPath.Afterwards.ChainedWildcard -> "/*"
+    }

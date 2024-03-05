@@ -410,7 +410,8 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false): Li
     else -> TODO()
 }
 
-internal val ServerPath.escaped: String
+
+private val ServerPath.escaped: String
     get() = "/" + segments.joinToString("/") {
         when (it) {
             is ServerPath.Segment.Constant -> it.value
