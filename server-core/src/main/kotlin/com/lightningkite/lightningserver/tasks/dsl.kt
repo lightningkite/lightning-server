@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.tasks
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
+import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.datetime.Clock
@@ -86,6 +87,7 @@ suspend fun doOnce(
             }
         )
     } catch (e: Exception) {
+        exceptionSettings().report(e, "doOnce: $name")
         a.updateOneById(
             name,
             modification {
