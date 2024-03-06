@@ -21,11 +21,27 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
 
     inner class WritableModelImpl(val id: ID) : WritableModel<T> {
         var live: Int = 0
+        var lastSet: Double = 0.0
+        var ready: Boolean = false
+
         override val serializer: KSerializer<T>
             get() = this@ModelCache.serializer
         private val listeners = ArrayList<() -> Unit>()
         private val awaiting = ArrayList<Continuation<T?>>()
+
         val inUse: Boolean get() = listeners.isNotEmpty() || awaiting.isNotEmpty()
+        val upToDate: Boolean get() = (ready && live > 0) || clockMillis() - lastSet < cacheMs
+
+        var value: T? = null
+            set(value) {
+                ready = true
+                lastSet = clockMillis()
+                field = value
+                listeners.toList().forEach { it() }
+                awaiting.toList().forEach { it.resume(value) }
+                awaiting.clear()
+            }
+
         override fun addListener(listener: () -> Unit): () -> Unit {
             listeners.add(listener)
             return {
@@ -36,19 +52,6 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
             }
         }
 
-        var ready: Boolean = false
-        var value: T? = null
-            set(value) {
-                ready = true
-                lastSet = clockMillis()
-                field = value
-                listeners.toList().forEach { it() }
-                awaiting.toList().forEach { it.resume(value) }
-                awaiting.clear()
-            }
-        var lastSet: Double = 0.0
-        val upToDate: Boolean get() = live > 0 || clockMillis() - lastSet < cacheMs
-
         override suspend fun awaitRaw(): T? {
             if (!upToDate) {
                 suspendCoroutineCancellable<T?> {
@@ -58,11 +61,11 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
                     }
                 }
             }
-            return if(ready) value else suspendCoroutineCancellable { _ -> {} }
+            return value
         }
 
         override suspend infix fun set(value: T?) {
-            if(value == null) delete()
+            if (value == null) delete()
             else {
                 val result = skipCache.replace(id, value)
                 this.value = result
@@ -77,7 +80,9 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         override suspend fun modify(modification: Modification<T>): T? {
             val result = try {
                 skipCache.modify(id, modification)
-            } catch(e: Exception) { null }  // TODO: we can do better than this
+            } catch (e: Exception) {
+                null
+            }  // TODO: we can do better than this
             val oldValue = value
             value = result
             for (query in queries) {
@@ -91,6 +96,10 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         override suspend fun delete() {
             skipCache.delete(id)
             virtualDelete()
+        }
+
+        override suspend fun invalidate() {
+            lastSet = 0.0
         }
 
         fun virtualDelete() {
@@ -141,7 +150,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         }
 
         fun onAdded(item: T) {
-            if(!query.condition(item)) return
+            if (!query.condition(item)) return
             if (comparator == null) return
             if (!complete) {
                 val lastItem = cache[ids.lastOrNull() ?: return]?.value ?: return
@@ -161,6 +170,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
 
         fun onRemoved(id: ID) {
             ids.remove(id)
+            unreportedChanges = true
         }
 
         fun reset(ids: Collection<ID>) {
@@ -178,11 +188,13 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
 
     val cache = HashMap<ID, WritableModelImpl>()
     val queries = HashMap<Query<T>, ListImpl>()
+
     private interface LivingSocket<T> {
-        fun start(): ()->Unit
+        fun start(): () -> Unit
         val connected: Readable<Boolean>
         fun send(condition: Condition<T>)
     }
+
     private val currentSocket: Async<LivingSocket<T>?> = asyncGlobal {
         (skipCache as? ModelRestEndpointsPlusUpdatesWebsocket<T, ID>)?.updates()?.apply {
             onMessage {
@@ -200,7 +212,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
                 send(socketCondition)
             }
         }?.let {
-            object: LivingSocket<T> {
+            object : LivingSocket<T> {
                 override fun start(): () -> Unit = it.start()
                 override val connected: Readable<Boolean> get() = it.connected
                 override fun send(condition: Condition<T>) = it.send(condition)
@@ -216,6 +228,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
                         }
                         queries.forEach { it.value.onAdded(new); it.value.refreshIfNeeded() }
                     }
+
                     old != null -> {
                         cache[old._id]?.virtualDelete()
                     }
@@ -225,7 +238,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
                 send(Query(socketCondition, limit = 0))
             }
         }?.let {
-            object: LivingSocket<T> {
+            object : LivingSocket<T> {
                 override fun start(): () -> Unit = it.start()
                 override val connected: Readable<Boolean> get() = it.connected
                 override fun send(condition: Condition<T>) = it.send(Query(condition, limit = 0))
@@ -233,39 +246,40 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         }
     }
     private var socketCondition: Condition<T> = Condition.Never()
-    private var socketEnder: (()->Unit)? = null
+    private var socketEnder: (() -> Unit)? = null
     suspend fun updateSocket(condition: Condition<T>) {
         socketCondition = condition
         val socket = currentSocket.await() ?: return
-        if(socket.connected.await()) {
+        if (socket.connected.await()) {
             socket.send(condition)
         }
-        if(condition is Condition.Never) {
-            if(socketEnder != null) {
+        if (condition is Condition.Never) {
+            if (socketEnder != null) {
                 socketEnder?.invoke()
                 socketEnder = null
             }
         } else {
-            if(socketEnder == null) {
+            if (socketEnder == null) {
                 socketEnder = socket.start()
             }
         }
     }
+
     var listeningDirty = false
 
     override fun get(id: ID): WritableModel<T> = cache.getOrPut(id) { WritableModelImpl(id) }
 
     override suspend fun watch(id: ID): WritableModel<T> {
         val original = cache.getOrPut(id) { WritableModelImpl(id) }
-        return object: WritableModel<T> by original {
+        return object : WritableModel<T> by original {
             override fun addListener(listener: () -> Unit): () -> Unit {
                 val o = original.addListener(listener)
                 var once = true
-                if(original.live++ == 0) listeningDirty = true
+                if (original.live++ == 0) listeningDirty = true
                 return {
-                    if(once) {
+                    if (once) {
                         once = false
-                        if(--original.live == 0) listeningDirty = true
+                        if (--original.live == 0) listeningDirty = true
                     }
                     o()
                 }
@@ -281,15 +295,15 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         val original = queries.getOrPut(query) {
             ListImpl(query)
         }
-        return object: Readable<List<T>> by original {
+        return object : Readable<List<T>> by original {
             override fun addListener(listener: () -> Unit): () -> Unit {
                 val o = original.addListener(listener)
                 var once = true
-                if(original.live++ == 0) listeningDirty = true
+                if (original.live++ == 0) listeningDirty = true
                 return {
-                    if(once) {
+                    if (once) {
                         once = false
-                        if(--original.live == 0) listeningDirty = true
+                        if (--original.live == 0) listeningDirty = true
                     }
                     o()
                 }
@@ -343,14 +357,14 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
     }
 
     suspend fun regularly() {
-        if(listeningDirty) {
+        if (listeningDirty) {
             listeningDirty = false
-            val subConditions = queries.values.mapNotNull { if(it.live == 0) null else it.query.condition } +
-                    cache.values.mapNotNull { if(it.live == 0) null else it.id }
+            val subConditions = queries.values.mapNotNull { if (it.live == 0) null else it.query.condition } +
+                    cache.values.mapNotNull { if (it.live == 0) null else it.id }
                         .takeUnless { it.isEmpty() }
                         ?.let { Condition.OnField(idProp, Condition.Inside(it)) }
                         .let(::listOfNotNull)
-            updateSocket(if(subConditions.isEmpty()) Condition.Never() else Condition.Or(subConditions))
+            updateSocket(if (subConditions.isEmpty()) Condition.Never() else Condition.Or(subConditions))
         }
         for (query in queries.values.toList()) {
             if (query.inUse && !query.upToDate) {
@@ -362,14 +376,19 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
             }
         }
         val needsUpdates = cache.values.toList().asSequence().filter { it.inUse && !it.upToDate }.map { it.id }.toSet()
-        if(needsUpdates.isNotEmpty()) {
-            val results = skipCache.query(
-                Query(
-                    DataClassPathSelf(serializer).get(idProp).inside(needsUpdates),
-                    limit = 1000
-                )
-            )
-            needsUpdates.forEach {  id ->
+        if (needsUpdates.isNotEmpty()) {
+            val limit = 1000
+            val results = needsUpdates
+                .chunked(limit)
+                .flatMap {
+                    skipCache.query(
+                        Query(
+                            DataClassPathSelf(serializer).get(idProp).inside(needsUpdates),
+                            limit = limit
+                        )
+                    )
+                }
+            needsUpdates.forEach { id ->
                 cache.getOrPut(id) { WritableModelImpl(id) }.value = results.find { it._id == id }
             }
         }
@@ -377,7 +396,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
 
     init {
         launchGlobal {
-            while(true) {
+            while (true) {
                 delay(200)
                 regularly()
             }

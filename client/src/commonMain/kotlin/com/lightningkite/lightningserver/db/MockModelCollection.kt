@@ -31,6 +31,10 @@ class MockModelCollection<T : HasId<ID>, ID : Comparable<ID>>(val serializer: KS
             actionPerformed()
         }
 
+        override suspend fun invalidate() {
+            actionPerformed()
+        }
+
         override fun addListener(listener: () -> Unit): () -> Unit = property.addListener(listener)
         override suspend fun awaitRaw(): T? = property.awaitRaw()
         override suspend fun set(value: T?) {
