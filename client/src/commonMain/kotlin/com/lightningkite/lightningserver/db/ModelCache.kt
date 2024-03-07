@@ -121,8 +121,13 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
     inner class ListImpl(val query: Query<T>) : Readable<List<T>> {
         var live: Int = 0
         var lastSet: Double = 0.0
-        val now = clockMillis()
-        val upToDate: Boolean get() = ready && (live > 0 || (now - lastSet < cacheMs && now > totalInvalidation))
+        var lastInvalidateCheck = clockMillis()
+        val upToDate: Boolean get() {
+            val now = clockMillis()
+            val result = (ready && (live > 0 || (now - lastSet < cacheMs && lastInvalidateCheck > totalInvalidation)))
+            lastInvalidateCheck = now
+            return result
+        }
         val comparator = query.orderBy.comparator ?: compareBy { it._id }
 
         var complete: Boolean = false
