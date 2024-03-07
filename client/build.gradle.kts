@@ -1,4 +1,7 @@
-import com.lightningkite.deployhelpers.*
+import com.lightningkite.deployhelpers.developer
+import com.lightningkite.deployhelpers.github
+import com.lightningkite.deployhelpers.mit
+import com.lightningkite.deployhelpers.standardPublishing
 
 plugins {
     kotlin("multiplatform")
@@ -10,7 +13,7 @@ plugins {
     `maven-publish`
 }
 
-repositories{
+repositories {
     maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
 }
 
@@ -26,11 +29,7 @@ kotlin {
         }
     }
 
-    jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
-        }
-    }
+    jvm()
     js(IR) {
         browser()
     }
