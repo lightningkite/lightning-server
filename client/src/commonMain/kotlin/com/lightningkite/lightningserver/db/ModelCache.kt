@@ -30,7 +30,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         private val awaiting = ArrayList<Continuation<T?>>()
 
         val inUse: Boolean get() = listeners.isNotEmpty() || awaiting.isNotEmpty()
-        val upToDate: Boolean get() = (ready && live > 0) || clockMillis() - lastSet < cacheMs
+        val upToDate: Boolean get() = ready && (live > 0 || clockMillis() - lastSet < cacheMs)
 
         var value: T? = null
             set(value) {
@@ -122,7 +122,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         var live: Int = 0
         var lastSet: Double = 0.0
         val now = clockMillis()
-        val upToDate: Boolean get() = (ready && live > 0) || (now - lastSet < cacheMs && now > totalInvalidation)
+        val upToDate: Boolean get() = ready && (live > 0 || (now - lastSet < cacheMs && now > totalInvalidation))
         val comparator = query.orderBy.comparator ?: compareBy { it._id }
 
         var complete: Boolean = false
