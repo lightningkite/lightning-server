@@ -39,22 +39,43 @@ abstract class CommonSymbolProcessor(
         outFolder.mkdirs()
         val createdFiles = HashSet<File>()
         val common = resolver.getAllFiles().any { it.filePath?.contains("/src/common", true) == true }
-        fileCreator = label@{ dependencies, packageName, fileName, extensionName ->
-            if(!common) return@label myCodeGenerator.createNewFile(dependencies, packageName, fileName, extensionName).bufferedWriter()
-            val packagePath = packageName.split('.').filter { it.isNotBlank() }.joinToString(""){ "$it/" }
-            outFolder.resolve("${packagePath}$fileName.$extensionName")
-                .also { it.parentFile.mkdirs() }
-                .also { createdFiles += outFolder.resolve(it) }
-                .bufferedWriter()
+
+        // Acquire lock
+        val lockFile = projectFolder.resolve("build/generated/ksp/.ls-lock")
+        if(lockFile.exists()) {
+            // A different process is doing KSP for us; bail after waiting a bit
+            while(lockFile.exists()) {
+                Thread.sleep(1000L)
+            }
+            return listOf()
         }
-        process2(resolver)
-        val manifest = outFolder.parentFile!!.resolve("ls-manifest.txt")
-        manifest.takeIf { it.exists() }?.readLines()
-            ?.map { File(it) }
-            ?.toSet()
-            ?.minus(createdFiles)
+        try {
+            lockFile.createNewFile()
+
+            fileCreator = label@{ dependencies, packageName, fileName, extensionName ->
+                if (!common) return@label myCodeGenerator.createNewFile(
+                    dependencies,
+                    packageName,
+                    fileName,
+                    extensionName
+                ).bufferedWriter()
+                val packagePath = packageName.split('.').filter { it.isNotBlank() }.joinToString("") { "$it/" }
+                outFolder.resolve("${packagePath}$fileName.$extensionName")
+                    .also { it.parentFile.mkdirs() }
+                    .also { createdFiles += outFolder.resolve(it) }
+                    .bufferedWriter()
+            }
+            process2(resolver)
+            val manifest = outFolder.parentFile!!.resolve("ls-manifest.txt")
+            manifest.takeIf { it.exists() }?.readLines()
+                ?.map { File(it) }
+                ?.toSet()
+                ?.minus(createdFiles)
 //            ?.forEach { outFolder.resolve(it).takeIf { it.exists() }?.delete() }
-        manifest.writeText(createdFiles.joinToString("\n") + "\n")
+            manifest.writeText(createdFiles.joinToString("\n") + "\n")
+        } finally {
+            lockFile.delete()
+        }
         return listOf()
     }
 

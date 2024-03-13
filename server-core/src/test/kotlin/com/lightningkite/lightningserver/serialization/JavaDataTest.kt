@@ -106,6 +106,9 @@ class JavaDataTest {
             CompletePermissions.serializer(),
             Serialization.javaData.encodeToByteArray(CompletePermissions.serializer(), sample)
         ))
+        val serializer = CompletePermissions.serializer()
+        assertEquals(sample, Serialization.stringArray.decodeFromStringList(serializer, Serialization.stringArray.encodeToStringList(serializer, sample).also { println(it) }))
+        assertEquals(sample, Serialization.stringArray.decodeFromString(serializer, Serialization.stringArray.encodeToString(serializer, sample).also { println(it) }))
     }
 
     @Test
@@ -160,5 +163,8 @@ class JavaDataTest {
             CompletePermissions.serializer(),
             Serialization.javaData.encodeToByteArray(CompletePermissions.serializer(), sample2)
         ))
+        val serializer = CompletePermissions.serializer()
+        assertEquals(sample2, Serialization.stringArray.decodeFromStringList(serializer, Serialization.stringArray.encodeToStringList(serializer, sample2)))
+        assertEquals(sample2, Serialization.stringArray.decodeFromString(serializer, Serialization.stringArray.encodeToString(serializer, sample2)))
     }
 }

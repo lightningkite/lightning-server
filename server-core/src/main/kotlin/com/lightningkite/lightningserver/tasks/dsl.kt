@@ -4,24 +4,30 @@ package com.lightningkite.lightningserver.tasks
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
+import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.serialization.Serialization
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.datetime.Clock
 import com.lightningkite.now
+import kotlinx.datetime.Instant
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.serialization.serializer
-import kotlinx.datetime.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 @LightningServerDsl
-inline fun <reified INPUT> task(name: String, noinline implementation: suspend Task.RunningTask<INPUT>.(INPUT) -> Unit) =
+inline fun <reified INPUT> task(
+    name: String,
+    noinline implementation: suspend Task.RunningTask<INPUT>.(INPUT) -> Unit,
+) =
     task(name, Serialization.module.serializer<INPUT>(), implementation)
 
 @LightningServerDsl
-fun <INPUT> task(name: String, serializer: KSerializer<INPUT>, implementation: suspend Task.RunningTask<INPUT>.(INPUT) -> Unit) =
+fun <INPUT> task(
+    name: String,
+    serializer: KSerializer<INPUT>,
+    implementation: suspend Task.RunningTask<INPUT>.(INPUT) -> Unit,
+) =
     Task(name, serializer, implementation)
 
 @LightningServerDsl
@@ -37,7 +43,7 @@ data class ActionHasOccurred(
     override val _id: String,
     val started: Instant? = null,
     val completed: Instant? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
 ) : HasId<String>
 
 @LightningServerDsl
@@ -46,7 +52,7 @@ fun startupOnce(
     database: () -> Database,
     maxDuration: Duration = 60.seconds,
     priority: Double = 0.0,
-    action: suspend () -> Unit
+    action: suspend () -> Unit,
 ): StartupAction {
     prepareModels()
     return startup(priority) {
@@ -54,13 +60,15 @@ fun startupOnce(
     }
 }
 
+private class DoOnceException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
+
 @LightningServerDsl
 suspend fun doOnce(
     name: String,
     database: () -> Database,
     maxDuration: Duration = 60.seconds,
     priority: Double = 0.0,
-    action: suspend () -> Unit
+    action: suspend () -> Unit,
 ) {
     prepareModels()
     val a = database().collection<ActionHasOccurred>()
@@ -86,6 +94,7 @@ suspend fun doOnce(
             }
         )
     } catch (e: Exception) {
+        exceptionSettings().report(DoOnceException(cause = e), "doOnce: $name")
         a.updateOneById(
             name,
             modification {

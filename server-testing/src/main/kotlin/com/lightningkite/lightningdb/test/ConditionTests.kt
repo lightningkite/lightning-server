@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb.test
 
 import com.lightningkite.GeoCoordinate
+import com.lightningkite.kilometers
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -23,7 +24,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = condition<GeoTest>() { it.geo.distanceToKilometersBetween(lk, lessThanKilometers = 50.0) }
+        val condition = condition<GeoTest>() { it.geo.distanceBetween(lk, lessThan = 50.0.kilometers) }
         val results = collection.find(condition).toList()
         assertEquals(listOf(lower), results)
         Unit
@@ -37,7 +38,7 @@ abstract class ConditionTests() {
         val manualList = listOf(lower, higher)
         collection.insertOne(lower)
         collection.insertOne(higher)
-        val condition = condition<GeoTest>() { it.geo.distanceToKilometersBetween(lk, greaterThanKilometers = 50.0) }
+        val condition = condition<GeoTest>() { it.geo.distanceBetween(lk, greaterThan = 50.0.kilometers) }
         val results = collection.find(condition).toList()
         assertEquals(listOf(higher), results)
         Unit

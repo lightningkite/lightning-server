@@ -5,6 +5,7 @@ import com.charleskorn.kaml.YamlConfiguration
 import com.github.jershell.kbson.*
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.SetOnce
+import com.lightningkite.lightningserver.StringArrayFormat
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
 import com.lightningkite.lightningserver.http.HttpContent
@@ -98,6 +99,9 @@ abstract class Serialization {
             contextual(Instant::class, InstantLongSerializer)
         }))
     }
+    var stringArray: StringArrayFormat by SetOnce {
+        StringArrayFormat(module)
+    }
     var properties: Properties by SetOnce {
         Properties(module)
     }
@@ -144,15 +148,12 @@ abstract class Serialization {
         }
     }
 
-    @kotlinx.serialization.Serializable
-    data class IdHolder<ID>(val id: ID)
-
     fun <T> toString(value: T, serializer: KSerializer<T>): String {
-        return Serialization.properties.encodeToStringMap(IdHolder.serializer(serializer), IdHolder(value))["id"]!!
+        return Serialization.stringArray.encodeToString(serializer, value)
     }
 
     fun <T> fromString(string: String, serializer: KSerializer<T>): T {
-        return Serialization.properties.decodeFromStringMap(IdHolder.serializer(serializer), mapOf("id" to string)).id
+        return Serialization.stringArray.decodeFromString(serializer, string)
     }
 
     init {

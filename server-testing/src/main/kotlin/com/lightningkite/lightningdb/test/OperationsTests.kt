@@ -5,7 +5,9 @@ import kotlinx.datetime.Instant
 import kotlin.test.assertEquals
 import com.lightningkite.lightningdb.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.toList
+import org.junit.Assert.fail
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.max
 import kotlin.random.Random
@@ -160,5 +162,19 @@ abstract class OperationsTests() {
 //        assertEquals(operations.fold(m) { acc, op -> op(acc) }, collection().get(m._id))
         assertEquals(0, opCount.get())
         println("Concurrent ops: ${opMax.get()}")
+    }
+
+    @Test fun test_compounds(): Unit = runBlocking {
+        fun collection() = database.collection<CompoundKeyTestModel>("test_compounds")
+        collection().insertOne(CompoundKeyTestModel(CompoundTestKey("A", "B")))
+        collection().insertOne(CompoundKeyTestModel(CompoundTestKey("A", "C")))
+        collection().insertOne(CompoundKeyTestModel(CompoundTestKey("C", "B")))
+        try {
+            collection().insertOne(CompoundKeyTestModel(CompoundTestKey("A", "C")))
+            fail()
+        } catch(e: UniqueViolationException) {
+            // OK!
+        }
+        collection().find(condition(true)).collect { println(it) }
     }
 }
