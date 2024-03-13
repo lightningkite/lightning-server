@@ -17,7 +17,7 @@ val khrysalisVersion: String by project
 val coroutines: String by project
 dependencies {
     api(project(":server-core"))
-    api("com.googlecode.xmemcached:xmemcached:2.4.7")
+    api(libs.xmemcached)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutines")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation(project(":server-testing"))

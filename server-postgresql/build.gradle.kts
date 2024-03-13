@@ -26,14 +26,14 @@ val khrysalisVersion: String by project
 val exposedVersion = "0.39.2"
 dependencies {
     api(project(":server-core"))
-    api("org.jetbrains.exposed:exposed-core:$exposedVersion")
-    api("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
-    api("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
-    api("org.postgresql:postgresql:42.5.4")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.7.2")
+    api(libs.exposed.core)
+    api(libs.exposed.java.time)
+    api(libs.exposed.jdbc)
+    api(libs.postgresql)
+    implementation(libs.kotlinx.coroutines.jdk8)
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation(project(":server-testing"))
-    testImplementation("io.zonky.test:embedded-postgres:2.0.4")
+    testImplementation(libs.embedded.postgres)
     ksp(project(":processor"))
     kspTest(project(":processor"))
 }

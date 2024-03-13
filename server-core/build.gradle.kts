@@ -30,32 +30,30 @@ dependencies {
 
     implementation("ch.qos.logback:logback-classic:$logBack")
 
-//    implementation("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
-
     api("io.ktor:ktor-client-content-negotiation-jvm:$ktorVersion")
     api("io.ktor:ktor-client-cio-jvm:$ktorVersion")
     api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines")
-    api("org.jetbrains.kotlinx:kotlinx-html-jvm:0.8.0")
+    api(libs.kotlinx.html.jvm)
 
-    api("dev.turingcomplete:kotlin-onetimepassword:2.4.0")
-    api("com.lightningkite:kotlinx-serialization-csv:2.2.1")
+    api(libs.kotlin.onetimepassword)
+    api(libs.kotlinx.serialization.csv)
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
     api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$kotlinXSerialization")
-    api("io.github.pdvrieze.xmlutil:serialization-jvm:0.86.3")
-    api("org.mongodb:bson:4.10.1")
-    api("com.github.jershell:kbson:0.5.0")
-    api("com.charleskorn.kaml:kaml:0.57.0")
+    api(libs.serialization.jvm)
+    api(libs.bson)
+    api(libs.kbson)
+    api(libs.kaml)
     api(kotlin("reflect"))
 
-    implementation("org.bouncycastle:bcprov-jdk18on:1.77")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.77")
+    implementation(libs.bcprov.jdk18on)
+    implementation(libs.bcpkix.jdk18on)
 
-    api("org.apache.commons:commons-email:1.5")
+    api(libs.commons.email)
 
-    testImplementation("com.auth0:java-jwt:4.3.0")
+    testImplementation(libs.java.jwt)
 
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 

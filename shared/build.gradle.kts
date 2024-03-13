@@ -44,12 +44,12 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinXSerialization")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
+                api(libs.kotlinSerializationProperties)
+                api(libs.kotlinSerializationJson)
 
-                implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-                implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
-                api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
+                implementation(libs.kotlinStandardLib)
+                implementation(libs.kotlinReflect)
+                api(libs.kotlinDateTime)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))
@@ -115,6 +115,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     dependencies {
-        coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+        coreLibraryDesugaring(libs.desugar.jdk.libs)
     }
 }

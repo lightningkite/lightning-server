@@ -1,0 +1,129 @@
+[versions]
+agp = "8.2.0"
+appcompat = "1.6.1"
+awsVersion = "2.17.276"
+awsLambdaJavaLog4j2 = "1.5.1"
+awsLambdaJavaEvents = "3.11.1"
+awsLambdaJavaCore = "1.2.2"
+azureFunctionsJavaLibrary = "2.0.1"
+azureStorageBlob = "12.21.0"
+bcpkixJdk18on = "1.77"
+bcprovJdk18on = "1.77"
+bson = "4.10.1"
+cardview = "1.0.0"
+commonsEmail = "1.5"
+commonsLang3 = "3.12.0"
+deFlapdoodleEmbedMongo = "3.5.4"
+desugar_jdk_libs = "2.0.4"
+dynamodb = "2.20.68"
+embeddedPostgres = "2.0.4"
+embeddedRedis = "0.8.3"
+exposedVersion = "0.39.2"
+firebaseAdmin = "9.2.0"
+javaJwt = "4.4.0"
+kaml = "0.57.0"
+kbson = "0.5.0"
+kotlin = "1.9.22"
+kotlinOnetimepassword = "2.4.0"
+kotlinxCoroutinesJdk8 = "1.7.2"
+kotlinxHtmlJvm = "0.8.0"
+kotlinxSerializationCsv = "2.2.1"
+ktorVersion = "2.3.8"
+lettuceCore = "6.2.3.RELEASE"
+material = "1.11.0"
+media3Common = "1.2.1"
+media3Ui = "1.2.1"
+media3Exoplayer = "1.2.1"
+nexus-publish = "2.0.0-rc-1"
+dokka = "1.9.20"
+android-minSdk = "24"
+android-compileSdk = "33"
+kotlinxSerialization = "1.6.2"
+kotlinDateTime = "0.4.1"
+orgCrac = "0.1.3"
+postgresql = "42.5.4"
+recyclerview = "1.3.2"
+sentry = "7.2.0"
+sentryLogback = "1.7.30"
+serializationJvm = "0.86.3"
+sshj = "0.35.0"
+timber = "5.0.1"
+transition = "1.4.1"
+ksp = "1.9.22-1.0.17"
+foojay = "0.5.0"
+xmemcached = "2.4.7"
+
+[libraries]
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+apigatewaymanagementapi = { module = "software.amazon.awssdk:apigatewaymanagementapi", version.ref = "awsVersion" }
+aws-lambda-java-log4j2 = { module = "com.amazonaws:aws-lambda-java-log4j2", version.ref = "awsLambdaJavaLog4j2" }
+aws-lambda-java-events = { module = "com.amazonaws:aws-lambda-java-events", version.ref = "awsLambdaJavaEvents" }
+aws-lambda-java-core = { module = "com.amazonaws:aws-lambda-java-core", version.ref = "awsLambdaJavaCore" }
+azure-functions-java-library = { module = "com.microsoft.azure.functions:azure-functions-java-library", version.ref = "azureFunctionsJavaLibrary" }
+azure-storage-blob = { module = "com.azure:azure-storage-blob", version.ref = "azureStorageBlob" }
+bcpkix-jdk18on = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bcpkixJdk18on" }
+bcprov-jdk18on = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bcprovJdk18on" }
+bson = { module = "org.mongodb:bson", version.ref = "bson" }
+cardview = { module = "androidx.cardview:cardview", version.ref = "cardview" }
+cloudwatch = { module = "software.amazon.awssdk:cloudwatch", version.ref = "awsVersion" }
+commons-email = { module = "org.apache.commons:commons-email", version.ref = "commonsEmail" }
+commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commonsLang3" }
+de-flapdoodle-embed-mongo = { module = "de.flapdoodle.embed:de.flapdoodle.embed.mongo", version.ref = "deFlapdoodleEmbedMongo" }
+desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libs" }
+dynamodb = { module = "software.amazon.awssdk:dynamodb", version.ref = "dynamodb" }
+embedded-postgres = { module = "io.zonky.test:embedded-postgres", version.ref = "embeddedPostgres" }
+embedded-redis = { module = "org.signal:embedded-redis", version.ref = "embeddedRedis" }
+exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposedVersion" }
+exposed-java-time = { module = "org.jetbrains.exposed:exposed-java-time", version.ref = "exposedVersion" }
+exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "exposedVersion" }
+firebase-admin = { module = "com.google.firebase:firebase-admin", version.ref = "firebaseAdmin" }
+java-jwt = { module = "com.auth0:java-jwt", version.ref = "javaJwt" }
+kaml = { module = "com.charleskorn.kaml:kaml", version.ref = "kaml" }
+kbson = { module = "com.github.jershell:kbson", version.ref = "kbson" }
+kotlin-onetimepassword = { module = "dev.turingcomplete:kotlin-onetimepassword", version.ref = "kotlinOnetimepassword" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin"}
+kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "kotlinxCoroutinesJdk8" }
+kotlinx-coroutines-reactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version.ref = "kotlinxCoroutinesJdk8" }
+kotlinx-html-jvm = { module = "org.jetbrains.kotlinx:kotlinx-html-jvm", version.ref = "kotlinxHtmlJvm" }
+kotlinx-serialization-csv = { module = "com.lightningkite:kotlinx-serialization-csv", version.ref = "kotlinxSerializationCsv" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktorVersion" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktorVersion" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktorVersion" }
+lambda = { module = "software.amazon.awssdk:lambda", version.ref = "awsVersion" }
+lettuce-core = { module = "io.lettuce:lettuce-core", version.ref = "lettuceCore" }
+material = { module = "com.google.android.material:material", version.ref = "material" }
+media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3Exoplayer" }
+ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktorVersion" }
+media3-common = { module = "androidx.media3:media3-common", version.ref = "media3Common" }
+media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3Ui" }
+mongodb-driver-kotlin-coroutine = { module = "org.mongodb:mongodb-driver-kotlin-coroutine", version.ref = "bson" }
+nexus-publish = { module = "io.github.gradle-nexus.publish-plugin:io.github.gradle-nexus.publish-plugin.gradle.plugin", version.ref = "nexus-publish" }
+kotlinSerializationJson = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+kotlinSerializationProperties = { module = "org.jetbrains.kotlinx:kotlinx-serialization-properties", version.ref = "kotlinxSerialization" }
+kotlinDateTime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinDateTime" }
+kotlinStandardLib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
+kotlinReflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+rds = { module = "software.amazon.awssdk:rds", version.ref = "awsVersion" }
+org-crac = { module = "io.github.crac:org-crac", version.ref = "orgCrac" }
+recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerview" }
+s3 = { module = "software.amazon.awssdk:s3", version.ref = "awsVersion" }
+sentry = { module = "io.sentry:sentry", version.ref = "sentry" }
+sentry-logback = { module = "io.sentry:sentry-logback", version.ref = "sentryLogback" }
+serialization-jvm = { module = "io.github.pdvrieze.xmlutil:serialization-jvm", version.ref = "serializationJvm" }
+ses = { module = "software.amazon.awssdk:ses", version.ref = "awsVersion" }
+sshj = { module = "com.hierynomus:sshj", version.ref = "sshj" }
+timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
+transition = { module = "androidx.transition:transition", version.ref = "transition" }
+ksp = { module = "com.google.devtools.ksp:symbol-processing", version.ref = "ksp" }
+kspApi = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "ksp" }
+kspGradlePluginz = { module = "com.google.devtools.ksp:symbol-processing-gradle-plugin", version.ref = "ksp" }
+xmemcached = { module = "com.googlecode.xmemcached:xmemcached", version.ref = "xmemcached" }
+
+[plugins]
+androidLibrary = { id = "com.android.library", version.ref = "agp" }
+kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+dokkaPlugin = { id = "org.jetbrains.dokka", version.ref = "dokka" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp"}
+kotlinJvm = {id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
