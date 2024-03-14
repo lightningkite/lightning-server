@@ -45,13 +45,10 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
                     appendLine(" {")
                     for (index in 0 until it.descriptor.elementsCount) {
                         append("    ")
-                        append(
-                            it.descriptor.getElementName(index).first()
-                                .let { char -> if (char.isJavaIdentifierStart()) char else '_' })
-                        append(
-                            it.descriptor.getElementName(index).drop(1)
-                                .map { char -> if (char.isJavaIdentifierPart()) char else '_' }.joinToString()
-                        )
+                        it.descriptor.getElementName(index).first()
+                            .let { if (it.isJavaIdentifierStart()) it else '_' }.let { append(it) }
+                        it.descriptor.getElementName(index).drop(1)
+                            .map { if (it.isJavaIdentifierPart()) it else '_' }.forEach { append(it) }
                         append(" = \"")
                         append(it.descriptor.getElementName(index))
                         append("\",")
