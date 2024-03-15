@@ -45,7 +45,10 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
                     appendLine(" {")
                     for (index in 0 until it.descriptor.elementsCount) {
                         append("    ")
-                        append(it.descriptor.getElementName(index))
+                        it.descriptor.getElementName(index).first()
+                            .let { if (it.isJavaIdentifierStart()) it else '_' }.let { append(it) }
+                        it.descriptor.getElementName(index).drop(1)
+                            .map { if (it.isJavaIdentifierPart()) it else '_' }.forEach { append(it) }
                         append(" = \"")
                         append(it.descriptor.getElementName(index))
                         append("\",")
@@ -426,8 +429,8 @@ private fun KSerializer<*>.write(): String = nullElement()?.let { it.write() + "
                 }
                 this.tryTypeParameterSerializers2()?.takeUnless { it.isEmpty() }
                     ?.joinToString(", ", "<", ">") { it.write() }?.let {
-                    out.append(it)
-                }
+                        out.append(it)
+                    }
             }
         }
     }.toString()
