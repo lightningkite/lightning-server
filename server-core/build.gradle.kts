@@ -41,7 +41,6 @@ dependencies {
     api("org.jetbrains.kotlinx:kotlinx-html-jvm:0.8.0")
 
     api("dev.turingcomplete:kotlin-onetimepassword:2.4.0")
-    api("com.lightningkite:kotlinx-serialization-csv:2.2.1")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
     api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$kotlinXSerialization")
     api("io.github.pdvrieze.xmlutil:serialization-jvm:0.86.3")
@@ -53,7 +52,7 @@ dependencies {
     implementation("org.bouncycastle:bcprov-jdk18on:1.77")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.77")
 
-    api("org.apache.commons:commons-email:1.5")
+    api("org.eclipse.angus:angus-mail:2.0.3")
 
     testImplementation("com.auth0:java-jwt:4.3.0")
 

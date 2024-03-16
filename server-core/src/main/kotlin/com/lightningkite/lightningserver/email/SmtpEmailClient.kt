@@ -3,10 +3,10 @@ package com.lightningkite.lightningserver.email
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.settings.generalSettings
 import java.util.*
-import javax.mail.Authenticator
-import javax.mail.PasswordAuthentication
-import javax.mail.Session
-import javax.mail.Transport
+import jakarta.mail.Authenticator
+import jakarta.mail.PasswordAuthentication
+import jakarta.mail.Session
+import jakarta.mail.Transport
 
 /**
  * An email client that will send real emails through SMTP.

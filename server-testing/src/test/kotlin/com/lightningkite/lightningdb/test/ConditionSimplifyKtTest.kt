@@ -209,10 +209,5 @@ class ConditionSimplifyKtTest {
         for (data in sampleData)
             assertEquals(this(data), simplified(data))
     }
-
-    @Test fun testA() {
-        Serialization.csv.encodeToString(TestSettings.files().root.resolve("example").serverFile)
-            .let { println(it) }
-    }
 }
 

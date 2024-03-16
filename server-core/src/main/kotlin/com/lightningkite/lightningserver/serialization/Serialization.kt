@@ -14,7 +14,6 @@ import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.cbor.Cbor
-import kotlinx.serialization.csv.Csv
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.getContextualDescriptor
@@ -62,14 +61,8 @@ abstract class Serialization {
             encodeDefaults = false
         }
     }
-    var csv: Csv by SetOnce {
-        Csv {
-            hasHeaderRecord = true
-            ignoreUnknownColumns = true
-            serializersModule = module
-            trimUnquotedWhitespace = true
-            deferToFormatWhenVariableColumns = json
-        }
+    var csv: CsvFormat by SetOnce {
+        CsvFormat(StringDeferringConfig(module, deferredFormat = json))
     }
     val yaml: Yaml by SetOnce {
         Yaml(module, YamlConfiguration(encodeDefaults = false, strictMode = false))
@@ -104,6 +97,9 @@ abstract class Serialization {
     }
     var properties: Properties by SetOnce {
         Properties(module)
+    }
+    var formData: FormDataFormat by SetOnce {
+        FormDataFormat(StringDeferringConfig(module, deferredFormat = json))
     }
 
     interface HttpContentParser {
@@ -157,9 +153,9 @@ abstract class Serialization {
     }
 
     init {
-        handler(FormDataHandler { properties })
+        handler(FormDataHandler { formData })
         handler(JsonFormatHandler(json = { json }, jsonWithoutDefaults = { jsonWithoutDefaults }))
-        handler(StringFormatHandler({ csv }, ContentType.Text.CSV))
+        handler(CsvFormatHandler({ csv }))
         handler(BinaryFormatHandler({ cbor }, ContentType.Application.Cbor))
         handler(BinaryFormatHandler({
             object : BinaryFormat {

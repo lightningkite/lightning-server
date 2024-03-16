@@ -49,7 +49,7 @@ kotlin {
 
                 implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
                 implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
-                api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
+                api("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0-RC.2")
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))

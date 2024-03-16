@@ -5,17 +5,14 @@ import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContentAndHeaders
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.settings.generalSettings
+import jakarta.activation.*
+import jakarta.mail.*
+import jakarta.mail.internet.*
+import jakarta.mail.util.*
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import java.util.*
-import javax.activation.DataHandler
-import javax.mail.Address
-import javax.mail.Message
-import javax.mail.Multipart
-import javax.mail.Session
-import javax.mail.internet.*
-import javax.mail.util.ByteArrayDataSource
 
 
 private suspend fun HttpContentAndHeaders.into(part: MimePart) {

@@ -1,7 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath

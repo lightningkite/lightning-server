@@ -19,7 +19,6 @@ import com.lightningkite.lightningserver.db.*
 import com.lightningkite.lightningserver.email.Email
 import com.lightningkite.lightningserver.email.EmailLabeledValue
 import com.lightningkite.lightningserver.email.EmailSettings
-import com.lightningkite.lightningserver.email.SesClient
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.SentryExceptionReporter
@@ -65,7 +64,6 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     init {
         Metrics
-        SesClient
         PostgresDatabase
         DynamoDbCache
         MongoDatabase
