@@ -85,7 +85,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                         }
                         MongoDatabase(databaseName = params?.get("databaseName")?.firstOrNull() ?: "default") {
                             embeddedMongo(
-                                replFile = File(folder),
+                                databaseFolder = File(folder),
                                 port = params?.get("port")?.firstOrNull()?.toIntOrNull(),
                                 version = params?.get("mongoVersion")?.firstOrNull()
                             )
