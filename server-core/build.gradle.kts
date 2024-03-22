@@ -38,15 +38,15 @@ dependencies {
 
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines")
-    api("org.jetbrains.kotlinx:kotlinx-html-jvm:0.8.0")
+    api("org.jetbrains.kotlinx:kotlinx-html-jvm:0.11.0")
 
     api("dev.turingcomplete:kotlin-onetimepassword:2.4.0")
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
     api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$kotlinXSerialization")
     api("io.github.pdvrieze.xmlutil:serialization-jvm:0.86.3")
-    api("org.mongodb:bson:4.10.1")
+    api("org.mongodb:bson:4.11.1")
     api("com.github.jershell:kbson:0.5.0")
-    api("com.charleskorn.kaml:kaml:0.57.0")
+    api("com.charleskorn.kaml:kaml:0.58.0")
     api(kotlin("reflect"))
 
     implementation("org.bouncycastle:bcprov-jdk18on:1.77")
@@ -54,7 +54,7 @@ dependencies {
 
     api("org.eclipse.angus:angus-mail:2.0.3")
 
-    testImplementation("com.auth0:java-jwt:4.3.0")
+    testImplementation("com.auth0:java-jwt:4.4.0")
 
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 

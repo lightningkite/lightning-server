@@ -17,7 +17,7 @@ val khrysalisVersion: String by project
 val coroutines:String by project
 dependencies {
     api(project(":server-core"))
-    implementation("com.hierynomus:sshj:0.35.0")
+    implementation("com.hierynomus:sshj:0.38.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutines")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation(project(":server-testing"))
