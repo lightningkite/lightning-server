@@ -1,7 +1,6 @@
-package com.lightningkite.lightningdb.test.com.lightningkite.lightningdb.test
+package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningdb.test.*
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.CacheTest
@@ -17,7 +16,6 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.io.File
-import kotlin.time.Duration
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.hours
 

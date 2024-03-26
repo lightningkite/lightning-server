@@ -14,9 +14,6 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.encodeToString
 import org.junit.Assert.*
 import org.junit.Test
-import kotlin.time.Duration
-import kotlinx.datetime.Instant
-import java.time.Clock
 import kotlin.test.assertContains
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
@@ -65,6 +62,17 @@ abstract class FileSystemTests {
             assertEquals(ContentType.Text.Plain, info!!.type)
             assertTrue(info.size > 0L)
             assertTrue(info.lastModified > beforeModify)
+
+            // Testing with sub folders.
+            val secondFile = system.root.resolve("test/secondTest.txt")
+            val secondMessage = "Hello Second world!"
+            val secondBeforeModify = now().minus(120.seconds)
+            secondFile.put(HttpContent.Text(secondMessage, ContentType.Text.Plain))
+            val secondInfo = secondFile.head()
+            assertNotNull(secondInfo)
+            assertEquals(ContentType.Text.Plain, secondInfo!!.type)
+            assertTrue(secondInfo.size > 0L)
+            assertTrue(secondInfo.lastModified > secondBeforeModify)
         }
     }
 

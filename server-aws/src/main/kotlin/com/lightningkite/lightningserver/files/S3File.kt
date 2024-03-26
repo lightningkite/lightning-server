@@ -38,7 +38,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
                     it.delimiter("/")
                     token?.let { t -> it.continuationToken(t) }
                 }.await()
-                results += r.contents().filter { !it.key().substringAfter(path.toString()).contains('/') }
+                results += r.contents().filter { !it.key().substringAfter(path.unixPath).contains('/') }
                     .map { S3File(system, File(it.key())) }
                 if (r.isTruncated) token = r.nextContinuationToken()
                 else break
@@ -53,7 +53,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         try {
             system.s3Async.headObject {
                 it.bucket(system.bucket)
-                it.key(path.toString())
+                it.key(path.unixPath)
             }.await().let {
                 FileInfo(
                     type = ContentType(it.contentType()),

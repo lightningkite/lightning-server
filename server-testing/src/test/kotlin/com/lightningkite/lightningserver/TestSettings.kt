@@ -80,9 +80,8 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         com.lightningkite.lightningdb.prepareModels()
         Settings.populateDefaults()
         engine = LocalEngine(LocalCache)
-
-
     }
+
     val sampleUser = GlobalScope.async(start = CoroutineStart.LAZY) {
         info.collection().insertOne(User(
             email = "test@test.com",
