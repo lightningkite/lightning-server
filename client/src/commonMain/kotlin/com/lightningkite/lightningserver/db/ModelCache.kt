@@ -277,7 +277,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
 
     override fun get(id: ID): WritableModel<T> = cache.getOrPut(id) { WritableModelImpl(id) }
 
-    override suspend fun watch(id: ID): WritableModel<T> {
+    override fun watch(id: ID): WritableModel<T> {
         val original = cache.getOrPut(id) { WritableModelImpl(id) }
         return object : WritableModel<T> by original {
             override fun addListener(listener: () -> Unit): () -> Unit {
