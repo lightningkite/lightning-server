@@ -42,7 +42,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api(project(":shared"))
-                api("com.lightningkite.rock:library:main-SNAPSHOT")
+                api("com.lightningkite.kiteui:library:main-SNAPSHOT")
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))

@@ -43,7 +43,7 @@ fun Documentable.Companion.kotlinSdkLocal(packageName: String, root: File = File
 
 fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(packageName).apply {
     imports.add("com.lightningkite.*")
-    imports.add("com.lightningkite.rock.*")
+    imports.add("com.lightningkite.kiteui.*")
     imports.add("com.lightningkite.lightningdb.*")
     imports.add("com.lightningkite.lightningserver.db.*")
     imports.add("kotlinx.datetime.*")
@@ -77,7 +77,7 @@ fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(
 
 fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmitter(packageName).apply {
     imports.add("com.lightningkite.*")
-    imports.add("com.lightningkite.rock.*")
+    imports.add("com.lightningkite.kiteui.*")
     imports.add("com.lightningkite.lightningdb.*")
     imports.add("com.lightningkite.lightningserver.db.*")
     imports.add("kotlinx.datetime.*")
@@ -188,7 +188,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
 fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmitter(packageName).apply {
     imports.add("com.lightningkite.*")
     imports.add("com.lightningkite.lightningdb.*")
-    imports.add("com.lightningkite.rock.*")
+    imports.add("com.lightningkite.kiteui.*")
     imports.add("kotlinx.datetime.*")
     val byGroup = safeDocumentables.groupBy { it.docGroupIdentifier }
     val groups = byGroup.keys.filterNotNull()

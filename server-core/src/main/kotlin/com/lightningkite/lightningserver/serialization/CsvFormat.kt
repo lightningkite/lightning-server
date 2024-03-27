@@ -5,7 +5,10 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.encoding.*
+import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.modules.SerializersModule
+import java.io.IOException
+import java.io.InputStream
 import java.io.Reader
 
 class CsvFormat(val stringDeferringConfig: StringDeferringConfig, val csvConfig: CsvConfig = CsvConfig.default) :
@@ -171,6 +174,40 @@ class CsvFormat(val stringDeferringConfig: StringDeferringConfig, val csvConfig:
         }
     }
 
+    fun <T> decodeToSequence(charIterator: CharIterator, deserializer: DeserializationStrategy<T>): Sequence<T> {
+        return charIterator.csvLines(csvConfig).asMaps(csvConfig).map {
+            StringDeferringDecoder(stringDeferringConfig, deserializer.descriptor, it).decodeSerializableValue(
+                deserializer
+            )
+        }
+    }
+
+    /**
+     * Transforms the given [stream] into lazily deserialized sequence of elements of type [T] using UTF-8 encoding and [deserializer].
+     * Unlike [decodeFromStream], [stream] is allowed to have more than one element.
+     *
+     * Elements must all be of type [T].
+     * Elements are parsed lazily when resulting [Sequence] is evaluated.
+     * Resulting sequence is tied to the stream and can be evaluated only once.
+     *
+     * **Resource caution:** this method neither closes the [stream] when the parsing is finished nor provides a method to close it manually.
+     * It is a caller responsibility to hold a reference to a stream and close it. Moreover, because stream is parsed lazily,
+     * closing it before returned sequence is evaluated completely will result in [IOException] from decoder.
+     *
+     * @throws [SerializationException] if the given JSON input cannot be deserialized to the value of type [T].
+     * @throws [IllegalArgumentException] if the decoded input cannot be represented as a valid instance of type [T]
+     * @throws [IOException] If an I/O error occurs and stream cannot be read from.
+     */
+    @ExperimentalSerializationApi
+    fun <T> decodeToSequence(stream: InputStream, deserializer: DeserializationStrategy<T>): Sequence<T> {
+        return stream.reader().iterator().csvLines(csvConfig).asMaps(csvConfig).map {
+            StringDeferringDecoder(stringDeferringConfig, deserializer.descriptor, it).decodeSerializableValue(
+                deserializer
+            )
+        }
+    }
+
+    @Deprecated("Use the official header, decodeToSequence", ReplaceWith("this.decodeToSequence(charIterator, deserializer))"))
     fun <T> decodeSequence(deserializer: DeserializationStrategy<T>, charIterator: CharIterator): Sequence<T> {
         return charIterator.csvLines(csvConfig).asMaps(csvConfig).map {
             StringDeferringDecoder(stringDeferringConfig, deserializer.descriptor, it).decodeSerializableValue(
@@ -179,21 +216,13 @@ class CsvFormat(val stringDeferringConfig: StringDeferringConfig, val csvConfig:
         }
     }
 
-    fun <T> encodeSequence(serializer: SerializationStrategy<T>, sequence: Sequence<T>, out: Appendable) {
-        out.appendCsv(
-            keys = StringDeferringEncoder(stringDeferringConfig, steadyHeaders = true).headers(serializer.descriptor),
-            values = sequence.map {
-                StringDeferringEncoder(stringDeferringConfig, steadyHeaders = true).apply {
-                    encodeSerializableValue(
-                        serializer,
-                        it
-                    )
-                }.map
-            },
-            config = csvConfig
-        )
-    }
-
+    /**
+     * Begin serializing values into CSV records.
+     *
+     * @param serializer The serializer used to serialize the given object.
+     * @param appendable The output where the CSV will be written.
+     * @return a function that writes a T into the appendable
+     */
     fun <T> beginEncodingToAppendable(serializer: SerializationStrategy<T>, out: Appendable): (T) -> Unit {
         val add = out.startCsv(
             keys = StringDeferringEncoder(stringDeferringConfig, steadyHeaders = true).headers(serializer.descriptor),
@@ -217,7 +246,18 @@ class CsvFormat(val stringDeferringConfig: StringDeferringConfig, val csvConfig:
      * @param appendable The output where the CSV will be written.
      */
     fun <T> encodeSequenceToAppendable(serializer: KSerializer<T>, values: Sequence<T>, appendable: Appendable) {
-        encodeSequence(serializer, values, appendable)
+        appendable.appendCsv(
+            keys = StringDeferringEncoder(stringDeferringConfig, steadyHeaders = true).headers(serializer.descriptor),
+            values = values.map {
+                StringDeferringEncoder(stringDeferringConfig, steadyHeaders = true).apply {
+                    encodeSerializableValue(
+                        serializer,
+                        it
+                    )
+                }.map
+            },
+            config = csvConfig
+        )
     }
 
     /**
@@ -228,8 +268,9 @@ class CsvFormat(val stringDeferringConfig: StringDeferringConfig, val csvConfig:
      * @return A sequence of each element decoded.
      */
     @ExperimentalSerializationApi
+    @Deprecated("Use the official header, decodeToSequence", ReplaceWith("this.decodeToSequence(reader.iterator(), deserializer))"))
     fun <T> decodeSequenceFromReader(deserializer: KSerializer<T>, reader: Reader): Sequence<T> {
-        return decodeSequence(deserializer, reader.iterator())
+        return decodeToSequence(reader.iterator(), deserializer)
     }
 
     /**
@@ -241,13 +282,14 @@ class CsvFormat(val stringDeferringConfig: StringDeferringConfig, val csvConfig:
      * @param handler The code to handle the sequence of incoming values.  The sequence will not be available after the
      * function completes.
      */
+    @Deprecated("Use the official header, decodeToSequence", ReplaceWith("this.decodeToSequence(reader.iterator(), deserializer))"))
     fun <T> decodeFromReaderUsingSequence(
         deserializer: KSerializer<T>,
         reader: Reader,
         handler: (Sequence<T>) -> Unit,
     ) {
         reader.use {
-            handler(decodeSequence(deserializer, reader.iterator()))
+            handler(decodeToSequence(reader.iterator(), deserializer))
         }
     }
 }

@@ -1,9 +1,11 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.rock.*
-import com.lightningkite.rock.reactive.Readable
-import com.lightningkite.rock.reactive.await
+import com.lightningkite.kiteui.*
+import com.lightningkite.kiteui.reactive.BaseReadable
+import com.lightningkite.kiteui.reactive.Readable
+import com.lightningkite.kiteui.reactive.ReadableState
+import com.lightningkite.kiteui.reactive.await
 import kotlinx.serialization.KSerializer
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
@@ -28,9 +30,8 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         override val serializer: KSerializer<T>
             get() = this@ModelCache.serializer
         private val listeners = ArrayList<() -> Unit>()
-        private val awaiting = ArrayList<Continuation<T?>>()
 
-        val inUse: Boolean get() = listeners.isNotEmpty() || awaiting.isNotEmpty()
+        val inUse: Boolean get() = listeners.isNotEmpty()
         val upToDate: Boolean get() = ready && (live > 0 || clockMillis() - lastSet < cacheMs)
 
         var value: T? = null
@@ -39,9 +40,13 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
                 lastSet = clockMillis()
                 invalid = false
                 field = value
-                listeners.toList().forEach { it() }
-                awaiting.toList().forEach { it.resume(value) }
-                awaiting.clear()
+                listeners.toList().forEach {
+                    try {
+                        it()
+                    } catch(e: Exception) {
+                        e.printStackTrace2()
+                    }
+                }
             }
 
         override fun addListener(listener: () -> Unit): () -> Unit {
@@ -54,17 +59,8 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
             }
         }
 
-        override suspend fun awaitRaw(): T? {
-            if (!upToDate) {
-                suspendCoroutineCancellable<T?> {
-                    awaiting.add(it)
-                    return@suspendCoroutineCancellable {
-                        awaiting.remove(it)
-                    }
-                }
-            }
-            return value
-        }
+        override val state: ReadableState<T?>
+            get() = if(upToDate) ReadableState(value) else ReadableState.notReady
 
         override suspend infix fun set(value: T?) {
             if (value == null) delete()
@@ -105,6 +101,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
 
         fun virtualDelete() {
             val oldValue = value
+//            println("Assigned value to null")
             value = null
             oldValue?.let { value ->
                 for (query in queries) {
@@ -193,8 +190,8 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
             unreportedChanges = true
         }
 
-        override suspend fun awaitRaw(): List<T> =
-            if (ready) ids.mapNotNull { cache[it]?.value } else suspendCoroutineCancellable { {} }
+        override val state: ReadableState<List<T>>
+            get() = if (ready) ReadableState(ids.mapNotNull { cache[it]?.value }) else ReadableState.notReady
     }
 
     val cache = HashMap<ID, WritableModelImpl>()
@@ -362,53 +359,64 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         return skipCache.bulkModify(bulkUpdate)
     }
 
+    var locked = false
     suspend fun regularly() {
-        if (listeningDirty) {
-            listeningDirty = false
-            val subConditions = queries.values.mapNotNull { if (it.live == 0) null else it.query.condition } +
-                    cache.values.mapNotNull { if (it.live == 0) null else it.id }
-                        .takeUnless { it.isEmpty() }
-                        ?.let { Condition.OnField(idProp, Condition.Inside(it)) }
-                        .let(::listOfNotNull)
-            updateSocket(if (subConditions.isEmpty()) Condition.Never() else Condition.Or(subConditions))
-        }
-        for (query in queries.values.toList()) {
-            if (query.inUse && !query.upToDate) {
-                skipCache.query(query.query).let {
-                    for (item in it) cache.getOrPut(item._id) { WritableModelImpl(item._id) }.value = item
-                    query.reset(it.map { it._id })
-                }
+        if(locked) return
+        locked = true
+        try {
+            if (listeningDirty) {
+                listeningDirty = false
+                val subConditions = queries.values.mapNotNull { if (it.live == 0) null else it.query.condition } +
+                        cache.values.mapNotNull { if (it.live == 0) null else it.id }
+                            .takeUnless { it.isEmpty() }
+                            ?.let { Condition.OnField(idProp, Condition.Inside(it)) }
+                            .let(::listOfNotNull)
+                updateSocket(if (subConditions.isEmpty()) Condition.Never() else Condition.Or(subConditions))
             }
-        }
-
-        val needsUpdates = cache.values.toList().asSequence().filter { (it.inUse && !it.upToDate) || it.invalid }.map { it.id }.toSet()
-        if (needsUpdates.isNotEmpty()) {
-            println("Needs Updating")
-            val limit = 1000
-            val results = needsUpdates
-                .chunked(limit)
-                .flatMap {
-                    skipCache.query(
-                        Query(
-                            DataClassPathSelf(serializer).get(idProp).inside(needsUpdates),
-                            limit = limit
-                        )
-                    )
-                }
-            for (id in needsUpdates) {
-                results.find { it._id == id }?.also { updated ->
-                    cache.getOrPut(id) { WritableModelImpl(id) }.value = updated
-                    for (query in queries.values.toList()) {
-                        query.onNewValue(updated)
+            for (query in queries.values.toList()) {
+                if (query.inUse && !query.upToDate) {
+                    skipCache.query(query.query).let {
+                        for (item in it) cache.getOrPut(item._id) { WritableModelImpl(item._id) }.value = item
+                        query.reset(it.map { it._id })
                     }
-                } ?: run {
-                    cache[id]?.virtualDelete()
                 }
             }
-        }
 
-        for (query in queries.values.toList()) {
-            query.refreshIfNeeded()
+            val needsUpdates =
+                cache.values.toList().asSequence().filter { (it.inUse && !it.upToDate) || it.invalid }.map { it.id }
+                    .toSet()
+            if (needsUpdates.isNotEmpty()) {
+                val limit = 1000
+                val results = needsUpdates
+                    .chunked(limit)
+                    .flatMap {
+                        skipCache.query(
+                            Query(
+                                DataClassPathSelf(serializer).get(idProp).inside(needsUpdates),
+                                limit = limit
+                            )
+                        )
+                    }
+                for (id in needsUpdates) {
+//                    println("Need update for ${serializer.descriptor.serialName} $id")
+                    results.find { it._id == id }?.also { updated ->
+//                        println("Found updated ${updated}")
+                        cache.getOrPut(id) { WritableModelImpl(id) }.value = updated
+                        for (query in queries.values.toList()) {
+                            query.onNewValue(updated)
+                        }
+                    } ?: run {
+//                        println("Did not find it; virtually deleting")
+                        cache[id]?.virtualDelete()
+                    }
+                }
+            }
+
+            for (query in queries.values.toList()) {
+                query.refreshIfNeeded()
+            }
+        } finally {
+            locked = false
         }
     }
 

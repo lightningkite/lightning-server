@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.rock.TypedWebSocket
-import com.lightningkite.rock.reactive.*
+import com.lightningkite.kiteui.TypedWebSocket
+import com.lightningkite.kiteui.reactive.*
 import kotlinx.serialization.KSerializer
 
 interface ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>> {

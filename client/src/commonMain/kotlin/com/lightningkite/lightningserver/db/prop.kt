@@ -3,8 +3,8 @@ package com.lightningkite.lightningserver.db
 import com.lightningkite.lightningdb.DataClassPath
 import com.lightningkite.lightningdb.DataClassPathSelf
 import com.lightningkite.lightningdb.Modification
-import com.lightningkite.rock.delay
-import com.lightningkite.rock.reactive.*
+import com.lightningkite.kiteui.delay
+import com.lightningkite.kiteui.reactive.*
 
 private object NotInUse
 

@@ -1,8 +1,9 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.rock.reactive.LateInitProperty
-import com.lightningkite.rock.reactive.Readable
+import com.lightningkite.kiteui.reactive.LateInitProperty
+import com.lightningkite.kiteui.reactive.Readable
+import com.lightningkite.kiteui.reactive.ReadableState
 import kotlinx.serialization.KSerializer
 
 class MockModelCollection<T : HasId<ID>, ID : Comparable<ID>>(val serializer: KSerializer<T>) : ModelCollection<T, ID> {
@@ -17,7 +18,7 @@ class MockModelCollection<T : HasId<ID>, ID : Comparable<ID>>(val serializer: KS
         override val serializer: KSerializer<T>
             get() = this@MockModelCollection.serializer
         val property = LateInitProperty<T?>()
-        val value: T? get() = if (property.ready) property.value else null
+        val value: T? get() = property.state.let { if(it.success) it.raw else null }
 
         override suspend fun modify(modification: Modification<T>): T? {
             property.value = property.value?.let { modification(it) }
@@ -36,7 +37,8 @@ class MockModelCollection<T : HasId<ID>, ID : Comparable<ID>>(val serializer: KS
         }
 
         override fun addListener(listener: () -> Unit): () -> Unit = property.addListener(listener)
-        override suspend fun awaitRaw(): T? = property.awaitRaw()
+        override val state: ReadableState<T?>
+            get() = property.state
         override suspend fun set(value: T?) {
             if(value == null) delete()
             else {
@@ -64,8 +66,9 @@ class MockModelCollection<T : HasId<ID>, ID : Comparable<ID>>(val serializer: KS
     override fun get(id: ID): WritableModel<T> = models.getOrPut(id) { MockWritableModel(id) }
     override suspend fun query(query: Query<T>): Readable<List<T>> = object : Readable<List<T>> {
         override fun addListener(listener: () -> Unit): () -> Unit = this@MockModelCollection.addListener(listener)
-        override suspend fun awaitRaw(): List<T> = models.values.asSequence()
-            .mapNotNull { if (it.property.ready) it.property.value else null }
+        override val state: ReadableState<List<T>>
+            get() = ReadableState(models.values.asSequence()
+            .mapNotNull { if (it.property.state.ready) it.property.value else null }
             .filter { query.condition(it) }
             .let {
                 query.orderBy.comparator?.let { c ->
@@ -74,7 +77,7 @@ class MockModelCollection<T : HasId<ID>, ID : Comparable<ID>>(val serializer: KS
             }
             .drop(query.skip)
             .take(query.limit)
-            .toList()
+            .toList())
     }
 
     override suspend fun watch(query: Query<T>): Readable<List<T>> = query(query)

@@ -1,10 +1,10 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.rock.TypedWebSocket
-import com.lightningkite.rock.launchGlobal
-import com.lightningkite.rock.reactive.Constant
-import com.lightningkite.rock.reactive.Readable
+import com.lightningkite.kiteui.TypedWebSocket
+import com.lightningkite.kiteui.launchGlobal
+import com.lightningkite.kiteui.reactive.Constant
+import com.lightningkite.kiteui.reactive.Readable
 
 class MockModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(val log: (String) -> Unit) :
     ModelRestEndpointsPlusWs<T, ID>, ModelRestEndpointsPlusUpdatesWebsocket<T, ID> {

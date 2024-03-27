@@ -194,9 +194,9 @@ auctionDay,auction,venue,company,auctionDate,city,state,country,wasMigrated,lotN
         val data = listOf(basis, TestObj())
         assertEquals(
             data,
-            buildString { csv.encodeSequence(TestObj.serializer(), data.asSequence(), this) }
+            buildString { csv.encodeSequenceToAppendable(TestObj.serializer(), data.asSequence(), this) }
                 .also { println(it) }
-                .let { csv.decodeSequence(TestObj.serializer(), it.iterator()) }
+                .let { csv.decodeToSequence(it.iterator(), TestObj.serializer()) }
                 .toList()
         )
     }

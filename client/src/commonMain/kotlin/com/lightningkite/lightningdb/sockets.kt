@@ -1,8 +1,8 @@
 package com.lightningkite.lightningdb
 
 // import com.lightningkite.khrysalis.*
-import com.lightningkite.rock.*
-import com.lightningkite.rock.reactive.*
+import com.lightningkite.kiteui.*
+import com.lightningkite.kiteui.reactive.*
 import com.lightningkite.uuid
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
