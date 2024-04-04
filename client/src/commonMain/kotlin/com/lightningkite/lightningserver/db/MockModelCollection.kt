@@ -32,7 +32,7 @@ class MockModelCollection<T : HasId<ID>, ID : Comparable<ID>>(val serializer: KS
             actionPerformed()
         }
 
-        override suspend fun invalidate() {
+        override fun invalidate() {
             actionPerformed()
         }
 

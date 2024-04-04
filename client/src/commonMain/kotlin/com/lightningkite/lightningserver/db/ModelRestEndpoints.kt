@@ -38,7 +38,7 @@ interface WritableModel<T> : Writable<T?> {
     val serializer: KSerializer<T>
     suspend fun modify(modification: Modification<T>): T?
     suspend fun delete(): Unit
-    suspend fun invalidate(): Unit
+    fun invalidate(): Unit
 }
 
 interface ModelCollection<T : HasId<ID>, ID : Comparable<ID>> {
@@ -54,5 +54,6 @@ interface ModelCollection<T : HasId<ID>, ID : Comparable<ID>> {
 
 interface CachingModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>> : ModelCollection<T, ID> {
     val skipCache: ModelRestEndpoints<T, ID>
+    fun totallyInvalidate()
 }
 

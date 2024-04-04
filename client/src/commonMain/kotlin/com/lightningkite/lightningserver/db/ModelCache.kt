@@ -2,13 +2,10 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.kiteui.*
-import com.lightningkite.kiteui.reactive.BaseReadable
 import com.lightningkite.kiteui.reactive.Readable
 import com.lightningkite.kiteui.reactive.ReadableState
 import com.lightningkite.kiteui.reactive.await
 import kotlinx.serialization.KSerializer
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.resume
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -95,7 +92,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
             virtualDelete()
         }
 
-        override suspend fun invalidate() {
+        override fun invalidate() {
             invalid = true
         }
 
@@ -112,7 +109,12 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         }
     }
 
-    var totalInvalidation: Double = 0.0
+    private var totalInvalidation: Double = 0.0
+
+    override fun totallyInvalidate(){
+        totalInvalidation = clockMillis()
+        cache.values.forEach { it.invalidate() }
+    }
 
     inner class ListImpl(val query: Query<T>) : Readable<List<T>> {
         var live: Int = 0
@@ -355,7 +357,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
     }
 
     override suspend fun bulkModify(bulkUpdate: MassModification<T>): Int {
-        totalInvalidation = clockMillis()
+        totallyInvalidate()
         return skipCache.bulkModify(bulkUpdate)
     }
 
