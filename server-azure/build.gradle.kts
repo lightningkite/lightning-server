@@ -16,8 +16,8 @@ val kotlinVersion: String by project
 val khrysalisVersion: String by project
 dependencies {
     api(project(":server-core"))
-    api("com.microsoft.azure.functions:azure-functions-java-library:2.0.1")
-    api("com.azure:azure-storage-blob:12.21.0")
+    api("com.microsoft.azure.functions:azure-functions-java-library:3.1.0")
+    api("com.azure:azure-storage-blob:12.25.3")
 
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation(project(":server-testing"))

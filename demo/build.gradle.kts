@@ -29,7 +29,18 @@ repositories {
 
 val ktorVersion:String by project
 dependencies {
-    api(project(":server"))
+    api(project(":server-aws"))
+    api(project(":server-azure"))
+    api(project(":server-core"))
+    api(project(":server-testing"))
+    api(project(":server-dynamodb"))
+    api(project(":server-firebase"))
+    api(project(":server-ktor"))
+    api(project(":server-memcached"))
+    api(project(":server-mongo"))
+    api(project(":server-redis"))
+    api(project(":server-sentry"))
+    api(project(":server-sftp"))
     ksp(project(":processor"))
     implementation("com.lightningkite:kotliner-cli:1.0.3")
     implementation("io.ktor:ktor-server-call-logging:$ktorVersion")

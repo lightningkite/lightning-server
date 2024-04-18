@@ -28,7 +28,7 @@ dependencies {
 //    implementation("com.fasterxml.jackson.core:jackson-databind:2.13.3")
     // End Security
 
-    implementation("ch.qos.logback:logback-classic:$logBack")
+    implementation("ch.qos.logback:logback-classic:1.5.3")
 
 //    implementation("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
 
@@ -44,7 +44,7 @@ dependencies {
     api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
     api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$kotlinXSerialization")
     api("io.github.pdvrieze.xmlutil:serialization-jvm:0.86.3")
-    api("org.mongodb:bson:4.11.1")
+    api("org.mongodb:bson:5.0.1")
     api("com.github.jershell:kbson:0.5.0")
     api("com.charleskorn.kaml:kaml:0.58.0")
     api(kotlin("reflect"))

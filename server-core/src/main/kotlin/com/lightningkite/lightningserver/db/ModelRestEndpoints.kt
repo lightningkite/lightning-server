@@ -41,7 +41,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     val detailPath = path.arg<ID>("id", info.serialization.idSerializer)
     val wholePath = TypedServerPath0(path)
     val bulkPath = TypedServerPath0(path).path("bulk")
-    val interfaceName = Documentable.InterfaceInfo("ModelRestEndpoints", listOf(
+    val interfaceName = Documentable.InterfaceInfo("ClientModelRestEndpoints", listOf(
         info.serialization.serializer,
         info.serialization.idSerializer
     ))
@@ -279,6 +279,36 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
             }
         }
     )
+
+//    val upsertOverDefault = (info as? ModelInfoWithDefault<USER, T, ID>)?.let {
+//        detailPath.path("upsert").patch.api(
+//            belongsToInterface = interfaceName,
+//            authOptions = info.authOptions,
+//            inputType = Modification.serializer(info.serialization.serializer),
+//            outputType = info.serialization.serializer,
+//            summary = "Upsert Over Default",
+//            description = "Creates or updates a ${collectionName} based on the default value",
+//            errorCases = listOf(),
+//            examples = exampleItem()?.let {
+//                sampleModifications().map { mod ->
+//                    ApiExample(mod, mod(it))
+//                }
+//            } ?: listOf(),
+//            successCode = HttpStatus.Created,
+//            implementation = { value: Modification<T> ->
+//                try {
+//                    info.collection(this)
+//                        .upsertOne(Condition.OnField(info.serialization.serializer._id(), Condition.Equal(path1)),  value, value(info.defaultItem(this.authOrNull).let {
+//                            info.serialization.serializer._id().setCopy(it, path1)
+//                        }))
+//                        .new
+//                        ?: throw NotFoundException()
+//                } catch (e: UniqueViolationException) {
+//                    throw BadRequestException(detail = "unique", message = e.message, cause = e)
+//                }
+//            }
+//        )
+//    }
 
     // This is used replace many objects at once. This does make individual calls to the database. Kmongo does not have a many replace option.
     val bulkReplace = wholePath.put.api(

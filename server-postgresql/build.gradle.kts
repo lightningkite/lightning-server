@@ -23,17 +23,17 @@ repositories {
 
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
-val exposedVersion = "0.39.2"
+val exposedVersion = "0.49.0"
 dependencies {
     api(project(":server-core"))
     api("org.jetbrains.exposed:exposed-core:$exposedVersion")
     api("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
     api("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
-    api("org.postgresql:postgresql:42.7.2")
+    api("org.postgresql:postgresql:42.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.7.2")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation(project(":server-testing"))
-    testImplementation("io.zonky.test:embedded-postgres:2.0.5")
+    testImplementation("io.zonky.test:embedded-postgres:2.0.6")
     ksp(project(":processor"))
     kspTest(project(":processor"))
 }

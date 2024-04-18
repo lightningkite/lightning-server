@@ -6,8 +6,8 @@ import com.lightningkite.kiteui.launchGlobal
 import com.lightningkite.kiteui.reactive.Constant
 import com.lightningkite.kiteui.reactive.Readable
 
-class MockModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(val log: (String) -> Unit) :
-    ModelRestEndpointsPlusWs<T, ID>, ModelRestEndpointsPlusUpdatesWebsocket<T, ID> {
+class MockClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>>(val log: (String) -> Unit) :
+    ClientModelRestEndpointsPlusWs<T, ID>, ClientModelRestEndpointsPlusUpdatesWebsocket<T, ID> {
     val items = HashMap<ID, T>()
     val watchers = ArrayList<(changes: List<EntryChange<T>>) -> Unit>()
     override suspend fun query(input: Query<T>): List<T> {

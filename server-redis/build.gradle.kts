@@ -17,8 +17,9 @@ val khrysalisVersion: String by project
 val coroutines:String by project
 dependencies {
     api(project(":server-core"))
-    api("io.lettuce:lettuce-core:6.3.1.RELEASE")
+    api("io.lettuce:lettuce-core:6.3.2.RELEASE")
     api("org.signal:embedded-redis:0.8.3")
+    api("com.google.guava:guava:33.0.0-jre")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutines")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation(project(":server-testing"))

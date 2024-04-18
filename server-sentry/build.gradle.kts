@@ -17,7 +17,7 @@ val khrysalisVersion: String by project
 val coroutines: String by project
 dependencies {
     api(project(":server-core"))
-    api("io.sentry:sentry:7.2.0")
+    api("io.sentry:sentry:7.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutines")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     ksp(project(":processor"))
