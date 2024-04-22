@@ -1,17 +1,14 @@
 package com.lightningkite.lightningdb
 
-// import com.lightningkite.khrysalis.*
 import com.lightningkite.kiteui.*
 import com.lightningkite.kiteui.reactive.*
 import com.lightningkite.uuid
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 
 private val shared = HashMap<String, TypedWebSocket<MultiplexMessage, MultiplexMessage>>()
-fun multiplexSocket(url: String, path: String, params: Map<String, List<String>>, json: Json): RetryWebsocket {
+fun multiplexSocket(url: String, path: String, params: Map<String, List<String>>, json: Json, pingTime: Long = 30_000L): RetryWebsocket {
     val shared = shared.getOrPut(url) {
-        val s = retryWebsocket(url)
-        // TODO: Pings
+        val s = retryWebsocket(url, pingTime)
         s.typed(json, MultiplexMessage.serializer(), MultiplexMessage.serializer())
     }
     val channelOpen = Property(false)

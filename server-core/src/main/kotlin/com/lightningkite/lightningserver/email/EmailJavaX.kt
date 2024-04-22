@@ -46,9 +46,9 @@ suspend fun Email.toJavaX(session: Session = Session.getDefaultInstance(Properti
     val email = this@toJavaX
     subject = email.subject
     email.fromEmail?.let { setFrom(InternetAddress(it, email.fromLabel)) }
-    email.to.forEach { setRecipient(Message.RecipientType.TO, InternetAddress(it.value, it.label)) }
-    email.cc.forEach { setRecipient(Message.RecipientType.CC, InternetAddress(it.value, it.label)) }
-    email.bcc.forEach { setRecipient(Message.RecipientType.BCC, InternetAddress(it.value, it.label)) }
+    email.to.map { InternetAddress(it.value, it.label) }.also { setRecipients(Message.RecipientType.TO, it.toTypedArray()) }
+    email.cc.map { InternetAddress(it.value, it.label) }.also { setRecipients(Message.RecipientType.CC, it.toTypedArray()) }
+    email.bcc.map { InternetAddress(it.value, it.label) }.also { setRecipients(Message.RecipientType.BCC, it.toTypedArray()) }
     HttpContentAndHeaders(
         headers = email.customHeaders,
         content = HttpContent.Multipart(
