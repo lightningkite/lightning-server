@@ -171,7 +171,7 @@ class RestApiWebsocketHelper private constructor(val database: () -> Database) {
         for (changeSub in db) {
             try {
                 changeSub._id.close()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // We don't really care.  We just want to shut down as many of these as we can.
                 /*squish*/
             }

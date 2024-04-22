@@ -81,7 +81,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
 
     override suspend fun message(event: WebSockets.MessageEvent) {
         if (event.content.isBlank()) {
-            event.id.send("")
+            event.id.send(" ")
             return
         }
         val message = Serialization.json.decodeFromString<MultiplexMessage>(event.content)
