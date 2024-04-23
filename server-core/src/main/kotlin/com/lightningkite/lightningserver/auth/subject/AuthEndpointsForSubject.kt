@@ -146,6 +146,11 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         detail = "invalid-proof",
         message = "A given proof was invalid."
     )
+    val errorIrrelevantProof = LSError(
+        400,
+        detail = "irrelevant-proof",
+        message = "A given proof was not related to the user."
+    )
     val errorExpiredProof = LSError(
         400,
         detail = "expired-proof",
@@ -200,7 +205,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         outputType = IdAndAuthMethods.serializer(handler.idSerializer),
         summary = "Log In",
         description = "Attempt to log in as a ${handler.name} using various proofs.",
-        errorCases = listOf(errorNoSingleUser, errorInvalidProof),
+        errorCases = listOf(errorNoSingleUser, errorInvalidProof, errorIrrelevantProof),
         implementation = { proofs: List<Proof> ->
             proofs.forEach {
                 if (!proofHasher().verify(it)) throw HttpStatusException(errorInvalidProof.copy(data = it.via))
@@ -209,6 +214,9 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             val used = proofs.map { it.via }.toSet()
             val users = proofs.mapNotNull { handler.findUser(it.property, it.value) }.distinctBy { it._id }
             val subject = users.singleOrNull() ?: throw HttpStatusException(errorNoSingleUser)
+            proofs.forEach {
+                if(handler.get(subject, it.property) != it.value) throw HttpStatusException(errorIrrelevantProof.copy(data = it.via))
+            }
             val strength = proofs.groupBy { it.property }.values.sumOf { it.maxOf { it.strength } }
             val proofMethods = handler.proofMethods
                 .filter { it.established(handler, subject) }
