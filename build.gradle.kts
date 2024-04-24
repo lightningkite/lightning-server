@@ -15,10 +15,10 @@ buildscript {
     }
     dependencies {
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
-        classpath("org.jetbrains.dokka:dokka-gradle-plugin:1.9.10")
+        classpath("org.jetbrains.dokka:dokka-gradle-plugin:1.9.20")
         classpath("com.lightningkite:deploy-helpers:0.0.7")
         classpath("com.android.tools.build:gradle:7.4.2")
-        classpath("org.owasp:dependency-check-gradle:9.0.9")
+        classpath("org.owasp:dependency-check-gradle:9.1.0")
         classpath("com.github.ben-manes:gradle-versions-plugin:0.51.0")
     }
 }

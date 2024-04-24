@@ -250,7 +250,7 @@ class PostgresCollection<T : Any>(
         return t {
             table.deleteWhere(
                 limit = 1,
-                op = { condition(condition, serializer, table).asOp() }
+                op = { it.condition(condition, serializer, table).asOp() }
             ) > 0
         }
     }
@@ -266,7 +266,7 @@ class PostgresCollection<T : Any>(
     override suspend fun deleteManyIgnoringOld(condition: Condition<T>): Int {
         return t {
             table.deleteWhere(
-                op = { condition(condition, serializer, table).asOp() }
+                op = { it.condition(condition, serializer, table).asOp() }
             )
         }
     }

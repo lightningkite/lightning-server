@@ -167,6 +167,28 @@ class AuthEndpointsForSubjectTest {
             val result = TestSettings.testUserSubject.login.test(null, listOf(proof))
             assert(result.session != null)
         }
+
+        // Can't log in with wrong phone
+        run {
+            val proofA = run {
+                val key = TestSettings.proofSms.start.test(null, "8001002001")
+                val pin = pinRegex.find(TestSMSClient.lastMessageSent?.message ?: "")!!.value
+                TestSettings.proofSms.prove.test(null, FinishProof(key, pin))
+            }
+            val proofB = run {
+                val key = TestSettings.proofEmail.start.test(null, "notadmin@test.com")
+                val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.also { println(it) }?.plainText?.let {
+                    pinRegex.find(it)?.value
+                }!!
+                TestSettings.proofEmail.prove.test(null, FinishProof(key, pin))
+            }
+            try {
+                val result = TestSettings.testUserSubject.login.test(null, listOf(proofA, proofB))
+                fail()
+            } catch(e: Exception) {
+                assertContains(e.message ?: "", "not related", ignoreCase = true)
+            }
+        }
     }
 
     @Test

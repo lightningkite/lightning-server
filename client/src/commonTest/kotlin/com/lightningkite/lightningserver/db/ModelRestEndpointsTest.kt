@@ -26,13 +26,13 @@ class ModelRestEndpointsTest {
         prepareModels()
         val collectionsToTest = listOf(
             MockModelCollection(SampleModel.serializer()),
-            ModelCache(MockModelRestEndpoints(::println), SampleModel.serializer()),
+            ModelCache(MockClientModelRestEndpoints(::println), SampleModel.serializer()),
             ModelCache(
-                object : ModelRestEndpointsPlusWs<SampleModel, UUID> by MockModelRestEndpoints(::println) {},
+                object : ClientModelRestEndpointsPlusWs<SampleModel, UUID> by MockClientModelRestEndpoints(::println) {},
                 SampleModel.serializer()
             ),
             ModelCache(
-                object : ModelRestEndpoints<SampleModel, UUID> by MockModelRestEndpoints(::println) {},
+                object : ClientModelRestEndpoints<SampleModel, UUID> by MockClientModelRestEndpoints(::println) {},
                 SampleModel.serializer()
             )
         )

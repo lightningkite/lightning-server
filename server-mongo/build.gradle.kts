@@ -20,8 +20,8 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutines")
-    implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:4.12.2")
-    api("org.mongodb:mongodb-driver-kotlin-coroutine:4.11.1")
+    implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:4.12.3")
+    api("org.mongodb:mongodb-driver-kotlin-coroutine:5.0.1")
 
     kspTest(project(":processor"))
     testImplementation(project(":server-testing"))

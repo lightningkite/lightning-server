@@ -10,7 +10,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
-    override val skipCache: ModelRestEndpoints<T, ID>,
+    override val skipCache: ClientModelRestEndpoints<T, ID>,
     val serializer: KSerializer<T>,
     cacheTime: Duration = 5.minutes,
 ) : CachingModelRestEndpoints<T, ID> {
@@ -40,7 +40,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
                 listeners.toList().forEach {
                     try {
                         it()
-                    } catch(e: Exception) {
+                    } catch (e: Exception) {
                         e.printStackTrace2()
                     }
                 }
@@ -57,16 +57,16 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         }
 
         override val state: ReadableState<T?>
-            get() = if(upToDate) ReadableState(value) else ReadableState.notReady
+            get() = if (upToDate) ReadableState(value) else ReadableState.notReady
 
         override suspend infix fun set(value: T?) {
             if (value == null) delete()
             else {
                 val result = skipCache.replace(id, value)
                 this.value = result
-                for (query in queries) {
-                    query.value.onNewValue(result)
-                    query.value.refreshIfNeeded()
+                for (query in queries.values.toList()) {
+                    query.onNewValue(result)
+                    query.refreshIfNeeded()
                 }
             }
         }
@@ -79,10 +79,10 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
             }  // TODO: we can do better than this
 //            val oldValue = value
             value = result
-            for (query in queries) {
+            for (query in queries.values.toList()) {
 //                oldValue?._id?.let { query.value.onRemoved(it) }
-                result?.let { query.value.onNewValue(it) }
-                query.value.refreshIfNeeded()
+                result?.let { query.onNewValue(it) }
+                query.refreshIfNeeded()
             }
             return result
         }
@@ -101,9 +101,9 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
 //            println("Assigned value to null")
             value = null
             oldValue?.let { value ->
-                for (query in queries) {
-                    query.value.onRemoved(id)
-                    query.value.refreshIfNeeded()
+                for (query in queries.values.toList()) {
+                    query.onRemoved(id)
+                    query.refreshIfNeeded()
                 }
             }
         }
@@ -111,7 +111,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
 
     private var totalInvalidation: Double = 0.0
 
-    override fun totallyInvalidate(){
+    override fun totallyInvalidate() {
         totalInvalidation = clockMillis()
         cache.values.forEach { it.invalidate() }
     }
@@ -144,10 +144,12 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         private val listeners = ArrayList<() -> Unit>()
         val inUse: Boolean get() = listeners.isNotEmpty()
         override fun addListener(listener: () -> Unit): () -> Unit {
+            println("Listener to $query added")
             listeners.add(listener)
             return {
                 val pos = listeners.indexOfFirst { it === listener }
                 if (pos != -1) {
+                    println("Listener to $query removed")
                     listeners.removeAt(pos)
                     unreportedChanges = true
                 }
@@ -160,8 +162,14 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
                 return
             }
             if (hasMorePages) {
-                val lastItem = cache[ids.lastOrNull() ?: return]?.value ?: return
-                if (comparator.compare(item, lastItem) > 0) return
+                val lastItem = cache[ids.lastOrNull() ?: run {
+                    return
+                }]?.value ?: run {
+                    return
+                }
+                if (comparator.compare(item, lastItem) > 0) {
+                    return
+                }
             }
             if (item._id in ids) {
                 unreportedChanges = true
@@ -206,7 +214,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
     }
 
     private val currentSocket: Async<LivingSocket<T>?> = asyncGlobal {
-        (skipCache as? ModelRestEndpointsPlusUpdatesWebsocket<T, ID>)?.updates()?.apply {
+        (skipCache as? ClientModelRestEndpointsPlusUpdatesWebsocket<T, ID>)?.updates()?.apply {
             onMessage {
                 it.updates.forEach { new ->
                     cache.getOrPut(new._id) { WritableModelImpl(new._id) }.apply {
@@ -227,7 +235,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
                 override val connected: Readable<Boolean> get() = it.connected
                 override fun send(condition: Condition<T>) = it.send(condition)
             }
-        } ?: (skipCache as? ModelRestEndpointsPlusWs<T, ID>)?.watch()?.apply {
+        } ?: (skipCache as? ClientModelRestEndpointsPlusWs<T, ID>)?.watch()?.apply {
             onMessage {
                 val old = it.old
                 val new = it.new
@@ -326,7 +334,12 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         val id = new._id
         val impl = cache.getOrPut(id) { WritableModelImpl(id) }
         impl.value = new
-        queries.forEach { it.value.onNewValue(new); it.value.refreshIfNeeded() }
+        println("---INSERT $new---")
+        queries.forEach {
+            println("Updating query ${it.key}")
+            it.value.onNewValue(new)
+            it.value.refreshIfNeeded()
+        }
         return impl
     }
 
@@ -363,7 +376,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
 
     var locked = false
     suspend fun regularly() {
-        if(locked) return
+        if (locked) return
         locked = true
         try {
             if (listeningDirty) {
@@ -376,8 +389,11 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
                 updateSocket(if (subConditions.isEmpty()) Condition.Never() else Condition.Or(subConditions))
             }
             for (query in queries.values.toList()) {
+                println("Checkingg query ${query.query}")
+                println("query.inUse(${query.inUse}) && !query.upToDate(${query.upToDate})")
                 if (query.inUse && !query.upToDate) {
                     skipCache.query(query.query).let {
+                        println("Query got result, applying")
                         for (item in it) cache.getOrPut(item._id) { WritableModelImpl(item._id) }.value = item
                         query.reset(it.map { it._id })
                     }

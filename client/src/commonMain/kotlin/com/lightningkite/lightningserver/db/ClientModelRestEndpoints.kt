@@ -5,7 +5,7 @@ import com.lightningkite.kiteui.TypedWebSocket
 import com.lightningkite.kiteui.reactive.*
 import kotlinx.serialization.KSerializer
 
-interface ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>> {
+interface ClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>> {
     suspend fun default(): T = throw IllegalArgumentException()
     suspend fun query(input: Query<T>): List<T>
     suspend fun queryPartial(input: QueryPartial<T>): List<Partial<T>>
@@ -26,11 +26,11 @@ interface ModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>> {
     suspend fun groupAggregate(input: GroupAggregateQuery<T>): Map<String, Double?>
 }
 
-interface ModelRestEndpointsPlusWs<T : HasId<ID>, ID : Comparable<ID>> : ModelRestEndpoints<T, ID> {
+interface ClientModelRestEndpointsPlusWs<T : HasId<ID>, ID : Comparable<ID>> : ClientModelRestEndpoints<T, ID> {
     suspend fun watch(): TypedWebSocket<Query<T>, ListChange<T>>
 }
 
-interface ModelRestEndpointsPlusUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>> : ModelRestEndpoints<T, ID> {
+interface ClientModelRestEndpointsPlusUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>> : ClientModelRestEndpoints<T, ID> {
     suspend fun updates(): TypedWebSocket<Condition<T>, CollectionUpdates<T, ID>>
 }
 
@@ -53,7 +53,7 @@ interface ModelCollection<T : HasId<ID>, ID : Comparable<ID>> {
 }
 
 interface CachingModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>> : ModelCollection<T, ID> {
-    val skipCache: ModelRestEndpoints<T, ID>
+    val skipCache: ClientModelRestEndpoints<T, ID>
     fun totallyInvalidate()
 }
 

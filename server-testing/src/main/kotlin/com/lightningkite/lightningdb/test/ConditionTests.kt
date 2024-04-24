@@ -10,6 +10,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import com.lightningkite.lightningdb.*
+import java.util.*
 
 abstract class ConditionTests() {
 
@@ -2570,4 +2571,293 @@ abstract class ConditionTests() {
 
         Unit
     }
+    
+    
+    ////
+
+
+    @Test fun test_UUID_eq() = runBlocking {
+        val collection = database.collection<LargeTestModel>("LargeTestModel_test_UUID_eq")
+        val lower = LargeTestModel(uuid = UUID(0L, 1L))
+        val higher = LargeTestModel(uuid = UUID(0L, 3L))
+        val manualList = listOf(lower, higher)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        val condition = path<LargeTestModel>().uuid eq UUID(0L, 3L)
+        val results = collection.find(condition).toList()
+        assertContains(results, higher)
+        assertTrue(lower !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    
+    @Test fun test_UUID_ne() = runBlocking {
+        val collection = database.collection<LargeTestModel>("LargeTestModel_test_UUID_ne")
+        val lower = LargeTestModel(uuid = UUID(0L, 1L))
+        val higher = LargeTestModel(uuid = UUID(0L, 3L))
+        val manualList = listOf(lower, higher)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        val condition = path<LargeTestModel>().uuid ne UUID(0L, 3L)
+        val results = collection.find(condition).toList()
+        assertContains(results, lower)
+        assertTrue(higher !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    
+    @Test fun test_UUID_nullable_eq() = runBlocking {
+        val collection = database.collection<LargeTestModel>("LargeTestModel_test_UUID_nullable_eq")
+        val lower = LargeTestModel(uuidNullable =  null)
+        val higher = LargeTestModel(uuidNullable = UUID(0L, 3L))
+        val manualList = listOf(lower, higher)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        val condition = path<LargeTestModel>().uuidNullable.notNull eq UUID(0L, 3L)
+        val results = collection.find(condition).toList()
+        assertContains(results, higher)
+        assertTrue(lower !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    
+    @Test fun test_UUID_nullable() = runBlocking {
+        val collection = database.collection<LargeTestModel>("test_UUID_nullable")
+        val lower = LargeTestModel(uuidNullable =  null)
+        val higher = LargeTestModel(uuidNullable = UUID(0L, 3L))
+        val manualList = listOf(lower, higher)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        val condition = path<LargeTestModel>().uuidNullable eq null
+        val results = collection.find(condition).toList()
+        assertContains(results, lower)
+        assertTrue(higher !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    @Test fun test_UUID_inside() = runBlocking {
+        val collection = database.collection<LargeTestModel>("LargeTestModel_test_UUID_inside")
+        val higher = LargeTestModel(uuid = UUID(0L, 3L))
+        val lower = LargeTestModel(uuid = UUID(0L, 1L))
+        val manualList = listOf(lower, higher)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        val condition = path<LargeTestModel>().uuid inside listOf<UUID>(UUID(0L, 3L))
+        val results = collection.find(condition).toList()
+        assertContains(results, higher)
+        assertTrue(lower !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    
+    @Test fun test_UUID_inside_nullable() = runBlocking {
+        val collection = database.collection<LargeTestModel>("LargeTestModel_test_UUID_inside_nullable")
+        val higher = LargeTestModel(uuidNullable = UUID(0L, 3L))
+        val isNull = LargeTestModel(uuidNullable =  null)
+        val manualList = listOf(isNull, higher)
+        collection.insertOne(isNull)
+        collection.insertOne(higher)
+        val condition = path<LargeTestModel>().uuidNullable.notNull inside listOf<UUID>(UUID(0L, 3L))
+        val results = collection.find(condition).toList()
+        assertContains(results, higher)
+        assertTrue(isNull !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    
+    @Test fun test_UUID_notIn() = runBlocking {
+        val collection = database.collection<LargeTestModel>("test_UUID_notIn")
+        val lower = LargeTestModel(uuid = UUID(0L, 1L))
+        val higher = LargeTestModel(uuid = UUID(0L, 3L))
+        val manualList = listOf(lower, higher)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        val condition = path<LargeTestModel>().uuid notIn listOf<UUID>(UUID(0L, 3L))
+        val results = collection.find(condition).toList()
+        assertContains(results, lower)
+        assertTrue(higher !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+        
+    @Test fun test_UUID_gt() = runBlocking {
+        val collection = database.collection<LargeTestModel>("LargeTestModel_test_UUID_gt")
+        val lower = LargeTestModel(uuid = UUID(0L, 1L))
+        val higher = LargeTestModel(uuid = UUID(0L, 3L))
+        val middle = LargeTestModel(uuid = UUID(0L, 2L))
+        val manualList = listOf(lower, higher, middle)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        collection.insertOne(middle)
+        val condition = path<LargeTestModel>().uuid gt UUID(0L, 2L)
+        val results = collection.find(condition).toList()
+        assertContains(results, higher)
+        assertTrue(lower !in results)
+        assertTrue(middle !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    
+    @Test fun test_UUID_lt() = runBlocking {
+        val collection = database.collection<LargeTestModel>("LargeTestModel_test_UUID_lt")
+        val lower = LargeTestModel(uuid = UUID(0L, 1L))
+        val higher = LargeTestModel(uuid = UUID(0L, 3L))
+        val middle = LargeTestModel(uuid = UUID(0L, 2L))
+        val manualList = listOf(lower, higher, middle)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        collection.insertOne(middle)
+        val condition = path<LargeTestModel>().uuid lt UUID(0L, 2L)
+        val results = collection.find(condition).toList()
+        assertContains(results, lower)
+        assertTrue(higher !in results)
+        assertTrue(middle !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    
+    @Test fun test_UUID_gte() = runBlocking {
+        val collection = database.collection<LargeTestModel>("LargeTestModel_test_UUID_gte")
+        val lower = LargeTestModel(uuid = UUID(0L, 1L))
+        val higher = LargeTestModel(uuid = UUID(0L, 3L))
+        val middle = LargeTestModel(uuid = UUID(0L, 2L))
+        val manualList = listOf(lower, higher, middle)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        collection.insertOne(middle)
+        val condition = path<LargeTestModel>().uuid gte UUID(0L, 2L)
+        val results = collection.find(condition).toList()
+        assertContains(results, middle)
+        assertContains(results, higher)
+        assertTrue(lower !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    
+    @Test fun test_UUID_lte() = runBlocking {
+        val collection = database.collection<LargeTestModel>("LargeTestModel_test_UUID_lte")
+        val lower = LargeTestModel(uuid = UUID(0L, 1L))
+        val higher = LargeTestModel(uuid = UUID(0L, 3L))
+        val middle = LargeTestModel(uuid = UUID(0L, 2L))
+        val manualList = listOf(lower, higher, middle)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        collection.insertOne(middle)
+        val condition = path<LargeTestModel>().uuid lte UUID(0L, 2L)
+        val results = collection.find(condition).toList()
+        assertContains(results, middle)
+        assertContains(results, lower)
+        assertTrue(higher !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    
+    @Test fun UUIUUID_gt_nullable() = runBlocking {
+        val collection = database.collection<LargeTestModel>("@")
+        val isNull = LargeTestModel(uuidNullable =  null)
+        val lower = LargeTestModel(uuidNullable = UUID(0L, 1L))
+        val higher = LargeTestModel(uuidNullable = UUID(0L, 3L))
+        val middle = LargeTestModel(uuidNullable = UUID(0L, 2L))
+        val manualList = listOf(lower, higher, middle, isNull)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        collection.insertOne(middle)
+        collection.insertOne(isNull)
+        val condition = path<LargeTestModel>().uuidNullable.notNull gt UUID(0L, 2L)
+        val results = collection.find(condition).toList()
+        assertContains(results, higher)
+        assertTrue(lower !in results)
+        assertTrue(middle !in results)
+        assertTrue(isNull !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    @Test fun test_UUID_lt_nullable() = runBlocking {
+        val collection = database.collection<LargeTestModel>("test_UUID_lt_nullable")
+        val isNull = LargeTestModel(uuidNullable =  null)
+        val lower = LargeTestModel(uuidNullable = UUID(0L, 1L))
+        val higher = LargeTestModel(uuidNullable = UUID(0L, 3L))
+        val middle = LargeTestModel(uuidNullable = UUID(0L, 2L))
+        val manualList = listOf(lower, higher, middle, isNull)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        collection.insertOne(middle)
+        collection.insertOne(isNull)
+        val condition = path<LargeTestModel>().uuidNullable.notNull lt UUID(0L, 2L)
+        val results = collection.find(condition).toList()
+        assertContains(results, lower)
+        assertTrue(higher !in results)
+        assertTrue(middle !in results)
+        assertTrue(isNull !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    @Test fun test_UUID_gte_nullable() = runBlocking {
+        val collection = database.collection<LargeTestModel>("test_UUID_gte_nullable")
+        val isNull = LargeTestModel(uuidNullable =  null)
+        val lower = LargeTestModel(uuidNullable = UUID(0L, 1L))
+        val higher = LargeTestModel(uuidNullable = UUID(0L, 3L))
+        val middle = LargeTestModel(uuidNullable = UUID(0L, 2L))
+        val manualList = listOf(lower, higher, middle, isNull)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        collection.insertOne(middle)
+        collection.insertOne(isNull)
+        val condition = path<LargeTestModel>().uuidNullable.notNull gte UUID(0L, 2L)
+        val results = collection.find(condition).toList()
+        assertContains(results, middle)
+        assertContains(results, higher)
+        assertTrue(lower !in results)
+        assertTrue(isNull !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+    @Test fun test_UUID_lte_nullable() = runBlocking {
+        val collection = database.collection<LargeTestModel>("test_UUID_lte_nullable")
+        val isNull = LargeTestModel(uuidNullable =  null)
+        val lower = LargeTestModel(uuidNullable = UUID(0L, 1L))
+        val higher = LargeTestModel(uuidNullable = UUID(0L, 3L))
+        val middle = LargeTestModel(uuidNullable = UUID(0L, 2L))
+        val manualList = listOf(lower, higher, middle, isNull)
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        collection.insertOne(middle)
+        collection.insertOne(isNull)
+        val condition = path<LargeTestModel>().uuidNullable.notNull lte UUID(0L, 2L)
+        val results = collection.find(condition).toList()
+        assertContains(results, middle)
+        assertContains(results, lower)
+        assertTrue(higher !in results)
+        assertTrue(isNull !in results)
+        assertEquals(manualList.filter { condition(it) }.sortedBy { it._id }, results.sortedBy { it._id })
+        Unit
+    }
+
+    val testDataUuidMin = UUID(0L, 1L)
+    val testDataUuidMax = UUID(0L, Int.MAX_VALUE.toLong() + 1L)
+    fun testDataUuid(id: Int) = UUID(0L, id.toLong() + 1L)
+    val <T> DataClassPath<T, UUID>.isTestData: Condition<T> get() = gte(testDataUuidMin) and lte(testDataUuidMax)
+    @Test fun test_UUID_between()  = runBlocking {
+        val collection = database.collection<LargeTestModel>("test_UUID_between")
+        val lower = LargeTestModel(uuid = UUID(0L, 1L))
+        val higher = LargeTestModel(uuid = UUID(1L, 3L))
+        val middle = LargeTestModel(uuid = UUID(0L, 2L))
+        collection.insertOne(lower)
+        collection.insertOne(higher)
+        collection.insertOne(middle)
+        val condition = path<LargeTestModel>().uuid.isTestData
+        val results = collection.find(condition).toList()
+        assertContains(results, middle)
+        assertContains(results, lower)
+        assertTrue(higher !in results)
+        Unit
+    }
+    
+    
+    
+    
+    
+    
+    
+    
 }

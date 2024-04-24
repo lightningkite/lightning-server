@@ -529,8 +529,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                         statusCode = HttpStatus.NoContent.code,
                         headers = mapOf(
                             HttpHeader.AccessControlAllowOrigin to (headers[HttpHeader.Origin] ?: "*"),
-                            HttpHeader.AccessControlAllowMethods to (headers[HttpHeader.AccessControlRequestMethod]
-                                ?: "GET"),
+                            HttpHeader.AccessControlAllowMethods to "GET,POST,PUT,PATCH,DELETE,HEAD",
                             HttpHeader.AccessControlAllowHeaders to (cors.allowedHeaders.joinToString(", ")),
                             HttpHeader.AccessControlAllowCredentials to "true",
                         )

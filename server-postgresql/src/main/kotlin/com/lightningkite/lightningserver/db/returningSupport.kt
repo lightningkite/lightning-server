@@ -58,7 +58,7 @@ class DeleteReturningStatement(
 ) : ReturningStatement(StatementType.DELETE, listOf(table)) {
     override val set: FieldSet = returning ?: table
 
-    override fun prepareSQL(transaction: Transaction): String = buildString {
+    override fun prepareSQL(transaction: Transaction, prepared: Boolean): String = buildString {
         append("DELETE FROM ")
         append(transaction.identity(table))
         if (where != null) {
@@ -123,7 +123,7 @@ class UpdateReturningStatement(
     private val firstDataSet: List<Pair<Column<*>, Any?>>
         get() = values.toList()
 
-    override fun prepareSQL(transaction: Transaction): String =
+    override fun prepareSQL(transaction: Transaction, prepared: Boolean): String =
         with(QueryBuilder(true)) {
             +"UPDATE "
             table.describe(transaction, this)
@@ -245,7 +245,7 @@ class UpdateReturningOldStatement(
     private val firstDataSet: List<Pair<Column<*>, Any?>>
         get() = values.toList()
 
-    override fun prepareSQL(transaction: Transaction): String =
+    override fun prepareSQL(transaction: Transaction, prepared: Boolean): String =
         with(QueryBuilder(true)) {
             +"UPDATE "
             table.describe(transaction, this)

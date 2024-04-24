@@ -19,12 +19,10 @@ object TestSettings {
     init {
         Server
         Settings.populateDefaults(mapOf(
-            Server.database.name to DatabaseSettings("ram"),
             generalSettings.name to GeneralServerSettings(
                 debug = true
             )
         ))
-        Server.files()
         engine = UnitTestEngine
     }
 }

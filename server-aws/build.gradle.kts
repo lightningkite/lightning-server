@@ -15,7 +15,7 @@ plugins {
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
 val coroutines: String by project
-val awsVersion = "2.23.4"
+val awsVersion = "2.25.24"
 dependencies {
     api(project(":server-dynamodb"))
     api(project(":server-core"))
@@ -27,7 +27,7 @@ dependencies {
     api("software.amazon.awssdk:apigatewaymanagementapi:$awsVersion")
     api("software.amazon.awssdk:cloudwatch:$awsVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:$coroutines")
-    api("com.amazonaws:aws-lambda-java-core:1.2.2")
+    api("com.amazonaws:aws-lambda-java-core:1.2.3")
     api("com.amazonaws:aws-lambda-java-events:3.11.4")
     runtimeOnly("com.amazonaws:aws-lambda-java-log4j2:1.6.0")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
