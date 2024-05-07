@@ -1,130 +1,128 @@
 [versions]
-kotlin="1.9.23"
+agp="8.2.0"
+androidDesugaring="2.0.4"
+angusMail="2.0.3"
+awsVersion="2.25.24"
+awssdk="2.17.232"
+azureFunctions="3.1.0"
+azureStorage="12.25.3"
+bouncyCastle="1.77"
+bson="5.0.1"
 coroutines="1.8.0"
 dokka="1.9.20"
-ksp="1.9.23-1.0.20"
-agp="8.2.0"
-graalVmNative="0.9.24"
-shadow="7.1.0"
-
-ktor="2.3.9"
-logBackClassic ="1.5.3"
-kotlinHtmlJvm="0.11.0"
-oneTimePass="2.4.0"
-serializationLibs="1.6.3"
-serializationXmlUtil="0.86.3"
-xmlUtilJvm="0.86.3"
-bson="5.0.1"
-kbson="0.5.0"
-kaml="0.58.0"
-bouncyCastle="1.77"
-angusMail="2.0.3"
-javaJwt="4.4.0"
-awssdk="2.17.232"
-awsVersion="2.25.24"
 dynamodb="2.23.4"
-orgCrac="0.1.3"
+embedMongo="4.12.3"
+embeddedPostgres="2.0.6"
+embeddedRedis="0.8.3"
+exposed="0.49.0"
+firebaseAdmin="9.2.0"
+graalVmNative="0.9.24"
+guava="33.0.0-jre"
+hierynomusSshj="0.38.0"
+javaJwt="4.4.0"
+kaml="0.58.0"
+kbson="0.5.0"
+kiteUI="main-SNAPSHOT"
+kotlin="1.9.23"
+kotlinHtmlJvm="0.11.0"
+kotlinerCli="1.0.3"
+ksp="1.9.23-1.0.20"
+ktor="2.3.9"
 lambdaJavaCore="1.2.3"
 lambdaJavaEvents="3.11.4"
 lambdaJavaLog4j2="1.6.0"
-exposed="0.49.0"
-azureFunctions="3.1.0"
-azureStorage="12.25.3"
-firebaseAdmin="9.2.0"
-memcached="2.4.8"
-embedMongo="4.12.3"
-mongoDriver="5.0.1"
-postgresql="42.7.3"
-embeddedPostgres="2.0.6"
 lettuce="6.3.2.RELEASE"
-guava="33.0.0-jre"
-hierynomusSshj="0.38.0"
-embeddedRedis="0.8.3"
-sentry="7.6.0"
-sentry9="1.7.30"
-kiteUI="main-SNAPSHOT"
-androidDesugaring="2.0.4"
+logBackClassic ="1.5.3"
+memcached="2.4.8"
+mongoDriver="5.0.1"
+oneTimePass="2.4.0"
+orgCrac="0.1.3"
+postgresql="42.7.3"
 proguard="7.3.2"
-kotlinerCli="1.0.3"
+sentry9="1.7.30"
+sentry="7.6.0"
+serializationLibs="1.6.3"
+serializationXmlUtil="0.86.3"
+shadow="7.1.0"
+xmlUtilJvm="0.86.3"
 
 [libraries]
-kotlinCompiler={module="org.jetbrains.kotlin:kotlin-compiler", version.ref="kotlin"}
-serialization={module="org.jetbrains.kotlin:kotlin-serialization", version.ref="kotlin"}
-kotlinTest={module="org.jetbrains.kotlin:kotlin-test-junit", version.ref="kotlin"}
-ksp={module="com.google.devtools.ksp:symbol-processing-api", version.ref="ksp"}
-ktorContentNegotiation={module="io.ktor:ktor-client-content-negotiation", version.ref="ktor"}
-ktorJson={module="io.ktor:ktor-serialization-kotlinx-json", version.ref="ktor"}
-ktorWebsockets={module="io.ktor:ktor-server-websockets-jvm", version.ref="ktor"}
-ktorCore={module="io.ktor:ktor-server-core-jvm", version.ref="ktor"}
-ktorCioJvm={module="io.ktor:ktor-server-cio-jvm", version.ref="ktor"}
-ktorClientCio={module="io.ktor:ktor-client-cio", version.ref="ktor"}
-ktorNetty={module="io.ktor:ktor-server-netty-jvm", version.ref="ktor"}
-ktorCors={module="io.ktor:ktor-server-cors-jvm", version.ref="ktor"}
-ktorTestHost={module="io.ktor:ktor-server-test-host-jvm", version.ref="ktor"}
-ktorCallLogging={module="io.ktor:ktor-server-call-logging", version.ref="ktor"}
-coroutinesCore={module="org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
-logBackClassic={module="ch.qos.logback:logback-classic", version.ref= "logBackClassic" }
-kotlinHtmlJvm={module="org.jetbrains.kotlinx:kotlinx-html-jvm", version.ref="kotlinHtmlJvm"}
-oneTimePass = {module="dev.turingcomplete:kotlin-onetimepassword", version.ref="oneTimePass"}
-serializationProperties={module="org.jetbrains.kotlinx:kotlinx-serialization-properties", version.ref="serializationLibs"}
-serializationCbor={module="org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref="serializationLibs"}
-kotlinJvmHtml={module="org.jetbrains.kotlinx:kotlinx-html-jvm", version.ref="kotlinHtmlJvm"}
-mongoBson={module="org.mongodb:bson", version.ref="bson"}
-kBson={module="com.github.jershell:kbson", version.ref="kbson"}
-xmlUtilJvm={module="io.github.pdvrieze.xmlutil:serialization-jvm", version.ref="xmlUtilJvm"}
-kaml={module="com.charleskorn.kaml:kaml", version.ref="kaml"}
-kotlinStdLib={module="org.jetbrains.kotlin:kotlin-stdlib", version.ref="kotlin"}
-kotlinReflect={module="org.jetbrains.kotlin:kotlin-reflect", version.ref="kotlin"}
-bouncyCastleBcprov ={module="org.bouncycastle:bcprov-jdk18on", version.ref="bouncyCastle"}
-bouncyCastleBcpkix={module="org.bouncycastle:bcpkix-jdk18on", version.ref="bouncyCastle"}
+androidDesugaring={module="com.android.tools:desugar_jdk_libs", version.ref="androidDesugaring"}
 angusMail={module="org.eclipse.angus:angus-mail", version.ref="angusMail"}
-javaJwt={module="com.auth0:java-jwt", version.ref="javaJwt"}
-deployHelpers={module="com.lightningkite:deploy-helpers", version="0.0.7"}
-coroutinesReactive={module="org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version.ref="coroutines"}
-coroutinesJdk={module="org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref="coroutines"}
-awssdk={module="software.amazon.awssdk:s3", version.ref="awssdk"}
-dynamodb={module="software.amazon.awssdk:dynamodb", version.ref="dynamodb"}
-awsS3={module="software.amazon.awssdk:s3", version.ref="awsVersion"}
-awsLambda={module="software.amazon.awssdk:lambda", version.ref="awsVersion"}
-awsSes={module="software.amazon.awssdk:ses", version.ref="awsVersion"}
-awsRds={module="software.amazon.awssdk:rds", version.ref="awsVersion"}
 awsApiGateway={module="software.amazon.awssdk:apigatewaymanagementapi", version.ref="awsVersion"}
 awsCloudWatch={module="software.amazon.awssdk:cloudwatch", version.ref="awsVersion"}
-orgCrac={module="io.github.crac:org-crac", version.ref="orgCrac"}
-lambdaJavaCore={module="com.amazonaws:aws-lambda-java-core", version.ref="lambdaJavaCore"}
-lambdaJavaEvents={module="com.amazonaws:aws-lambda-java-events", version.ref="lambdaJavaEvents"}
-lambdaJavaLog4j2={module="com.amazonaws:aws-lambda-java-log4j2", version.ref="lambdaJavaLog4j2"}
+awsLambda={module="software.amazon.awssdk:lambda", version.ref="awsVersion"}
+awsRds={module="software.amazon.awssdk:rds", version.ref="awsVersion"}
+awsS3={module="software.amazon.awssdk:s3", version.ref="awsVersion"}
+awsSes={module="software.amazon.awssdk:ses", version.ref="awsVersion"}
+awssdk={module="software.amazon.awssdk:s3", version.ref="awssdk"}
+azureFunctions={module="com.microsoft.azure.functions:azure-functions-java-library", version.ref="azureFunctions"}
+azureStorage={module="com.azure:azure-storage-blob", version.ref="azureStorage"}
+bouncyCastleBcpkix={module="org.bouncycastle:bcpkix-jdk18on", version.ref="bouncyCastle"}
+bouncyCastleBcprov ={module="org.bouncycastle:bcprov-jdk18on", version.ref="bouncyCastle"}
+coroutinesCore={module="org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutinesJdk={module="org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref="coroutines"}
+coroutinesReactive={module="org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version.ref="coroutines"}
+deployHelpers={module="com.lightningkite:deploy-helpers", version="0.0.7"}
+dynamodb={module="software.amazon.awssdk:dynamodb", version.ref="dynamodb"}
+embedMongo={module="de.flapdoodle.embed:de.flapdoodle.embed.mongo", version.ref="embedMongo"}
+embeddedPostgres={module="io.zonky.test:embedded-postgres", version.ref="embeddedPostgres"}
+embeddedRedis={module="org.signal:embedded-redis", version.ref="embeddedRedis"}
 exposedCore={module="org.jetbrains.exposed:exposed-core", version.ref="exposed"}
 exposedJavaTime={module="org.jetbrains.exposed:exposed-java-time", version.ref="exposed"}
 exposedJdbc={module="org.jetbrains.exposed:exposed-jdbc", version.ref="exposed"}
-azureFunctions={module="com.microsoft.azure.functions:azure-functions-java-library", version.ref="azureFunctions"}
-azureStorage={module="com.azure:azure-storage-blob", version.ref="azureStorage"}
 firebaseAdmin={module="com.google.firebase:firebase-admin", version.ref="firebaseAdmin"}
-memcached={module="com.googlecode.xmemcached:xmemcached", version.ref="memcached"}
-embedMongo={module="de.flapdoodle.embed:de.flapdoodle.embed.mongo", version.ref="embedMongo"}
-mongoDriver={module="org.mongodb:mongodb-driver-kotlin-coroutine", version.ref="mongoDriver"}
-postgresql={module="org.postgresql:postgresql", version.ref="postgresql"}
-embeddedPostgres={module="io.zonky.test:embedded-postgres", version.ref="embeddedPostgres"}
-lettuce={module="io.lettuce:lettuce-core", version.ref="lettuce"}
-embeddedRedis={module="org.signal:embedded-redis", version.ref="embeddedRedis"}
 guava={module="com.google.guava:guava", version.ref="guava"}
 hierynomusSshj={module="com.hierynomus:sshj", version.ref="hierynomusSshj"}
-sentry={module="io.sentry:sentry", version.ref="sentry"}
+javaJwt={module="com.auth0:java-jwt", version.ref="javaJwt"}
+kBson={module="com.github.jershell:kbson", version.ref="kbson"}
+kaml={module="com.charleskorn.kaml:kaml", version.ref="kaml"}
+kiteUI={module="com.lightningkite.kiteui:library", version.ref="kiteUI"}
+kotlinCompiler={module="org.jetbrains.kotlin:kotlin-compiler", version.ref="kotlin"}
+kotlinHtmlJvm={module="org.jetbrains.kotlinx:kotlinx-html-jvm", version.ref="kotlinHtmlJvm"}
+kotlinJvmHtml={module="org.jetbrains.kotlinx:kotlinx-html-jvm", version.ref="kotlinHtmlJvm"}
+kotlinReflect={module="org.jetbrains.kotlin:kotlin-reflect", version.ref="kotlin"}
+kotlinStdLib={module="org.jetbrains.kotlin:kotlin-stdlib", version.ref="kotlin"}
+kotlinTest={module="org.jetbrains.kotlin:kotlin-test-junit", version.ref="kotlin"}
+kotlinerCli={module="com.lightningkite:kotliner-cli", version.ref="kotlinerCli"}
+ksp={module="com.google.devtools.ksp:symbol-processing-api", version.ref="ksp"}
+ktorCallLogging={module="io.ktor:ktor-server-call-logging", version.ref="ktor"}
+ktorCioJvm={module="io.ktor:ktor-server-cio-jvm", version.ref="ktor"}
+ktorClientCio={module="io.ktor:ktor-client-cio", version.ref="ktor"}
+ktorContentNegotiation={module="io.ktor:ktor-client-content-negotiation", version.ref="ktor"}
+ktorCore={module="io.ktor:ktor-server-core-jvm", version.ref="ktor"}
+ktorCors={module="io.ktor:ktor-server-cors-jvm", version.ref="ktor"}
+ktorJson={module="io.ktor:ktor-serialization-kotlinx-json", version.ref="ktor"}
+ktorNetty={module="io.ktor:ktor-server-netty-jvm", version.ref="ktor"}
+ktorTestHost={module="io.ktor:ktor-server-test-host-jvm", version.ref="ktor"}
+ktorWebsockets={module="io.ktor:ktor-server-websockets-jvm", version.ref="ktor"}
+lambdaJavaCore={module="com.amazonaws:aws-lambda-java-core", version.ref="lambdaJavaCore"}
+lambdaJavaEvents={module="com.amazonaws:aws-lambda-java-events", version.ref="lambdaJavaEvents"}
+lambdaJavaLog4j2={module="com.amazonaws:aws-lambda-java-log4j2", version.ref="lambdaJavaLog4j2"}
+lettuce={module="io.lettuce:lettuce-core", version.ref="lettuce"}
+logBackClassic={module="ch.qos.logback:logback-classic", version.ref= "logBackClassic" }
+memcached={module="com.googlecode.xmemcached:xmemcached", version.ref="memcached"}
+mongoBson={module="org.mongodb:bson", version.ref="bson"}
+mongoDriver={module="org.mongodb:mongodb-driver-kotlin-coroutine", version.ref="mongoDriver"}
+oneTimePass = {module="dev.turingcomplete:kotlin-onetimepassword", version.ref="oneTimePass"}
+orgCrac={module="io.github.crac:org-crac", version.ref="orgCrac"}
+postgresql={module="org.postgresql:postgresql", version.ref="postgresql"}
+proguard={module="com.guardsquare:proguard-gradle", version.ref="proguard"}
 sentry9={module="io.sentry:sentry", version.ref="sentry9"}
 sentry9Logback={module="io.sentry:sentry-logback", version.ref="sentry9"}
-kiteUI={module="com.lightningkite.kiteui:library", version.ref="kiteUI"}
-androidDesugaring={module="com.android.tools:desugar_jdk_libs", version.ref="androidDesugaring"}
-proguard={module="com.guardsquare:proguard-gradle", version.ref="proguard"}
-kotlinerCli={module="com.lightningkite:kotliner-cli", version.ref="kotlinerCli"}
-
+sentry={module="io.sentry:sentry", version.ref="sentry"}
+serialization={module="org.jetbrains.kotlin:kotlin-serialization", version.ref="kotlin"}
+serializationCbor={module="org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref="serializationLibs"}
+serializationProperties={module="org.jetbrains.kotlinx:kotlinx-serialization-properties", version.ref="serializationLibs"}
+xmlUtilJvm={module="io.github.pdvrieze.xmlutil:serialization-jvm", version.ref="xmlUtilJvm"}
 
 [plugins]
-kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
-kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 androidApp = {id="com.android.application", version.ref = "agp"}
 androidLibrary = { id="com.android.library", version.ref = "agp"}
 dokka={id="org.jetbrains.dokka", version.ref="dokka"}
+graalVmNative={id="org.graalvm.buildtools.native", version.ref="graalVmNative"}
+kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 ksp={id="com.google.devtools.ksp", version.ref="ksp"}
 serialization={id="org.jetbrains.kotlin.plugin.serialization", version.ref="kotlin"}
-graalVmNative={id="org.graalvm.buildtools.native", version.ref="graalVmNative"}
 shadow={id="com.github.johnrengelman.shadow", version.ref="shadow"}
