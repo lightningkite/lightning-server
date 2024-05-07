@@ -2,32 +2,16 @@ import org.gradle.api.internal.file.archive.ZipFileTree
 import proguard.gradle.ProGuardTask
 
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.serialization")
-    id("com.google.devtools.ksp")
+    alias(serverlibs.plugins.kotlinJvm)
+    alias(serverlibs.plugins.serialization)
+    alias(serverlibs.plugins.ksp)
     application
-    id("org.graalvm.buildtools.native") version "0.9.24"
-    id("com.github.johnrengelman.shadow") version "7.1.0"
-}
-
-buildscript {
-    dependencies {
-        classpath("com.guardsquare:proguard-gradle:7.3.2")
-    }
+    alias(serverlibs.plugins.graalVmNative)
+    alias(serverlibs.plugins.shadow)
 }
 
 group = "com.lightningkite.lightningserver"
 
-repositories {
-    mavenLocal()
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap") }
-    mavenCentral()
-}
-
-val ktorVersion:String by project
 dependencies {
     api(project(":server-aws"))
     api(project(":server-azure"))
@@ -42,8 +26,8 @@ dependencies {
     api(project(":server-sentry"))
     api(project(":server-sftp"))
     ksp(project(":processor"))
-    implementation("com.lightningkite:kotliner-cli:1.0.3")
-    implementation("io.ktor:ktor-server-call-logging:$ktorVersion")
+    implementation(serverlibs.kotlinerCli)
+    implementation(serverlibs.ktorCallLogging)
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 }
 
@@ -82,6 +66,6 @@ tasks.create("proguardTest", ProGuardTask::class) {
 //    this.libraryjars("${System.getProperty("java.home")}/lib/rt.jar".also { println("rt jar is ${it}") })
     this.libraryjars(configurations.runtimeClasspath)
     this.configuration("src/main/proguard.pro")
-//    this.keep("name: 'com.lightningkite.lightningserver.demo.**'")
-//    this.keep("com.lightningkite.lightningserver.demo.AwsHandler")
+//    this.keepnames("com.lightningkite.lightningserver.demo.**")
+//    this.keepnames("com.lightningkite.lightningserver.demo.AwsHandler")
 }

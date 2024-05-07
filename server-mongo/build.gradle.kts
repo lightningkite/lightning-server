@@ -4,28 +4,25 @@ import com.lightningkite.deployhelpers.mit
 import com.lightningkite.deployhelpers.standardPublishing
 
 plugins {
-    kotlin("jvm")
-    id("com.google.devtools.ksp")
-    kotlin("plugin.serialization")
-    id("org.jetbrains.dokka")
+    alias(serverlibs.plugins.kotlinJvm)
+    alias(serverlibs.plugins.ksp)
+    alias(serverlibs.plugins.serialization)
+    alias(serverlibs.plugins.dokka)
     id("signing")
     `maven-publish`
 }
 
-val kotlinVersion:String by project
-val coroutines:String by project
-val kotlinXSerialization:String by project
 dependencies {
     api(project(":server-core"))
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutines")
-    implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:4.12.3")
-    api("org.mongodb:mongodb-driver-kotlin-coroutine:5.0.1")
-
+    implementation(serverlibs.kotlinStdLib)
+    implementation(serverlibs.coroutinesCore)
+    implementation(serverlibs.coroutinesReactive)
+    implementation(serverlibs.embedMongo)
+    implementation(serverlibs.mongoDriver)
+    ksp(project(":processor"))
     kspTest(project(":processor"))
     testImplementation(project(":server-testing"))
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
+    testImplementation(serverlibs.kotlinTest)
 }
 
 ksp {
@@ -71,4 +68,4 @@ standardPublishing {
 }
 
 
-//tasks.getByName("sourceJar").dependsOn("kspKotlin")
+tasks.getByName("sourceJar").dependsOn("kspKotlin")

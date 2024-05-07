@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.lightningserver.auth.oauth.prepareModels
 import com.lightningkite.lightningserver.metrics.Metricable
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
@@ -8,7 +9,6 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.serializer
 import kotlin.reflect.KType
-import kotlin.reflect.typeOf
 
 /**
  * An abstracted model for communicating with a Database.

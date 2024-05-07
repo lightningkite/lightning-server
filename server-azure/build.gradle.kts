@@ -4,24 +4,20 @@ import com.lightningkite.deployhelpers.mit
 import com.lightningkite.deployhelpers.standardPublishing
 
 plugins {
-    kotlin("jvm")
-    id("com.google.devtools.ksp")
-    kotlin("plugin.serialization")
-    id("org.jetbrains.dokka")
+    alias(serverlibs.plugins.kotlinJvm)
+    alias(serverlibs.plugins.ksp)
+    alias(serverlibs.plugins.serialization)
+    alias(serverlibs.plugins.dokka)
     id("signing")
     `maven-publish`
 }
 
-val kotlinVersion: String by project
-val khrysalisVersion: String by project
 dependencies {
     api(project(":server-core"))
-    api("com.microsoft.azure.functions:azure-functions-java-library:3.1.0")
-    api("com.azure:azure-storage-blob:12.25.3")
-
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
+    api(serverlibs.azureFunctions)
+    api(serverlibs.azureStorage)
+    testImplementation(serverlibs.kotlinTest)
     testImplementation(project(":server-testing"))
-
     ksp(project(":processor"))
     kspTest(project(":processor"))
 }
@@ -47,7 +43,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
     kotlinOptions.jvmTarget = JavaVersion.VERSION_11.toString()
 }
-
 
 standardPublishing {
     name.set("Lightning-server-Server")

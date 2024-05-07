@@ -4,20 +4,15 @@ import com.lightningkite.deployhelpers.mit
 import com.lightningkite.deployhelpers.standardPublishing
 
 plugins {
-    kotlin("multiplatform")
-    id("com.google.devtools.ksp")
-    kotlin("plugin.serialization")
-    id("com.android.library")
-    id("org.jetbrains.dokka")
+    alias(serverlibs.plugins.kotlinMultiplatform)
+    alias(serverlibs.plugins.androidLibrary)
+    alias(serverlibs.plugins.ksp)
+    alias(serverlibs.plugins.serialization)
+    alias(serverlibs.plugins.dokka)
     id("signing")
     `maven-publish`
 }
 
-repositories {
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
-}
-
-val kotlinVersion: String by project
 kotlin {
     targetHierarchy.default()
     androidTarget {
@@ -36,13 +31,12 @@ kotlin {
     iosX64()
     iosArm64()
     iosSimulatorArm64()
-//    androidTarget()
 
     sourceSets {
         val commonMain by getting {
             dependencies {
                 api(project(":shared"))
-                api("com.lightningkite.kiteui:library:main-SNAPSHOT")
+                api(serverlibs.kiteUI)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))
@@ -109,6 +103,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     dependencies {
-        coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+        coreLibraryDesugaring(serverlibs.androidDesugaring)
     }
 }
