@@ -26,6 +26,7 @@ pluginManagement {
             google()
             gradlePluginPortal()
             mavenCentral()
+            maven("https://jitpack.io")
         }
 
         versionCatalogs {
@@ -41,6 +42,7 @@ include(":shared")
 include(":server")
 include(":server-aws")
 include(":server-azure")
+//include(":server-cassandra")
 include(":server-core")
 include(":server-testing")
 include(":server-dynamodb")

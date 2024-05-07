@@ -57,7 +57,7 @@ class OauthProofEndpoints(
             property = "email",
             value = email,
             at = now()
-        )).encodeURLQueryComponent()}")
+        )).encodeURLQueryComponent()}&backend=${generalSettings().publicUrl.encodeURLQueryComponent()}")
     }
     override val indirectLink: ServerPath = path("open").get.handler {
         HttpResponse.redirectToGet(callback.loginUrl(uuid()))
