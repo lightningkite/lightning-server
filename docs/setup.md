@@ -16,9 +16,9 @@ If your project's `build.gradle.kts` was generated with this line, comment it ou
 // settings.gradle.kts
 pluginManagement {
     plugins {
-        kotlin("jvm") version "1.8.10"
-        kotlin("plugin.serialization") version "1.8.10"
-        id("com.google.devtools.ksp") version "1.8.10-1.0.9"
+        kotlin("jvm") version "1.9.23"
+        kotlin("plugin.serialization") version "1.9.23"
+        id("com.google.devtools.ksp") version "1.9.23-1.0.20"
     }
 }
 ```
