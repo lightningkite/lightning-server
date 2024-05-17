@@ -85,6 +85,7 @@ class ModelRestUpdatesWebsocket<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<
                         it.relevant assign null
                 },
             )
+            send(CollectionUpdates(condition = condition))
         },
         disconnect = {
             helper.subscriptionDb().deleteMany(condition { it._id eq socketId })
@@ -130,7 +131,7 @@ class ModelRestUpdatesWebsocket<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<
             }.filter { it.old != null || it.new != null }
 
             jobs.add(launch {
-                if (toSend.size > 50) {
+                if (toSend.size > 20) {
                     websocket.send(it._id, CollectionUpdates(overload = true))
                 } else {
                     websocket.send(it._id, CollectionUpdates(

@@ -6,5 +6,6 @@ import kotlinx.serialization.Serializable
 data class CollectionUpdates<T: HasId<ID>, ID: Comparable<ID>>(
     val updates: Set<T> = setOf(),
     val remove: Set<ID> = setOf(),
-    val overload: Boolean = false
+    val overload: Boolean = false,
+    val condition: Condition<T>? = null,
 )
