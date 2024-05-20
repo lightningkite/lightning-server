@@ -11,7 +11,7 @@ plugins {
     id("signing")
     `maven-publish`
 }
-
+group = "com.lightningkite"
 dependencies {
     api(project(":server-core"))
     implementation(serverlibs.coroutinesJdk)

@@ -9,7 +9,7 @@ plugins {
     id("signing")
     `maven-publish`
 }
-
+group = "com.lightningkite"
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
 val kotlinXSerialization: String by project

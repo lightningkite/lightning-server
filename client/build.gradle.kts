@@ -3,6 +3,7 @@ import com.lightningkite.deployhelpers.github
 import com.lightningkite.deployhelpers.mit
 import com.lightningkite.deployhelpers.standardPublishing
 
+
 plugins {
     alias(serverlibs.plugins.kotlinMultiplatform)
     alias(serverlibs.plugins.androidLibrary)
@@ -12,7 +13,7 @@ plugins {
     id("signing")
     `maven-publish`
 }
-
+group = "com.lightningkite"
 kotlin {
     targetHierarchy.default()
     androidTarget {

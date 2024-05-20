@@ -6,6 +6,7 @@ plugins {
     id("signing")
     `maven-publish`
 }
+group = "com.lightningkite"
 
 
 val kotlinVersion:String by project
