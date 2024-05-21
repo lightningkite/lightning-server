@@ -13,7 +13,7 @@ plugins {
     id("signing")
     `maven-publish`
 }
-group = "com.lightningkite"
+group= "com.lightningkite.lightningserver"
 kotlin {
     targetHierarchy.default()
     androidTarget {
