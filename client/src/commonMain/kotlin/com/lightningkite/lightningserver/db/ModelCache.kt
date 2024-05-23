@@ -144,12 +144,12 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         private val listeners = ArrayList<() -> Unit>()
         val inUse: Boolean get() = listeners.isNotEmpty()
         override fun addListener(listener: () -> Unit): () -> Unit {
-            println("Listener to $query added")
+//            println("Listener to $query added")
             listeners.add(listener)
             return {
                 val pos = listeners.indexOfFirst { it === listener }
                 if (pos != -1) {
-                    println("Listener to $query removed")
+//                    println("Listener to $query removed")
                     listeners.removeAt(pos)
                     unreportedChanges = true
                 }
@@ -334,9 +334,9 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
         val id = new._id
         val impl = cache.getOrPut(id) { WritableModelImpl(id) }
         impl.value = new
-        println("---INSERT $new---")
+//        println("---INSERT $new---")
         queries.forEach {
-            println("Updating query ${it.key}")
+//            println("Updating query ${it.key}")
             it.value.onNewValue(new)
             it.value.refreshIfNeeded()
         }
@@ -345,8 +345,7 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
 
     override suspend fun insert(item: List<T>): List<T> {
         val newItems = skipCache.insertBulk(item)
-        newItems.forEach {
-            val new = skipCache.insert(it)
+        newItems.forEach {new ->
             val id = new._id
             val impl = cache.getOrPut(id) { WritableModelImpl(id) }
             impl.value = new
@@ -389,11 +388,11 @@ class ModelCache<T : HasId<ID>, ID : Comparable<ID>>(
                 updateSocket(if (subConditions.isEmpty()) Condition.Never() else Condition.Or(subConditions))
             }
             for (query in queries.values.toList()) {
-                println("Checkingg query ${query.query}")
-                println("query.inUse(${query.inUse}) && !query.upToDate(${query.upToDate})")
+//                println("Checkingg query ${query.query}")
+//                println("query.inUse(${query.inUse}) && !query.upToDate(${query.upToDate})")
                 if (query.inUse && !query.upToDate) {
                     skipCache.query(query.query).let {
-                        println("Query got result, applying")
+//                        println("Query got result, applying")
                         for (item in it) cache.getOrPut(item._id) { WritableModelImpl(item._id) }.value = item
                         query.reset(it.map { it._id })
                     }
