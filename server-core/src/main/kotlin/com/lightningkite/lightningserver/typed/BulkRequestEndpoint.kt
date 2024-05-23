@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
+import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.async
@@ -49,6 +50,7 @@ fun ServerPath.bulkRequestEndpoint() = post.api(
                             result = Serialization.json.encodeToString(api.outputType, result)
                         )
                     } catch(e: Exception) {
+                        e.report()
                         entry.key to BulkResponse(
                             error = when(e) {
                                 is HttpStatusException -> e.toLSError()
