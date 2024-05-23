@@ -14,3 +14,15 @@ buildscript {
         classpath(serverlibs.proguard)
     }
 }
+
+allprojects {
+    group = "com.lightningkite.lightningserver"
+    repositories {
+        mavenLocal()
+//        maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
+        maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
+        google()
+        mavenCentral()
+
+    }
+}
