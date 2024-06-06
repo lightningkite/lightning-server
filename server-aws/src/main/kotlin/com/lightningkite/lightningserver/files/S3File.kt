@@ -1,22 +1,25 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.atZone
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
+import com.lightningkite.now
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toKotlinInstant
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.model.*
 import java.io.File
 import java.io.InputStream
-import java.math.BigInteger
 import java.net.URLDecoder
 import java.security.MessageDigest
 import kotlin.time.Duration
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import kotlin.time.TimeSource
 import kotlin.time.toJavaDuration
 
 data class S3File(val system: S3FileSystem, val path: File) : FileObject {
@@ -168,14 +171,100 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
 
     override val signedUrl: String
         get() = system.signedUrlDuration?.let { e ->
-            system.signer.presignGetObject {
-                it.signatureDuration(system.signedUrlDuration.toJavaDuration())
-                it.getObjectRequest {
-                    it.bucket(system.bucket)
-                    it.key(path.unixPath)
+            var stopwatch = TimeSource.Monotonic.markNow()
+            var timeIndex = 0
+            fun mark() {
+                val e = stopwatch.elapsedNow()
+                stopwatch = TimeSource.Monotonic.markNow()
+                times[timeIndex++] += e
+            }
+
+            val creds = system.creds()
+            val accessKey = creds.access
+            val tokenPreEncoded = creds.tokenPreEncoded
+            mark()
+            var dateOnly = ""
+            val date = now().atZone(TimeZone.UTC).run {
+                buildString {
+                    this.append(date.year.toString().padStart(4, '0'))
+                    this.append(date.monthNumber.toString().padStart(2, '0'))
+                    this.append(date.dayOfMonth.toString().padStart(2, '0'))
+                    dateOnly = toString()
+                    append("T")
+                    this.append(time.hour.toString().padStart(2, '0'))
+                    this.append(time.minute.toString().padStart(2, '0'))
+                    this.append(time.second.toString().padStart(2, '0'))
+                    append("Z")
                 }
-            }.url().toString()
+            }
+            mark()
+            val objectPath = path.unixPath
+            val preHeaders = tokenPreEncoded?.let {
+                "X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=${accessKey}%2F$dateOnly%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=$date&X-Amz-Expires=${e.inWholeSeconds}&X-Amz-Security-Token=${it}&X-Amz-SignedHeaders=host"
+            } ?: run {
+                "X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=${accessKey}%2F$dateOnly%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=$date&X-Amz-Expires=${e.inWholeSeconds}&X-Amz-SignedHeaders=host"
+            }
+            mark()
+            val hashHolder = ByteArray(32)
+            val canonicalRequestHasher = MessageDigest.getInstance("SHA-256")
+            canonicalRequestHasher.update(constantBytesA)
+            canonicalRequestHasher.update(objectPath.removePrefix("/").toByteArray())
+            canonicalRequestHasher.update(constantByteNewline)
+            canonicalRequestHasher.update(preHeaders.toByteArray())
+            canonicalRequestHasher.update(constantBytesC)
+            canonicalRequestHasher.update(system.bucket.toByteArray())
+            canonicalRequestHasher.update(constantBytesD)
+            canonicalRequestHasher.update(system.region.id().toByteArray())
+            canonicalRequestHasher.update(constantBytesE)
+            canonicalRequestHasher.digest(
+                hashHolder,
+                0, 32
+            )
+            mark()
+            val canonicalRequestHash = hashHolder.toHex()
+            mark()
+            val finalHasher = Mac.getInstance("HmacSHA256")
+            finalHasher.init(system.signingKey(dateOnly))
+            finalHasher.update(constantBytesF)
+            finalHasher.update(date.toByteArray())
+            finalHasher.update(constantByteNewline)
+            finalHasher.update(dateOnly.toByteArray())
+            finalHasher.update(constantByteSlash)
+            finalHasher.update(system.region.id().toByteArray())
+            finalHasher.update(constantBytesH)
+            finalHasher.update(canonicalRequestHash.toByteArray())
+            finalHasher.doFinal(
+                hashHolder,
+                0
+            )
+            val regeneratedSig = hashHolder.toHex()
+            mark()
+            val result = "$url?$preHeaders&X-Amz-Signature=$regeneratedSig"
+            mark()
+            result
         } ?: url
+
+    companion object {
+        val times = Array<Duration>(20, {Duration.ZERO})
+        fun reset() {
+            times.fill(Duration.ZERO)
+        }
+        fun report(): String = buildString {
+            for((index, time) in times.withIndex()) {
+                appendLine("mark $index: $time")
+            }
+        }
+
+        private val constantBytesA = "GET\n/".toByteArray()
+        private val constantBytesC = "\nhost:".toByteArray()
+        private val constantBytesD = ".s3.".toByteArray()
+        private val constantBytesE = (".amazonaws.com\n\nhost\nUNSIGNED-PAYLOAD").toByteArray()
+        private val constantBytesF = "AWS4-HMAC-SHA256\n".toByteArray()
+        private val constantByteNewline = '\n'.code.toByte()
+        private val constantByteSlash = '/'.code.toByte()
+        private val constantBytesH = "/s3/aws4_request\n".toByteArray()
+
+    }
 
     override fun uploadUrl(timeout: Duration): String = system.signer.presignPutObject {
         it.signatureDuration(timeout.toJavaDuration())
@@ -188,9 +277,14 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
     override fun toString(): String = url
 }
 
-private fun ByteArray.toHex(): String = BigInteger(1, this@toHex).toString(16)
-private fun ByteArray.mac(key: ByteArray): ByteArray = Mac.getInstance("HmacSHA256").apply {
+//internal fun ByteArray.toHex(): String = BigInteger(1, this@toHex).toString(16).padStart(64, '0')
+internal fun ByteArray.toHex(): String = buildString {
+    for(item in this@toHex) {
+        append(item.toUByte().toString(16).padStart(2, '0'))
+    }
+}
+internal fun ByteArray.mac(key: ByteArray): ByteArray = Mac.getInstance("HmacSHA256").apply {
     init(SecretKeySpec(key, "HmacSHA256"))
 }.doFinal(this)
 
-private fun String.sha256(): String = MessageDigest.getInstance("SHA-256").digest(toByteArray()).toHex()
+internal fun String.sha256(): String = MessageDigest.getInstance("SHA-256").digest(toByteArray()).toHex()

@@ -177,4 +177,14 @@ abstract class OperationsTests() {
         }
         collection().find(condition(true)).collect { println(it) }
     }
+    @Test fun test_compoundUpdate(): Unit = runBlocking {
+        fun collection() = database.collection<CompoundKeyTestModel>("test_compoundUpdate")
+        collection().insertOne(CompoundKeyTestModel(CompoundTestKey("A", "B")))
+        collection().updateOne(condition {
+            it._id.eq(CompoundTestKey("A", "B")) and it._id.first.eq("A")
+        }, modification {
+            it.value assign 1
+        })
+        collection().find(condition(true)).collect { println(it) }
+    }
 }

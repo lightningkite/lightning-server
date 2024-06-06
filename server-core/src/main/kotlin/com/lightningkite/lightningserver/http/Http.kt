@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.HtmlDefaults
+import com.lightningkite.lightningserver.auth.authAny
+import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
@@ -75,6 +77,8 @@ object Http {
 
     suspend fun execute(request: HttpRequest): HttpResponse {
         return endpoints[request.endpoint]?.let { handler ->
+            val authOrNull = request.authAny()
+            serverLogger.info("${request.endpoint} (${request.parts}) accessed by ${authOrNull} (${request.sourceIp})")
             try {
                 Metrics.handlerPerformance(request.endpoint) {
                     fullAction(request, handler)

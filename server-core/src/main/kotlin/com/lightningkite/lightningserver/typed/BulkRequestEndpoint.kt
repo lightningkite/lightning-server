@@ -3,9 +3,11 @@ package com.lightningkite.lightningserver.typed
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.HttpResponseException
 import com.lightningkite.lightningserver.LSError
+import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.*
@@ -32,6 +34,7 @@ fun ServerPath.bulkRequestEndpoint() = post.api(
                     val api = Http.endpoints[handler.endpoint] as? ApiEndpoint<HasId<*>?, TypedServerPath, Any?, Any?> ?: return@async entry.key to BulkResponse(
                         error = LSError(400, detail = "not-api", message = "Matched route is not an API endpoint", data = it.method + " " + it.path)
                     )
+                    serverLogger.info("${api.route.endpoint} (${handler.parts}) accessed by ${authOrNull} (${rawRequest?.sourceIp}) (via bulk)")
                     try {
                         val result = api.implementation(api.authAndPathParts(
                             authOrNull, HttpRequest(

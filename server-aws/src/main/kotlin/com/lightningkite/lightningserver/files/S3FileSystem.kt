@@ -1,15 +1,20 @@
 package com.lightningkite.lightningserver.files
 
-import software.amazon.awssdk.auth.credentials.AwsCredentials
-import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
+import com.lightningkite.atZone
+import com.lightningkite.now
+import io.ktor.http.*
+import kotlinx.datetime.TimeZone
+import software.amazon.awssdk.auth.credentials.*
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3AsyncClient
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 import java.io.File
+import java.time.Instant
+import javax.crypto.spec.SecretKeySpec
+import kotlin.jvm.optionals.getOrNull
 import kotlin.time.Duration
+import kotlin.time.toJavaDuration
 
 class S3FileSystem(
     val region: Region,
@@ -17,10 +22,53 @@ class S3FileSystem(
     val bucket: String,
     val signedUrlDuration: Duration? = null
 ) : FileSystem {
+    val signedUrlDurationJava: java.time.Duration? = signedUrlDuration?.toJavaDuration()
     override val rootUrls: List<String> = listOf(
         "https://${bucket}.s3.${region.id()}.amazonaws.com/",
         "https://s3-${region.id()}.amazonaws.com/${bucket}/",
     )
+    private var credsOnHand: AwsCredentials? = null
+    private var credsOnHandMs: Long = 0
+    private var credsDirect: DirectAwsCredentials? = null
+    data class DirectAwsCredentials(
+        val access: String,
+        val secret: String,
+        val token: String? = null
+    ) {
+        val tokenPreEncoded = token?.encodeURLParameter()
+    }
+    fun creds(): DirectAwsCredentials {
+        val onHand = credsDirect
+        return if(onHand == null || System.currentTimeMillis() > credsOnHandMs) {
+            val x = credentialProvider.resolveCredentials()
+            credsOnHand = x
+            val y = DirectAwsCredentials(
+                access = x.accessKeyId(),
+                secret = x.secretAccessKey(),
+                token = (x as? AwsSessionCredentials)?.sessionToken(),
+            )
+            credsDirect = y
+            credsOnHandMs = x.expirationTime().getOrNull()?.toEpochMilli() ?: (System.currentTimeMillis() + 24L*60*60*1000)
+            y
+        } else onHand
+    }
+    private var lastSigningKey: SecretKeySpec? = null
+    private var lastSigningKeyDate: String = ""
+    fun signingKey(date: String): SecretKeySpec {
+        val lastSigningKey = lastSigningKey
+        if(lastSigningKey == null || lastSigningKeyDate != date) {
+            val secretKey = creds().secret
+            val newKey = "AWS4$secretKey".toByteArray()
+                .let { date.toByteArray().mac(it) }
+                .let { region.id().toByteArray().mac(it) }
+                .let { "s3".toByteArray().mac(it) }
+                .let { "aws4_request".toByteArray().mac(it) }
+                .let { SecretKeySpec(it, "HmacSHA256") }
+            this.lastSigningKey = newKey
+            lastSigningKeyDate = date
+            return newKey
+        } else return lastSigningKey
+    }
 
     val s3: S3Client by lazy {
         S3Client.builder()

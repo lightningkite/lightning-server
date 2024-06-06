@@ -21,6 +21,7 @@ import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import com.lightningkite.now
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -131,13 +132,15 @@ class ModelRestUpdatesWebsocket<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<
             }.filter { it.old != null || it.new != null }
 
             jobs.add(launch {
-                if (toSend.size > 20) {
+                val updates = CollectionUpdates(
+                    updates = toSend.mapNotNull { it.new }.toSet(),
+                    remove = toSend.mapNotNull { it.old.takeIf { _ -> it.new == null }?._id }.toSet()
+                )
+                val size = Serialization.json.encodeToString(CollectionUpdates.serializer(info.serialization.serializer, info.serialization.idSerializer), updates).length
+                if (size >= 24000) {
                     websocket.send(it._id, CollectionUpdates(overload = true))
                 } else {
-                    websocket.send(it._id, CollectionUpdates(
-                        updates = toSend.mapNotNull { it.new }.toSet(),
-                        remove = toSend.mapNotNull { it.old.takeIf { _ -> it.new == null }?._id }.toSet()
-                    ))
+                    websocket.send(it._id, updates)
                 }
             })
         }

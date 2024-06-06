@@ -27,6 +27,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 @OptIn(InternalSerializationApi::class)
 class PasswordProofEndpoints(
@@ -178,10 +179,10 @@ class PasswordProofEndpoints(
         successCode = HttpStatus.OK,
         implementation = { input: IdentificationAndPassword ->
             val postedAt = now()
-            val cacheKey = "otp-count-${input.property}-${input.value}"
-            cache().add(cacheKey, 1, 1.hours)
+            val cacheKey = "password-${input.property}-${input.value}"
             val ct = (cache().get<Int>(cacheKey) ?: 0)
-            if (ct > 5) throw BadRequestException("Too many attempts; please wait.")
+            if (ct > 5) throw BadRequestException("Too many attempts; please wait five minutes.")
+            cache().add(cacheKey, 1, 5.minutes)
             val subject = input.type
             val handler = Authentication.subjects.values.find { it.name == subject }
                 ?: throw IllegalArgumentException("No subject $subject recognized")

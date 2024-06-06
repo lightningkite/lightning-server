@@ -27,11 +27,11 @@ interface ClientModelRestEndpoints<T : HasId<ID>, ID : Comparable<ID>> {
 }
 
 interface ClientModelRestEndpointsPlusWs<T : HasId<ID>, ID : Comparable<ID>> : ClientModelRestEndpoints<T, ID> {
-    suspend fun watch(): TypedWebSocket<Query<T>, ListChange<T>>
+    fun watch(): TypedWebSocket<Query<T>, ListChange<T>>
 }
 
 interface ClientModelRestEndpointsPlusUpdatesWebsocket<T : HasId<ID>, ID : Comparable<ID>> : ClientModelRestEndpoints<T, ID> {
-    suspend fun updates(): TypedWebSocket<Condition<T>, CollectionUpdates<T, ID>>
+    fun updates(): TypedWebSocket<Condition<T>, CollectionUpdates<T, ID>>
 }
 
 interface WritableModel<T> : Writable<T?> {

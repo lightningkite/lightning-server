@@ -28,7 +28,8 @@ data class User(
 @GenerateDataClassPaths
 @Serializable
 data class CompoundKeyTestModel(
-    override val _id: CompoundTestKey = CompoundTestKey("first", "second")
+    override val _id: CompoundTestKey = CompoundTestKey("first", "second"),
+    val value: Int = 0,
 ): HasId<CompoundTestKey>
 
 @GenerateDataClassPaths

@@ -119,7 +119,7 @@ resource "aws_lambda_function" "main" {
   s3_bucket = aws_s3_bucket.lambda_bucket.id
   s3_key    = aws_s3_object.app_storage.key
 
-  runtime = "java11"
+  runtime = "java17"
   handler = "com.lightningkite.lightningserver.demo.AwsHandler"
   
   memory_size = "${var.lambda_memory_size}"
@@ -159,18 +159,6 @@ resource "aws_cloudwatch_log_group" "main" {
 
 resource "local_sensitive_file" "settings_raw" {
   content = jsonencode({
-    cache = {
-        url = "dynamodb://${var.deployment_location}/demo_example"
-    }
-    secretBasis = random_password.secretBasis.result
-    jwt = {
-        expiration = var.jwt_expiration 
-        emailExpiration = var.jwt_emailExpiration 
-        secret = random_password.jwt.result
-    }
-    oauth_github = var.oauth_github
-    exceptions = var.exceptions
-    oauth_apple = var.oauth_apple
     general = {
         projectName = var.display_name
         publicUrl = "https://${var.domain_name}"
@@ -180,6 +168,15 @@ resource "local_sensitive_file" "settings_raw" {
     }
     database = {
       url = "mongodb+srv://demoexampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_serverless_instance.database.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
+    }
+    cache = {
+        url = "dynamodb://${var.deployment_location}/demo_example"
+    }
+    secretBasis = random_password.secretBasis.result
+    jwt = {
+        expiration = var.jwt_expiration 
+        emailExpiration = var.jwt_emailExpiration 
+        secret = random_password.jwt.result
     }
     sms = var.sms
     logging = var.logging
@@ -191,12 +188,11 @@ resource "local_sensitive_file" "settings_raw" {
         url = "cloudwatch://${var.deployment_location}/${var.metrics_namespace}"
         trackingByEntryPoint = var.metrics_tracked
     }
+    exceptions = var.exceptions
     email = {
         url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.${var.deployment_location}.amazonaws.com:587" 
         fromEmail = "noreply@${var.domain_name}"
-    }
-    oauth_google = var.oauth_google
-    oauth_microsoft = var.oauth_microsoft})
+    }})
   filename = "${path.module}/build/raw-settings.json"
 }
 

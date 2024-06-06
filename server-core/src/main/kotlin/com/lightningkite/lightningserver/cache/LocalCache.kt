@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.cache
 
 import com.lightningkite.lightningserver.logger
+import com.lightningkite.now
+import kotlinx.datetime.Instant
 import kotlinx.serialization.KSerializer
 import kotlin.time.Duration
 import java.util.concurrent.ConcurrentHashMap
@@ -12,14 +14,14 @@ import java.util.concurrent.ConcurrentHashMap
  */
 open class LocalCache(val entries: ConcurrentHashMap<String, Entry> = ConcurrentHashMap()) : Cache {
     companion object: LocalCache()
-    data class Entry(val value: Any?, val expires: Long? = null)
+    data class Entry(val value: Any?, val expires: Instant? = null)
 
     @Suppress("UNCHECKED_CAST")
     override suspend fun <T> get(key: String, serializer: KSerializer<T>): T? =
-        entries[key]?.takeIf { it.expires == null || it.expires > System.currentTimeMillis() }?.value as? T
+        entries[key]?.takeIf { it.expires == null || it.expires > now() }?.value as? T
 
     override suspend fun <T> set(key: String, value: T, serializer: KSerializer<T>, timeToLive: Duration?) {
-        entries[key] = Entry(value, timeToLive?.inWholeMilliseconds?.let { System.currentTimeMillis() + it })
+        entries[key] = Entry(value, timeToLive?.let { now() + it })
     }
 
     override suspend fun <T> setIfNotExists(
@@ -29,14 +31,14 @@ open class LocalCache(val entries: ConcurrentHashMap<String, Entry> = Concurrent
         timeToLive: Duration?
     ): Boolean {
         if (entries[key] == null) {
-            entries[key] = Entry(value, timeToLive?.inWholeMilliseconds?.let { System.currentTimeMillis() + it })
+            entries[key] = Entry(value, timeToLive?.let { now() + it })
             return true
         }
         return false
     }
 
     override suspend fun add(key: String, value: Int, timeToLive: Duration?) {
-        val entry = entries[key]?.takeIf { it.expires == null || it.expires > System.currentTimeMillis() }
+        val entry = entries[key]?.takeIf { it.expires == null || it.expires > now() }
         val current = entry?.value
         val new = when (current) {
             is Byte -> (current + value).toByte()
@@ -47,7 +49,7 @@ open class LocalCache(val entries: ConcurrentHashMap<String, Entry> = Concurrent
             is Double -> (current + value)
             else -> value
         }
-        entries[key] = Entry(new, timeToLive?.inWholeMilliseconds?.let { System.currentTimeMillis() + it })
+        entries[key] = Entry(new, timeToLive?.let { now() + it })
     }
 
     override suspend fun remove(key: String) {
