@@ -199,7 +199,7 @@ class AuthEndpointsForSubjectTest {
 
     @Test
     fun testPasswordSpam(): Unit = runBlocking {
-        val info = TestSettings.proofEmail.start.test(null, "notadmin@test.com")
+        val info = TestSettings.proofEmail.start.test(null, "notadmin2@test.com")
         val pinRegex = Regex("[A-Z][A-Z][A-Z][A-Z][A-Z][A-Z]")
         val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.also { println(it) }?.plainText?.let {
             pinRegex.find(it)?.value
