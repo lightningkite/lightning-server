@@ -25,7 +25,8 @@ object DebugExceptionReporter : ExceptionReporter {
         logger.debug(
             """
 Exception Reported:
-    ${t.message}:
+    Context: $context
+    Message: ${t.message}:
         ${t.stackTraceToString()}
 """.trimIndent()
         )
