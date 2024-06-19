@@ -1,9 +1,9 @@
 package com.lightningkite.lightningdb
 
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 
-fun <T, V> Modification<T>.forFieldOrNull(field: KProperty1<T, V>): Modification<V>? {
+fun <T, V> Modification<T>.forFieldOrNull(field: SerializableProperty<T, V>): Modification<V>? {
     return when (this) {
         is Modification.Chain -> modifications.mapNotNull { it.forFieldOrNull(field) }.takeUnless { it.isEmpty() }
             ?.let { Modification.Chain(it) }
@@ -13,7 +13,7 @@ fun <T, V> Modification<T>.forFieldOrNull(field: KProperty1<T, V>): Modification
     }
 }
 
-fun <T, V> Modification<T>.vet(field: KProperty1<T, V>, onModification: (Modification<V>) -> Unit) {
+fun <T, V> Modification<T>.vet(field: SerializableProperty<T, V>, onModification: (Modification<V>) -> Unit) {
     when (this) {
         is Modification.Assign -> onModification(Modification.Assign(field.get(this.value)))
         is Modification.Chain -> modifications.forEach { it.vet(field, onModification) }
@@ -33,8 +33,8 @@ fun <T> Modification<T>.vet(onModification: (Modification<T>) -> Unit) {
 }
 
 @Suppress("UNCHECKED_CAST")
-fun <V> Modification<*>.vet(fieldChain: List<KProperty1<*, *>>, onModification: (Modification<V>) -> Unit) {
-    val field: KProperty1<*, *> = fieldChain.firstOrNull() ?: run {
+fun <V> Modification<*>.vet(fieldChain: List<SerializableProperty<*, *>>, onModification: (Modification<V>) -> Unit) {
+    val field: SerializableProperty<*, *> = fieldChain.firstOrNull() ?: run {
         onModification(this as Modification<V>)
         return
     }
@@ -42,7 +42,7 @@ fun <V> Modification<*>.vet(fieldChain: List<KProperty1<*, *>>, onModification: 
         is Modification.Assign -> {
             var value = this.value
             for (key in fieldChain) {
-                value = (key as KProperty1<Any?, Any?>).get(value)
+                value = (key as SerializableProperty<Any?, Any?>).get(value)
             }
             onModification(Modification.Assign(value as V))
         }
@@ -59,7 +59,7 @@ fun <V> Modification<*>.vet(fieldChain: List<KProperty1<*, *>>, onModification: 
 }
 
 fun <T, V> Modification<T>.map(
-    field: KProperty1<T, V>,
+    field: SerializableProperty<T, V>,
     onModification: (Modification<V>) -> Modification<V>,
 ): Modification<T> {
     return when (this) {
@@ -82,7 +82,7 @@ fun <T, V> Modification<T>.map(
 }
 
 suspend fun <T, V> Modification<T>.mapSuspend(
-    field: KProperty1<T, V>,
+    field: SerializableProperty<T, V>,
     onModification: suspend (Modification<V>) -> Modification<V>,
 ): Modification<T> {
     return when (this) {

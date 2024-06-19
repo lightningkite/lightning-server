@@ -1,12 +1,14 @@
 package com.lightningkite.lightningserver.core
 
 import com.lightningkite.lightningserver.http.Http
+import com.lightningkite.lightningserver.metrics.MetricType
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
@@ -26,7 +28,7 @@ fun allServerEntryPoints(): List<String> {
     ).flatten()
 }
 
-class ServerEntryPointElement(val entryPoint: Any) : AbstractCoroutineContextElement(ServerEntryPointElement) {
+class ServerEntryPointElement(val entryPoint: Any, val metricSums: ConcurrentHashMap<MetricType, Double> = ConcurrentHashMap()) : AbstractCoroutineContextElement(ServerEntryPointElement) {
     companion object Key : CoroutineContext.Key<ServerEntryPointElement>
 }
 

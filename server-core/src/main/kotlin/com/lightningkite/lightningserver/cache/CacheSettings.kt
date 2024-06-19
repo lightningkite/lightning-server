@@ -23,6 +23,5 @@ data class CacheSettings(
         }
     }
 
-    val cache: Cache by lazy { parse((legacyUri ?: url).substringBefore("://"), this.copy(url = legacyUri ?: url)) }
-    override fun invoke(): Cache = cache
+    override fun invoke(): Cache = parse(url.substringBefore("://"), this)
 }

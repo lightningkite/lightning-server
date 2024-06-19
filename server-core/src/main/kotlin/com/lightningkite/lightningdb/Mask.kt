@@ -1,11 +1,10 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.khrysalis.IsCodableAndHashable
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlin.reflect.KProperty1
+import org.slf4j.LoggerFactory
 
-/**
- * Rules about how outgoing data should be masked to prevent unwanted information from leaking.
- */
 @Serializable
 data class Mask<T>(
     /**
@@ -13,95 +12,117 @@ data class Mask<T>(
      */
     val pairs: List<Pair<Condition<T>, Modification<T>>> = listOf()
 ) {
-    /**
-     * Masks a single instance.
-     */
+    companion object {
+        val logger = LoggerFactory.getLogger("com.lightningkite.lightningdb.Mask")
+    }
     operator fun invoke(on: T): T {
         var value = on
-        for (pair in pairs) {
-            if (!pair.first(on)) value = pair.second(value)
+        for(pair in pairs) {
+            if(!pair.first(on)) value = pair.second(value)
         }
         return value
     }
-
-    /**
-     * Check under what conditions a given sort should be permitted.
-     */
+    operator fun invoke(on: Partial<T>): Partial<T> {
+        var value = on
+        for(pair in pairs) {
+            val evaluated = pair.first(on)
+            if(evaluated != true) value = pair.second(value)
+        }
+        return value
+    }
     fun permitSort(on: List<SortPart<T>>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
-        for (pair in pairs) {
-            if (on.any { pair.second.matchesPath(it.field.property) }) totalConditions.add(pair.first)
+        for(pair in pairs) {
+            if(on.any { pair.second.affects(it.field) }) totalConditions.add(pair.first)
         }
-        return when (totalConditions.size) {
+        return when(totalConditions.size) {
             0 -> Condition.Always()
             1 -> totalConditions[0]
             else -> Condition.And(totalConditions)
         }
     }
-
-    /**
-     * Check under what conditions a property should be accessible.
-     */
-    operator fun invoke(on: KProperty1<T, *>): Condition<T> {
+    operator fun invoke(on: DataClassPathPartial<T>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
-        for (pair in pairs) {
-            if (pair.second.matchesPath(on)) totalConditions.add(pair.first)
+        for(pair in pairs) {
+            if(pair.second.affects(on)) totalConditions.add(pair.first)
         }
-        return when (totalConditions.size) {
+        return when(totalConditions.size) {
             0 -> Condition.Always()
             1 -> totalConditions[0]
             else -> Condition.And(totalConditions)
         }
     }
-
-    /**
-     * Adds additional restrictions to a condition to prevent a leak of information
-     */
     operator fun invoke(condition: Condition<T>): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
-        for (pair in pairs) {
-            if (condition.matchesPath(pair.second)) totalConditions.add(pair.first)
+        for(pair in pairs) {
+            if(condition.readsResultOf(pair.second)) totalConditions.add(pair.first)
         }
-        return when (totalConditions.size) {
+        return when(totalConditions.size) {
             0 -> Condition.Always()
             1 -> totalConditions[0]
             else -> Condition.And(totalConditions)
         }
     }
-
-    /**
-     * A helper class for building a mask.
-     */
     class Builder<T>(
+        serializer: KSerializer<T>,
         val pairs: ArrayList<Pair<Condition<T>, Modification<T>>> = ArrayList()
     ) {
-        val it = startChain<T>()
-
-        fun <V> PropChain<T, V>.mask(value: V, unless: Condition<T> = Condition.Always()) {
+        val it = DataClassPathSelf(serializer)
+        fun <V> DataClassPath<T, V>.mask(value: V, unless: Condition<T> = Condition.Never()) {
             pairs.add(unless to mapModification(Modification.Assign(value)))
         }
-
-        @Deprecated("Replaced with functions that cause fewer mistakes - try mask instead.")
-        infix fun <V> PropChain<T, V>.maskedTo(value: V) = mapModification(Modification.Assign(value))
-        @Deprecated("Replaced with functions that cause fewer mistakes - try mask instead.")
+        infix fun <V> DataClassPath<T, V>.maskedTo(value: V) = mapModification(Modification.Assign(value))
         infix fun Modification<T>.unless(condition: Condition<T>) {
             pairs.add(condition to this)
         }
-        @Deprecated("Replaced with functions that cause fewer mistakes - try mask instead.")
         fun always(modification: Modification<T>) {
             pairs.add(Condition.Never<T>() to modification)
         }
-
         fun build() = Mask(pairs)
-        fun include(mask: Mask<T>) {
-            pairs.addAll(mask.pairs)
-        }
+        fun include(mask: Mask<T>) { pairs.addAll(mask.pairs) }
     }
 }
 
-/**
- * DSL for creating a [Mask].
- */
-inline fun <T> mask(builder: Mask.Builder<T>.() -> Unit): Mask<T> {
-    return Mask.Builder<T>().apply(builder).build()
+inline fun <reified T> mask(builder: Mask.Builder<T>.(DataClassPath<T, T>)->Unit): Mask<T> {
+    return Mask.Builder<T>(serializerOrContextual()).apply { builder(path()) }.build()
+}
+
+operator fun <T> Condition<T>.invoke(map: Partial<T>): Boolean? {
+    return when(this) {
+        is Condition.Always -> true
+        is Condition.Never -> false
+        is Condition.And -> {
+            val results = this.conditions.map { it(map) }
+            if(results.any { it == false }) false
+            else if(results.any { it == null }) null
+            else true
+        }
+        is Condition.Or -> {
+            val results = this.conditions.map { it(map) }
+            if(results.any { it == true }) true
+            else if(results.any { it == null }) null
+            else true
+        }
+        is Condition.Not -> condition(map)?.not()
+        is Condition.OnField<*, *> -> if(map.parts.containsKey(key)) map.parts[key].let {
+            @Suppress("UNCHECKED_CAST")
+            if(it is Partial<*>) (condition as Condition<Any?>).invoke(map = it as Partial<Any?>)
+            else (condition as Condition<Any?>)(it)
+        } else null
+        else -> null
+    }
+}
+@Suppress("UNCHECKED_CAST")
+operator fun <T> Modification<T>.invoke(map: Partial<T>): Partial<T> {
+    return when(this) {
+        is Modification.OnField<*, *> -> if(map.parts.containsKey(key)) {
+            val newPartial = Partial<T>(map.parts.toMutableMap())
+            newPartial.parts[key as SerializableProperty<T, *>] = map.parts[key].let {
+                if (it is Partial<*>) (modification as Modification<Any?>)(it as Partial<Any?>)
+                else (modification as Modification<Any?>)(it)
+            }
+            newPartial
+        } else map
+        else -> map
+    }
 }

@@ -1,12 +1,16 @@
 package com.lightningkite.lightningdb
 
 import com.mongodb.client.model.changestream.UpdateDescription
+import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.internal.GeneratedSerializer
 import org.bson.*
 import org.bson.codecs.Codec
 import org.bson.codecs.DecoderContext
 import org.bson.codecs.EncoderContext
 import org.bson.codecs.configuration.CodecRegistry
 import java.util.*
+import com.lightningkite.lightningdb.SerializableProperty
 import kotlin.reflect.typeOf
 
 fun BsonValue.setPath(path: String, value: BsonValue) {
@@ -60,3 +64,5 @@ fun <T: Any> Codec<T>.fromUpdateDescription(on: T, updateDescription: UpdateDesc
 fun <T> Codec<T>.fromDocument(doc: Document, registry: CodecRegistry): T {
     return this.decode(BsonDocumentReader(BsonDocumentWrapper.asBsonDocument(doc, registry)), DecoderContext.builder().build())
 }
+
+val DataClassPathPartial<*>.mongo: String get() = properties.joinToString(".") { it.name }

@@ -4,10 +4,10 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.db.testmodels.TestThing
+import com.lightningkite.lightningserver.testmodels.TestThing
+import com.lightningkite.lightningserver.testmodels.TestThing_value
 import com.lightningkite.lightningserver.typed.test
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import org.junit.Test
 import java.util.*
@@ -20,22 +20,22 @@ class ChangeSocketTest {
     fun test() {
         val database = TestSettings.database
         runBlocking {
-            com.lightningkite.lightningserver.db.testmodels.prepareModels()
-            database().collection<TestThing>().deleteMany(Condition.Always())
+            com.lightningkite.lightningserver.testmodels.prepareModels()
+            TestSettings.wsModelInfo.collection().deleteMany(Condition.Always())
             TestSettings.ws.test {
 
                 suspend fun assertSent(
                     inserted: TestThing
                 ) {
                     while(incoming.tryReceive().isSuccess) {}
-                    database().collection<TestThing>().insertOne(inserted)
+                    TestSettings.wsModelInfo.collection().insertOne(inserted)
                     assertEquals(ListChange(new = inserted), incoming.receive().also { println("Got $it") })
                 }
                 suspend fun assertNotSent(
                     inserted: TestThing
                 ) {
                     while(incoming.tryReceive().isSuccess) {}
-                    database().collection<TestThing>().insertOne(inserted)
+                    TestSettings.wsModelInfo.collection().insertOne(inserted)
                     assertTrue(incoming.tryReceive().isFailure)
                 }
 
@@ -55,7 +55,7 @@ class ChangeSocketTest {
                 // Limited query
 
                 while(incoming.tryReceive().isSuccess) {}
-                this.send(Query(Condition.OnField(TestThing::value, Condition.Equal(42))))
+                this.send(Query(Condition.OnField(TestThing_value, Condition.Equal(42))))
                 assertEquals(ListChange(wholeList = listOf()), incoming.receive().also { println("Got $it") })
 
                 assertNotSent(TestThing())
@@ -68,21 +68,21 @@ class ChangeSocketTest {
     fun test2() {
         val database = TestSettings.database
         runBlocking {
-            database().collection<TestThing>().deleteMany(Condition.Always())
+            TestSettings.wsModelInfo.collection().deleteMany(Condition.Always())
             TestSettings.ws2.test {
 
                 suspend fun assertSent(
                     inserted: TestThing
                 ) {
                     while(incoming.tryReceive().isSuccess) {}
-                    database().collection<TestThing>().insertOne(inserted)
+                    TestSettings.wsModelInfo.collection().insertOne(inserted)
                     assertEquals(ListChange(new = inserted), incoming.receive().also { println("Got $it") })
                 }
                 suspend fun assertNotSent(
                     inserted: TestThing
                 ) {
                     while(incoming.tryReceive().isSuccess) {}
-                    database().collection<TestThing>().insertOne(inserted)
+                    TestSettings.wsModelInfo.collection().insertOne(inserted)
                     assertTrue(incoming.tryReceive().isFailure)
                 }
 
@@ -102,7 +102,7 @@ class ChangeSocketTest {
                 // Limited query
 
                 while(incoming.tryReceive().isSuccess) {}
-                this.send(Query(Condition.OnField(TestThing::value, Condition.Equal(42))))
+                this.send(Query(Condition.OnField(TestThing_value, Condition.Equal(42))))
                 assertEquals(ListChange(wholeList = listOf()), incoming.receive().also { println("Got $it") })
 
                 assertNotSent(TestThing())

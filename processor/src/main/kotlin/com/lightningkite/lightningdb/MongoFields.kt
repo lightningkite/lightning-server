@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
 import com.google.devtools.ksp.symbol.*
+import org.jetbrains.kotlin.util.capitalizeDecapitalize.decapitalizeAsciiOnly
 
 data class MongoFields(
     val declaration: KSClassDeclaration
@@ -12,16 +13,7 @@ data class MongoFields(
     val fields by lazy { declaration.fields() }
     val hasId by lazy { declaration.superTypes.any { it.resolve().declaration.qualifiedName?.asString() == "com.lightningkite.lightningdb.HasId" } }
 
-    fun allSubs(handled: MutableSet<KSClassDeclaration>): Sequence<MongoFields> = sequenceOf(this) + fields
-        .flatMap { it.kotlinType.resolve().allClassDeclarations() }
-        .filter { it.usesSub && it.classKind != ClassKind.ENUM_CLASS }
-        .filter { handled.add(it) }
-        .asSequence()
-        .map { MongoFields(it) }
-        .flatMap { it.allSubs(handled) }
-
     fun write(out: TabAppendable) = with(out) {
-        var useContextualFor = listOf<String>()
         declaration.containingFile?.annotations?.forEach {
             when (it.shortName.asString()) {
                 "UseContextualSerialization" -> {
@@ -34,7 +26,6 @@ data class MongoFields(
                                     ?.removePrefix("[")
                                     ?.removeSuffix("]")
                                     ?.split(", ")
-                                    ?.also { useContextualFor = it }
                                     ?.joinToString { "$it::class" }
                             }
                         })"
@@ -42,7 +33,7 @@ data class MongoFields(
                 }
                 else -> {
                     try {
-                        if(it.shortName.asString() == "SharedCode") khrysalisUsed = true
+                        if(it.shortName.asString() == "SharedCode") return@forEach
                         appendLine(
                             "@file:${it.shortName.asString()}(${
                                 it.arguments.joinToString(", ") {
@@ -72,35 +63,91 @@ data class MongoFields(
                     "kotlinx.serialization.*",
                     "kotlinx.serialization.builtins.*",
                     "kotlinx.serialization.internal.GeneratedSerializer",
-                    "java.time.*",
-                    "java.util.*",
+                    "kotlinx.datetime.*",
+                    "com.lightningkite.*",
                 )
             )
             ?.distinct()
             ?.forEach { appendLine("import $it") }
         appendLine()
+        val contextualTypes = declaration.containingFile?.annotation("UseContextualSerialization", "kotlinx.serialization")?.arguments?.firstOrNull()
+            ?.value
+            ?.let { it as? List<KSType> }
+            ?.map { it.declaration }
+            ?: listOf()
+        appendLine("// Contextual types: ${contextualTypes.joinToString { it.qualifiedName?.asString() ?: "-" }}")
         if(declaration.typeParameters.isEmpty()) {
             appendLine("fun prepare${simpleName}Fields() {")
             tab {
-                for (field in fields) {
-                    appendLine("$classReference::${field.name}.setCopyImplementation { original, value -> original.copy(${field.name} = value) }")
-                }
+                appendLine("val props: Array<SerializableProperty<$classReference, *>> = arrayOf(${fields.joinToString { field -> "${simpleName}_${field.name}" }})")
+                appendLine("$classReference.serializer().properties { props }")
             }
             appendLine("}")
             for (field in fields) {
-                appendLine("val <K> PropChain<K, $typeReference>.${field.name}: PropChain<K, ${field.kotlinType.toKotlin()}> get() = this[${classReference}::${field.name}]")
+                appendLine("val <K> DataClassPath<K, $typeReference>.${field.name}: DataClassPath<K, ${field.kotlinType.toKotlin()}> get() = this[${classReference}_${field.name}]")
+            }
+            appendLine("inline val $typeReference.Companion.path: DataClassPath<$typeReference, $typeReference> get() = path<$typeReference>()")
+            appendLine()
+            appendLine()
+            for (field in fields) {
+                appendLine("object ${simpleName}_${field.name}: SerializableProperty<$typeReference, ${field.kotlinType.toKotlin()}> {")
+                tab {
+                    appendLine("""override val name: String = "${field.name}"""")
+                    appendLine("""override fun get(receiver: $typeReference): ${field.kotlinType.toKotlin()} = receiver.${field.name}""")
+                    appendLine("""override fun setCopy(receiver: $typeReference, value: ${field.kotlinType.toKotlin()}) = receiver.copy(${field.name} = value)""")
+                    appendLine("""override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${field.kotlinType.resolve()!!.toKotlinSerializer(contextualTypes)}""")
+                }
+                appendLine("}")
             }
         } else {
             appendLine("fun prepare${simpleName}Fields() {")
             tab {
-                for (field in fields) {
-                    appendLine("$classReference<${declaration.typeParameters.joinToString(", ") { it.bounds.firstOrNull()?.toKotlin() ?: "Any?" }}>::${field.name}.setCopyImplementation { original, value -> original.copy(${field.name} = value) }")
+                val nothings = declaration.typeParameters.joinToString(", ") { "NothingSerializer()" }
+                appendLine("$classReference.serializer($nothings).properties { args -> arrayOf(")
+                tab {
+                    val args = declaration.typeParameters.indices.joinToString(", ") { "args[$it]" }
+                    for(field in fields) {
+                        appendLine("${simpleName}_${field.name}($args),")
+                    }
                 }
+                appendLine(") }")
             }
             appendLine("}")
             for (field in fields) {
-                appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { "reified " + it.name.asString() }}> PropChain<ROOT, $typeReference>.${field.name}: PropChain<ROOT, ${field.kotlinType.toKotlin()}> get() = this[${classReference}${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}::${field.name}]")
+                appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { it.name.asString() + ": " + (it.bounds.firstOrNull()?.toKotlin() ?: "Any?") }}> DataClassPath<ROOT, $typeReference>.${field.name}: DataClassPath<ROOT, ${field.kotlinType.toKotlin()}> get() = this.serializer.tryTypeParameterSerializers()!!.let { this[${simpleName}_${field.name}(${declaration.typeParameters.withIndex().joinToString(", ") { "it[${it.index}] as KSerializer<${it.value.name.asString()}>" }})] }")
             }
+            appendLine()
+            appendLine()
+            for (field in fields) {
+                appendLine("class ${simpleName}_${field.name}<${declaration.typeParameters.joinToString(", ") { it.name.asString() + ": " + (it.bounds.firstOrNull()?.toKotlin() ?: "Any?") }}>(${declaration.typeParameters.joinToString(", ") { it.name.asString().decapitalizeAsciiOnly() + ": KSerializer<${it.name.asString()}>" }}): SerializableProperty<$typeReference, ${field.kotlinType.toKotlin()}> {")
+                tab {
+                    appendLine("""override val name: String = "${field.name}"""")
+                    appendLine("""override fun get(receiver: $typeReference): ${field.kotlinType.toKotlin()} = receiver.${field.name}""")
+                    appendLine("""override fun setCopy(receiver: $typeReference, value: ${field.kotlinType.toKotlin()}) = receiver.copy(${field.name} = value)""")
+                    appendLine("""override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${field.kotlinType.resolve()!!.toKotlinSerializer(contextualTypes)}""")
+                    appendLine("""override fun hashCode(): Int = ${field.name.hashCode() * 31 + simpleName.hashCode()}""")
+                    appendLine("""override fun equals(other: Any?): Boolean = other is ${simpleName}_${field.name}<${declaration.typeParameters.joinToString(", ") { "* "}}>""")
+                }
+                appendLine("}")
+            }
+        }
+    }
+    fun writeTs(out: TabAppendable) {
+        out.appendLine("---")
+        for (field in fields) {
+            out.appendLine("- id: ${packageName}.${field.name}")
+            out.appendLine("  type: get")
+            out.appendLine("  receiver: com.lightningkite.lightningdb.DataClassPath<*, ${packageName}.${typeReference}>")
+            out.appendLine("  template: '~this~.prop(\"${field.name}\")'")
+        }
+    }
+    fun writeSwift(out: TabAppendable) {
+        out.appendLine("---")
+        for (field in fields) {
+            out.appendLine("- id: ${packageName}.${field.name}")
+            out.appendLine("  type: get")
+            out.appendLine("  receiver: com.lightningkite.lightningdb.DataClassPath<*, ${packageName}.${typeReference}>")
+            out.appendLine("  template: '~this~.get(prop: ${typeReference}.${field.name}Prop)'")
         }
     }
 }
@@ -122,7 +169,8 @@ private val KSType.useCustomType: Boolean
             "kotlin.Pair",
             "com.lightningkite.lightningdb.UUIDFor",
             "java.util.UUID",
-            "java.time.Instant",
+            "com.lightningkite.UUID",
+            "kotlinx.datetime.Instant",
             "org.litote.kmongo.Id" -> false
             else -> true
         }
@@ -140,7 +188,8 @@ private val KSType.conditionType: String
             "kotlin.Float",
             "kotlin.Double",
             "java.util.UUID",
-            "java.time.Instant",
+            "com.lightningkite.UUID",
+            "kotlinx.datetime.Instant",
             "com.lightningkite.lightningdb.UUIDFor",
             "kotlin.Char" -> "ComparableCondition" + "<${this.makeNotNullable().toKotlin(annotations)}>"
             "kotlin.collections.List" -> "ArrayCondition" + "<${
@@ -182,8 +231,9 @@ private val KSType.modificationType: String
             "kotlin.Float",
             "kotlin.Double" -> "NumberModification" + "<${this.makeNotNullable().toKotlin(annotations)}>"
             "java.util.UUID",
+            "com.lightningkite.UUID",
             "com.lightningkite.lightningdb.UUIDFor",
-            "java.time.Instant",
+            "kotlinx.datetime.Instant",
             "kotlin.String", "kotlin.Char" -> "ComparableModification" + "<${
                 this.makeNotNullable().toKotlin(annotations)
             }>"

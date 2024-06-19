@@ -1,6 +1,6 @@
 package com.lightningkite.lightningdb
 
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 fun <T> Modification<T>.simplify(): Modification<T> {
     return if (this is Modification.Chain) {
@@ -18,7 +18,7 @@ fun <T> Modification<T>.simplify(): Modification<T> {
         }
     } else if (this is Modification.OnField<*, *>) {
         Modification.OnField<T, Any?>(
-            key as KProperty1<T, Any?>,
+            key as SerializableProperty<T, Any?>,
             modification.simplify() as Modification<Any?>
         ) as Modification<T>
     } else this

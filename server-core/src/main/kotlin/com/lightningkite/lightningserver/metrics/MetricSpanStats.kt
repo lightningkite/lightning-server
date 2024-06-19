@@ -5,22 +5,22 @@ package com.lightningkite.lightningserver.metrics
 import com.lightningkite.lightningdb.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.time.Duration.Companion.minutes
 
-@DatabaseModel
-@IndexSetJankPatch(["type", "endpoint", "timeSpan", "timeStamp", ":", "timeSpan", "timeStamp"])
-//@IndexSet(["type", "endpoint", "timeSpan", "timeStamp"])
-//@IndexSet(["timeSpan", "timeStamp"])
+@GenerateDataClassPaths
+@IndexSet(["type", "endpoint", "timeSpan", "timeStamp"])
+@IndexSet(["timeSpan", "timeStamp"])
 @Serializable
 data class MetricSpanStats(
     override val _id: String,
     @Index val endpoint: String,
     @Index val type: String,
-    val timeStamp: Instant = Instant.EPOCH,
-    @Index val timeSpan: Duration = Duration.ofMinutes(1),
+    val timeStamp: Instant = Instant.DISTANT_PAST,
+    @Index val timeSpan: Duration = 1.minutes,
     val min: Double,
     val max: Double,
     val sum: Double,
@@ -42,8 +42,8 @@ fun MetricSpanStats.asModification(): Modification<MetricSpanStats> {
     return modification {
         it.min coerceAtMost this@asModification.min
         it.max coerceAtLeast this@asModification.max
-        it.sum + this@asModification.sum
-        it.count + this@asModification.count
+        it.sum += this@asModification.sum
+        it.count += this@asModification.count
     }
 }
 
@@ -51,7 +51,7 @@ fun List<MetricEvent>.stats(
     endpoint: String,
     type: String,
     timeStamp: Instant,
-    timeSpan: Duration = Duration.ofMinutes(1),
+    timeSpan: Duration = 1.minutes,
 ): MetricSpanStats {
     val sum = this.sumOf { it.value }
     return MetricSpanStats(
@@ -68,4 +68,4 @@ fun List<MetricEvent>.stats(
 }
 
 fun Instant.roundTo(span: Duration): Instant =
-    Instant.ofEpochMilli(this.toEpochMilli() / span.toMillis() * span.toMillis())
+    Instant.fromEpochMilliseconds(this.toEpochMilliseconds() / span.inWholeMilliseconds * span.inWholeMilliseconds)

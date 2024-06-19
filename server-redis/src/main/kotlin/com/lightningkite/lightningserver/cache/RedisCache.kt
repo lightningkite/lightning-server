@@ -9,7 +9,8 @@ import kotlinx.coroutines.reactive.awaitFirstOrNull
 import kotlinx.coroutines.reactive.collect
 import kotlinx.serialization.KSerializer
 import redis.embedded.RedisServer
-import java.time.Duration
+import kotlin.time.Duration
+import kotlin.time.toJavaDuration
 
 class RedisCache(val client: RedisClient) : Cache {
     companion object {
@@ -41,7 +42,8 @@ class RedisCache(val client: RedisClient) : Cache {
         connection.set(
             key,
             Serialization.Internal.json.encodeToString(serializer, value),
-            SetArgs().let { timeToLive?.toMillis()?.let { t -> it.ex(t) } ?: it }).collect {}
+            SetArgs().let { timeToLive?.inWholeMilliseconds?.let { t -> it.ex(t) } ?: it }
+        ).collect {}
     }
 
     override suspend fun <T> setIfNotExists(
@@ -51,7 +53,7 @@ class RedisCache(val client: RedisClient) : Cache {
         timeToLive: Duration?
     ): Boolean {
         val result = connection.setnx(key, Serialization.Internal.json.encodeToString(serializer, value)).awaitFirst()
-        if(result) timeToLive?.let { connection.getex(key, GetExArgs().ex(it)) }
+        if(result) timeToLive?.let { connection.getex(key, GetExArgs().ex(it.toJavaDuration())) }
         return result
     }
 
@@ -87,11 +89,7 @@ class RedisCache(val client: RedisClient) : Cache {
 
     override suspend fun add(key: String, value: Int, timeToLive: Duration?) {
         connection.incrby(key, value.toLong()).collect { }
-        timeToLive?.let { connection.getex(key, GetExArgs().ex(it)) }
-    }
-
-    override suspend fun clear() {
-        connection.flushdb().collect { }
+        timeToLive?.let { connection.getex(key, GetExArgs().ex(it.toJavaDuration())) }
     }
 
     override suspend fun remove(key: String) {

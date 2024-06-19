@@ -19,8 +19,8 @@ class TestMongoExceptions : MongoTest() {
 
         collection.insertOne(IndexingTestModel(email = "test@test.com", account = "asdf"))
 
-        assertFailsWith<BadRequestException> { collection.insertOne(IndexingTestModel(email = "test@test.com", account = "asdf"))!! }
-        assertFailsWith<BadRequestException> {
+        assertFailsWith<UniqueViolationException> { collection.insertOne(IndexingTestModel(email = "test@test.com", account = "asdf"))!! }
+        assertFailsWith<UniqueViolationException> {
             val item = collection.insertOne(IndexingTestModel(email = "test1@test.com", account = "asdf"))!!
             collection.updateOneById(item._id, modification { it.email assign "test@test.com" })
         }

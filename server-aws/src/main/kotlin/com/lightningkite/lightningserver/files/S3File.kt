@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.toKotlinInstant
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.model.*
 import java.io.File
@@ -13,9 +14,10 @@ import java.io.InputStream
 import java.math.BigInteger
 import java.net.URLDecoder
 import java.security.MessageDigest
-import java.time.Duration
+import kotlin.time.Duration
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import kotlin.time.toJavaDuration
 
 data class S3File(val system: S3FileSystem, val path: File) : FileObject {
     override fun resolve(path: String): FileObject = S3File(system, this.path.resolve(path))
@@ -36,7 +38,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
                     it.delimiter("/")
                     token?.let { t -> it.continuationToken(t) }
                 }.await()
-                results += r.contents().filter { !it.key().substringAfter(path.toString()).contains('/') }
+                results += r.contents().filter { !it.key().substringAfter(path.unixPath).contains('/') }
                     .map { S3File(system, File(it.key())) }
                 if (r.isTruncated) token = r.nextContinuationToken()
                 else break
@@ -51,10 +53,12 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         try {
             system.s3Async.headObject {
                 it.bucket(system.bucket)
-                it.key(path.toString())
+                it.key(path.unixPath)
             }.await().let {
                 FileInfo(
-                    type = ContentType(it.contentType()), size = it.contentLength(), lastModified = it.lastModified()
+                    type = ContentType(it.contentType()),
+                    size = it.contentLength(),
+                    lastModified = it.lastModified().toKotlinInstant()
                 )
             }
         } catch (e: NoSuchKeyException) {
@@ -62,6 +66,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         }
     }
 
+    @Deprecated("Use get instead", replaceWith = ReplaceWith("get().stream()"))
     override suspend fun read(): InputStream = withContext(Dispatchers.IO) {
         system.s3.getObject(
             GetObjectRequest.builder().also {
@@ -95,7 +100,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         return HttpContent.Stream(
             getStream = { s },
             length = s.response().contentLength(),
-            type = ContentType(s.response().contentType())
+            type = s.response().contentType()?.let(::ContentType) ?: ContentType.Application.OctetStream
         )
     }
 
@@ -109,47 +114,51 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
     }
 
     override fun checkSignature(queryParams: String): Boolean {
-        if (system.signedUrlExpirationSeconds != null) {
-            val headers = queryParams.split('&').associate {
-                URLDecoder.decode(it.substringBefore('='), Charsets.UTF_8) to URLDecoder.decode(
-                    it.substringAfter(
-                        '=', ""
-                    ), Charsets.UTF_8
-                )
+        if (system.signedUrlDuration != null) {
+            try {
+                val headers = queryParams.split('&').associate {
+                    URLDecoder.decode(it.substringBefore('='), Charsets.UTF_8) to URLDecoder.decode(
+                        it.substringAfter(
+                            '=', ""
+                        ), Charsets.UTF_8
+                    )
+                }
+                val accessKey = system.credentialProvider.resolveCredentials().accessKeyId()
+                val secretKey = system.credentialProvider.resolveCredentials().secretAccessKey()
+                val objectPath = path.unixPath
+                val date = headers["X-Amz-Date"] ?: return false
+                val algorithm = headers["X-Amz-Algorithm"] ?: return false
+                val expires = headers["X-Amz-Expires"] ?: return false
+                val credential = headers["X-Amz-Credential"] ?: return false
+                val scope = credential.substringAfter("/")
+
+                val canonicalRequest = """
+                GET
+                ${"/" + objectPath.removePrefix("/")}
+                ${queryParams.substringBefore("&X-Amz-Signature=").split('&').sorted().joinToString("&")}
+                host:${system.bucket}.s3.${system.region.id()}.amazonaws.com
+                
+                host
+                UNSIGNED-PAYLOAD
+                """.trimIndent()
+
+                val toSignString = """
+                $algorithm
+                $date
+                $scope
+                ${canonicalRequest.sha256()}
+                """.trimIndent()
+
+                val signingKey = "AWS4$secretKey".toByteArray().let { date.substringBefore('T').toByteArray().mac(it) }
+                    .let { system.region.id().toByteArray().mac(it) }.let { "s3".toByteArray().mac(it) }
+                    .let { "aws4_request".toByteArray().mac(it) }
+
+                val regeneratedSig = toSignString.toByteArray().mac(signingKey).toHex()
+
+                if (regeneratedSig == headers["X-Amz-Signature"]!!) return true
+            } catch (e: Exception) {
+                /* squish */
             }
-            val accessKey = system.credentialProvider.resolveCredentials().accessKeyId()
-            val secretKey = system.credentialProvider.resolveCredentials().secretAccessKey()
-            val objectPath = path.unixPath
-            val date = headers["X-Amz-Date"]!!
-            val algorithm = headers["X-Amz-Algorithm"]!!
-            val expires = headers["X-Amz-Expires"]!!
-            val credential = headers["X-Amz-Credential"]!!
-            val scope = credential.substringAfter("/")
-
-            val canonicalRequest = """
-        GET
-        ${"/" + objectPath.removePrefix("/")}
-        ${queryParams.substringBefore("&X-Amz-Signature=").split('&').sorted().joinToString("&")}
-        host:${system.bucket}.s3.${system.region.id()}.amazonaws.com
-        
-        host
-        UNSIGNED-PAYLOAD
-        """.trimIndent()
-
-            val toSignString = """
-        $algorithm
-        $date
-        $scope
-        ${canonicalRequest.sha256()}
-        """.trimIndent()
-
-            val signingKey = "AWS4$secretKey".toByteArray().let { date.substringBefore('T').toByteArray().mac(it) }
-                .let { system.region.id().toByteArray().mac(it) }.let { "s3".toByteArray().mac(it) }
-                .let { "aws4_request".toByteArray().mac(it) }
-
-            val regeneratedSig = toSignString.toByteArray().mac(signingKey).toHex()
-
-            if (regeneratedSig == headers["X-Amz-Signature"]!!) return true
             return super.checkSignature(queryParams)
         } else return true
     }
@@ -158,9 +167,9 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         get() = "https://${system.bucket}.s3.${system.region.id()}.amazonaws.com/${path.unixPath}"
 
     override val signedUrl: String
-        get() = system.signedUrlExpirationSeconds?.let { e ->
+        get() = system.signedUrlDuration?.let { e ->
             system.signer.presignGetObject {
-                it.signatureDuration(Duration.ofSeconds(e.toLong()))
+                it.signatureDuration(system.signedUrlDuration.toJavaDuration())
                 it.getObjectRequest {
                     it.bucket(system.bucket)
                     it.key(path.unixPath)
@@ -169,7 +178,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         } ?: url
 
     override fun uploadUrl(timeout: Duration): String = system.signer.presignPutObject {
-        it.signatureDuration(timeout)
+        it.signatureDuration(timeout.toJavaDuration())
         it.putObjectRequest {
             it.bucket(system.bucket)
             it.key(path.unixPath)

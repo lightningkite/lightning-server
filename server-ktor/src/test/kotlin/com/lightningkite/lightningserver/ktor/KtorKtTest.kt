@@ -16,6 +16,7 @@ import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.websocket.MultiplexWebSocketHandler
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import com.lightningkite.lightningserver.websocket.websocket
+import com.lightningkite.uuid
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.serialization.kotlinx.json.*
@@ -143,7 +144,7 @@ class KtorKtTest {
                     })
                 }
             }
-            val channel = UUID.randomUUID().toString()
+            val channel = uuid().toString()
             client.webSocket(multiplexSocket.toString()) {
                 send(
                     Serialization.json.encodeToString(

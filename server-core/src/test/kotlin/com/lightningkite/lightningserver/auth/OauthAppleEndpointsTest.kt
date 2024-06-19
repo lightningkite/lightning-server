@@ -1,6 +1,10 @@
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningserver.auth.oauth.OauthProviderCredentialsApple
 import com.lightningkite.lightningserver.bytes.toHexString
+import com.lightningkite.lightningserver.encryption.SecureHasher
+import com.lightningkite.lightningserver.encryption.fromSigned32
+import com.lightningkite.lightningserver.encryption.signed32
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,7 +15,7 @@ import kotlin.test.assertContentEquals
 class OauthAppleEndpointsTest {
     @Test
     fun testAppleLengthFail() {
-        val s = OauthAppleEndpoints.OauthAppleSettings(
+        val s = OauthProviderCredentialsApple(
             serviceId = "serviceId",
             teamId = "teamId",
             keyId = "keyId",

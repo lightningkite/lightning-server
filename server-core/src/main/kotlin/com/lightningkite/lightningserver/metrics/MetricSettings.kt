@@ -3,24 +3,21 @@
 package com.lightningkite.lightningserver.metrics
 
 import com.lightningkite.lightningdb.Database
+import com.lightningkite.lightningserver.db.DatabaseSettings
+import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import com.lightningkite.lightningserver.settings.Pluggable
 import com.lightningkite.lightningserver.settings.Settings
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.UseContextualSerialization
 import org.slf4j.LoggerFactory
-import java.time.Duration
+import kotlin.time.Duration
 
 @Serializable
 data class MetricSettings(
     val url: String = "none",
-    val trackingByEntryPoint: Set<String> = setOf("executionTime"),
-    val trackingTotalsOnly: Set<String> = setOf(),
-    val keepFor: Map<Duration, Duration> = mapOf(
-        Duration.ofDays(1) to Duration.ofDays(7),
-        Duration.ofHours(2) to Duration.ofDays(1),
-        Duration.ofMinutes(10) to Duration.ofHours(2),
-    )
+    val trackingByEntryPoint: Set<String> = setOf(Metrics.executionTime.name),
+    val trackingTotalsOnly: Set<String> = setOf()
 ) : () -> Metrics {
     @Transient
     val tracked = trackingTotalsOnly + trackingByEntryPoint
@@ -31,6 +28,8 @@ data class MetricSettings(
                 object : Metrics {
                     override val settings: MetricSettings = it
                     override suspend fun report(events: List<MetricEvent>) {}
+                    override suspend fun healthCheck(): HealthStatus =
+                        HealthStatus(HealthStatus.Level.OK, additionalMessage = "No metrics reporting")
                 }
             }
             register("log") {
@@ -42,10 +41,15 @@ data class MetricSettings(
                             logger.debug("Logging metric event $it")
                         }
                     }
+                    override suspend fun healthCheck(): HealthStatus =
+                        HealthStatus(HealthStatus.Level.OK, additionalMessage = "Metrics only recorded in log")
                 }
             }
             register("db") {
-                DatabaseMetrics(it) { Settings.requirements[it.url.substringAfter("://")]!!() as Database }
+                DatabaseMetrics(it) {
+                    (Settings.requirements[it.url.substringAfter("://")]?.invoke() as? Database)
+                        ?: DatabaseSettings(it.url.substringAfter("://")).invoke()
+                }
             }
         }
     }

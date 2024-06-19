@@ -8,7 +8,6 @@ import kotlinx.serialization.KSerializer
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-import kotlin.reflect.KProperty1
 
 /**
  * A FieldCollection who's underlying implementation is actually manipulating a MutableList.
@@ -16,9 +15,8 @@ import kotlin.reflect.KProperty1
  */
 open class InMemoryFieldCollection<Model : Any>(
     val data: MutableList<Model> = ArrayList(),
-    val serializer: KSerializer<Model>
-) :
-    AbstractSignalFieldCollection<Model>() {
+    override val serializer: KSerializer<Model>
+) : FieldCollection<Model> {
 
     private val lock = ReentrantLock()
 
@@ -28,10 +26,9 @@ open class InMemoryFieldCollection<Model : Any>(
     private fun uniqueCheck(changes: List<EntryChange<Model>>) = uniqueIndexChecks.forEach { it(changes) }
 
     init {
-        serializer.descriptor.indexes().forEach { index: NeededIndex ->
+        serializer.descriptor.indexes().plus(NeededIndex(fields = listOf("_id"), true, "primary key")).forEach { index: NeededIndex ->
             if (index.unique) {
-                val fields =
-                    serializer.attemptGrabFields().filterKeys { index.fields.contains(it) }.values.map { it.property }
+                val fields = serializer.serializableProperties!!.filter { index.fields.contains(it.name) }
                 uniqueIndexChecks.add { changes: List<EntryChange<Model>> ->
                     val fieldChanges = changes.mapNotNull { entryChange ->
                         if (
@@ -45,8 +42,12 @@ open class InMemoryFieldCollection<Model : Any>(
                             null
                     }
                     fieldChanges.forEach { fieldValues ->
-                        if (data.any { fromDb -> fieldValues.all { (property, value) -> property.get(fromDb) == value } }) {
-                            throw BadRequestException("Unique Index Violation. The following fields are already in the database: ${fieldValues.joinToString { (property, value) -> "${property.name}: $value" }}")
+                        if (data.any { fromDb ->
+                                fieldValues.all { (property, value) ->
+                                    property.get(fromDb) == value
+                                }
+                            }) {
+                            throw UniqueViolationException(collection = serializer.descriptor.serialName, key = fields.joinToString { it.name }, cause = IllegalStateException())
                         }
                     }
                 }
@@ -81,33 +82,37 @@ open class InMemoryFieldCollection<Model : Any>(
 
     override suspend fun count(condition: Condition<Model>): Int = data.count { condition(it) }
 
+    @Suppress("UNCHECKED_CAST")
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
-        groupBy: KProperty1<Model, Key>,
-    ): Map<Key, Int> = data.groupingBy { groupBy.get(it) }.eachCount()
+        groupBy: DataClassPath<Model, Key>,
+    ): Map<Key, Int> =
+        data.filter { condition(it) }.groupingBy { groupBy.get(it) }.eachCount().minus(null) as Map<Key, Int>
 
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        property: KProperty1<Model, N>,
+        property: DataClassPath<Model, N>,
     ): Double? =
         data.asSequence().filter { condition(it) }.mapNotNull { property.get(it)?.toDouble() }.aggregate(aggregate)
 
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        groupBy: KProperty1<Model, Key>,
-        property: KProperty1<Model, N>,
+        groupBy: DataClassPath<Model, Key>,
+        property: DataClassPath<Model, N>,
     ): Map<Key, Double?> = data.asSequence().filter { condition(it) }
-        .mapNotNull { groupBy.get(it) to (property.get(it)?.toDouble() ?: return@mapNotNull null) }.aggregate(aggregate)
+        .mapNotNull {
+            (groupBy.get(it) ?: return@mapNotNull null) to (property.get(it)?.toDouble() ?: return@mapNotNull null)
+        }.aggregate(aggregate)
 
-    override suspend fun insertImpl(models: Iterable<Model>): List<Model> = lock.withLock {
+    override suspend fun insert(models: Iterable<Model>): List<Model> = lock.withLock {
         uniqueCheck(models.map { EntryChange(null, it) })
         data.addAll(models)
         return models.toList()
     }
 
-    override suspend fun replaceOneImpl(
+    override suspend fun replaceOne(
         condition: Condition<Model>,
         model: Model,
         orderBy: List<SortPart<Model>>,
@@ -132,7 +137,7 @@ open class InMemoryFieldCollection<Model : Any>(
         }
     }
 
-    override suspend fun upsertOneImpl(
+    override suspend fun upsertOne(
         condition: Condition<Model>,
         modification: Modification<Model>,
         model: Model,
@@ -151,7 +156,7 @@ open class InMemoryFieldCollection<Model : Any>(
         return EntryChange(null, model)
     }
 
-    override suspend fun updateOneImpl(
+    override suspend fun updateOne(
         condition: Condition<Model>,
         modification: Modification<Model>,
         orderBy: List<SortPart<Model>>,
@@ -169,7 +174,7 @@ open class InMemoryFieldCollection<Model : Any>(
         return EntryChange(null, null)
     }
 
-    override suspend fun updateManyImpl(
+    override suspend fun updateMany(
         condition: Condition<Model>,
         modification: Modification<Model>,
     ): CollectionChanges<Model> = lock.withLock {
@@ -189,7 +194,7 @@ open class InMemoryFieldCollection<Model : Any>(
             }
     }
 
-    override suspend fun deleteOneImpl(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? =
+    override suspend fun deleteOne(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? =
         lock.withLock {
             for (it in sortIndices(orderBy)) {
                 val old = data[it]
@@ -201,7 +206,7 @@ open class InMemoryFieldCollection<Model : Any>(
             return null
         }
 
-    override suspend fun deleteManyImpl(condition: Condition<Model>): List<Model> = lock.withLock {
+    override suspend fun deleteMany(condition: Condition<Model>): List<Model> = lock.withLock {
         val removed = ArrayList<Model>()
         data.removeAll {
             if (condition(it)) {
@@ -214,7 +219,7 @@ open class InMemoryFieldCollection<Model : Any>(
         return removed
     }
 
-    override suspend fun replaceOneIgnoringResultImpl(
+    override suspend fun replaceOneIgnoringResult(
         condition: Condition<Model>,
         model: Model,
         orderBy: List<SortPart<Model>>,
@@ -224,29 +229,29 @@ open class InMemoryFieldCollection<Model : Any>(
         orderBy
     ).new != null
 
-    override suspend fun upsertOneIgnoringResultImpl(
+    override suspend fun upsertOneIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>,
         model: Model,
     ): Boolean = upsertOne(condition, modification, model).old != null
 
-    override suspend fun updateOneIgnoringResultImpl(
+    override suspend fun updateOneIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>,
         orderBy: List<SortPart<Model>>,
     ): Boolean = updateOne(condition, modification, orderBy).new != null
 
-    override suspend fun updateManyIgnoringResultImpl(
+    override suspend fun updateManyIgnoringResult(
         condition: Condition<Model>,
         modification: Modification<Model>,
     ): Int = updateMany(condition, modification).changes.size
 
-    override suspend fun deleteOneIgnoringOldImpl(
+    override suspend fun deleteOneIgnoringOld(
         condition: Condition<Model>,
         orderBy: List<SortPart<Model>>,
     ): Boolean = deleteOne(condition, orderBy) != null
 
-    override suspend fun deleteManyIgnoringOldImpl(condition: Condition<Model>): Int = deleteMany(condition).size
+    override suspend fun deleteManyIgnoringOld(condition: Condition<Model>): Int = deleteMany(condition).size
 
     fun drop() {
         data.clear()

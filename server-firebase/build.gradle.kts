@@ -4,21 +4,17 @@ import com.lightningkite.deployhelpers.mit
 import com.lightningkite.deployhelpers.standardPublishing
 
 plugins {
-    kotlin("jvm")
-    id("com.google.devtools.ksp")
-    kotlin("plugin.serialization")
-    id("org.jetbrains.dokka")
+    alias(serverlibs.plugins.kotlinJvm)
+    alias(serverlibs.plugins.ksp)
+    alias(serverlibs.plugins.serialization)
+    alias(serverlibs.plugins.dokka)
     id("signing")
     `maven-publish`
 }
 
-val kotlinVersion: String by project
-val khrysalisVersion: String by project
 dependencies {
     api(project(":server-core"))
-
-    api("com.google.firebase:firebase-admin:9.1.1")
-
+    api(serverlibs.firebaseAdmin)
     ksp(project(":processor"))
     kspTest(project(":processor"))
 }
@@ -35,15 +31,20 @@ kotlin {
         kotlin.srcDir("build/generated/ksp/test/kotlin")
     }
 }
+
+tasks.withType<JavaCompile>().configureEach {
+    this.targetCompatibility = "11"
+}
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlinx.serialization.ExperimentalSerializationApi"
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
+    kotlinOptions.jvmTarget = JavaVersion.VERSION_11.toString()
 }
 
 
 standardPublishing {
     name.set("Lightning-server-Server")
-    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
+    description.set("An implementation of LightningServer Notifications using FCM.")
     github("lightningkite", "lightning-server")
 
     licenses {
@@ -63,3 +64,4 @@ standardPublishing {
         )
     }
 }
+tasks.getByName("sourceJar").dependsOn("kspKotlin")

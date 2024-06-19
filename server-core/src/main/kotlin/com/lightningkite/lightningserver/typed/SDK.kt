@@ -2,6 +2,8 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.listElement
 import com.lightningkite.lightningdb.mapValueElement
+import com.lightningkite.lightningdb.tryTypeParameterSerializers2
+import com.lightningkite.lightningserver.auth.AuthType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.http.HttpMethod
@@ -40,16 +42,16 @@ fun Documentable.Companion.kotlinSdkLocal(packageName: String, root: File = File
 }
 
 fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(packageName).apply {
-    imports.add("io.reactivex.rxjava3.core.Single")
-    imports.add("io.reactivex.rxjava3.core.Observable")
-    imports.add("com.lightningkite.rx.okhttp.*")
+    imports.add("com.lightningkite.*")
+    imports.add("com.lightningkite.kiteui.*")
     imports.add("com.lightningkite.lightningdb.*")
-    imports.add("com.lightningkite.lightningdb.live.*")
-    imports.add("java.util.UUID")
-    imports.add("java.util.Optional")
-    imports.add("java.time.*")
+    imports.add("com.lightningkite.lightningserver.db.*")
+    imports.add("kotlinx.datetime.*")
+    imports.add("com.lightningkite.lightningserver.auth.oauth.*")
+    imports.add("com.lightningkite.lightningserver.auth.proof.*")
+    imports.add("com.lightningkite.lightningserver.auth.subject.*")
     val byGroup = safeDocumentables
-        .distinctBy { it.docGroup.toString() + "/" + it.summary }.groupBy { it.docGroup }
+        .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }.groupBy { it.docGroupIdentifier }
     val groups = byGroup.keys.filterNotNull()
     appendLine("interface Api {")
     for (group in groups) {
@@ -74,21 +76,27 @@ fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(
 }.toString()
 
 fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmitter(packageName).apply {
-    imports.add("io.reactivex.rxjava3.core.Single")
-    imports.add("io.reactivex.rxjava3.core.Observable")
-    imports.add("com.lightningkite.rx.okhttp.*")
+    imports.add("com.lightningkite.*")
+    imports.add("com.lightningkite.kiteui.*")
     imports.add("com.lightningkite.lightningdb.*")
-    imports.add("com.lightningkite.lightningdb.live.*")
-    imports.add("java.util.UUID")
-    imports.add("java.util.Optional")
-    imports.add("java.time.*")
+    imports.add("com.lightningkite.lightningserver.db.*")
+    imports.add("kotlinx.datetime.*")
     run {
         val sessionClassName = "AbstractAnonymousSession"
         val byGroup = safeDocumentables
-            .distinctBy { it.docGroup.toString() + "/" + it.summary }.groupBy { it.docGroup }
-            .mapValues { it.value.filter { !it.authInfo.required || it.authInfo.type == null } }
+            .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }.groupBy { it.docGroupIdentifier }
+            .mapValues { it.value.filter { !it.authOptions.options.contains(null).not() } }
         val groups = byGroup.keys.filterNotNull()
-        appendLine("open class $sessionClassName(val api: Api) {")
+        append("open class $sessionClassName(val api: Api)")
+        byGroup[null]!!.mapNotNull { it.belongsToInterface }.distinct().let {
+            if(it.isNotEmpty()) {
+                append(": ")
+                append(it.joinToString {
+                    it.name + (it.subtypes.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.kotlinTypeString(this) } ?: "")
+                })
+            }
+        }
+        appendLine(" {")
         for (group in groups) {
             appendLine("    val ${group.groupToPartName()}: $sessionClassName${group.groupToInterfaceName()} = $sessionClassName${group.groupToInterfaceName()}(api.${group.groupToPartName()})")
         }
@@ -100,7 +108,16 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
             appendLine()
         }
         for (group in groups) {
-            appendLine("    open class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()}) {")
+            append("    open class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()})")
+            byGroup[group]!!.mapNotNull { it.belongsToInterface }.distinct().let {
+                if(it.isNotEmpty()) {
+                    append(": ")
+                    append(it.joinToString {
+                        it.name + (it.subtypes.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.kotlinTypeString(this) } ?: "")
+                    })
+                }
+            }
+            appendLine(" {")
             for (entry in byGroup[group]!!) {
                 append("        ")
                 this.functionHeader(entry, skipAuth = true)
@@ -113,33 +130,52 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
         appendLine("}")
         appendLine()
     }
-    val userTypes = safeDocumentables.groupBy { it.authInfo.type }.keys.filterNotNull()
+    val userTypes = safeDocumentables.groupBy { it.primaryAuthName }.keys.filterNotNull()
     userTypes.forEach { userType ->
         val byGroup = safeDocumentables
-            .distinctBy { it.docGroup.toString() + "/" + it.summary }.groupBy { it.docGroup }
-            .mapValues { it.value.filter { !it.authInfo.required || it.authInfo.type == null || it.authInfo.type == userType } }
+            .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }.groupBy { it.docGroupIdentifier }
+            .mapValues { it.value.filter { !it.authOptions.options.contains(null).not() || it.primaryAuthName == null || it.primaryAuthName == userType } }
         val groups = byGroup.keys.filterNotNull()
         val sessionClassName = "${userType.substringAfterLast('.')}Session"
-        appendLine("abstract class Abstract$sessionClassName(api: Api, ${userType.userTypeTokenName()}: String) {")
+        append("abstract class Abstract$sessionClassName(api: Api, ${userType.userTypeTokenName()}: String, ${userType.userTypeAccessTokenName()}: suspend () -> String)")
+        byGroup[null]!!.mapNotNull { it.belongsToInterface }.distinct().let {
+            if(it.isNotEmpty()) {
+                append(": ")
+                append(it.joinToString {
+                    it.name + (it.subtypes.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.kotlinTypeString(this) } ?: "")
+                })
+            }
+        }
+        appendLine(" {")
         appendLine("    abstract val api: Api")
         appendLine("    abstract val ${userType.userTypeTokenName()}: String")
+        appendLine("    abstract val ${userType.userTypeAccessTokenName()}: suspend () -> String")
         for (group in groups) {
-            appendLine("    val ${group.groupToPartName()}: $sessionClassName${group.groupToInterfaceName()} = $sessionClassName${group.groupToInterfaceName()}(api.${group.groupToPartName()}, ${userType.userTypeTokenName()})")
+            appendLine("    val ${group.groupToPartName()}: $sessionClassName${group.groupToInterfaceName()} = $sessionClassName${group.groupToInterfaceName()}(api.${group.groupToPartName()}, ${userType.userTypeTokenName()}, ${userType.userTypeAccessTokenName()})")
         }
         for (entry in byGroup[null] ?: listOf()) {
             append("    ")
-            this.functionHeader(entry, skipAuth = entry.authInfo.type == userType)
+            this.functionHeader(entry, skipAuth = entry.primaryAuthName == userType)
             append(" = api.")
-            functionCall(entry, skipAuth = false, nullAuth = entry.authInfo.type != userType)
+            functionCall(entry, skipAuth = false, nullAuth = entry.primaryAuthName != userType)
             appendLine()
         }
         for (group in groups) {
-            appendLine("    class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()}, val ${userType.userTypeTokenName()}: String) {")
+            append("    class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()},val ${userType.userTypeTokenName()}:String, val ${userType.userTypeAccessTokenName()}: suspend () -> String)")
+            byGroup[group]!!.mapNotNull { it.belongsToInterface }.distinct().let {
+                if(it.isNotEmpty()) {
+                    append(": ")
+                    append(it.joinToString {
+                        it.name + (it.subtypes.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.kotlinTypeString(this) } ?: "")
+                    })
+                }
+            }
+            appendLine(" {")
             for (entry in byGroup[group]!!) {
                 append("        ")
-                this.functionHeader(entry, skipAuth = entry.authInfo.type == userType)
+                this.functionHeader(entry, skipAuth = entry.primaryAuthName == userType)
                 append(" = api.")
-                functionCall(entry, skipAuth = false, nullAuth = entry.authInfo.type != userType)
+                functionCall(entry, skipAuth = false, nullAuth = entry.primaryAuthName != userType)
                 appendLine()
             }
             appendLine("    }")
@@ -150,17 +186,11 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
 }.toString()
 
 fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmitter(packageName).apply {
-    imports.add("io.reactivex.rxjava3.core.Single")
-    imports.add("io.reactivex.rxjava3.core.Observable")
-    imports.add("com.lightningkite.rx.android.resources.ImageReference")
-    imports.add("com.lightningkite.rx.kotlin")
-    imports.add("com.lightningkite.rx.okhttp.*")
+    imports.add("com.lightningkite.*")
     imports.add("com.lightningkite.lightningdb.*")
-    imports.add("com.lightningkite.lightningdb.live.*")
-    imports.add("java.util.UUID")
-    imports.add("java.util.Optional")
-    imports.add("java.time.*")
-    val byGroup = safeDocumentables.groupBy { it.docGroup }
+    imports.add("com.lightningkite.kiteui.*")
+    imports.add("kotlinx.datetime.*")
+    val byGroup = safeDocumentables.groupBy { it.docGroupIdentifier }
     val groups = byGroup.keys.filterNotNull()
     appendLine("class LiveApi(val httpUrl: String, val socketUrl: String): Api {")
     for (group in groups) {
@@ -170,36 +200,28 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
         append("    override ")
         this.functionHeader(entry)
         when (entry) {
-            is ApiEndpoint<*, *, *> -> {
-                appendLine(" = HttpClient.call(")
-                appendLine("        url = \"\$httpUrl${entry.route.path.escaped}\",")
-                appendLine("        method = HttpClient.${entry.route.method},")
-                entry.authInfo.type?.let {
-                    if (entry.authInfo.required) {
-                        appendLine("        headers = mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
-                    } else {
-                        appendLine("        headers = if(${it.userTypeTokenName()} != null) mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\") else mapOf(),")
-                    }
+            is ApiEndpoint<*, *, *, *> -> {
+                appendLine(" = fetch(")
+                appendLine("        url = \"\$httpUrl${entry.path.path.escaped}\",")
+                appendLine("        method = HttpMethod.${entry.route.method},")
+                entry.primaryAuthName?.let {
+                    appendLine("            token = ${it.userTypeAccessTokenName()},")
                 }
                 entry.inputType.takeUnless { it == Unit.serializer() }?.let {
-                    appendLine("        body = input.toJsonRequestBody()")
+                    appendLine("        body = input")
                 }
-                entry.outputType.takeUnless { it == Unit.serializer() }?.let {
-                    appendLine("    ).readJson()")
-                } ?: run {
-                    appendLine("    ).discard()")
-                }
+                appendLine("    )")
             }
 
-            is ApiWebsocket<*, *, *> -> {
+            is ApiWebsocket<*, *, *, *> -> {
                 appendLine(" = multiplexedSocket(")
-                appendLine("        url = \"\$socketUrl?path=multiplex\", ")
-                appendLine("        path = \"${entry.path}\", ")
-                entry.authInfo.type?.let {
-                    if (entry.authInfo.required) {
-                        appendLine("        queryParams = mapOf(\"jwt\" to listOf(${it.userTypeTokenName()}))")
+                appendLine("        socketUrl = socketUrl, ")
+                appendLine("        path = \"${entry.path.path.escaped}\", ")
+                entry.primaryAuthName?.let {
+                    if (entry.authOptions.options.contains(null).not()) {
+                        appendLine("        queryParams = httpHeaders(\"jwt\" to listOf(${it.userTypeTokenName()}))")
                     } else {
-                        appendLine("        queryParams = if(${it.userTypeTokenName()} != null) mapOf(\"jwt\" to listOf(${it.userTypeTokenName()})) else mapOf()")
+                        appendLine("        queryParams = if(${it.userTypeTokenName()} != null) httpHeaders(\"jwt\" to listOf(${it.userTypeTokenName()})) else httpHeaders()")
                     }
                 }
                 appendLine("    )")
@@ -212,37 +234,25 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
             append("        override ")
             this.functionHeader(entry)
             when (entry) {
-                is ApiEndpoint<*, *, *> -> {
-                    appendLine(" = HttpClient.call(")
-                    appendLine("            url = \"\$httpUrl${entry.route.path.escaped}\",")
-                    appendLine("            method = HttpClient.${entry.route.method},")
-                    entry.authInfo.type?.let {
-                        if (entry.authInfo.required) {
-                            appendLine("            headers = mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\"),")
-                        } else {
-                            appendLine("            headers = if(${it.userTypeTokenName()} != null) mapOf(\"Authorization\" to \"Bearer \$${it.userTypeTokenName()}\") else mapOf(),")
-                        }
+                is ApiEndpoint<*, *, *, *> -> {
+                    appendLine(" = fetch(")
+                    appendLine("            url = \"\$httpUrl${entry.path.path.escaped}\",")
+                    appendLine("            method = HttpMethod.${entry.route.method},")
+                    entry.primaryAuthName?.let {
+                        appendLine("            token = ${it.userTypeAccessTokenName()},")
                     }
                     entry.inputType.takeUnless { it == Unit.serializer() }?.let {
-                        appendLine("            body = input.toJsonRequestBody()")
+                        appendLine("            body = input")
                     }
-                    entry.outputType.takeUnless { it == Unit.serializer() }?.let {
-                        appendLine("        ).readJson()")
-                    } ?: run {
-                        appendLine("        ).discard()")
-                    }
+                    appendLine("        )")
                 }
 
-                is ApiWebsocket<*, *, *> -> {
+                is ApiWebsocket<*, *, *, *> -> {
                     appendLine(" = multiplexedSocket(")
-                    appendLine("            url = \"\$socketUrl?path=multiplex\", ")
-                    appendLine("            path = \"${entry.path}\", ")
-                    entry.authInfo.type?.let {
-                        if (entry.authInfo.required) {
-                            appendLine("            queryParams = mapOf(\"jwt\" to listOf(${it.userTypeTokenName()}))")
-                        } else {
-                            appendLine("            queryParams = if(${it.userTypeTokenName()} != null) mapOf(\"jwt\" to listOf(${it.userTypeTokenName()})) else mapOf()")
-                        }
+                    appendLine("            socketUrl = socketUrl, ")
+                    appendLine("            path = \"${entry.path.path.escaped}\", ")
+                    entry.primaryAuthName?.let {
+                        appendLine("            token = ${it.userTypeTokenName()},")
                     }
                     appendLine("        )")
                 }
@@ -255,9 +265,9 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
 }.toString()
 
 private val Documentable.Companion.safeDocumentables
-    get() = (Http.endpoints.values.filterIsInstance<ApiEndpoint<*, *, *>>()
-        .filter { it.route.method != HttpMethod.GET || it.inputType == Unit.serializer() } + WebSockets.handlers.values.filterIsInstance<ApiWebsocket<*, *, *>>())
-        .distinctBy { it.docGroup.toString() + "/" + it.summary }
+    get() = (Http.endpoints.values.filterIsInstance<ApiEndpoint<*, *, *, *>>()
+        .filter { it.route.method != HttpMethod.GET || it.inputType == Unit.serializer() } + WebSockets.handlers.values.filterIsInstance<ApiWebsocket<*, *, *, *>>())
+        .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }
 
 private class CodeEmitter(val packageName: String, val body: StringBuilder = StringBuilder()) : Appendable by body {
     val imports = mutableSetOf<String>("com.lightningkite.khrysalis.SharedCode")
@@ -294,6 +304,8 @@ private fun String.groupToInterfaceName(): String = replaceFirstChar { it.upperc
 private fun String.groupToPartName(): String = replaceFirstChar { it.lowercase() }
 private fun String.userTypeTokenName(): String =
     this.substringAfterLast('.').replaceFirstChar { it.lowercase() }.plus("Token")
+private fun String.userTypeAccessTokenName(): String =
+    this.substringAfterLast('.').replaceFirstChar { it.lowercase() }.plus("AccessToken")
 
 private fun KSerializer<*>.kotlinTypeString(emitter: CodeEmitter): String {
     return when {
@@ -307,13 +319,15 @@ private fun KSerializer<*>.kotlinTypeString(emitter: CodeEmitter): String {
             descriptor.serialName.substringBefore('<').removeSuffix("?").takeIf { it.contains('.') }
                 ?.let { emitter.imports.add(it) }
             descriptor.serialName.substringBefore('<')
-                .substringAfterLast('.') + (subSerializers().takeUnless { it.isEmpty() }
+                .substringAfterLast('.') + (tryTypeParameterSerializers2()?.takeUnless { it.isEmpty() }
                 ?.joinToString(", ", "<", ">") { it.kotlinTypeString(emitter) } ?: "")
         }
     }
 }
 
 private fun CodeEmitter.functionHeader(documentable: Documentable, skipAuth: Boolean = false) {
+    if(skipAuth && documentable.belongsToInterface != null) { append("override ")}
+    append("suspend ")
     append("fun ${documentable.functionName}(")
     var argComma = false
     arguments(documentable, skipAuth).forEach {
@@ -325,22 +339,16 @@ private fun CodeEmitter.functionHeader(documentable: Documentable, skipAuth: Boo
     }
     append("): ")
     when (documentable) {
-        is ApiEndpoint<*, *, *> -> {
-            append("Single<")
-            append(documentable.outputType.kotlinTypeString(this).let {
-                if (it.endsWith("?"))
-                    "Optional<${it.removeSuffix("?")}>"
-                else it
-            })
-            append(">")
+        is ApiEndpoint<*, *, *, *> -> {
+            append(documentable.outputType.kotlinTypeString(this))
         }
 
-        is ApiWebsocket<*, *, *> -> {
-            append("Observable<WebSocketIsh<")
-            append(documentable.outputType.kotlinTypeString(this))
-            append(", ")
+        is ApiWebsocket<*, *, *, *> -> {
+            append("TypedWebSocket<")
             append(documentable.inputType.kotlinTypeString(this))
-            append(">>")
+            append(", ")
+            append(documentable.outputType.kotlinTypeString(this))
+            append(">")
         }
 
         else -> TODO()
@@ -370,29 +378,29 @@ private data class Arg(
 )
 
 private fun arguments(documentable: Documentable, skipAuth: Boolean = false): List<Arg> = when (documentable) {
-    is ApiEndpoint<*, *, *> -> listOfNotNull(
-        documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
-            .map {
-                Arg(name = it.name, type = documentable.routeTypes[it.name], stringType = "String")
+    is ApiEndpoint<*, *, *, *> -> listOfNotNull(
+        documentable.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
+            .mapIndexed { index, it ->
+                Arg(name = it.name, type = documentable.path.serializers[index], stringType = "String")
             },
         documentable.inputType.takeUnless { it == Unit.serializer() }?.let {
             Arg(name = "input", type = it)
         }?.let(::listOf),
-        documentable.authInfo.type?.takeUnless { skipAuth }?.let {
-            if (documentable.authInfo.required)
-                Arg(name = it.userTypeTokenName(), stringType = "String", isAuth = true)
+        documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
+            if (documentable.authOptions.options.contains(null).not())
+                Arg(name = it.userTypeAccessTokenName(), stringType = "suspend () -> String", isAuth = true)
             else
-                Arg(name = it.userTypeTokenName(), stringType = "String?", default = "null", isAuth = true)
+                Arg(name = it.userTypeAccessTokenName(), stringType = "(suspend () -> String)?", default = "null", isAuth = true)
         }?.let(::listOf),
     ).flatten()
 
-    is ApiWebsocket<*, *, *> -> listOfNotNull(
-        documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
+    is ApiWebsocket<*, *, *, *> -> listOfNotNull(
+        documentable.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {
                 Arg(name = it.name, stringType = "String")
             },
-        documentable.authInfo.type?.takeUnless { skipAuth }?.let {
-            if (documentable.authInfo.required)
+        documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
+            if (documentable.authOptions.options.contains(null).not())
                 Arg(name = it.userTypeTokenName(), stringType = "String", isAuth = true)
             else
                 Arg(name = it.userTypeTokenName(), stringType = "String?", default = "null", isAuth = true)
@@ -402,11 +410,12 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false): Li
     else -> TODO()
 }
 
-internal val ServerPath.escaped: String
+
+private val ServerPath.escaped: String
     get() = "/" + segments.joinToString("/") {
         when (it) {
             is ServerPath.Segment.Constant -> it.value
-            is ServerPath.Segment.Wildcard -> "\${${it.name}}"
+            is ServerPath.Segment.Wildcard -> "\${${it.name}.urlify()}"
         }
     } + when (after) {
         ServerPath.Afterwards.None -> ""

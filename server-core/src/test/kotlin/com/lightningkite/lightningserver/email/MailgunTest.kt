@@ -16,7 +16,7 @@ class MailgunTest {
         println((client as MailgunEmailClient).key)
         println((client as MailgunEmailClient).domain)
         runBlocking {
-            client.send("Test Email", listOf("joseph@lightningkite.com"), "Test Message")
+            client.send(Email("Test", to = listOf(EmailLabeledValue("joseph@lightningkite.com")), plainText = "Test Message"))
         }
     }
 }

@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.cache
 
 import com.lightningkite.lightningserver.logger
 import kotlinx.serialization.KSerializer
-import java.time.Duration
+import kotlin.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -10,20 +10,16 @@ import java.util.concurrent.ConcurrentHashMap
  * This is NOT meant for persistent or long term storage. This cache will be completely erased everytime the application is stopped.
  * This is useful in places that persistent data is not needed and speed is desired such as Unit Tests
  */
-object LocalCache : Cache {
+open class LocalCache(val entries: ConcurrentHashMap<String, Entry> = ConcurrentHashMap()) : Cache {
+    companion object: LocalCache()
     data class Entry(val value: Any?, val expires: Long? = null)
-
-    val entries by lazy {
-        logger.warn("WARNING: Using local cache.  You should NEVER see this in production or serverless.")
-        ConcurrentHashMap<String, Entry>()
-    }
 
     @Suppress("UNCHECKED_CAST")
     override suspend fun <T> get(key: String, serializer: KSerializer<T>): T? =
         entries[key]?.takeIf { it.expires == null || it.expires > System.currentTimeMillis() }?.value as? T
 
     override suspend fun <T> set(key: String, value: T, serializer: KSerializer<T>, timeToLive: Duration?) {
-        entries[key] = Entry(value, timeToLive?.toMillis()?.let { System.currentTimeMillis() + it })
+        entries[key] = Entry(value, timeToLive?.inWholeMilliseconds?.let { System.currentTimeMillis() + it })
     }
 
     override suspend fun <T> setIfNotExists(
@@ -33,7 +29,7 @@ object LocalCache : Cache {
         timeToLive: Duration?
     ): Boolean {
         if (entries[key] == null) {
-            entries[key] = Entry(value, timeToLive?.toMillis()?.let { System.currentTimeMillis() + it })
+            entries[key] = Entry(value, timeToLive?.inWholeMilliseconds?.let { System.currentTimeMillis() + it })
             return true
         }
         return false
@@ -51,11 +47,7 @@ object LocalCache : Cache {
             is Double -> (current + value)
             else -> value
         }
-        entries[key] = Entry(new, timeToLive?.toMillis()?.let { System.currentTimeMillis() + it })
-    }
-
-    override suspend fun clear() {
-        entries.clear()
+        entries[key] = Entry(new, timeToLive?.inWholeMilliseconds?.let { System.currentTimeMillis() + it })
     }
 
     override suspend fun remove(key: String) {

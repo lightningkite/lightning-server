@@ -2,10 +2,10 @@ package com.lightningkite.lightningserver.serialization
 
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
-import com.github.jershell.kbson.Configuration
-import com.github.jershell.kbson.KBson
-import com.lightningkite.lightningdb.ClientModule
+import com.github.jershell.kbson.*
+import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.SetOnce
+import com.lightningkite.lightningserver.StringArrayFormat
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
 import com.lightningkite.lightningserver.http.HttpContent
@@ -14,7 +14,6 @@ import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.cbor.Cbor
-import kotlinx.serialization.csv.Csv
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.getContextualDescriptor
@@ -26,6 +25,10 @@ import kotlinx.serialization.properties.Properties
 import nl.adaptivity.xmlutil.XmlDeclMode
 import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
 import nl.adaptivity.xmlutil.serialization.XML
+import java.math.BigDecimal
+import kotlinx.datetime.*
+import java.util.*
+import kotlin.collections.HashMap
 
 /**
  * A place to hold all the support Serialization types.
@@ -58,19 +61,14 @@ abstract class Serialization {
             encodeDefaults = false
         }
     }
-    var csv: Csv by SetOnce {
-        Csv {
-            hasHeaderRecord = true
-            ignoreUnknownColumns = true
-            serializersModule = module
-            trimUnquotedWhitespace = true
-        }
+    var csv: CsvFormat by SetOnce {
+        CsvFormat(StringDeferringConfig(module, deferredFormat = json))
     }
     val yaml: Yaml by SetOnce {
         Yaml(module, YamlConfiguration(encodeDefaults = false, strictMode = false))
     }
     var bson: KBson by SetOnce {
-        KBson(module, Configuration())
+        KBson(module.overwriteWith(BsonOverrides), Configuration())
     }
     var xml: XML by SetOnce {
         XML(module) {
@@ -89,10 +87,19 @@ abstract class Serialization {
         }
     }
     var javaData: JavaData by SetOnce {
-        JavaData(module)
+        JavaData(module.overwriteWith(SerializersModule {
+            contextual(UUID::class, UUIDPartsSerializer)
+            contextual(Instant::class, InstantLongSerializer)
+        }))
+    }
+    var stringArray: StringArrayFormat by SetOnce {
+        StringArrayFormat(module)
     }
     var properties: Properties by SetOnce {
         Properties(module)
+    }
+    var formData: FormDataFormat by SetOnce {
+        FormDataFormat(StringDeferringConfig(module, deferredFormat = json))
     }
 
     interface HttpContentParser {
@@ -137,21 +144,18 @@ abstract class Serialization {
         }
     }
 
-    @kotlinx.serialization.Serializable
-    data class IdHolder<ID>(val id: ID)
-
     fun <T> toString(value: T, serializer: KSerializer<T>): String {
-        return Serialization.properties.encodeToStringMap(IdHolder.serializer(serializer), IdHolder(value))["id"]!!
+        return Serialization.stringArray.encodeToString(serializer, value)
     }
 
     fun <T> fromString(string: String, serializer: KSerializer<T>): T {
-        return Serialization.properties.decodeFromStringMap(IdHolder.serializer(serializer), mapOf("id" to string)).id
+        return Serialization.stringArray.decodeFromString(serializer, string)
     }
 
     init {
-        handler(FormDataHandler { properties })
+        handler(FormDataHandler { formData })
         handler(JsonFormatHandler(json = { json }, jsonWithoutDefaults = { jsonWithoutDefaults }))
-        handler(StringFormatHandler({ csv }, ContentType.Text.CSV))
+        handler(CsvFormatHandler({ csv }))
         handler(BinaryFormatHandler({ cbor }, ContentType.Application.Cbor))
         handler(BinaryFormatHandler({
             object : BinaryFormat {

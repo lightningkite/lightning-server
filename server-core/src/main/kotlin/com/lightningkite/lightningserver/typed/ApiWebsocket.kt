@@ -1,11 +1,13 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.LSError
-import com.lightningkite.lightningserver.auth.AuthInfo
-import com.lightningkite.lightningserver.auth.cast
-import com.lightningkite.lightningserver.auth.rawUser
+import com.lightningkite.lightningserver.auth.AuthOptions
+import com.lightningkite.lightningserver.auth.authChecked
+import com.lightningkite.lightningserver.auth.authOptions
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
@@ -17,38 +19,48 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.html.INPUT
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
+import java.net.URLDecoder
 
-data class ApiWebsocket<USER, INPUT, OUTPUT>(
-    override val path: ServerPath,
-    override val authInfo: AuthInfo<USER>,
+data class ApiWebsocket<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
+    override val path: PATH,
+    override val authOptions: AuthOptions<USER>,
     val inputType: KSerializer<INPUT>,
     val outputType: KSerializer<OUTPUT>,
     override val summary: String,
     override val description: String = summary,
     val errorCases: List<LSError>,
-    val routeTypes: Map<String, KSerializer<*>> = mapOf(),
-    val connect: suspend ApiWebsocket<USER, INPUT, OUTPUT>.(TypedConnectEvent<USER>) -> Unit,
-    val message: suspend ApiWebsocket<USER, INPUT, OUTPUT>.(TypedMessageEvent<INPUT>) -> Unit,
-    val disconnect: suspend ApiWebsocket<USER, INPUT, OUTPUT>.(WebSockets.DisconnectEvent) -> Unit,
+    override val belongsToInterface: Documentable.InterfaceInfo? = null,
+    val connect: suspend AuthPathPartsAndConnect<USER, PATH, OUTPUT>.() -> Unit,
+    val message: suspend TypedWebSocketSender<OUTPUT>.(INPUT) -> Unit,
+    val disconnect: suspend TypedWebSocketSender<OUTPUT>.() -> Unit,
 ) : Documentable, WebSockets.Handler {
 
-    data class TypedConnectEvent<USER>(val user: USER, val id: WebSocketIdentifier)
-    data class TypedMessageEvent<INPUT>(val id: WebSocketIdentifier, val content: INPUT)
-
+    private val wildcards = path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
     override suspend fun connect(event: WebSockets.ConnectEvent) {
-        this.connect.invoke(this, TypedConnectEvent(authInfo.cast(event.rawUser()), event.id))
+        val auth = event.authChecked<USER>(authOptions)
+        val receiver = AuthPathPartsAndConnect<USER, PATH, OUTPUT>(
+            authOrNull = auth,
+            parts = path.serializers.mapIndexed { idx, ser ->
+                val name = wildcards.get(idx).name
+                val str = event.parts[name] ?: throw BadRequestException("Route segment $name not found")
+                str.parseUrlPartOrBadRequest(path.serializers[idx])
+            }.toTypedArray(),
+            event = event,
+            outputSerializer = outputType,
+            rawRequest = event
+        )
+        this.connect.invoke(receiver)
     }
 
     override suspend fun message(event: WebSockets.MessageEvent) {
         val parsed = event.content.let { Serialization.json.decodeFromString(inputType, it) }
-        this.message.invoke(this, TypedMessageEvent(event.id, parsed))
+        this.message.invoke(TypedWebSocketSender(event.id, outputType, event.cache), parsed)
     }
 
     override suspend fun disconnect(event: WebSockets.DisconnectEvent) {
-        this.disconnect.invoke(this, event)
+        this.disconnect.invoke(TypedWebSocketSender(event.id, outputType, event.cache))
     }
 
     suspend fun send(id: WebSocketIdentifier, content: OUTPUT) =
@@ -56,46 +68,108 @@ data class ApiWebsocket<USER, INPUT, OUTPUT>(
 
 }
 
+private fun <T> String.parseUrlPartOrBadRequest(serializer: KSerializer<T>): T = try {
+    Serialization.fromString(URLDecoder.decode(this, Charsets.UTF_8), serializer)
+} catch (e: Exception) {
+    throw BadRequestException("Path part ${this} could not be parsed as a ${serializer.descriptor.serialName}.")
+}
+
 @LightningServerDsl
-inline fun <reified USER, reified INPUT, reified OUTPUT> ServerPath.typedWebsocket(
+inline fun <reified USER: HasId<*>?, PATH: TypedServerPath, reified INPUT, reified OUTPUT> PATH.apiWebsocket(
     summary: String,
     description: String = summary,
     errorCases: List<LSError>,
-    noinline connect: suspend ApiWebsocket<USER, INPUT, OUTPUT>.(ApiWebsocket.TypedConnectEvent<USER>) -> Unit = { },
-    noinline message: suspend ApiWebsocket<USER, INPUT, OUTPUT>.(ApiWebsocket.TypedMessageEvent<INPUT>) -> Unit = { },
-    noinline disconnect: suspend ApiWebsocket<USER, INPUT, OUTPUT>.(WebSockets.DisconnectEvent) -> Unit = {}
-): ApiWebsocket<USER, INPUT, OUTPUT> = typedWebsocket(
-    authInfo = AuthInfo(),
+    belongsToInterface: Documentable.InterfaceInfo? = null,
+    noinline connect: suspend AuthPathPartsAndConnect<USER, PATH, OUTPUT>.() -> Unit,
+    noinline message: suspend TypedWebSocketSender<OUTPUT>.(INPUT) -> Unit,
+    noinline disconnect: suspend TypedWebSocketSender<OUTPUT>.() -> Unit,
+): ApiWebsocket<USER, PATH, INPUT, OUTPUT> = apiWebsocket(
+    authOptions = authOptions<USER>(),
     inputType = Serialization.module.serializer(),
     outputType = Serialization.module.serializer(),
     summary = summary,
     description = description,
     errorCases = errorCases,
+    belongsToInterface = belongsToInterface,
     connect = connect,
     message = message,
     disconnect = disconnect,
 )
 
 @LightningServerDsl
-fun <USER, INPUT, OUTPUT> ServerPath.typedWebsocket(
-    authInfo: AuthInfo<USER>,
+fun <USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT> PATH.apiWebsocket(
+    authOptions: AuthOptions<USER>,
     inputType: KSerializer<INPUT>,
     outputType: KSerializer<OUTPUT>,
     summary: String,
     description: String = summary,
     errorCases: List<LSError>,
-    connect: suspend ApiWebsocket<USER, INPUT, OUTPUT>.(ApiWebsocket.TypedConnectEvent<USER>) -> Unit = { },
-    message: suspend ApiWebsocket<USER, INPUT, OUTPUT>.(ApiWebsocket.TypedMessageEvent<INPUT>) -> Unit = { },
-    disconnect: suspend ApiWebsocket<USER, INPUT, OUTPUT>.(WebSockets.DisconnectEvent) -> Unit = {}
-): ApiWebsocket<USER, INPUT, OUTPUT> {
+    belongsToInterface: Documentable.InterfaceInfo? = null,
+    connect: suspend AuthPathPartsAndConnect<USER, PATH, OUTPUT>.() -> Unit,
+    message: suspend TypedWebSocketSender<OUTPUT>.(INPUT) -> Unit,
+    disconnect: suspend TypedWebSocketSender<OUTPUT>.() -> Unit,
+): ApiWebsocket<USER, PATH, INPUT, OUTPUT> {
     val ws = ApiWebsocket(
         path = this,
-        authInfo = authInfo,
+        authOptions = authOptions,
         inputType = inputType,
         outputType = outputType,
         summary = summary,
         description = description,
         errorCases = errorCases,
+        belongsToInterface = belongsToInterface,
+        connect = connect,
+        message = message,
+        disconnect = disconnect,
+    )
+    WebSockets.handlers[path] = ws
+    return ws
+}
+
+@LightningServerDsl
+inline fun <reified USER: HasId<*>?, reified INPUT, reified OUTPUT> ServerPath.apiWebsocket(
+    summary: String,
+    description: String = summary,
+    errorCases: List<LSError>,
+    belongsToInterface: Documentable.InterfaceInfo? = null,
+    noinline connect: suspend AuthPathPartsAndConnect<USER, TypedServerPath0, OUTPUT>.() -> Unit,
+    noinline message: suspend TypedWebSocketSender<OUTPUT>.(INPUT) -> Unit,
+    noinline disconnect: suspend TypedWebSocketSender<OUTPUT>.() -> Unit,
+): ApiWebsocket<USER, TypedServerPath0, INPUT, OUTPUT> = apiWebsocket(
+    authOptions = authOptions<USER>(),
+    inputType = Serialization.module.serializer(),
+    outputType = Serialization.module.serializer(),
+    summary = summary,
+    description = description,
+    errorCases = errorCases,
+    belongsToInterface = belongsToInterface,
+    connect = connect,
+    message = message,
+    disconnect = disconnect,
+)
+
+@LightningServerDsl
+fun <USER: HasId<*>?, INPUT, OUTPUT> ServerPath.apiWebsocket(
+    authOptions: AuthOptions<USER>,
+    inputType: KSerializer<INPUT>,
+    outputType: KSerializer<OUTPUT>,
+    summary: String,
+    description: String = summary,
+    errorCases: List<LSError>,
+    belongsToInterface: Documentable.InterfaceInfo? = null,
+    connect: suspend AuthPathPartsAndConnect<USER, TypedServerPath0, OUTPUT>.() -> Unit,
+    message: suspend TypedWebSocketSender<OUTPUT>.(INPUT) -> Unit,
+    disconnect: suspend TypedWebSocketSender<OUTPUT>.() -> Unit,
+): ApiWebsocket<USER, TypedServerPath0, INPUT, OUTPUT> {
+    val ws = ApiWebsocket(
+        path = TypedServerPath0(this),
+        authOptions = authOptions,
+        inputType = inputType,
+        outputType = outputType,
+        summary = summary,
+        description = description,
+        errorCases = errorCases,
+        belongsToInterface = belongsToInterface,
         connect = connect,
         message = message,
         disconnect = disconnect,
@@ -106,7 +180,7 @@ fun <USER, INPUT, OUTPUT> ServerPath.typedWebsocket(
 
 data class TypedVirtualSocket<INPUT, OUTPUT>(val incoming: ReceiveChannel<OUTPUT>, val send: suspend (INPUT) -> Unit)
 
-suspend fun <USER, INPUT, OUTPUT> ApiWebsocket<USER, INPUT, OUTPUT>.test(
+suspend fun <USER: HasId<*>?, INPUT, OUTPUT> ApiWebsocket<USER, TypedServerPath0, INPUT, OUTPUT>.test(
     parts: Map<String, String> = mapOf(),
     wildcard: String? = null,
     queryParameters: List<Pair<String, String>> = listOf(),
@@ -116,7 +190,7 @@ suspend fun <USER, INPUT, OUTPUT> ApiWebsocket<USER, INPUT, OUTPUT>.test(
     sourceIp: String = "0.0.0.0",
     test: suspend TypedVirtualSocket<INPUT, OUTPUT>.() -> Unit
 ) {
-    this.path.test(
+    this.path.path.test(
         parts = parts,
         wildcard = wildcard,
         queryParameters = queryParameters,

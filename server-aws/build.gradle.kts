@@ -4,38 +4,33 @@ import com.lightningkite.deployhelpers.mit
 import com.lightningkite.deployhelpers.standardPublishing
 
 plugins {
-    kotlin("jvm")
-    id("com.google.devtools.ksp")
-    kotlin("plugin.serialization")
-    id("org.jetbrains.dokka")
+    alias(serverlibs.plugins.kotlinJvm)
+    alias(serverlibs.plugins.ksp)
+    alias(serverlibs.plugins.dokka)
+    alias(serverlibs.plugins.serialization)
     id("signing")
     `maven-publish`
 }
 
-val kotlinVersion: String by project
-val khrysalisVersion: String by project
-val coroutines: String by project
-val awsVersion = "2.17.276"
 dependencies {
     api(project(":server-dynamodb"))
     api(project(":server-core"))
-    api("io.github.crac:org-crac:0.1.3")
-    api("software.amazon.awssdk:s3:$awsVersion")
-    api("software.amazon.awssdk:lambda:$awsVersion")
-    api("software.amazon.awssdk:ses:$awsVersion")
-    api("software.amazon.awssdk:rds:$awsVersion")
-    api("software.amazon.awssdk:apigatewaymanagementapi:$awsVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:$coroutines")
-    api("com.amazonaws:aws-lambda-java-core:1.2.1")
-    api("com.amazonaws:aws-lambda-java-events:3.11.0")
-    runtimeOnly("com.amazonaws:aws-lambda-java-log4j2:1.5.1")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
+    api(serverlibs.orgCrac)
+    api(serverlibs.awsS3)
+    api(serverlibs.awsLambda)
+    api(serverlibs.awsSes)
+    api(serverlibs.awsRds)
+    api(serverlibs.awsApiGateway)
+    api(serverlibs.awsCloudWatch)
+    api(serverlibs.orgCrac)
+    api(serverlibs.lambdaJavaCore)
+    api(serverlibs.lambdaJavaEvents)
+    api(serverlibs.lambdaJavaLog4j2)
+    testImplementation(serverlibs.kotlinTest)
     testImplementation(project(":server-testing"))
-
     ksp(project(":processor"))
     kspTest(project(":processor"))
 }
-
 ksp {
     arg("generateFields", "true")
 }
@@ -48,15 +43,20 @@ kotlin {
         kotlin.srcDir("build/generated/ksp/test/kotlin")
     }
 }
+
+tasks.withType<JavaCompile>().configureEach {
+    this.targetCompatibility = "11"
+}
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlinx.serialization.ExperimentalSerializationApi"
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
+    kotlinOptions.jvmTarget = JavaVersion.VERSION_11.toString()
 }
 
 
 standardPublishing {
     name.set("Lightning-server-Server")
-    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
+    description.set("An implementation of LightningServer Engine using AWS Lambda, FileSystem using AWS S3, Email using AWS SES, and Metrics using AWS CloudWatch.")
     github("lightningkite", "lightning-server")
 
     licenses {
@@ -76,3 +76,4 @@ standardPublishing {
         )
     }
 }
+tasks.getByName("sourceJar").dependsOn("kspKotlin")

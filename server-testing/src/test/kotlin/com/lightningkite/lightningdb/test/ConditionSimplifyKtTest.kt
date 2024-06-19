@@ -1,12 +1,15 @@
 package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.TestSettings
+import com.lightningkite.lightningserver.files.serverFile
 import com.lightningkite.lightningserver.serialization.Serialization
+import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.properties.encodeToStringMap
 import org.junit.Test
-import java.time.Instant
-import kotlin.system.measureNanoTime
+import kotlinx.datetime.Instant
 import kotlin.system.measureTimeMillis
 import kotlin.test.assertEquals
 import kotlin.test.fail
@@ -16,8 +19,15 @@ class ConditionSimplifyKtTest {
         TestSettings
     }
 
+    @Test fun paths() {
+        condition<LargeTestModel> {
+            ( it.embedded.value1 eq "sa") and (it.boolean eq false) and (it.boolean neq true) and (it.embeddedNullable.notNull.value2 eq 42)
+        }.also { println(it) }.readPaths().let { println(it) }
+    }
+
     @Test
     fun test() {
+        condition<LargeTestModel> { Condition.Always<LargeTestModel>() and Condition.Never() }.simplifyOk()
         condition<LargeTestModel> { Condition.Never<LargeTestModel>() or Condition.Never() }.simplifyOk()
         condition<LargeTestModel> { it.boolean eq false }.simplifyOk()
         condition<LargeTestModel> { it.boolean.eq(false) and Condition.Always() }.simplifyOk()
@@ -149,7 +159,7 @@ class ConditionSimplifyKtTest {
             double = 1.0,
             char = 'a',
             string = "hi",
-            instant = Instant.now(),
+            instant = now(),
             list = listOf(1, 2)
         ),
         LargeTestModel(
@@ -162,7 +172,7 @@ class ConditionSimplifyKtTest {
             double = 2.0,
             char = 'b',
             string = "hi2",
-            instant = Instant.now(),
+            instant = now(),
             list = listOf(2, 3)
         ),
         LargeTestModel(
@@ -175,7 +185,7 @@ class ConditionSimplifyKtTest {
             double = 2.0,
             char = 'b',
             string = "hi2",
-            instant = Instant.now(),
+            instant = now(),
             list = listOf(2, 3)
         ),
         LargeTestModel(
@@ -188,7 +198,7 @@ class ConditionSimplifyKtTest {
             double = 2.0,
             char = 'b',
             string = "hi2",
-            instant = Instant.now(),
+            instant = now(),
             list = listOf(2, 3)
         ),
     )

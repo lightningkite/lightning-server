@@ -1,51 +1,42 @@
 package com.lightningkite.lightningserver.email
 
 import com.lightningkite.lightningserver.client
+import com.lightningkite.lightningserver.settings.generalSettings
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.cio.*
+import kotlinx.coroutines.runBlocking
 
 /**
- * An email client that will send real emails through SMTP.
+ * An email client that will send real emails through the Mailgun API.
  */
 class MailgunEmailClient(
     val key: String,
     val domain: String,
 ) : EmailClient {
-    override suspend fun sendHtml(
-        subject: String,
-        to: List<String>,
-        html: String,
-        plainText: String,
-        attachments: List<Attachment>
-    ) {
-        val parts = attachments.map {
-            when (it) {
-                is Attachment.Local -> FormPart(if (it.inline) "inline" else "attachment", ChannelProvider(
-                    size = it.file.length(),
-                    block = { it.file.readChannel() }
-                ))
-
-                is Attachment.Remote -> {
-                    val result = client.get(it.url)
-                    val content = result.bodyAsChannel().toByteArray()
-                    FormPart(if (it.inline) "inline" else "attachment", content)
-                }
-            }
+    override suspend fun send(email: Email) {
+        val parts = email.attachments.map {
+            FormPart(if (it.inline) "inline" else "attachment", ChannelProvider(
+                size = it.content.length,
+                block = { runBlocking { it.content.stream() }.toByteReadChannel() }
+            ))
         }
         val result = client.submitFormWithBinaryData(
             url = "https://api.mailgun.net/v3/$domain/messages",
             formData = formData {
-                append("from", "noreply@$domain")
-                to.forEach {
-                    append("to", it)
+                append("from", "${generalSettings().projectName} <noreply@$domain>")
+                email.to.forEach {
+                    append("to", it.toString())
                 }
-                append("subject", subject)
-                append("text", plainText)
-                append("html", html)
+                append("subject", email.subject)
+                append("text", email.plainText)
+                append("html", email.html)
                 append("o:tracking", "false")
+                email.customHeaders.entries.forEach {
+                    append("h:${it.first}", it.second)
+                }
                 parts.forEach { append(it) }
             },
             block = {

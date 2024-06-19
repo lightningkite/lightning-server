@@ -3,8 +3,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.cast
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.NotFoundException
@@ -12,42 +11,47 @@ import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.tasks.startup
 import com.lightningkite.lightningserver.tasks.task
-import com.lightningkite.lightningserver.typed.ApiWebsocket
-import com.lightningkite.lightningserver.typed.typedWebsocket
+import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import java.time.Instant
-import java.time.Duration
-import kotlin.reflect.KProperty1
+import kotlinx.datetime.Instant
+import com.lightningkite.lightningdb.SerializableProperty
+import com.lightningkite.now
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 @LightningServerDsl
-fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
+fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
     database: () -> Database,
     info: ModelInfo<USER, T, ID>,
-    key: KProperty1<T, *>? = null,
-): ApiWebsocket<USER, Query<T>, ListChange<T>> {
+    key: SerializableProperty<T, *>? = null,
+): ApiWebsocket<USER, TypedServerPath0, Query<T>, ListChange<T>> {
     prepareModels()
     val modelName = info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
     val modelIdentifier = info.serialization.serializer.descriptor.serialName
     val helper = RestApiWebsocketHelper[database]
+    val interfaceName = Documentable.InterfaceInfo("ClientModelRestEndpointsPlusWs", listOf(
+        info.serialization.serializer,
+        info.serialization.idSerializer
+    ))
 
-    return typedWebsocket<USER, Query<T>, ListChange<T>>(
-        authInfo = info.serialization.authInfo,
+    return apiWebsocket<USER, Query<T>, ListChange<T>>(
+        authOptions = info.authOptions,
         inputType = Query.serializer(info.serialization.serializer),
         outputType = ListChange.serializer(info.serialization.serializer),
+        belongsToInterface = interfaceName,
         summary = "Watch",
         description = "Gets a changing list of ${modelName}s that match the given query.",
         errorCases = listOf(),
-        connect = { event ->
-            val user = event.user?.takeUnless { it == Unit }?.let {
-                @Suppress("UNCHECKED_CAST")
-                (Authentication.handler as Authentication.Handler<USER>).userToIdString(it)
-            }
-            val collection = info.collection(event.user)
+        connect = {
+            val auth = this.authOrNull
+            val user = auth?.serializable(now().plus(1.days))
+            val collection = info.collection(this)
             helper.subscriptionDb().insertOne(
                 __WebSocketDatabaseChangeSubscription(
                     _id = event.id,
@@ -59,33 +63,30 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
                         collection.mask()
                     ),
                     relevant = setOf(),
-                    establishedAt = Instant.now()
+                    establishedAt = now()
                 )
             )
         },
-        message = { event ->
-            val existing = helper.subscriptionDb().get(event.id) ?: throw NotFoundException()
-            val user = existing.user?.let {
-                @Suppress("UNCHECKED_CAST")
-                (Authentication.handler as Authentication.Handler<USER>).idStringToUser(it)
-            }
-            val p = info.collection(info.serialization.authInfo.cast(user))
-            val q = event.content.copy(condition = p.fullCondition(event.content.condition).simplify())
+        message = { query ->
+            val existing = helper.subscriptionDb().get(socketId) ?: throw NotFoundException()
+            @Suppress("UNCHECKED_CAST") val auth = existing.user?.real() as? RequestAuth<USER & Any>
+            val p = info.collection(AuthAccessor(auth, null))
+            val q = query.copy(condition = p.fullCondition(query.condition).simplify())
             val c = Serialization.json.encodeToString(Query.serializer(info.serialization.serializer), q)
             helper.subscriptionDb().updateOne(
-                condition = condition { it._id eq event.id },
+                condition = condition { it._id eq socketId },
                 modification = modification {
                     it.condition assign c
-                    if(key != null)
+                    if (key != null)
                         it.relevant assign q.condition.relevantHashCodesForKey(key)
                     else
                         it.relevant assign null
                 },
             )
-            send(event.id, ListChange(wholeList = p.query(q).toList()))
+            send(ListChange(wholeList = p.query(q).toList()))
         },
-        disconnect = { event ->
-            helper.subscriptionDb().deleteMany(condition { it._id eq event.id })
+        disconnect = {
+            helper.subscriptionDb().deleteMany(condition { it._id eq socketId })
         }
     ).apply {
         val sendWsChanges = task(
@@ -93,7 +94,7 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             CollectionChanges.serializer(info.serialization.serializer)
         ) { changes: CollectionChanges<T> ->
             val jobs = ArrayList<Job>()
-            val targets = if(key != null) {
+            val targets = if (key != null) {
                 val relevantValues = changes.changes.asSequence().flatMap { listOfNotNull(it.old, it.new) }
                     .map { key.get(it).hashCode() }
                     .toSet()
@@ -139,8 +140,8 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
             jobs.forEach { it.join() }
         }
         startup {
-            info.collection().registerRawSignal { changes ->
-                changes.changes.chunked(500).forEach {
+            info.registerChangeListener { changes ->
+                changes.changes.chunked(50).forEach {
                     sendWsChanges(CollectionChanges(changes = it))
                 }
             }
@@ -148,29 +149,29 @@ fun <USER, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
     }
 }
 
-private class RestApiWebsocketHelper private constructor(val database: ()->Database) {
+class RestApiWebsocketHelper private constructor(val database: () -> Database) {
 
     companion object {
-        private val existing = HashMap<()->Database, RestApiWebsocketHelper>()
-        operator fun get(database: ()->Database) = existing.getOrPut(database) { RestApiWebsocketHelper(database) }
+        private val existing = HashMap<() -> Database, RestApiWebsocketHelper>()
+        operator fun get(database: () -> Database) = existing.getOrPut(database) { RestApiWebsocketHelper(database) }
     }
 
     fun subscriptionDb() = database().collection<__WebSocketDatabaseChangeSubscription>()
 
-    val schedule = schedule("WebsocketDatabaseChangeSubscriptionCleanup", Duration.ofMinutes(5)) {
-        val now = Instant.now()
+    val schedule = schedule("WebsocketDatabaseChangeSubscriptionCleanup", 5.minutes) {
+        val now = now()
         val db =
-            subscriptionDb().deleteMany(condition {
-                it.condition eq ""
-                it.establishedAt lt now.minus(Duration.ofMinutes(5))
+            subscriptionDb().deleteMany(condition<__WebSocketDatabaseChangeSubscription> {
+                (it.condition eq "") and
+                        (it.establishedAt lt now.minus(5.minutes))
             } or condition {
-                it.establishedAt lt now.minus(Duration.ofHours(1))
+                it.establishedAt lt now.minus(1.hours)
             })
 
         for (changeSub in db) {
-            try{
+            try {
                 changeSub._id.close()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // We don't really care.  We just want to shut down as many of these as we can.
                 /*squish*/
             }
@@ -179,42 +180,15 @@ private class RestApiWebsocketHelper private constructor(val database: ()->Datab
 }
 
 @Serializable
-@DatabaseModel
+@GenerateDataClassPaths
 @Suppress("ClassName")
 @IndexSet(["databaseId", "relevant"])
 data class __WebSocketDatabaseChangeSubscription(
     override val _id: WebSocketIdentifier,
     val databaseId: String,
-    val user: String?, //USER
+    val user: RequestAuthSerializable?, //USER
     val condition: String, //Query<T>
     val mask: String, //Mask<T>
     val establishedAt: Instant,
     val relevant: Set<Int>? = null,
 ) : HasId<WebSocketIdentifier>
-
-
-fun <T, V> Condition<T>.relevantHashCodesForKey(key: KProperty1<T, V>): Set<Int>? = when(this) {
-    is Condition.And<T> -> conditions
-        .asSequence()
-        .mapNotNull { it.relevantHashCodesForKey(key) }
-        .reduceOrNull { a, b -> a.intersect(b) }
-    is Condition.Or<T> -> conditions
-        .asSequence()
-        .map { it.relevantHashCodesForKey(key) }
-        .reduceOrNull { a, b -> if(a == null || b == null) null else a.union(b) }
-    is Condition.OnField<*, *> -> if(this.key == key) condition.relevantHashCodes() else null
-    else -> null
-}
-fun <T> Condition<T>.relevantHashCodes(): Set<Int>? = when(this) {
-    is Condition.And<T> -> conditions
-        .asSequence()
-        .mapNotNull { it.relevantHashCodes() }
-        .reduceOrNull { a, b -> a.intersect(b) }
-    is Condition.Or<T> -> conditions
-        .asSequence()
-        .map { it.relevantHashCodes() }
-        .reduceOrNull { a, b -> if(a == null || b == null) null else a.union(b) }
-    is Condition.Equal -> setOf(value.hashCode())
-    is Condition.Inside -> values.map { it.hashCode() }.toSet()
-    else -> null
-}

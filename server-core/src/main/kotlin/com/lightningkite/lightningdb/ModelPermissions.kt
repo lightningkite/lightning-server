@@ -1,6 +1,6 @@
 package com.lightningkite.lightningdb
 
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 /**
  * Defines permissions for accessing a model in a database.
@@ -45,72 +45,30 @@ data class ModelPermissions<Model>(
         )
     }
 
-
-    @Deprecated("Use Mask instead of individual definitions like the ones below")
-    data class Read<Model, Field>(
-        val property: KProperty1<Model, Field>,
-        val condition: Condition<Model>,
-        val mask: Field
-    )
-
-    @Deprecated("Use UpdateRestrictions instead of individual definitions like the ones below")
-    data class Update<Model, Field>(
-        val property: KProperty1<Model, Field>,
-        val condition: Condition<Model>
-    )
-
-    @Deprecated("Use the new masks and update restriction objects.")
     constructor(
-        create: Condition<Model>,
         read: Condition<Model>,
-        readFields: Map<KProperty1<Model, *>, Read<Model, *>>,
-        update: Condition<Model>,
-        delete: Condition<Model>,
-        maxQueryTimeMs: Long = 1_000L
+        readMask: Mask<Model> = Mask(),
+        manage: Condition<Model>,
+        updateRestriction: UpdateRestrictions<Model> = UpdateRestrictions(),
     ) : this(
-        create = create,
+        create = manage,
+        update = manage,
+        updateRestrictions = updateRestriction,
         read = read,
-        readMask = Mask(readFields.values.map {
-            it.condition to Modification.OnField(
-                it.property,
-                Modification.Assign(it.mask)
-            )
-        }),
-        update = update,
-        updateRestrictions = UpdateRestrictions(listOf()),
-        delete = delete,
-        maxQueryTimeMs = maxQueryTimeMs,
+        readMask = readMask,
+        delete = manage
     )
-
-    @Deprecated("Use the new masks and update restriction objects.")
     constructor(
-        create: Condition<Model>,
-        read: Condition<Model>,
-        readFields: Map<KProperty1<Model, *>, Read<Model, *>> = mapOf(),
-        update: Condition<Model>,
-        updateFields: Map<KProperty1<Model, *>, Update<Model, *>>,
-        delete: Condition<Model>,
-        maxQueryTimeMs: Long = 1_000L
+        all: Condition<Model>,
+        readMask: Mask<Model> = Mask(),
+        updateRestriction: UpdateRestrictions<Model> = UpdateRestrictions(),
     ) : this(
-        create = create,
-        read = read,
-        readMask = Mask(readFields.values.map {
-            it.condition to Modification.OnField(
-                it.property,
-                Modification.Assign(it.mask)
-            )
-        }),
-        update = update,
-        updateRestrictions = UpdateRestrictions(updateFields.values.map {
-            Triple(
-                Modification.OnField(
-                    it.property,
-                    Modification.Assign(null)
-                ), it.condition, Condition.Always()
-            )
-        }),
-        delete = delete,
-        maxQueryTimeMs = maxQueryTimeMs,
+        create = all,
+        update = all,
+        updateRestrictions = updateRestriction,
+        read = all,
+        readMask = readMask,
+        delete = all
     )
 
     /**
@@ -122,4 +80,9 @@ data class ModelPermissions<Model>(
      * Masks a single instance of the model.
      */
     fun mask(model: Model): Model = readMask(model)
+
+    /**
+     * Masks a single instance of the model.
+     */
+    fun mask(model: Partial<Model>): Partial<Model> = readMask(model)
 }

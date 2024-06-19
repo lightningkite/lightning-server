@@ -429,7 +429,7 @@ server. You can add it to your server like any other path:
         path = path("auth"),
         userSerializer = Serialization.module.serializer(),
         idSerializer = Serialization.module.serializer(),
-        authInfo = AuthInfo&lt;User&gt;(),
+        authRequirement = AuthInfo&lt;User&gt;(),
         jwtSigner = userSigner,
         email = email,
         userId = { it._id },

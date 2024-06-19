@@ -2,101 +2,94 @@ package com.lightningkite.lightningdb
 
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
-import com.mongodb.reactivestreams.client.MongoClient
-import kotlinx.coroutines.runBlocking
-import org.bson.Document
+import com.mongodb.kotlin.client.coroutine.MongoClient
+import de.flapdoodle.embed.mongo.commands.MongodArguments
+import de.flapdoodle.embed.mongo.distribution.Version
+import de.flapdoodle.embed.mongo.transitions.Mongod
+import de.flapdoodle.embed.mongo.transitions.MongodProcessArguments
+import de.flapdoodle.embed.mongo.transitions.RunningMongodProcess
+import de.flapdoodle.embed.mongo.types.DatabaseDir
+import de.flapdoodle.embed.process.io.ProcessOutput
+import de.flapdoodle.embed.process.types.ProcessArguments
+import de.flapdoodle.net.Net
+import de.flapdoodle.reverse.TransitionWalker
+import de.flapdoodle.reverse.transitions.Start
 import org.bson.UuidRepresentation
-import org.litote.kmongo.coroutine.toList
-import org.litote.kmongo.reactivestreams.KMongo
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
-import de.flapdoodle.embed.mongo.packageresolver.Command
-import de.flapdoodle.embed.mongo.MongodStarter
-import de.flapdoodle.embed.mongo.config.*
-import de.flapdoodle.embed.mongo.distribution.Version
-import de.flapdoodle.embed.process.config.process.ProcessOutput
-import de.flapdoodle.embed.process.runtime.Network
-import java.io.Closeable
 import java.nio.file.Files
 
-fun testMongo(replFile: File = Files.createTempDirectory("embeddedMongo").toFile(), port: Int = Network.freeServerPort(Network.getLocalHost())): MongoClient
-    = embeddedMongo(true, replFile, port)
-fun embeddedMongo(replFile: File = File("./build/embeddedMongo"), port: Int = 54961): MongoClient
-    = embeddedMongo(false, replFile, port)
+fun testMongo(
+    databaseFolder: File = Files.createTempDirectory("embeddedMongo").toFile(),
+    version: String? = null
+): MongoClient = embeddedMongo(
+    deleteAfter = true,
+    databaseFolder = databaseFolder,
+    port = Net.freeServerPort(Net.getLocalHost()),
+    version = version?.let { Version.Main.valueOf(it) } ?: Version.Main.V7_0
+)
 
-private fun embeddedMongo(deleteAfter: Boolean, replFile: File, port: Int): MongoClient {
-    val starter = MongodStarter.getInstance(
-        Defaults.runtimeConfigFor(Command.MongoD, LoggerFactory.getLogger("embeddedMongo"))
-            .processOutput(ProcessOutput.silent())
+fun embeddedMongo(
+    databaseFolder: File = File("./build/embeddedMongo"),
+    port: Int? = null,
+    version: String? = null
+): MongoClient =
+    embeddedMongo(
+        deleteAfter = false,
+        databaseFolder = databaseFolder,
+        port = port ?: 54961,
+        version = version?.let { Version.Main.valueOf(it) } ?: Version.Main.V7_0
+    )
+
+private fun embeddedMongo(
+    deleteAfter: Boolean,
+    databaseFolder: File,
+    port: Int,
+    version: Version.Main = Version.Main.V7_0
+): MongoClient {
+
+    databaseFolder.mkdirs()
+    val runner:TransitionWalker.ReachedState<RunningMongodProcess> = Mongod.instance()
+        .withProcessOutput(Start.to(ProcessOutput::class.java).initializedWith(ProcessOutput.named("lsLogger", LoggerFactory.getLogger("de.flapdoodle.embed.mongo"))))
+        .withDatabaseDir(Start.to(DatabaseDir::class.java).initializedWith(DatabaseDir.of(databaseFolder.toPath())))
+        .withNet(
+            Start.to(de.flapdoodle.embed.mongo.config.Net::class.java)
+                .initializedWith(
+                    de.flapdoodle.embed.mongo.config.Net.defaults()
+                        .withPort(port)
+                ))
+        .withMongodArguments(
+            Start.to(MongodArguments::class.java)
+                .initializedWith(
+                    MongodArguments.defaults()
+                        .withUseNoPrealloc(false)
+                        .withUseSmallFiles(false)
+                        .withUseNoJournal(false)
+                        .withIsQuiet(true)
+                        .withVerbosityLevel(0)
+        ))
+        .start(version)
+    val connectionString = "mongodb://${runner.current().serverAddress}"
+
+    val client = MongoClient.create(
+        MongoClientSettings.builder()
+            .apply {
+                applyConnectionString(ConnectionString(connectionString))
+                uuidRepresentation(UuidRepresentation.STANDARD)
+            }
             .build()
     )
-    val replFileExisted = replFile.exists() && replFile.list()?.isEmpty() == false
-    replFile.mkdirs()
-    val mongodConfig: MongodConfig = MongodConfig.builder()
-        .version(Version.Main.V6_0)
-        .replication(Storage(replFile.toString(), "rs0", 128))
-        .cmdOptions(
-            MongoCmdOptions.builder()
-                .useNoPrealloc(false)
-                .useSmallFiles(false)
-                .useNoJournal(false)
-                .isVerbose(false)
-                .build()
-        )
-        .net(Net(port, Network.localhostIsIPv6()))
-        .build()
-    val mongodExecutable = starter.prepare(mongodConfig)
-    mongodExecutable.start()
 
-    if(!replFileExisted) {
-        runBlocking {
-            try {
-                KMongo
-                    .createClient("mongodb://localhost:$port/")
-                    .getDatabase("admin")
-                    .runCommand(Document().apply {
-                        append("replSetInitiate", Document().apply {
-                            append("_id", "rs0")
-                            append("members", listOf(Document().apply {
-                                append("_id", 0)
-                                append("host", "localhost:${port}")
-                            }))
-                        })
-                    })
-                    .toList()
-            } catch (e: Exception) {
-                mongodExecutable.stop()
-                throw e
-            }
+    Runtime.getRuntime().addShutdownHook(Thread {
+        try {
+            client.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-    }
-
-    val wrapped = KMongo.createClient(
-        MongoClientSettings.builder()
-            .applyConnectionString(ConnectionString("mongodb://localhost:$port/?replicaSet=rs0"))
-            .uuidRepresentation(UuidRepresentation.STANDARD)
-            .build())
-    var closeable: Closeable? = null
-    var fromShutdownHook = false
-    val shutdownHook = Thread {
-        fromShutdownHook = true
-        closeable?.close()
-    }
-    val client = object : MongoClient by wrapped {
-        override fun close() {
-            if(!fromShutdownHook) {
-                Runtime.getRuntime().removeShutdownHook(shutdownHook)
-            }
-            mongodExecutable.stop()
-            try {
-                wrapped.close()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-            if(deleteAfter) replFile.deleteRecursively()
-        }
-    }
-    closeable = client
-    Runtime.getRuntime().addShutdownHook(shutdownHook)
+        runner.current().stop()
+        if (deleteAfter) databaseFolder.deleteRecursively()
+    })
     return client
+
 }

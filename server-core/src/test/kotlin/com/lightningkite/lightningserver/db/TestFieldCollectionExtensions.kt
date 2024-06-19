@@ -1,8 +1,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.db.testmodels.TempThing
+import com.lightningkite.lightningserver.testmodels.TempThing
 import kotlinx.coroutines.flow.count
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -17,13 +16,13 @@ class TestFieldCollectionExtensions {
     @Before
     fun setup() {
         prepareModels()
-        com.lightningkite.lightningserver.db.testmodels.prepareModels()
-        collection = TestSettings.database().collection<TempThing>() as InMemoryFieldCollection
-        collection.drop()
+        com.lightningkite.lightningserver.testmodels.prepareModels()
+        collection = InMemoryDatabase().collection<TempThing>() as InMemoryFieldCollection
     }
 
     @Test
     fun testAll():Unit = runBlocking {
+        collection.deleteMany(Condition.Always())
 
         collection.insertMany((0 until 100).toList().map { TempThing(it) })
 
@@ -34,10 +33,10 @@ class TestFieldCollectionExtensions {
             assertEquals(it, results[it]._id)
         }
 
-        collection.insertOne(TempThing(1))
+        collection.insertOne(TempThing(101))
         assertEquals(101, collection.all().count())
         results = collection.all().toList()
-        assertEquals(1, results[100]._id)
+        assertEquals(101, results[100]._id)
     }
 
 }

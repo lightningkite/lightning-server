@@ -1,15 +1,17 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.lightningserver.auth.JwtSigner
+import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.encryption.hasher
+import com.lightningkite.lightningserver.encryption.secretBasis
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.*
 import java.io.File
 import java.io.RandomAccessFile
-import java.time.Duration
+import kotlin.time.Duration
 
 /**
  * A FileSystem implementation that uses the environments local file system as it's storage solution.
@@ -23,7 +25,7 @@ class LocalFileSystem(
     rootFile: File,
     val serveDirectory: String,
     val signedUrlExpiration: Duration?,
-    val signer: JwtSigner
+    val signer: SecureHasher = secretBasis().hasher(serveDirectory),
 ) : FileSystem {
     val rootFile: File = rootFile.absoluteFile
     override val root: FileObject = LocalFile(this, rootFile)
@@ -32,19 +34,33 @@ class LocalFileSystem(
         FileSystem.register(this)
     }
 
+    val fetchHead = ServerPath("$serveDirectory/{...}").head.handler {
+        val wildcard = it.wildcard?.removePrefix("/") ?: throw BadRequestException("No file to look up")
+        if (wildcard.contains("..")) throw IllegalStateException()
+        val file = rootFile.resolve(wildcard)
+        val fileObject = LocalFile(this, file)
+        if(!fileObject.checkSignature(it.queryParameters.joinToString("&") { "${it.first}=${it.second}" }))
+            throw UnauthorizedException("Token invalid")
+        if (!file.exists()) throw NotFoundException("No file ${wildcard} found")
+        if (!file.absolutePath.startsWith(rootFile.absolutePath)) throw IllegalStateException()
+        val head = fileObject.head() ?: throw NotFoundException("No file ${wildcard} found")
+        HttpResponse(
+            body = null,
+            status = HttpStatus.NoContent,
+        ) {
+            set(HttpHeader.ContentType, head.type.toString())
+            set(HttpHeader.ContentLength, head.size.toString())
+        }
+    }
+
     val fetch = ServerPath("$serveDirectory/{...}").get.handler {
         val wildcard = it.wildcard?.removePrefix("/") ?: throw BadRequestException("No file to look up")
         if (wildcard.contains("..")) throw IllegalStateException()
-
-        signedUrlExpiration?.let { duration ->
-            val location = signer.verify(
-                it.queryParameter("token") ?: throw BadRequestException("No token provided")
-            ).removePrefix("/")
-            if (location != wildcard) throw BadRequestException("Token does not match file - token had ${location}, path had ${it.wildcard}")
-        }
         val file = rootFile.resolve(wildcard)
-        if (!file.exists()) throw NotFoundException("No file ${wildcard} found")
         val fileObject = LocalFile(this, file)
+        if(!fileObject.checkSignature(it.queryParameters.joinToString("&") { "${it.first}=${it.second}" }))
+            throw UnauthorizedException("Token invalid")
+        if (!file.exists()) throw NotFoundException("No file ${wildcard} found")
         if (!file.absolutePath.startsWith(rootFile.absolutePath)) throw IllegalStateException()
         val range = it.headers[HttpHeader.ContentRange] ?: it.headers[HttpHeader.Range]
         val contentType = fileObject.contentTypeFile
@@ -96,16 +112,11 @@ class LocalFileSystem(
     }
 
     val upload = ServerPath("$serveDirectory/{...}").put.handler {
-        if (it.wildcard == null) throw BadRequestException("No file to look up")
-        val parsedToken = signer.verify(
-            it.queryParameter("token") ?: throw BadRequestException("No token provided")
-        )
-        if (!parsedToken.startsWith("W|")) throw UnauthorizedException("Token does not hold write permissions")
-        val location = parsedToken.removePrefix("W|").removePrefix("/")
-        val wildcard = it.wildcard.removePrefix("/")
-        if (location != wildcard) throw BadRequestException("Token does not match file")
+        val wildcard = it.wildcard!!.removePrefix("/")
         if (wildcard.contains("..")) throw IllegalStateException()
-        val file = root.resolve(wildcard)
+        val file = root.resolve(wildcard) as LocalFile
+        if(!file.checkSignatureWrite(it.queryParameters))
+            throw UnauthorizedException("Token invalid")
         file.put(it.body!!)
         HttpResponse(status = HttpStatus.NoContent)
     }

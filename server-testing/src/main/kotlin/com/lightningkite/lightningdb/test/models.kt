@@ -1,53 +1,72 @@
-@file:UseContextualSerialization(UUID::class, Instant::class)
+@file:UseContextualSerialization(UUID::class, Instant::class, ServerFile::class)
 package com.lightningkite.lightningdb.test
 
+import com.lightningkite.GeoCoordinate
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.DatabaseModel
-import com.lightningkite.lightningdb.UUIDFor
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import java.time.Instant
+import kotlinx.datetime.Instant
 import java.util.*
 import com.lightningkite.lightningdb.*
+import com.lightningkite.UUID
+import com.lightningkite.uuid
 
-@DatabaseModel()
+@GenerateDataClassPaths()
 @Serializable
 data class User(
-    override val _id: UUID = UUID.randomUUID(),
+    override val _id: UUID = uuid(),
     @Unique override var email: String,
     @Unique override val phoneNumber: String,
     var age: Long = 0,
-    var friends: List<UUIDFor<User>> = listOf()
+    var friends: List<UUID> = listOf()
 ) : HasId<UUID>, HasEmail, HasPhoneNumber {
     companion object
 }
 
-@DatabaseModel()
+@GenerateDataClassPaths
+@Serializable
+data class CompoundKeyTestModel(
+    override val _id: CompoundTestKey = CompoundTestKey("first", "second")
+): HasId<CompoundTestKey>
+
+@GenerateDataClassPaths
+@Serializable
+data class CompoundTestKey(
+    val first: String,
+    val second: String,
+): Comparable<CompoundTestKey> {
+    companion object {
+        val comparator = compareBy<CompoundTestKey> { it.first }.thenBy { it.second }
+    }
+    override fun compareTo(other: CompoundTestKey): Int = comparator.compare(this, other)
+}
+
+@GenerateDataClassPaths()
 @Serializable
 data class Post(
-    override val _id: UUID = UUID.randomUUID(),
-    var author: UUIDFor<User>,
+    override val _id: UUID = uuid(),
+    var author: UUID,
     var content: String,
     var at: Long? = null
 ) : HasId<UUID> {
     companion object
 }
 
-@DatabaseModel()
+@GenerateDataClassPaths()
 @Serializable
 data class Employee(
-    override val _id: @Contextual UUID = UUID.randomUUID(),
+    override val _id: @Contextual UUID = uuid(),
     var dictionary: Map<String, Int> = mapOf(),
 ) : HasId<UUID> {
     companion object
 }
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class EmbeddedObjectTest(
-    override val _id: UUID = UUID.randomUUID(),
+    override val _id: UUID = uuid(),
     var name: String = "",
     var embed1: ClassUsedForEmbedding = ClassUsedForEmbedding("value1", 1),
     var embed2: ClassUsedForEmbedding = ClassUsedForEmbedding("value2", 2),
@@ -55,6 +74,7 @@ data class EmbeddedObjectTest(
     companion object
 }
 
+@GenerateDataClassPaths
 @Serializable
 data class ClassUsedForEmbedding(
     var value1:String = "default",
@@ -67,20 +87,27 @@ data class RecursiveEmbed(
     var value2:String = "value2"
 )
 
-@DatabaseModel
+@GenerateDataClassPaths
+@Serializable
+data class HasServerFiles(
+    val file: ServerFile,
+    val optionalFile: ServerFile? = null
+)
+
+@GenerateDataClassPaths
 @Serializable
 data class EmbeddedNullable(
-    override val _id: UUID = UUID.randomUUID(),
+    override val _id: UUID = uuid(),
     var name: String = "",
     var embed1: ClassUsedForEmbedding? = null,
 ) : HasId<UUID> {
     companion object
 }
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class LargeTestModel(
-    override val _id: UUID = UUID.randomUUID(),
+    override val _id: UUID = uuid(),
     var boolean: Boolean = false,
     var byte: Byte = 0,
     var short: Short = 0,
@@ -90,7 +117,8 @@ data class LargeTestModel(
     var double: Double = 0.0,
     var char: Char = ' ',
     var string: String = "",
-    var instant: Instant = Instant.ofEpochMilli(0L),
+    var uuid: UUID = UUID(0L, 0L),
+    var instant: Instant = Instant.fromEpochMilliseconds(0L),
     var list: List<Int> = listOf(),
     var listEmbedded: List<ClassUsedForEmbedding> = listOf(),
     var set: Set<Int> = setOf(),
@@ -106,6 +134,7 @@ data class LargeTestModel(
     var doubleNullable: Double? = null,
     var charNullable: Char? = null,
     var stringNullable: String? = null,
+    var uuidNullable: UUID? = null,
     var instantNullable: Instant? = null,
     var listNullable: List<Int>? = null,
     var mapNullable: Map<String, Int>? = null,
@@ -114,17 +143,26 @@ data class LargeTestModel(
     companion object
 }
 
-@DatabaseModel
+@GenerateDataClassPaths
+@Serializable
+data class GeoTest(
+    override val _id: UUID = uuid(),
+    val geo: GeoCoordinate = GeoCoordinate(41.727019, -111.8443002)
+) : HasId<UUID> {
+    companion object
+}
+
+@GenerateDataClassPaths
 @Serializable
 data class EmbeddedMap(
-    override val _id: UUID = UUID.randomUUID(),
+    override val _id: UUID = uuid(),
     var map: Map<String, RecursiveEmbed>,
 ) : HasId<UUID>
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 data class MetaTestModel(
-    override val _id: UUID = UUID.randomUUID(),
+    override val _id: UUID = uuid(),
     val condition: Condition<LargeTestModel>,
     val modification: Modification<LargeTestModel>
 ) : HasId<UUID> {

@@ -1,13 +1,17 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.lightningserver.encryption.sign
+import com.lightningkite.lightningserver.encryption.verify
 import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.encryption.signUrl
+import com.lightningkite.lightningserver.encryption.verifyUrl
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.settings.generalSettings
+import kotlinx.datetime.Clock
+import com.lightningkite.now
 import java.io.File
-import java.io.InputStream
-import java.time.Duration
-import java.time.Instant
-import kotlin.io.path.inputStream
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 
 val File.unixPath: String get() = path.replace("\\", "/")
 
@@ -41,7 +45,7 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
         return FileInfo(type = contentTypeFile.takeIf { it.exists() }?.readText()?.let { ContentType(it) }
             ?: ContentType.fromExtension(file.extension),
             size = file.length(),
-            lastModified = Instant.ofEpochMilli(file.lastModified()))
+            lastModified = Instant.fromEpochMilliseconds(file.lastModified()))
     }
 
     override suspend fun put(content: HttpContent) {
@@ -64,15 +68,20 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
         assert(file.delete())
     }
 
-    override fun checkSignature(queryParams: String): Boolean {
+    fun checkSignature(queryParams: List<Pair<String, String>>): Boolean {
         return try {
             system.signedUrlExpiration?.let {
-                system.signer.verify(queryParams.substringAfter('=')) == file.absoluteFile.relativeTo(system.rootFile).unixPath
+                val qp = queryParams.associate { it }
+                val readUntil = qp["readUntil"]?.toLongOrNull() ?: return false
+                if(System.currentTimeMillis() > readUntil) return false
+                val signedUrlStart = "$url?readUntil=$readUntil"
+                system.signer.verifyUrl(signedUrlStart, qp["signature"] ?: "")
             } ?: true
         } catch (e: Exception) {
             false
         }
     }
+    override fun checkSignature(queryParams: String): Boolean = checkSignature(queryParams.split('&').map { it.substringBefore('=') to it.substringAfter('=') })
 
     override val url: String
         get() = generalSettings().publicUrl + "/" + system.serveDirectory + "/" + file.absoluteFile.relativeTo(
@@ -80,15 +89,25 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
         ).unixPath
 
     override val signedUrl: String
-        get() = url + (system.signedUrlExpiration?.let { expiration ->
-            "?token=" + system.signer.token(
-                file.absoluteFile.relativeTo(system.rootFile).unixPath,
-                expiration
-            )
-        } ?: "")
+        get() = if(system.signedUrlExpiration == null) url else url.plus("?readUntil=${now().plus(system.signedUrlExpiration).toEpochMilliseconds()}").let {
+            it + "&signature=" + system.signer.signUrl(it)
+        }
 
-    override fun uploadUrl(timeout: Duration): String =
-        url + "?token=" + system.signer.token("W|" + file.absoluteFile.relativeTo(system.rootFile).unixPath, timeout)
+    override fun uploadUrl(timeout: Duration): String = url.plus("?writeUntil=${now().plus(timeout).toEpochMilliseconds()}").let {
+        it + "&signature=" + system.signer.signUrl(it)
+    }
+
+    internal fun checkSignatureWrite(queryParams: List<Pair<String, String>>): Boolean {
+        return try {
+            val qp = queryParams.associate { it }
+            val writeUntil = qp["writeUntil"]?.toLongOrNull() ?: return false
+            val signedUrlStart = "$url?writeUntil=$writeUntil"
+            if(System.currentTimeMillis() > writeUntil) return false
+            system.signer.verifyUrl(signedUrlStart, qp["signature"] ?: "")
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     override fun toString(): String = file.toString()
 

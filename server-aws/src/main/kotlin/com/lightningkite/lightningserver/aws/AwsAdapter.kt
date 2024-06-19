@@ -2,7 +2,11 @@ package com.lightningkite.lightningserver.aws
 
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler
+import com.lightningkite.lightningserver.SetOnce
+import com.lightningkite.lightningserver.cache.Cache
+import com.lightningkite.lightningserver.cache.PrefixCache
 import com.lightningkite.lightningserver.cache.setIfNotExists
+import com.lightningkite.lightningserver.compression.extensionForEngineCompression
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.Disconnectable
 import com.lightningkite.lightningserver.core.ServerPath
@@ -11,6 +15,7 @@ import com.lightningkite.lightningserver.db.DynamoDbCache
 import com.lightningkite.lightningserver.encryption.OpenSsl
 import com.lightningkite.lightningserver.engine.Engine
 import com.lightningkite.lightningserver.engine.engine
+import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -27,11 +32,7 @@ import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.websocket.QueryParamWebSocketHandler
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import com.lightningkite.lightningserver.websocket.WebSockets
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.http.content.*
-import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.future.await
 import kotlinx.serialization.Serializable
@@ -54,20 +55,35 @@ import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.URI
-import java.time.Duration
+import kotlin.time.Duration
 import java.util.*
 import org.crac.Resource
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.StringWriter
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
+import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.hours
 
 
 abstract class AwsAdapter : RequestStreamHandler, Resource {
+    init {
+        logger.debug("Initializing AwsAdapter...")
+    }
+
     @Serializable
-    data class TaskInvoke(val taskName: String, val input: String)
+    data class TaskInvoke(val taskName: String, val input: String, val format: TaskDataFormat = TaskDataFormat.Json)
+
+    @Serializable
+    enum class TaskDataFormat { Json, JsonGzip }
 
     @Serializable
     data class Scheduled(val scheduled: String)
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(AwsAdapter::class.java)
+        var preventLambdaTimeoutReuse: Boolean = false
 
         fun loadSettings(jclass: Class<*>) {
             logger.debug("Loading settings...")
@@ -97,38 +113,72 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         }
 
         val region by lazy { Region.of(System.getenv("AWS_REGION")) }
-        private val wsCache by lazy {
-            DynamoDbCache(
-                { DynamoDbAsyncClient.builder().region(region).build() },
-                generalSettings().wsUrl.substringAfter("://")
-                    .substringBefore('?')
-                    .filter { it.isLetterOrDigit() || it == '_' || it == '.' || it == '-' }
-            )
+        var cache: () -> Cache by SetOnce {
+            val lazy = lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+                DynamoDbCache(
+                    { DynamoDbAsyncClient.builder().region(region).build() },
+                    generalSettings().wsUrl.substringAfter("://")
+                        .substringBefore('?')
+                        .filter { it.isLetterOrDigit() || it == '_' || it == '.' || it == '-' }
+                )
+            }
+            return@SetOnce { lazy.value }
         }
 
-        fun cache() = wsCache
-        val configureEngine by lazy {
+        private val backgroundReportingActions = ArrayList<suspend () -> Unit>()
+        private val configureEngine by lazy {
             engine = object : Engine {
                 val lambdaClient = LambdaAsyncClient.builder()
                     .region(region)
                     .build()
 
                 override suspend fun launchTask(task: Task<Any?>, input: Any?) {
-                    lambdaClient.invoke {
-                        it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
-                        it.qualifier(System.getenv("AWS_LAMBDA_FUNCTION_VERSION"))
-                        it.invocationType(InvocationType.EVENT)
-                        it.payload(
-                            SdkBytes.fromUtf8String(
-                                Serialization.json.encodeToString(
-                                    TaskInvoke.serializer(),
-                                    TaskInvoke(task.name, Serialization.json.encodeToString(task.serializer, input))
+                    try {
+                        lambdaClient.invoke {
+                            it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+                            it.qualifier(System.getenv("AWS_LAMBDA_FUNCTION_VERSION"))
+                            it.invocationType(InvocationType.EVENT)
+                            val payload = Serialization.Internal.json.encodeToString(task.serializer, input)
+                            if (payload.length > 100_000) {
+                                val zipped = ByteArrayOutputStream().use {
+                                    GZIPOutputStream(it).use {
+                                        it.write(payload.toByteArray(Charsets.UTF_8))
+                                    }
+                                    it.flush()
+                                    it.toByteArray()
+                                }
+                                it.payload(
+                                    SdkBytes.fromUtf8String(
+                                        Serialization.Internal.json.encodeToString(
+                                            TaskInvoke.serializer(),
+                                            TaskInvoke(
+                                                task.name,
+                                                Base64.getEncoder().encodeToString(zipped),
+                                                format = TaskDataFormat.JsonGzip
+                                            )
+                                        )
+                                    )
                                 )
-                            )
-                        )
-                    }.await().let {
-                        it.logResult()
+                            } else {
+                                it.payload(
+                                    SdkBytes.fromUtf8String(
+                                        Serialization.Internal.json.encodeToString(
+                                            TaskInvoke.serializer(),
+                                            TaskInvoke(task.name, payload)
+                                        )
+                                    )
+                                )
+                            }
+                        }.await().let {
+                            it.logResult()
+                        }
+                    } catch(e: Exception) {
+                        throw Exception("Failed to call ${task.name}", e)
                     }
+                }
+
+                override fun backgroundReportingAction(action: suspend () -> Unit) {
+                    backgroundReportingActions.add(action)
                 }
             }
             logger.debug("Running Tasks.onEngineReady()...")
@@ -175,86 +225,130 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
     }
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context) {
-        runBlocking {
+        var roughContext: String = "???"
+        try {
             val asJson = Serialization.json.parseToJsonElement(input.reader().readText()) as JsonObject
-            try {
+            val response: APIGatewayV2HTTPResponse = blockingTimeout(context.remainingTimeInMillis - 5_000L) {
                 when {
-                    asJson.containsKey("taskName") -> Serialization.json.encodeToStream(
-                        handleTask(
-                            Serialization.json.decodeFromJsonElement(
-                                TaskInvoke.serializer(),
-                                asJson
-                            )
-                        ), output
+                    asJson.containsKey("taskName") -> handleTask(
+                        Serialization.Internal.json.decodeFromJsonElement(
+                            TaskInvoke.serializer(),
+                            asJson
+                        ).also { roughContext = it.taskName }
                     )
 
-                    asJson.containsKey("httpMethod") -> Serialization.json.encodeToStream(
-                        handleHttp(
-                            Serialization.json.decodeFromJsonElement<APIGatewayV2HTTPEvent>(
-                                asJson
-                            )
-                        ), output
-                    )
+                    asJson.containsKey("httpMethod") -> handleHttp(
+                        Serialization.json.decodeFromJsonElement<APIGatewayV2HTTPEvent>(
+                            asJson
+                        ).also { roughContext = it.httpMethod + " " + it.path }
+                    ){ roughContext = it }
 
-                    asJson["requestContext"]?.jsonObject?.containsKey("connectionId") == true -> Serialization.json.encodeToStream(
-                        handleWebsocket(Serialization.json.decodeFromJsonElement<APIGatewayV2WebsocketRequest>(asJson)),
-                        output
+                    asJson["requestContext"]?.jsonObject?.containsKey("connectionId") == true -> handleWebsocket(
+                        Serialization.json.decodeFromJsonElement<APIGatewayV2WebsocketRequest>(asJson)
+                            .also { roughContext = "Websocket" }
                     )
 
                     asJson.containsKey("scheduled") -> {
                         val parsed: Scheduled = Serialization.json.decodeFromJsonElement(asJson)
+                        roughContext = parsed.scheduled
                         val schedule =
-                            Scheduler.schedules[parsed.scheduled] ?: return@runBlocking APIGatewayV2HTTPResponse(
-                                statusCode = 404,
-                                body = "No schedule '${parsed.scheduled}' found"
-                            )
+                            Scheduler.schedules[parsed.scheduled]
+                                ?: return@blockingTimeout APIGatewayV2HTTPResponse(
+                                    statusCode = 404,
+                                    body = "No schedule '${parsed.scheduled}' found"
+                                )
                         try {
                             Metrics.handlerPerformance(schedule) {
                                 schedule.handler()
                             }
+                            APIGatewayV2HTTPResponse(statusCode = 200)
                         } catch (e: Exception) {
                             e.report(schedule)
                             APIGatewayV2HTTPResponse(statusCode = 500)
                         }
                     }
 
-                    // The suicide function.  Exists to handle the panic handler to prevent cost issues.
-                    asJson.containsKey("panic") -> {
-                        try {
-                            logger.info("Activating the panic shutdown...")
-                            val result = LambdaAsyncClient.builder().region(region).build().putFunctionConcurrency {
-                                it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
-                                it.reservedConcurrentExecutions(0)
-                            }.await()
-                            logger.info("Panic got code ${result.sdkHttpResponse().statusCode()}")
-                            assert(result.sdkHttpResponse().isSuccessful)
-                            APIGatewayV2HTTPResponse(statusCode = 200)
-                        } catch (e: Exception) {
-                            e.report("Panic")
-                            APIGatewayV2HTTPResponse(statusCode = 500)
-                        }
-                    }
-
                     else -> {
-                        asJson.jankMeADataClass("Something")
+                        APIGatewayV2HTTPResponse(
+                            statusCode = 500,
+                            body = "No response available for the handler"
+                        )
                     }
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                e.report(asJson)
             }
+            val backgroundRegularHealthActionsJob = GlobalScope.launch {
+                println("Running ${backgroundReportingActions.size} backgroundRegularHealthActions...")
+                backgroundReportingActions.forEach {
+                    try {
+                        it()
+                    } catch (e: Exception) {
+                        e.report()
+                    }
+                }
+            }
+            Serialization.json.encodeToStream(response, output)
+            output.flush()
+            output.close()
+            runBlocking {
+                backgroundRegularHealthActionsJob.join()
+            }
+        } catch (e: Exception) {
+            // Something basic in processing died, we must report it.
+            val ex = Exception("Full lambda failure", e)
+            ex.printStackTrace()
+            runBlocking {
+                ex.report(roughContext)
+            }
+            if (preventLambdaTimeoutReuse) {
+                println("Killing self to prevent potentially broken reuse.  To disable this, set AwsAdapter.preventLambdaTimeoutReuse to false.")
+                exitProcess(1)
+            }
+        } catch (e: StackOverflowError) {
+            // StackOverflowError is bad, but not critical.  This lambda could still server other requests.
+            val ex = Exception("Full lambda failure", e)
+            ex.printStackTrace()
+            runBlocking {
+                ex.report(roughContext)
+            }
+            if (preventLambdaTimeoutReuse) {
+                println("Killing self to prevent potentially broken reuse.  To disable this, set AwsAdapter.preventLambdaTimeoutReuse to false.")
+                exitProcess(1)
+            }
+        } catch (e: VirtualMachineError) {
+            // If we have a critical error, we need to make sure the process dies so Lambda doesn't attempt to reuse the VM.
+            try {
+                e.printStackTrace()
+                runBlocking {
+                    e.report(roughContext)
+                }
+            } catch (t: Throwable) { /*squish*/
+            }
+            println("Killing self to prevent potentially broken reuse due to full VirtualMachineError ${e.message}.")
+            exitProcess(1)
         }
     }
+
+    private class AwsTaskInvokeException(message: String? = null, cause: Exception? = null): Exception(message, cause)
 
     suspend fun handleTask(event: TaskInvoke): APIGatewayV2HTTPResponse {
         return coroutineScope {
             @Suppress("UNCHECKED_CAST") val task = Tasks.tasks[event.taskName] as Task<Any?>?
             if (task == null) {
+                exceptionSettings().report(AwsTaskInvokeException("Task ${event.taskName} not found"), event.taskName)
                 logger.error("Task ${event.taskName} not found")
                 APIGatewayV2HTTPResponse(statusCode = 404, body = "Task ${event.taskName} not found")
             } else try {
                 Metrics.handlerPerformance(task) {
-                    task.implementation(this, Serialization.json.decodeFromString(task.serializer, event.input))
+                    val payload = when(event.format) {
+                        TaskDataFormat.Json -> Serialization.Internal.json.decodeFromString(task.serializer, event.input)
+                        TaskDataFormat.JsonGzip -> {
+                            val data = ByteArrayInputStream(Base64.getDecoder().decode(event.input)).use {
+                                GZIPInputStream(it).readBytes()
+                            }.toString(Charsets.UTF_8)
+                            Serialization.Internal.json.decodeFromString(task.serializer, data)
+                        }
+                    }
+                    task.invokeImmediate(this, payload)
                 }
                 APIGatewayV2HTTPResponse(statusCode = 204)
             } catch (e: Exception) {
@@ -274,11 +368,11 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
 
     val wsType = "aws"
 
+    private fun wsCache(id: String) = PrefixCache(cache(), id + "/")
     init {
         WebSocketIdentifier.register(
             type = wsType,
             send = { id, value ->
-                Metrics.report("webSocketMessages", 1.0)
                 try {
                     val result = apiGatewayManagement.postToConnection {
                         it.connectionId(id)
@@ -298,12 +392,11 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     }
                     true
                 } catch (e: GoneException) {
-                    handleWsDisconnect(id)
+                    handleWsDisconnect(id, wsCache(id))
                     false
                 }
             },
             close = { id ->
-                Metrics.report("webSocketCloses", 1.0)
                 try {
                     val result = apiGatewayManagement.deleteConnection {
                         it.connectionId(id)
@@ -341,7 +434,9 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 HttpContent.Text(raw, headers.contentType ?: ContentType.Text.Plain)
         }
         val queryParams =
-            (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
+            (event.multiValueQueryStringParameters
+                ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
+        val wsCache = wsCache(event.requestContext.connectionId)
 
         return when (event.requestContext.routeKey) {
             "\$connect" -> {
@@ -354,6 +449,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     headers = headers,
                     domain = event.requestContext.domainName,
                     protocol = "https",
+                    cache = wsCache,
                     sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0"
                 )
                 try {
@@ -365,31 +461,34 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             }
 
             "\$disconnect" -> {
-                handleWsDisconnect(event.requestContext.connectionId)
+                handleWsDisconnect(event.requestContext.connectionId, wsCache)
             }
 
             else -> if (body == null || body.length == 0L)
                 APIGatewayV2HTTPResponse(200)
             else {
                 val lkEvent =
-                    WebSockets.MessageEvent(WebSocketIdentifier(wsType, event.requestContext.connectionId), event.body)
+                    WebSockets.MessageEvent(WebSocketIdentifier(wsType, event.requestContext.connectionId), wsCache, event.body)
                 try {
                     rootWs.message(lkEvent)
                     APIGatewayV2HTTPResponse(200)
                 } catch (e: Exception) {
-                    try { lkEvent.id.close() } catch(e: Exception) { /*squish*/ }
-                    handleWsDisconnect(event.requestContext.connectionId)
+                    try {
+                        lkEvent.id.close()
+                    } catch (e: Exception) { /*squish*/
+                    }
+                    handleWsDisconnect(event.requestContext.connectionId, wsCache)
                     APIGatewayV2HTTPResponse(500, body = Serialization.json.encodeToString(e.message ?: ""))
                 }
             }
         }
     }
 
-    private suspend fun handleWsDisconnect(id: String): APIGatewayV2HTTPResponse {
-        val lkEvent = WebSockets.DisconnectEvent(WebSocketIdentifier(wsType, id))
+    private suspend fun handleWsDisconnect(id: String, wsCache: Cache): APIGatewayV2HTTPResponse {
+        val lkEvent = WebSockets.DisconnectEvent(WebSocketIdentifier(wsType, id), wsCache)
         return try {
             // Ensure it only runs once
-            if (cache().setIfNotExists("${lkEvent.id}-closed", true, timeToLive = Duration.ofHours(1))) {
+            if (cache().setIfNotExists("${lkEvent.id}-closed", true, timeToLive = 1.hours)) {
                 rootWs.disconnect(lkEvent)
             }
             APIGatewayV2HTTPResponse(200)
@@ -398,7 +497,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         }
     }
 
-    suspend fun handleHttp(event: APIGatewayV2HTTPEvent): APIGatewayV2HTTPResponse {
+    suspend fun handleHttp(event: APIGatewayV2HTTPEvent, setRoughContext: (String)->Unit): APIGatewayV2HTTPResponse {
         val method = HttpMethod(event.httpMethod)
         val path = event.path.removePrefix("/" + event.requestContext.stage)
         val headers = HttpHeaders(event.multiValueHeaders.entries.flatMap { it.value.map { v -> it.key to v } })
@@ -412,7 +511,8 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 HttpContent.Text(raw, headers.contentType ?: ContentType.Text.Plain)
         }
         val queryParams =
-            (event.multiValueQueryStringParameters ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
+            (event.multiValueQueryStringParameters
+                ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
 
         val match = Http.matcher.match(path, method) ?: run {
             if (method == HttpMethod.OPTIONS) {
@@ -429,8 +529,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                         statusCode = HttpStatus.NoContent.code,
                         headers = mapOf(
                             HttpHeader.AccessControlAllowOrigin to (headers[HttpHeader.Origin] ?: "*"),
-                            HttpHeader.AccessControlAllowMethods to (headers[HttpHeader.AccessControlRequestMethod]
-                                ?: "GET"),
+                            HttpHeader.AccessControlAllowMethods to "GET,POST,PUT,PATCH,DELETE,HEAD",
                             HttpHeader.AccessControlAllowHeaders to (cors.allowedHeaders.joinToString(", ")),
                             HttpHeader.AccessControlAllowCredentials to "true",
                         )
@@ -448,6 +547,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 wildcard = null
             )
         }
+        setRoughContext(match.endpoint.toString())
         val request = HttpRequest(
             endpoint = match.endpoint,
             parts = match.parts,
@@ -459,7 +559,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
             protocol = "https",
             sourceIp = event.requestContext.identity.sourceIp
         )
-        val result = Http.execute(request).extensionForEngineAddCors(request)
+        val result = Http.execute(request).extensionForEngineAddCors(request).extensionForEngineCompression(request)
         val outHeaders = HashMap<String, String>()
         result.headers.entries.forEach { outHeaders.put(it.first, it.second) }
         val b = result.body
@@ -474,12 +574,24 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 return response
             }
 
-            b is HttpContent.Text || b.type.isText -> {
+            b is HttpContent.Text -> {
                 val response = withContext(Dispatchers.IO) {
                     APIGatewayV2HTTPResponse(
                         statusCode = result.status.code,
                         headers = outHeaders,
                         body = b.text()
+                    )
+                }
+                return response
+            }
+
+            b is HttpContent.Binary -> {
+                val response = withContext(Dispatchers.IO) {
+                    APIGatewayV2HTTPResponse(
+                        statusCode = result.status.code,
+                        headers = outHeaders,
+                        body = Base64.getEncoder().encodeToString(b.bytes),
+                        isBase64Encoded = true
                     )
                 }
                 return response

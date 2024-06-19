@@ -1,15 +1,12 @@
 package com.lightningkite.lightningserver.azure
 
-import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.db.DatabaseSettings
-import com.lightningkite.lightningserver.email.EmailSettings
+import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.files.FilesSettings
-import com.lightningkite.lightningserver.notifications.NotificationSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.serializer
 
 
@@ -292,19 +289,12 @@ fun terraformAzure(projectName: String = "project", appendable: Appendable) {
                     databaseNumber = var.${setting.key}_databaseNumber
                 }""".trimIndent())
             }
-            serializer<JwtSigner>() -> {
+            serializer<SecretBasis>() -> {
                 appendable.appendLine("""
                     
                     ####
-                    # ${setting.key}: JwtSigner
+                    # ${setting.key}: SecretBasis
                     ####
-                    
-                    variable "${setting.key}_expirationMilliseconds" {
-                      default = 31540000000
-                    }
-                    variable "${setting.key}_emailExpirationMilliseconds" {
-                      default = 1800000
-                    }
                     resource "random_password" "${setting.key}" {
                       length           = 32
                       special          = true
@@ -321,8 +311,6 @@ fun terraformAzure(projectName: String = "project", appendable: Appendable) {
                     }
                 """.trimIndent())
                 appSettings.add("""${setting.key} = {
-                    expirationMilliseconds = var.${setting.key}_expirationMilliseconds 
-                    emailExpirationMilliseconds = var.${setting.key}_emailExpirationMilliseconds 
                     secret = "@Microsoft.KeyVault(SecretUri=${'$'}{azurerm_key_vault.vault.vault_uri}secrets/${setting.key}_key)"
                 }""".trimIndent())
             }

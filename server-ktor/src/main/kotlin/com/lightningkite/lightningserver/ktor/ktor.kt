@@ -16,6 +16,7 @@ import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.websocket.QueryParamWebSocketHandler
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifierPubSub
 import com.lightningkite.lightningserver.websocket.WebSockets
+import com.lightningkite.now
 import io.ktor.http.*
 import io.ktor.http.HttpMethod
 import io.ktor.http.content.*
@@ -33,18 +34,21 @@ import io.ktor.server.websocket.*
 import io.ktor.util.*
 import io.ktor.utils.io.jvm.javaio.*
 import io.ktor.websocket.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.*
 import org.slf4j.LoggerFactory
-import java.time.*
-import java.util.*
-import kotlin.collections.HashMap
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import com.lightningkite.lightningserver.core.ContentType as HttpContentType
 
 fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
     val logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.ktor.lightningServer")
-    val myEngine = LocalEngine
+    val myEngine = LocalEngine(cache)
     engine = myEngine
     try {
         runBlocking { Tasks.onSettingsReady() }
@@ -66,7 +70,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                     allowHost(it, listOf("http", "https", "ws", "wss"))
                 }
                 it.allowedHeaders.forEach {
-                    if(it == "*") allowHeaders { true }
+                    if (it == "*") allowHeaders { true }
                     else allowHeader(it)
                 }
             }
@@ -100,6 +104,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                             parts[s] = strings.single()
                         }
                         val id = ws.connect()
+                        val cache = LocalCache()
                         try {
                             launch {
                                 ws.listenForWebSocketMessage(id).collect {
@@ -123,7 +128,8 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                                         headers = call.request.headers.adapt(),
                                         domain = call.request.origin.host,
                                         protocol = call.request.origin.scheme,
-                                        sourceIp = call.request.origin.remoteHost
+                                        sourceIp = call.request.origin.remoteHost,
+                                        cache = cache
                                     )
                                 )
                             }
@@ -137,7 +143,8 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                                     entry.value.message(
                                         WebSockets.MessageEvent(
                                             id = id,
-                                            content = (incoming as? Frame.Text)?.readText() ?: ""
+                                            content = (incoming as? Frame.Text)?.readText() ?: "",
+                                            cache = cache
                                         )
                                     )
                                 }
@@ -150,7 +157,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                                         WebSockets.WsHandlerType.DISCONNECT
                                     )
                                 ) {
-                                    entry.value.disconnect(WebSockets.DisconnectEvent(id))
+                                    entry.value.disconnect(WebSockets.DisconnectEvent(id, cache = cache))
                                 }
                             } finally {
                                 ws.markDisconnect(id)
@@ -166,13 +173,25 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                 route(routeString, HttpMethod.parse(entry.key.method.toString())) {
                     handle {
                         val request = call.adapt(entry.key)
-                        val result = Http.execute(request)
+                        val result: HttpResponse = Http.execute(request)
                         for (header in result.headers.entries) {
                             call.response.header(header.first, header.second)
                         }
                         call.response.status(HttpStatusCode.fromValue(result.status.code))
                         when (val b = result.body) {
-                            null -> call.respondText("")
+                            null -> {
+                                val contentType = call.response.headers[io.ktor.http.HttpHeaders.ContentType]
+                                val contentLength = call.response.headers[io.ktor.http.HttpHeaders.ContentLength]
+                                if (contentType != null && contentLength != null) {
+                                    call.response.call.respondOutputStream(
+                                        ContentType.parse(contentType),
+                                        HttpStatusCode.NoContent,
+                                        contentLength.toLong(),
+                                        {})
+                                } else
+                                    call.respondText("", contentType = null, status = null, configure = { })
+                            }
+
                             is HttpContent.Binary -> call.respondBytes(
                                 b.bytes,
                                 ContentType.parse(b.type.toString())
@@ -195,6 +214,55 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                 }
             }
         }
+        routing {
+            route("{param...}") {
+                handle {
+                    val request = call.adapt(
+                        HttpEndpoint(
+                            call.request.origin.uri.substringBefore('?').substringBefore('#'),
+                            com.lightningkite.lightningserver.http.HttpMethod(call.request.httpMethod.value.uppercase())
+                        )
+                    )
+                    val result = Http.execute(request)
+                    for (header in result.headers.entries) {
+                        call.response.header(header.first, header.second)
+                    }
+                    call.response.status(HttpStatusCode.fromValue(result.status.code))
+                    when (val b = result.body) {
+                        null -> {
+                            val contentType = call.response.headers[io.ktor.http.HttpHeaders.ContentType]
+                            val contentLength = call.response.headers[io.ktor.http.HttpHeaders.ContentLength]
+                            if (contentType != null && contentLength != null) {
+                                call.response.headers
+                                call.response.call.respondOutputStream(
+                                    ContentType.parse(contentType),
+                                    HttpStatusCode.NoContent,
+                                    contentLength.toLong(),
+                                    {})
+                            } else
+                                call.respondText("", contentType = null, status = null, configure = { })
+                        }
+                        is HttpContent.Binary -> call.respondBytes(
+                            b.bytes,
+                            ContentType.parse(b.type.toString())
+                        )
+
+                        is HttpContent.Text -> call.respondText(b.string, ContentType.parse(b.type.toString()))
+                        is HttpContent.OutStream -> call.respondOutputStream(ContentType.parse(b.type.toString())) {
+                            b.write(
+                                this
+                            )
+                        }
+
+                        is HttpContent.Stream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
+                            b.getStream().copyTo(this)
+                        }
+
+                        is HttpContent.Multipart -> TODO()
+                    }
+                }
+            }
+        }
         Scheduler.schedules.values.forEach {
             @Suppress("OPT_IN_USAGE")
             GlobalScope.launch {
@@ -202,10 +270,10 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                     val upcomingRun = cache.get<Long>(it.name + "-nextRun") ?: run {
                         val time = when (val s = it.schedule) {
                             is Schedule.Daily -> {
-                                val now = ZonedDateTime.now(s.zone)
-                                val runTimeToday = ZonedDateTime.of(LocalDate.now(), s.time, s.zone)
-                                if (now > runTimeToday) runTimeToday.plusDays(1).toInstant().toEpochMilli()
-                                else runTimeToday.toInstant().toEpochMilli()
+                                val now = now()
+                                val runTimeToday = now.toLocalDateTime(s.zone).date.atTime(s.time).toInstant(s.zone)
+                                if (now > runTimeToday) runTimeToday.plus(1.days).toEpochMilliseconds()
+                                else runTimeToday.toEpochMilliseconds()
                             }
 
                             is Schedule.Frequency -> {
@@ -217,7 +285,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                     }
                     delay((upcomingRun - System.currentTimeMillis()).coerceAtLeast(1L))
                     if (cache.setIfNotExists(it.name + "-lock", true)) {
-                        cache.set(it.name + "-lock", true, Duration.ofHours(1))
+                        cache.set(it.name + "-lock", true, 1.hours)
                         try {
                             Metrics.handlerPerformance(it) {
                                 it.handler()
@@ -226,10 +294,13 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                             exceptionSettings().report(t)
                         }
                         val nextRun = when (val s = it.schedule) {
-                            is Schedule.Daily -> ZonedDateTime.of(LocalDate.now().plusDays(1), s.time, s.zone)
-                                .toInstant().toEpochMilli()
+                            is Schedule.Daily -> LocalDateTime(
+                                now().toLocalDateTime(s.zone).date.plus(DatePeriod(days = 1)),
+                                s.time
+                            ).toInstant(s.zone)
+                                .toEpochMilliseconds()
 
-                            is Schedule.Frequency -> upcomingRun + s.gap.toMillis()
+                            is Schedule.Frequency -> upcomingRun + s.gap.inWholeMilliseconds
                         }
                         cache.set<Long>(it.name + "-nextRun", nextRun)
                         cache.remove(it.name + "-lock")
@@ -308,40 +379,42 @@ internal suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
 }
 
 internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.ContentType): HttpContent.Multipart {
-    return HttpContent.Multipart(object : Flow<HttpContent.Multipart.Part> {
-        override suspend fun collect(collector: FlowCollector<HttpContent.Multipart.Part>) {
+    return HttpContent.Multipart(myType, object : Flow<HttpContentAndHeaders> {
+        override suspend fun collect(collector: FlowCollector<HttpContentAndHeaders>) {
             this@adapt.forEachPart {
                 collector.emit(
                     when (it) {
-                        is PartData.FormItem -> HttpContent.Multipart.Part.FormItem(
+                        is PartData.FormItem -> HttpContent.Multipart.formItem(
                             it.name ?: "",
                             it.value
                         )
 
                         is PartData.FileItem -> {
                             val h = it.headers.adapt()
-                            HttpContent.Multipart.Part.DataItem(
+                            HttpContent.Multipart.dataItem(
                                 key = it.name ?: "",
                                 filename = it.originalFileName ?: "",
                                 headers = h,
                                 content = HttpContent.Stream(
                                     it.streamProvider,
                                     h.contentLength,
-                                    it.contentType?.adapt() ?: HttpContentType.Application.OctetStream
+                                    it.contentType?.adapt()
+                                        ?: com.lightningkite.lightningserver.core.ContentType.Application.OctetStream
                                 )
                             )
                         }
 
                         is PartData.BinaryItem -> {
                             val h = it.headers.adapt()
-                            HttpContent.Multipart.Part.DataItem(
+                            HttpContent.Multipart.dataItem(
                                 key = it.name ?: "",
                                 filename = "",
                                 headers = h,
                                 content = HttpContent.Stream(
                                     { it.provider().asStream() },
                                     h.contentLength,
-                                    it.contentType?.adapt() ?: HttpContentType.Application.OctetStream
+                                    it.contentType?.adapt()
+                                        ?: com.lightningkite.lightningserver.core.ContentType.Application.OctetStream
                                 )
                             )
                         }
@@ -351,5 +424,5 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
                 )
             }
         }
-    }, myType)
+    })
 }

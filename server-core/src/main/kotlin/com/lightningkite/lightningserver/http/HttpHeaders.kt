@@ -1,7 +1,9 @@
 package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.core.ContentType
-import java.time.Instant
+import kotlinx.datetime.Instant
+import kotlinx.datetime.ZoneOffset
+import kotlinx.datetime.toJavaInstant
 import java.time.format.DateTimeFormatter
 
 data class HttpHeaders(val entries: List<Pair<String, String>>) {
@@ -14,6 +16,10 @@ data class HttpHeaders(val entries: List<Pair<String, String>>) {
     }
 
     operator fun get(key: String): String? = normalizedEntries[key.lowercase()]?.firstOrNull()
+    fun getMany(key: String): List<String> = normalizedEntries[key.lowercase()] ?: listOf()
+    fun getValues(key: String): List<HttpHeaderValue> = normalizedEntries[key.lowercase()]?.map { HttpHeaderValue(it) } ?: listOf()
+
+    operator fun plus(other: HttpHeaders): HttpHeaders = HttpHeaders(this.entries + other.entries)
 
     val cookies: Map<String, String> by lazy {
         this[HttpHeader.Cookie]?.let {
@@ -46,6 +52,13 @@ data class HttpHeaders(val entries: List<Pair<String, String>>) {
         fun set(key: String, value: String) {
             entries.add(key to value)
         }
+        fun set(key: String, value: HttpHeaderValue) {
+            entries.add(key to value.toString())
+        }
+
+        fun set(headers: HttpHeaders) {
+            entries += headers.entries
+        }
 
         fun setCookie(
             key: String,
@@ -62,7 +75,7 @@ data class HttpHeaders(val entries: List<Pair<String, String>>) {
                 append("$key=$value")
                 if (expiresAt != null) {
                     append("; Expires=")
-                    append(DateTimeFormatter.RFC_1123_DATE_TIME.format(expiresAt))
+                    append(DateTimeFormatter.RFC_1123_DATE_TIME.format(expiresAt.toJavaInstant().atOffset(java.time.ZoneOffset.UTC)))
                 }
                 if (maxAge != null) {
                     append("; Max-Age=")

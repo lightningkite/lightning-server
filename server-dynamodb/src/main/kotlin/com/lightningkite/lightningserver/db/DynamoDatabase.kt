@@ -14,15 +14,14 @@ import kotlin.reflect.KType
 
 @Deprecated("This doesn't work yet.")
 class DynamoDatabase(val dynamo: DynamoDbAsyncClient): Database {
-    private val collections = ConcurrentHashMap<String, Lazy<DynamoDbCollection<*>>>()
+    private val collections = ConcurrentHashMap<Pair<KSerializer<*>, String>, Lazy<DynamoDbCollection<*>>>()
 
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : Any> collection(type: KType, name: String): DynamoDbCollection<T> =
-        (collections.getOrPut(name) {
+    override fun <T : Any> collection(serializer: KSerializer<T>, name: String): DynamoDbCollection<T> =
+        (collections.getOrPut(serializer to name) {
             lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
                 DynamoDbCollection(
                     dynamo,
-                    Serialization.module.serializer(type) as KSerializer<T>,
+                    serializer,
                     name
                 ).also {
                     runBlocking {

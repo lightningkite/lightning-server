@@ -8,32 +8,76 @@ import com.lightningkite.lightningserver.serverhealth.HealthStatus
  * sending emails away, so it can go to multiple places.
  */
 interface EmailClient : HealthCheckable {
+    suspend fun send(email: Email)
+    suspend fun sendBulk(template: Email, personalizations: List<EmailPersonalization>) = personalizations.forEach {
+        send(it(template))
+    }
+
+    @Deprecated(
+        "Prefer send(Email)"
+    )
     suspend fun sendHtml(
         subject: String,
         to: List<String>,
         html: String,
         plainText: String = html.emailApproximatePlainText(),
         attachments: List<Attachment> = listOf(),
+    ) = send(
+        Email(
+            subject = subject,
+            to = to.map { EmailLabeledValue(it) },
+            html = html,
+            plainText = plainText,
+            attachments = attachments.map { it.convert() },
+        )
+    )
+
+    @Deprecated(
+        "Prefer send(Email)"
     )
     suspend fun sendPlainText(
         subject: String,
         to: List<String>,
         plainText: String,
         attachments: List<Attachment> = listOf(),
-    ) = sendHtml(subject = subject, to = to, html = plainText.emailPlainTextToHtml(), plainText = plainText, attachments = attachments)
+    ) = send(
+        Email(
+            subject = subject,
+            to = to.map { EmailLabeledValue(it) },
+            plainText = plainText,
+            attachments = attachments.map { it.convert() },
+        )
+    )
 
-    @Deprecated("Prefer sendHtml", ReplaceWith("sendHtml(subject = subject, to = to, html = htmlMessage, plainText = message, attachments = attachments)"))
+    @Deprecated(
+        "Prefer send(Email)"
+    )
     suspend fun send(
         subject: String,
         to: List<String>,
         message: String,
         htmlMessage: String? = null,
         attachments: List<Attachment> = listOf(),
-    ) = sendHtml(subject = subject, to = to, html = htmlMessage ?: message.emailPlainTextToHtml(), plainText = message, attachments = attachments)
+    ) = send(
+        Email(
+            subject = subject,
+            to = to.map { EmailLabeledValue(it) },
+            plainText = message,
+            html = htmlMessage ?: message.emailPlainTextToHtml(),
+            attachments = attachments.map { it.convert() },
+        )
+    )
+
 
     override suspend fun healthCheck(): HealthStatus {
         try {
-            sendPlainText("Test Email", to = listOf("test@test.com"), plainText = "This is a test message")
+            send(
+                Email(
+                    subject = "Test Email",
+                    to = listOf(EmailLabeledValue("test@test.com")),
+                    plainText = "This is a test message"
+                )
+            )
             return HealthStatus(HealthStatus.Level.OK)
         } catch (e: Exception) {
             return HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)

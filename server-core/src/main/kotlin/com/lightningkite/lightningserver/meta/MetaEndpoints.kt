@@ -1,19 +1,15 @@
 package com.lightningkite.lightningserver.meta
 
 import com.lightningkite.lightningserver.HtmlDefaults
-import com.lightningkite.lightningserver.auth.AuthInfo
-import com.lightningkite.lightningserver.auth.jwt
-import com.lightningkite.lightningserver.auth.rawUser
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.db.adminIndex
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.jsonschema.lightningServerSchema
 import com.lightningkite.lightningserver.jsonschema.openApiDescription
-import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -21,6 +17,7 @@ import com.lightningkite.lightningserver.serverhealth.healthCheck
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.apiDocs
+import com.lightningkite.lightningserver.typed.bulkRequestEndpoint
 import com.lightningkite.lightningserver.websocket.WebSockets
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -29,17 +26,10 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-class MetaEndpoints<USER>(
+class MetaEndpoints(
     path: ServerPath,
-    val authInfo: AuthInfo<USER>,
     packageName: String = "com.mypackage",
-    isAdmin: suspend (USER) -> Boolean,
 ) : ServerPathGroup(path) {
-    init {
-        Metrics.shouldAllowAccess = {
-            isAdmin(authInfo.tryCast(it.rawUser()) as USER)
-        }
-    }
 
     val root = get.handler {
         HttpResponse(body = HttpContent.Html {
@@ -54,23 +44,26 @@ class MetaEndpoints<USER>(
         })
     }
     val docs = path("docs").apiDocs(packageName)
-    val health = path("health").healthCheck(authInfo, isAdmin)
+    val health = path("health").healthCheck()
     val isOnline = path("online").get.handler { HttpResponse.plainText("Server is running.") }
 
-    private suspend fun openAdmin(jwt: String?): HttpResponse {
+    private suspend fun openAdmin(request: HttpRequest): HttpResponse {
         val inject = buildJsonObject {
             put("url", generalSettings().publicUrl)
             put("basePage", path("admin/").toString())
-            jwt?.let {
-                put("jwt", it)
-            }
+            (request.headers[HttpHeader.Authorization] ?: request.headers.cookies[HttpHeader.Authorization])
+                ?.removePrefix("Bearer ")
+                ?.removePrefix("bearer ")
+                ?.let {
+                    put("jwt", it)
+                }
         }
         val original = client.get("https://lightning-server-admin.s3.us-west-2.amazonaws.com/index.html").bodyAsText()
         val page = (original.substringBeforeLast("</body>") + """
             <script type="application/json" id="injectedBackendInformation">${inject}</script>
             </body>
         """.trimIndent() + original.substringAfterLast("</body>"))
-            .replace("/static/", admin.path.toString() + "/static/")
+            .replace("/static/", admin.path.toString() + "static/")
         return HttpResponse.html(content = page, headers = {
             set(
                 "Content-Security-Policy",
@@ -79,16 +72,17 @@ class MetaEndpoints<USER>(
         })
     }
 
+    val bulk = path("bulk").bulkRequestEndpoint()
+
     val admin = path("admin/").get.handler {
-        openAdmin(it.jwt())
+        openAdmin(it)
     }
     val adminResources = path("admin/{...}").get.handler {
         if (it.wildcard?.contains(".") == true)
             HttpResponse.pathMovedOld("https://lightning-server-admin.s3.us-west-2.amazonaws.com/${it.wildcard}")
         else
-            openAdmin(it.jwt())
+            openAdmin(it)
     }
-    val adminIndex = path("admin-index").adminIndex()
     val schema = path("schema").get.handler {
         HttpResponse(
             body = HttpContent.Text(
@@ -102,43 +96,49 @@ class MetaEndpoints<USER>(
         when (it.headers.accept.firstOrNull()) {
             ContentType.Text.Html -> HttpResponse.html(
                 content = """
-                <html>
-                  <head>
-                    <meta charset="UTF-8">
-                    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.19.5/swagger-ui.css" >
-                    <style>
-                      .topbar {
-                        display: none;
-                      }
-                    </style>
-                  </head>
-
-                  <body>
-                    <div id="swagger-ui"></div>
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.19.5/swagger-ui-bundle.js"> </script>
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.19.5/swagger-ui-standalone-preset.js"> </script>
-                    <script>
-                      window.onload = function() {
-                        const ui = SwaggerUIBundle({
-                          spec: ${Serialization.jsonWithoutDefaults.encodeToString(openApiDescription)},
-                          dom_id: '#swagger-ui',
-                          deepLinking: true,
-                          presets: [
-                            SwaggerUIBundle.presets.apis,
-                            SwaggerUIStandalonePreset
-                          ],
-                          plugins: [
-                            SwaggerUIBundle.plugins.DownloadUrl
-                          ],
-                          layout: "StandaloneLayout"
-                        })
-                     
-                        window.ui = ui
-                      }
-                  </script>
-                  </body>
-                </html>
-            """.trimIndent()
+                    <!DOCTYPE html>
+                    <html>
+                      <head>
+                        <meta charset="utf-8" />
+                        <meta name="viewport" content="width=device-width, initial-scale=1" />
+                        <meta
+                          name="description"
+                          content="SwaggerUI"
+                        />
+                        <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui.css" />
+                        <style>
+                          .topbar {
+                            display: none;
+                          }
+                        </style>
+                      </head>
+    
+                      <body>
+                        <div id="swagger-ui"></div>
+                        <script src="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui-bundle.js" crossorigin></script>
+                        <script src="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui-standalone-preset.js" crossorigin></script>
+                        <script>
+                          window.onload = function() {
+                            const ui = SwaggerUIBundle({
+                              spec: ${Serialization.jsonWithoutDefaults.encodeToString(openApiDescription)},
+                              dom_id: '#swagger-ui',
+                              deepLinking: true,
+                              presets: [
+                                SwaggerUIBundle.presets.apis,
+                                SwaggerUIStandalonePreset
+                              ],
+                              plugins: [
+                                SwaggerUIBundle.plugins.DownloadUrl
+                              ],
+                              layout: "StandaloneLayout"
+                            })
+                         
+                            window.ui = ui
+                          }
+                      </script>
+                      </body>
+                    </html>
+                """.trimIndent()
             )
 
             else -> HttpResponse(
@@ -197,7 +197,9 @@ class MetaEndpoints<USER>(
                 const pathElement = document.getElementById("path") 
                 const messagesElement = document.getElementById("messages")
                 const token = getCookie("Authorization")
-                ws = new WebSocket("${generalSettings().wsUrl}" + pathElement.value + (token ? "?jwt=" + token : ""), "wss")
+                const url = "${generalSettings().wsUrl}" + pathElement.value + (token ? "?jwt=" + token : "")
+                console.log(url)
+                ws = new WebSocket(url, url.substring(0, url.indexOf("://")))
                 ws.addEventListener('open', ev => {
                     const newElement = document.createElement('p')
                     newElement.innerText = 'WS Opened.'
@@ -256,10 +258,9 @@ class MetaEndpoints<USER>(
     }
     val endpoints = listOf<HttpEndpoint>(
         docs,
-        health.route,
+        health.route.endpoint,
         isOnline,
         admin,
-        adminIndex,
         openApi,
         openApiJson,
         schema,
@@ -268,7 +269,6 @@ class MetaEndpoints<USER>(
     )
 }
 
-inline fun <reified USER> ServerPath.metaEndpoints(
-    packageName: String = "com.mypackage",
-    noinline isAdmin: suspend (USER) -> Boolean,
-): MetaEndpoints<USER> = MetaEndpoints(this, AuthInfo(), packageName, isAdmin)
+inline fun ServerPath.metaEndpoints(
+    packageName: String = "com.mypackage"
+): MetaEndpoints = MetaEndpoints(this, packageName)

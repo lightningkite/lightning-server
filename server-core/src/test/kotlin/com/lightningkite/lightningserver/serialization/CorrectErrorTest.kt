@@ -25,14 +25,14 @@ class CorrectErrorTest {
             implementation = { user: Unit, input: TestModel -> input }
         )
         runBlocking {
-            t.route.test(
+            t.route.endpoint.test(
                 body = HttpContent.Text("""{"number": 2}""", ContentType.Application.Json),
                 headers = HttpHeaders(HttpHeader.Accept to ContentType.Application.Json.toString())
             ).let {
                 assertEquals(HttpStatus.OK, it.status)
                 assertEquals(TestModel(number = 2), it.body?.parse())
             }
-            t.route.test(
+            t.route.endpoint.test(
                 body = HttpContent.Text("""{"number": "asdf"}""", ContentType.Application.Json),
                 headers = HttpHeaders(HttpHeader.Accept to ContentType.Application.Json.toString())
             ).let {
@@ -40,40 +40,5 @@ class CorrectErrorTest {
                 println(it.body?.text())
             }
         }
-//        testApplication {
-//            application {
-//                configureSerialization()
-//                this.routing {
-//                    post(
-//                        path = "test",
-//                        summary = "Test endpoint",
-//                        errorCases = listOf(),
-//                        implementation = { input: TestModel -> input }
-//                    )
-//                }
-//            }
-//            val client = createClient {
-//                this.expectSuccess = false
-//                install(ContentNegotiation) {
-//                    json(Json {
-//                        serializersModule = ClientModule
-//                    })
-//                }
-//            }
-//            val correct = client.post("/test") {
-//                setBody(buildJsonObject { put("number", 2) })
-//                contentType(ContentType.Application.Json)
-//                accept(ContentType.Application.Json)
-//                println(headers.entries().joinToString())
-//            }
-//            assertTrue(correct.status.isSuccess())
-//            val wrong = client.post("/test") {
-//                setBody(buildJsonObject { put("number", "wrongo") })
-//                contentType(ContentType.Application.Json)
-//                accept(ContentType.Application.Json)
-//                println(headers.entries().joinToString())
-//            }
-//            assertFalse(wrong.status.isSuccess())
-//        }
     }
 }

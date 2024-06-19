@@ -1,10 +1,14 @@
 package com.lightningkite.lightningdb
 
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.actor
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.StringFormat
 import kotlinx.serialization.builtins.ListSerializer
 import java.io.Closeable
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.*
 
 /**
@@ -18,10 +22,16 @@ class InMemoryUnsafePersistentFieldCollection<Model : Any>(
 ) : InMemoryFieldCollection<Model>(
     data = Collections.synchronizedList(ArrayList()),
     serializer = serializer
-),
-    Closeable {
+), Closeable{
+
+    private val scope = CoroutineScope(Dispatchers.IO)
+
+    @OptIn(ObsoleteCoroutinesApi::class)
+    val saveScope = scope.actor<Unit>(start = CoroutineStart.LAZY) {
+        handleCollectionDump()
+    }
+
     init {
-        var closing = false
         data.addAll(
             encoding.decodeFromString(
                 ListSerializer(serializer),
@@ -29,19 +39,21 @@ class InMemoryUnsafePersistentFieldCollection<Model : Any>(
             )
         )
         val shutdownHook = Thread {
-            closing = true
-            this.close()
+            handleCollectionDump()
         }
         Runtime.getRuntime().addShutdownHook(shutdownHook)
-        this.signals.add {
-            close()
-        }
     }
 
     override fun close() {
+        scope.launch {
+            saveScope.send(Unit)
+        }
+    }
+
+    fun handleCollectionDump() {
         val temp = file.parentFile!!.resolve(file.name + ".saving")
         temp.writeText(encoding.encodeToString(ListSerializer(serializer), data.toList()))
-        temp.renameTo(file)
+        Files.move(temp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE)
         logger.debug("Saved $file")
     }
 }

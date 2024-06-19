@@ -1,7 +1,8 @@
 package com.lightningkite.lightningdb
 
 import kotlinx.coroutines.flow.Flow
-import kotlin.reflect.KProperty1
+import kotlinx.coroutines.flow.map
+import kotlinx.serialization.KSerializer
 
 /**
  * An abstract way to communicate with a database on a specific collection/table
@@ -9,6 +10,8 @@ import kotlin.reflect.KProperty1
  * will have it's own implementation of this interface.
  */
 interface FieldCollection<Model : Any> {
+    val serializer: KSerializer<Model>
+
     /**
      * The field collection this wraps, if any.
      */
@@ -36,6 +39,26 @@ interface FieldCollection<Model : Any> {
     ): Flow<Model>
 
     /**
+     * Query for items in the collection.
+     */
+    suspend fun findPartial(
+        fields: Set<DataClassPathPartial<Model>>,
+        condition: Condition<Model>,
+        orderBy: List<SortPart<Model>> = listOf(),
+        skip: Int = 0,
+        limit: Int = Int.MAX_VALUE,
+        maxQueryMs: Long = 15_000,
+    ): Flow<Partial<Model>> = find(
+        condition = condition,
+        orderBy = orderBy,
+        skip = skip,
+        limit = limit,
+        maxQueryMs = maxQueryMs
+    ).map {
+        Partial(it, fields)
+    }
+
+    /**
      * Count the number of matching items in the collection.
      */
     suspend fun count(
@@ -47,7 +70,7 @@ interface FieldCollection<Model : Any> {
      */
     suspend fun <Key> groupCount(
         condition: Condition<Model> = Condition.Always(),
-        groupBy: KProperty1<Model, Key>
+        groupBy: DataClassPath<Model, Key>
     ): Map<Key, Int>
 
     /**
@@ -56,7 +79,7 @@ interface FieldCollection<Model : Any> {
     suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model> = Condition.Always(),
-        property: KProperty1<Model, N>
+        property: DataClassPath<Model, N>
     ): Double?
 
     /**
@@ -65,8 +88,8 @@ interface FieldCollection<Model : Any> {
     suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model> = Condition.Always(),
-        groupBy: KProperty1<Model, Key>,
-        property: KProperty1<Model, N>
+        groupBy: DataClassPath<Model, Key>,
+        property: DataClassPath<Model, N>
     ): Map<Key, Double?>
 
 
@@ -192,12 +215,4 @@ interface FieldCollection<Model : Any> {
     suspend fun deleteManyIgnoringOld(
         condition: Condition<Model>
     ): Int
-
-    /**
-     * Registers a raw signal for the collection.
-     * This skips over any security rules and goes straight to the root of the database.
-     * Useful for handling change signals that absolutely cannot be skipped under any circumstances.
-     * Currently only used for websocket change watching.
-     */
-    fun registerRawSignal(callback: suspend (CollectionChanges<Model>) -> Unit)
 }

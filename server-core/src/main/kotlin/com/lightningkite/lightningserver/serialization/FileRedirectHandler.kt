@@ -10,7 +10,8 @@ import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.schedule.schedule
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
-import java.time.Duration
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 
 object FileRedirectHandler : Serialization.HttpContentHandler {
     override val contentType: ContentType = ContentType.Text.UriList
@@ -35,7 +36,7 @@ object FileRedirectHandler : Serialization.HttpContentHandler {
         return HttpContent.Text(file.signedUrl + "\r\n", contentType)
     }
 
-    val cleanSchedule = schedule("cleanRedirectToFiles", Duration.ofDays(1)) {
+    val cleanSchedule = schedule("cleanRedirectToFiles", 1.days) {
         ExternalServerFileSerializer.fileSystem().root.resolve("temp-download").list()?.forEach {
             it.delete()
         }

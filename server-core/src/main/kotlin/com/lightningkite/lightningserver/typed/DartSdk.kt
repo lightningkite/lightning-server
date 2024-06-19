@@ -2,9 +2,10 @@
 
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningdb.MySealedClassSerializerInterface
+import com.lightningkite.lightningdb.MySealedClassSerializer
 import com.lightningkite.lightningdb.listElement
 import com.lightningkite.lightningdb.mapValueElement
+import com.lightningkite.lightningdb.nullElement
 import com.lightningkite.lightningserver.camelCase
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.HttpMethod
@@ -44,7 +45,8 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
         .forEach {
             when (it.descriptor.kind) {
                 is StructureKind.CLASS -> {
-                    if (it is MySealedClassSerializerInterface) return@forEach
+                    if (it is MySealedClassSerializer) return@forEach
+                    appendLine("@JsonSerializable()")
                     append("class ")
                     it.write().let { out.append(it) }
                     appendLine(" {")
@@ -99,7 +101,7 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
     appendLine()
     appendLine()
 
-    val byGroup = safeDocumentables.groupBy { it.docGroup }
+    val byGroup = safeDocumentables.groupBy { it.docGroupIdentifier }
     val groups = byGroup.keys.filterNotNull()
 
     for (group in groups) {
@@ -136,14 +138,14 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
             this.functionHeader(entry, skipAuth = false)
             appendLine(" async {")
             val hasInput = entry.inputType != Unit.serializer()
-            appendLine("        var url = Uri.parse(\"\${parent.httpUrl}${entry.route.path.escaped}\");")
+            appendLine("        var url = Uri.parse(\"\${parent.httpUrl}${entry.route.path.path.escaped}\");")
             appendLine("        var headers = parent.extraHeaders;")
-            entry.authInfo.type?.let {
-                if (entry.authInfo.required) {
-                    appendLine("        headers[\"Authorization\"] = \"Bearer ${it.userTypeTokenName()}}\";")
+            entry.primaryAuthName?.let {
+                if (entry.authOptions.options.contains(null).not()) {
+                    appendLine("        headers[\"Authorization\"] = \"Bearer $${it.userTypeTokenName()}\";")
                 } else {
                     appendLine("        if (${it.userTypeTokenName()} == null) {")
-                    appendLine("            headers[\"Authorization\"] = \"Bearer ${it.userTypeTokenName()}}\";")
+                    appendLine("            headers[\"Authorization\"] = \"Bearer $${it.userTypeTokenName()}\";")
                     appendLine("        }")
                 }
             }
@@ -151,7 +153,7 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
                 appendLine(
                     "        var response = await http.${
                         entry.route.method.toString().lowercase()
-                    }(url, headers: headers, body: ${entry.inputType.writeSerialize("input")});"
+                    }(url, headers: headers, body: jsonEncode(${entry.inputType.writeSerialize("input")}));"
                 )
             } else {
                 appendLine(
@@ -160,8 +162,8 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
                     }(url, headers: headers);"
                 )
             }
-            appendLine("        if (response.statusCode / 100 != 2) {")
-            appendLine("            throw response;")
+            appendLine("        if (response.statusCode ~/ 100 != 2) {")
+            appendLine("            throw \"${'$'}{response.statusCode} ${'$'}{response.body}\";")
             appendLine("        }")
             entry.outputType.takeUnless { it == Unit.serializer() }?.let {
                 appendLine("        return ${it.writeParse("response.body")};")
@@ -187,14 +189,14 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
         this.functionHeader(entry, skipAuth = false)
         appendLine(" async {")
         val hasInput = entry.inputType != Unit.serializer()
-        appendLine("        var url = Uri.parse(\"\${httpUrl}${entry.route.path.escaped}\");")
+        appendLine("        var url = Uri.parse(\"\${httpUrl}${entry.path.path.escaped}\");")
         appendLine("        var headers = extraHeaders;")
-        entry.authInfo.type?.let {
-            if (entry.authInfo.required) {
-                appendLine("        headers[\"Authorization\"] = \"Bearer ${it.userTypeTokenName()}}\";")
+        entry.primaryAuthName?.let {
+            if (entry.authOptions.options.contains(null).not()) {
+                appendLine("        headers[\"Authorization\"] = \"Bearer $${it.userTypeTokenName()}\";")
             } else {
                 appendLine("        if (${it.userTypeTokenName()} == null) {")
-                appendLine("            headers[\"Authorization\"] = \"Bearer ${it.userTypeTokenName()}}\";")
+                appendLine("            headers[\"Authorization\"] = \"Bearer $${it.userTypeTokenName()}\";")
                 appendLine("        }")
             }
         }
@@ -202,7 +204,7 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
             appendLine(
                 "        var response = await http.${
                     entry.route.method.toString().lowercase()
-                }(url, headers: headers, body: ${entry.inputType.writeSerialize("input")});"
+                }(url, headers: headers, body: jsonEncode(${entry.inputType.writeSerialize("input")}));"
             )
         } else {
             appendLine(
@@ -211,8 +213,8 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
                 }(url, headers: headers);"
             )
         }
-        appendLine("        if (response.statusCode / 100 != 2) {")
-        appendLine("            throw response;")
+        appendLine("        if (response.statusCode ~/ 100 != 2) {")
+        appendLine("            throw \"${'$'}{response.statusCode} ${'$'}{response.body}\";")
         appendLine("        }")
         entry.outputType.takeUnless { it == Unit.serializer() }?.let {
             appendLine("        return ${it.writeParse("response.body")};")
@@ -242,7 +244,7 @@ private val fromLightningServerPackage = setOf(
 )
 private val skipSet = fromLightningServerPackage + setOf(
     "SortPart",
-    "KProperty1Partial",
+    "SerializablePropertyPartial",
 )
 
 private fun String.groupToInterfaceName(): String = replaceFirstChar { it.uppercase() } + "Api"
@@ -259,7 +261,7 @@ private fun Appendable.functionHeader(
     overrideUserType: String? = null,
 ) {
     when (documentable) {
-        is ApiEndpoint<*, *, *> -> {
+        is ApiEndpoint<*, *, *, *> -> {
             append("Future<")
             documentable.outputType.write().let { append(it) }
             append(">")
@@ -293,7 +295,7 @@ private fun Appendable.functionCall(
     arguments(documentable, skipAuth, overrideUserType).forEach {
         if (argComma) append(", ")
         else argComma = true
-        if (it.name == documentable.authInfo.type?.userTypeTokenName() && authUsesThis) {
+        if (it.name == documentable.primaryAuthName?.userTypeTokenName() && authUsesThis) {
             append("this.")
         }
         append(it.name)
@@ -314,32 +316,32 @@ private fun arguments(
     skipAuth: Boolean = false,
     overrideUserType: String? = null,
 ): List<DArg> = when (documentable) {
-    is ApiEndpoint<*, *, *> -> listOfNotNull(
-        documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
-            .map {
-                DArg(name = it.name, type = documentable.routeTypes[it.name], stringType = "String")
+    is ApiEndpoint<*, *, *, *> -> listOfNotNull(
+        documentable.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
+            .mapIndexed { index, it ->
+                DArg(name = it.name, type = documentable.path.serializers[index], stringType = "String")
             },
         documentable.inputType.takeUnless { it == Unit.serializer() }?.let {
             DArg(name = "input", type = it)
         }?.let(::listOf),
-        documentable.authInfo.type?.takeUnless { skipAuth }?.let {
+        documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
             DArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),
                 stringType = "String",
-                optional = !documentable.authInfo.required
+                optional = !documentable.authOptions.options.contains(null).not()
             )
         }?.let(::listOf)
     ).flatten()
 
-    is ApiWebsocket<*, *, *> -> listOfNotNull(
-        documentable.authInfo.type?.takeUnless { skipAuth }?.let {
+    is ApiWebsocket<*, *, *, *> -> listOfNotNull(
+        documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
             DArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),
                 stringType = "String",
-                optional = !documentable.authInfo.required
+                optional = !documentable.authOptions.options.contains(null).not()
             )
         }?.let(::listOf),
-        documentable.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
+        documentable.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {
                 DArg(name = it.name, stringType = "String")
             }
@@ -349,7 +351,7 @@ private fun arguments(
 }
 
 
-private fun KSerializer<*>.write(): String = if (this == Unit.serializer()) "void" else StringBuilder().also { out ->
+private fun KSerializer<*>.write(): String = nullElement()?.let { it.write() + "?" } ?: if (this == Unit.serializer()) "void" else StringBuilder().also { out ->
     when (descriptor.kind) {
         PrimitiveKind.BOOLEAN -> out.append("bool")
         PrimitiveKind.BYTE,
@@ -399,7 +401,6 @@ private fun KSerializer<*>.write(): String = if (this == Unit.serializer()) "voi
             }
         }
     }
-    if (descriptor.isNullable) out.append("?")
 }.toString()
 
 private fun KSerializer<*>.writeSerialize(on: String): String = StringBuilder().also { out ->
@@ -418,6 +419,7 @@ private fun KSerializer<*>.writeSerialize(on: String): String = StringBuilder().
         PrimitiveKind.CHAR,
         PrimitiveKind.STRING -> out.append(on)
 
+        // TODO
         StructureKind.LIST -> {
             out.append(on)
             if (descriptor.isNullable) out.append("?.") else out.append(".")
@@ -473,8 +475,8 @@ private fun KSerializer<*>.writeParse(on: String): String = StringBuilder().also
         }
 
         StructureKind.LIST -> {
-            if (descriptor.isNullable) out.append("($on as List<dynamic>?)?.") else out.append("($on as List<dynamic>).")
-            out.append("map((e) => ${this.listElement()!!.writeParse("e")}).toList()")
+            if (descriptor.isNullable) out.append("($on as List<dynamic>?)?.") else out.append("(jsonDecode($on) as List<dynamic>).")
+            out.append("map((e) => ${this.write().replace("List<", "").replace(">", "")}.fromJson(e)).toList()")
         }
 
         StructureKind.MAP -> {
@@ -492,7 +494,7 @@ private fun KSerializer<*>.writeParse(on: String): String = StringBuilder().also
         StructureKind.CLASS,
         -> {
             out.append(descriptor.simpleSerialName)
-            out.append(".fromJson($on as Map<String, dynamic>)")
+            out.append(".fromJson(jsonDecode($on) as Map<String, dynamic>)")
         }
     }
 }.toString()
@@ -502,3 +504,16 @@ private val SerialDescriptor.simpleSerialName: String
 
 private fun String.userTypeTokenName(): String =
     this.substringAfterLast('.').replaceFirstChar { it.lowercase() }.plus("Token")
+
+
+private val ServerPath.escaped: String
+    get() = "/" + segments.joinToString("/") {
+        when (it) {
+            is ServerPath.Segment.Constant -> it.value
+            is ServerPath.Segment.Wildcard -> "\${${it.name}}"
+        }
+    } + when (after) {
+        ServerPath.Afterwards.None -> ""
+        ServerPath.Afterwards.TrailingSlash -> "/"
+        ServerPath.Afterwards.ChainedWildcard -> "/*"
+    }

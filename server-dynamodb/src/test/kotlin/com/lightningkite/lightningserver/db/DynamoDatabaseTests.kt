@@ -17,7 +17,8 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.*
 import java.net.URI
-import java.util.UUID
+import com.lightningkite.UUID
+import com.lightningkite.uuid
 
 class DynamoDBTests() {
     @Test
@@ -40,16 +41,16 @@ class DynamoDBTests() {
             println(collection.find(condition { it._id eq special._id }).toList())
             collection.updateMany(condition { it._id eq special._id }, modification { it.value assign 2 })
             println(collection.find(condition { it._id eq special._id }).toList())
-            collection.updateMany(condition { it._id eq special._id }, modification { it.value plus 1 })
+            collection.updateMany(condition { it._id eq special._id }, modification { it.value += 1 })
             println(collection.find(condition { it._id eq special._id }).toList())
             println(collection.find(Condition.Always()).toList())
-            println(collection.find(Condition.Always(), orderBy = listOf(SortPart(TestData::value))).toList())
+            println(collection.find(Condition.Always(), orderBy = listOf(SortPart(path<TestData>().value))).toList())
         }
     }
 }
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable data class TestData(
-    val _id: UUID = UUID.randomUUID(),
+    val _id: UUID = uuid(),
     @Index val value: Int = 42
 )

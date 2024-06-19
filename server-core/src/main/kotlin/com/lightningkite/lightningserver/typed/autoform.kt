@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
-import com.lightningkite.lightningserver.jsonschema.encodeToSchema
+import com.lightningkite.lightningserver.jsonschema.schema
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
 import io.ktor.util.*
@@ -122,7 +122,7 @@ fun <T> FlowContent.jsForm(
     div { this.id = id }
     script {
         unsafe {
-            UploadEarlyEndpoint.default?.endpoint?.path?.fullUrl()?.let { uploadUrl ->
+            UploadEarlyEndpoint.default?.endpoint?.path?.path?.fullUrl()?.let { uploadUrl ->
                 +"""
                 JSONEditor.defaults.callbacks = {
                     upload: {
@@ -152,7 +152,7 @@ fun <T> FlowContent.jsForm(
                     disable_properties: true,
                     form_name_root: "$title",
                     collapsed: $collapsed,
-                    schema: ${Serialization.json.encodeToSchema(serializer)},
+                    schema: ${Serialization.json.schema(serializer)},
                     max_depth: 5
                 });
                 window.${jsEditorName} = $jsEditorName
@@ -191,7 +191,7 @@ fun <T> FlowContent.displayUntyped(
                     disable_properties: true,
                     form_name_root: "$title",
                     collapsed: $collapsed,
-                    schema: ${Serialization.json.encodeToSchema(serializer)}
+                    schema: ${Serialization.json.schema(serializer)}
                 });
                 ${jsEditorName}.disable()
                 ${

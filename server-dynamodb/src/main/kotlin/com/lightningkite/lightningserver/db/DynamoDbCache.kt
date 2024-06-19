@@ -4,6 +4,8 @@ import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.CacheSettings
 import kotlinx.coroutines.*
 import kotlinx.coroutines.future.await
+import kotlinx.datetime.Clock
+import com.lightningkite.now
 import kotlinx.serialization.KSerializer
 import software.amazon.awssdk.auth.credentials.AwsCredentials
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
@@ -11,8 +13,8 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.*
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 
 class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: String = "cache") : Cache {
     val client by lazy(LazyThreadSafetyMode.SYNCHRONIZED, makeClient)
@@ -120,7 +122,7 @@ class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: St
                 "key" to AttributeValue.fromS(key),
                 "value" to serializer.toDynamo(value),
             ) + (timeToLive?.let {
-                mapOf("expires" to AttributeValue.fromN(Instant.now().plus(it).epochSecond.toString()))
+                mapOf("expires" to AttributeValue.fromN(now().plus(it).epochSeconds.toString()))
             } ?: mapOf()))
         }.await()
     }
@@ -142,7 +144,7 @@ class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: St
                         "key" to AttributeValue.fromS(key),
                         "value" to serializer.toDynamo(value),
                     ) + (timeToLive?.let {
-                        mapOf("expires" to AttributeValue.fromN(Instant.now().plus(it).epochSecond.toString()))
+                        mapOf("expires" to AttributeValue.fromN(now().plus(it).epochSeconds.toString()))
                     } ?: mapOf())
                 )
             }.await()
@@ -157,22 +159,17 @@ class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: St
         client.updateItem {
             it.tableName(tableName)
             it.key(mapOf("key" to AttributeValue.fromS(key)))
-            it.updateExpression("SET #exp = :exp, #v = #v + :v")
+            it.updateExpression("SET #exp = :exp, #v = if_not_exists(#v, :z) + :v")
             it.expressionAttributeNames(mapOf("#v" to "value", "#exp" to "expiration"))
             it.expressionAttributeValues(
                 mapOf(
+                    ":z" to AttributeValue.fromN("0"),
                     ":v" to AttributeValue.fromN(value.toString()),
-                    ":exp" to (timeToLive?.let { AttributeValue.fromN(Instant.now().plus(it).epochSecond.toString()) }
+                    ":exp" to (timeToLive?.let { AttributeValue.fromN(now().plus(it).epochSeconds.toString()) }
                         ?: AttributeValue.fromNul(true))
                 )
             )
         }.await()
-    }
-
-    override suspend fun clear() {
-        ready.await()
-        ready = ready()
-        client.deleteTable { it.tableName(tableName) }.await()
     }
 
     override suspend fun remove(key: String) {

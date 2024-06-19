@@ -2,28 +2,23 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningdb.Condition
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.future.await
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
-import kotlinx.serialization.descriptors.elementDescriptors
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.*
-import kotlin.reflect.KProperty1
 
 class DynamoDbCollection<T : Any>(
     val client: DynamoDbAsyncClient,
-    val serializer: KSerializer<T>,
+    override val serializer: KSerializer<T>,
     val tableName: String,
-) : AbstractSignalFieldCollection<T>() {
+) : FieldCollection<T> {
 
-    val idSerializer = serializer.fieldSerializer("_id") as? KSerializer<Any>
+    val idSerializer = serializer.serializableProperties!!.find { it.name == "_id" }!!.serializer as KSerializer<Any?>
 
     suspend fun findRaw(
         condition: Condition<T>,
@@ -33,7 +28,7 @@ class DynamoDbCollection<T : Any>(
         maxQueryMs: Long = 30_000L,
     ): Flow<Pair<Map<String, AttributeValue>, T>> {
         //TODO: Need to use the serial name
-        val orderKey = orderBy.map { it.field.property.name }
+        val orderKey = orderBy.map { it.field.toString() }
         val index = indices[orderKey]
         val key = if (index != null) orderKey.first() else "_id"
         val c = condition.dynamo(serializer, key)
@@ -66,7 +61,7 @@ class DynamoDbCollection<T : Any>(
         maxQueryMs: Long,
     ): Flow<T> = findRaw(condition, orderBy, skip, limit, maxQueryMs).map { it.second }
 
-    override suspend fun insertImpl(models: Iterable<T>): List<T> {
+    override suspend fun insert(models: Iterable<T>): List<T> {
         client.batchWriteItem {
             it.requestItems(mapOf(tableName to models.map {
                 WriteRequest.builder().putRequest(
@@ -77,11 +72,11 @@ class DynamoDbCollection<T : Any>(
         return models.toList()
     }
 
-    override suspend fun replaceOneImpl(condition: Condition<T>, model: T, orderBy: List<SortPart<T>>): EntryChange<T> {
+    override suspend fun replaceOne(condition: Condition<T>, model: T, orderBy: List<SortPart<T>>): EntryChange<T> {
         TODO("Not yet implemented")
     }
 
-    override suspend fun replaceOneIgnoringResultImpl(
+    override suspend fun replaceOneIgnoringResult(
         condition: Condition<T>,
         model: T,
         orderBy: List<SortPart<T>>,
@@ -89,7 +84,7 @@ class DynamoDbCollection<T : Any>(
         TODO("Not yet implemented")
     }
 
-    override suspend fun upsertOneImpl(
+    override suspend fun upsertOne(
         condition: Condition<T>,
         modification: Modification<T>,
         model: T,
@@ -97,7 +92,7 @@ class DynamoDbCollection<T : Any>(
         TODO("Not yet implemented")
     }
 
-    override suspend fun upsertOneIgnoringResultImpl(
+    override suspend fun upsertOneIgnoringResult(
         condition: Condition<T>,
         modification: Modification<T>,
         model: T,
@@ -122,7 +117,7 @@ class DynamoDbCollection<T : Any>(
         }
     }
 
-    override suspend fun updateOneImpl(condition: Condition<T>, modification: Modification<T>, orderBy: List<SortPart<T>>): EntryChange<T> {
+    override suspend fun updateOne(condition: Condition<T>, modification: Modification<T>, orderBy: List<SortPart<T>>): EntryChange<T> {
         val m = modification.dynamo(serializer)
         return perKey(condition, limit = 1) { c, key ->
             val result = client.updateItem {
@@ -139,7 +134,7 @@ class DynamoDbCollection<T : Any>(
         }.singleOrNull() ?: EntryChange(null, null)
     }
 
-    override suspend fun updateOneIgnoringResultImpl(condition: Condition<T>, modification: Modification<T>, orderBy: List<SortPart<T>>): Boolean {
+    override suspend fun updateOneIgnoringResult(condition: Condition<T>, modification: Modification<T>, orderBy: List<SortPart<T>>): Boolean {
         val m = modification.dynamo(serializer)
         return perKey(condition, limit = 1) { c, key ->
             client.updateItem {
@@ -151,7 +146,7 @@ class DynamoDbCollection<T : Any>(
         }.singleOrNull() ?: false
     }
 
-    override suspend fun updateManyImpl(condition: Condition<T>, modification: Modification<T>): CollectionChanges<T> {
+    override suspend fun updateMany(condition: Condition<T>, modification: Modification<T>): CollectionChanges<T> {
         val m = modification.dynamo(serializer)
         val changes = ArrayList<EntryChange<T>>()
         perKey(condition) { c, key ->
@@ -170,7 +165,7 @@ class DynamoDbCollection<T : Any>(
         return CollectionChanges(changes = changes)
     }
 
-    override suspend fun updateManyIgnoringResultImpl(condition: Condition<T>, modification: Modification<T>): Int {
+    override suspend fun updateManyIgnoringResult(condition: Condition<T>, modification: Modification<T>): Int {
         var changed = 0
         val m = modification.dynamo(serializer)
         perKey(condition) { c, key ->
@@ -184,7 +179,7 @@ class DynamoDbCollection<T : Any>(
         return changed
     }
 
-    override suspend fun deleteOneImpl(condition: Condition<T>, orderBy: List<SortPart<T>>): T? {
+    override suspend fun deleteOne(condition: Condition<T>, orderBy: List<SortPart<T>>): T? {
         return perKey(condition, limit = 1) { c, key ->
             val result = client.deleteItem {
                 it.tableName(tableName)
@@ -196,7 +191,7 @@ class DynamoDbCollection<T : Any>(
         }.singleOrNull()
     }
 
-    override suspend fun deleteOneIgnoringOldImpl(condition: Condition<T>, orderBy: List<SortPart<T>>): Boolean {
+    override suspend fun deleteOneIgnoringOld(condition: Condition<T>, orderBy: List<SortPart<T>>): Boolean {
         return perKey(condition, limit = 1) { c, key ->
             client.deleteItem {
                 it.tableName(tableName)
@@ -207,7 +202,7 @@ class DynamoDbCollection<T : Any>(
         }.singleOrNull() ?: false
     }
 
-    override suspend fun deleteManyImpl(condition: Condition<T>): List<T> {
+    override suspend fun deleteMany(condition: Condition<T>): List<T> {
         return perKey(condition) { c, key ->
             val result = client.deleteItem {
                 it.tableName(tableName)
@@ -220,7 +215,7 @@ class DynamoDbCollection<T : Any>(
         }.toList()
     }
 
-    override suspend fun deleteManyIgnoringOldImpl(condition: Condition<T>): Int {
+    override suspend fun deleteManyIgnoringOld(condition: Condition<T>): Int {
         var changed = 0
         perKey(condition) { c, key ->
             val result = client.deleteItem {
@@ -260,10 +255,10 @@ class DynamoDbCollection<T : Any>(
         }
     }
 
-    override suspend fun <Key> groupCount(condition: Condition<T>, groupBy: KProperty1<T, Key>): Map<Key, Int> {
+    override suspend fun <Key> groupCount(condition: Condition<T>, groupBy: DataClassPath<T, Key>): Map<Key, Int> {
         val map = HashMap<Key, Int>()
         find(condition).collect {
-            val key = groupBy.get(it)
+            val key = groupBy.get(it) ?: return@collect
             map[key] = map.getOrDefault(key, 0)
         }
         return map
@@ -272,7 +267,7 @@ class DynamoDbCollection<T : Any>(
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<T>,
-        property: KProperty1<T, N>,
+        property: DataClassPath<T, N>,
     ): Double? {
         val a = aggregate.aggregator()
         find(condition).collect {
@@ -284,12 +279,12 @@ class DynamoDbCollection<T : Any>(
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<T>,
-        groupBy: KProperty1<T, Key>,
-        property: KProperty1<T, N>,
+        groupBy: DataClassPath<T, Key>,
+        property: DataClassPath<T, N>,
     ): Map<Key, Double?> {
         val map = HashMap<Key, Aggregator>()
         find(condition).collect {
-            val key = groupBy.get(it)
+            val key = groupBy.get(it) ?: return@collect
             property.get(it)?.toDouble()?.let { map.getOrPut(key) { aggregate.aggregator() }.consume(it) }
         }
         return map.mapValues { it.value.complete() }
@@ -308,87 +303,10 @@ class DynamoDbCollection<T : Any>(
             descriptor.annotations.forEach {
                 when (it) {
                     is UniqueSet -> expectedIndices[it.fields.joinToString("_")] = it.fields.toList()
-
-                    is UniqueSetJankPatch -> {
-                        val sets: MutableList<MutableList<String>> = mutableListOf()
-                        var current = mutableListOf<String>()
-                        it.fields.forEach { value ->
-                            if (value == ":") {
-                                sets.add(current)
-                                current = mutableListOf()
-                            } else {
-                                current.add(value)
-                            }
-                        }
-                        sets.add(current)
-                        sets.forEach { set ->
-                            expectedIndices[set.joinToString("_")] = set.toList()
-                        }
-                    }
-
                     is IndexSet -> expectedIndices[it.fields.joinToString("_")] = it.fields.toList()
-
-                    is IndexSetJankPatch -> {
-                        val sets: MutableList<MutableList<String>> = mutableListOf()
-                        var current = mutableListOf<String>()
-                        it.fields.forEach { value ->
-                            if (value == ":") {
-                                sets.add(current)
-                                current = mutableListOf()
-                            } else {
-                                current.add(value)
-                            }
-                        }
-                        sets.add(current)
-                        sets.forEach { set ->
-                            expectedIndices[set.joinToString("_")] = set.toList()
-                        }
-                    }
-
                     is TextIndex -> throw IllegalArgumentException()
                     is NamedUniqueSet -> expectedIndices[it.indexName] = it.fields.toList()
-
-                    is NamedUniqueSetJankPatch -> {
-                        val sets: MutableList<MutableList<String>> = mutableListOf()
-                        var current = mutableListOf<String>()
-                        it.fields.forEach { value ->
-                            if (value == ":") {
-                                sets.add(current)
-                                current = mutableListOf()
-                            } else {
-                                current.add(value)
-                            }
-                        }
-                        sets.add(current)
-                        val names = it.indexNames.split(":").map { it.trim() }
-
-                        sets.forEachIndexed { index, set ->
-                            expectedIndices[names.getOrNull(index) ?: set.joinToString("_")] = set.toList()
-                        }
-                    }
-
                     is NamedIndexSet -> expectedIndices[it.indexName] = it.fields.toList()
-
-                    is NamedIndexSetJankPatch -> {
-
-                        val sets: MutableList<MutableList<String>> = mutableListOf()
-                        var current = mutableListOf<String>()
-                        it.fields.forEach { value ->
-                            if (value == ":") {
-                                sets.add(current)
-                                current = mutableListOf()
-                            } else {
-                                current.add(value)
-                            }
-                        }
-                        sets.add(current)
-                        val names = it.indexNames.split(":").map { it.trim() }
-
-                        sets.forEachIndexed { index, set ->
-                            expectedIndices[names.getOrNull(index) ?: set.joinToString("_")] = set.toList()
-                        }
-
-                    }
                 }
             }
             (0 until descriptor.elementsCount).forEach { index ->

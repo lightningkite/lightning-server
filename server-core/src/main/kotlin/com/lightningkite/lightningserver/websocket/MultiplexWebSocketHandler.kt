@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.websocket
 import com.lightningkite.lightningdb.MultiplexMessage
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.CacheHandle
+import com.lightningkite.lightningserver.cache.PrefixCache
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.NotFoundException
@@ -13,7 +14,8 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import java.time.Duration
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 
 class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
     val type = "multiplex"
@@ -79,7 +81,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
 
     override suspend fun message(event: WebSockets.MessageEvent) {
         if (event.content.isBlank()) {
-            event.id.send("")
+            event.id.send(" ")
             return
         }
         val message = Serialization.json.decodeFromString<MultiplexMessage>(event.content)
@@ -126,6 +128,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                                 queryParameters = message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } }
                                     ?: listOf(),
                                 id = wsIdChannel,
+                                cache = PrefixCache(event.cache, message.channel + "/"),
                                 headers = HttpHeaders(info.headers),
                                 domain = info.domain,
                                 protocol = info.protocol,
@@ -145,7 +148,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                     )
                     return
                 }
-                channels(event.id).modify(40, Duration.ofHours(8)) {
+                channels(event.id).modify(40, 8.hours) {
                     it?.plus(message.channel) ?: setOf(message.channel)
                 }
                 event.id.send(
@@ -174,14 +177,15 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                     return
                 }
                 path(event.id, message.channel).remove()
-                channels(event.id).modify(40, timeToLive = Duration.ofHours(8)) {
+                channels(event.id).modify(40, timeToLive = 8.hours) {
                     it?.minus(message.channel) ?: setOf()
                 }
                 try {
                     Metrics.handlerPerformance(WebSockets.HandlerSection(path, WebSockets.WsHandlerType.DISCONNECT)) {
                         otherHandler.disconnect(
                             WebSockets.DisconnectEvent(
-                                id = wsIdChannel
+                                id = wsIdChannel,
+                                cache = PrefixCache(event.cache, message.channel + "/"),
                             )
                         )
                     }
@@ -226,13 +230,14 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                         otherHandler.message(
                             WebSockets.MessageEvent(
                                 id = wsIdChannel,
+                                cache = PrefixCache(event.cache, message.channel + "/"),
                                 content = message.data!!
                             )
                         )
                     }
                 } catch (e: Exception) {
                     e.report(WebSockets.HandlerSection(path, WebSockets.WsHandlerType.MESSAGE))
-                    channels(event.id).modify(40, timeToLive = Duration.ofHours(8)) {
+                    channels(event.id).modify(40, timeToLive = 8.hours) {
                         it?.minus(message.channel) ?: setOf()
                     }
                     path(event.id, message.channel).remove()
@@ -254,7 +259,8 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                         ) {
                             otherHandler.disconnect(
                                 WebSockets.DisconnectEvent(
-                                    id = wsIdChannel
+                                    id = wsIdChannel,
+                                    cache = PrefixCache(event.cache, message.channel + "/"),
                                 )
                             )
                         }
@@ -278,7 +284,8 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                     Metrics.handlerPerformance(WebSockets.HandlerSection(path, WebSockets.WsHandlerType.DISCONNECT)) {
                         otherHandler.disconnect(
                             WebSockets.DisconnectEvent(
-                                id = wsIdChannel
+                                id = wsIdChannel,
+                                cache = PrefixCache(event.cache, channel + "/"),
                             )
                         )
                     }

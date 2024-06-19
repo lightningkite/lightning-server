@@ -11,8 +11,8 @@ import net.schmizz.sshj.sftp.OpenMode
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import java.io.File
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 
 class Sftp(
     val host: String,
@@ -105,7 +105,7 @@ class Sftp(
                         FileInfo(
                             type = path.extension.let { ContentType.fromExtension(it) },
                             size = it.size,
-                            lastModified = Instant.ofEpochSecond(it.mtime)
+                            lastModified = Instant.fromEpochSeconds(it.mtime)
                         )
                     }
                 } catch (e: net.schmizz.sshj.sftp.SFTPException) {

@@ -6,20 +6,25 @@
 variable "deployment_location" {
     type = string
     default = "us-west-2"
+    nullable = false
 }
 variable "debug" {
     type = bool
     default = false
+    nullable = false
 }
 variable "ip_prefix" {
     type = string
     default = "10.0"
+    nullable = false
 }
 variable "domain_name_zone" {
     type = string
+    nullable = false
 }
 variable "domain_name" {
     type = string
+    nullable = false
 }
 
 ##########

@@ -3,7 +3,8 @@ package com.lightningkite.lightningdb
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onStart
-import kotlin.reflect.KProperty1
+import kotlinx.serialization.KSerializer
+import com.lightningkite.lightningdb.SerializableProperty
 import kotlin.reflect.KType
 
 /**
@@ -15,6 +16,7 @@ open class DelayedFieldCollection<Model : Any>(
     override val wraps: FieldCollection<Model>,
     val milliseconds: Long
 ) : FieldCollection<Model> {
+    override val serializer: KSerializer<Model> get() = wraps.serializer
     override suspend fun fullCondition(condition: Condition<Model>): Condition<Model> = wraps.fullCondition(condition)
     override suspend fun mask(): Mask<Model> = wraps.mask()
     override suspend fun find(
@@ -25,12 +27,22 @@ open class DelayedFieldCollection<Model : Any>(
         maxQueryMs: Long,
     ): Flow<Model> = wraps.find(condition, orderBy, skip, limit, maxQueryMs).onStart { delay(milliseconds) }
 
+    override suspend fun findPartial(
+        fields: Set<DataClassPathPartial<Model>>,
+        condition: Condition<Model>,
+        orderBy: List<SortPart<Model>>,
+        skip: Int,
+        limit: Int,
+        maxQueryMs: Long
+    ): Flow<Partial<Model>> =
+        wraps.findPartial(fields, condition, orderBy, skip, limit, maxQueryMs).onStart { delay(milliseconds) }
+
     override suspend fun count(condition: Condition<Model>): Int {
         delay(milliseconds)
         return wraps.count(condition)
     }
 
-    override suspend fun <Key> groupCount(condition: Condition<Model>, groupBy: KProperty1<Model, Key>): Map<Key, Int> {
+    override suspend fun <Key> groupCount(condition: Condition<Model>, groupBy: DataClassPath<Model, Key>): Map<Key, Int> {
         delay(milliseconds)
         return wraps.groupCount(condition, groupBy)
     }
@@ -38,7 +50,7 @@ open class DelayedFieldCollection<Model : Any>(
     override suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        property: KProperty1<Model, N>,
+        property: DataClassPath<Model, N>,
     ): Double? {
         delay(milliseconds)
         return wraps.aggregate(aggregate, condition, property)
@@ -47,8 +59,8 @@ open class DelayedFieldCollection<Model : Any>(
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
         condition: Condition<Model>,
-        groupBy: KProperty1<Model, Key>,
-        property: KProperty1<Model, N>,
+        groupBy: DataClassPath<Model, Key>,
+        property: DataClassPath<Model, N>,
     ): Map<Key, Double?> {
         delay(milliseconds)
         return wraps.groupAggregate(aggregate, condition, groupBy, property)
@@ -145,17 +157,16 @@ open class DelayedFieldCollection<Model : Any>(
         delay(milliseconds)
         return wraps.deleteManyIgnoringOld(condition)
     }
-
-    override fun registerRawSignal(callback: suspend (CollectionChanges<Model>) -> Unit) {
-        return wraps.registerRawSignal(callback)
-    }
 }
 
 fun <Model : Any> FieldCollection<Model>.delayed(milliseconds: Long): FieldCollection<Model> =
     DelayedFieldCollection(this, milliseconds)
 
-fun Database.delayed(milliseconds: Long): Database = object : Database by this {
-    override fun <T : Any> collection(type: KType, name: String): FieldCollection<T> {
-        return this@delayed.collection<T>(type, name).delayed(milliseconds)
+fun Database.delayed(milliseconds: Long): Database = object : Database {
+    override fun <T : Any> collection(serializer: KSerializer<T>, name: String): FieldCollection<T> {
+        return this@delayed.collection<T>(serializer, name).delayed(milliseconds)
     }
+
+    override suspend fun connect() = this@delayed.connect()
+    override suspend fun disconnect() = this@delayed.disconnect()
 }

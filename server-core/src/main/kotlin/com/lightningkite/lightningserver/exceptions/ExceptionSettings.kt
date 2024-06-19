@@ -1,6 +1,9 @@
 package com.lightningkite.lightningserver.exceptions
 
+import com.lightningkite.lightningdb.Database
+import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.settings.Pluggable
+import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.Serializable
 
@@ -17,6 +20,19 @@ data class ExceptionSettings(
         init {
             ExceptionSettings.register("debug") { DebugExceptionReporter }
             ExceptionSettings.register("none") { NoExceptionReporter }
+            ExceptionSettings.register("grouped-db") {
+
+                Regex("""grouped-db://(?<dbString>[^|]+)\|(?<packageName>.+)""")
+                    .matchEntire(it.url)
+                    ?.let { match ->
+                        val dbString = match.groups["dbString"]!!.value
+                        val packageName = match.groups["packageName"]!!.value
+                        val database = (Settings.requirements[dbString]?.invoke() as? Database)
+                            ?: DatabaseSettings(dbString).invoke()
+                        GroupedDatabaseExceptionReporter(packageName, database)
+                    }
+                    ?: throw IllegalStateException("Invalid grouped-db URL. The URL should match the pattern: grouped-db://[dbString:Database Setting Name]|[packageName]")
+            }
         }
     }
 

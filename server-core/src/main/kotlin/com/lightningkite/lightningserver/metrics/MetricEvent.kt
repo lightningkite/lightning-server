@@ -2,12 +2,13 @@ package com.lightningkite.lightningserver.metrics
 
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 @Serializable
 data class MetricEvent(
-    val type: String,
-    val entryPoint: String,
+    val metricType: MetricType,
+    val entryPoint: String?,
+//    val otherDimensions: Map<String, String> = mapOf(),
     @Contextual val time: Instant,
     val value: Double
 )

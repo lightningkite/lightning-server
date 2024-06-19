@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - development
+      - version-**
 
 jobs:
   release:
@@ -14,13 +15,15 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-java@v2
         with:
-          java-version: '11'
+          java-version: '17'
           distribution: 'adopt'
           cache: gradle
       - name: Make gradlew executable
         run: chmod +x ./gradlew
       - name: Validate Gradle wrapper
         uses: gradle/wrapper-validation-action@v1
+      - name: Clean
+        run: ./gradlew clean
       - name: Test
         run: ./gradlew test
       - uses: actions/upload-artifact@v2

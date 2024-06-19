@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.now
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -13,9 +14,9 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.encodeToString
 import org.junit.Assert.*
 import org.junit.Test
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.assertContains
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 
 abstract class FileSystemTests {
     abstract val system: FileSystem?
@@ -54,13 +55,24 @@ abstract class FileSystemTests {
         runBlocking {
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
-            val beforeModify = Instant.now().minusSeconds(120L)
+            val beforeModify = now().minus(120.seconds)
             testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
             val info = testFile.head()
             assertNotNull(info)
             assertEquals(ContentType.Text.Plain, info!!.type)
             assertTrue(info.size > 0L)
             assertTrue(info.lastModified > beforeModify)
+
+            // Testing with sub folders.
+            val secondFile = system.root.resolve("test/secondTest.txt")
+            val secondMessage = "Hello Second world!"
+            val secondBeforeModify = now().minus(120.seconds)
+            secondFile.put(HttpContent.Text(secondMessage, ContentType.Text.Plain))
+            val secondInfo = secondFile.head()
+            assertNotNull(secondInfo)
+            assertEquals(ContentType.Text.Plain, secondInfo!!.type)
+            assertTrue(secondInfo.size > 0L)
+            assertTrue(secondInfo.lastModified > secondBeforeModify)
         }
     }
 
@@ -111,7 +123,7 @@ abstract class FileSystemTests {
         runBlocking {
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
-            assert(client.put(testFile.uploadUrl(Duration.ofHours(1))) {
+            assert(client.put(testFile.uploadUrl(1.hours)) {
                 uploadHeaders(this)
                 setBody(TextContent(message, io.ktor.http.ContentType.Text.Plain))
             }.status.isSuccess())

@@ -1,29 +1,26 @@
 package com.lightningkite.lightningserver
 
+import java.util.*
 
-private val camelRegex = "[a-z][A-Z]".toRegex()
-private val snakeRegex = "_[a-zA-Z]".toRegex()
-private val kabobRegex = "-[a-zA-Z]".toRegex()
-internal fun String.humanize(): String = camelRegex.replace(this) {
-    "${it.value[0]} ${it.value[1].uppercase()}"
-}.let {
-    snakeRegex.replace(it) {
-        " " + it.value[1].uppercase()
-    }
-}.replaceFirstChar { it.uppercaseChar() }.trim()
 
-internal fun String.kabobCase(): String = camelRegex.replace(this) {
-    "${it.value[0]}-${it.value[1]}"
-}.let {
-    snakeRegex.replace(it) {
-        "-" + it.value[1]
+val `casing separator regex` = Regex("([-_\\s]+([A-Z]*[a-z0-9]+))|([-_\\s]*[A-Z]+)")
+inline fun String.caseAlter(crossinline update: (after: String) -> String): String =
+    `casing separator regex`.replace(this) {
+        if(it.range.start == 0) it.value
+        else update(it.value.filter { !(it == '-' || it == '_' || it.isWhitespace()) })
     }
-}.lowercase().trim()
 
-internal fun String.camelCase(): String = snakeRegex.replace(this) {
-    "${it.value[0]}${it.value[1].uppercase()}"
-}.let {
-    kabobRegex.replace(it) {
-        it.value[1].uppercase()
-    }
-}.lowercase().trim()
+private fun String.capitalize(): String = replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+private fun String.decapitalize(): String = replaceFirstChar { if (it.isUpperCase()) it.lowercase(Locale.getDefault()) else it.toString() }
+
+fun String.titleCase() = caseAlter { " " + it.capitalize() }.capitalize()
+fun String.spaceCase() = caseAlter { " " + it }.decapitalize()
+fun String.kabobCase() = caseAlter { "-$it" }.lowercase()
+fun String.snakeCase() = caseAlter { "_$it" }.lowercase()
+fun String.screamingSnakeCase() = caseAlter { "_$it" }.uppercase()
+fun String.camelCase() = caseAlter { it.capitalize() }.decapitalize()
+fun String.pascalCase() = caseAlter { it.capitalize() }.replaceFirstChar {
+    if (it.isLowerCase()) it.titlecase(
+        Locale.getDefault()
+    ) else it.toString()
+}

@@ -1,11 +1,12 @@
 package com.lightningkite.lightningserver.cache
 
+import com.lightningkite.lightningserver.metrics.Metricable
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
-import java.time.Duration
+import kotlin.time.Duration
 
 @Deprecated("Renamed to just 'cache'", ReplaceWith("Cache", "com.lightningkite.lightningserver.cache.Cache"))
 typealias CacheInterface = Cache
@@ -14,7 +15,7 @@ typealias CacheInterface = Cache
  * An abstracted model for communicating with a Cache.
  * Every implementation will handle how to get and set values in the underlying cache system.
  */
-interface Cache : HealthCheckable {
+interface Cache : HealthCheckable, Metricable<Cache> {
 
     /**
      * Returns a value of type T from the cache.
@@ -93,13 +94,6 @@ interface Cache : HealthCheckable {
      */
     suspend fun add(key: String, value: Int, timeToLive: Duration? = null)
 
-
-    /**
-     * WARNING: A Dangerous call if you aren't sure.
-     * Will remove EVERY key in the cache leaving you with an entirely empty cache.
-     */
-    suspend fun clear()
-
     /**
      * Removes a single key from cache. If the key didn't exist, nothing will happen.
      *
@@ -122,6 +116,8 @@ interface Cache : HealthCheckable {
             HealthStatus(HealthStatus.Level.ERROR, additionalMessage = e.message)
         }
     }
+
+    override fun withMetrics(metricsKeyName: String): Cache = MetricsCache(this, metricsKeyName)
 }
 
 /**

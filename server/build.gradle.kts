@@ -4,18 +4,15 @@ import com.lightningkite.deployhelpers.mit
 import com.lightningkite.deployhelpers.standardPublishing
 
 plugins {
-    kotlin("jvm")
-    id("com.google.devtools.ksp")
-    kotlin("plugin.serialization")
-    id("org.jetbrains.dokka")
+    alias(serverlibs.plugins.kotlinJvm)
+    alias(serverlibs.plugins.ksp)
+    alias(serverlibs.plugins.serialization)
+    alias(serverlibs.plugins.dokka)
     id("signing")
     `maven-publish`
 }
 
-val kotlinVersion: String by project
-val khrysalisVersion: String by project
 dependencies {
-
     api(project(":server-aws"))
     api(project(":server-azure"))
     api(project(":server-core"))
@@ -25,6 +22,7 @@ dependencies {
     api(project(":server-redis"))
     api(project(":server-dynamodb"))
     api(project(":server-postgresql"))
+    api(project(":server-sentry"))
 }
 
 ksp {
@@ -42,6 +40,7 @@ kotlin {
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlinx.serialization.ExperimentalSerializationApi"
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
+    kotlinOptions.jvmTarget = JavaVersion.VERSION_1_8.toString()
 }
 
 

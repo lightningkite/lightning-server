@@ -1,0 +1,59 @@
+- id: com.lightningkite.lightningdb.fields
+  type: get
+  template: '((~this~ as any)._fields as Map<string, keyof ~T0~ & string>)'
+- id: com.lightningkite.lightningdb.fields
+  type: set
+  template: '(~this~ as any)._fields = ~value~'
+
+- id: com.lightningkite.lightningdb.SerializablePropertyPartial
+  type: type
+  template: (keyof ~T0~ & string)
+
+- id: com.lightningkite.lightningdb.SerializablePropertyPartial
+  type: typeRef
+  template: String
+
+- id: com.lightningkite.lightningdb.SerializablePropertyPartial
+  type: call
+  template: ~0~
+
+- id: com.lightningkite.lightningdb.SerializablePropertyPartial.compare
+  type: get
+  template:
+    pattern: 'compareBy(~this~)'
+    imports:
+      compareBy: '@lightningkite/khrysalis-runtime'
+
+
+- id: com.lightningkite.lightningdb.notNull
+  type: get
+  receiver: com.lightningkite.lightningdb.DataClassPath
+  template: '~this~.notNull()'
+
+
+- id: com.lightningkite.lightningdb.ServerFile
+  type: call
+  template: '~0~'
+
+- id: com.lightningkite.lightningdb.ServerFile
+  type: type
+  template: 'string'
+
+- id: com.lightningkite.lightningdb.ServerFile
+  type: typeRef
+  template: 'String'
+
+- id: com.lightningkite.lightningdb.ServerFile.location
+  type: get
+  template: ~this~
+
+- id: com.lightningkite.lightningdb.setCopyImplementation
+  type: call
+  template: ''
+
+- id: com.lightningkite.lightningdb.setCopy
+  type: call
+  template:
+    pattern: keySet(~0~, ~this~, ~1~)
+    imports:
+      keySet: '@lightningkite/lightning-server|db/TProperty1Extensions'

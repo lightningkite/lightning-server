@@ -5,6 +5,6 @@ package com.lightningkite.lightningserver.core
  * Ex: Database
  */
 interface Disconnectable {
-    suspend fun disconnect()
-    suspend fun connect()
+    suspend fun disconnect() {}
+    suspend fun connect() {}
 }

@@ -1,57 +1,76 @@
 package com.lightningkite.lightningserver.email
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.apache.commons.mail.EmailAttachment
-import org.apache.commons.mail.HtmlEmail
-import org.apache.commons.mail.MultiPartEmail
-import org.apache.commons.mail.SimpleEmail
+import com.lightningkite.lightningserver.logger
+import com.lightningkite.lightningserver.settings.generalSettings
+import java.util.*
+import jakarta.mail.Authenticator
+import jakarta.mail.PasswordAuthentication
+import jakarta.mail.Session
+import jakarta.mail.Transport
+import jakarta.mail.internet.InternetAddress
 
 /**
  * An email client that will send real emails through SMTP.
  */
 class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
-    override suspend fun sendHtml(
-        subject: String,
-        to: List<String>,
-        html: String,
-        plainText: String,
-        attachments: List<Attachment>
-    ) {
-        val email = HtmlEmail()
-        email.setHtmlMsg(html)
-        email.setTextMsg(plainText)
-        attachments.forEach {
-            val attachment = EmailAttachment()
-            attachment.disposition = if (it.inline) EmailAttachment.INLINE else EmailAttachment.ATTACHMENT
-            attachment.description = it.description
-            attachment.name = it.name
-            when (it) {
-                is Attachment.Remote -> {
-                    attachment.url = it.url
-                }
 
-                is Attachment.Local -> {
-                    attachment.path = it.file.absolutePath
-                }
+    val session = Session.getInstance(
+        Properties().apply {
+            smtpConfig.username?.let { username ->
+                put("mail.smtp.user", username)
             }
-            email.attach(attachment)
-        }
-        email.hostName = smtpConfig.hostName
-        if (smtpConfig.username != null || smtpConfig.password != null) {
-            if (smtpConfig.username == null || smtpConfig.password == null) throw Exception("Missing Authentication")
-            email.setAuthentication(smtpConfig.username, smtpConfig.password)
-        }
-        email.setSmtpPort(smtpConfig.port)
-        email.isSSLOnConnect = smtpConfig.useSSL
-        email.setFrom(smtpConfig.fromEmail)
-        email.subject = subject
-//        email.addHeader("X-SES-LIST-MANAGEMENT-OPTIONS", "contactListName; topic=topicName")
-        email.addTo(*to.toTypedArray())
-        println("Ready to send...")
-        withContext(Dispatchers.IO) {
-            email.send()
-        }
-        println("Email sent")
+            put("mail.smtp.host", smtpConfig.hostName)
+            put("mail.smtp.port", smtpConfig.port)
+            put("mail.smtp.auth", smtpConfig.username != null && smtpConfig.password != null)
+            put("mail.smtp.ssl.enable", smtpConfig.port == 465)
+            put("mail.smtp.starttls.enable", smtpConfig.port == 587)
+            put("mail.smtp.starttls.required", smtpConfig.port == 587)
+        },
+        if (smtpConfig.username != null && smtpConfig.password != null)
+            object : Authenticator() {
+                override fun getPasswordAuthentication(): PasswordAuthentication = PasswordAuthentication(
+                    smtpConfig.username,
+                    smtpConfig.password
+                )
+            }
+        else
+            null
+    )
+
+    override suspend fun send(email: Email) {
+        if(email.to.isEmpty() && email.cc.isEmpty() && email.bcc.isEmpty()) return
+        Transport.send(
+            email.copy(
+                fromEmail = email.fromEmail ?: smtpConfig.fromEmail,
+                fromLabel = email.fromLabel ?: generalSettings().projectName
+            ).toJavaX(session)
+        )
+    }
+
+    override suspend fun sendBulk(template: Email, personalizations: List<EmailPersonalization>) {
+        if (personalizations.isEmpty()) return
+        session.transport
+            .also { it.connect() }
+            .use { transport ->
+                personalizations
+                    .asSequence()
+                    .map {
+                        it(template).copy(
+                            fromEmail = template.fromEmail ?: smtpConfig.fromEmail,
+                            fromLabel = template.fromLabel ?: generalSettings().projectName
+                        )
+                    }
+                    .forEach { email ->
+                        transport.sendMessage(
+                            email.toJavaX(session).also { it.saveChanges() },
+                            email.to
+                                .plus(email.cc)
+                                .plus(email.bcc)
+                                .map { InternetAddress(it.value, it.label) }
+                                .toTypedArray()
+                                .also { if (it.isEmpty()) return@forEach }
+                        )
+                    }
+            }
     }
 }

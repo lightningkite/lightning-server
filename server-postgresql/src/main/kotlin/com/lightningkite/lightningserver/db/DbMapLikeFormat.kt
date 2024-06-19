@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.serialization.Serialization
+import kotlinx.datetime.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
@@ -16,9 +17,16 @@ import org.jetbrains.exposed.sql.Column
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.javatime.*
 import org.jetbrains.exposed.sql.statements.UpdateBuilder
-import java.time.Instant
-import java.time.ZoneId
-import java.time.ZonedDateTime
+import kotlinx.datetime.serializers.InstantIso8601Serializer
+import kotlinx.datetime.serializers.LocalDateIso8601Serializer
+import kotlinx.datetime.serializers.LocalDateTimeIso8601Serializer
+import kotlinx.datetime.serializers.LocalTimeIso8601Serializer
+import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import kotlin.time.toJavaDuration
+import kotlin.time.toKotlinDuration
 
 class DbMapLikeFormat(val serializersModule: SerializersModule = Serialization.module) {
     fun <T> encode(serializer: KSerializer<T>, value: T, it: UpdateBuilder<*>, path: List<String> = listOf("")) {
@@ -198,21 +206,12 @@ class DbLikeMapDecoder(
 
     override fun <T> decodeSerializableValue(deserializer: DeserializationStrategy<T>): T {
         return when ((deserializer as? KSerializer<T>)?.nullElement() ?: deserializer) {
-            UUIDSerializer,
-            LocalDateSerializer,
-            InstantSerializer,
-            DurationSerializer,
-                //LocalDateTimeSerializer,
-            LocalTimeSerializer,
-            -> getter(popTag()) as T
-
-            ZonedDateTimeSerializer -> {
-                val tag = popTag()
-                ZonedDateTime.ofInstant(
-                    getter(tag) as Instant,
-                    ZoneId.of(getter(composeName(tag, "zone")) as String)
-                ) as T
-            }
+            UUIDSerializer -> getter(popTag()) as T
+            LocalDateIso8601Serializer -> getter(popTag()).let { it as LocalDate }.toKotlinLocalDate() as T
+            InstantIso8601Serializer -> getter(popTag()).let { it as java.time.Instant }.toKotlinInstant() as T
+            DurationSerializer -> getter(popTag()).let { it as Duration }.toKotlinDuration() as T
+            LocalDateTimeIso8601Serializer -> getter(popTag()).let { it as LocalDateTime }.toKotlinLocalDateTime() as T
+            LocalTimeIso8601Serializer -> getter(popTag()) .let { it as LocalTime }.toKotlinLocalTime() as T
 
             else -> super.decodeSerializableValue(deserializer)
         }
@@ -423,19 +422,13 @@ class DbLikeMapEncoder(
 
     override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
         when ((serializer as? KSerializer<T>)?.nullElement() ?: serializer) {
-            UUIDSerializer,
-            LocalDateSerializer,
-            InstantSerializer,
-            DurationSerializer,
-                //LocalDateTimeSerializer,
-            LocalTimeSerializer,
-            -> writer(popTag(), value)
-
-            ZonedDateTimeSerializer -> {
-                val tag = popTag()
-                writer(tag, (value as ZonedDateTime).toInstant())
-                writer(composeName(tag, "zone"), (value as ZonedDateTime).zone.id)
-            }
+            UUIDSerializer -> writer(popTag(), value)
+            LocalDateIso8601Serializer -> writer(popTag(), (value as kotlinx.datetime.LocalDate).toJavaLocalDate())
+            InstantIso8601Serializer -> writer(popTag(), (value as kotlinx.datetime.Instant).toJavaInstant())
+            DurationSerializer -> writer(popTag(), (value as kotlin.time.Duration).toJavaDuration())
+                //LocalDateTimeSerializer -> writer(popTag(), value)
+            LocalDateTimeIso8601Serializer -> writer(popTag(), (value as kotlinx.datetime.LocalDateTime).toJavaLocalDateTime())
+            LocalTimeIso8601Serializer -> writer(popTag(), (value as kotlinx.datetime.LocalTime).toJavaLocalTime())
 
             else -> super.encodeSerializableValue(serializer, value)
         }

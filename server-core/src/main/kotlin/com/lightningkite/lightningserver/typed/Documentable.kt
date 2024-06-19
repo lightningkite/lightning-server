@@ -1,9 +1,10 @@
-@file:OptIn(InternalSerializationApi::class)
+@file:OptIn(InternalSerializationApi::class, InternalSerializationApi::class)
 
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.AuthInfo
+import com.lightningkite.lightningserver.auth.AuthOptions
+import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.routes.docName
@@ -17,14 +18,17 @@ import kotlinx.serialization.descriptors.capturedKClass
 import kotlinx.serialization.internal.GeneratedSerializer
 
 interface Documentable {
-    val path: ServerPath
+    val path: TypedServerPath
     val summary: String
     val description: String
-    val authInfo: AuthInfo<*>
+    val authOptions: AuthOptions<*>
+    val belongsToInterface: InterfaceInfo?
+
+    data class InterfaceInfo(val name: String, val subtypes: List<KSerializer<*>>)
 
     companion object {
-        val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *>>()
-        val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *, *>>()
+        val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *, *>>()
+        val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *, *, *>>()
         val all get() = endpoints + websockets
         val usedTypes: Collection<KSerializer<*>>
             get() {
@@ -48,23 +52,40 @@ interface Documentable {
     }
 }
 
-val Documentable.docGroup: String? get() = generateSequence(path) { it.parent }.mapNotNull { it.docName }.firstOrNull()
+val Documentable.docGroup: String? get() = generateSequence(path.path) { it.parent }.mapNotNull { it.docName }.firstOrNull()
+val Documentable.docGroupIdentifier: String? get() = docGroup
+    ?.replace(Regex("""[^0-9a-zA-Z]+(?<following>.)?""")) { match ->
+        match.groups["following"]?.value?.uppercase() ?: ""
+    }
+    ?.replaceFirstChar { it.lowercase() }
 val Documentable.functionName: String
-    get() = summary.split(' ').joinToString("") { it.replaceFirstChar { it.uppercase() } }
+    get() = summary
+        .replace(Regex("""[^0-9a-zA-Z]+(?<following>.)?""")) { match ->
+            match.groups["following"]?.value?.uppercase() ?: ""
+        }
         .replaceFirstChar { it.lowercase() }
 
-internal fun KSerializer<*>.subSerializers(): Array<KSerializer<*>> = listElement()?.let { arrayOf(it) }
+internal fun KSerializer<*>.subSerializers(): Array<KSerializer<*>> = nullElement()?.let { arrayOf(it) }
+    ?: listElement()?.let { arrayOf(it) }
     ?: mapValueElement()?.let { arrayOf(it) }
     ?: (this as? GeneratedSerializer<*>)?.typeParametersSerializers()
     ?: (this as? ConditionSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: (this as? ModificationSerializer<*>)?.inner?.let { arrayOf(it) }
+    ?: (this as? PartialSerializer<*>)?.source?.let { arrayOf(it) }
+    ?: (this as? SortPartSerializer<*>)?.inner?.let { arrayOf(it) }
+    ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: arrayOf()
 
-internal fun KSerializer<*>.subAndChildSerializers(): Array<KSerializer<*>> = listElement()?.let { arrayOf(it) }
+internal fun KSerializer<*>.subAndChildSerializers(): Array<KSerializer<*>> = nullElement()?.let { arrayOf(it) }
+    ?: serializableProperties?.map { it.serializer }?.toTypedArray()
+    ?: listElement()?.let { arrayOf(it) }
     ?: mapValueElement()?.let { arrayOf(it) }
     ?: (this as? GeneratedSerializer<*>)?.run { childSerializers() + typeParametersSerializers() }
     ?: (this as? ConditionSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: (this as? ModificationSerializer<*>)?.inner?.let { arrayOf(it) }
+    ?: (this as? PartialSerializer<*>)?.source?.let { arrayOf(it) }
+    ?: (this as? SortPartSerializer<*>)?.inner?.let { arrayOf(it) }
+    ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: arrayOf()
 
 internal fun KSerializer<*>.uncontextualize(): KSerializer<*> {

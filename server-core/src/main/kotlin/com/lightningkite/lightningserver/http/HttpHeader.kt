@@ -118,6 +118,8 @@ object HttpHeader {
     const val XRequestId: String = "X-Request-ID"
     const val XCorrelationId: String = "X-Correlation-ID"
     const val XTotalCount: String = "X-Total-Count"
+
+    const val XMasquerade: String = "X-Masquerade"
 }
 
 private fun test() {

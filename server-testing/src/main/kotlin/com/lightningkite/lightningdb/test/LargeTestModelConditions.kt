@@ -1,9 +1,11 @@
 package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.Condition
-import com.lightningkite.lightningdb.setCopy
-import java.time.Instant
-import kotlin.reflect.KProperty1
+import kotlinx.datetime.Instant
+import com.lightningkite.lightningdb.SerializableProperty
+import kotlinx.datetime.Clock
+import com.lightningkite.now
+import kotlin.time.Duration.Companion.seconds
 
 object LargeTestModelConditions {
     class Case(
@@ -13,8 +15,8 @@ object LargeTestModelConditions {
     )
 
     class ComparableType<T: Comparable<T>>(
-        val field: KProperty1<LargeTestModel, T>,
-        val nullable: KProperty1<LargeTestModel, T?>,
+        val field: SerializableProperty<LargeTestModel, T>,
+        val nullable: SerializableProperty<LargeTestModel, T?>,
         val low: T,
         val middle: T,
         val high: T,
@@ -84,26 +86,26 @@ object LargeTestModelConditions {
     }
 
     class OtherType<T>(
-        val field: KProperty1<LargeTestModel, T>,
+        val field: SerializableProperty<LargeTestModel, T>,
         val first: T,
         val second: T,
     )
 
     val types: List<ComparableType<*>> = listOf(
-        ComparableType<Byte>(LargeTestModel::byte, LargeTestModel::byteNullable, 0.toByte(), 1.toByte(), 2.toByte()),
-        ComparableType<Short>(LargeTestModel::short, LargeTestModel::shortNullable, 0.toShort(), 1.toShort(), 2.toShort()),
-        ComparableType<Int>(LargeTestModel::int, LargeTestModel::intNullable, 0.toInt(), 1.toInt(), 2.toInt()),
-        ComparableType<Long>(LargeTestModel::long, LargeTestModel::longNullable, 0.toLong(), 1.toLong(), 2.toLong()),
-        ComparableType<Float>(LargeTestModel::float, LargeTestModel::floatNullable, 0f, 1f, 2f),
-        ComparableType<Double>(LargeTestModel::double, LargeTestModel::doubleNullable, 0.0, 1.0, 2.0),
-        ComparableType<Char>(LargeTestModel::char, LargeTestModel::charNullable, 'a', 'b', 'c'),
-        ComparableType<String>(LargeTestModel::string, LargeTestModel::stringNullable, "aa", "ab", "ac"),
+        ComparableType<Byte>(LargeTestModel_byte, LargeTestModel_byteNullable, 0.toByte(), 1.toByte(), 2.toByte()),
+        ComparableType<Short>(LargeTestModel_short, LargeTestModel_shortNullable, 0.toShort(), 1.toShort(), 2.toShort()),
+        ComparableType<Int>(LargeTestModel_int, LargeTestModel_intNullable, 0.toInt(), 1.toInt(), 2.toInt()),
+        ComparableType<Long>(LargeTestModel_long, LargeTestModel_longNullable, 0.toLong(), 1.toLong(), 2.toLong()),
+        ComparableType<Float>(LargeTestModel_float, LargeTestModel_floatNullable, 0f, 1f, 2f),
+        ComparableType<Double>(LargeTestModel_double, LargeTestModel_doubleNullable, 0.0, 1.0, 2.0),
+        ComparableType<Char>(LargeTestModel_char, LargeTestModel_charNullable, 'a', 'b', 'c'),
+        ComparableType<String>(LargeTestModel_string, LargeTestModel_stringNullable, "aa", "ab", "ac"),
         ComparableType<Instant>(
-            LargeTestModel::instant,
-            LargeTestModel::instantNullable,
-            Instant.now().minusSeconds(1),
-            Instant.now(),
-            Instant.now().plusSeconds(1)
+            LargeTestModel_instant,
+            LargeTestModel_instantNullable,
+            now().minus(1.seconds),
+            now(),
+            now().plus(1.seconds)
         ),
     )
 

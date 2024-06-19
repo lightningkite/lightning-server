@@ -6,7 +6,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import java.io.InputStream
-import java.time.Duration
+import kotlin.time.Duration
 
 /**
  * An abstraction that allows FileSystem implementations to access and manipulate the underlying files.

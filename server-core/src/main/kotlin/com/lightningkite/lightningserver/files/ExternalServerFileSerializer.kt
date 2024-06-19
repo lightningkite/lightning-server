@@ -29,7 +29,7 @@ object ExternalServerFileSerializer : KSerializer<ServerFile> {
     @OptIn(ExperimentalSerializationApi::class)
     override val descriptor: SerialDescriptor = object : SerialDescriptor {
         override val kind: SerialKind = PrimitiveKind.STRING
-        override val serialName: String = "ServerFile"
+        override val serialName: String = "com.lightningkite.lightningdb.ServerFile"
         override val elementsCount: Int get() = 0
         override fun getElementName(index: Int): String = error()
         override fun getElementIndex(name: String): Int = error()
@@ -68,7 +68,7 @@ object ExternalServerFileSerializer : KSerializer<ServerFile> {
             return ServerFile(file.url)
         } else {
             val file = FileSystem.resolve(raw.substringBefore('?'))
-                ?: throw BadRequestException("The given url ($raw) does not start with any files root.  Known roots: ${FileSystem.urlRoots}")
+                ?: throw BadRequestException("The given url (${raw.substringBefore('?')}) does not start with any files root.  Known roots: ${FileSystem.urlRoots}")
             val paramString = raw.substringAfter('?')
             val paramMap = paramString.split('&').associate {
                 URLDecoder.decode(it.substringBefore('='), Charsets.UTF_8) to URLDecoder.decode(
@@ -81,7 +81,7 @@ object ExternalServerFileSerializer : KSerializer<ServerFile> {
             if (fileValidators.any { it(file.url, paramMap) } || file.checkSignature(paramString))
                 return ServerFile(file.url)
             else
-                throw BadRequestException("URL does not appear to be signed properly")
+                throw BadRequestException("URL '${raw.substringBefore('?')}' does not appear to be signed properly")
         }
     }
 }

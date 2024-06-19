@@ -3,8 +3,9 @@ package com.lightningkite.lightningserver.files
 import com.azure.storage.blob.BlobContainerClientBuilder
 import com.azure.storage.common.StorageSharedKeyCredential
 import java.io.File
-import java.time.Duration
+import kotlin.time.Duration
 import java.util.*
+import kotlin.time.Duration.Companion.days
 
 class AzureFileSystem(
     val account: String,
@@ -36,7 +37,7 @@ class AzureFileSystem(
                     account = account,
                     container = container,
                     key = key,
-                    signedUrlExpirationSeconds = (it.signedUrlExpiration ?: Duration.ofDays(1)).toSeconds().toInt()
+                    signedUrlExpirationSeconds = (it.signedUrlExpiration ?: 1.days).inWholeSeconds.toInt()
                 )
             }
         }

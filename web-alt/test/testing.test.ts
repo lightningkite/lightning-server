@@ -10,7 +10,7 @@ interface TestType {
 
 test('Valid condition types work', () => {
     const condition: Condition<TestType> = {
-        numbers: { AnyElements: { GreaterThan: 2 }}
+        numbers: { ListAnyElements: { GreaterThan: 2 }}
     }
 })
 let item: TestType = {
@@ -50,8 +50,8 @@ test('Not Inside false', () => { expect(evaluateCondition({ name: { NotInside: [
 test('StringContains', () => { expect(evaluateCondition({ name: { StringContains: { value: "ob", ignoreCase: true } } }, item)).toBe(true) })
 test('StringContains false', () => { expect(evaluateCondition({ name: { StringContains: { value: "as", ignoreCase: true } } }, item)).toBe(false) })
 test('StringContains case sensitive', () => { expect(evaluateCondition({ name: { StringContains: { value: "bo", ignoreCase: false } } }, item)).toBe(false) })
-test('Any', () => { expect(evaluateCondition({ numbers: { AnyElements: { GreaterThan: 3 } } }, item)).toBe(true) })
-test('All', () => { expect(evaluateCondition({ numbers: { AllElements: { GreaterThan: 3 } } }, item)).toBe(false) })
+test('Any', () => { expect(evaluateCondition({ numbers: { ListAnyElements: { GreaterThan: 3 } } }, item)).toBe(true) })
+test('All', () => { expect(evaluateCondition({ numbers: { ListAllElements: { GreaterThan: 3 } } }, item)).toBe(false) })
 
 test('Assign', () => { expect(evaluateModification({ name: { Assign: "asdf"} }, item).name).toBe("asdf") })
 

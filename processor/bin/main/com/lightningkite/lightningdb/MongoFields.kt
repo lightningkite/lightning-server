@@ -72,7 +72,7 @@ data class MongoFields(
                     "kotlinx.serialization.*",
                     "kotlinx.serialization.builtins.*",
                     "kotlinx.serialization.internal.GeneratedSerializer",
-                    "java.time.*",
+                    "kotlinx.datetime.*",
                     "java.util.*",
                 )
             )
@@ -88,7 +88,7 @@ data class MongoFields(
             }
             appendLine("}")
             for (field in fields) {
-                appendLine("val <K> PropChain<K, $typeReference>.${field.name}: PropChain<K, ${field.kotlinType.toKotlin()}> get() = this[${classReference}::${field.name}]")
+                appendLine("val <K> DataClassPath<K, $typeReference>.${field.name}: DataClassPath<K, ${field.kotlinType.toKotlin()}> get() = this[${classReference}::${field.name}]")
             }
         } else {
             appendLine("fun prepare${simpleName}Fields() {")
@@ -99,7 +99,7 @@ data class MongoFields(
             }
             appendLine("}")
             for (field in fields) {
-                appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { "reified " + it.name.asString() }}> PropChain<ROOT, $typeReference>.${field.name}: PropChain<ROOT, ${field.kotlinType.toKotlin()}> get() = this[${classReference}${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}::${field.name}]")
+                appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { "reified " + it.name.asString() }}> DataClassPath<ROOT, $typeReference>.${field.name}: DataClassPath<ROOT, ${field.kotlinType.toKotlin()}> get() = this[${classReference}${declaration.typeParameters.joinToString(", ", "<", ">") { it.name.asString() }}::${field.name}]")
             }
         }
     }
@@ -122,7 +122,7 @@ private val KSType.useCustomType: Boolean
             "kotlin.Pair",
             "com.lightningkite.lightningdb.UUIDFor",
             "java.util.UUID",
-            "java.time.Instant",
+            "kotlinx.datetime.Instant",
             "org.litote.kmongo.Id" -> false
             else -> true
         }
@@ -140,7 +140,7 @@ private val KSType.conditionType: String
             "kotlin.Float",
             "kotlin.Double",
             "java.util.UUID",
-            "java.time.Instant",
+            "kotlinx.datetime.Instant",
             "com.lightningkite.lightningdb.UUIDFor",
             "kotlin.Char" -> "ComparableCondition" + "<${this.makeNotNullable().toKotlin(annotations)}>"
             "kotlin.collections.List" -> "ArrayCondition" + "<${
@@ -183,7 +183,7 @@ private val KSType.modificationType: String
             "kotlin.Double" -> "NumberModification" + "<${this.makeNotNullable().toKotlin(annotations)}>"
             "java.util.UUID",
             "com.lightningkite.lightningdb.UUIDFor",
-            "java.time.Instant",
+            "kotlinx.datetime.Instant",
             "kotlin.String", "kotlin.Char" -> "ComparableModification" + "<${
                 this.makeNotNullable().toKotlin(annotations)
             }>"

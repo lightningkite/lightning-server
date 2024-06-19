@@ -1,65 +1,86 @@
 import com.lightningkite.deployhelpers.*
-import com.lightningkite.khrysalis.gradle.*
 
 plugins {
-    kotlin("jvm")
-    id("com.google.devtools.ksp")
-    kotlin("plugin.serialization")
-    id("com.lightningkite.khrysalis")
-    id("org.jetbrains.dokka")
+    alias(serverlibs.plugins.kotlinMultiplatform)
+    alias(serverlibs.plugins.ksp)
+    alias(serverlibs.plugins.serialization)
+    alias(serverlibs.plugins.androidLibrary)
+    alias(serverlibs.plugins.dokka)
     id("signing")
     `maven-publish`
 }
 
 val kotlinVersion: String by project
 val khrysalisVersion: String by project
-val kotlinXSerialization:String by project
-dependencies {
-
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinXSerialization")
-    api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
-    api("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
-
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
-
-    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-swift:$khrysalisVersion")
-    kcp("com.lightningkite.khrysalis:kotlin-compiler-plugin-typescript:$khrysalisVersion")
-
-    equivalents("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion:equivalents")
-
-    ksp(project(":processor"))
-    kspTest(project(":processor"))
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
-
-}
+val kotlinXSerialization: String by project
 
 ksp {
     arg("generateFields", "true")
 }
 
 kotlin {
-    sourceSets.test {
-        kotlin.srcDir("build/generated/ksp/test/kotlin")
+    applyDefaultHierarchyTemplate()
+    androidTarget {
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
     }
-    sourceSets.main {
-        kotlin.srcDir("build/generated/ksp/main/kotlin")
+
+    jvm {
+        compilations.all {
+            kotlinOptions.jvmTarget = "1.8"
+        }
+    }
+    js(IR) {
+        browser()
+    }
+    iosX64()
+    iosArm64()
+    iosSimulatorArm64()
+
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinXSerialization")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
+
+                implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
+                implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
+                api("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0-RC.2")
+            }
+            kotlin {
+                srcDir(file("build/generated/ksp/common/commonMain/kotlin"))
+            }
+        }
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+            kotlin {
+                srcDir(file("build/generated/ksp/common/commonTest/kotlin"))
+            }
+        }
+        val jvmMain by getting {
+            dependencies {
+            }
+        }
+        val jvmTest by getting {
+            dependsOn(commonTest)
+        }
     }
 }
 
-khrysalis {
-    iosProjectName = "LightningServer"
-    iosProjectFolder = rootDir.resolve("ios")
-    iosSourceFolder = rootDir.resolve("ios/LightningServer/Classes/shared")
-    webProjectName = "@lightningkite/lightning-server"
-    webProjectFolder = rootDir.resolve("web")
-    webSourceFolder = rootDir.resolve("web/src")
-    libraryMode = true
+dependencies {
+    configurations.filter { it.name.startsWith("ksp") && it.name != "ksp" }.forEach {
+        add(it.name, project(":processor"))
+    }
 }
 
 standardPublishing {
     name.set("Lightning-server-Shared")
-    description.set("A tool for communication between a server and a client built around Ktor servers.")
+    description.set("A tool for communication between a server using LightningServer and a client.")
     github("lightningkite", "lightning-server")
 
     licenses {
@@ -79,4 +100,20 @@ standardPublishing {
         )
     }
 }
-tasks.getByName("equivalentsJar").published = true
+
+android {
+    namespace = "com.lightningkite.lightningserver"
+    compileSdk = 34
+
+    defaultConfig {
+        minSdk = 26
+    }
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    dependencies {
+        coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    }
+}

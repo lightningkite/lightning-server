@@ -10,10 +10,17 @@ import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.Clock
+import com.lightningkite.now
+import kotlinx.datetime.toJavaInstant
+import kotlinx.datetime.toKotlinInstant
 import java.io.File
 import java.io.InputStream
-import java.time.Duration
-import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.toJavaDuration
 
 data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
     val client by lazy { system.blobContainerClient.getBlobClient(path.name) }
@@ -31,7 +38,7 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
                 FileInfo(
                     type = ContentType(it.contentType),
                     size = it.blobSize,
-                    lastModified = it.lastModified.toInstant()
+                    lastModified = it.lastModified.toInstant().toKotlinInstant()
                 )
             }
         } catch (e: Exception) {
@@ -43,7 +50,7 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
         try {
             system.blobContainerClient.listBlobs(
                 ListBlobsOptions().setPrefix(path.unixPath),
-                Duration.ofSeconds(5)
+                5.seconds.toJavaDuration()
             )
                 .filter { !it.name.substringAfter(path.toString()).contains('/') }
                 .map { AzureFile(system, File(it.name)) }
@@ -86,12 +93,12 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
         get() = client.blobUrl
 
     override val signedUrl: String get() {
-        val offsetDateTime = OffsetDateTime.now().plusSeconds(system.signedUrlExpirationSeconds.toLong())
+        val offsetDateTime = now().plus(system.signedUrlExpirationSeconds.seconds)
         val sasPermission = BlobSasPermission().setReadPermission(true)
 
-        val signatureValues = BlobServiceSasSignatureValues(offsetDateTime, sasPermission)
+        val signatureValues = BlobServiceSasSignatureValues(offsetDateTime.toJavaInstant().atOffset(ZoneOffset.UTC), sasPermission)
 
-        signatureValues.startTime = OffsetDateTime.now().minusMinutes(10)
+        signatureValues.startTime = now().minus(10.minutes).toJavaInstant().atOffset(ZoneOffset.UTC)
         signatureValues.protocol = SasProtocol.HTTPS_ONLY
 
         // Sign the url for this object
@@ -99,12 +106,12 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
     }
 
     override fun uploadUrl(timeout: Duration): String {
-        val offsetDateTime = OffsetDateTime.now().plus(timeout)
+        val offsetDateTime = now().plus(timeout)
         val sasPermission = BlobSasPermission().setWritePermission(true).setCreatePermission(true).setAddPermission(true)
 
-        val signatureValues = BlobServiceSasSignatureValues(offsetDateTime, sasPermission)
+        val signatureValues = BlobServiceSasSignatureValues(offsetDateTime.toJavaInstant().atOffset(ZoneOffset.UTC), sasPermission)
 
-        signatureValues.startTime = OffsetDateTime.now().minusMinutes(10)
+        signatureValues.startTime = now().minus(10.minutes).toJavaInstant().atOffset(ZoneOffset.UTC)
         signatureValues.protocol = SasProtocol.HTTPS_ONLY
 
         // Sign the url for this object

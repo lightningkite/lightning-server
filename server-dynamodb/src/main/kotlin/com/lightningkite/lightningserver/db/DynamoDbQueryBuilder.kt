@@ -7,7 +7,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
 import java.lang.IllegalArgumentException
-import kotlin.reflect.KProperty1
+import com.lightningkite.lightningdb.SerializableProperty
 
 data class DynamoCondition<T>(
     val local: Condition<T>? = null,
@@ -263,7 +263,7 @@ fun <T> Condition<T>.dynamo(serializer: KSerializer<T>, sortKey: String): Dynamo
         is Condition.OnField<*, *> -> {
             @Suppress("UNCHECKED_CAST")
             val inner =
-                (condition as Condition<IsCodableAndHashable>).dynamo(serializer.fieldSerializer(key as KProperty1<T, IsCodableAndHashable>)!!, sortKey)
+                (condition as Condition<IsCodableAndHashable>).dynamo(key.serializer as KSerializer<IsCodableAndHashable>, sortKey)
             val indexed = key.name == sortKey
             if (indexed) {
                 DynamoCondition(
@@ -370,7 +370,7 @@ fun <T> Modification<T>.dynamo(serializer: KSerializer<T>): DynamoModification<T
         is Modification.OnField<*, *> -> {
             @Suppress("UNCHECKED_CAST")
             val inner =
-                (modification as Modification<IsCodableAndHashable>).dynamo(serializer.fieldSerializer(key as KProperty1<T, IsCodableAndHashable>)!!)
+                (modification as Modification<IsCodableAndHashable>).dynamo(key.serializer as KSerializer<IsCodableAndHashable>)
             DynamoModification(
                 local = (this as Modification<T>).takeIf { inner.local != null },
                 set = inner.set.map {

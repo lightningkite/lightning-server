@@ -4,31 +4,25 @@ import com.lightningkite.deployhelpers.mit
 import com.lightningkite.deployhelpers.standardPublishing
 
 plugins {
-    kotlin("jvm")
-    id("com.google.devtools.ksp")
-    kotlin("plugin.serialization")
-    id("org.jetbrains.dokka")
+    alias(serverlibs.plugins.kotlinJvm)
+    alias(serverlibs.plugins.ksp)
+    alias(serverlibs.plugins.serialization)
+    alias(serverlibs.plugins.dokka)
     id("signing")
     `maven-publish`
 }
 
-val kotlinVersion:String by project
-val coroutines:String by project
-val kotlinXSerialization:String by project
 dependencies {
     api(project(":server-core"))
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutines")
-    implementation("de.flapdoodle.embed:de.flapdoodle.embed.mongo:3.5.4")
-    implementation("com.github.jershell:kbson:0.5.0")
-    api("org.litote.kmongo:kmongo-coroutine-serialization:4.9.0")
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinXSerialization")
-
+    implementation(serverlibs.kotlinStdLib)
+    implementation(serverlibs.coroutinesCore)
+    implementation(serverlibs.coroutinesReactive)
+    implementation(serverlibs.embedMongo)
+    implementation(serverlibs.mongoDriver)
+    ksp(project(":processor"))
     kspTest(project(":processor"))
-    testImplementation(project(":client"))
     testImplementation(project(":server-testing"))
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
+    testImplementation(serverlibs.kotlinTest)
 }
 
 ksp {
@@ -41,9 +35,18 @@ kotlin {
     }
 }
 
+tasks.withType<JavaCompile>().configureEach {
+    this.targetCompatibility = "11"
+}
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    kotlinOptions.freeCompilerArgs += "-opt-in=kotlinx.serialization.ExperimentalSerializationApi"
+    kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
+    kotlinOptions.jvmTarget = JavaVersion.VERSION_11.toString()
+}
+
 standardPublishing {
     name.set("Lightning-server-Mongo")
-    description.set("A MongoDB implementation of Lightning-server-Databases.")
+    description.set("An implementation of LightningServer Database using MongoDB.")
     github("lightningkite", "lightning-server")
 
     licenses {
@@ -64,3 +67,5 @@ standardPublishing {
     }
 }
 
+
+tasks.getByName("sourceJar").dependsOn("kspKotlin")

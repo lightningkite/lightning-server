@@ -3,10 +3,9 @@ package com.lightningkite.lightningserver.serialization
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.csv.Csv
 import java.io.InputStream
 
-class CsvFormatHandler(val csv: () -> Csv) : StringFormatHandler(csv, ContentType.Text.CSV) {
+class CsvFormatHandler(val csv: () -> CsvFormat) : StringFormatHandler(csv, ContentType.Text.CSV) {
     override suspend fun <T> streaming(contentType: ContentType, serializer: KSerializer<T>, value: T): HttpContent {
         return HttpContent.OutStream(
             write = { csv().encodeToAppendable(serializer, value, it.writer()) },

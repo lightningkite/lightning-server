@@ -11,12 +11,14 @@ import java.util.*
 import kotlin.test.assertContains
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import com.lightningkite.UUID
+import com.lightningkite.uuid
 
 @Serializable
-@DatabaseModel
+@GenerateDataClassPaths
 @TextIndex(["string"])
 data class ModelWithTextIndex(
-    override val _id: UUID = UUID.randomUUID(),
+    override val _id: UUID = uuid(),
     val string: String
 ): HasId<UUID>
 
@@ -31,32 +33,32 @@ class TextConditionTest: MongoTest() {
         collection.insertOne(value2)
 
         var query = "One"
-        var condition = startChain<ModelWithTextIndex>().fullTextSearch(query, false)
+        var condition = path<ModelWithTextIndex>().fullTextSearch(query, false)
         var results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "one"
-        condition = startChain<ModelWithTextIndex>().fullTextSearch(query, false)
+        condition = path<ModelWithTextIndex>().fullTextSearch(query, false)
         results = collection.find(condition).toList()
         assertFalse(results.contains(value1))
 
         query = "one"
-        condition = startChain<ModelWithTextIndex>().fullTextSearch(query, true)
+        condition = path<ModelWithTextIndex>().fullTextSearch(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "four two"
-        condition = startChain<ModelWithTextIndex>().fullTextSearch(query, true)
+        condition = path<ModelWithTextIndex>().fullTextSearch(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "four five"
-        condition = startChain<ModelWithTextIndex>().fullTextSearch(query, true)
+        condition = path<ModelWithTextIndex>().fullTextSearch(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value2)
 
         query = "three five"
-        condition = startChain<ModelWithTextIndex>().fullTextSearch(query, true)
+        condition = path<ModelWithTextIndex>().fullTextSearch(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
         assertContains(results, value2)
@@ -71,42 +73,42 @@ class TextConditionTest: MongoTest() {
         collection.insertOne(value2)
 
         var query = "One"
-        var condition = startChain<ModelWithTextIndex>().string.contains(query, false)
+        var condition = path<ModelWithTextIndex>().string.contains(query, false)
         var results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "one"
-        condition = startChain<ModelWithTextIndex>().string.contains(query, false)
+        condition = path<ModelWithTextIndex>().string.contains(query, false)
         results = collection.find(condition).toList()
         assertFalse(results.contains(value1))
 
         query = "one"
-        condition = startChain<ModelWithTextIndex>().string.contains(query, true)
+        condition = path<ModelWithTextIndex>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "four two"
-        condition = startChain<ModelWithTextIndex>().string.contains(query, true)
+        condition = path<ModelWithTextIndex>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertTrue(results.isEmpty())
 
         query = "six seven"
-        condition = startChain<ModelWithTextIndex>().string.contains(query, true)
+        condition = path<ModelWithTextIndex>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertContains(results, value2)
 
         query = "seven six"
-        condition = startChain<ModelWithTextIndex>().string.contains(query, true)
+        condition = path<ModelWithTextIndex>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertTrue(results.isEmpty())
 
         query = "four five"
-        condition = startChain<ModelWithTextIndex>().string.contains(query, true)
+        condition = path<ModelWithTextIndex>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertTrue(results.isEmpty())
 
         query = "three five"
-        condition = startChain<ModelWithTextIndex>().string.contains(query, true)
+        condition = path<ModelWithTextIndex>().string.contains(query, true)
         results = collection.find(condition).toList()
         assertTrue(results.isEmpty())
     }

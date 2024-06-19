@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.toHttpContent
 import com.lightningkite.lightningserver.settings.generalSettings
 import io.ktor.util.*
+import kotlinx.datetime.Instant
 
 
 /**
@@ -23,6 +24,13 @@ open class HttpStatusException(
     val headers: HttpHeaders = HttpHeaders.EMPTY,
     cause: Throwable? = null
 ) : Exception(message, cause) {
+    constructor(lsError: LSError): this(
+        status = HttpStatus(lsError.http),
+        detail = lsError.detail,
+        message = lsError.message,
+        data = lsError.data,
+    )
+
     override val message: String get() = super.message!!
     fun toLSError(): LSError = LSError(
         http = status.code,

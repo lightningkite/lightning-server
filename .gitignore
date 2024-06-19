@@ -13,3 +13,4 @@ local.tf
 local.tfvars
 
 bssoftware
+**/.DS_Store

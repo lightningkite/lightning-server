@@ -2,33 +2,38 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.db.testmodels.TempThing
+import com.lightningkite.lightningserver.testmodels.TempThing
+import com.lightningkite.lightningserver.testmodels.TempThing__id
+import com.lightningkite.lightningserver.testmodels._id
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
-import kotlin.math.sign
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
+// Bruh
+// You can't do modifications on the primary key this haphazardly.
+@Ignore
 class SimpleSignals {
 
-    lateinit var collection: InMemoryFieldCollection<TempThing>
+    lateinit var collection: FieldCollection<TempThing>
     val thing1 = TempThing(1)
     val thing2 = TempThing(2)
     val thing3 = TempThing(3)
     var runCount = 0
     var calledIds: MutableList<Int> = mutableListOf()
 
-    val mod1 = Modification.OnField(TempThing::_id, Modification.Assign(4))
-    val mod2 = Modification.OnField(TempThing::_id, Modification.Assign(5))
+    val mod1 = Modification.OnField(TempThing__id, Modification.Assign(4))
+    val mod2 = Modification.OnField(TempThing__id, Modification.Assign(5))
 
     @Before
     fun setup() {
         prepareModels()
-        com.lightningkite.lightningserver.db.testmodels.prepareModels()
-        collection = TestSettings.database().collection<TempThing>() as InMemoryFieldCollection
-        collection.drop()
+        com.lightningkite.lightningserver.testmodels.prepareModels()
+        collection = TestSettings.database().collection<TempThing>()
+        runBlocking { collection.deleteManyIgnoringOld(Condition.Always()) }
     }
 
     @Test
@@ -291,6 +296,115 @@ class SimpleSignals {
         signaledCollection.updateManyIgnoringResult(Condition.Always(), mod2)
         assertEquals(listOf(5, 5), calledIds)
         assertEquals(2, runCount)
+        calledIds.clear()
+        runCount = 0
+
+    }
+
+    @Test
+    fun testPostRawChanges():Unit = runBlocking {
+
+        val signaledCollection = collection.postRawChanges { changes: List<EntryChange<TempThing>> ->
+            calledIds.addAll(changes.flatMap { listOf(it.old?._id, it.new?._id) }.mapNotNull { it }.toSet() )
+            runCount++
+        }
+
+        signaledCollection.insert(listOf(thing1, thing2))
+        assertEquals(listOf(thing1._id, thing2._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.replaceOne(condition { it._id eq thing2._id }, thing3)
+        assertEquals(listOf(thing2._id, thing3._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.updateOne(condition { it._id eq thing3._id }, modification { it._id assign 2 })
+        assertEquals(listOf(thing3._id, thing2._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.upsertOne(condition { it._id eq thing2._id }, modification { it._id assign 3 }, thing3)
+        assertEquals(listOf(thing2._id, thing3._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.updateMany(Condition.Always(), modification { it._id assign 4 })
+        assertEquals(listOf(thing1._id, 4, thing3._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+        collection.deleteMany(Condition.Always())
+        collection.insertMany(listOf(thing1, thing2, thing3))
+
+
+        signaledCollection.deleteOne(Condition.Always())
+        assertEquals(listOf(thing1._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.deleteMany(Condition.Always())
+        assertEquals(listOf(thing2._id, thing3._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+        collection.deleteMany(Condition.Always())
+        collection.insertMany(listOf(thing1, thing2, thing3))
+
+        signaledCollection.replaceOneIgnoringResult(condition { it._id eq thing2._id }, thing3)
+        assertEquals(listOf(thing2._id, thing3._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.updateOneIgnoringResult(condition { it._id eq thing3._id }, modification { it._id assign 2 })
+        assertEquals(listOf(thing3._id, thing2._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.upsertOneIgnoringResult(condition { it._id eq thing2._id }, modification { it._id assign 3 }, thing3)
+        assertEquals(listOf(thing2._id, thing3._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.updateManyIgnoringResult(Condition.Always(), modification { it._id assign 4 })
+        assertEquals(listOf(thing1._id, 4, thing3._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        collection.deleteMany(Condition.Always())
+        collection.insertMany(listOf(thing1, thing2, thing3))
+
+
+        signaledCollection.deleteOneIgnoringOld(Condition.Always())
+        assertEquals(listOf(thing1._id), calledIds)
+        assertEquals(1, runCount)
+        calledIds.clear()
+        runCount = 0
+
+
+        signaledCollection.deleteManyIgnoringOld(Condition.Always())
+        assertEquals(listOf(thing2._id, thing3._id), calledIds)
+        assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 

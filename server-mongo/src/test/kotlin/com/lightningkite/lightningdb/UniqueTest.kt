@@ -15,6 +15,8 @@ import org.junit.Test
 import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.fail
+import com.lightningkite.UUID
+import com.lightningkite.uuid
 
 
 class UniqueTest : MongoTest() {
@@ -35,7 +37,7 @@ class UniqueTest : MongoTest() {
             try {
                 println(collection.insertOne(IndexingTestModel(email = "test@test.com", account = "asdf")))
                 fail()
-            } catch(w: BadRequestException) {
+            } catch(w: UniqueViolationException) {
                 /*expected*/
             }
         }
@@ -43,11 +45,11 @@ class UniqueTest : MongoTest() {
 
 }
 
-@DatabaseModel
+@GenerateDataClassPaths
 @Serializable
 @UniqueSet(["email", "account"])
 data class IndexingTestModel(
-    override val _id: UUID = UUID.randomUUID(),
+    override val _id: UUID = uuid(),
     val email: String? = null,
     val account: String? = null,
 ) : HasId<UUID>

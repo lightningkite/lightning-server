@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.utils.MutableMapWithChangeHandler
+import org.slf4j.LoggerFactory
 
 object Http {
     init {
@@ -14,6 +15,8 @@ object Http {
     }
 
     var fixEndingSlash: Boolean = true
+
+    private val logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.http.Http")
 
     val endpoints: MutableMap<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> =
         MutableMapWithChangeHandler<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> {
@@ -32,6 +35,10 @@ object Http {
     var exception: suspend (HttpRequest, Exception) -> HttpResponse =
         { request, exception ->
             if (exception is HttpStatusException) {
+                if (generalSettings().debug) {
+                    println(exception.toLSError())
+                    logger.warn(exception.toLSError().toString())
+                }
                 exception.toResponse(request)
             } else {
                 exception.report(request)
@@ -54,18 +61,31 @@ object Http {
         )
     }
 
-    val onRequest = ArrayList<suspend (HttpRequest)->Unit>()
+    var interceptors = listOf<HttpInterceptor>()
+        set(value) {
+            field = value
+            // WARNING: This will melt your brain
+            fullAction = interceptors.fold<HttpInterceptor, HttpInterceptor>({ request, handler -> handler(request) }) { total, wrapper ->
+                return@fold { request, handler ->
+                    total(request) { wrapper(it, handler) }
+                }
+            }
+        }
+    private var fullAction: HttpInterceptor = { req, cont -> cont(req) }
 
     suspend fun execute(request: HttpRequest): HttpResponse {
-        return Metrics.handlerPerformance(request.endpoint) {
-            endpoints[request.endpoint]?.let { handler ->
-                try {
-                    onRequest.forEach { it(request) }
-                    handler(request)
-                } catch (e: Exception) {
-                    exception(request, e)
+        return endpoints[request.endpoint]?.let { handler ->
+            try {
+                Metrics.handlerPerformance(request.endpoint) {
+                    fullAction(request, handler)
                 }
-            } ?: notFound(request.endpoint, request)
+            } catch (e: Exception) {
+                exception(request, e)
+            }
+        } ?: notFound(request.endpoint, request).also {
+            if (generalSettings().debug) {
+                logger.warn("${request.endpoint} not found!")
+            }
         }
     }
 }
@@ -99,3 +119,5 @@ suspend fun HttpEndpoint.test(
         e.toResponse(req)
     }
 }
+
+typealias HttpInterceptor = suspend (request: HttpRequest, cont: suspend (HttpRequest) -> HttpResponse) -> HttpResponse

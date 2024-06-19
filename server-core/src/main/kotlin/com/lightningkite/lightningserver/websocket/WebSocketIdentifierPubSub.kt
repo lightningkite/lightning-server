@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.pubsub.PubSub
+import com.lightningkite.uuid
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.takeWhile
 import java.util.*
@@ -30,7 +31,7 @@ class WebSocketIdentifierPubSub(val type: String = "ws-pubsub", val pubSub: PubS
     }
 
     suspend fun connect(): WebSocketIdentifier {
-        val uuid = UUID.randomUUID().toString()
+        val uuid = uuid().toString()
         val sid = WebSocketIdentifier(type, uuid)
         cache.set<Boolean>("$sid-connected", true)
         return sid
