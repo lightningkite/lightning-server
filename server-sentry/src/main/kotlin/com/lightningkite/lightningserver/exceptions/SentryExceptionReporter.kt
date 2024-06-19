@@ -23,7 +23,10 @@ class SentryExceptionReporter(val dsn: String) : ExceptionReporter {
     companion object {
         init {
             ExceptionSettings.register("sentry") {
-                SentryExceptionReporter(it.url.substringAfter("://"))
+                Regex("""sentry://(?<dsn>https://[^@]*@[^/]*/\d+)""")
+                    .matchEntire(it.url)
+                    ?.let { matches -> SentryExceptionReporter(matches.groups["dsn"]!!.value) }
+                    ?: throw IllegalStateException("Invalid sentry URL. The URL should match the pattern: sentry://https://[Sentry Key]@[Host]/[Project Number]")
             }
         }
     }
@@ -43,14 +46,16 @@ class SentryExceptionReporter(val dsn: String) : ExceptionReporter {
             is HttpRequest -> {
                 val p = context.authAny()?.get()
                 val event = SentryEvent(t).apply {
-                    this.request
                     request = Request().apply {
                         url = context.endpoint.path.toString()
                         method = context.endpoint.method.toString()
                         queryString = context.queryParameters.joinToString("&") { "${it.first}=${it.second}" }
                         cookies = context.headers.cookies.entries.joinToString { "${it.key}=${it.value}" }
                         headers = context.headers.normalizedEntries.mapValues { it.value.joinToString { it } }
-                        try{ data = context.body?.text() } catch (_:Exception){}
+                        try {
+                            data = context.body?.text()
+                        } catch (_: Exception) {
+                        }
 
                         envs = mapOf(
                             "REMOTE_ADDR" to context.sourceIp,
