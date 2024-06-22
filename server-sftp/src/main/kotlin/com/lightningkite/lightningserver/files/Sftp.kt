@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.files
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
+import com.lightningkite.lightningserver.utils.parseParameterString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.schmizz.sshj.DefaultConfig
@@ -30,7 +31,7 @@ class Sftp(
                     val host = match.groups["host"]!!.value
                     val port = match.groups["port"]!!.value.toInt()
                     val params: Map<String, List<String>> =
-                        FilesSettings.parseParameterString(match.groups["params"]!!.value)
+                        parseParameterString(match.groups["params"]!!.value)
                     val rootPath = match.groups["path"]!!.value
                     val user = match.groups["user"]!!.value
                     Sftp(host, port, rootPath) {

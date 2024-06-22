@@ -12,31 +12,12 @@ plugins {
     `maven-publish`
 }
 
+
 dependencies {
-    api(project(":shared"))
-    api(serverlibs.ktorJson)
-    api(serverlibs.ktorCioJvm)
-    api(serverlibs.ktorClientCio)
-    api(serverlibs.ktorContentNegotiation)
-    implementation(serverlibs.coroutinesCore)
-    implementation(serverlibs.logBackClassic)
-    implementation(serverlibs.kotlinStdLib)
-    api(serverlibs.kotlinHtmlJvm)
-    api(serverlibs.oneTimePass)
-    api(serverlibs.serializationProperties)
-    api(serverlibs.serializationCbor)
-    api(serverlibs.xmlUtilJvm)
-    api(serverlibs.mongoBson)
-    api(serverlibs.kBson)
-    api(serverlibs.kaml)
-    api(serverlibs.kotlinReflect)
-    implementation(serverlibs.bouncyCastleBcprov)
-    implementation(serverlibs.bouncyCastleBcpkix)
-
-    api(serverlibs.angusMail)
-    testImplementation(serverlibs.javaJwt)
+    api(project(":server-core"))
+    implementation("io.netty:netty-all:4.1.111.Final")
     testImplementation(serverlibs.kotlinTest)
-
+    implementation(serverlibs.coroutinesCore)
     ksp(project(":processor"))
     kspTest(project(":processor"))
 }
@@ -53,18 +34,15 @@ kotlin {
         kotlin.srcDir("build/generated/ksp/test/kotlin")
     }
 }
-tasks.withType<JavaCompile>().configureEach {
-    this.targetCompatibility = "11"
-}
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlinx.serialization.ExperimentalSerializationApi"
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
-    kotlinOptions.jvmTarget = JavaVersion.VERSION_11.toString()
 }
 
+
 standardPublishing {
-    name.set("Lightning-server-Server")
-    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
+    name.set("Lightning-Server-Netty")
+    description.set("A Lightning Server runner built on top of Netty.")
     github("lightningkite", "lightning-server")
 
     licenses {
@@ -84,5 +62,3 @@ standardPublishing {
         )
     }
 }
-
-tasks.getByName("sourceJar").dependsOn("kspKotlin")

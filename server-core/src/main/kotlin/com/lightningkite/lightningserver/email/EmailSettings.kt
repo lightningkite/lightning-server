@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.email
 
 import com.lightningkite.lightningserver.settings.Pluggable
+import com.lightningkite.lightningserver.utils.parseParameterString
 import kotlinx.serialization.Serializable
 
 /**
@@ -37,7 +38,7 @@ data class EmailSettings(
                     .matchEntire(it.url)
                     ?.let { match ->
                         val port = match.groups["port"]!!.value.toInt()
-                        val params = EmailSettings.parseParameterString(match.groups["params"]?.value ?: "")
+                        val params = parseParameterString(match.groups["params"]?.value ?: "")
                         SmtpEmailClient(
                             SmtpConfig(
                                 hostName = match.groups["host"]!!.value,

@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.core.Disconnectable
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
+import com.lightningkite.lightningserver.utils.parseParameterString
 import com.mongodb.*
 import com.mongodb.kotlin.client.coroutine.MongoClient
 import com.mongodb.kotlin.client.coroutine.MongoCollection
@@ -67,7 +68,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                     .matchEntire(it.url)
                     ?.let { match ->
                         val params: Map<String, List<String>>? = match.groups["params"]?.value?.let { params ->
-                            DatabaseSettings.parseParameterString(params)
+                            parseParameterString(params)
                         }
                         MongoDatabase(databaseName = "default") {
                             testMongo(version = params?.get("mongoVersion")?.firstOrNull())
@@ -81,7 +82,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                     ?.let { match ->
                         val folder = match.groups["folder"]!!.value
                         val params: Map<String, List<String>>? = match.groups["params"]?.value?.let { params ->
-                            DatabaseSettings.parseParameterString(params)
+                            parseParameterString(params)
                         }
                         MongoDatabase(databaseName = params?.get("databaseName")?.firstOrNull() ?: "default") {
                             embeddedMongo(
