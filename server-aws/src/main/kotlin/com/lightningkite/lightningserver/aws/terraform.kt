@@ -1340,11 +1340,11 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
                 description = "The configurations for the Emergency Invocation alarm. Threshold is the Number of Invocations, Period is the timeframe in Minutes, and DataPointsToAlarm are how many periods need to breach in the number of EvaluationPeriods before an alarm is triggered. Assign null to not create this alarm.",
                 validations = listOf(
                     Validation(
-                        condition = "var.emergencyInvocations.evaluationPeriods > 0",
+                        condition = "(var.emergencyInvocations == null ? true : var.emergencyInvocations.evaluationPeriods > 0)",
                         errorMessage = """"emergencyInvocations evaluationPeriods must be greater than 0"""",
                     ),
                     Validation(
-                        condition = "(var.emergencyInvocations.dataPointsToAlarm <= var.emergencyInvocations.evaluationPeriods && var.emergencyInvocations.dataPointsToAlarm > 0)",
+                        condition = "(var.emergencyInvocations == null ? true : (var.emergencyInvocations.dataPointsToAlarm <= var.emergencyInvocations.evaluationPeriods && var.emergencyInvocations.dataPointsToAlarm > 0))",
                         errorMessage = """"emergencyInvocations dataPointsToAlarm must be greater than 0 and less than or equal to emergencyInvocations evaluationPeriods"""",
                     )
                 )
@@ -1357,15 +1357,15 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
                 description = "The configurations for the Emergency Compute alarm. Threshold is the Milliseconds of Compute, Period is the timeframe in Minutes, and DataPointsToAlarm are how many periods need to breach in the number of EvaluationPeriods before an alarm is triggered. Assign null to not create this alarm.",
                 validations = listOf(
                     Validation(
-                        condition = "contains([\"Sum\", \"Average\", \"Maximum\"], var.emergencyCompute.statistic)",
+                        condition = "(var.emergencyCompute == null ? true : contains([\"Sum\", \"Average\", \"Maximum\"], var.emergencyCompute.statistic))",
                         errorMessage = """"Allowed values for emergencyCompute statistic are: \"Sum\", \"Average\", \"Maximum\".""""
                     ),
                     Validation(
-                        condition = "var.emergencyCompute.evaluationPeriods > 0",
+                        condition = "(var.emergencyCompute == null ? true : var.emergencyCompute.evaluationPeriods > 0)",
                         errorMessage = """"emergencyCompute evaluationPeriods must be greater than 0"""",
                     ),
                     Validation(
-                        condition = "(var.emergencyCompute.dataPointsToAlarm <= var.emergencyCompute.evaluationPeriods && var.emergencyCompute.dataPointsToAlarm > 0)",
+                        condition = "(var.emergencyCompute == null ? true : (var.emergencyCompute.dataPointsToAlarm <= var.emergencyCompute.evaluationPeriods && var.emergencyCompute.dataPointsToAlarm > 0))",
                         errorMessage = """"emergencyCompute dataPointsToAlarm must be greater than 0 and less than or equal to emergencyCompute evaluationPeriods"""",
                     )
                 )
@@ -1378,11 +1378,11 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
                 description = "The configurations for the Panic Invocations alarm. Threshold is the Number of Invocations, Period is the timeframe in Minutes, and DataPointsToAlarm are how many periods need to breach in the number of EvaluationPeriods before an alarm is triggered. Assign null to not create this alarm.",
                 validations = listOf(
                     Validation(
-                        condition = "var.panicInvocations.evaluationPeriods > 0",
+                        condition = "(var.panicInvocations == null ? true : var.panicInvocations.evaluationPeriods > 0)",
                         errorMessage = """"panicInvocations evaluationPeriods must be greater than 0"""",
                     ),
                     Validation(
-                        condition = "(var.panicInvocations.dataPointsToAlarm <= var.panicInvocations.evaluationPeriods && var.panicInvocations.dataPointsToAlarm > 0)",
+                        condition = "(var.panicInvocations == null ? true : (var.panicInvocations.dataPointsToAlarm <= var.panicInvocations.evaluationPeriods && var.panicInvocations.dataPointsToAlarm > 0))",
                         errorMessage = """"panicInvocations dataPointsToAlarm must be greater than 0 and less than or equal to panicInvocations evaluationPeriods"""",
                     )
                 )
@@ -1395,15 +1395,15 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
                 description = "The configurations for the Panic Compute alarm. Threshold is the Milliseconds of Compute, Period is the timeframe in Minutes, and DataPointsToAlarm are how many periods need to breach in the number of EvaluationPeriods before an alarm is triggered. Assign null to not create this alarm.",
                 validations = listOf(
                     Validation(
-                        condition = "contains([\"Sum\", \"Average\", \"Maximum\"], var.panicCompute.statistic)",
+                        condition = "(var.panicCompute == null ? true : contains([\"Sum\", \"Average\", \"Maximum\"], var.panicCompute.statistic))",
                         errorMessage = """"Allowed values for panicCompute statistic are: \"Sum\", \"Average\", \"Maximum\".""""
                     ),
                     Validation(
-                        condition = "var.panicCompute.evaluationPeriods > 0",
+                        condition = "(var.panicCompute == null ? true : var.panicCompute.evaluationPeriods > 0)",
                         errorMessage = """"panicCompute evaluationPeriods must be greater than 0"""",
                     ),
                     Validation(
-                        condition = "(var.panicCompute.dataPointsToAlarm <= var.panicCompute.evaluationPeriods && var.panicCompute.dataPointsToAlarm > 0)",
+                        condition = "(var.panicCompute == null ? true : (var.panicCompute.dataPointsToAlarm <= var.panicCompute.evaluationPeriods && var.panicCompute.dataPointsToAlarm > 0))",
                         errorMessage = """"panicCompute dataPointsToAlarm must be greater than 0 and less than or equal to panicCompute evaluationPeriods"""",
                     )
                 )
