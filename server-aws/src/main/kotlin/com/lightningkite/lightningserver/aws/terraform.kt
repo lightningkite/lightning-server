@@ -159,12 +159,18 @@ internal data class TerraformHandler(
     }
 }
 
+internal data class Validation(
+    val condition: String,
+    val errorMessage: String,
+)
+
 internal data class TerraformInput(
     val name: String,
     val type: String,
     val default: String?,
     val nullable: Boolean = false,
     val description: String? = null,
+    val validations: List<Validation> = emptyList(),
 ) {
     companion object {
         fun stringList(name: String, default: List<String>?, nullable: Boolean = false, description: String? = null) =
@@ -173,7 +179,7 @@ internal data class TerraformInput(
                 "list(string)",
                 default?.joinToString(", ", "[", "]") { "\"$it\"" },
                 nullable = nullable,
-                description = description
+                description = description,
             )
 
         fun string(name: String, default: String?, nullable: Boolean = false, description: String? = null) =
@@ -1328,31 +1334,79 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
 
             TerraformInput(
                 name = "emergencyInvocations",
-                type = "object({ threshold = number, period = number })",
+                type = "object({ threshold = number, period = number, evaluationPeriods = number, dataPointsToAlarm = number })",
                 default = "null",
                 nullable = true,
-                description = "The configurations for the Emergency Invocation alarm. Threshold is the Number of Invocations, and Period is the timeframe in Minutes. Assign null to not create this alarm."
+                description = "The configurations for the Emergency Invocation alarm. Threshold is the Number of Invocations, Period is the timeframe in Minutes, and DataPointsToAlarm are how many periods need to breach in the number of EvaluationPeriods before an alarm is triggered. Assign null to not create this alarm.",
+                validations = listOf(
+                    Validation(
+                        condition = "(var.emergencyInvocations == null ? true : var.emergencyInvocations.evaluationPeriods > 0)",
+                        errorMessage = """"emergencyInvocations evaluationPeriods must be greater than 0"""",
+                    ),
+                    Validation(
+                        condition = "(var.emergencyInvocations == null ? true : (var.emergencyInvocations.dataPointsToAlarm <= var.emergencyInvocations.evaluationPeriods && var.emergencyInvocations.dataPointsToAlarm > 0))",
+                        errorMessage = """"emergencyInvocations dataPointsToAlarm must be greater than 0 and less than or equal to emergencyInvocations evaluationPeriods"""",
+                    )
+                )
             ),
             TerraformInput(
                 name = "emergencyCompute",
-                type = "object({ threshold = number, period = number })",
+                type = "object({ threshold = number, period = number, statistic = string, evaluationPeriods = number, dataPointsToAlarm = number })",
                 default = "null",
                 nullable = true,
-                description = "The configurations for the Emergency Compute alarm. Threshold is the Milliseconds of Compute, and Period is the timeframe in Minutes. Assign null to not create this alarm."
+                description = "The configurations for the Emergency Compute alarm. Threshold is the Milliseconds of Compute, Period is the timeframe in Minutes, and DataPointsToAlarm are how many periods need to breach in the number of EvaluationPeriods before an alarm is triggered. Assign null to not create this alarm.",
+                validations = listOf(
+                    Validation(
+                        condition = "(var.emergencyCompute == null ? true : contains([\"Sum\", \"Average\", \"Maximum\"], var.emergencyCompute.statistic))",
+                        errorMessage = """"Allowed values for emergencyCompute statistic are: \"Sum\", \"Average\", \"Maximum\".""""
+                    ),
+                    Validation(
+                        condition = "(var.emergencyCompute == null ? true : var.emergencyCompute.evaluationPeriods > 0)",
+                        errorMessage = """"emergencyCompute evaluationPeriods must be greater than 0"""",
+                    ),
+                    Validation(
+                        condition = "(var.emergencyCompute == null ? true : (var.emergencyCompute.dataPointsToAlarm <= var.emergencyCompute.evaluationPeriods && var.emergencyCompute.dataPointsToAlarm > 0))",
+                        errorMessage = """"emergencyCompute dataPointsToAlarm must be greater than 0 and less than or equal to emergencyCompute evaluationPeriods"""",
+                    )
+                )
             ),
             TerraformInput(
                 name = "panicInvocations",
-                type = "object({ threshold = number, period = number })",
+                type = "object({ threshold = number, period = number, evaluationPeriods = number, dataPointsToAlarm = number })",
                 default = "null",
                 nullable = true,
-                description = "The configurations for the Panic Invocations alarm. Threshold is the Number of Invocations, and Period is the timeframe in Minutes. Assign null to not create this alarm."
+                description = "The configurations for the Panic Invocations alarm. Threshold is the Number of Invocations, Period is the timeframe in Minutes, and DataPointsToAlarm are how many periods need to breach in the number of EvaluationPeriods before an alarm is triggered. Assign null to not create this alarm.",
+                validations = listOf(
+                    Validation(
+                        condition = "(var.panicInvocations == null ? true : var.panicInvocations.evaluationPeriods > 0)",
+                        errorMessage = """"panicInvocations evaluationPeriods must be greater than 0"""",
+                    ),
+                    Validation(
+                        condition = "(var.panicInvocations == null ? true : (var.panicInvocations.dataPointsToAlarm <= var.panicInvocations.evaluationPeriods && var.panicInvocations.dataPointsToAlarm > 0))",
+                        errorMessage = """"panicInvocations dataPointsToAlarm must be greater than 0 and less than or equal to panicInvocations evaluationPeriods"""",
+                    )
+                )
             ),
             TerraformInput(
                 name = "panicCompute",
-                type = "object({ threshold = number, period = number })",
+                type = "object({ threshold = number, period = number, statistic = string, evaluationPeriods = number, dataPointsToAlarm = number })",
                 default = "null",
                 nullable = true,
-                description = "The configurations for the Panic Compute alarm. Threshold is the Milliseconds of Compute, and Period is the timeframe in Minutes. Assign null to not create this alarm."
+                description = "The configurations for the Panic Compute alarm. Threshold is the Milliseconds of Compute, Period is the timeframe in Minutes, and DataPointsToAlarm are how many periods need to breach in the number of EvaluationPeriods before an alarm is triggered. Assign null to not create this alarm.",
+                validations = listOf(
+                    Validation(
+                        condition = "(var.panicCompute == null ? true : contains([\"Sum\", \"Average\", \"Maximum\"], var.panicCompute.statistic))",
+                        errorMessage = """"Allowed values for panicCompute statistic are: \"Sum\", \"Average\", \"Maximum\".""""
+                    ),
+                    Validation(
+                        condition = "(var.panicCompute == null ? true : var.panicCompute.evaluationPeriods > 0)",
+                        errorMessage = """"panicCompute evaluationPeriods must be greater than 0"""",
+                    ),
+                    Validation(
+                        condition = "(var.panicCompute == null ? true : (var.panicCompute.dataPointsToAlarm <= var.panicCompute.evaluationPeriods && var.panicCompute.dataPointsToAlarm > 0))",
+                        errorMessage = """"panicCompute dataPointsToAlarm must be greater than 0 and less than or equal to panicCompute evaluationPeriods"""",
+                    )
+                )
             ),
 
             TerraformInput.string(
@@ -1462,7 +1516,8 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
                 1 : 0)
               alarm_name                = "${namePrefix}_emergency_invocations"
               comparison_operator       = "GreaterThanOrEqualToThreshold"
-              evaluation_periods        = "1"
+              evaluation_periods        = var.emergencyInvocations.evaluationPeriods
+              datapoints_to_alarm       = var.emergencyInvocations.dataPointsToAlarm
               metric_name               = "Invocations"
               namespace                 = "AWS/Lambda"
               period                    = var.emergencyInvocations.period * 60
@@ -1481,11 +1536,12 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
                 1 : 0)
               alarm_name                = "${namePrefix}_emergency_compute"
               comparison_operator       = "GreaterThanOrEqualToThreshold"
-              evaluation_periods        = "1"
+              evaluation_periods        = var.emergencyCompute.evaluationPeriods
+              datapoints_to_alarm       = var.emergencyCompute.dataPointsToAlarm
               metric_name               = "Duration"
               namespace                 = "AWS/Lambda"
               period                    = var.emergencyCompute.period * 60
-              statistic                 = "Sum"
+              statistic                 = var.emergencyCompute.statistic
               threshold                 = var.emergencyCompute.threshold
               alarm_description         = ""
               insufficient_data_actions = []
@@ -1500,7 +1556,8 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
                 1 : 0)
               alarm_name                = "${namePrefix}_panic_invocations"
               comparison_operator       = "GreaterThanOrEqualToThreshold"
-              evaluation_periods        = "1"
+              evaluation_periods        = var.panicInvocations.evaluationPeriods
+              datapoints_to_alarm       = var.panicInvocations.dataPointsToAlarm
               metric_name               = "Invocations"
               namespace                 = "AWS/Lambda"
               period                    = var.panicInvocations.period * 60
@@ -1519,11 +1576,12 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
                 1 : 0)
               alarm_name                = "${namePrefix}_panic_compute"
               comparison_operator       = "GreaterThanOrEqualToThreshold"
-              evaluation_periods        = "1"
+              evaluation_periods        = var.panicCompute.evaluationPeriods
+              datapoints_to_alarm       = var.panicCompute.dataPointsToAlarm
               metric_name               = "Duration"
               namespace                 = "AWS/Lambda"
               period                    = var.panicCompute.period * 60
-              statistic                 = "Sum"
+              statistic                 = var.panicCompute.statistic
               threshold                 = var.panicCompute.threshold
               alarm_description         = ""
               insufficient_data_actions = []
@@ -2300,6 +2358,12 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
                 it.appendLine("    nullable = ${input.nullable}")
                 input.description?.let { d ->
                     it.appendLine("    description = \"$d\"")
+                }
+                input.validations.forEach { validation ->
+                    it.appendLine("    validation {")
+                    it.appendLine("        condition = ${validation.condition}")
+                    it.appendLine("        error_message = ${validation.errorMessage}")
+                    it.appendLine("    }")
                 }
                 it.appendLine("}")
             }
