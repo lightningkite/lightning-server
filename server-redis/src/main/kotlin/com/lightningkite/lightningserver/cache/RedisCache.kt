@@ -93,13 +93,9 @@ class RedisCache(val client: RedisClient) : Cache {
 //    }
 
     override suspend fun add(key: String, value: Int, timeToLive: Duration?) {
-        println("add $key $value $timeToLive")
         connection.incrby(key, value.toLong()).collect { }
-        println("incrby complete for $key")
         timeToLive?.let {
-            println("ttl applying to $key")
             connection.pexpire(key, it.toJavaDuration()).collect {  }
-            println("ttl applied to $key")
         }
     }
 

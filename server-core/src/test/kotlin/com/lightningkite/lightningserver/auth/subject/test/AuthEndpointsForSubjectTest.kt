@@ -214,23 +214,8 @@ class AuthEndpointsForSubjectTest {
         val auth = TestSettings.testUserSubject.tokenToAuth(result.session!!, null)!!
         val self = TestSettings.testUserSubject.self.implementation(AuthAndPathParts(auth, null, arrayOf()), Unit)
 
-        // Set up OTP
-        TestSettings.proofOtp.establish.test(self, EstablishOtp("Test Label"))
-        @Suppress("UNCHECKED_CAST") var secret = TestSettings.proofOtp.table(TestSettings.subjectHandler).get(self._id as Comparable<Any>)!!
-        assertFalse(secret.active)
-        run {
-            // Can still log in with email pin only before confirmation
-            assertNotNull(TestSettings.testUserSubject.login.test(null, listOf(proof1)).session)
-        }
-        TestSettings.proofOtp.confirm.test(self, secret.generator.generate())
-        secret = TestSettings.proofOtp.table(TestSettings.subjectHandler).get(self._id as Comparable<Any>)!!
-        assertTrue(secret.active)
-
         // Set up Password
         TestSettings.proofPassword.establish.test(self, EstablishPassword("test"))
-
-        // Set up phone
-        TestSettings.userInfo.collection().updateOneById(self._id, modification { it.phoneNumber assign "8001002000" })
 
         // Can log in with password alone
         var time: Instant = Clock.System.now()

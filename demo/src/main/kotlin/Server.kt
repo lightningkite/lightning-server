@@ -181,21 +181,6 @@ object Server : ServerPathGroup(ServerPath.root) {
         }
         HttpResponse.plainText(count.toString() + " - $last")
     }
-    val fileSignPerfCheck2 = path("file-sign-perf-check2").get.handler {
-        val system = files()
-        var endAt = System.currentTimeMillis() + 1000
-        while(System.currentTimeMillis() < endAt)
-            (system.root.resolve("test.txt") as S3File).signedUrlAlt
-        var count = 0
-        endAt = System.currentTimeMillis() + 1000
-        var last = ""
-        S3File.reset()
-        while(System.currentTimeMillis() < endAt) {
-            count++
-            last = (system.root.resolve("test.txt") as S3File).signedUrlAlt
-        }
-        HttpResponse.plainText("$count - $last \n ${S3File.report()}")
-    }
 
     val databaseCheck = path("database-check").get.handler {
         HttpResponse.plainText(database().collection<User>()::class.qualifiedName ?: "???")

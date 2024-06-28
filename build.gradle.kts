@@ -17,10 +17,6 @@ buildscript {
 
 allprojects {
     group = "com.lightningkite.lightningserver"
-}
-
-allprojects {
-    group = "com.lightningkite.lightningserver"
     repositories {
         mavenLocal()
 //        maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")

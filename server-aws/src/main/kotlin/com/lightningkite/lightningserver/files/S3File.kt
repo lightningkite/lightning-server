@@ -171,18 +171,9 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
 
     override val signedUrl: String
         get() = system.signedUrlDuration?.let { e ->
-            var stopwatch = TimeSource.Monotonic.markNow()
-            var timeIndex = 0
-            fun mark() {
-                val e = stopwatch.elapsedNow()
-                stopwatch = TimeSource.Monotonic.markNow()
-                times[timeIndex++] += e
-            }
-
             val creds = system.creds()
             val accessKey = creds.access
             val tokenPreEncoded = creds.tokenPreEncoded
-            mark()
             var dateOnly = ""
             val date = now().atZone(TimeZone.UTC).run {
                 buildString {
@@ -197,14 +188,12 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
                     append("Z")
                 }
             }
-            mark()
             val objectPath = path.unixPath
             val preHeaders = tokenPreEncoded?.let {
                 "X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=${accessKey}%2F$dateOnly%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=$date&X-Amz-Expires=${e.inWholeSeconds}&X-Amz-Security-Token=${it}&X-Amz-SignedHeaders=host"
             } ?: run {
                 "X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=${accessKey}%2F$dateOnly%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=$date&X-Amz-Expires=${e.inWholeSeconds}&X-Amz-SignedHeaders=host"
             }
-            mark()
             val hashHolder = ByteArray(32)
             val canonicalRequestHasher = MessageDigest.getInstance("SHA-256")
             canonicalRequestHasher.update(constantBytesA)
@@ -220,9 +209,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
                 hashHolder,
                 0, 32
             )
-            mark()
             val canonicalRequestHash = hashHolder.toHex()
-            mark()
             val finalHasher = Mac.getInstance("HmacSHA256")
             finalHasher.init(system.signingKey(dateOnly))
             finalHasher.update(constantBytesF)
@@ -238,23 +225,11 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
                 0
             )
             val regeneratedSig = hashHolder.toHex()
-            mark()
             val result = "$url?$preHeaders&X-Amz-Signature=$regeneratedSig"
-            mark()
             result
         } ?: url
 
     companion object {
-        val times = Array<Duration>(20, {Duration.ZERO})
-        fun reset() {
-            times.fill(Duration.ZERO)
-        }
-        fun report(): String = buildString {
-            for((index, time) in times.withIndex()) {
-                appendLine("mark $index: $time")
-            }
-        }
-
         private val constantBytesA = "GET\n/".toByteArray()
         private val constantBytesC = "\nhost:".toByteArray()
         private val constantBytesD = ".s3.".toByteArray()
