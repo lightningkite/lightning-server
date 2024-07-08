@@ -109,12 +109,17 @@ annotation class ExpectedPattern(val pattern: String)
 annotation class DisplayName(val text: String)
 
 /**
- * A display name of the item in question.
+ * Which mime types are valid
  */
 @SerialInfo
 @Retention(AnnotationRetention.RUNTIME)
-@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
-annotation class MimeType(vararg val types: String)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class MimeType(vararg val types: String, val maxSize: Long = -1)
+
+@SerialInfo
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class MaxLength(val size: Int)
 
 /**
  * A description of the item in question.

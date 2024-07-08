@@ -3,16 +3,18 @@ package com.lightningkite.lightningserver.serialization
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import com.github.jershell.kbson.*
+import com.lightningkite.ValidationIssue
+import com.lightningkite.ValidationIssuePart
+import com.lightningkite.Validators
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.SetOnce
 import com.lightningkite.lightningserver.StringArrayFormat
 import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
+import com.lightningkite.lightningserver.files.fileObject
 import com.lightningkite.lightningserver.http.HttpContent
-import kotlinx.serialization.BinaryFormat
-import kotlinx.serialization.DeserializationStrategy
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerializationStrategy
+import com.lightningkite.validate
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialKind
@@ -27,6 +29,7 @@ import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
 import nl.adaptivity.xmlutil.serialization.XML
 import java.math.BigDecimal
 import kotlinx.datetime.*
+import kotlinx.serialization.*
 import java.util.*
 import kotlin.collections.HashMap
 
@@ -42,6 +45,29 @@ abstract class Serialization {
 
     object Internal : Serialization() {
         override fun defaultModule(): SerializersModule = ClientModule.overwriteWith(additionalModule)
+    }
+
+    init {
+        Validators.suspendProcessor<MimeType, ServerFile> { t, v ->
+            val h = v.fileObject.head()
+            when {
+                h == null -> ValidationIssuePart(1, "File does not exist")
+                h.size > t.maxSize -> ValidationIssuePart(1, "File is too big; max size is ${t.maxSize} bytes but file is ${h.size} bytes")
+                t.types.none { h.type.matches(ContentType(it)) } -> ValidationIssuePart(1, "File type ${h.type} does not match ${t.types.joinToString("; ")}")
+                else -> null
+            }
+        }
+    }
+    suspend fun <T> validateOrThrow(serializer: SerializationStrategy<T>, value: T) {
+        val out = ArrayList<ValidationIssue>()
+        module.validate(serializer, value) { out.add(it) }
+        if(out.isNotEmpty()) {
+            throw BadRequestException(
+                detail = "validation-failed",
+                message = out.joinToString("; ") { "${it.path.joinToString(".")}: ${it.text}" },
+                data = json.encodeToString(out)
+            )
+        }
     }
 
     var additionalModule: SerializersModule by SetOnce { SerializersModule { } }

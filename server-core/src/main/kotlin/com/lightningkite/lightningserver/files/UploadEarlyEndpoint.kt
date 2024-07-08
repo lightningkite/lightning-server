@@ -1,10 +1,12 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.schedule.schedule
+import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
@@ -37,11 +39,12 @@ class UploadEarlyEndpoint(
         default = this
     }
 
-    val endpoint = get.typed(
+    val endpoint = get.api(
+        authOptions = noAuth,
         summary = "Upload File for Request",
         description = "Upload a file to make a request later.  Times out in around 10 minutes.",
         errorCases = listOf(),
-        implementation = { _: Unit, _: Unit ->
+        implementation = { _: Unit ->
             val newFile = files().root.resolve(filePath).resolveRandom("file", "file")
             val newItem = UploadForNextRequest(
                 expires = now().plus(expiration),

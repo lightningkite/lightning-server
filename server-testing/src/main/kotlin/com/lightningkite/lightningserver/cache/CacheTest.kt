@@ -57,7 +57,7 @@ abstract class CacheTest {
         }
     }
 
-    @Test fun expirationTest() {
+    @Test open fun expirationTest() {
         val cache = cache ?: run {
             println("Could not test because the cache is not supported on this system.")
             return

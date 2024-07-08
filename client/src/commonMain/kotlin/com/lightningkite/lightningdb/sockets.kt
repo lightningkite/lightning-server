@@ -1,14 +1,26 @@
-package com.lightningkite.lightningdb
+package com.ilussobsa.sdk
 
 import com.lightningkite.kiteui.*
 import com.lightningkite.kiteui.reactive.*
+import com.lightningkite.lightningdb.MultiplexMessage
 import com.lightningkite.uuid
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.random.Random
 
 private val shared = HashMap<String, TypedWebSocket<MultiplexMessage, MultiplexMessage>>()
-fun multiplexSocket(url: String, path: String, params: Map<String, List<String>>, json: Json, pingTime: Long = 30_000L): RetryWebsocket {
+fun multiplexSocket(
+    url: String,
+    path: String,
+    params: Map<String, List<String>>,
+    json: Json,
+    pingTime: Long = 30_000L,
+    log: Console? = null
+): RetryWebsocket {
     val shared = shared.getOrPut(url) {
-        val s = retryWebsocket(url, pingTime)
+        val s = retryWebsocket({ websocket(url) }, pingTime, log = log)
         s.typed(json, MultiplexMessage.serializer(), MultiplexMessage.serializer())
     }
     val channelOpen = Property(false)
@@ -47,6 +59,7 @@ fun multiplexSocket(url: String, path: String, params: Map<String, List<String>>
                 shouldBeOn.value--
             }
         }
+
         val lifecycle = CalculationContext.Standard().apply {
             reactiveScope {
                 val shouldBeOn = shouldBeOn.await() > 0
@@ -114,4 +127,3 @@ fun multiplexSocket(url: String, path: String, params: Map<String, List<String>>
         }
     }
 }
-

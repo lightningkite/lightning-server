@@ -10,11 +10,16 @@ package com.lightningkite.lightningserver.core
 class ContentType(val type: String, val subtype: String, val parameters: Map<String, String> = mapOf()) {
     constructor(string: String) : this(
         string.substringBefore('/'),
-        string.substringAfter('/').takeWhile { !it.isWhitespace() && it != ';' },
+        string.substringAfter('/', "*").takeWhile { !it.isWhitespace() && it != ';' },
         string.substringAfter(';', "").split(";")
             .filter { it.isNotBlank() }
             .associate { it.substringBefore('=').trim() to it.substringAfter('=').trim() }
     )
+
+    fun matches(other: ContentType): Boolean {
+        return (other.type == "*" || type == other.type) &&
+                (other.subtype == "*" || subtype == other.subtype)
+    }
 
     override fun equals(other: Any?): Boolean {
         return other is ContentType && type == other.type && subtype == other.subtype

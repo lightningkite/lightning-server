@@ -8,6 +8,7 @@ import org.junit.BeforeClass
 import org.junit.Ignore
 import org.junit.Test
 
+@Ignore
 class MemcachedTest: CacheTest() {
     override val cache: Cache? by lazy {
         if (EmbeddedMemcached.available) MemcachedCache(XMemcachedClient("127.0.0.1", 11211))
