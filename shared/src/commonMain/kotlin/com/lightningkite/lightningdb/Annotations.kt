@@ -114,7 +114,7 @@ annotation class DisplayName(val text: String)
 @SerialInfo
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
-annotation class MimeType(vararg val types: String, val maxSize: Long = -1)
+annotation class MimeType(vararg val types: String, val maxSize: Long = Long.MAX_VALUE)
 
 @SerialInfo
 @Retention(AnnotationRetention.RUNTIME)
