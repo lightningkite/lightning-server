@@ -10,7 +10,8 @@ import kotlin.test.*
 @Serializable
 @GenerateDataClassPaths
 data class Sample(
-    @MaxLength(5) val x: String
+    @MaxLength(5) val x: String = "asdf",
+    @IntegerRange(0, 100) val y: Int = 4,
 )
 
 class ValidationTest {
@@ -46,6 +47,10 @@ class ValidationTest {
                     )
                 )
             )
+        })
+        assertFails(modification<Sample> {
+            it.x assign "asdfab"
+            it.y assign 101
         })
     }
 }

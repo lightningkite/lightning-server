@@ -41,19 +41,25 @@ fun ServerPath.bulkRequestEndpoint() = post.api(
                     )
                     serverLogger.info("${api.route.endpoint} (${handler.parts}) accessed by ${authOrNull} (${rawRequest?.sourceIp}) (via bulk)")
                     try {
-                        val result = api.implementation(api.authAndPathParts(
-                            authOrNull, HttpRequest(
-                                endpoint = handler.endpoint,
-                                parts = handler.parts,
-                                wildcard = handler.wildcard,
-                                body = it.body?.let { HttpContent.Text(it, ContentType.Application.Json) },
-                                queryParameters = listOf(),
-                                headers = rawRequest?.headers ?: HttpHeaders.EMPTY,
-                                domain = rawRequest?.domain ?: "",
-                                protocol = rawRequest?.protocol ?: "https",
-                                sourceIp = rawRequest?.sourceIp ?: "0.0.0.0"
-                            )
-                        ), it.body?.let { Serialization.json.decodeFromString(api.inputType, it) } ?: Unit)
+                        val result = api.implementation(
+                            api.authAndPathParts(
+                                authOrNull, HttpRequest(
+                                    endpoint = handler.endpoint,
+                                    parts = handler.parts,
+                                    wildcard = handler.wildcard,
+                                    body = it.body?.let { HttpContent.Text(it, ContentType.Application.Json) },
+                                    queryParameters = listOf(),
+                                    headers = rawRequest?.headers ?: HttpHeaders.EMPTY,
+                                    domain = rawRequest?.domain ?: "",
+                                    protocol = rawRequest?.protocol ?: "https",
+                                    sourceIp = rawRequest?.sourceIp ?: "0.0.0.0"
+                                )
+                            ),
+                            it.body?.let {
+                                Serialization.json.decodeFromString(api.inputType, it)
+                                    .also { Serialization.validateOrThrow(api.inputType, it) }
+                            } ?: Unit
+                        )
                         entry.key to BulkResponse(
                             result = Serialization.json.encodeToString(api.outputType, result),
                             durationMs = start.elapsedNow().inWholeMilliseconds

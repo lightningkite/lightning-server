@@ -27,6 +27,12 @@ data class User(
 
 @GenerateDataClassPaths
 @Serializable
+data class ValidatedModel(
+    @ExpectedPattern("[a-zA-Z ]+") @MaxLength(15) val name: String,
+)
+
+@GenerateDataClassPaths
+@Serializable
 data class CompoundKeyTestModel(
     override val _id: CompoundTestKey = CompoundTestKey("first", "second"),
     val value: Int = 0,
