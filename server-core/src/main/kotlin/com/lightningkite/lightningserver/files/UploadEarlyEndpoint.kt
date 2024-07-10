@@ -97,7 +97,7 @@ class UploadEarlyEndpoint(
     @TestOnly
     internal fun verifyUrl(url: String): Boolean {
         val params = url.substringAfter('?').split('&').associate { it.substringBefore('=') to it.substringAfter('=').decodeURLQueryComponent() }
-        return verifyUrl(url.substringBefore('?'), params["useUntil"]!!.toLong(), params["token"]!!)
+        return verifyUrl(url.substringBefore('?'), params["useUntil"]?.toLong() ?: throw IllegalArgumentException("Parameter 'useUntil' is missing in '$url'"), params["token"] ?: throw IllegalArgumentException("Parameter 'token' is missing in '$url'"))
     }
     @TestOnly
     internal fun verifyUrl(url: String, exp: Long, token: String): Boolean {
