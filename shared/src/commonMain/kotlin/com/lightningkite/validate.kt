@@ -86,7 +86,7 @@ object Validators {
                     "Too long; maximum ${t.size} characters allowed"
                 ) else null
 
-                else -> throw NotImplementedError("Unknown type ${v::class.qualifiedName}")
+                else -> throw NotImplementedError("Unknown type ${v::class}")
             }
         }
         processor<ExpectedPattern, Any> { t, v ->
@@ -101,7 +101,7 @@ object Validators {
                     "Does not match pattern; expected to match ${t.pattern}"
                 ) else null
 
-                else -> throw NotImplementedError("Unknown type ${v::class.qualifiedName}")
+                else -> throw NotImplementedError("Unknown type ${v::class}")
             }
         }
         processor<IntegerRange, Any> { t, v ->
@@ -146,7 +146,7 @@ object Validators {
                     "Out of range; expected to be between ${t.min} and ${t.max}"
                 ) else null
 
-                else -> throw NotImplementedError("Unknown type ${v::class.qualifiedName}")
+                else -> throw NotImplementedError("Unknown type ${v::class}")
             }
         }
         processor<FloatRange, Any> { t, v ->
@@ -161,7 +161,7 @@ object Validators {
                     "Out of range; expected to be between ${t.min} and ${t.max}"
                 ) else null
 
-                else -> throw NotImplementedError("Unknown type ${v::class.qualifiedName}")
+                else -> throw NotImplementedError("Unknown type ${v::class}")
             }
         }
     }
