@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningdb
 
+import com.lightningkite.ShouldValidateSub
 import com.lightningkite.khrysalis.*
 import kotlinx.serialization.*
 import com.lightningkite.lightningdb.SerializableProperty

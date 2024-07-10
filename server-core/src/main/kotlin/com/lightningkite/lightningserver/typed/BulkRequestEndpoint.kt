@@ -16,6 +16,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.builtins.ListSerializer
+import kotlin.time.TimeSource
+import kotlin.time.measureTime
 
 fun ServerPath.bulkRequestEndpoint() = post.api(
     summary = "Bulk Request",
@@ -25,14 +27,17 @@ fun ServerPath.bulkRequestEndpoint() = post.api(
         coroutineScope {
             requests.entries.map { entry ->
                 async {
+                    val start = TimeSource.Monotonic.markNow()
                     val it = entry.value
                     val handler = Http.matcher.match(it.path, HttpMethod(it.method))
                         ?: return@async entry.key to BulkResponse(
-                            error = LSError(404, detail = "no-match", message = "No matching route found", data = it.method + " " + it.path)
+                            error = LSError(404, detail = "no-match", message = "No matching route found", data = it.method + " " + it.path),
+                            durationMs = start.elapsedNow().inWholeMilliseconds
                         )
                     @Suppress("UNCHECKED_CAST")
                     val api = Http.endpoints[handler.endpoint] as? ApiEndpoint<HasId<*>?, TypedServerPath, Any?, Any?> ?: return@async entry.key to BulkResponse(
-                        error = LSError(400, detail = "not-api", message = "Matched route is not an API endpoint", data = it.method + " " + it.path)
+                        error = LSError(400, detail = "not-api", message = "Matched route is not an API endpoint", data = it.method + " " + it.path),
+                        durationMs = start.elapsedNow().inWholeMilliseconds
                     )
                     serverLogger.info("${api.route.endpoint} (${handler.parts}) accessed by ${authOrNull} (${rawRequest?.sourceIp}) (via bulk)")
                     try {
@@ -50,7 +55,8 @@ fun ServerPath.bulkRequestEndpoint() = post.api(
                             )
                         ), it.body?.let { Serialization.json.decodeFromString(api.inputType, it) } ?: Unit)
                         entry.key to BulkResponse(
-                            result = Serialization.json.encodeToString(api.outputType, result)
+                            result = Serialization.json.encodeToString(api.outputType, result),
+                            durationMs = start.elapsedNow().inWholeMilliseconds
                         )
                     } catch(e: Exception) {
                         e.report()

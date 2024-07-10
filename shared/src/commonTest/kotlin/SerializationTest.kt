@@ -56,7 +56,7 @@ class SerializationTest {
         val serializer = PartialSerializer(User.serializer())
         val part = partialOf<User>{
             it._id assign uuid()
-            it.email assign "test@test.com"
+            it.email assign "test@test.com".trimmedCaseless()
         }
         val asText = myJson.encodeToString(serializer, part)
         println(asText)
@@ -114,28 +114,28 @@ class SerializationTest {
 
     @Test fun executionTest() {
         val modification = modification<User> { it.age assign 22 }
-        val model = User(email = "joseph@lightningkite.com")
+        val model = User(email = "joseph@lightningkite.com".trimmedCaseless())
         assertEquals(22, modification(model).age)
     }
 
     @Test fun demoConditions() {
         Condition.Equal(2).cycle()
-        (path<User>().email eq "Dan").cycle()
-        (path<User>().email eq "Dan").cycle()
+        (path<User>().email eq "Dan".trimmedCaseless()).cycle()
+        (path<User>().email eq "Dan".trimmedCaseless()).cycle()
         (path<Post>().content eq "Lightning Kite").cycle()
     }
     @Test fun demoModifications() {
         Modification.Assign(2).cycle()
-        modification<User> { it.email assign "Dan" }.cycle()
+        modification<User> { it.email assign "Dan".trimmedCaseless() }.cycle()
         modification<Post> { it.content assign "Lightning Kite" }.cycle()
     }
     @Test fun demoSorts() {
         sort<User> {
-            it.email.ascending()
+            it.name.ascending()
             it.age.descending()
         }.cycle()
         sort<User> {
-            it.email.ascending(ignoreCase = true)
+            it.name.ascending(ignoreCase = true)
             it.age.descending()
         }.cycle()
     }

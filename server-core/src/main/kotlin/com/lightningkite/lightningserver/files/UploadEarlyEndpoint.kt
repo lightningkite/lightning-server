@@ -5,17 +5,19 @@ import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.encryption.*
+import com.lightningkite.lightningserver.filescanner.FileScanner
+import com.lightningkite.lightningserver.filescanner.copyAndScan
+import com.lightningkite.lightningserver.filescanner.scan
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.typed.api
-import com.lightningkite.lightningserver.typed.typed
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
 import com.lightningkite.now
+import com.lightningkite.uuid
 import io.ktor.http.*
+import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration
-import kotlinx.datetime.Instant
 import org.jetbrains.annotations.TestOnly
 import kotlin.time.Duration.Companion.days
 
@@ -24,18 +26,35 @@ class UploadEarlyEndpoint(
     val files: () -> FileSystem,
     val database: () -> Database,
     val signer: () -> SecureHasher = secretBasis.hasher("upload-early"),
-    val filePath: String = ExternalServerFileSerializer.uploadPath,
+    val fileScanner: () -> List<FileScanner> = { listOf() },
+    val jailFilePath: String = "upload-jail",
+    val filePath: String = "uploaded",
     val expiration: Duration = 1.days
-) : ServerPathGroup(path) {
+) : ServerPathGroup(path), FileSystem.SpecialResolver {
 
     companion object {
         var default: UploadEarlyEndpoint? = null
     }
-
+    override val prefix: String = "future://$path/"
+    override fun resolve(url: String): FileObject {
+        val post = url.substringAfter(prefix)
+        verifyUrl(post)
+        val id = post.substringBefore('?')
+        val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
+        val safeFo = files().root.resolve(filePath).resolve("$id.file")
+        runBlocking { fileScanner().copyAndScan(originalFo, safeFo) }
+        return safeFo
+    }
     init {
         prepareModels()
-        ExternalServerFileSerializer.fileValidators += this::validateFile
-        ExternalServerFileSerializer.fileSystem = files
+        FileSystem.register(this)
+        FileSystem.default = files
+        ExternalServerFileSerializer.uploadFile = {
+            fileScanner().scan(it)
+            val d = files().root.resolveRandom("uploaded", "file")
+            d.put(it)
+            d
+        }
         default = this
     }
 
@@ -45,7 +64,8 @@ class UploadEarlyEndpoint(
         description = "Upload a file to make a request later.  Times out in around 10 minutes.",
         errorCases = listOf(),
         implementation = { _: Unit ->
-            val newFile = files().root.resolve(filePath).resolveRandom("file", "file")
+            val id = uuid()
+            val newFile = files().root.resolve(jailFilePath).resolve("$id.file")
             val newItem = UploadForNextRequest(
                 expires = now().plus(expiration),
                 file = ServerFile(newFile.url)
@@ -53,11 +73,10 @@ class UploadEarlyEndpoint(
             database().collection<UploadForNextRequest>().insertOne(newItem)
             UploadInformation(
                 uploadUrl = newFile.uploadUrl(expiration),
-                futureCallToken = signUrl(newFile.url)
+                futureCallToken = signUrl(prefix + id.toString())
             )
         }
     )
-
 
     val cleanupSchedule = schedule("cleanupUploads", 1.days) {
         database().collection<UploadForNextRequest>().deleteMany(condition { it.expires lt now() }).forEach {
@@ -67,20 +86,6 @@ class UploadEarlyEndpoint(
                 e.printStackTrace()
             }
         }
-    }
-
-    @OptIn(DelicateCoroutinesApi::class)
-    fun validateFile(url: String, params: Map<String, String>): Boolean {
-        val token = params["token"] ?: return false
-        val exp = params["useUntil"]?.toLongOrNull() ?: return false
-        if(now().toEpochMilliseconds() > exp) return false
-        val file = ServerFile(url)
-        if(!verifyUrl(url, exp, token)) return false
-        GlobalScope.launch {
-            database().collection<UploadForNextRequest>()
-                .deleteMany(condition { it.file eq ServerFile(url) })
-        }
-        return true
     }
 
     @TestOnly

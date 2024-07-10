@@ -45,8 +45,12 @@ serializationLibs="1.6.3"
 serializationXmlUtil="0.86.3"
 shadow="7.1.0"
 xmlUtilJvm="0.86.3"
+clamAv="2.1.2"
+apacheTika="2.9.2"
 
 [libraries]
+clamAv={module="xyz.capybara:clamav-client", version.ref="clamAv"}
+apacheTika={module="org.apache.tika:tika-parsers", version.ref="apacheTika"}
 androidDesugaring={module="com.android.tools:desugar_jdk_libs", version.ref="androidDesugaring"}
 angusMail={module="org.eclipse.angus:angus-mail", version.ref="angusMail"}
 awsApiGateway={module="software.amazon.awssdk:apigatewaymanagementapi", version.ref="awsVersion"}

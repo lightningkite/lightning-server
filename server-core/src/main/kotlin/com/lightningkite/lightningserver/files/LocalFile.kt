@@ -68,6 +68,20 @@ class LocalFile(val system: LocalFileSystem, val file: File) : FileObject {
         assert(file.delete())
     }
 
+    override suspend fun copyTo(other: FileObject) {
+        if(other is LocalFile) {
+            this.file.copyTo(other.file, overwrite = true)
+            this.contentTypeFile.copyTo(other.contentTypeFile, overwrite = true)
+        } else super.copyTo(other)
+    }
+
+    override suspend fun moveTo(other: FileObject) {
+        if(other is LocalFile) {
+            this.file.renameTo(other.file)
+            this.contentTypeFile.renameTo(other.contentTypeFile)
+        } else super.copyTo(other)
+    }
+
     fun checkSignature(queryParams: List<Pair<String, String>>): Boolean {
         return try {
             system.signedUrlExpiration?.let {

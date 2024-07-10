@@ -36,19 +36,7 @@ class MultipartJsonHandler(val json: () -> Json) : Serialization.HttpContentPars
                 if (filename.isNullOrBlank()) return@collect
                 val path = key.root.split('.')
                 if (!serializer.isFile(path)) throw BadRequestException("$key is not a ServerFile.")
-                //if (
-                //    isFile.allowedTypes
-                //        .asSequence()
-                //        .map { ContentType.parse(it) }
-                //        .none { part.contentType!!.match(it) }
-                //) {
-                //    throw BadRequestException("Content type ${part.contentType} doesn't match any of the accepted types: ${isFile.allowedTypes.joinToString()}")
-                //}
-                val file = ExternalServerFileSerializer.fileSystem().root.resolveRandom(
-                    "uploaded/${filename.substringBeforeLast(".")}",
-                    contentType.extension ?: filename.substringAfterLast(".")
-                )
-                file.put(part.content)
+                val file = ExternalServerFileSerializer.uploadFile(part.content)
                 var current: MutableMap<String, Any?> = overrideData
                 for (pathPart in path.dropLast(1)) {
                     @Suppress("UNCHECKED_CAST")

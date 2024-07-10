@@ -24,7 +24,7 @@ abstract class FileSystemTests {
     @Test
     fun testHealth() {
         val system = system ?: run {
-            println("Could not test because the cache is not supported on this system.")
+            println("Could not test because the file system isn't supported here.")
             return
         }
         runBlocking {
@@ -35,7 +35,7 @@ abstract class FileSystemTests {
     @Test
     fun testWriteAndRead() {
         val system = system ?: run {
-            println("Could not test because the cache is not supported on this system.")
+            println("Could not test because the file system isn't supported here.")
             return
         }
         runBlocking {
@@ -49,7 +49,7 @@ abstract class FileSystemTests {
     @Test
     fun testInfo() {
         val system = system ?: run {
-            println("Could not test because the cache is not supported on this system.")
+            println("Could not test because the file system isn't supported here.")
             return
         }
         runBlocking {
@@ -79,7 +79,7 @@ abstract class FileSystemTests {
     @Test
     fun testList() {
         val system = system ?: run {
-            println("Could not test because the cache is not supported on this system.")
+            println("Could not test because the file system isn't supported here.")
             return
         }
         runBlocking {
@@ -99,7 +99,7 @@ abstract class FileSystemTests {
     @Test
     open fun testSignedUrlAccess() {
         val system = system ?: run {
-            println("Could not test because the cache is not supported on this system.")
+            println("Could not test because the file system isn't supported here.")
             return
         }
         runBlocking {
@@ -117,7 +117,7 @@ abstract class FileSystemTests {
     @Test
     open fun testSignedUpload() {
         val system = system ?: run {
-            println("Could not test because the cache is not supported on this system.")
+            println("Could not test because the file system isn't supported here.")
             return
         }
         runBlocking {

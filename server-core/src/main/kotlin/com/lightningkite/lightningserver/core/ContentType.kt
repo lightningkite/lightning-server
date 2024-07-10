@@ -106,6 +106,7 @@ class ContentType(val type: String, val subtype: String, val parameters: Map<Str
         public val SVG: ContentType = ContentType("image", "svg+xml")
         public val WebP: ContentType = ContentType("image", "webp")
         public val XIcon: ContentType = ContentType("image", "x-icon")
+        public val Tiff: ContentType = ContentType("image", "tiff")
     }
 
     /**
@@ -162,6 +163,11 @@ class ContentType(val type: String, val subtype: String, val parameters: Map<Str
     }
 
     companion object {
+        val xmlTypes = setOf(
+            Application.Xml,
+            Text.Html,
+            Text.Xml,
+        )
         private val fromFileExtension by lazy {
             mapOf(
                 "bin" to Application.OctetStream,

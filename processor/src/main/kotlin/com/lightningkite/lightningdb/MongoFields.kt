@@ -96,13 +96,14 @@ data class MongoFields(
                     appendLine("""override fun get(receiver: $typeReference): ${field.kotlinType.toKotlin()} = receiver.${field.name}""")
                     appendLine("""override fun setCopy(receiver: $typeReference, value: ${field.kotlinType.toKotlin()}) = receiver.copy(${field.name} = value)""")
                     appendLine("""override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${field.kotlinType.resolve()!!.toKotlinSerializer(contextualTypes)}""")
+                    appendLine("""override val annotations: List<Annotation> = $classReference.serializer().tryFindAnnotations("${field.name}")""")
                 }
                 appendLine("}")
             }
         } else {
+            val nothings = declaration.typeParameters.joinToString(", ") { "NothingSerializer()" }
             appendLine("fun prepare${simpleName}Fields() {")
             tab {
-                val nothings = declaration.typeParameters.joinToString(", ") { "NothingSerializer()" }
                 appendLine("$classReference.serializer($nothings).properties { args -> arrayOf(")
                 tab {
                     val args = declaration.typeParameters.indices.joinToString(", ") { "args[$it]" }
@@ -125,6 +126,7 @@ data class MongoFields(
                     appendLine("""override fun get(receiver: $typeReference): ${field.kotlinType.toKotlin()} = receiver.${field.name}""")
                     appendLine("""override fun setCopy(receiver: $typeReference, value: ${field.kotlinType.toKotlin()}) = receiver.copy(${field.name} = value)""")
                     appendLine("""override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${field.kotlinType.resolve()!!.toKotlinSerializer(contextualTypes)}""")
+                    appendLine("""override val annotations: List<Annotation> = $classReference.serializer($nothings).tryFindAnnotations("${field.name}")""")
                     appendLine("""override fun hashCode(): Int = ${field.name.hashCode() * 31 + simpleName.hashCode()}""")
                     appendLine("""override fun equals(other: Any?): Boolean = other is ${simpleName}_${field.name}<${declaration.typeParameters.joinToString(", ") { "* "}}>""")
                 }

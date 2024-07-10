@@ -9,6 +9,7 @@ import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toKotlinInstant
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.model.*
@@ -29,6 +30,17 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
 
     override val parent: FileObject?
         get() = path.parentFile?.let { S3File(system, path) } ?: if (path.unixPath.isNotEmpty()) system.root else null
+
+    override suspend fun copyTo(other: FileObject) {
+        if(other is S3File) {
+            system.s3Async.copyObject {
+                it.sourceBucket(system.bucket)
+                it.destinationBucket(other.system.bucket)
+                it.sourceKey(path.unixPath)
+                it.destinationKey(other.path.unixPath)
+            }.await()
+        } else super.copyTo(other)
+    }
 
     override suspend fun list(): List<FileObject>? = withContext(Dispatchers.IO) {
         try {
@@ -112,6 +124,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             system.s3Async.deleteObject {
                 it.bucket(system.bucket)
                 it.key(path.unixPath)
+                it.bypassGovernanceRetention(true)
             }.await()
         }
     }

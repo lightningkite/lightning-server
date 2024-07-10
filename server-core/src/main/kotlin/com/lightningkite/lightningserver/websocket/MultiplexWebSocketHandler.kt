@@ -15,6 +15,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 
 class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
@@ -75,7 +76,8 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                 sourceIp = event.sourceIp,
                 headers = event.headers.entries + (event.queryParameter("jwt")?.let { listOf("Authorization" to it) }
                     ?: listOf())
-            )
+            ),
+            timeToLive = 1.days
         )
     }
 

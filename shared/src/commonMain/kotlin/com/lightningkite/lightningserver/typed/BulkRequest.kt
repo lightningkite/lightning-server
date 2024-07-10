@@ -16,5 +16,6 @@ data class BulkRequest(
 data class BulkResponse(
     @Description("JSON")
     val result: String? = null,
-    val error: LSError? = null
+    val error: LSError? = null,
+    val durationMs: Long = 0L
 )

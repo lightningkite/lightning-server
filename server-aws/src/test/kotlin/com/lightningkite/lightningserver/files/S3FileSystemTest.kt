@@ -41,7 +41,6 @@ class S3FileSystemTest : FileSystemTests() {
 
     @Test
     fun signPerformance() {
-        LoggingSettings()
         val system = system ?: return
 
         var endAt = System.currentTimeMillis() + 1000
