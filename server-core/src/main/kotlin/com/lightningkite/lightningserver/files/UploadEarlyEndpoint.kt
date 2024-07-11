@@ -38,6 +38,14 @@ class UploadEarlyEndpoint(
     override val prefix: String = "future://$path/"
     override fun resolve(url: String): FileObject {
         val post = url.substringAfter(prefix)
+        val id = post.substringBefore('?')
+        val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
+        val safeFo = files().root.resolve(filePath).resolve("$id.file")
+        runBlocking { fileScanner().copyAndScan(originalFo, safeFo) }
+        return safeFo
+    }
+    override fun resolveWithSignature(url: String): FileObject {
+        val post = url.substringAfter(prefix)
         verifyUrl(post)
         val id = post.substringBefore('?')
         val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")

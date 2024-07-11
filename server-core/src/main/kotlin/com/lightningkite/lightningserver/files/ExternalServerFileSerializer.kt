@@ -61,13 +61,9 @@ object ExternalServerFileSerializer : KSerializer<ServerFile> {
                 uploadFile(HttpContent.Binary(data, type))
             }.serverFile
         } else {
-            val file = FileSystem.resolve(raw)
+            val file = FileSystem.resolveWithSignature(raw)
                 ?: throw BadRequestException("The given url (${raw.substringBefore('?')}) does not start with any files root.  Known roots: ${FileSystem.urlRoots}")
-            val paramString = raw.substringAfter('?')
-            if (file.checkSignature(paramString))
-                return ServerFile(file.url)
-            else
-                throw BadRequestException("URL '${raw.substringBefore('?')}' does not appear to be signed properly")
+            return ServerFile(file.url)
         }
     }
 }
