@@ -59,5 +59,4 @@ class S3FileSystemTest : FileSystemTests() {
         println("Last: $last")
         println("Testable: ${system.root.resolve("test.txt").signedUrl}")
     }
-
 }

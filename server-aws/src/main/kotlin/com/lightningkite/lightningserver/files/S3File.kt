@@ -4,6 +4,7 @@ import com.lightningkite.atZone
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.now
+import io.ktor.http.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
@@ -180,7 +181,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
     }
 
     override val url: String
-        get() = "https://${system.bucket}.s3.${system.region.id()}.amazonaws.com/${path.unixPath}"
+        get() = "https://${system.bucket}.s3.${system.region.id()}.amazonaws.com/${path.unixPath.encodeURLPath()}"
 
     override val signedUrl: String
         get() = system.signedUrlDuration?.let { e ->
@@ -210,7 +211,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             val hashHolder = ByteArray(32)
             val canonicalRequestHasher = MessageDigest.getInstance("SHA-256")
             canonicalRequestHasher.update(constantBytesA)
-            canonicalRequestHasher.update(objectPath.removePrefix("/").toByteArray())
+            canonicalRequestHasher.update(objectPath.removePrefix("/").encodeURLPath().toByteArray())
             canonicalRequestHasher.update(constantByteNewline)
             canonicalRequestHasher.update(preHeaders.toByteArray())
             canonicalRequestHasher.update(constantBytesC)
@@ -218,10 +219,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             canonicalRequestHasher.update(constantBytesD)
             canonicalRequestHasher.update(system.region.id().toByteArray())
             canonicalRequestHasher.update(constantBytesE)
-            canonicalRequestHasher.digest(
-                hashHolder,
-                0, 32
-            )
+            canonicalRequestHasher.digest(hashHolder, 0, 32)
             val canonicalRequestHash = hashHolder.toHex()
             val finalHasher = Mac.getInstance("HmacSHA256")
             finalHasher.init(system.signingKey(dateOnly))
@@ -233,12 +231,9 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             finalHasher.update(system.region.id().toByteArray())
             finalHasher.update(constantBytesH)
             finalHasher.update(canonicalRequestHash.toByteArray())
-            finalHasher.doFinal(
-                hashHolder,
-                0
-            )
+            finalHasher.doFinal(hashHolder, 0)
             val regeneratedSig = hashHolder.toHex()
-            val result = "$url?$preHeaders&X-Amz-Signature=$regeneratedSig"
+            val result = "${url}?$preHeaders&X-Amz-Signature=$regeneratedSig"
             result
         } ?: url
 

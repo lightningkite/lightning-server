@@ -110,6 +110,22 @@ abstract class FileSystemTests {
             println("testFile.signedUrl: ${testFile.signedUrl}")
             assert(client.get(testFile.signedUrl).status.isSuccess())
         }
+        runBlocking {
+            val testFile = system.root.resolve("test with spaces.txt")
+            val message = "Hello world!"
+            testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
+            assert(testFile.signedUrl.startsWith(testFile.url))
+            println("testFile.signedUrl: ${testFile.signedUrl}")
+            assert(client.get(testFile.signedUrl).status.isSuccess())
+        }
+        runBlocking {
+            val testFile = system.root.resolve("folder/test with spaces.txt")
+            val message = "Hello world!"
+            testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
+            assert(testFile.signedUrl.startsWith(testFile.url))
+            println("testFile.signedUrl: ${testFile.signedUrl}")
+            assert(client.get(testFile.signedUrl).status.isSuccess())
+        }
     }
 
     open fun uploadHeaders(builder: HttpRequestBuilder) {}
