@@ -43,6 +43,7 @@ abstract class FileSystemTests {
             val message = "Hello world!"
             testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
             assertEquals(message, testFile.get()!!.stream().reader().readText())
+            testFile.delete()
         }
     }
 

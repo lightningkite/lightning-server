@@ -125,7 +125,6 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             system.s3Async.deleteObject {
                 it.bucket(system.bucket)
                 it.key(path.unixPath)
-                it.bypassGovernanceRetention(true)
             }.await()
         }
     }
