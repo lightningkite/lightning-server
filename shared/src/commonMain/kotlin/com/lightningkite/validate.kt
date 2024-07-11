@@ -8,18 +8,18 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.AbstractEncoder
 import kotlinx.serialization.encoding.CompositeEncoder
 import kotlinx.serialization.modules.SerializersModule
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.coroutineContext
 import kotlin.reflect.KClass
 
-interface ShouldValidateSub<A>: KSerializer<A> {
-    fun validate(value: A, existingAnnotations: List<Annotation>, defer: (Any?, List<Annotation>) -> Unit) = defer(value, existingAnnotations)
+interface ShouldValidateSub<A> : KSerializer<A> {
+    fun validate(value: A, existingAnnotations: List<Annotation>, defer: (Any?, List<Annotation>) -> Unit) =
+        defer(value, existingAnnotations)
 }
 
 typealias ValidationOut = (ValidationIssue) -> Unit
 
 @Serializable
 data class ValidationIssue(val path: List<String>, val code: Int, val text: String)
+
 @Serializable
 data class ValidationIssuePart(val code: Int, val text: String)
 
@@ -47,24 +47,48 @@ suspend fun <T> SerializersModule.validate(serializer: SerializationStrategy<T>,
 object Validators {
     internal val processors = ArrayList<(Annotation, value: Any?) -> ValidationIssuePart?>()
     inline fun <reified T : Annotation, V : Any> processor(crossinline action: (T, V) -> ValidationIssuePart?) {
-        processor(T::class) { a, b -> if (a is T) action(a, b as V) else null }
+        directProcessor(T::class) { a, b ->
+            if (a is T) {
+                if(b is Collection<*>)
+                    b.asSequence().mapNotNull { action(a, it as V) }.firstOrNull()
+                else if(b is Map<*, *>)
+                    b.values.asSequence().mapNotNull { action(a, it as V) }.firstOrNull()
+                else action(a, b as V)
+            } else
+                null
+        }
     }
 
-    fun processor(type: KClass<out Annotation>, action: (Annotation, Any?) -> ValidationIssuePart?) {
+    inline fun <reified T : Annotation, V : Any> directProcessor(crossinline action: (T, V) -> ValidationIssuePart?) {
+        directProcessor(T::class) { a, b -> if (a is T) action(a, b as V) else null }
+    }
+
+    fun directProcessor(type: KClass<out Annotation>, action: (Annotation, Any?) -> ValidationIssuePart?) {
         processors.add(action)
     }
 
     internal val suspendProcessors = ArrayList<suspend (Annotation, value: Any?) -> ValidationIssuePart?>()
     inline fun <reified T : Annotation, V : Any> suspendProcessor(crossinline action: suspend (T, V) -> ValidationIssuePart?) {
-        suspendProcessor(T::class) { a, b -> if (a is T) action(a, b as V) else null }
+        directSuspendProcessor(T::class) { a, b ->
+            if (a is T) {
+                if(b is Collection<*>)
+                    b.mapNotNull { action(a, it as V) }.firstOrNull()
+                else if(b is Map<*, *>)
+                    b.values.mapNotNull { action(a, it as V) }.firstOrNull()
+                else action(a, b as V)
+            } else
+                null
+        }
     }
-
-    fun suspendProcessor(type: KClass<out Annotation>, action: suspend (Annotation, Any?) -> ValidationIssuePart?) {
+    inline fun <reified T : Annotation, V : Any> directSuspendProcessor(crossinline action: suspend (T, V) -> ValidationIssuePart?) {
+        directSuspendProcessor(T::class) { a, b -> if (a is T) action(a, b as V) else null }
+    }
+    fun directSuspendProcessor(type: KClass<out Annotation>, action: suspend (Annotation, Any?) -> ValidationIssuePart?) {
         suspendProcessors.add(action)
     }
 
     init {
-        processor<MaxLength, Any> { t, v ->
+        directProcessor<MaxSize, Any> { t, v ->
             when (v) {
                 is Collection<*> -> if (v.size > t.size) ValidationIssuePart(
                     1,
@@ -76,6 +100,11 @@ object Validators {
                     "Too long; got ${v.size} entries but have a maximum of ${t.size} entries."
                 ) else null
 
+                else -> throw NotImplementedError("Unknown type ${v::class}")
+            }
+        }
+        processor<MaxLength, Any> { t, v ->
+            when (v) {
                 is String -> if (v.length > t.size) ValidationIssuePart(
                     1,
                     "Too long; maximum ${t.size} characters allowed"
@@ -200,14 +229,20 @@ private class ValidationEncoder(override val serializersModule: SerializersModul
     }
 
     override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
-        if (serializer is ShouldValidateSub<T>) serializer.validate(value, lastDescriptor?.getElementAnnotations(lastElementIndex) ?: listOf()) { a, b -> if(a != null) validate(a, b) }
-        else if(next.isNotEmpty() && value != null) validate(value, lastDescriptor?.getElementAnnotations(lastElementIndex) ?: listOf())
+        if (serializer is ShouldValidateSub<T>) serializer.validate(
+            value,
+            lastDescriptor?.getElementAnnotations(lastElementIndex) ?: listOf()
+        ) { a, b -> if (a != null) validate(a, b) }
+        else if (next.isNotEmpty() && value != null) validate(
+            value,
+            lastDescriptor?.getElementAnnotations(lastElementIndex) ?: listOf()
+        )
         next = emptyList()
         super.encodeSerializableValue(serializer, value)
     }
 
     override fun encodeValue(value: Any) {
-        if(next.isNotEmpty()) validate(value, lastDescriptor?.getElementAnnotations(lastElementIndex) ?: listOf())
+        if (next.isNotEmpty()) validate(value, lastDescriptor?.getElementAnnotations(lastElementIndex) ?: listOf())
         next = emptyList()
     }
 

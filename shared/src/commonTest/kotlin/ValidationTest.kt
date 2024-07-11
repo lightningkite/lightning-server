@@ -12,6 +12,7 @@ import kotlin.test.*
 data class Sample(
     @MaxLength(5) val x: String = "asdf",
     @IntegerRange(0, 100) val y: Int = 4,
+    @MaxLength(5) @MaxSize(5) val z: List<String> = listOf()
 )
 
 class ValidationTest {
@@ -52,5 +53,8 @@ class ValidationTest {
             it.x assign "asdfab"
             it.y assign 101
         })
+        assertPasses(Sample(z = listOf("asdf", "fdsa")))
+        assertFails(Sample(z = listOf("asdf", "fdsaasdf")))
+        assertFails(Sample(z = listOf("asdf", "fdsa", "asdf", "fdsa", "asdf", "fdsa")))
     }
 }
