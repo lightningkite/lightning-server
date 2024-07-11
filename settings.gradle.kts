@@ -35,7 +35,6 @@ pluginManagement {
     }
 }
 
-include(":client")
 include(":demo")
 include(":processor")
 include(":shared")
