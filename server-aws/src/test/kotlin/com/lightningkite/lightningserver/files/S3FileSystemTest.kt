@@ -59,4 +59,21 @@ class S3FileSystemTest : FileSystemTests() {
         println("Last: $last")
         println("Testable: ${system.root.resolve("test.txt").signedUrl}")
     }
+
+    @Test
+    fun testSignedUrlAccessMessedUp() {
+        val system = system ?: run {
+            println("Could not test because the file system isn't supported here.")
+            return
+        }
+        runBlocking {
+            val testFile = system.root.resolve("folder/messed(up+=x).txt")
+            val message = "Hello world!"
+            testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
+            assert(testFile.signedUrl.startsWith(testFile.url))
+            println("testFile.signedUrl:         ${testFile.signedUrl}")
+            println("testFile.officialSignedUrl: ${(testFile as S3File).officialSignedUrl}")
+            assert(client.get(testFile.signedUrl).status.isSuccess())
+        }
+    }
 }

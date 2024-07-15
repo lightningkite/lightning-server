@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.now
 import io.ktor.http.*
+import io.ktor.utils.io.charsets.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
@@ -17,10 +18,12 @@ import software.amazon.awssdk.services.s3.model.*
 import java.io.File
 import java.io.InputStream
 import java.net.URLDecoder
+import java.net.URLEncoder
 import java.security.MessageDigest
 import kotlin.time.Duration
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import kotlin.text.Charsets
 import kotlin.time.TimeSource
 import kotlin.time.toJavaDuration
 
@@ -179,8 +182,11 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         } else return true
     }
 
+    private fun String.encodeURLPathSafe(): String = URLEncoder.encode(this, Charsets.UTF_8).replace("%2F", "/").replace("+", "%20")
+
+
     override val url: String
-        get() = "https://${system.bucket}.s3.${system.region.id()}.amazonaws.com/${path.unixPath.encodeURLPath()}"
+        get() = "https://${system.bucket}.s3.${system.region.id()}.amazonaws.com/${path.unixPath.encodeURLPathSafe()}"
 
     override val signedUrl: String
         get() = system.signedUrlDuration?.let { e ->
@@ -210,7 +216,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             val hashHolder = ByteArray(32)
             val canonicalRequestHasher = MessageDigest.getInstance("SHA-256")
             canonicalRequestHasher.update(constantBytesA)
-            canonicalRequestHasher.update(objectPath.removePrefix("/").encodeURLPath().toByteArray())
+            canonicalRequestHasher.update(objectPath.removePrefix("/").encodeURLPathSafe().toByteArray())
             canonicalRequestHasher.update(constantByteNewline)
             canonicalRequestHasher.update(preHeaders.toByteArray())
             canonicalRequestHasher.update(constantBytesC)
@@ -236,6 +242,17 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             result
         } ?: url
 
+    val officialSignedUrl: String
+        get() = system.signedUrlDuration?.let { e ->
+            system.signer.presignGetObject {
+                it.signatureDuration(system.signedUrlDuration.toJavaDuration())
+                it.getObjectRequest {
+                    it.bucket(system.bucket)
+                    it.key(path.unixPath)
+                }
+            }.url().toString()
+        } ?: url
+
     companion object {
         private val constantBytesA = "GET\n/".toByteArray()
         private val constantBytesC = "\nhost:".toByteArray()
@@ -246,6 +263,8 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         private val constantByteSlash = '/'.code.toByte()
         private val constantBytesH = "/s3/aws4_request\n".toByteArray()
 
+        private val okChars = setOf('/', '.', '_', '-')
+        private val HEX_ALPHABET = (('a'..'f') + ('A'..'F') + ('0'..'9')).toSet()
     }
 
     override fun uploadUrl(timeout: Duration): String = system.signer.presignPutObject {
