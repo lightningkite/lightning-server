@@ -1,6 +1,8 @@
 @file:SharedCode
+
 package com.lightningkite.lightningdb
 
+import com.lightningkite.IsRawString
 import com.lightningkite.khrysalis.IsCodableAndHashable
 import com.lightningkite.khrysalis.JsName
 import com.lightningkite.khrysalis.SharedCode
@@ -12,7 +14,10 @@ inline fun <reified T : IsCodableAndHashable> modification(setup: ModificationBu
     }.build()
 }
 
-inline fun <T : IsCodableAndHashable> modification(path: DataClassPath<T, T>, setup: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit): Modification<T> {
+inline fun <T : IsCodableAndHashable> modification(
+    path: DataClassPath<T, T>,
+    setup: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit
+): Modification<T> {
     return ModificationBuilder<T>().apply {
         setup(this, path)
     }.build()
@@ -27,9 +32,12 @@ inline fun <reified T : IsCodableAndHashable> Modification<T>.and(setup: Modific
 
 class ModificationBuilder<K : IsCodableAndHashable>() {
     val modifications = ArrayList<Modification<K>>()
-    fun add(modification: Modification<K>) { modifications.add(modification) }
+    fun add(modification: Modification<K>) {
+        modifications.add(modification)
+    }
+
     fun build(): Modification<K> {
-        if(modifications.size == 1) return modifications[0]
+        if (modifications.size == 1) return modifications[0]
         else return Modification.Chain(modifications)
     }
 
@@ -61,6 +69,11 @@ class ModificationBuilder<K : IsCodableAndHashable>() {
     @JsName("plusAssignString")
     infix operator fun DataClassPath<K, String>.plusAssign(value: String) {
         modifications.add(mapModification(Modification.AppendString(value)))
+    }
+
+    @JvmName("plusAssignRaw") @JsName("plusAssignRawString")
+    infix operator fun <T : IsRawString> DataClassPath<K, T>.plusAssign(value: String) {
+        modifications.add(mapModification(Modification.AppendRawString(value)))
     }
 
     @JsName("plusAssignList")

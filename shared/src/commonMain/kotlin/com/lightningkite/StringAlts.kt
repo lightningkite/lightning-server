@@ -2,7 +2,6 @@ package com.lightningkite
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -12,6 +11,7 @@ import kotlin.jvm.JvmInline
 
 interface IsRawString {
     val raw: String
+    fun mapRaw(action: (String) -> String): IsRawString
 }
 
 object TrimOnSerialize: KSerializer<String> {
@@ -42,9 +42,8 @@ object TrimmedStringSerializer : KSerializer<TrimmedString> {
 value class TrimmedString @Deprecated("Use String.trimmed()") constructor(override val raw: String) : Comparable<TrimmedString>, IsRawString {
     override fun compareTo(other: TrimmedString): Int = raw.compareTo(other.raw)
     override fun toString(): String = raw
+    override fun mapRaw(action: (String) -> String): TrimmedString = raw.let(action).trimmed()
 }
-
-inline fun TrimmedString.map(action: (String) -> String): TrimmedString = raw.let(action).trimmed()
 
 @Suppress("DEPRECATION")
 inline fun String.trimmed(): TrimmedString = TrimmedString(this.trim())
@@ -63,9 +62,8 @@ object CaselessStringSerializer : KSerializer<CaselessString> {
 value class CaselessString @Deprecated("Use String.caseless()") constructor(override val raw: String) : Comparable<CaselessString>, IsRawString {
     override fun compareTo(other: CaselessString): Int = raw.compareTo(other.raw)
     override fun toString(): String = raw
+    override fun mapRaw(action: (String) -> String): CaselessString = raw.let(action).caseless()
 }
-
-inline fun CaselessString.map(action: (String) -> String): CaselessString = raw.let(action).caseless()
 
 @Suppress("DEPRECATION")
 inline fun String.caseless(): CaselessString = CaselessString(this.lowercase())
@@ -84,9 +82,8 @@ object TrimmedCaselessStringSerializer : KSerializer<TrimmedCaselessString> {
 value class TrimmedCaselessString @Deprecated("Use String.trimmedCaseless()") constructor(override val raw: String) : Comparable<TrimmedCaselessString>, IsRawString {
     override fun compareTo(other: TrimmedCaselessString): Int = raw.compareTo(other.raw)
     override fun toString(): String = raw
+    override fun mapRaw(action: (String) -> String): TrimmedCaselessString = raw.let(action).trimmedCaseless()
 }
-
-inline fun TrimmedCaselessString.map(action: (String) -> String): TrimmedCaselessString = raw.let(action).trimmedCaseless()
 
 @Suppress("DEPRECATION")
 inline fun String.trimmedCaseless(): TrimmedCaselessString = TrimmedCaselessString(this.trim().lowercase())

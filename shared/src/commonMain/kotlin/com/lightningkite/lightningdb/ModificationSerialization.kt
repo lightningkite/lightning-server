@@ -2,7 +2,10 @@
 
 package com.lightningkite.lightningdb
 
+import com.lightningkite.IsRawString
 import com.lightningkite.ShouldValidateSub
+import com.lightningkite.TrimmedString
+import com.lightningkite.TrimmedStringSerializer
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
 import kotlinx.serialization.descriptors.*
@@ -206,6 +209,12 @@ object ModificationAppendStringSerializer : WrappingSerializer<Modification.Appe
     override fun getDeferred(): KSerializer<String> = String.serializer()
     override fun inner(it: Modification.AppendString): String = it.value
     override fun outer(it: String): Modification.AppendString = Modification.AppendString(it)
+}
+
+class ModificationAppendRawStringSerializer<T : IsRawString> : WrappingSerializer<Modification.AppendRawString<T>, String>("AppendString") {
+    override fun getDeferred(): KSerializer<String> = String.serializer()
+    override fun inner(it: Modification.AppendRawString<T>): String = it.value
+    override fun outer(it: String): Modification.AppendRawString<T> = Modification.AppendRawString(it)
 }
 
 class ModificationListAppendSerializer<T>(val inner: KSerializer<T>) :

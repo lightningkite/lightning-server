@@ -94,6 +94,12 @@ private fun <T> Condition<T>.dump(serializer: KSerializer<T>, into: Document = D
                 it["\$options"] = if(this.ignoreCase) "i" else ""
             }
         }
+        is Condition.RawStringContains -> {
+            into.sub(key).also {
+                it["\$regex"] = Regex.escape(this.value)
+                it["\$options"] = if(this.ignoreCase) "i" else ""
+            }
+        }
         is Condition.RegexMatches -> {
             into.sub(key).also {
                 it["\$regex"] = this.pattern
@@ -121,6 +127,7 @@ private fun <T> Modification<T>.dump(serializer: KSerializer<T>, update: UpdateW
         is Modification.Increment -> into["\$inc", key] = by.let { Serialization.Internal.bson.stringifyAny(serializer, it) }
         is Modification.Multiply -> into["\$mul", key] = by.let { Serialization.Internal.bson.stringifyAny(serializer, it) }
         is Modification.AppendString -> TODO("Appending strings is not supported yet")
+        is Modification.AppendRawString -> TODO("Appending raw strings is not supported yet")
         is Modification.IfNotNull<*> -> (modification as Modification<Any?>).dump(serializer.nullElement()!! as KSerializer<Any?>, update, key)
         is Modification.OnField<*, *> ->
             (modification as Modification<Any?>).dump(this.key.serializer as KSerializer<Any?>, update, if (key == null) this.key.name else "$key.${this.key.name}")

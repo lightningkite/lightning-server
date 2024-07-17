@@ -305,6 +305,7 @@ private fun <T> FieldModifier.modification(
         is Modification.Increment -> modifySingle(fieldSet) { type, old -> PlusOp(fieldSet.formatSingleExpression(modification.by), old, type) }
         is Modification.Multiply -> modifySingle(fieldSet) { type, old -> TimesOp(fieldSet.formatSingleExpression(modification.by), old, type) }
         is Modification.AppendString -> modifySingle(fieldSet) { type, old -> Concat("", old, fieldSet.formatSingleExpression(modification.value as T)) as Expression<Any?> }
+        is Modification.AppendRawString -> modifySingle(fieldSet) { type, old -> Concat("", old, fieldSet.formatSingleExpression(modification.value as T)) as Expression<Any?> }
         is Modification.ListAppend<*> -> modifyEach(fieldSet, modification.items as T) { type, it, old -> ConcatOp(old, it) }
         is Modification.ListRemove<*> -> fieldSet.fields.forEach {
             modify(it.key) { old -> MapOp(fieldSet as FieldSet2<List<Any?>>, { f -> f.fields[it.key]!! }, { SqlExpressionBuilder.run { NotOp(condition(modification.condition as Condition<Any?>, it)) } }) as Expression<Any?> }
