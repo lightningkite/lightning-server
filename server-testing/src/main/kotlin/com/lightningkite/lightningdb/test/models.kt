@@ -154,7 +154,7 @@ data class LargeTestModel(
 @Serializable
 data class GeoTest(
     override val _id: UUID = uuid(),
-    val geo: GeoCoordinate = GeoCoordinate(41.727019, -111.8443002)
+    @Index val geo: GeoCoordinate = GeoCoordinate(41.727019, -111.8443002)
 ) : HasId<UUID> {
     companion object
 }
