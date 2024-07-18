@@ -14,6 +14,7 @@ val kspVersion:String by project
 dependencies {
     implementation(serverlibs.ksp)
     implementation(serverlibs.kotlinCompiler)
+    testImplementation(serverlibs.kotlinTest)
 }
 
 standardPublishing {

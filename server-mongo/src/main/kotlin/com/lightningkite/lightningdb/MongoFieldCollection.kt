@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.GeoCoordinateGeoJsonSerializer
+import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.mongodb.MongoCommandException
 import com.mongodb.client.model.*
@@ -400,18 +401,59 @@ class MongoFieldCollection<Model : Any>(
                     try {
                         createIndex(keys, options)
                     } catch (e: MongoCommandException) {
-                        //there is an exception if the parameters of an existing index are changed.
-                        //then drop the index and create a new one
-                        dropIndex(name)
-                        createIndex(
-                            keys,
-                            options
-                        )
+                        if(e.errorCode == 85) {
+                            //there is an exception if the parameters of an existing index are changed.
+                            //then drop the index and create a new one
+                            try {
+                                dropIndex(name)
+                                createIndex(
+                                    keys,
+                                    options
+                                )
+                            } catch (e2: MongoCommandException) {
+                                Exception(
+                                    "Creating text index failed on ${this@prepare.namespace.fullName}",
+                                    e
+                                ).report()
+                                Exception(
+                                    "Creating text index failed on ${this@prepare.namespace.fullName} even after attempted removal",
+                                    e2
+                                ).report()
+                            }
+                        } else {
+                            e.report()
+                        }
                     }
                 }
             }
             serializer.descriptor.indexes().forEach {
-                if (it.unique) {
+                if (it.type == GeoCoordinateGeoJsonSerializer.descriptor.serialName) {
+                    requireCompletion += launch {
+                        val nameOrDefault = it.name ?: it.fields[0].plus("_geo")
+                        try {
+                            createIndex(Indexes.geo2dsphere(it.fields), IndexOptions().name(nameOrDefault))
+                        } catch (e: MongoCommandException) {
+                            // Reform index if it already exists but with some difference in options
+                            if (e.errorCode == 85) {
+                                try {
+                                    dropIndex(nameOrDefault)
+                                    createIndex(Indexes.geo2dsphere(it.fields), IndexOptions().name(nameOrDefault))
+                                } catch (e2: MongoCommandException) {
+                                    Exception(
+                                        "Creating geo index failed on ${this@prepare.namespace.fullName}",
+                                        e
+                                    ).report()
+                                    Exception(
+                                        "Creating geo index failed on ${this@prepare.namespace.fullName} even after attempted removal",
+                                        e2
+                                    ).report()
+                                }
+                            } else {
+                                e.report()
+                            }
+                        }
+                    }
+                } else if (it.unique) {
                     requireCompletion += launch {
                         val keys = Sorts.ascending(it.fields)
                         val options = IndexOptions().unique(true).name(it.name)
@@ -420,8 +462,21 @@ class MongoFieldCollection<Model : Any>(
                         } catch (e: MongoCommandException) {
                             // Reform index if it already exists but with some difference in options
                             if (e.errorCode == 85) {
-                                dropIndex(keys)
-                                createIndex(keys, options)
+                                try {
+                                    dropIndex(keys)
+                                    createIndex(keys, options)
+                                } catch (e2: MongoCommandException) {
+                                    Exception(
+                                        "Creating unique index failed on ${this@prepare.namespace.fullName}",
+                                        e
+                                    ).report()
+                                    Exception(
+                                        "Creating unique index failed on ${this@prepare.namespace.fullName} even after attempted removal",
+                                        e2
+                                    ).report()
+                                }
+                            } else {
+                                e.report()
                             }
                         }
                     }
@@ -434,27 +489,18 @@ class MongoFieldCollection<Model : Any>(
                         } catch (e: MongoCommandException) {
                             // Reform index if it already exists but with some difference in options
                             if (e.errorCode == 85) {
-                                dropIndex(keys)
-                                createIndex(keys, options)
-                            }
-                        }
-                    }
-                }
-            }
-            serializer.descriptor.let {
-                (0..<it.elementsCount).forEach { index ->
-                    val name = it.getElementName(index)
-                    val type = it.getElementDescriptor(index)
-                    if (type.serialName == GeoCoordinateGeoJsonSerializer.descriptor.serialName) {
-                        requireCompletion += launch {
-                            try {
-                                createIndex(Indexes.geo2dsphere(name), IndexOptions().name(name + "_geo"))
-                            } catch (e: MongoCommandException) {
-                                // Reform index if it already exists but with some difference in options
-                                if (e.errorCode == 85) {
-                                    dropIndex(name + "_geo")
-                                    createIndex(Indexes.geo2dsphere(name), IndexOptions().name(name + "_geo"))
+                                try {
+                                    dropIndex(keys)
+                                    createIndex(keys, options)
+                                } catch (e2: MongoCommandException) {
+                                    Exception("Creating index failed on ${this@prepare.namespace.fullName}", e).report()
+                                    Exception(
+                                        "Creating index failed on ${this@prepare.namespace.fullName} even after attempted removal",
+                                        e2
+                                    ).report()
                                 }
+                            } else {
+                                e.report()
                             }
                         }
                     }
