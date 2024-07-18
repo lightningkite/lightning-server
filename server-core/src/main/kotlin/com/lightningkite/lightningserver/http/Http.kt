@@ -67,17 +67,24 @@ object Http {
         set(value) {
             field = value
             // WARNING: This will melt your brain
-            fullAction = interceptors.fold<HttpInterceptor, HttpInterceptor>({ request, handler -> handler(request) }) { total, wrapper ->
-                return@fold { request, handler ->
-                    total(request) { wrapper(it, handler) }
+            fullAction =
+                interceptors.fold<HttpInterceptor, HttpInterceptor>({ request, handler -> handler(request) }) { total, wrapper ->
+                    return@fold { request, handler ->
+                        total(request) { wrapper(it, handler) }
+                    }
                 }
-            }
         }
     private var fullAction: HttpInterceptor = { req, cont -> cont(req) }
 
     suspend fun execute(request: HttpRequest): HttpResponse {
         return endpoints[request.endpoint]?.let { handler ->
-            val authOrNull = request.authAny()
+            val authOrNull = try {
+                request.authAny()
+            } catch (http: HttpStatusException){
+                return http.toResponse(request)
+            } catch (e: Exception) {
+                return HttpResponse(null, HttpStatus.Unauthorized)
+            }
             serverLogger.info("${request.endpoint} (${request.parts}) accessed by ${authOrNull} (${request.sourceIp})")
             try {
                 Metrics.handlerPerformance(request.endpoint) {
@@ -102,7 +109,7 @@ suspend fun HttpEndpoint.test(
     body: HttpContent? = null,
     domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
     protocol: String = generalSettings().publicUrl.substringBefore("://"),
-    sourceIp: String = "0.0.0.0"
+    sourceIp: String = "0.0.0.0",
 ): HttpResponse {
     Tasks.onSettingsReady()
     Tasks.onEngineReady()
