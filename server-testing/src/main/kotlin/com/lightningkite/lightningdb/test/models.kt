@@ -64,7 +64,7 @@ data class Post(
 @GenerateDataClassPaths()
 @Serializable
 data class Employee(
-    override val _id: @Contextual UUID = uuid(),
+    override val _id: UUID = uuid(),
     var dictionary: Map<String, Int> = mapOf(),
 ) : HasId<UUID> {
     companion object

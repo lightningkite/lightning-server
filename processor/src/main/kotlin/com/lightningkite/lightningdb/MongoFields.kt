@@ -193,7 +193,7 @@ private val KSType.conditionType: String
             "com.lightningkite.UUID",
             "kotlinx.datetime.Instant",
             "com.lightningkite.lightningdb.UUIDFor",
-            "kotlin.Char" -> "ComparableCondition" + "<${this.makeNotNullable().toKotlin(annotations)}>"
+            "kotlin.Char" -> "ComparableCondition" + "<${this.makeNotNullable().toKotlin()}>"
             "kotlin.collections.List" -> "ArrayCondition" + "<${
                 this.arguments[0].run {
                     "${
@@ -209,14 +209,14 @@ private val KSType.conditionType: String
                 }
             }>"
             "kotlin.Boolean", "org.litote.kmongo.Id", "kotlin.Pair" -> "EquatableCondition" + "<${
-                this.makeNotNullable().toKotlin(annotations)
+                this.makeNotNullable().toKotlin()
             }>"
             else -> {
                 if ((declaration as? KSClassDeclaration)?.classKind == ClassKind.ENUM_CLASS) "EquatableCondition<$name>" else "${name}Condition"
             }
         }.let {
             if (isMarkedNullable) "NullableCondition<${this.toKotlin()}, ${
-                this.makeNotNullable().toKotlin(annotations)
+                this.makeNotNullable().toKotlin()
             }, $it>"
             else it
         }
@@ -254,14 +254,14 @@ private val KSType.modificationType: String
                 }
             }>"
             "kotlin.Boolean", "org.litote.kmongo.Id", "kotlin.Pair" -> "EquatableModification" + "<${
-                this.makeNotNullable().toKotlin(annotations)
+                this.makeNotNullable().toKotlin()
             }>"
             else -> {
                 if ((declaration as? KSClassDeclaration)?.classKind == ClassKind.ENUM_CLASS) "EquatableModification<$name>" else "${name}Modification"
             }
         }.let {
-            if (isMarkedNullable) "NullableModification<${this.toKotlin(annotations)}, ${
-                this.makeNotNullable().toKotlin(annotations)
+            if (isMarkedNullable) "NullableModification<${this.toKotlin()}, ${
+                this.makeNotNullable().toKotlin()
             }, $it>"
             else it
         }

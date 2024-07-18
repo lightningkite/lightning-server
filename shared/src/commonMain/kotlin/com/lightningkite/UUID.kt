@@ -1,5 +1,10 @@
 package com.lightningkite
 
-expect class UUID: Comparable<UUID>
-expect fun uuid(): UUID
-expect fun uuid(string: String): UUID
+import kotlinx.serialization.Contextual
+
+expect class UUIDRaw: Comparable<UUIDRaw> {
+    override fun compareTo(other: UUIDRaw): Int
+}
+typealias UUID = @Contextual UUIDRaw
+expect fun uuid(): UUIDRaw
+expect fun uuid(string: String): UUIDRaw
