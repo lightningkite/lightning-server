@@ -11,6 +11,7 @@ data class NeededIndex(
     val fields: List<String>,
     val unique: Boolean = false,
     val name: String? = null,
+    val type: String? = null,
 )
 
 /**
@@ -52,7 +53,8 @@ fun SerialDescriptor.indexes(): Set<NeededIndex> {
                         NeededIndex(
                             fields = listOf(prefix + descriptor.getElementName(index)),
                             unique = false,
-                            name = it.indexName
+                            name = it.indexName,
+                            type = sub.serialName
                         )
                     )
 
@@ -60,7 +62,8 @@ fun SerialDescriptor.indexes(): Set<NeededIndex> {
                         NeededIndex(
                             fields = listOf(prefix + descriptor.getElementName(index)),
                             unique = false,
-                            name = null
+                            name = null,
+                            type = sub.serialName
                         )
                     )
 
@@ -68,7 +71,8 @@ fun SerialDescriptor.indexes(): Set<NeededIndex> {
                         NeededIndex(
                             fields = listOf(prefix + descriptor.getElementName(index)),
                             unique = true,
-                            name = it.indexName
+                            name = it.indexName,
+                            type = sub.serialName
                         )
                     )
 
@@ -76,7 +80,8 @@ fun SerialDescriptor.indexes(): Set<NeededIndex> {
                         NeededIndex(
                             fields = listOf(prefix + descriptor.getElementName(index)),
                             unique = true,
-                            name = null
+                            name = null,
+                            type = sub.serialName
                         )
                     )
                 }
