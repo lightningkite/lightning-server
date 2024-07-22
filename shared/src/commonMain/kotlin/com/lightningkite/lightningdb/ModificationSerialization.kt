@@ -89,6 +89,10 @@ private val stringOptions: List<MySealedClassSerializer.Option<Modification<Stri
     comparableOptions(String.serializer()) + listOf(
         MySealedClassSerializer.Option(Modification.AppendString.serializer()) { it is Modification.AppendString },
     )
+private fun <T : IsRawString> rawStringOptions(element: KSerializer<T>) =
+    comparableOptions(element) + listOf(
+        MySealedClassSerializer.Option(Modification.AppendRawString.serializer(element)) { it is Modification.AppendRawString },
+    )
 
 //private fun <T: Any> classOptions(inner: KSerializer<T>, fields: List<SerializableProperty<T, *>>): List<MySealedClassSerializer.Option<Modification<T>, *>> = commonOptions(inner) + fields.map { prop ->
 //    MySealedClassSerializer.Option(ModificationOnFieldSerializer(prop)) { it is Modification.OnField<*, *> && it.key.name == prop.name }
@@ -121,6 +125,7 @@ data class ModificationSerializer<T>(val inner: KSerializer<T>) :
                 inner.nullElement() != null -> nullableOptions(inner.nullElement()!! as KSerializer<Any>)
                 inner.descriptor.serialName == "kotlin.String" -> stringOptions
                 inner.descriptor.serialName in numlist -> numberOptions(inner as KSerializer<Int>)
+                inner.descriptor.kind == PrimitiveKind.STRING -> rawStringOptions(inner as KSerializer<IsRawString>)
                 inner.descriptor.kind == StructureKind.MAP -> stringMapOptions(inner.mapValueElement()!!)
                 inner.descriptor.kind == StructureKind.LIST -> {
                     if (inner.descriptor.serialName.contains("Set")) setOptions(inner.listElement()!!)

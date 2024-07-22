@@ -197,6 +197,14 @@ private fun <T> ISqlExpressionBuilder.condition(
                 LikeEscapeOp(col, LiteralOp(TextColumnType(), condition.value), true, null)
         }
 
+        is Condition.RawStringContains -> {
+            val col = fieldSet.single
+            if (condition.ignoreCase)
+                InsensitiveLikeEscapeOp(col, LiteralOp(TextColumnType(), condition.value), true, null)
+            else
+                LikeEscapeOp(col, LiteralOp(TextColumnType(), condition.value), true, null)
+        }
+
         is Condition.RegexMatches -> {
             val col = fieldSet.single
             RegexpOp(col as Column<String>, LiteralOp(TextColumnType(), condition.pattern), true)
