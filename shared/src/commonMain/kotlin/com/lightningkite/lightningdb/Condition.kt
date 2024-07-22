@@ -118,7 +118,7 @@ sealed class Condition<T : IsCodableAndHashable> {
     }
 
     @Serializable
-    @SerialName("RawStringContains")
+    @SerialName("StringContains")
     data class RawStringContains<T: IsRawString>(val value: String, val ignoreCase: Boolean = false) : Condition<T>() {
         override fun invoke(on: T): Boolean = on.raw.contains(value, ignoreCase)
     }
