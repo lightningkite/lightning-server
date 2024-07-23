@@ -125,7 +125,7 @@ data class ModificationSerializer<T>(val inner: KSerializer<T>) :
                 inner.nullElement() != null -> nullableOptions(inner.nullElement()!! as KSerializer<Any>)
                 inner.descriptor.serialName == "kotlin.String" -> stringOptions
                 inner.descriptor.serialName in numlist -> numberOptions(inner as KSerializer<Int>)
-                inner.descriptor.kind == PrimitiveKind.STRING -> rawStringOptions(inner as KSerializer<IsRawString>)
+                IsRawString.Companion.serialNames.contains(inner.descriptor.serialName) -> rawStringOptions(inner as KSerializer<IsRawString>)
                 inner.descriptor.kind == StructureKind.MAP -> stringMapOptions(inner.mapValueElement()!!)
                 inner.descriptor.kind == StructureKind.LIST -> {
                     if (inner.descriptor.serialName.contains("Set")) setOptions(inner.listElement()!!)

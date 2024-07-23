@@ -13,21 +13,29 @@ interface IsRawString : Comparable<IsRawString> {
     val raw: String
     fun mapRaw(action: (String) -> String): IsRawString
     override fun compareTo(other: IsRawString): Int = raw.compareTo(other.raw)
+
+    companion object {
+        val serialNames = setOf(
+            "TrimmedString",
+            "CaselessString",
+            "TrimmedCaselessString",
+        )
+    }
 }
 
 object TrimOnSerialize: KSerializer<String> {
     override fun deserialize(decoder: Decoder): String = decoder.decodeString().trim()
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TrimmedString", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TrimOnSerialize", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: String) = encoder.encodeString(value)
 }
 object LowercaseOnSerialize: KSerializer<String> {
     override fun deserialize(decoder: Decoder): String = decoder.decodeString().lowercase()
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("CaselessString", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("LowercaseOnSerialize", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: String) = encoder.encodeString(value)
 }
 object TrimLowercaseOnSerialize: KSerializer<String> {
     override fun deserialize(decoder: Decoder): String = decoder.decodeString().trim().lowercase()
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("CaselessString", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TrimLowercaseOnSerialize", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: String) = encoder.encodeString(value)
 }
 
