@@ -125,13 +125,18 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         override val authType: AuthType get() = AuthType<TestUser>()
 
         override suspend fun findUser(property: String, value: String): TestUser? {
-            return when(property) {
-                "email" -> userInfo.collection().findOne(condition { it.email eq value }) ?: run {
-                    userInfo.collection().insertOne(TestUser(email = value))
+            try {
+                return when (property) {
+                    "email" -> userInfo.collection().findOne(condition { it.email eq value }) ?: run {
+                        userInfo.collection().insertOne(TestUser(email = value))
+                    }
+
+                    "phone" -> userInfo.collection().find(condition { it.phoneNumber eq value }).toList().singleOrNull()
+                    "_id" -> userInfo.collection().get(uuid(value))
+                    else -> null
                 }
-                "phone" -> userInfo.collection().find(condition { it.phoneNumber eq value }).toList().singleOrNull()
-                "_id" -> userInfo.collection().get(uuid(value))
-                else -> null
+            } catch(e: Exception) {
+                throw Exception("Failed to find $property = $value", e)
             }
         }
 

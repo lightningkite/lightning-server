@@ -154,7 +154,7 @@ class OneTimePasswordProofEndpoints(
                 IdentificationAndPassword(
                     auth.subject.name,
                     "_id",
-                    auth.idString,
+                    auth.idString.also { println("Confirming info got $it for idstring") },
                     code
                 )
             )
