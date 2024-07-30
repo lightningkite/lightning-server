@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.websocket.WebSockets
+import com.lightningkite.lightningserver.websocket.WsInterceptor
 import com.lightningkite.now
 import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
@@ -29,16 +30,14 @@ class RateLimiter(
     val cache: () -> Cache,
     val log: ((String)->Unit)? = null
 ) {
-    init {
-        Http.interceptors += { request, cont ->
-            gate(request, request.authAny(), request.sourceIp) {
-                cont(request)
-            }
+    val httpInterceptor: HttpInterceptor = { request, cont ->
+        gate(request, request.authAny(), request.sourceIp) {
+            cont(request)
         }
-        WebSockets.interceptors += { request, cont ->
-            gate(request, request.authAny(), request.sourceIp) {
-                cont(request)
-            }
+    }
+    val wsInterceptor: WsInterceptor = { request, cont ->
+        gate(request, request.authAny(), request.sourceIp) {
+            cont(request)
         }
     }
 
