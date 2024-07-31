@@ -60,7 +60,10 @@ class RateLimiter(
     @OptIn(ExperimentalContracts::class)
     suspend inline fun gate(request: Request, auth: RequestAuth<*>?, ip: String, action: () -> Unit): RateLimitInfo? {
         contract { callsInPlace(action, InvocationKind.EXACTLY_ONCE) }
-        if (ignore(request)) return null
+        if (ignore(request)) {
+            action()
+            return null
+        }
         val now = now()
         val key = auth?.let { it.subject.name + "/" + it.rawId } ?: ip
         val cacheKey = "rateLimiter-$rateLimiterId-$key"

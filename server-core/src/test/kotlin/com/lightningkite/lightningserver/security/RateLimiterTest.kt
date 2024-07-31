@@ -97,7 +97,7 @@ class RateLimiterTest {
             )
             c.clear()
 
-            // With no artifical duration modification, many short requests are approximately equivalent to a few long ones
+            // With no artificial duration modification, many short requests are approximately equivalent to a few long ones
             assertSuccessesForLimiter(
                 expected = 89,
                 limiter = RateLimiter(
@@ -113,7 +113,7 @@ class RateLimiterTest {
             )
             c.clear()
 
-            // With no artifical duration modification, many short requests are approximately equivalent to a few long ones
+            // With no artificial duration modification, many short requests are approximately equivalent to a few long ones
             assertSuccessesForLimiter(
                 expected = 5,
                 limiter = RateLimiter(
