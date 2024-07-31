@@ -28,6 +28,7 @@ data class GeneralServerSettings(
     val publicUrl: String = "http://$host:$port",
     val wsUrl: String = publicUrl.removePrefix("http").let { "ws" + it },
     val debug: Boolean = false,
+    val realIpHeader: String? = null,
     val cors: CorsSettings? = if (debug) CorsSettings(
         allowedDomains = listOf("*"),
         allowedHeaders = listOf("*", HttpHeader.Authorization)
