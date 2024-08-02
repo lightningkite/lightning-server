@@ -10,11 +10,16 @@ package com.lightningkite.lightningserver.core
 class ContentType(val type: String, val subtype: String, val parameters: Map<String, String> = mapOf()) {
     constructor(string: String) : this(
         string.substringBefore('/'),
-        string.substringAfter('/').takeWhile { !it.isWhitespace() && it != ';' },
+        string.substringAfter('/', "*").takeWhile { !it.isWhitespace() && it != ';' },
         string.substringAfter(';', "").split(";")
             .filter { it.isNotBlank() }
             .associate { it.substringBefore('=').trim() to it.substringAfter('=').trim() }
     )
+
+    fun matches(other: ContentType): Boolean {
+        return (other.type == "*" || type == other.type) &&
+                (other.subtype == "*" || subtype == other.subtype)
+    }
 
     override fun equals(other: Any?): Boolean {
         return other is ContentType && type == other.type && subtype == other.subtype
@@ -101,6 +106,7 @@ class ContentType(val type: String, val subtype: String, val parameters: Map<Str
         public val SVG: ContentType = ContentType("image", "svg+xml")
         public val WebP: ContentType = ContentType("image", "webp")
         public val XIcon: ContentType = ContentType("image", "x-icon")
+        public val Tiff: ContentType = ContentType("image", "tiff")
     }
 
     /**
@@ -157,6 +163,11 @@ class ContentType(val type: String, val subtype: String, val parameters: Map<Str
     }
 
     companion object {
+        val xmlTypes = setOf(
+            Application.Xml,
+            Text.Html,
+            Text.Xml,
+        )
         private val fromFileExtension by lazy {
             mapOf(
                 "bin" to Application.OctetStream,

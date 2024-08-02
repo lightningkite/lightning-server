@@ -4,11 +4,16 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import io.lettuce.core.GetExArgs
 import io.lettuce.core.RedisClient
 import io.lettuce.core.SetArgs
+import io.lettuce.core.api.sync.RedisListCommands
 import kotlinx.coroutines.reactive.awaitFirst
 import kotlinx.coroutines.reactive.awaitFirstOrNull
 import kotlinx.coroutines.reactive.collect
 import kotlinx.serialization.KSerializer
+import redis.embedded.RedisExecProvider
 import redis.embedded.RedisServer
+import redis.embedded.util.Architecture
+import redis.embedded.util.OS
+import redis.embedded.util.OsArchitecture
 import kotlin.time.Duration
 import kotlin.time.toJavaDuration
 
@@ -42,7 +47,7 @@ class RedisCache(val client: RedisClient) : Cache {
         connection.set(
             key,
             Serialization.Internal.json.encodeToString(serializer, value),
-            SetArgs().let { timeToLive?.inWholeMilliseconds?.let { t -> it.ex(t) } ?: it }
+            SetArgs().let { timeToLive?.inWholeMilliseconds?.let { t -> it.px(t) } ?: it }
         ).collect {}
     }
 
@@ -53,7 +58,7 @@ class RedisCache(val client: RedisClient) : Cache {
         timeToLive: Duration?
     ): Boolean {
         val result = connection.setnx(key, Serialization.Internal.json.encodeToString(serializer, value)).awaitFirst()
-        if(result) timeToLive?.let { connection.getex(key, GetExArgs().ex(it.toJavaDuration())) }
+        if(result) timeToLive?.let { connection.pexpire(key, it.toJavaDuration()).collect {  } }
         return result
     }
 
@@ -89,7 +94,9 @@ class RedisCache(val client: RedisClient) : Cache {
 
     override suspend fun add(key: String, value: Int, timeToLive: Duration?) {
         connection.incrby(key, value.toLong()).collect { }
-        timeToLive?.let { connection.getex(key, GetExArgs().ex(it.toJavaDuration())) }
+        timeToLive?.let {
+            connection.pexpire(key, it.toJavaDuration()).collect {  }
+        }
     }
 
     override suspend fun remove(key: String) {

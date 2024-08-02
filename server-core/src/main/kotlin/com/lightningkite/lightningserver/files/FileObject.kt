@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.http.HttpContent
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Instant
 import java.io.InputStream
 import kotlin.time.Duration
 
@@ -16,12 +17,21 @@ interface FileObject {
     val parent: FileObject?
     val name: String
     suspend fun list(): List<FileObject>?
-    @Deprecated("Use head instead", ReplaceWith("head()")) suspend fun info(): FileInfo? = head()
+    @Deprecated("Use head instead", ReplaceWith("head()"))
+    suspend fun info(): FileInfo? = head()
     suspend fun head(): FileInfo?
-    @Deprecated("Use put instead", ReplaceWith("put(content)")) suspend fun write(content: HttpContent) = put(content)
-    @Deprecated("Use get instead", ReplaceWith("get().stream()")) suspend fun read(): InputStream = get()!!.stream()
+    @Deprecated("Use put instead", ReplaceWith("put(content)"))
+    suspend fun write(content: HttpContent) = put(content)
+    @Deprecated("Use get instead", ReplaceWith("get().stream()"))
+    suspend fun read(): InputStream = get()!!.stream()
     suspend fun put(content: HttpContent)
     suspend fun get(): HttpContent?
+    suspend fun copyTo(other: FileObject): Unit = put(get()!!)
+    suspend fun moveTo(other: FileObject): Unit {
+        copyTo(other)
+        delete()
+    }
+
     suspend fun delete()
     fun checkSignature(queryParams: String): Boolean {
         return runBlocking {

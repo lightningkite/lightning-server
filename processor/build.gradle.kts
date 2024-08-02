@@ -1,12 +1,8 @@
-import com.lightningkite.deployhelpers.developer
-import com.lightningkite.deployhelpers.github
-import com.lightningkite.deployhelpers.mit
-import com.lightningkite.deployhelpers.standardPublishing
-import java.util.Properties
+import com.lightningkite.deployhelpers.*
 
 plugins {
-    kotlin("jvm")
-    id("org.jetbrains.dokka")
+    alias(serverlibs.plugins.kotlinJvm)
+    alias(serverlibs.plugins.dokka)
     id("signing")
     `maven-publish`
 }
@@ -14,9 +10,11 @@ plugins {
 
 val kotlinVersion:String by project
 val kspVersion:String by project
+
 dependencies {
-    implementation("com.google.devtools.ksp:symbol-processing-api:$kspVersion")
-    implementation("org.jetbrains.kotlin:kotlin-compiler:$kotlinVersion")
+    implementation(serverlibs.ksp)
+    implementation(serverlibs.kotlinCompiler)
+    testImplementation(serverlibs.kotlinTest)
 }
 
 standardPublishing {

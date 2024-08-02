@@ -209,5 +209,11 @@ class ConditionSimplifyKtTest {
         for (data in sampleData)
             assertEquals(this(data), simplified(data))
     }
+
+    @Test fun simplifyCompound() {
+        println(condition<CompoundKeyTestModel> {
+            it._id.eq(CompoundTestKey("A", "B")) and it._id.first.eq("A")
+        }.simplify())
+    }
 }
 

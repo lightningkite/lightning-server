@@ -22,9 +22,7 @@ import java.util.*
  */
 object ExternalServerFileSerializer : KSerializer<ServerFile> {
 
-    var fileValidators: List<(url: String, param: Map<String, String>) -> Boolean> = listOf()
-    lateinit var fileSystem: () -> FileSystem
-    var uploadPath: String = "uploaded"
+    lateinit var uploadFile: suspend (data: HttpContent) -> FileObject
 
     @OptIn(ExperimentalSerializationApi::class)
     override val descriptor: SerialDescriptor = object : SerialDescriptor {
@@ -58,30 +56,14 @@ object ExternalServerFileSerializer : KSerializer<ServerFile> {
             val type = ContentType(raw.removePrefix("data:").substringBefore(';'))
             val base64 = raw.substringAfter("base64,")
             val data = Base64.getDecoder().decode(base64)
-            val file = fileSystem().root.resolve(uploadPath).resolveRandom(
-                "file",
-                type.extension ?: "bin"
-            )
-            runBlocking {
-                file.put(HttpContent.Binary(data, type))
-            }
-            return ServerFile(file.url)
+//            if(data.size < 500) return ServerFile(raw)
+            return runBlocking {
+                uploadFile(HttpContent.Binary(data, type))
+            }.serverFile
         } else {
-            val file = FileSystem.resolve(raw.substringBefore('?'))
+            val file = FileSystem.resolveWithSignature(raw)
                 ?: throw BadRequestException("The given url (${raw.substringBefore('?')}) does not start with any files root.  Known roots: ${FileSystem.urlRoots}")
-            val paramString = raw.substringAfter('?')
-            val paramMap = paramString.split('&').associate {
-                URLDecoder.decode(it.substringBefore('='), Charsets.UTF_8) to URLDecoder.decode(
-                    it.substringAfter(
-                        '=',
-                        ""
-                    ), Charsets.UTF_8
-                )
-            }
-            if (fileValidators.any { it(file.url, paramMap) } || file.checkSignature(paramString))
-                return ServerFile(file.url)
-            else
-                throw BadRequestException("URL '${raw.substringBefore('?')}' does not appear to be signed properly")
+            return ServerFile(file.url)
         }
     }
 }

@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.auth.subject.test
 
+import com.lightningkite.default
 import com.lightningkite.lightningdb.get
 import com.lightningkite.lightningdb.modification
 import com.lightningkite.lightningdb.updateOneById
@@ -13,6 +14,7 @@ import com.lightningkite.lightningserver.auth.oauth.OauthCodeRequest
 import com.lightningkite.lightningserver.auth.oauth.OauthTokenRequest
 import com.lightningkite.lightningserver.auth.proof.*
 import com.lightningkite.lightningserver.email.TestEmailClient
+import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
@@ -22,10 +24,14 @@ import com.lightningkite.lightningserver.typed.AuthAndPathParts
 import com.lightningkite.lightningserver.typed.test
 import com.lightningkite.uuid
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.serialization.UseContextualSerialization
 import org.junit.Test
 import java.util.*
 import kotlin.test.*
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 class AuthEndpointsForSubjectTest {
 
@@ -188,6 +194,56 @@ class AuthEndpointsForSubjectTest {
             } catch(e: Exception) {
                 assertContains(e.message ?: "", "not related", ignoreCase = true)
             }
+        }
+    }
+
+    @Test
+    fun testPasswordSpam(): Unit = runBlocking {
+        val info = TestSettings.proofEmail.start.test(null, "notadmin@test.com")
+        val pinRegex = Regex("[A-Z][A-Z][A-Z][A-Z][A-Z][A-Z]")
+        val pin = (TestSettings.email() as TestEmailClient).lastEmailSent?.also { println(it) }?.plainText?.let {
+            pinRegex.find(it)?.value
+        }!!
+        val proof1 = TestSettings.proofEmail.prove.test(null, FinishProof(
+            key = info,
+            password = pin
+        ))
+        val result = TestSettings.testUserSubject.login.test(null, listOf(proof1))
+        println(result)
+        assert(result.session != null)
+        val auth = TestSettings.testUserSubject.tokenToAuth(result.session!!, null)!!
+        val self = TestSettings.testUserSubject.self.implementation(AuthAndPathParts(auth, null, arrayOf()), Unit)
+
+        // Set up Password
+        TestSettings.proofPassword.establish.test(self, EstablishPassword("test"))
+
+        // Can log in with password alone
+        var time: Instant = Clock.System.now()
+        Clock.default = object: Clock {
+            override fun now(): Instant = time
+        }
+        try {
+            for(i in 0..10) {
+                try {
+                    TestSettings.proofPassword.prove.test(
+                        null,
+                        IdentificationAndPassword(TestSettings.subjectHandler.name, "email", self.email, "wrong")
+                    )
+                } catch(e: HttpStatusException) {
+                    println(e.message)
+                    if(e.message.contains("wait"))
+                        break
+                }
+                time += 0.1.seconds
+            }
+            time += 5.minutes
+            time += 5.seconds
+            TestSettings.proofPassword.prove.test(
+                null,
+                IdentificationAndPassword(TestSettings.subjectHandler.name, "email", self.email, "test")
+            )
+        } finally {
+            Clock.default = Clock.System
         }
     }
 

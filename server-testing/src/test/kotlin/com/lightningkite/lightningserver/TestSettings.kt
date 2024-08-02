@@ -4,6 +4,7 @@ import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningdb.insertOne
 import com.lightningkite.lightningdb.test.User
+import com.lightningkite.lightningdb.test.ValidatedModel
 import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.auth.authOptions
 import com.lightningkite.lightningserver.auth.authRequired
@@ -73,6 +74,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     val sample1 = path("sample1").post.api(summary = "Test1", authOptions = authOptions<User>()) { input: Int -> input + 42 }
     val sample2 = path("sample2").post.api(summary = "Test2", authOptions = noAuth) { input: Int -> input + 42 }
     val sample3 = path("sample3").post.api(summary = "Test3", authOptions = authRequired<User> { false }) { input: Int -> input + 42 }
+    val sample4 = path("sample4").post.api(summary = "Test4", authOptions = noAuth) { input: ValidatedModel -> input }
     val bulk = path("bulk").bulkRequestEndpoint()
 
     init {

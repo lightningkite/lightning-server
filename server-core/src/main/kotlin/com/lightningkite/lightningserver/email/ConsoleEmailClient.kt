@@ -19,6 +19,13 @@ object ConsoleEmailClient : EmailClient {
             appendLine(email.to.joinToString())
             appendLine()
             appendLine(email.plainText)
+
+            if (email.attachments.isNotEmpty()) {
+                appendLine("-----Attachments-----")
+                email.attachments.forEach {
+                    appendLine(it.filename)
+                }
+            }
         })
     }
 }

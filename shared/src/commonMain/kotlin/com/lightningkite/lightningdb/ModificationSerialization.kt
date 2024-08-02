@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningdb
 
+import com.lightningkite.ShouldValidateSub
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
 import kotlinx.serialization.descriptors.*
@@ -13,53 +14,91 @@ private fun <T> commonOptions(inner: KSerializer<T>): List<MySealedClassSerializ
     MySealedClassSerializer.Option(Modification.Chain.serializer(inner)) { it is Modification.Chain },
     MySealedClassSerializer.Option(Modification.Assign.serializer(inner)) { it is Modification.Assign },
 )
-private fun <T: Any> nullableOptions(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<T?>, *>> = commonOptions(inner.nullable) + listOf(
-    MySealedClassSerializer.Option(Modification.IfNotNull.serializer(inner)) { it is Modification.IfNotNull },
-)
-private fun <T: Comparable<T>> comparableOptions(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<T>, *>> = commonOptions(inner) + listOf(
-    MySealedClassSerializer.Option(Modification.CoerceAtLeast.serializer(inner)) { it is Modification.CoerceAtLeast },
-    MySealedClassSerializer.Option(Modification.CoerceAtMost.serializer(inner)) { it is Modification.CoerceAtMost },
-)
-private fun <T> listOptions(element: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<List<T>>, *>>  = commonOptions(ListSerializer(element)) + listOf(
-    MySealedClassSerializer.Option(Modification.ListAppend.serializer(element), setOf("AppendList")) { it is Modification.ListAppend },
-    MySealedClassSerializer.Option(Modification.ListRemove.serializer(element), setOf("Remove")) { it is Modification.ListRemove },
-    MySealedClassSerializer.Option(Modification.ListRemoveInstances.serializer(element), setOf("RemoveInstances")) { it is Modification.ListRemoveInstances },
-    MySealedClassSerializer.Option(Modification.ListDropFirst.serializer(element), setOf("DropFirst")) { it is Modification.ListDropFirst },
-    MySealedClassSerializer.Option(Modification.ListDropLast.serializer(element), setOf("DropLast")) { it is Modification.ListDropLast },
-    MySealedClassSerializer.Option(Modification.ListPerElement.serializer(element), setOf("PerElement")) { it is Modification.ListPerElement },
-)
-private fun <T> setOptions(element: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<Set<T>>, *>>  = commonOptions(SetSerializer(element)) + listOf(
-    MySealedClassSerializer.Option(Modification.SetAppend.serializer(element), setOf("AppendSet")) { it is Modification.SetAppend },
-    MySealedClassSerializer.Option(Modification.SetRemove.serializer(element)) { it is Modification.SetRemove },
-    MySealedClassSerializer.Option(Modification.SetRemoveInstances.serializer(element)) { it is Modification.SetRemoveInstances },
-    MySealedClassSerializer.Option(Modification.SetDropFirst.serializer(element)) { it is Modification.SetDropFirst },
-    MySealedClassSerializer.Option(Modification.SetDropLast.serializer(element)) { it is Modification.SetDropLast },
-    MySealedClassSerializer.Option(Modification.SetPerElement.serializer(element)) { it is Modification.SetPerElement },
-)
-private fun <T> stringMapOptions(element: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<Map<String, T>>, *>>  = commonOptions(
-    MapSerializer(String.serializer(), element)
-) + listOf(
-    MySealedClassSerializer.Option(Modification.Combine.serializer(element)) { it is Modification.Combine },
-    MySealedClassSerializer.Option(Modification.ModifyByKey.serializer(element)) { it is Modification.ModifyByKey },
-    MySealedClassSerializer.Option(Modification.RemoveKeys.serializer(element)) { it is Modification.RemoveKeys },
-)
-private fun <T> numberOptions(serializer: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<T>, *>> where T: Number, T:Comparable<T> = comparableOptions(serializer) + listOf(
-    MySealedClassSerializer.Option(Modification.Increment.serializer(serializer)) { it is Modification.Increment },
-    MySealedClassSerializer.Option(Modification.Multiply.serializer(serializer)) { it is Modification.Multiply },
-)
-private val stringOptions: List<MySealedClassSerializer.Option<Modification<String>, *>>  = comparableOptions(String.serializer()) + listOf(
-    MySealedClassSerializer.Option(Modification.AppendString.serializer()) { it is Modification.AppendString },
-)
+
+private fun <T : Any> nullableOptions(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<T?>, *>> =
+    commonOptions(inner.nullable) + listOf(
+        MySealedClassSerializer.Option(Modification.IfNotNull.serializer(inner)) { it is Modification.IfNotNull },
+    )
+
+private fun <T : Comparable<T>> comparableOptions(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<T>, *>> =
+    commonOptions(inner) + listOf(
+        MySealedClassSerializer.Option(Modification.CoerceAtLeast.serializer(inner)) { it is Modification.CoerceAtLeast },
+        MySealedClassSerializer.Option(Modification.CoerceAtMost.serializer(inner)) { it is Modification.CoerceAtMost },
+    )
+
+private fun <T> listOptions(element: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<List<T>>, *>> =
+    commonOptions(ListSerializer(element)) + listOf(
+        MySealedClassSerializer.Option(
+            Modification.ListAppend.serializer(element),
+            setOf("AppendList")
+        ) { it is Modification.ListAppend },
+        MySealedClassSerializer.Option(
+            Modification.ListRemove.serializer(element),
+            setOf("Remove")
+        ) { it is Modification.ListRemove },
+        MySealedClassSerializer.Option(
+            Modification.ListRemoveInstances.serializer(element),
+            setOf("RemoveInstances")
+        ) { it is Modification.ListRemoveInstances },
+        MySealedClassSerializer.Option(
+            Modification.ListDropFirst.serializer(element),
+            setOf("DropFirst")
+        ) { it is Modification.ListDropFirst },
+        MySealedClassSerializer.Option(
+            Modification.ListDropLast.serializer(element),
+            setOf("DropLast")
+        ) { it is Modification.ListDropLast },
+        MySealedClassSerializer.Option(
+            Modification.ListPerElement.serializer(element),
+            setOf("PerElement")
+        ) { it is Modification.ListPerElement },
+    )
+
+private fun <T> setOptions(element: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<Set<T>>, *>> =
+    commonOptions(SetSerializer(element)) + listOf(
+        MySealedClassSerializer.Option(
+            Modification.SetAppend.serializer(element),
+            setOf("AppendSet")
+        ) { it is Modification.SetAppend },
+        MySealedClassSerializer.Option(Modification.SetRemove.serializer(element)) { it is Modification.SetRemove },
+        MySealedClassSerializer.Option(Modification.SetRemoveInstances.serializer(element)) { it is Modification.SetRemoveInstances },
+        MySealedClassSerializer.Option(Modification.SetDropFirst.serializer(element)) { it is Modification.SetDropFirst },
+        MySealedClassSerializer.Option(Modification.SetDropLast.serializer(element)) { it is Modification.SetDropLast },
+        MySealedClassSerializer.Option(Modification.SetPerElement.serializer(element)) { it is Modification.SetPerElement },
+    )
+
+private fun <T> stringMapOptions(element: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<Map<String, T>>, *>> =
+    commonOptions(
+        MapSerializer(String.serializer(), element)
+    ) + listOf(
+        MySealedClassSerializer.Option(Modification.Combine.serializer(element)) { it is Modification.Combine },
+        MySealedClassSerializer.Option(Modification.ModifyByKey.serializer(element)) { it is Modification.ModifyByKey },
+        MySealedClassSerializer.Option(Modification.RemoveKeys.serializer(element)) { it is Modification.RemoveKeys },
+    )
+
+private fun <T> numberOptions(serializer: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<T>, *>> where T : Number, T : Comparable<T> =
+    comparableOptions(serializer) + listOf(
+        MySealedClassSerializer.Option(Modification.Increment.serializer(serializer)) { it is Modification.Increment },
+        MySealedClassSerializer.Option(Modification.Multiply.serializer(serializer)) { it is Modification.Multiply },
+    )
+
+private val stringOptions: List<MySealedClassSerializer.Option<Modification<String>, *>> =
+    comparableOptions(String.serializer()) + listOf(
+        MySealedClassSerializer.Option(Modification.AppendString.serializer()) { it is Modification.AppendString },
+    )
+
 //private fun <T: Any> classOptions(inner: KSerializer<T>, fields: List<SerializableProperty<T, *>>): List<MySealedClassSerializer.Option<Modification<T>, *>> = commonOptions(inner) + fields.map { prop ->
 //    MySealedClassSerializer.Option(ModificationOnFieldSerializer(prop)) { it is Modification.OnField<*, *> && it.key.name == prop.name }
 //}
-private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<T>, *>> = commonOptions(inner) + inner.serializableProperties!!.let {
-    it.mapIndexed { index, ser ->
-        MySealedClassSerializer.Option(ModificationOnFieldSerializer(
-            ser
-        )) { it is Modification.OnField<*, *> && it.key.name == inner.descriptor.getElementName(index) }
+private fun <T : Any> classOptionsReflective(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<T>, *>> =
+    commonOptions(inner) + inner.serializableProperties!!.let {
+        it.mapIndexed { index, ser ->
+            MySealedClassSerializer.Option(
+                serializer = ModificationOnFieldSerializer(field = ser),
+                annotations = ser.annotations,
+            ) { it is Modification.OnField<*, *> && it.key.name == inner.descriptor.getElementName(index) }
+        }
     }
-}
 
 private val cache = HashMap<KSerializerKey, MySealedClassSerializerInterface<*>>()
 private val numlist = setOf(
@@ -70,31 +109,48 @@ private val numlist = setOf(
     "kotlin.Float",
     "kotlin.Double",
 )
+
 @Suppress("UNCHECKED_CAST")
-data class ModificationSerializer<T>(val inner: KSerializer<T>): MySealedClassSerializerInterface<Modification<T>> by (cache.getOrPut(KSerializerKey(inner)) {
-    MySealedClassSerializer<Modification<T>>("com.lightningkite.lightningdb.Modification", {
-        val r = when {
-            inner.nullElement() != null -> nullableOptions(inner.nullElement()!! as KSerializer<Any>)
-            inner.descriptor.serialName == "kotlin.String" -> stringOptions
-            inner.descriptor.serialName in numlist -> numberOptions(inner as KSerializer<Int>)
-            inner.descriptor.kind == StructureKind.MAP -> stringMapOptions(inner.mapValueElement()!!)
-            inner.descriptor.kind == StructureKind.LIST -> {
-                if(inner.descriptor.serialName.contains("Set")) setOptions(inner.listElement()!!)
-                else listOptions(inner.listElement()!!)
+data class ModificationSerializer<T>(val inner: KSerializer<T>) :
+    MySealedClassSerializerInterface<Modification<T>> by (cache.getOrPut(KSerializerKey(inner)) {
+        MySealedClassSerializer<Modification<T>>("com.lightningkite.lightningdb.Modification", {
+            val r = when {
+                inner.nullElement() != null -> nullableOptions(inner.nullElement()!! as KSerializer<Any>)
+                inner.descriptor.serialName == "kotlin.String" -> stringOptions
+                inner.descriptor.serialName in numlist -> numberOptions(inner as KSerializer<Int>)
+                inner.descriptor.kind == StructureKind.MAP -> stringMapOptions(inner.mapValueElement()!!)
+                inner.descriptor.kind == StructureKind.LIST -> {
+                    if (inner.descriptor.serialName.contains("Set")) setOptions(inner.listElement()!!)
+                    else listOptions(inner.listElement()!!)
+                }
+
+                inner.serializableProperties != null -> classOptionsReflective(inner as KSerializer<Any>)
+                else -> comparableOptions(inner as KSerializer<String>)
             }
-            inner.serializableProperties != null -> classOptionsReflective(inner as KSerializer<Any>)
-            else -> comparableOptions(inner as KSerializer<String>)
-        }
-        r as List<MySealedClassSerializer.Option<Modification<T>, out Modification<T>>>
-    })
-} as MySealedClassSerializerInterface<Modification<T>>)
+            r as List<MySealedClassSerializer.Option<Modification<T>, out Modification<T>>>
+        })
+    } as MySealedClassSerializerInterface<Modification<T>>)
 
 class ModificationOnFieldSerializer<K : Any, V>(
     val field: SerializableProperty<K, V>
-) : WrappingSerializer<Modification.OnField<K, V>, Modification<V>>(field.name) {
+) : WrappingSerializer<Modification.OnField<K, V>, Modification<V>>(field.name), ShouldValidateSub<Modification.OnField<K, V>> {
     override fun getDeferred(): KSerializer<Modification<V>> = Modification.serializer(field.serializer)
     override fun inner(it: Modification.OnField<K, V>): Modification<V> = it.modification
     override fun outer(it: Modification<V>): Modification.OnField<K, V> = Modification.OnField(field, it)
+    override fun validate(
+        value: Modification.OnField<K, V>,
+        existingAnnotations: List<Annotation>,
+        defer: (Any?, List<Annotation>) -> Unit
+    ) {
+        fun Modification<V>.check() {
+            when(this) {
+                is Modification.Assign<V> -> defer(this.value, existingAnnotations)
+                is Modification.Chain<V> -> modifications.forEach { it.check() }
+                else -> {}
+            }
+        }
+        value.modification.check()
+    }
 }
 
 class ModificationChainSerializer<T>(val inner: KSerializer<T>) :

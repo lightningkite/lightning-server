@@ -372,9 +372,11 @@ internal suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
             }
 
         },
-        domain = request.origin.host,
+        domain = request.origin.serverHost,
         protocol = request.origin.scheme,
-        sourceIp = request.origin.remoteHost
+        sourceIp = generalSettings().realIpHeader?.let {
+            request.header(it) ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
+        } ?: request.origin.remoteAddress
     )
 }
 

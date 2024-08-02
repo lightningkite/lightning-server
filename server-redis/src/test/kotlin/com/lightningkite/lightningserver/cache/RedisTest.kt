@@ -9,7 +9,10 @@ import org.junit.AfterClass
 import org.junit.Assert.assertEquals
 import org.junit.BeforeClass
 import org.junit.Test
+import redis.embedded.RedisExecProvider
 import redis.embedded.RedisServer
+import redis.embedded.util.Architecture
+import redis.embedded.util.OS
 
 class RedisTest: CacheTest() {
     override val cache: Cache? by lazy {

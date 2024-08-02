@@ -1,33 +1,18 @@
 import org.gradle.api.internal.file.archive.ZipFileTree
 import proguard.gradle.ProGuardTask
+import java.util.*
 
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.serialization")
-    id("com.google.devtools.ksp")
+    alias(serverlibs.plugins.kotlinJvm)
+    alias(serverlibs.plugins.serialization)
+    alias(serverlibs.plugins.ksp)
     application
-    id("org.graalvm.buildtools.native") version "0.9.24"
-    id("com.github.johnrengelman.shadow") version "7.1.0"
-}
-
-buildscript {
-    dependencies {
-        classpath("com.guardsquare:proguard-gradle:7.3.2")
-    }
+    alias(serverlibs.plugins.graalVmNative)
+    alias(serverlibs.plugins.shadow)
 }
 
 group = "com.lightningkite.lightningserver"
 
-repositories {
-    mavenLocal()
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap") }
-    mavenCentral()
-}
-
-val ktorVersion:String by project
 dependencies {
     api(project(":server-aws"))
     api(project(":server-azure"))
@@ -42,8 +27,8 @@ dependencies {
     api(project(":server-sentry"))
     api(project(":server-sftp"))
     ksp(project(":processor"))
-    implementation("com.lightningkite:kotliner-cli:1.0.3")
-    implementation("io.ktor:ktor-server-call-logging:$ktorVersion")
+    implementation(serverlibs.kotlinerCli)
+    implementation(serverlibs.ktorCallLogging)
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 }
 
@@ -58,20 +43,57 @@ application {
     mainClass.set("com.lightningkite.lightningserver.demo.MainKt")
 }
 
-tasks.create("lambda", Sync::class.java) {
+
+tasks.create("lambda", Copy::class.java) {
+    group = "deploy"
     this.destinationDir = project.buildDir.resolve("dist/lambda")
     val jarTask = tasks.getByName("jar")
     dependsOn(jarTask)
     val output = jarTask.outputs.files.find { it.extension == "jar" }!!
     from(zipTree(output))
-    duplicatesStrategy = DuplicatesStrategy.WARN
     into("lib") {
-        from(configurations.runtimeClasspath) {
-            var index = 0
-            rename { s -> (index++).toString() + s }
+        from(configurations.runtimeClasspath)
+    }
+}
+tasks.create("rebuildTerraform", JavaExec::class.java) {
+    group = "deploy"
+    classpath(sourceSets.main.get().runtimeClasspath)
+    mainClass.set("com.lightningkite.lightningserver.demo.MainKt")
+    args("terraform")
+    workingDir(project.rootDir)
+}
+
+fun env(name: String, profile: String) {
+    val mongoProfile = file("${System.getProperty("user.home")}/.mongo/profiles/$profile.env")
+
+    if(mongoProfile.exists()) {
+        tasks.create("deployServer${name}Init", Exec::class.java) {
+            group = "deploy"
+            this.dependsOn("lambda", "rebuildTerraform")
+            this.environment("AWS_PROFILE", "$profile")
+            val props = Properties()
+            mongoProfile.reader().use { props.load(it) }
+            props.entries.forEach {
+                environment(it.key.toString().trim('"', ' '), it.value.toString().trim('"', ' '))
+            }
+            this.executable = "terraform"
+            this.args("init")
+            this.workingDir = file("terraform/$name")
+        }
+        tasks.create("deployServer${name}", Exec::class.java) {
+            group = "deploy"
+            this.dependsOn("deployServer${name}Init")
+            this.environment("AWS_PROFILE", "$profile")
+            val props = Properties()
+            mongoProfile.reader().use { props.load(it) }
+            props.entries.forEach { environment(it.key.toString().trim('"', ' '), it.value.toString().trim('"', ' ')) }
+            this.executable = "terraform"
+            this.args("apply", "-auto-approve")
+            this.workingDir = file("terraform/$name")
         }
     }
 }
+env("example", "default")
 
 tasks.create("proguardTest", ProGuardTask::class) {
     this.injars(tasks.getByName("shadowJar"))
@@ -82,6 +104,6 @@ tasks.create("proguardTest", ProGuardTask::class) {
 //    this.libraryjars("${System.getProperty("java.home")}/lib/rt.jar".also { println("rt jar is ${it}") })
     this.libraryjars(configurations.runtimeClasspath)
     this.configuration("src/main/proguard.pro")
-//    this.keep("name: 'com.lightningkite.lightningserver.demo.**'")
-//    this.keep("com.lightningkite.lightningserver.demo.AwsHandler")
+//    this.keepnames("com.lightningkite.lightningserver.demo.**")
+//    this.keepnames("com.lightningkite.lightningserver.demo.AwsHandler")
 }

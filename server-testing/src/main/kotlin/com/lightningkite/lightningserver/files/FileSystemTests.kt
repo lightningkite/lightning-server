@@ -24,7 +24,7 @@ abstract class FileSystemTests {
     @Test
     fun testHealth() {
         val system = system ?: run {
-            println("Could not test because the cache is not supported on this system.")
+            println("Could not test because the file system isn't supported here.")
             return
         }
         runBlocking {
@@ -35,7 +35,7 @@ abstract class FileSystemTests {
     @Test
     fun testWriteAndRead() {
         val system = system ?: run {
-            println("Could not test because the cache is not supported on this system.")
+            println("Could not test because the file system isn't supported here.")
             return
         }
         runBlocking {
@@ -43,13 +43,14 @@ abstract class FileSystemTests {
             val message = "Hello world!"
             testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
             assertEquals(message, testFile.get()!!.stream().reader().readText())
+            testFile.delete()
         }
     }
 
     @Test
     fun testInfo() {
         val system = system ?: run {
-            println("Could not test because the cache is not supported on this system.")
+            println("Could not test because the file system isn't supported here.")
             return
         }
         runBlocking {
@@ -79,7 +80,7 @@ abstract class FileSystemTests {
     @Test
     fun testList() {
         val system = system ?: run {
-            println("Could not test because the cache is not supported on this system.")
+            println("Could not test because the file system isn't supported here.")
             return
         }
         runBlocking {
@@ -99,11 +100,27 @@ abstract class FileSystemTests {
     @Test
     open fun testSignedUrlAccess() {
         val system = system ?: run {
-            println("Could not test because the cache is not supported on this system.")
+            println("Could not test because the file system isn't supported here.")
             return
         }
         runBlocking {
             val testFile = system.root.resolve("test.txt")
+            val message = "Hello world!"
+            testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
+            assert(testFile.signedUrl.startsWith(testFile.url))
+            println("testFile.signedUrl: ${testFile.signedUrl}")
+            assert(client.get(testFile.signedUrl).status.isSuccess())
+        }
+        runBlocking {
+            val testFile = system.root.resolve("test with spaces.txt")
+            val message = "Hello world!"
+            testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
+            assert(testFile.signedUrl.startsWith(testFile.url))
+            println("testFile.signedUrl: ${testFile.signedUrl}")
+            assert(client.get(testFile.signedUrl).status.isSuccess())
+        }
+        runBlocking {
+            val testFile = system.root.resolve("folder/test with spaces.txt")
             val message = "Hello world!"
             testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
             assert(testFile.signedUrl.startsWith(testFile.url))
@@ -117,7 +134,7 @@ abstract class FileSystemTests {
     @Test
     open fun testSignedUpload() {
         val system = system ?: run {
-            println("Could not test because the cache is not supported on this system.")
+            println("Could not test because the file system isn't supported here.")
             return
         }
         runBlocking {

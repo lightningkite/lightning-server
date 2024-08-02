@@ -1,10 +1,12 @@
 package com.lightningkite.lightningserver.cache
 
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 abstract class CacheTest {
     abstract val cache: Cache?
@@ -52,6 +54,38 @@ abstract class CacheTest {
         }
         runBlocking {
             assertEquals(HealthStatus.Level.OK, cache.healthCheck().level)
+        }
+    }
+
+    @Test open fun expirationTest() {
+        val cache = cache ?: run {
+            println("Could not test because the cache is not supported on this system.")
+            return
+        }
+        runBlocking {
+            val key = "x"
+            assertEquals(null, cache.get<Int>(key))
+            cache.set<Int>(key, 1, 0.25.seconds)
+            assertEquals(1, cache.get<Int>(key))
+            delay(300)
+            assertEquals(null, cache.get<Int>(key))
+            cache.set<Int>(key, 1, 0.25.seconds)
+            cache.add(key, 1, 0.25.seconds)
+            assertEquals(2, cache.get<Int>(key))
+            delay(900)
+            assertEquals(null, cache.get<Int>(key))
+            cache.add(key, 1, 0.25.seconds)
+            assertEquals(1, cache.get<Int>(key))
+            delay(300)
+            assertEquals(null, cache.get<Int>(key))
+        }
+        runBlocking {
+            val key = "y"
+            assertEquals(null, cache.get<Int>(key))
+            cache.add(key, 1, 0.25.seconds)
+            assertEquals(1, cache.get<Int>(key))
+            delay(300)
+            assertEquals(null, cache.get<Int>(key))
         }
     }
 }

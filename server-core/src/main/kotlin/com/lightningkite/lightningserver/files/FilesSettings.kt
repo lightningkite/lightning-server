@@ -41,40 +41,5 @@ data class FilesSettings(
     }
 
     override fun invoke(): FileSystem = parse(url.substringBefore("://"), this)
-
-//    init {
-//        if(storageUrl.startsWith("az")) {
-//            val auth = StaticUserAuthenticator("", storageUrl.substringAfter("://").substringBefore('.'), this.key ?: throw IllegalStateException("Azure file system requested, but no key was provided."))
-//            println("Establishing authenticator for Azure as $auth")
-//            DefaultFileSystemConfigBuilder.getInstance().setUserAuthenticator(AzFileProvider.getDefaultFileSystemOptions(), auth)
-//            println(DefaultFileSystemConfigBuilder.getInstance().getUserAuthenticator(AzFileProvider.getDefaultFileSystemOptions()))
-//        }
-//
-//        if(storageUrl.startsWith("file://")) {
-//            routing {
-//                path("$userContentPath/{...}").apply{
-//                    get.handler {
-//                        if(it.wildcard?.contains("..") != false) throw IllegalStateException()
-//                        val file = root.resolveFile(it.wildcard).content
-//                        HttpResponse(
-//                            body = HttpContent.Stream(
-//                                getStream = { file.inputStream },
-//                                length = file.size,
-//                                type = ContentType(file.contentInfo.contentType)
-//                            ),
-//                        )
-//                    }
-//                    post.handler {
-//                        val location = jwtSigner.verify<String>(it.queryParameter("token") ?: throw BadRequestException("No token provided"))
-//                        if(location != it.wildcard) throw BadRequestException("Token does not match file")
-//                        if(it.wildcard.contains("..")) throw IllegalStateException()
-//                        val file = root.resolveFile(it.wildcard).content
-//                        it.body?.stream()?.copyTo(file.outputStream)
-//                        HttpResponse(status = HttpStatus.NoContent)
-//                    }
-//                }
-//            }
-//        }
-//    }
 }
 

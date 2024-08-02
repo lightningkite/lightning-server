@@ -1,17 +1,24 @@
 package com.lightningkite.lightningdb
 
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.encoding.CompositeDecoder
 import kotlin.reflect.KClass
 
-// TODO: Replace with a simpler serializer / index pair?
 interface SerializableProperty<A, B> {
     val name: String
     fun get(receiver: A): B
     fun setCopy(receiver: A, value: B): A
     val serializer: KSerializer<B>
+    val annotations: List<Annotation> get() = listOf()
 
     companion object {
     }
+}
+fun <T> KSerializer<T>.tryFindAnnotations(propertyName: String): List<Annotation> {
+    val i = descriptor.getElementIndex(propertyName)
+    if (i < 0) return listOf()
+    else return descriptor.getElementAnnotations(i)
 }
 private val serClassToList = HashMap<KClass<*>, (Array<KSerializer<*>>)->Array<SerializableProperty<*, *>>>()
 @Suppress("UNCHECKED_CAST")
@@ -20,6 +27,8 @@ fun <T, S: KSerializer<T>> S.properties(action: (Array<KSerializer<Nothing>>)->A
     @Suppress("UNCHECKED_CAST")
     serClassToList[this::class] = action as (Array<KSerializer<*>>)->Array<SerializableProperty<*, *>>
 }
+
+
 
 //object UUID_mostSignificantBits: SerializableProperty<UUID, Long> {
 //    override val name: String = "mostSignificantBits"

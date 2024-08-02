@@ -21,7 +21,7 @@ object Settings {
         private set
 
     fun populate(map: Map<String, Any?>) {
-        if(sealed) throw IllegalStateException("Settings have already been populated.")
+        if (sealed) throw IllegalStateException("Settings have already been populated.")
         values.putAll(map.mapValues { Box(it.value) })
         val missing = requirements.keys - values.keys
         if (requirements.filter { it.key in missing }.any { !it.value.optional }) {
@@ -66,22 +66,24 @@ object Settings {
         val serializer: KSerializer<Serializable>,
         val default: Serializable,
         val optional: Boolean,
-        getter: (Serializable) -> Goal
+        val description: String?,
+        getter: (Serializable) -> Goal,
     ) : () -> Goal {
         private val alreadyDone = AtomicBoolean(false)
         private val getter: (Serializable) -> Goal = {
-            if(!alreadyDone.compareAndSet(false, true)) throw Error()
+            if (!alreadyDone.compareAndSet(false, true)) throw Error()
             getter(it)
         }
         private val value by lazy<Goal> {
-            if(!sealed) throw IllegalStateException()
+            if (!sealed) throw IllegalStateException()
             @Suppress("UNCHECKED_CAST")
-            if(values.containsKey(name)) {
+            if (values.containsKey(name)) {
                 getter(values[name]?.item as Serializable)
             } else {
                 getter(default)
             }
         }
+
         override fun invoke(): Goal = value
     }
 
@@ -95,12 +97,13 @@ fun <Setting, Result> setting(
     default: Setting,
     serializer: KSerializer<Setting>,
     optional: Boolean = false,
-    getter: (Setting)->Result,
+    description: String? = null,
+    getter: (Setting) -> Result,
 ): Settings.Requirement<Setting, Result> {
     @Suppress("UNCHECKED_CAST")
     if (Settings.requirements.containsKey(name)) return Settings.requirements[name] as Settings.Requirement<Setting, Result>
     if (Settings.sealed) throw Error("Settings have already been set; you cannot add more requirements now.  Attempted to add '$name'")
-    val req = Settings.Requirement(name, serializer, default, optional, getter)
+    val req = Settings.Requirement(name, serializer, default, optional, description, getter)
     Settings.requirements[name] = req
     return req
 }
@@ -108,12 +111,14 @@ fun <Setting, Result> setting(
 inline fun <reified Goal> setting(
     name: String,
     default: Goal,
-    optional: Boolean = false
+    optional: Boolean = false,
+    description: String? = null,
 ): Settings.Requirement<Goal, Goal> = setting<Goal, Goal>(
     name = name,
     default = default,
     optional = optional,
     serializer = Serialization.module.serializer<Goal>(),
+    description = description,
     getter = { it }
 )
 
@@ -121,24 +126,28 @@ inline fun <reified Goal> setting(
 inline fun <reified Serializable : () -> Goal, Goal> setting(
     name: String,
     default: Serializable,
-    optional: Boolean = false
+    optional: Boolean = false,
+    description: String? = null,
 ): Settings.Requirement<Serializable, Goal> = setting<Serializable, Goal>(
     name = name,
     default = default,
     optional = optional,
     serializer = Serialization.module.serializer<Serializable>(),
+    description = description,
     getter = { it() }
 )
 
 @JvmName("settingInvokableMetricable")
-inline fun <reified Serializable : () -> Goal, Goal: Metricable<Goal>> setting(
+inline fun <reified Serializable : () -> Goal, Goal : Metricable<Goal>> setting(
     name: String,
     default: Serializable,
-    optional: Boolean = false
+    optional: Boolean = false,
+    description: String? = null,
 ): Settings.Requirement<Serializable, Goal> = setting<Serializable, Goal>(
     name = name,
     default = default,
     optional = optional,
     serializer = Serialization.module.serializer<Serializable>(),
+    description = description,
     getter = { it().withMetrics(name) }
 )

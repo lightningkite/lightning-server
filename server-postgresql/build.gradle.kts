@@ -4,36 +4,24 @@ import com.lightningkite.deployhelpers.mit
 import com.lightningkite.deployhelpers.standardPublishing
 
 plugins {
-    kotlin("jvm")
-    id("com.google.devtools.ksp")
-    kotlin("plugin.serialization")
-    id("org.jetbrains.dokka")
+    alias(serverlibs.plugins.kotlinJvm)
+    alias(serverlibs.plugins.ksp)
+    alias(serverlibs.plugins.serialization)
+    alias(serverlibs.plugins.dokka)
     id("signing")
     `maven-publish`
 }
 
-repositories {
-    mavenLocal()
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap") }
-    mavenCentral()
-}
-
-val kotlinVersion: String by project
-val khrysalisVersion: String by project
-val exposedVersion = "0.49.0"
 dependencies {
     api(project(":server-core"))
-    api("org.jetbrains.exposed:exposed-core:$exposedVersion")
-    api("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
-    api("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
-    api("org.postgresql:postgresql:42.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.7.2")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
+    api(serverlibs.exposedCore)
+    api(serverlibs.exposedJavaTime)
+    api(serverlibs.exposedJdbc)
+    api(serverlibs.postgresql)
+    api(serverlibs.embeddedPostgres)
+    implementation(serverlibs.coroutinesJdk)
+    testImplementation(serverlibs.kotlinTest)
     testImplementation(project(":server-testing"))
-    testImplementation("io.zonky.test:embedded-postgres:2.0.6")
     ksp(project(":processor"))
     kspTest(project(":processor"))
 }

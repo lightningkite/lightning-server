@@ -23,22 +23,32 @@ import java.util.*
 
 class OauthProviderInfo(
     val niceName: String,
-    val pathName: String = niceName.lowercase().map { if(it.isLetterOrDigit()) it else '-' }.joinToString(""),
-    val identifierName: String = niceName.lowercase().map { if(it.isLetterOrDigit()) it else '_' }.joinToString(""),
+    val pathName: String = niceName.lowercase().map { if (it.isLetterOrDigit()) it else '-' }.joinToString(""),
+    val identifierName: String = niceName.lowercase().map { if (it.isLetterOrDigit()) it else '_' }.joinToString(""),
     val loginUrl: String,
     val tokenUrl: String,
     val mode: OauthResponseMode = OauthResponseMode.form_post,
     val settings: SettingInfo<*> = SettingInfo.standard,
     val scopeForProfile: String,
-    val getProfile: suspend (OauthResponse) -> ExternalProfile
+    val getProfile: suspend (OauthResponse) -> ExternalProfile,
 ) {
 
-    data class SettingInfo<T: Any>(
+    data class SettingInfo<T : Any>(
         val serializer: KSerializer<T>,
-        val read: (T) -> OauthProviderCredentials
+        val read: (T) -> OauthProviderCredentials,
     ) {
-        fun defineOptional(name: String) = setting(name, null, serializer.nullable, true) { if(it == null) null else read(it) }
-        fun define(name: String, default: T) = setting(name, default, serializer, false, read)
+        fun defineOptional(name: String) =
+            setting(name, null, serializer.nullable, true) { if (it == null) null else read(it) }
+
+        fun define(name: String, default: T) = setting(
+            name = name,
+            default = default,
+            serializer = serializer,
+            optional = false,
+            description = null,
+            getter = read
+        )
+
         companion object {
             val standard = SettingInfo(OauthProviderCredentials.serializer()) { it }
             val apple = SettingInfo(OauthProviderCredentialsApple.serializer()) { it.toOauthProviderCredentials() }
@@ -61,13 +71,17 @@ class OauthProviderInfo(
             client_id = credentials().id,
             response_mode = mode,
             access_type = accessType,
-            prompt = if(accessType == OauthAccessType.offline) OauthPromptType.consent else null,
+            prompt = if (accessType == OauthAccessType.offline) OauthPromptType.consent else null,
             login_hint = loginHint,
         ).let { Serialization.properties.encodeToFormData(it) }
         return "$loginUrl?$params"
     }
 
-    suspend fun accessToken(credentials: () -> OauthProviderCredentials, callback: HttpEndpoint, oauth: OauthCode): OauthResponse {
+    suspend fun accessToken(
+        credentials: () -> OauthProviderCredentials,
+        callback: HttpEndpoint,
+        oauth: OauthCode,
+    ): OauthResponse {
         oauth.error?.let {
             throw BadRequestException("Got error code '${it}' from $niceName.")
         } ?: oauth.code?.let { code ->
@@ -216,7 +230,7 @@ private data class GoogleResponse2(
 @Serializable
 private data class MicrosoftAccountInfo(
     val email: String? = null,
-    val picture: String? = null
+    val picture: String? = null,
 )
 
 @Serializable
@@ -234,5 +248,5 @@ private data class GithubEmail(
     val email: String,
     val verified: Boolean,
     val primary: Boolean,
-    val visibility: String? = null
+    val visibility: String? = null,
 )

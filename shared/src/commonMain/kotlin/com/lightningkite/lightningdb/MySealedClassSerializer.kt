@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningdb
 
+import com.lightningkite.ShouldValidateSub
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
@@ -10,7 +11,7 @@ import kotlinx.serialization.json.JsonNames
 import kotlin.IllegalStateException
 import kotlin.reflect.KClass
 
-interface MySealedClassSerializerInterface<T: Any>: KSerializer<T> {
+interface MySealedClassSerializerInterface<T : Any> : KSerializer<T> {
     val options: List<MySealedClassSerializer.Option<T, out T>>
 }
 
@@ -20,9 +21,10 @@ class MySealedClassSerializer<T : Any>(
     val annotations: List<Annotation> = listOf(),
 ) : MySealedClassSerializerInterface<T> {
 
-    class Option<Base, T: Base>(
+    class Option<Base, T : Base>(
         val serializer: KSerializer<T>,
         val alternativeNames: Set<String> = setOf(),
+        val annotations: List<Annotation> = listOf(),
         val isInstance: (Base) -> Boolean,
     )
 
@@ -34,9 +36,10 @@ class MySealedClassSerializer<T : Any>(
                 .map { n -> n to index }
         }.associate { it }
     }
+
     private fun getIndex(item: T): Int = options.indexOfFirst { it.isInstance(item) }
         .also {
-            if(it == -1)
+            if (it == -1)
                 throw IllegalStateException("No serializer inside ${descriptor.serialName} found for ${item}")
         }
 
@@ -44,8 +47,13 @@ class MySealedClassSerializer<T : Any>(
         buildClassSerialDescriptor(serialName) {
             this.annotations = this@MySealedClassSerializer.annotations
             for ((index, s) in this@MySealedClassSerializer.options.withIndex()) {
-                element(s.serializer.descriptor.serialName, s.serializer.descriptor, isOptional = true, annotations = this@MySealedClassSerializer.options[index].alternativeNames
-                    ?.let { listOf(JsonNames(*it.toTypedArray())) } ?: listOf())
+                element(
+                    s.serializer.descriptor.serialName,
+                    s.serializer.descriptor,
+                    isOptional = true,
+                    annotations = listOfNotNull(this@MySealedClassSerializer.options[index].alternativeNames
+                        ?.let { JsonNames(*it.toTypedArray()) }) + s.annotations
+                )
             }
         }
     }
@@ -56,7 +64,7 @@ class MySealedClassSerializer<T : Any>(
             if (index == CompositeDecoder.DECODE_DONE) throw SerializationException("Single key expected, but received none.")
             if (index == CompositeDecoder.UNKNOWN_NAME) throw SerializationException("Unknown key received.")
             val result = decodeSerializableElement(descriptor, index, options[index].serializer)
-            if(decodeElementIndex(descriptor) != CompositeDecoder.DECODE_DONE) throw SerializationException("Single key expected, but received multiple.")
+            if (decodeElementIndex(descriptor) != CompositeDecoder.DECODE_DONE) throw SerializationException("Single key expected, but received multiple.")
             result
         }
     }
@@ -65,7 +73,12 @@ class MySealedClassSerializer<T : Any>(
         encoder.encodeStructure(descriptor) {
             val index = getIndex(value)
             @Suppress("UNCHECKED_CAST")
-            this.encodeSerializableElement<Any?>(descriptor, index, options[index].serializer as KSerializer<Any?>, value)
+            this.encodeSerializableElement<Any?>(
+                descriptor,
+                index,
+                options[index].serializer as KSerializer<Any?>,
+                value
+            )
         }
     }
 }

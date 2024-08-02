@@ -4,59 +4,39 @@ import com.lightningkite.deployhelpers.mit
 import com.lightningkite.deployhelpers.standardPublishing
 
 plugins {
-    kotlin("jvm")
-    id("com.google.devtools.ksp")
-    kotlin("plugin.serialization")
-    id("org.jetbrains.dokka")
+    alias(serverlibs.plugins.kotlinJvm)
+    alias(serverlibs.plugins.ksp)
+    alias(serverlibs.plugins.serialization)
+    alias(serverlibs.plugins.dokka)
     id("signing")
     `maven-publish`
 }
 
-val ktorVersion: String by project
-val kotlinVersion: String by project
-val logBack: String by project
-val coroutines: String by project
-val kotlinXSerialization: String by project
 dependencies {
     api(project(":shared"))
+    api(serverlibs.ktorJson)
+    api(serverlibs.ktorCioJvm)
+    api(serverlibs.ktorClientCio)
+    api(serverlibs.ktorContentNegotiation)
+    implementation(serverlibs.coroutinesCore)
+    implementation(serverlibs.logBackClassic)
+    implementation(serverlibs.kotlinStdLib)
+    implementation(serverlibs.coroutinesCore)
+    api(serverlibs.kotlinHtmlJvm)
+    api(serverlibs.oneTimePass)
+    api(serverlibs.serializationProperties)
+    api(serverlibs.serializationCbor)
+    api(serverlibs.xmlUtilJvm)
+    api(serverlibs.mongoBson)
+    api(serverlibs.kBson)
+    api(serverlibs.kaml)
+    api(serverlibs.kotlinReflect)
+    implementation(serverlibs.bouncyCastleBcprov)
+    implementation(serverlibs.bouncyCastleBcpkix)
 
-    // Security
-//    implementation("com.google.protobuf:protobuf-java:3.21.1")
-//    implementation("io.netty:netty-codec-http:4.1.77.Final")
-//    implementation("io.netty:netty-common:4.1.77.Final")
-//    implementation("com.google.oauth-client:google-oauth-client:1.34.1")
-//    implementation("com.fasterxml.jackson.core:jackson-databind:2.13.3")
-    // End Security
-
-    implementation("ch.qos.logback:logback-classic:1.5.3")
-
-//    implementation("com.lightningkite.khrysalis:jvm-runtime:$khrysalisVersion")
-
-    api("io.ktor:ktor-client-content-negotiation-jvm:$ktorVersion")
-    api("io.ktor:ktor-client-cio-jvm:$ktorVersion")
-    api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines")
-    api("org.jetbrains.kotlinx:kotlinx-html-jvm:0.11.0")
-
-    api("dev.turingcomplete:kotlin-onetimepassword:2.4.0")
-    api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
-    api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$kotlinXSerialization")
-    api("io.github.pdvrieze.xmlutil:serialization-jvm:0.86.3")
-    api("org.mongodb:bson:5.0.1")
-    api("com.github.jershell:kbson:0.5.0")
-    api("com.charleskorn.kaml:kaml:0.58.0")
-    api(kotlin("reflect"))
-
-    implementation("org.bouncycastle:bcprov-jdk18on:1.77")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.77")
-
-    api("org.eclipse.angus:angus-mail:2.0.3")
-
-    testImplementation("com.auth0:java-jwt:4.4.0")
-
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
+    api(serverlibs.angusMail)
+    testImplementation(serverlibs.javaJwt)
+    testImplementation(serverlibs.kotlinTest)
 
     ksp(project(":processor"))
     kspTest(project(":processor"))
@@ -82,7 +62,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
     kotlinOptions.jvmTarget = JavaVersion.VERSION_11.toString()
 }
-
 
 standardPublishing {
     name.set("Lightning-server-Server")

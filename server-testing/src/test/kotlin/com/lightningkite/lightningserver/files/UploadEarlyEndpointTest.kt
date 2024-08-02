@@ -17,15 +17,28 @@ class UploadEarlyEndpointTest {
     fun test(): Unit = runBlocking {
         TestSettings
         val a = TestSettings.earlyUpload.endpoint.test(null, Unit)
-        val match = Http.matcher.match(a.uploadUrl.removePrefix(generalSettings().publicUrl).substringBefore('?'), HttpMethod.PUT)!!
-        Http.endpoints[match.endpoint]!!.invoke(HttpRequest(
-            match.endpoint,
-            match.parts,
-            match.wildcard,
-            queryParameters = a.uploadUrl.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=') },
-            body = HttpContent.Text("Test", ContentType.Text.Plain)
-        )).let { assert(it.status.success) }
+        runBlocking {
+            val match = Http.matcher.match(a.uploadUrl.removePrefix(generalSettings().publicUrl).substringBefore('?'), HttpMethod.PUT)!!
+            Http.endpoints[match.endpoint]!!.invoke(HttpRequest(
+                match.endpoint,
+                match.parts,
+                match.wildcard,
+                queryParameters = a.uploadUrl.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=') },
+                body = HttpContent.Text("Test", ContentType.Text.Plain)
+            )).let { assert(it.status.success) }
+        }
         TestSettings.consumeFile.test(null, ServerFile(a.futureCallToken))
-        TestSettings.consumeFile.test(null, ServerFile(a.futureCallToken))
+        val result = TestSettings.consumeFile.test(null, ServerFile(a.futureCallToken))
+        println("Resulting file: $result")
+        runBlocking {
+            val match = Http.matcher.match(result.removePrefix(generalSettings().publicUrl).substringBefore('?'), HttpMethod.GET)!!
+            Http.endpoints[match.endpoint]!!.invoke(HttpRequest(
+                match.endpoint,
+                match.parts,
+                match.wildcard,
+                queryParameters = a.uploadUrl.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=') },
+            )).let { assert(it.status.success) }
+        }
     }
 }
+

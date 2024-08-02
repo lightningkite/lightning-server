@@ -13,6 +13,9 @@
 -keep class io.ktor.** { *; }
 -keep class kotlinx.coroutines.** { *; }
 
+-keepnames com.lightningkite.lightningserver.demo.**
+-keepnames com.lightningkite.lightningserver.demo.AwsHandler
+
 -dontwarn jakarta.**
 -dontwarn org.osgi.**
 -dontwarn javax.**

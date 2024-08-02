@@ -29,6 +29,24 @@ data class RequestAuth<SUBJECT : HasId<*>>(
     val thirdParty: String? = null,
     val fromMasquerade: RequestAuth<*>? = null,
 ) {
+    override fun toString(): String = buildString {
+        fromMasquerade?.let {
+            append(it)
+            append(" masquerading as ")
+        }
+        append(subject.name)
+        append(' ')
+        append(rawId)
+        sessionId?.let {
+            append(" (")
+            append(it)
+            append(")")
+        }
+        thirdParty?.let {
+            append(" via ")
+            append(it)
+        }
+    }
     object Key : Request.CacheKey<RequestAuth<*>?> {
         override suspend fun calculate(request: Request): RequestAuth<*>? {
             for (reader in Authentication.readers) {

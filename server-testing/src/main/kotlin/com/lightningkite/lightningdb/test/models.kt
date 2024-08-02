@@ -27,8 +27,15 @@ data class User(
 
 @GenerateDataClassPaths
 @Serializable
+data class ValidatedModel(
+    @ExpectedPattern("[a-zA-Z ]+") @MaxLength(15) val name: String,
+)
+
+@GenerateDataClassPaths
+@Serializable
 data class CompoundKeyTestModel(
-    override val _id: CompoundTestKey = CompoundTestKey("first", "second")
+    override val _id: CompoundTestKey = CompoundTestKey("first", "second"),
+    val value: Int = 0,
 ): HasId<CompoundTestKey>
 
 @GenerateDataClassPaths
@@ -57,7 +64,7 @@ data class Post(
 @GenerateDataClassPaths()
 @Serializable
 data class Employee(
-    override val _id: @Contextual UUID = uuid(),
+    override val _id: UUID = uuid(),
     var dictionary: Map<String, Int> = mapOf(),
 ) : HasId<UUID> {
     companion object
@@ -147,7 +154,7 @@ data class LargeTestModel(
 @Serializable
 data class GeoTest(
     override val _id: UUID = uuid(),
-    val geo: GeoCoordinate = GeoCoordinate(41.727019, -111.8443002)
+    @Index val geo: GeoCoordinate = GeoCoordinate(41.727019, -111.8443002)
 ) : HasId<UUID> {
     companion object
 }

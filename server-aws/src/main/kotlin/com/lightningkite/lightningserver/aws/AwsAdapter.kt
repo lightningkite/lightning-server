@@ -334,7 +334,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         return coroutineScope {
             @Suppress("UNCHECKED_CAST") val task = Tasks.tasks[event.taskName] as Task<Any?>?
             if (task == null) {
-                exceptionSettings().report(AwsTaskInvokeException("Task ${event.taskName} not found"))
+                exceptionSettings().report(AwsTaskInvokeException("Task ${event.taskName} not found"), event.taskName)
                 logger.error("Task ${event.taskName} not found")
                 APIGatewayV2HTTPResponse(statusCode = 404, body = "Task ${event.taskName} not found")
             } else try {

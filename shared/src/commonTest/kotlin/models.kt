@@ -2,6 +2,7 @@
 @file:UseContextualSerialization(UUID::class, Instant::class)
 package com.lightningkite.lightningdb
 
+import com.lightningkite.TrimmedCaselessString
 import com.lightningkite.UUID
 import com.lightningkite.ZonedDateTime
 import com.lightningkite.khrysalis.SharedCode
@@ -18,7 +19,8 @@ import kotlinx.datetime.TimeZone
 @Serializable
 data class User(
     override val _id: UUID = uuid(),
-    var email: String,
+    @MaxLength(10) var email: TrimmedCaselessString,
+    val name: String = email.raw,
     var age: Long = 0,
     var friends: List<UUID> = listOf()
 ) : HasId<UUID> {
@@ -39,7 +41,7 @@ data class Post(
 @GenerateDataClassPaths()
 @Serializable
 data class Employee(
-    override val _id: @Contextual UUID = uuid(),
+    override val _id: UUID = uuid(),
     var dictionary: Map<String, Int> = mapOf(),
 ) : HasId<UUID> {
     companion object

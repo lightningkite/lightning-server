@@ -1,11 +1,11 @@
 import com.lightningkite.deployhelpers.*
 
 plugins {
-    kotlin("multiplatform")
-    id("com.google.devtools.ksp")
-    kotlin("plugin.serialization")
-    id("com.android.library")
-    id("org.jetbrains.dokka")
+    alias(serverlibs.plugins.kotlinMultiplatform)
+    alias(serverlibs.plugins.ksp)
+    alias(serverlibs.plugins.serialization)
+    alias(serverlibs.plugins.androidLibrary)
+    alias(serverlibs.plugins.dokka)
     id("signing")
     `maven-publish`
 }
@@ -21,7 +21,6 @@ ksp {
 kotlin {
     applyDefaultHierarchyTemplate()
     androidTarget {
-        publishLibraryVariants("release", "debug")
         compilations.all {
             kotlinOptions {
                 jvmTarget = "17"

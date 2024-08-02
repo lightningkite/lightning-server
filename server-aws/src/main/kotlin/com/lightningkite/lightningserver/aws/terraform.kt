@@ -35,12 +35,12 @@ internal data class TerraformProjectInfo(
 ) {
 }
 
-internal val TerraformProjectInfo.privateSubnets get() = if(existingVpc) "[for s in data.aws_subnet.private : s.id]" else "module.vpc.private_subnets"
-internal val TerraformProjectInfo.subnet_cidr_blocks get() = if(existingVpc) "[for s in data.aws_subnet.private : s.cidr_block]" else "concat(module.vpc.private_subnets_cidr_blocks, module.vpc.private_subnets_cidr_blocks, [])"
-internal val TerraformProjectInfo.vpc_id get() = if(existingVpc) "data.aws_vpc.main.id" else "module.vpc.vpc_id"
-internal val TerraformProjectInfo.vpc_cidr_block get() = if(existingVpc) "data.aws_vpc.main.cidr_block" else "module.vpc.vpc_cidr_block"
-internal val TerraformProjectInfo.public_route_table_ids get() = if(existingVpc) "toset([data.aws_vpc.main.main_route_table_id])" else "module.vpc.public_route_table_ids"
-internal val TerraformProjectInfo.natGatewayIp get() = if(existingVpc) "[for s in data.aws_nat_gateway.main : s.public_ip]" else "module.vpc.nat_public_ips"
+internal val TerraformProjectInfo.privateSubnets get() = if (existingVpc) "[for s in data.aws_subnet.private : s.id]" else "module.vpc.private_subnets"
+internal val TerraformProjectInfo.subnet_cidr_blocks get() = if (existingVpc) "[for s in data.aws_subnet.private : s.cidr_block]" else "concat(module.vpc.private_subnets_cidr_blocks, module.vpc.private_subnets_cidr_blocks, [])"
+internal val TerraformProjectInfo.vpc_id get() = if (existingVpc) "data.aws_vpc.main.id" else "module.vpc.vpc_id"
+internal val TerraformProjectInfo.vpc_cidr_block get() = if (existingVpc) "data.aws_vpc.main.cidr_block" else "module.vpc.vpc_cidr_block"
+internal val TerraformProjectInfo.public_route_table_ids get() = if (existingVpc) "toset([data.aws_vpc.main.main_route_table_id])" else "module.vpc.public_route_table_ids"
+internal val TerraformProjectInfo.natGatewayIp get() = if (existingVpc) "[for s in data.aws_nat_gateway.main : s.public_ip]" else "module.vpc.nat_public_ips"
 
 internal val TerraformProjectInfo.projectNameSafe: String
     get() = projectName.filter {
@@ -53,7 +53,8 @@ internal val TerraformProjectInfo.namePrefix: String get() = projectNameSafe
 internal val TerraformProjectInfo.namePrefixLower: String get() = projectNameSafe.lowercase()
 internal val TerraformProjectInfo.namePrefixUnderscores: String get() = projectNameSafe.replace("-", "_")
 internal val TerraformProjectInfo.namePrefixSafe: String get() = projectNameSafe.filter { it.isLetterOrDigit() }
-internal val TerraformProjectInfo.namePrefixPath: String get() = projectNameSafe.lowercase().replace("-", "/").replace("_", "")
+internal val TerraformProjectInfo.namePrefixPath: String
+    get() = projectNameSafe.lowercase().replace("-", "/").replace("_", "")
 internal val TerraformProjectInfo.namePrefixPathSegment: String get() = projectNameSafe.lowercase().replace("_", "")
 
 internal data class TerraformRequirementBuildInfo(
@@ -114,7 +115,8 @@ internal data class TerraformSection(
                             it
                         )
                     },
-                    nullable = setting.serializer.descriptor.isNullable
+                    nullable = setting.serializer.descriptor.isNullable,
+                    description = setting.description
                 ),
             ),
             toLightningServer = mapOf(setting.name to "var.${setting.name}")
@@ -157,12 +159,37 @@ internal data class TerraformHandler(
     }
 }
 
-internal data class TerraformInput(val name: String, val type: String, val default: String?, val nullable: Boolean = false) {
+internal data class Validation(
+    val condition: String,
+    val errorMessage: String,
+)
+
+internal data class TerraformInput(
+    val name: String,
+    val type: String,
+    val default: String?,
+    val nullable: Boolean = false,
+    val description: String? = null,
+    val validations: List<Validation> = emptyList(),
+) {
     companion object {
-        fun stringList(name: String, default: List<String>?, nullable: Boolean = false) = TerraformInput(name, "list(string)", default?.joinToString(", ", "[", "]") { "\"$it\"" }, nullable = nullable)
-        fun string(name: String, default: String?, nullable: Boolean = false) = TerraformInput(name, "string", default?.let { "\"$it\"" }, nullable = nullable)
-        fun boolean(name: String, default: Boolean?, nullable: Boolean = false) = TerraformInput(name, "bool", default?.toString(), nullable = nullable)
-        fun number(name: String, default: Number?, nullable: Boolean = false) = TerraformInput(name, "number", default?.toString(), nullable = nullable)
+        fun stringList(name: String, default: List<String>?, nullable: Boolean = false, description: String? = null) =
+            TerraformInput(
+                name,
+                "list(string)",
+                default?.joinToString(", ", "[", "]") { "\"$it\"" },
+                nullable = nullable,
+                description = description,
+            )
+
+        fun string(name: String, default: String?, nullable: Boolean = false, description: String? = null) =
+            TerraformInput(name, "string", default?.let { "\"$it\"" }, nullable = nullable, description = description)
+
+        fun boolean(name: String, default: Boolean?, nullable: Boolean = false, description: String? = null) =
+            TerraformInput(name, "bool", default?.toString(), nullable = nullable, description = description)
+
+        fun number(name: String, default: Number?, nullable: Boolean = false, description: String? = null) =
+            TerraformInput(name, "number", default?.toString(), nullable = nullable, description = description)
     }
 }
 
@@ -177,14 +204,16 @@ internal fun handlers() {
         inputs = {
             listOf(
                 TerraformInput(
-                    "cors",
-                    "object({ allowedDomains = list(string), allowedHeaders = list(string) })",
-                    "null",
-                    nullable = true
+                    name = "cors",
+                    type = "object({ allowedDomains = list(string), allowedHeaders = list(string) })",
+                    default = "null",
+                    nullable = true,
+                    description = "Defines the cors rules for the server."
                 ),
                 TerraformInput.string(
                     "display_name",
-                    projectName
+                    projectName,
+                    description = "The GeneralSettings projectName."
                 )
             )
         },
@@ -541,23 +570,27 @@ internal fun handlers() {
                 }
             """.trimIndent()
             )
-            if(project.vpc) {
-                appendLine("""
+            if (project.vpc) {
+                appendLine(
+                    """
                 resource "mongodbatlas_project_ip_access_list" "$key" {
                   for_each = toset(${project.natGatewayIp})
                   project_id   = mongodbatlas_project.$key.id
                   cidr_block = "${'$'}{each.value}/32"
                   comment    = "NAT Gateway"
                 }
-                """.trimIndent())
+                """.trimIndent()
+                )
             } else {
-                appendLine("""
+                appendLine(
+                    """
                 resource "mongodbatlas_project_ip_access_list" "$key" {
                   project_id   = mongodbatlas_project.$key.id
                   cidr_block = "0.0.0.0/0"
                   comment    = "Anywhere"
                 }
-                """.trimIndent())
+                """.trimIndent()
+                )
             }
         },
         settingOutput = { key ->
@@ -644,23 +677,27 @@ internal fun handlers() {
                 }
             """.trimIndent()
             )
-            if(project.vpc) {
-                appendLine("""
+            if (project.vpc) {
+                appendLine(
+                    """
                 resource "mongodbatlas_project_ip_access_list" "$key" {
                   for_each = toset(${project.natGatewayIp})
                   project_id   = mongodbatlas_project.$key.id
                   cidr_block = "${'$'}{each.value}/32"
                   comment    = "NAT Gateway"
                 }
-                """.trimIndent())
+                """.trimIndent()
+                )
             } else {
-                appendLine("""
+                appendLine(
+                    """
                 resource "mongodbatlas_project_ip_access_list" "$key" {
                   project_id   = mongodbatlas_project.$key.id
                   cidr_block = "0.0.0.0/0"
                   comment    = "Anywhere"
                 }
-                """.trimIndent())
+                """.trimIndent()
+                )
             }
         },
         settingOutput = { key ->
@@ -680,7 +717,7 @@ internal fun handlers() {
             )
         },
         emit = {
-            if(!project.vpc) throw IllegalArgumentException("A VPC is required for ElastiCache for security purposes.")
+            if (!project.vpc) throw IllegalArgumentException("A VPC is required for ElastiCache for security purposes.")
             appendLine(
                 """
                 resource "aws_elasticache_cluster" "${key}" {
@@ -1050,21 +1087,38 @@ internal fun defaultAwsHandler(project: TerraformProjectInfo) = with(project) {
     TerraformSection(
         name = "cloud",
         inputs = listOf(
-            TerraformInput.string("deployment_location", "us-west-2"),
-            TerraformInput.boolean("debug", false),
+            TerraformInput.string(
+                "deployment_location",
+                "us-west-2",
+                description = "The AWS region key to deploy all resources in."
+            ),
+            TerraformInput.boolean(
+                "debug",
+                false,
+                description = "The GeneralSettings debug. Debug true will turn on various things during run time for easier development and bug tracking. Should be false for production environments."
+            ),
             TerraformInput.string("ip_prefix", "10.0"),
         ) + (if (domain) listOf(
-            TerraformInput.string("domain_name_zone", null),
-            TerraformInput.string("domain_name", null)
-        ) else listOf()) + (if(vpc && existingVpc) listOf(
-            TerraformInput.string("vpc_id", null),
+            TerraformInput.string(
+                "domain_name_zone",
+                null,
+                description = "The AWS Hosted zone the domain will be placed under."
+            ),
+            TerraformInput.string("domain_name", null, description = "The domain the server will be hosted at.")
+        ) else listOf()) + (if (vpc && existingVpc) listOf(
+            TerraformInput.string(
+                "vpc_id",
+                null,
+                description = "The AWS VPC id that you want your resources to be placed under."
+            ),
             TerraformInput.stringList("vpc_private_subnets", null),
             TerraformInput.stringList("vpc_nat_gateways", null),
         ) else listOf()),
         emit = {
             if (vpc) {
-                if(existingVpc) {
-                    appendLine("""   
+                if (existingVpc) {
+                    appendLine(
+                        """   
                     data "aws_vpc" "main" {
                       id = var.vpc_id
                     }
@@ -1076,9 +1130,11 @@ internal fun defaultAwsHandler(project: TerraformProjectInfo) = with(project) {
                       for_each = toset(var.vpc_nat_gateways)
                       id       = each.value
                     }
-                    """.trimIndent())
+                    """.trimIndent()
+                    )
                 } else {
-                    appendLine("""   
+                    appendLine(
+                        """   
                     module "vpc" {
                       source = "terraform-aws-modules/vpc/aws"
                       version = "4.0.2"
@@ -1096,7 +1152,8 @@ internal fun defaultAwsHandler(project: TerraformProjectInfo) = with(project) {
                       enable_dns_hostnames = false
                       enable_dns_support   = true
                     }
-                    """.trimIndent())
+                    """.trimIndent()
+                    )
                 }
                 appendLine(
                     """
@@ -1246,24 +1303,145 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
     TerraformSection(
         name = "alarms",
         inputs = listOf(
-            TerraformInput.number("emergencyInvocationsPerMinuteThreshold", 100),
-            TerraformInput.number("emergencyComputePerMinuteThreshold", 10_000),
-            TerraformInput.number("panicInvocationsPerMinuteThreshold", 500),
-            TerraformInput.number("panicComputePerMinuteThreshold", 50_000),
-            TerraformInput.string("emergencyContact", null)
+            TerraformInput(
+                name = "emergencyInvocationsPerMinuteThreshold",
+                type = "number",
+                default = "null",
+                nullable = true,
+                description = "Number of Invocations Per Minute, Assign null to not create this alarm. (DEPRECATED!! Use emergencyInvocations which allows defined both threshold and period)"
+            ),
+            TerraformInput(
+                name = "emergencyComputePerMinuteThreshold",
+                type = "number",
+                default = "null",
+                nullable = true,
+                description = "Milliseconds of Compute Per Minute, Assign null to not create this alarm. (DEPRECATED!! Use emergencyCompute which allows defined both threshold and period)"
+            ),
+            TerraformInput(
+                name = "panicInvocationsPerMinuteThreshold",
+                type = "number",
+                default = "null",
+                nullable = true,
+                description = "Number of Invocations Per Minute, Assign null to not create this alarm. (DEPRECATED!! Use panicInvocations which allows defined both threshold and period)"
+            ),
+            TerraformInput(
+                name = "panicComputePerMinuteThreshold",
+                type = "number",
+                default = "null",
+                nullable = true,
+                description = "Milliseconds of Compute Per Minute, Assign null to not create this alarm. (DEPRECATED!! Use panicCompute which allows defined both threshold and period)"
+            ),
+
+            TerraformInput(
+                name = "emergencyInvocations",
+                type = "object({ threshold = number, period = number, evaluationPeriods = number, dataPointsToAlarm = number })",
+                default = "null",
+                nullable = true,
+                description = "The configurations for the Emergency Invocation alarm. Threshold is the Number of Invocations, Period is the timeframe in Minutes, and DataPointsToAlarm are how many periods need to breach in the number of EvaluationPeriods before an alarm is triggered. Assign null to not create this alarm.",
+                validations = listOf(
+                    Validation(
+                        condition = "(var.emergencyInvocations == null ? true : var.emergencyInvocations.evaluationPeriods > 0)",
+                        errorMessage = """"emergencyInvocations evaluationPeriods must be greater than 0"""",
+                    ),
+                    Validation(
+                        condition = "(var.emergencyInvocations == null ? true : (var.emergencyInvocations.dataPointsToAlarm <= var.emergencyInvocations.evaluationPeriods && var.emergencyInvocations.dataPointsToAlarm > 0))",
+                        errorMessage = """"emergencyInvocations dataPointsToAlarm must be greater than 0 and less than or equal to emergencyInvocations evaluationPeriods"""",
+                    )
+                )
+            ),
+            TerraformInput(
+                name = "emergencyCompute",
+                type = "object({ threshold = number, period = number, statistic = string, evaluationPeriods = number, dataPointsToAlarm = number })",
+                default = "null",
+                nullable = true,
+                description = "The configurations for the Emergency Compute alarm. Threshold is the Milliseconds of Compute, Period is the timeframe in Minutes, and DataPointsToAlarm are how many periods need to breach in the number of EvaluationPeriods before an alarm is triggered. Assign null to not create this alarm.",
+                validations = listOf(
+                    Validation(
+                        condition = "(var.emergencyCompute == null ? true : contains([\"Sum\", \"Average\", \"Maximum\"], var.emergencyCompute.statistic))",
+                        errorMessage = """"Allowed values for emergencyCompute statistic are: \"Sum\", \"Average\", \"Maximum\".""""
+                    ),
+                    Validation(
+                        condition = "(var.emergencyCompute == null ? true : var.emergencyCompute.evaluationPeriods > 0)",
+                        errorMessage = """"emergencyCompute evaluationPeriods must be greater than 0"""",
+                    ),
+                    Validation(
+                        condition = "(var.emergencyCompute == null ? true : (var.emergencyCompute.dataPointsToAlarm <= var.emergencyCompute.evaluationPeriods && var.emergencyCompute.dataPointsToAlarm > 0))",
+                        errorMessage = """"emergencyCompute dataPointsToAlarm must be greater than 0 and less than or equal to emergencyCompute evaluationPeriods"""",
+                    )
+                )
+            ),
+            TerraformInput(
+                name = "panicInvocations",
+                type = "object({ threshold = number, period = number, evaluationPeriods = number, dataPointsToAlarm = number })",
+                default = "null",
+                nullable = true,
+                description = "The configurations for the Panic Invocations alarm. Threshold is the Number of Invocations, Period is the timeframe in Minutes, and DataPointsToAlarm are how many periods need to breach in the number of EvaluationPeriods before an alarm is triggered. Assign null to not create this alarm.",
+                validations = listOf(
+                    Validation(
+                        condition = "(var.panicInvocations == null ? true : var.panicInvocations.evaluationPeriods > 0)",
+                        errorMessage = """"panicInvocations evaluationPeriods must be greater than 0"""",
+                    ),
+                    Validation(
+                        condition = "(var.panicInvocations == null ? true : (var.panicInvocations.dataPointsToAlarm <= var.panicInvocations.evaluationPeriods && var.panicInvocations.dataPointsToAlarm > 0))",
+                        errorMessage = """"panicInvocations dataPointsToAlarm must be greater than 0 and less than or equal to panicInvocations evaluationPeriods"""",
+                    )
+                )
+            ),
+            TerraformInput(
+                name = "panicCompute",
+                type = "object({ threshold = number, period = number, statistic = string, evaluationPeriods = number, dataPointsToAlarm = number })",
+                default = "null",
+                nullable = true,
+                description = "The configurations for the Panic Compute alarm. Threshold is the Milliseconds of Compute, Period is the timeframe in Minutes, and DataPointsToAlarm are how many periods need to breach in the number of EvaluationPeriods before an alarm is triggered. Assign null to not create this alarm.",
+                validations = listOf(
+                    Validation(
+                        condition = "(var.panicCompute == null ? true : contains([\"Sum\", \"Average\", \"Maximum\"], var.panicCompute.statistic))",
+                        errorMessage = """"Allowed values for panicCompute statistic are: \"Sum\", \"Average\", \"Maximum\".""""
+                    ),
+                    Validation(
+                        condition = "(var.panicCompute == null ? true : var.panicCompute.evaluationPeriods > 0)",
+                        errorMessage = """"panicCompute evaluationPeriods must be greater than 0"""",
+                    ),
+                    Validation(
+                        condition = "(var.panicCompute == null ? true : (var.panicCompute.dataPointsToAlarm <= var.panicCompute.evaluationPeriods && var.panicCompute.dataPointsToAlarm > 0))",
+                        errorMessage = """"panicCompute dataPointsToAlarm must be greater than 0 and less than or equal to panicCompute evaluationPeriods"""",
+                    )
+                )
+            ),
+
+            TerraformInput.string(
+                "emergencyContact",
+                null,
+                nullable = true,
+                description = "The email address that will receive emails when alarms are triggered."
+            )
         ),
         emit = {
             appendLine(
                 """
+            locals {
+              anyNotifications = (var.emergencyContact != null &&
+              (var.emergencyInvocationsPerMinuteThreshold != null ||
+              var.emergencyComputePerMinuteThreshold != null ||
+              var.panicInvocationsPerMinuteThreshold != null ||
+              var.panicComputePerMinuteThreshold != null ||
+              var.emergencyInvocations != null ||
+              var.emergencyCompute != null ||
+              var.panicInvocations != null ||
+              var.panicCompute != null))
+            }
             resource "aws_sns_topic" "emergency" {
-              name = "${namePrefix}_emergencies"
+              count = local.anyNotifications ? 1 : 0
+              name  = "${namePrefix}_emergencies"
             }
             resource "aws_sns_topic_subscription" "emergency_primary" {
-              topic_arn = aws_sns_topic.emergency.arn
+              count     = local.anyNotifications ? 1 : 0
+              topic_arn = aws_sns_topic.emergency[0].arn
               protocol  = "email"
               endpoint  = var.emergencyContact
             }
-            resource "aws_cloudwatch_metric_alarm" "emergency_invocations" {
+            resource "aws_cloudwatch_metric_alarm" "emergency_minute_invocations" {
+              count                     = local.anyNotifications && var.emergencyInvocationsPerMinuteThreshold != null ? 1 : 0
               alarm_name                = "${namePrefix}_emergency_invocations"
               comparison_operator       = "GreaterThanOrEqualToThreshold"
               evaluation_periods        = "1"
@@ -1271,15 +1449,16 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
               namespace                 = "AWS/Lambda"
               period                    = "60"
               statistic                 = "Sum"
-              threshold                 = "${'$'}{var.emergencyInvocationsPerMinuteThreshold}"
+              threshold                 = var.emergencyInvocationsPerMinuteThreshold
               alarm_description         = ""
               insufficient_data_actions = []
               dimensions = {
                 FunctionName = aws_lambda_function.main.function_name
               }
-              alarm_actions = [aws_sns_topic.emergency.arn]
+              alarm_actions = [aws_sns_topic.emergency[0].arn]
             }
-            resource "aws_cloudwatch_metric_alarm" "emergency_compute" {
+            resource "aws_cloudwatch_metric_alarm" "emergency_minute_compute" {
+              count                     = local.anyNotifications && var.emergencyComputePerMinuteThreshold != null ? 1 : 0
               alarm_name                = "${namePrefix}_emergency_compute"
               comparison_operator       = "GreaterThanOrEqualToThreshold"
               evaluation_periods        = "1"
@@ -1287,15 +1466,16 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
               namespace                 = "AWS/Lambda"
               period                    = "60"
               statistic                 = "Sum"
-              threshold                 = "${'$'}{var.emergencyComputePerMinuteThreshold}"
+              threshold                 = var.emergencyComputePerMinuteThreshold
               alarm_description         = ""
               insufficient_data_actions = []
               dimensions = {
                 FunctionName = aws_lambda_function.main.function_name
               }
-              alarm_actions = [aws_sns_topic.emergency.arn]
+              alarm_actions = [aws_sns_topic.emergency[0].arn]
             }
-            resource "aws_cloudwatch_metric_alarm" "panic_invocations" {
+            resource "aws_cloudwatch_metric_alarm" "panic_minute_invocations" {
+              count                     = local.anyNotifications && var.panicInvocationsPerMinuteThreshold != null ? 1 : 0
               alarm_name                = "${namePrefix}_panic_invocations"
               comparison_operator       = "GreaterThanOrEqualToThreshold"
               evaluation_periods        = "1"
@@ -1303,15 +1483,16 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
               namespace                 = "AWS/Lambda"
               period                    = "60"
               statistic                 = "Sum"
-              threshold                 = "${'$'}{var.panicInvocationsPerMinuteThreshold}"
+              threshold                 = var.panicInvocationsPerMinuteThreshold
               alarm_description         = ""
               insufficient_data_actions = []
               dimensions = {
                 FunctionName = aws_lambda_function.main.function_name
               }
-              alarm_actions = [aws_sns_topic.emergency.arn]
+              alarm_actions = [aws_sns_topic.emergency[0].arn]
             }
-            resource "aws_cloudwatch_metric_alarm" "panic_compute" {
+            resource "aws_cloudwatch_metric_alarm" "panic_minute_compute" {
+              count                     = local.anyNotifications && var.panicComputePerMinuteThreshold != null ? 1 : 0
               alarm_name                = "${namePrefix}_panic_compute"
               comparison_operator       = "GreaterThanOrEqualToThreshold"
               evaluation_periods        = "1"
@@ -1319,13 +1500,95 @@ internal fun awsCloudwatch(projectInfo: TerraformProjectInfo) = with(projectInfo
               namespace                 = "AWS/Lambda"
               period                    = "60"
               statistic                 = "Sum"
-              threshold                 = "${'$'}{var.panicComputePerMinuteThreshold}"
+              threshold                 = var.panicComputePerMinuteThreshold
               alarm_description         = ""
               insufficient_data_actions = []
               dimensions = {
                 FunctionName = aws_lambda_function.main.function_name
               }
-              alarm_actions = [aws_sns_topic.emergency.arn]
+              alarm_actions = [aws_sns_topic.emergency[0].arn]
+            }
+            
+            
+            resource "aws_cloudwatch_metric_alarm" "emergency_invocations" {
+              count = (local.anyNotifications &&
+              var.emergencyInvocations != null ?
+                1 : 0)
+              alarm_name                = "${namePrefix}_emergency_invocations"
+              comparison_operator       = "GreaterThanOrEqualToThreshold"
+              evaluation_periods        = var.emergencyInvocations.evaluationPeriods
+              datapoints_to_alarm       = var.emergencyInvocations.dataPointsToAlarm
+              metric_name               = "Invocations"
+              namespace                 = "AWS/Lambda"
+              period                    = var.emergencyInvocations.period * 60
+              statistic                 = "Sum"
+              threshold                 = var.emergencyInvocations.threshold
+              alarm_description         = ""
+              insufficient_data_actions = []
+              dimensions = {
+                FunctionName = aws_lambda_function.main.function_name
+              }
+              alarm_actions = [aws_sns_topic.emergency[0].arn]
+            }
+            resource "aws_cloudwatch_metric_alarm" "emergency_compute" {
+              count = (local.anyNotifications &&
+              var.emergencyCompute != null ?
+                1 : 0)
+              alarm_name                = "${namePrefix}_emergency_compute"
+              comparison_operator       = "GreaterThanOrEqualToThreshold"
+              evaluation_periods        = var.emergencyCompute.evaluationPeriods
+              datapoints_to_alarm       = var.emergencyCompute.dataPointsToAlarm
+              metric_name               = "Duration"
+              namespace                 = "AWS/Lambda"
+              period                    = var.emergencyCompute.period * 60
+              statistic                 = var.emergencyCompute.statistic
+              threshold                 = var.emergencyCompute.threshold
+              alarm_description         = ""
+              insufficient_data_actions = []
+              dimensions = {
+                FunctionName = aws_lambda_function.main.function_name
+              }
+              alarm_actions = [aws_sns_topic.emergency[0].arn]
+            }
+            resource "aws_cloudwatch_metric_alarm" "panic_invocations" {
+              count = (local.anyNotifications &&
+              var.panicInvocations != null ?
+                1 : 0)
+              alarm_name                = "${namePrefix}_panic_invocations"
+              comparison_operator       = "GreaterThanOrEqualToThreshold"
+              evaluation_periods        = var.panicInvocations.evaluationPeriods
+              datapoints_to_alarm       = var.panicInvocations.dataPointsToAlarm
+              metric_name               = "Invocations"
+              namespace                 = "AWS/Lambda"
+              period                    = var.panicInvocations.period * 60
+              statistic                 = "Sum"
+              threshold                 = var.panicInvocations.threshold
+              alarm_description         = ""
+              insufficient_data_actions = []
+              dimensions = {
+                FunctionName = aws_lambda_function.main.function_name
+              }
+              alarm_actions = [aws_sns_topic.emergency[0].arn]
+            }
+            resource "aws_cloudwatch_metric_alarm" "panic_compute" {
+              count = (local.anyNotifications &&
+              var.panicCompute != null ?
+                1 : 0)
+              alarm_name                = "${namePrefix}_panic_compute"
+              comparison_operator       = "GreaterThanOrEqualToThreshold"
+              evaluation_periods        = var.panicCompute.evaluationPeriods
+              datapoints_to_alarm       = var.panicCompute.dataPointsToAlarm
+              metric_name               = "Duration"
+              namespace                 = "AWS/Lambda"
+              period                    = var.panicCompute.period * 60
+              statistic                 = var.panicCompute.statistic
+              threshold                 = var.panicCompute.threshold
+              alarm_description         = ""
+              insufficient_data_actions = []
+              dimensions = {
+                FunctionName = aws_lambda_function.main.function_name
+              }
+              alarm_actions = [aws_sns_topic.emergency[0].arn]
             }
         """.trimIndent()
             )
@@ -1338,7 +1601,8 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
         val safeName = it.name.filter { it.isLetterOrDigit() || it == '_' }
         when (val s = it.schedule) {
             is Schedule.Daily -> {
-                val utcTime = LocalDateTime(LocalDate(2001, 1, 1), s.time).toInstant(s.zone).toLocalDateTime(TimeZone.UTC)
+                val utcTime =
+                    LocalDateTime(LocalDate(2001, 1, 1), s.time).toInstant(s.zone).toLocalDateTime(TimeZone.UTC)
                 TerraformSection(
                     name = "schedule_${it.name}",
                     emit = {
@@ -1410,9 +1674,21 @@ internal fun awsLambdaHandler(
 ) = TerraformSection(
     name = "lambda",
     inputs = listOf(
-        TerraformInput.number("lambda_memory_size", 1024),
-        TerraformInput.number("lambda_timeout", 30),
-        TerraformInput.boolean("lambda_snapstart", false),
+        TerraformInput.number(
+            "lambda_memory_size",
+            1024,
+            description = "The amount of ram available (in Megabytes) to the virtual machine running in Lambda."
+        ),
+        TerraformInput.number(
+            "lambda_timeout",
+            30,
+            description = "How long an individual lambda invocation can run before forcefully being shut down."
+        ),
+        TerraformInput.boolean(
+            "lambda_snapstart",
+            false,
+            description = "Whether or not lambda will deploy with SnapStart which compromises deploy time for shorter cold start time."
+        ),
     ),
     emit = {
         appendLine("""
@@ -1523,16 +1799,16 @@ internal fun awsLambdaHandler(
           }
   
           ${
-              if(project.vpc)
-              """
+            if (project.vpc)
+                """
               |  vpc_config {
               |    subnet_ids = ${project.privateSubnets}
               |    security_group_ids = [aws_security_group.internal.id, aws_security_group.access_outside.id]
               |  }
               """.trimMargin()
-              else
-              ""
-          }
+            else
+                ""
+        }
           
           environment {
             variables = {
@@ -1573,11 +1849,11 @@ internal fun awsLambdaHandler(
             always = timestamp()
           }
           provisioner "local-exec" {
-            command = local.is_windows ? "if(test-path \"${'$'}{path.module}/build/lambda/\") { rd -Recurse \"${'$'}{path.module}/build/lambda/\" }" : "rm -rf \"${'$'}{path.module}/build/lambda/\""
+            command = (local.is_windows ? "if(test-path \"${'$'}{path.module}/build/lambda/\") { rd -Recurse \"${'$'}{path.module}/build/lambda/\" }" : "rm -rf \"${'$'}{path.module}/build/lambda/\"")
             interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
           }
           provisioner "local-exec" {
-            command = local.is_windows ? "cp -r -force \"${'$'}{path.module}/../../build/dist/lambda/.\" \"${'$'}{path.module}/build/lambda/\"" : "cp -rf \"${'$'}{path.module}/../../build/dist/lambda/.\" \"${'$'}{path.module}/build/lambda/\""
+            command = (local.is_windows ? "cp -r -force \"${'$'}{path.module}/../../build/dist/lambda/.\" \"${'$'}{path.module}/build/lambda/\"" : "cp -rf \"${'$'}{path.module}/../../build/dist/lambda/.\" \"${'$'}{path.module}/build/lambda/\"")
             interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
           }
           provisioner "local-exec" {
@@ -1682,8 +1958,9 @@ internal fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSectio
                 }
             """.trimIndent()
         )
-        if(projectInfo.domain) {
-            appendLine("""
+        if (projectInfo.domain) {
+            appendLine(
+                """
                 resource "aws_acm_certificate" "http" {
                   domain_name   = var.domain_name
                   validation_method = "DNS"
@@ -1723,7 +2000,8 @@ internal fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSectio
                       zone_id                = aws_apigatewayv2_domain_name.http.domain_name_configuration[0].hosted_zone_id
                     }
                 }
-            """.trimIndent())
+            """.trimIndent()
+            )
         }
     },
     outputs = listOf(
@@ -1745,7 +2023,8 @@ internal fun httpAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSectio
 internal fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
     name = "websockets",
     emit = {
-        appendLine("""
+        appendLine(
+            """
             resource "aws_apigatewayv2_api" "ws" {
               name = "${projectInfo.namePrefix}-gateway"
               protocol_type = "WEBSOCKET"
@@ -1842,9 +2121,11 @@ internal fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
               role       = aws_iam_role.main_exec.name
               policy_arn = aws_iam_policy.api_gateway_ws.arn
             }
-        """.trimIndent())
-        if(projectInfo.domain) {
-            appendLine("""
+        """.trimIndent()
+        )
+        if (projectInfo.domain) {
+            appendLine(
+                """
                 resource "aws_acm_certificate" "ws" {
                   domain_name   = "ws.${'$'}{var.domain_name}"
                   validation_method = "DNS"
@@ -1884,7 +2165,8 @@ internal fun wsAwsHandler(projectInfo: TerraformProjectInfo) = TerraformSection(
                       zone_id                = aws_apigatewayv2_domain_name.ws.domain_name_configuration[0].hosted_zone_id
                     }
                 }
-            """.trimIndent())
+            """.trimIndent()
+            )
         }
     },
     outputs = listOf(
@@ -1982,14 +2264,14 @@ fun terraformMigrate(handlerFqn: String, folder: File) {
             println(" - Clean up terraform.tfvars")
             println(" - Run `./tf init && ./tf state push newstate.json` to import a migrated state")
         }
-    } catch(e: Exception) {
+    } catch (e: Exception) {
         newFolder.deleteRecursively()
         oldFolder.renameTo(newFolder)
     }
 }
 
 fun terraformAws(handlerFqn: String, projectName: String = "project", root: File) {
-    if(root.resolve("base").exists()) {
+    if (root.resolve("base").exists()) {
         println("Base folder detected; need to migrate to new Terraform format.")
         println("***WARNING***")
         println("You *MUST* rebuild your program to use the new terraform due to a new settings parser!")
@@ -2012,18 +2294,19 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
     val defaultHandlers = Settings.requirements.entries.associate {
         it.key to (TerraformHandler.handlers[it.value.serializer]?.maxBy { it.value.priority }?.key ?: "Direct")
     }
-    val info = projectInfoFile.takeIf { it.exists() }?.readText()?.let {
-        Serialization.Internal.json.decodeFromString(TerraformProjectInfo.serializer(), it)
-    }?.let {
-        it.copy(handlers = defaultHandlers + it.handlers)
-    } ?: TerraformProjectInfo(
-        projectName = projectName,
-        bucket = "your-deployment-bucket",
-        vpc = false,
-        domain = true,
-        profile = "default",
-        handlers = defaultHandlers,
-    )
+    val info = projectInfoFile
+        .takeIf { it.exists() }
+        ?.readText()
+        ?.let { Serialization.Internal.json.decodeFromString(TerraformProjectInfo.serializer(), it) }
+        ?.let { it.copy(handlers = defaultHandlers + it.handlers) }
+        ?: TerraformProjectInfo(
+            projectName = projectName,
+            bucket = "your-deployment-bucket",
+            vpc = false,
+            domain = true,
+            profile = "default",
+            handlers = defaultHandlers,
+        )
     @Suppress("JSON_FORMAT_REDUNDANT")
     projectInfoFile.writeText(
         Json(Serialization.Internal.json) { prettyPrint = true }
@@ -2058,7 +2341,7 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
     folder.listFiles()!!.filter {
         it.extension == "tf" && it.readText().contains(warning)
     }.forEach { it.delete() }
-    for((section, file) in sectionToFile) {
+    for ((section, file) in sectionToFile) {
 //        if(!file.readText().contains(warning)) continue
         file.printWriter().use { it ->
             it.appendLine(warning)
@@ -2073,6 +2356,15 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
                     it.appendLine("    default = $d")
                 }
                 it.appendLine("    nullable = ${input.nullable}")
+                input.description?.let { d ->
+                    it.appendLine("    description = \"$d\"")
+                }
+                input.validations.forEach { validation ->
+                    it.appendLine("    validation {")
+                    it.appendLine("        condition = ${validation.condition}")
+                    it.appendLine("        error_message = ${validation.errorMessage}")
+                    it.appendLine("    }")
+                }
                 it.appendLine("}")
             }
             it.appendLine()
@@ -2096,26 +2388,31 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
     }
 
     val usingMongo = allSections.any { it.providers.any { it.name == "mongodbatlas" } }
-    if(usingMongo){
+    if (usingMongo) {
         fun get(name: String): String {
             println("$name for profile ${info.profile}:")
             return readln()
         }
+
         val mongoCredsFile = File(System.getProperty("user.home")).resolve(".mongo/profiles/${info.profile}.env")
         val mongoCredsFile2 = File(System.getProperty("user.home")).resolve(".mongo/profiles/${info.profile}.ps1")
         mongoCredsFile.parentFile.mkdirs()
-        if(!mongoCredsFile.exists()) {
-            val mongoPublic = if(usingMongo) get("MongoDB Public Key") else null
-            val mongoPrivate = if(usingMongo) get("MongoDB Private Key") else null
-            mongoCredsFile.writeText("""
+        if (!mongoCredsFile.exists()) {
+            val mongoPublic = if (usingMongo) get("MongoDB Public Key") else null
+            val mongoPrivate = if (usingMongo) get("MongoDB Private Key") else null
+            mongoCredsFile.writeText(
+                """
                     MONGODB_ATLAS_PUBLIC_KEY="$mongoPublic"
                     MONGODB_ATLAS_PRIVATE_KEY="$mongoPrivate"
-                """.trimIndent() + "\n")
+                """.trimIndent() + "\n"
+            )
             mongoCredsFile.setExecutable(true)
-            mongoCredsFile2.writeText("""
+            mongoCredsFile2.writeText(
+                """
                     ${'$'}env:MONGODB_ATLAS_PUBLIC_KEY = "$mongoPublic"
                     ${'$'}env:MONGODB_ATLAS_PRIVATE_KEY = "$mongoPrivate"
-                """.trimIndent() + "\n")
+                """.trimIndent() + "\n"
+            )
             mongoCredsFile2.setExecutable(true)
         }
     }
@@ -2123,10 +2420,12 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
     folder.resolve("tf").printWriter().use {
         it.appendLine("#!/bin/bash")
         it.appendLine("export AWS_PROFILE=${info.profile}")
-        if(usingMongo){
-            it.appendLine("""
+        if (usingMongo) {
+            it.appendLine(
+                """
                   export ${'$'}(cat ~/.mongo/profiles/${info.profile}.env | xargs)
-            """.trimIndent())
+            """.trimIndent()
+            )
         }
         it.appendLine("terraform \"$@\"")
     }
@@ -2134,10 +2433,12 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
 
     folder.resolve("tf.ps1").printWriter().use {
         it.appendLine("\$env:AWS_PROFILE = \"${info.profile}\"")
-        if(usingMongo){
-            it.appendLine("""
+        if (usingMongo) {
+            it.appendLine(
+                """
                   . ~/.mongo/profiles/${info.profile}.ps1
-            """.trimIndent())
+            """.trimIndent()
+            )
         }
         it.appendLine("terraform \$args")
     }
@@ -2170,11 +2471,13 @@ fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectName: Strin
         it.appendLine("""  alias = "acm"""")
         it.appendLine("""  region = "us-east-1"""")
         it.appendLine("""}""")
-        if(usingMongo) {
-            it.appendLine("""   
+        if (usingMongo) {
+            it.appendLine(
+                """   
                 provider "mongodbatlas" {
                 }
-            """.trimIndent())
+            """.trimIndent()
+            )
         }
     }
 

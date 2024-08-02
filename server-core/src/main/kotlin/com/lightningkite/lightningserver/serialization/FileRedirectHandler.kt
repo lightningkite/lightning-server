@@ -4,13 +4,12 @@ import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
+import com.lightningkite.lightningserver.files.FileSystem
 import com.lightningkite.lightningserver.files.fileObject
 import com.lightningkite.lightningserver.files.resolveRandom
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.schedule.schedule
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 
 object FileRedirectHandler : Serialization.HttpContentHandler {
@@ -28,7 +27,7 @@ object FileRedirectHandler : Serialization.HttpContentHandler {
     override suspend fun <T> invoke(contentType: ContentType, serializer: KSerializer<T>, value: T): HttpContent {
         val subtype = contentType.parameters["subtype"]?.let { ContentType(it) } ?: ContentType.Application.Json
         val basis = Serialization.emitters[subtype] ?: throw BadRequestException("No parser found for type ${subtype}.")
-        val file = ExternalServerFileSerializer.fileSystem().root.resolveRandom(
+        val file = FileSystem.default().root.resolveRandom(
             "temp-download/",
             basis.contentType.extension ?: ""
         )
@@ -37,7 +36,7 @@ object FileRedirectHandler : Serialization.HttpContentHandler {
     }
 
     val cleanSchedule = schedule("cleanRedirectToFiles", 1.days) {
-        ExternalServerFileSerializer.fileSystem().root.resolve("temp-download").list()?.forEach {
+        FileSystem.default().root.resolve("temp-download").list()?.forEach {
             it.delete()
         }
     }

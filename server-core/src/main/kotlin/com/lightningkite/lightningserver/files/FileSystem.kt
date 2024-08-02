@@ -1,7 +1,9 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.Disconnectable
+import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
@@ -15,18 +17,40 @@ interface FileSystem : HealthCheckable, Disconnectable {
     val rootUrls: List<String> get() = listOf(root.url)
 
     companion object {
+        lateinit var default: () -> FileSystem
+
         fun register(system: FileSystem) {
             system.rootUrls.forEach {
                 roots.add(it to system)
             }
         }
+        fun register(specialResolver: SpecialResolver) {
+            specialResolvers += specialResolver
+        }
 
-        val urlRoots get() = roots.map { it.first }
+        val urlRoots get() = roots.map { it.first } + specialResolvers.map { it.prefix }
         private val roots = ArrayList<Pair<String, FileSystem>>()
+        private val specialResolvers = ArrayList<SpecialResolver>()
         fun resolve(url: String): FileObject? {
+            specialResolvers.find { url.startsWith(it.prefix) }?.resolve(url)?.let { return it }
             val (root, sys) = roots.find { url.startsWith(it.first) } ?: return null
             return sys.root.resolve(url.removePrefix(root).substringBefore('?'))
         }
+        fun resolveWithSignature(url: String): FileObject? {
+            specialResolvers.find { url.startsWith(it.prefix) }?.resolveWithSignature(url)?.let { return it }
+            val (root, sys) = roots.find { url.startsWith(it.first) } ?: return null
+            val paramString = url.substringAfter('?')
+            val result = sys.root.resolve(url.removePrefix(root).substringBefore('?')).also { file ->
+                if (!file.checkSignature(paramString)) throw BadRequestException("URL '${url.substringBefore('?')}' does not appear to be signed properly")
+            }
+            return result
+        }
+    }
+
+    interface SpecialResolver {
+        val prefix: String
+        fun resolve(url: String): FileObject
+        fun resolveWithSignature(url: String): FileObject
     }
 
     override suspend fun healthCheck(): HealthStatus {
