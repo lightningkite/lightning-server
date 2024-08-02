@@ -18,10 +18,10 @@ class AuthOption(
 data class AuthOptions<out USER : HasId<*>?>(val options: Set<AuthOption?>)
 operator fun <USER: HasId<*>?> AuthOptions<USER>.plus(
     other: AuthOptions<USER>
-) = AuthOptions<USER>(options)
+) = AuthOptions<USER>(options + other.options)
 
 inline fun <reified USER : HasId<*>> authRequired(
-    scopes: Set<String>? = null,
+    scopes: Set<String>? = setOf("*"),
     maxAge: Duration? = null,
     limitationDescription: String? = null,
     crossinline additionalRequirement: suspend (RequestAuth<USER>) -> Boolean = { true }
@@ -40,7 +40,7 @@ inline fun <reified USER : HasId<*>> authRequired(
 }
 
 inline fun <reified USER : HasId<*>> authOptional(
-    scopes: Set<String>? = null,
+    scopes: Set<String>? = setOf("*"),
     maxAge: Duration? = null,
     limitationDescription: String? = null,
     crossinline additionalRequirement: suspend (RequestAuth<USER>) -> Boolean = { true }
@@ -59,7 +59,7 @@ inline fun <reified USER : HasId<*>> authOptional(
 }
 
 inline fun <reified USER : HasId<*>?> authOptions(
-    scopes: Set<String>? = null,
+    scopes: Set<String>? = setOf("*"),
     maxAge: Duration? = null,
     limitationDescription: String? = null
 ): AuthOptions<USER> {
