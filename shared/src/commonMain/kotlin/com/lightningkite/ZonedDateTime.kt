@@ -17,7 +17,7 @@ data class ZonedDateTime(val dateTime: LocalDateTime, val zone: TimeZone) {
     override fun toString(): String = "$dateTime${zone.offsetAt(dateTime.toInstant(zone))}[${zone.id}]"
     companion object {
         fun parse(string: String): ZonedDateTime {
-            var dateTimeFinishedIndex = string.indexOfAny(charArrayOf('Z', '[', '+', '-'), 17)
+            var dateTimeFinishedIndex = string.indexOfAny(charArrayOf('Z', '[', '+', '-'), 14)
             if(dateTimeFinishedIndex == -1) dateTimeFinishedIndex = string.length
             return ZonedDateTime(
                 LocalDateTime.parse(string.substring(0, dateTimeFinishedIndex)),
@@ -58,7 +58,7 @@ data class OffsetDateTime(val dateTime: LocalDateTime, val offset: UtcOffset) {
     override fun toString(): String = "$dateTime$offset"
     companion object {
         fun parse(string: String): OffsetDateTime {
-            var dateTimeFinishedIndex = string.indexOfAny(charArrayOf('Z', '[', '+', '-'), 19)
+            var dateTimeFinishedIndex = string.indexOfAny(charArrayOf('Z', '[', '+', '-'), 14)
             if(dateTimeFinishedIndex == -1) dateTimeFinishedIndex = string.length
             return OffsetDateTime(
                 LocalDateTime.parse(string.substring(0, dateTimeFinishedIndex)),
