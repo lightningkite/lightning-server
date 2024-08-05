@@ -17,21 +17,13 @@ data class ZonedDateTime(val dateTime: LocalDateTime, val zone: TimeZone) {
     override fun toString(): String = "$dateTime${zone.offsetAt(dateTime.toInstant(zone))}[${zone.id}]"
     companion object {
         fun parse(string: String): ZonedDateTime {
-            var zoneNameIndex = string.lastIndexOf('[')
-            if(zoneNameIndex == -1) {
-                val offsetStartIndex = max(string.lastIndexOf('+'), string.lastIndexOf('-'))
-                val offset = UtcOffset.parse(string.substring(offsetStartIndex, string.length))
-                return ZonedDateTime(
-                    dateTime = LocalDateTime.parse(string.substring(0, offsetStartIndex)),
-                    zone = FixedOffsetTimeZone(offset)
-                )
-            } else {
-                val offsetStartIndex = max(string.lastIndexOf('+', zoneNameIndex), string.lastIndexOf('-', zoneNameIndex))
-                return ZonedDateTime(
-                    dateTime = LocalDateTime.parse(string.substring(0, offsetStartIndex)),
-                    zone = TimeZone.of(string.substring(zoneNameIndex + 1, string.length - 1))
-                )
-            }
+            val dateTimeFinishedIndex = string.indexOfAny(charArrayOf('Z', '[', '+', '-'), 19)
+            return ZonedDateTime(
+                LocalDateTime.parse(string.substring(0, dateTimeFinishedIndex)),
+                if(string.contains('[')) TimeZone.of(string.substringAfterLast('[').substringBefore(']'))
+                else if(string[dateTimeFinishedIndex] == 'Z') TimeZone.UTC
+                else FixedOffsetTimeZone(UtcOffset.parse(string.substring(dateTimeFinishedIndex, string.length)))
+            )
         }
     }
     val date: LocalDate get() = dateTime.date
@@ -64,13 +56,12 @@ data class OffsetDateTime(val dateTime: LocalDateTime, val offset: UtcOffset) {
     override fun toString(): String = "$dateTime$offset"
     companion object {
         fun parse(string: String): OffsetDateTime {
-            var zoneNameIndex = string.lastIndexOf('[')
-            if(zoneNameIndex == -1) zoneNameIndex = string.length
-            val offsetStartIndex = max(string.lastIndexOf('+', zoneNameIndex), string.lastIndexOf('-', zoneNameIndex))
-            val offset = string.substring(offsetStartIndex, zoneNameIndex)
+            val dateTimeFinishedIndex = string.indexOfAny(charArrayOf('Z', '[', '+', '-'), 19)
             return OffsetDateTime(
-                dateTime = LocalDateTime.parse(string.substring(0, offsetStartIndex)),
-                offset = UtcOffset.parse(offset)
+                LocalDateTime.parse(string.substring(0, dateTimeFinishedIndex)),
+                if(string.contains('[')) TimeZone.of(string.substringAfterLast('[').substringBefore(']')).offsetAt(now())
+                else if(string[dateTimeFinishedIndex] == 'Z') UtcOffset.ZERO
+                else UtcOffset.parse(string.substring(dateTimeFinishedIndex, string.length))
             )
         }
     }
