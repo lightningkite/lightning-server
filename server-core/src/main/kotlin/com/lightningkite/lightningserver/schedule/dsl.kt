@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.schedule
 
 import com.lightningkite.lightningserver.core.LightningServerDsl
-import kotlin.time.Duration
 import kotlinx.datetime.LocalTime
+import kotlin.time.Duration
 
 @LightningServerDsl
 fun schedule(name: String, frequency: Duration, action: suspend () -> Unit): ScheduledTask {

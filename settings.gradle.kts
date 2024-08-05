@@ -1,9 +1,6 @@
 rootProject.name = "lightning-server"
 
 pluginManagement {
-    val kotlinVersion: String by settings
-    val kspVersion: String by settings
-
     repositories {
         mavenLocal()
         google()
@@ -16,8 +13,8 @@ pluginManagement {
     }
 
     plugins {
-        kotlin("plugin.serialization") version kotlinVersion
-        id("com.google.devtools.ksp") version kspVersion
+        kotlin("plugin.serialization") version "2.0.0"
+        id("com.google.devtools.ksp") version "2.0.0-1.0.21"
     }
 
     dependencyResolutionManagement {
