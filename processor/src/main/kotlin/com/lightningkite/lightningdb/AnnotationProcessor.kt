@@ -13,14 +13,20 @@ var khrysalisUsed = false
 class TableGenerator(
     val codeGenerator: CodeGenerator,
     val logger: KSPLogger,
-) : CommonSymbolProcessor(codeGenerator) {
-    override fun process2(resolver: Resolver) {
-        val allDatabaseModels = resolver.getNewFiles()
-            .flatMap { it.declarations }
-            .filterIsInstance<KSClassDeclaration>()
-            .flatMap { sequenceOf(it) + it.declarations.filterIsInstance<KSClassDeclaration>() }
-            .filter { it.annotation("DatabaseModel") != null || it.annotation("GenerateDataClassPaths") != null }
-        val changedDatabaseModels = resolver.getNewFiles()
+) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 0) {
+    override fun interestedIn(resolver: Resolver): Set<KSFile> {
+        return resolver.getAllFiles()
+            .filter {
+                it.declarations
+                    .filterIsInstance<KSClassDeclaration>()
+                    .flatMap { sequenceOf(it) + it.declarations.filterIsInstance<KSClassDeclaration>() }
+                    .any { it.annotation("DatabaseModel") != null || it.annotation("GenerateDataClassPaths") != null }
+            }
+            .toSet()
+    }
+
+    override fun process2(resolver: Resolver, files: Set<KSFile>) {
+        val allDatabaseModels = files
             .flatMap { it.declarations }
             .filterIsInstance<KSClassDeclaration>()
             .flatMap { sequenceOf(it) + it.declarations.filterIsInstance<KSClassDeclaration>() }
@@ -28,7 +34,7 @@ class TableGenerator(
 
         val seen = HashSet<KSClassDeclaration>()
         resolver.getClassDeclarationByName("kotlin.Comparable")?.let { comparable = it }
-        changedDatabaseModels
+        allDatabaseModels
             .map { MongoFields(it) }
             .distinct()
             .forEach {
@@ -40,24 +46,6 @@ class TableGenerator(
                         fileName = it.simpleName + "Fields"
                     ).use { out ->
                         it.write(TabAppendable(out))
-                    }
-                    createNewFile(
-                        dependencies = it.declaration.containingFile?.let { Dependencies(false, it) }
-                            ?: Dependencies.ALL_FILES,
-                        packageName = it.packageName,
-                        fileName = it.simpleName + "Fields",
-                        extensionName = "ts.yaml"
-                    ).use { out ->
-                        it.writeTs(TabAppendable(out))
-                    }
-                    createNewFile(
-                        dependencies = it.declaration.containingFile?.let { Dependencies(false, it) }
-                            ?: Dependencies.ALL_FILES,
-                        packageName = it.packageName,
-                        fileName = it.simpleName + "Fields",
-                        extensionName = "swift.yaml"
-                    ).use { out ->
-                        it.writeSwift(TabAppendable(out))
                     }
                 } catch (e: Exception) {
                     Exception("Failed to generate fields for ${it.declaration.qualifiedName?.asString()}", e).printStackTrace()
