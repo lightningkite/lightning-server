@@ -1,9 +1,7 @@
 package com.lightningkite.lightningserver.auth.oauth
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningserver.auth.AuthOptions
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.RequestAuth
+import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.ModelInfoWithDefault
@@ -37,8 +35,18 @@ class OauthClientEndpoints(
             serializer = Serialization.module.serializer(),
             idSerializer = Serialization.module.serializer()
         ),
-        authOptions = maintainPermissions as AuthOptions<HasId<*>>,
+        authOptions = (maintainPermissions as AuthOptions<HasId<*>>) + noAuth,
         getBaseCollection = { database().collection<OauthClient>() },
+        forUser = {
+            val isRoot = maintainPermissions.accepts(authOrNull)
+            it.withPermissions(ModelPermissions(
+                read = condition(true),
+                readMask = mask {
+                    it.secrets.maskedTo(setOf()).unless(condition(isRoot))
+                },
+                manage = condition(isRoot)
+            ))
+        },
         exampleItem = { OauthClient(_id = "", scopes = setOf(), redirectUris = setOf(), niceName = "") },
         defaultItem = { OauthClient(_id = "", scopes = setOf(), redirectUris = setOf(), niceName = "") }
     )
