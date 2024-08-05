@@ -10,12 +10,12 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 
 
-
 fun terraformAzure(projectName: String = "project", appendable: Appendable) {
     val namePrefix = "${projectName}_\${var.deployment_name}"
     val dependencies = ArrayList<String>()
     val appSettings = ArrayList<String>()
-    appendable.appendLine("""
+    appendable.appendLine(
+        """
         ####
         # General configuration for an Azure functions project
         ####
@@ -122,16 +122,18 @@ fun terraformAzure(projectName: String = "project", appendable: Appendable) {
           ]
         }
 
-    """.trimIndent())
+    """.trimIndent()
+    )
     dependencies.add("azurerm_resource_group.resources")
     dependencies.add("azurerm_storage_account.function_storage")
     dependencies.add("azurerm_application_insights.insights")
     dependencies.add("azurerm_key_vault.vault")
-    for(setting in Settings.requirements) {
-        when(setting.value.serializer) {
+    for (setting in Settings.requirements) {
+        when (setting.value.serializer) {
             serializer<FilesSettings>() -> {
                 dependencies.add("azurerm_storage_account.${setting.key}_account")
-                appendable.appendLine("""
+                appendable.appendLine(
+                    """
                     
                     ####
                     # ${setting.key}: FilesSettings
@@ -169,16 +171,21 @@ fun terraformAzure(projectName: String = "project", appendable: Appendable) {
                         azurerm_storage_account.${setting.key}_account
                       ]
                     }
-                """.trimIndent())
-                appSettings.add("""${setting.key} = {
+                """.trimIndent()
+                )
+                appSettings.add(
+                    """${setting.key} = {
                     storageUrl = azurerm_storage_account.${setting.key}_account.primary_file_endpoint
                     key = "@Microsoft.KeyVault(SecretUri=${'$'}{azurerm_key_vault.vault.vault_uri}secrets/${setting.key}_key)"
                     signedUrlExpirationSeconds = var.${setting.key}_expiry
-                }""".trimIndent())
+                }""".trimIndent()
+                )
             }
+
             serializer<DatabaseSettings>() -> {
                 dependencies.add("azurerm_cosmosdb_account.${setting.key}")
-                appendable.appendLine("""
+                appendable.appendLine(
+                    """
                     
                     ####
                     # ${setting.key}: DatabaseSettings
@@ -227,15 +234,20 @@ fun terraformAzure(projectName: String = "project", appendable: Appendable) {
                         azurerm_cosmosdb_account.${setting.key}
                       ]
                     }
-                """.trimIndent())
-                appSettings.add("""${setting.key} = {
+                """.trimIndent()
+                )
+                appSettings.add(
+                    """${setting.key} = {
                     url = "@Microsoft.KeyVault(SecretUri=${'$'}{azurerm_key_vault.vault.vault_uri}secrets/${setting.key}_key)"
                     databaseName = var.${setting.key}_databaseName
-                }""".trimIndent())
+                }""".trimIndent()
+                )
             }
+
             serializer<CacheSettings>() -> {
                 dependencies.add("azurerm_redis_cache.${setting.key}")
-                appendable.appendLine("""
+                appendable.appendLine(
+                    """
                     
                     ####
                     # ${setting.key}: CacheSettings
@@ -282,15 +294,20 @@ fun terraformAzure(projectName: String = "project", appendable: Appendable) {
                         azurerm_redis_cache.${setting.key}
                       ]
                     }
-                """.trimIndent())
-                appSettings.add("""${setting.key} = {
+                """.trimIndent()
+                )
+                appSettings.add(
+                    """${setting.key} = {
                     url = "redis://"
                     connectionString = "@Microsoft.KeyVault(SecretUri=${'$'}{azurerm_key_vault.vault.vault_uri}secrets/${setting.key}_primaryConnectionString)"
                     databaseNumber = var.${setting.key}_databaseNumber
-                }""".trimIndent())
+                }""".trimIndent()
+                )
             }
+
             serializer<SecretBasis>() -> {
-                appendable.appendLine("""
+                appendable.appendLine(
+                    """
                     
                     ####
                     # ${setting.key}: SecretBasis
@@ -309,22 +326,34 @@ fun terraformAzure(projectName: String = "project", appendable: Appendable) {
                         azurerm_key_vault.vault
                       ]
                     }
-                """.trimIndent())
-                appSettings.add("""${setting.key} = {
+                """.trimIndent()
+                )
+                appSettings.add(
+                    """${setting.key} = {
                     secret = "@Microsoft.KeyVault(SecretUri=${'$'}{azurerm_key_vault.vault.vault_uri}secrets/${setting.key}_key)"
-                }""".trimIndent())
+                }""".trimIndent()
+                )
             }
+
             else -> {
-                appendable.appendLine("""
+                appendable.appendLine(
+                    """
                     
                     ####
                     # ${setting.key}
                     ####
                     
                     variable "${setting.key}" {
-                      default = jsondecode("${setting.value.let { Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.default).replace("\"", "\\\"") }}")
+                      default = jsondecode("${
+                        setting.value.let {
+                            @Suppress("UNCHECKED_CAST")
+                            Serialization.json.encodeToString(it.serializer as KSerializer<Any?>, it.default)
+                                .replace("\"", "\\\"")
+                        }
+                    }")
                     }
-                """.trimIndent())
+                """.trimIndent()
+                )
                 appSettings.add("""${setting.key} = var.${setting.key}""".trimIndent())
             }
 //            serializer<EmailSettings>() -> {}  // Azure has no email service, oddly enough
@@ -333,7 +362,8 @@ fun terraformAzure(projectName: String = "project", appendable: Appendable) {
     }
 
     // Now we create the outputs.
-    appendable.appendLine("""
+    appendable.appendLine(
+        """
                     
         ####
         # Primary function app declaration.
@@ -373,5 +403,6 @@ fun terraformAzure(projectName: String = "project", appendable: Appendable) {
 
           depends_on = [${dependencies.joinToString()}]
         }
-    """.trimIndent())
+    """.trimIndent()
+    )
 }

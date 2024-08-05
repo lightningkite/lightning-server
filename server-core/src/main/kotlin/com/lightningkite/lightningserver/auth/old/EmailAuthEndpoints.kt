@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.lightningkite.lightningserver.auth.old
 
 import com.lightningkite.lightningdb.HasId
@@ -40,7 +42,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
     val pinExpiration: Duration = 15.minutes,
     val pinMaxAttempts: Int = 5,
     private val emailSubject: () -> String = { "${generalSettings().projectName} Log In" },
-    private val template: (suspend (email: String, link: String, pin: String) -> String) = { email, link, pin ->
+    private val template: (suspend (email: String, link: String, pin: String) -> String) = { userEmail, link, pin ->
         HtmlDefaults.baseEmail("""
         <table role="presentation" style="width:100%;border-collapse:collapse;border:0;border-spacing:0;">
             ${
@@ -51,7 +53,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
             } ?: ""
         }
             <tr><td align="center" style="padding:0px;"><h1>Log In to ${generalSettings().projectName}</h1></td></tr>
-            <tr><td align="center" style="padding:0px;"><p>We received a request for a login email for ${email}. To log in, please click the link below or enter the PIN.</p></td></tr>
+            <tr><td align="center" style="padding:0px;"><p>We received a request for a login email for ${userEmail}. To log in, please click the link below or enter the PIN.</p></td></tr>
             <tr><td align="center" style="padding:0px;">
                 <table>
                     <tr><td align="center" style="padding:16px;background-color: ${HtmlDefaults.primaryColor};border-radius: 8px"><a style="color:white;text-decoration: none;font-size: 22px;" href="$link">Click here to login</a></td></tr>
@@ -89,7 +91,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
             ),
         ),
         successCode = HttpStatus.NoContent,
-        implementation = { user: Unit, addressUnsafe: String ->
+        implementation = { _: Unit, addressUnsafe: String ->
             val address = addressUnsafe.lowercase().trim()
             val jwt = base.token(emailAccess.byEmail(address), base.emailExpiration)
             val pin = pin.establish(address)
@@ -111,7 +113,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
         errorCases = listOf(),
         examples = listOf(ApiExample(input = EmailPinLogin("test@test.com", pin.generate()), output = "jwt.jwt.jwt")),
         successCode = HttpStatus.OK,
-        implementation = { anon: Unit, input: EmailPinLogin ->
+        implementation = { _: Unit, input: EmailPinLogin ->
             val email = input.email.lowercase().trim()
             pin.assert(email, input.pin)
             base.token(emailAccess.byEmail(email))
@@ -137,7 +139,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
             val callback = path("oauth/${it.first.pathName}/callback").oauthCallback<UUID>(
                 oauthProviderInfo = it.first,
                 credentials = { credRead(rawCreds) }
-            ) { response, uuid ->
+            ) { response, _ ->
                 val profile = it.first.getProfile(response)
                 val user = emailAccess.asExternal().byExternalService(profile)
                 val token = base.token(user, 1.minutes)
@@ -156,7 +158,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
                         "${it.first.loginUrl}?someparams=x"
                     )
                 ),
-                implementation = { anon: Unit, _: Unit ->
+                implementation = { _: Unit, _: Unit ->
                     callback.loginUrl(uuid())
                 }
             )
@@ -194,7 +196,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
         val email = it.body!!.text().split('&')
             .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             .get("email")!!.lowercase().trim()
-        val basis = try {
+        try {
             loginEmail.implementation(AuthAndPathParts(null, null, arrayOf()), email)
         } catch (e: Exception) {
             e.printStackTrace()

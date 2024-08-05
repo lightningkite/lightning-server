@@ -49,6 +49,7 @@ fun RequestAuth<*>.serializable(expiresAt: Instant) = RequestAuthSerializable(
 )
 
 fun RequestAuthSerializable.real(subjectHandler: Authentication.SubjectHandler<*, *>? = null): RequestAuth<*> {
+    @Suppress("UNCHECKED_CAST")
     val subject = subjectHandler
         ?: Authentication.subjects.values.find { it.name == this.subjectType } as? Authentication.SubjectHandler<HasId<Comparable<Any>>, Comparable<Any>>
         ?: throw TokenException("Auth type ${subjectType} not known.")

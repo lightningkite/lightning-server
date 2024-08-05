@@ -1,12 +1,12 @@
 package com.lightningkite
 
-import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.DoubleArraySerializer
-import kotlinx.serialization.builtins.IntArraySerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.*
 import kotlin.jvm.JvmInline
 import kotlin.math.PI
@@ -78,6 +78,7 @@ object GeoCoordinateGeoJsonSerializer: KSerializer<GeoCoordinate> {
     }
 
 }
+@OptIn(ExperimentalSerializationApi::class)
 object GeoCoordinateArraySerializer: KSerializer<GeoCoordinate> {
     val delegate = DoubleArraySerializer()
 

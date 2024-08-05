@@ -32,7 +32,7 @@ class MetaEndpoints(
 ) : ServerPathGroup(path) {
 
     val root = get.handler {
-        HttpResponse(body = HttpContent.Html {
+        HttpResponse(body = HttpContent.html {
             head { title("${generalSettings().projectName} - Meta Information") }
             body {
                 ul {
@@ -160,15 +160,15 @@ class MetaEndpoints(
         )
     }
     val paths = get("paths").handler {
-        HttpResponse(body = HttpContent.Html {
+        HttpResponse(body = HttpContent.html {
             head { title("${generalSettings().projectName} - Path List") }
             body {
                 ul {
                     for (endpoint in Http.endpoints.keys.sortedBy { it.path.toString() }) {
                         li { a(href = endpoint.path.fullUrl()) { +endpoint.toString() } }
                     }
-                    for (path in WebSockets.handlers.keys) {
-                        li { a(href = wsTester.path.toString() + "?path=${path}") { +"WS $path" } }
+                    for (wsPath in WebSockets.handlers.keys) {
+                        li { a(href = wsTester.path.toString() + "?path=${wsPath}") { +"WS $wsPath" } }
                     }
                     for (schedule in Scheduler.schedules) {
                         li { +"SCHEDULE ${schedule.key}: ${schedule.value.schedule}" }
@@ -269,6 +269,7 @@ class MetaEndpoints(
     )
 }
 
+@Suppress("NOTHING_TO_INLINE")
 inline fun ServerPath.metaEndpoints(
     packageName: String = "com.mypackage"
 ): MetaEndpoints = MetaEndpoints(this, packageName)

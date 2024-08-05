@@ -35,7 +35,7 @@ class PasswordProofEndpoints(
     val database: () -> Database,
     val cache: () -> Cache,
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
-    val evaluatePassword: (String) -> Unit = { it }
+    val evaluatePassword: (String) -> Unit = {  }
 ) : ServerPathGroup(path), Authentication.DirectProofMethod {
     init {
         path.docName = "PasswordProof"
@@ -70,20 +70,22 @@ class PasswordProofEndpoints(
                     serialization = ModelSerializationInfo(PasswordSecret.serializer(it.value.idSerializer as KSerializer<Comparable<Any>>), it.value.idSerializer as KSerializer<Comparable<Any>>),
                     authOptions = Authentication.isAdmin as AuthOptions<HasId<*>>,
                     getBaseCollection = { table(it.value) },
-                    getCollection = { c -> c.withPermissions(ModelPermissions(
-                        create = Condition.Always(),
-                        read = Condition.Always(),
-                        readMask = Mask(
-                            listOf(
-                                Condition.Never<PasswordSecret<Comparable<Any>>>() to Modification.OnField(
-                                    PasswordSecret_hash(it.value.idSerializer as KSerializer<Comparable<Any>>),
-                                    Modification.Assign("")
+                    getCollection = { c ->
+                        c.withPermissions(ModelPermissions(
+                            create = Condition.Always(),
+                            read = Condition.Always(),
+                            readMask = Mask(
+                                listOf(
+                                    Condition.Never<PasswordSecret<Comparable<Any>>>() to Modification.OnField(
+                                        PasswordSecret_hash(it.value.idSerializer as KSerializer<Comparable<Any>>),
+                                        Modification.Assign("")
+                                    )
                                 )
-                            )
-                        ),
-                        update = Condition.Always(),
-                        delete = Condition.Always(),
-                    )) as FieldCollection<PasswordSecret<Comparable<Any>>> },
+                            ),
+                            update = Condition.Always(),
+                            delete = Condition.Always(),
+                        ))
+                    },
                     modelName = "PasswordSecret For ${it.value.name}"
                 ))
             }
@@ -111,11 +113,13 @@ class PasswordProofEndpoints(
         implementation = { value: EstablishPassword ->
             evaluatePassword(value.password)
             if(value.hint?.contains(value.password, true) == true) throw BadRequestException("Hint cannot contain the password itself!")
+            @Suppress("UNCHECKED_CAST")
             val secret = PasswordSecret(
                 _id = auth.rawId as Comparable<Any>,
                 hash = value.password.secureHash(),
                 hint = value.hint,
             )
+            @Suppress("UNCHECKED_CAST")
             table(auth.subject).deleteOneById(auth.rawId as Comparable<Any>)
             table(auth.subject).insertOne(secret)
             Unit
@@ -131,6 +135,7 @@ class PasswordProofEndpoints(
         errorCases = listOf(),
         examples = listOf(),
         implementation = { _: Unit ->
+            @Suppress("UNCHECKED_CAST")
             table(auth.subject).deleteOneById(auth.rawId as Comparable<Any>)
         }
     )
@@ -144,6 +149,7 @@ class PasswordProofEndpoints(
         errorCases = listOf(),
         examples = listOf(),
         implementation = { _: Unit ->
+            @Suppress("UNCHECKED_CAST")
             table(auth.subject).get(auth.rawId as Comparable<Any>)?.let {
                 SecretMetadata(
                     establishedAt = it.establishedAt,
@@ -178,7 +184,6 @@ class PasswordProofEndpoints(
         ),
         successCode = HttpStatus.OK,
         implementation = { input: IdentificationAndPassword ->
-            val postedAt = now()
             val cacheKey = "password-${input.property}-${input.value}"
             val ct = (cache().get<Int>(cacheKey) ?: 0)
             if (ct > 5) throw BadRequestException("Too many attempts; please wait five minutes.")

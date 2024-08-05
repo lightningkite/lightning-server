@@ -79,9 +79,9 @@ class OneTimePasswordProofEndpoints(
         Tasks.onSettingsReady {
             Authentication.subjects.forEach {
                 @Suppress("UNCHECKED_CAST")
-                ModelRestEndpoints<HasId<*>, OtpSecret<Comparable<Any>>, Comparable<Any>>(
+                ModelRestEndpoints(
                     path("secrets/${it.value.name.lowercase()}"),
-                    modelInfo<HasId<*>, OtpSecret<Comparable<Any>>, Comparable<Any>>(
+                    modelInfo(
                         serialization = ModelSerializationInfo(
                             OtpSecret.serializer(it.value.idSerializer as KSerializer<Comparable<Any>>),
                             it.value.idSerializer as KSerializer<Comparable<Any>>
@@ -104,7 +104,7 @@ class OneTimePasswordProofEndpoints(
                                     update = Condition.Always(),
                                     delete = Condition.Always(),
                                 )
-                            ) as FieldCollection<OtpSecret<Comparable<Any>>>
+                            )
                         },
                         modelName = "OtpSecret For ${it.value.name}"
                     )
@@ -125,6 +125,7 @@ class OneTimePasswordProofEndpoints(
         errorCases = listOf(),
         examples = listOf(),
         implementation = { input: EstablishOtp ->
+            @Suppress("UNCHECKED_CAST")
             val secret = OtpSecret(
                 _id = auth.rawId as Comparable<Any>,
                 secret = ByteArray(32).also { SecureRandom.getInstanceStrong().nextBytes(it) },
@@ -147,8 +148,8 @@ class OneTimePasswordProofEndpoints(
         errorCases = listOf(),
         examples = listOf(),
         implementation = { code: String ->
-            val existing = table(auth.subject).get(auth.rawId as Comparable<Any>) ?: throw NotFoundException()
             @Suppress("UNCHECKED_CAST")
+            table(auth.subject).get(auth.rawId as Comparable<Any>) ?: throw NotFoundException()
             prove.implementation(
                 AuthAndPathParts(null, null, arrayOf()),
                 IdentificationAndPassword(
@@ -171,6 +172,7 @@ class OneTimePasswordProofEndpoints(
         errorCases = listOf(),
         examples = listOf(),
         implementation = { _: Unit ->
+            @Suppress("UNCHECKED_CAST")
             table(auth.subject).deleteOneById(auth.rawId as Comparable<Any>)
         }
     )
@@ -184,6 +186,7 @@ class OneTimePasswordProofEndpoints(
         errorCases = listOf(),
         examples = listOf(),
         implementation = { _: Unit ->
+            @Suppress("UNCHECKED_CAST")
             table(auth.subject).get(auth.rawId as Comparable<Any>)?.let {
                 SecretMetadata(
                     establishedAt = it.establishedAt,

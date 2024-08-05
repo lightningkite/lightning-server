@@ -33,7 +33,6 @@ data class MongoFields(
                 }
                 else -> {
                     try {
-                        if(it.shortName.asString() == "SharedCode") return@forEach
                         appendLine(
                             "@file:${it.shortName.asString()}(${
                                 it.arguments.joinToString(", ") {
@@ -50,7 +49,8 @@ data class MongoFields(
                 }
             }
         }
-        appendLine("@file:OptIn(ExperimentalSerializationApi::class, InternalSerializationApi::class)")
+        appendLine("""@file:OptIn(ExperimentalSerializationApi::class, InternalSerializationApi::class)""")
+        appendLine("""@file:Suppress("UNCHECKED_CAST", "UNUSED_PARAMETER", "UnusedImport")""")
         appendLine()
         if(packageName.isNotEmpty()) appendLine("package ${packageName}")
         appendLine()
@@ -72,7 +72,10 @@ data class MongoFields(
         appendLine()
         val contextualTypes = declaration.containingFile?.annotation("UseContextualSerialization", "kotlinx.serialization")?.arguments?.firstOrNull()
             ?.value
-            ?.let { it as? List<KSType> }
+            ?.let {
+                @Suppress("UNCHECKED_CAST")
+                it as? List<KSType>
+            }
             ?.map { it.declaration }
             ?: listOf()
         appendLine("// Contextual types: ${contextualTypes.joinToString { it.qualifiedName?.asString() ?: "-" }}")
@@ -95,7 +98,7 @@ data class MongoFields(
                     appendLine("""override val name: String = "${field.name}"""")
                     appendLine("""override fun get(receiver: $typeReference): ${field.kotlinType.toKotlin()} = receiver.${field.name}""")
                     appendLine("""override fun setCopy(receiver: $typeReference, value: ${field.kotlinType.toKotlin()}) = receiver.copy(${field.name} = value)""")
-                    appendLine("""override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${field.kotlinType.resolve()!!.toKotlinSerializer(contextualTypes)}""")
+                    appendLine("""override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${field.kotlinType.resolve().toKotlinSerializer(contextualTypes)}""")
                     appendLine("""override val annotations: List<Annotation> = $classReference.serializer().tryFindAnnotations("${field.name}")""")
                 }
                 appendLine("}")
@@ -125,7 +128,7 @@ data class MongoFields(
                     appendLine("""override val name: String = "${field.name}"""")
                     appendLine("""override fun get(receiver: $typeReference): ${field.kotlinType.toKotlin()} = receiver.${field.name}""")
                     appendLine("""override fun setCopy(receiver: $typeReference, value: ${field.kotlinType.toKotlin()}) = receiver.copy(${field.name} = value)""")
-                    appendLine("""override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${field.kotlinType.resolve()!!.toKotlinSerializer(contextualTypes)}""")
+                    appendLine("""override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${field.kotlinType.resolve().toKotlinSerializer(contextualTypes)}""")
                     appendLine("""override val annotations: List<Annotation> = $classReference.serializer($nothings).tryFindAnnotations("${field.name}")""")
                     appendLine("""override fun hashCode(): Int = ${field.name.hashCode() * 31 + simpleName.hashCode()}""")
                     appendLine("""override fun equals(other: Any?): Boolean = other is ${simpleName}_${field.name}<${declaration.typeParameters.joinToString(", ") { "* "}}>""")

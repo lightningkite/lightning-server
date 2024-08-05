@@ -2,6 +2,7 @@ package com.lightningkite
 
 import kotlinx.browser.window
 
+@Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
 actual data class UUIDRaw(val string: String): Comparable<UUIDRaw> {
     init {
         if(!uuidRegex.matches(string)) throw IllegalArgumentException("Invalid UUID string: $string")

@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.typed.AuthAccessor
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 
+@Suppress("DEPRECATION")
 @Deprecated("User newer version with auth accessor instead, as it enables more potential optimizations.")
 inline fun <reified USER : HasId<*>, reified T : HasId<ID>, reified ID : Comparable<ID>> ModelInfo(
     noinline getCollection: () -> FieldCollection<T>,

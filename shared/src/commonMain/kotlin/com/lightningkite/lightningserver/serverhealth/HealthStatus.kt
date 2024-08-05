@@ -1,8 +1,8 @@
-@file:SharedCode
+
 @file:UseContextualSerialization(Instant::class)
 package com.lightningkite.lightningserver.serverhealth
 
-import com.lightningkite.khrysalis.SharedCode
+
 import kotlinx.datetime.Clock
 import com.lightningkite.now
 import kotlinx.serialization.Serializable

@@ -13,7 +13,7 @@ suspend fun HttpResponse.extensionForEngineCompression(request: HttpRequest): Ht
             "gzip" -> return copy(headers = HttpHeaders {
                 set(headers)
                 set(HttpHeader.ContentEncoding, "gzip")
-            }, body = body?.bytes()?.gzip()?.let { HttpContent.Binary(it, body!!.type) })
+            }, body = body?.bytes()?.gzip()?.let { HttpContent.Binary(it, body.type) })
         }
     }
     return this

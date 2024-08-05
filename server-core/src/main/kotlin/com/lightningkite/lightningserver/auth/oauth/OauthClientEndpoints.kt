@@ -35,7 +35,7 @@ class OauthClientEndpoints(
             serializer = Serialization.module.serializer(),
             idSerializer = Serialization.module.serializer()
         ),
-        authOptions = (maintainPermissions as AuthOptions<HasId<*>>) + noAuth,
+        authOptions = @Suppress("UNCHECKED_CAST") (maintainPermissions as AuthOptions<HasId<*>>) + noAuth,
         getBaseCollection = { database().collection<OauthClient>() },
         forUser = {
             val isRoot = maintainPermissions.accepts(authOrNull)

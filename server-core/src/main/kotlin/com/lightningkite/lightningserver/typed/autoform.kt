@@ -58,7 +58,7 @@ fun <T> FORM.insideHtmlForm(
     serializer: KSerializer<T>,
     defaultValue: T? = null,
     collapsed: Boolean = false,
-    uploadEarlyEndpoint: UploadEarlyEndpoint? = UploadEarlyEndpoint.default,
+    @Suppress("UNUSED_PARAMETER") uploadEarlyEndpoint: UploadEarlyEndpoint? = UploadEarlyEndpoint.default,
 ): Unit {
     this.encType = FormEncType.multipartFormData
     input(InputType.hidden, name = "__json") {

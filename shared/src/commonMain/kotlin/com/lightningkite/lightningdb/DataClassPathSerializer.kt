@@ -70,6 +70,7 @@ class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializer<DataCla
             current = if(c == null) DataClassPathAccess(DataClassPathSelf<T>(inner), prop as SerializableProperty<T, Any?>)
             else DataClassPathAccess(c as DataClassPath<T, Any?>, prop as SerializableProperty<Any?, Any?>)
             if(part.endsWith('?')) {
+                @Suppress("UNCHECKED_CAST")
                 current = DataClassPathNotNull(current as DataClassPath<T, Any?>)
                 currentSerializer = currentSerializer.nullElement()!!
             }

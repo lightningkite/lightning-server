@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.aws
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import java.util.*
 
 @Serializable
 data class APIGatewayV2HTTPEvent(
@@ -100,7 +101,7 @@ data class APIGatewayV2WebsocketRequest(
 
 private fun JsonElement.jankType(key: String): String = when(this) {
     JsonNull -> "Any?"
-    is JsonObject -> key.capitalize()
+    is JsonObject -> key.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
     is JsonArray -> "List<${this.firstOrNull()?.jankType(key)}>"
     is JsonPrimitive -> when(this.content) {
         "true", "false" -> "Boolean"
@@ -116,7 +117,7 @@ internal fun JsonObject.jankMeADataClass(name: String) {
     }
     println(") {")
     entries.filter { it.value is JsonObject }.forEach {
-        (it.value as JsonObject).jankMeADataClass(it.key.capitalize())
+        (it.value as JsonObject).jankMeADataClass(it.key.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() })
     }
     println("}")
 }

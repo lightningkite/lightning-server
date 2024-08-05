@@ -3,7 +3,6 @@ package com.lightningkite.lightningdb
 import com.github.jershell.kbson.*
 import com.lightningkite.GeoCoordinate
 import com.lightningkite.GeoCoordinateGeoJsonSerializer
-import com.lightningkite.khrysalis.IsCodableAndHashable
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.mongodb.client.model.UpdateOptions
@@ -52,6 +51,7 @@ fun <T> KBson.stringifyAny(serializer: KSerializer<T>, obj: T): BsonValue {
 }
 
 
+@Suppress("UNCHECKED_CAST")
 private fun <T> Condition<T>.dump(serializer: KSerializer<T>, into: Document = Document(), key: String?): Document {
     when (this) {
         is Condition.Always -> {}
@@ -111,6 +111,7 @@ private fun <T> Condition<T>.dump(serializer: KSerializer<T>, into: Document = D
     return into
 }
 
+@Suppress("UNCHECKED_CAST")
 private fun <T> Modification<T>.dump(serializer: KSerializer<T>, update: UpdateWithOptions = UpdateWithOptions(), key: String?): UpdateWithOptions {
     val into = update.document
     when(this) {

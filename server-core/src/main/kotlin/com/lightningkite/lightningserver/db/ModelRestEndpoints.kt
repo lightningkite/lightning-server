@@ -73,10 +73,9 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
     private fun sampleSorts(): List<List<SortPart<T>>> {
         return try {
-            val sample = exampleItem() ?: return emptyList()
+            if (exampleItem() == null) return emptyList()
             info.serialization.serializer.serializableProperties!!
                 .filter { it.serializer.descriptor.kind is PrimitiveKind }
                 .let {
@@ -104,7 +103,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
             description = "Gets a default ${collectionName} that would be useful to start creating a full one to insert.  Primarily used for administrative interfaces.",
             errorCases = listOf(),
             examples = exampleItem()?.let { listOf(ApiExample(Unit, it)) } ?: listOf(),
-            implementation = { input: Unit ->
+            implementation = { _: Unit ->
                 info.defaultItem(authOrNull)
             }
         )
@@ -207,7 +206,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
             )
         ),
         examples = exampleItem()?.let { listOf(ApiExample(Unit, it)) } ?: listOf(),
-        implementation = { input: Unit ->
+        implementation = { _: Unit ->
             info.collection(this)
                 .get(path1)
                 ?: throw NotFoundException()

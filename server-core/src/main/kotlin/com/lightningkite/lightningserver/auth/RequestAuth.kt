@@ -146,6 +146,7 @@ data class RequestAuth<SUBJECT : HasId<*>>(
 
     private suspend fun getRawSubject(): SUBJECT {
         if (now() > rawExpiresAt) {
+            @Suppress("UNCHECKED_CAST")
             rawSubject =
                 (subject as Authentication.SubjectHandler<HasId<Comparable<Any?>>, Comparable<Any?>>).fetch(rawId as Comparable<Any?>) as SUBJECT
             rawExpiresAt = now().plus(subject.subjectCacheExpiration)
@@ -153,7 +154,6 @@ data class RequestAuth<SUBJECT : HasId<*>>(
         return rawSubject
     }
 
-    @Suppress("UNCHECKED_CAST")
     suspend fun get() = getRawSubject()
 
     fun clearCache(): RequestAuth<SUBJECT> {
@@ -209,7 +209,7 @@ suspend inline fun <reified T> Request.user(): T = authAny()?.get() as T
 suspend fun <USER : HasId<*>?> AuthOptions<USER>.accepts(auth: RequestAuth<*>?): Boolean =
     null in this.options || (auth != null && this.options.any { it?.accepts(auth) ?: false })
 
-@Suppress("UNCHECKED_CAST")
+@Suppress("UNCHECKED_CAST", "UNNECESSARY_NOT_NULL_ASSERTION")
 fun <USER : HasId<*>?> RequestAuth.Companion.test(
     item: USER,
     scopes: Set<String> = setOf("*"),

@@ -16,6 +16,7 @@ import kotlin.reflect.KType
 class DynamoDatabase(val dynamo: DynamoDbAsyncClient): Database {
     private val collections = ConcurrentHashMap<Pair<KSerializer<*>, String>, Lazy<DynamoDbCollection<*>>>()
 
+    @Suppress("UNCHECKED_CAST")
     override fun <T : Any> collection(serializer: KSerializer<T>, name: String): DynamoDbCollection<T> =
         (collections.getOrPut(serializer to name) {
             lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
@@ -25,7 +26,6 @@ class DynamoDatabase(val dynamo: DynamoDbAsyncClient): Database {
                     name
                 ).also {
                     runBlocking {
-                        @Suppress("OPT_IN_USAGE")
                         it.prepare()
                     }
                 }

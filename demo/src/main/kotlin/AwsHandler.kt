@@ -16,7 +16,7 @@ class AwsHandler : AwsAdapter() {
             CloudwatchMetrics
             Server
             preventLambdaTimeoutReuse = true
-            loadSettings(AwsHandler::class.java)
+            loadSettings()
         }
     }
 

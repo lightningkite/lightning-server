@@ -42,7 +42,7 @@ open class PinHandler(
 
     fun generate(): String {
         val r = SecureRandom()
-        var pin = ""
+        var pin: String
         do {
             pin = String(CharArray(length) { availableCharacters.get(r.nextInt(availableCharacters.size)) })
         } while (BadWordList.detectParanoid(pin))

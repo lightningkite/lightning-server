@@ -11,7 +11,7 @@ import kotlinx.serialization.modules.SerializersModule
 
 
 @OptIn(InternalSerializationApi::class)
-public class StringDeferringDecoder(
+class StringDeferringDecoder(
     val config: StringDeferringConfig,
     val descriptor: SerialDescriptor,
     val map: Map<String, String>,
@@ -88,17 +88,13 @@ public class StringDeferringDecoder(
         val v = map[tag]
         return (v != config.nullMarker && v?.lowercase() != "false") || map.keys.any { it.startsWith(tag + ".") }
     }
-    fun decodeTaggedNull(tag: String): Nothing? = null
 
-    fun decodeTaggedInline(tag: String, inlineDescriptor: SerialDescriptor): Decoder = this.apply { pushTag(tag) }
-
-    fun <T : Any?> decodeSerializableValue(deserializer: DeserializationStrategy<T>, previousValue: T?): T =
-        decodeSerializableValue(deserializer)
+    fun decodeTaggedInline(tag: String): Decoder = this.apply { pushTag(tag) }
 
     // ---- Implementation of low-level API ----
 
     override fun decodeInline(descriptor: SerialDescriptor): Decoder =
-        decodeTaggedInline(popTag(), descriptor)
+        decodeTaggedInline(popTag())
 
     override fun decodeNotNullMark(): Boolean {
         // String might be null for top-level deserialization
@@ -150,7 +146,7 @@ public class StringDeferringDecoder(
     override fun decodeInlineElement(
         descriptor: SerialDescriptor,
         index: Int
-    ): Decoder = decodeTaggedInline(descriptor.getTag(index), descriptor.getElementDescriptor(index))
+    ): Decoder = decodeTaggedInline(descriptor.getTag(index))
 
     private fun useDefer(
         sub: String,
@@ -176,7 +172,7 @@ public class StringDeferringDecoder(
                 throw SerializationException("${errorContext()}Failed to parse key $sub '$withoutPrefix' as a ${descriptor.getElementDescriptor(index).serialName}: ${e.message}", e)
             }
         } else {
-            return tagBlock(descriptor.getTag(index)) { decodeSerializableValue(deserializer, previousValue) }
+            return tagBlock(descriptor.getTag(index)) { decodeSerializableValue(deserializer) }
         }
     }
 
@@ -198,8 +194,7 @@ public class StringDeferringDecoder(
             return tagBlock(descriptor.getTag(index)) {
                 val isNullabilitySupported = deserializer.descriptor.isNullable
                 if (isNullabilitySupported || decodeNotNullMark()) decodeSerializableValue(
-                    deserializer,
-                    previousValue
+                    deserializer
                 ) else decodeNull()
             }
         }
@@ -216,8 +211,6 @@ public class StringDeferringDecoder(
     }
 
     private val tagStack = arrayListOf<String>()
-    private val currentTag: String
-        get() = tagStack.last()
     private val currentTagOrNull: String?
         get() = tagStack.lastOrNull()
 

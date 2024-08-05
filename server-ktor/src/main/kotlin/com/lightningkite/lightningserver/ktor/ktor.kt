@@ -47,7 +47,6 @@ import kotlin.time.Duration.Companion.hours
 import com.lightningkite.lightningserver.core.ContentType as HttpContentType
 
 fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
-    val logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.ktor.lightningServer")
     val myEngine = LocalEngine(cache)
     engine = myEngine
     try {
@@ -126,7 +125,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                                         queryParameters = call.request.queryParameters.flattenEntries(),
                                         id = id,
                                         headers = call.request.headers.adapt(),
-                                        domain = call.request.origin.host,
+                                        domain = call.request.origin.serverHost,
                                         protocol = call.request.origin.scheme,
                                         sourceIp = call.request.origin.remoteHost,
                                         cache = cache

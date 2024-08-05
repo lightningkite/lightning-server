@@ -33,7 +33,10 @@ inline fun <reified USER : HasId<*>> authRequired(
                 AuthType(type), scopes,
                 maxAge,
                 limitationDescription,
-                { additionalRequirement(it as RequestAuth<USER>) }
+                {
+                    @Suppress("UNCHECKED_CAST")
+                    additionalRequirement(it as RequestAuth<USER>)
+                }
             )
         )
     )
@@ -46,13 +49,17 @@ inline fun <reified USER : HasId<*>> authOptional(
     crossinline additionalRequirement: suspend (RequestAuth<USER>) -> Boolean = { true }
 ): AuthOptions<USER?> {
     val type = typeOf<USER>()
+    @Suppress("UNCHECKED_CAST")
     return AuthOptions<USER?>(
         setOf(
             AuthOption(
                 AuthType(type), scopes,
                 maxAge,
                 limitationDescription,
-                { additionalRequirement(it as RequestAuth<USER>) }
+                {
+                    @Suppress("UNCHECKED_CAST")
+                    additionalRequirement(it as RequestAuth<USER>)
+                }
             ), null
         )
     )

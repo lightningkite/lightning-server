@@ -2,6 +2,7 @@ package com.lightningkite
 
 import platform.Foundation.NSUUID
 
+@Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
 actual class UUIDRaw(val ns: NSUUID): Comparable<UUIDRaw> {
     actual override fun compareTo(other: UUIDRaw): Int = ns.compare(other.ns).toInt()
     override fun hashCode(): Int = ns.hashCode()

@@ -48,7 +48,9 @@ object ZonedDateTimeIso8601Serializer : KSerializer<ZonedDateTime> {
     override fun serialize(encoder: Encoder, value: ZonedDateTime) = encoder.encodeString(value.toString())
 }
 
+@Suppress("NOTHING_TO_INLINE")
 inline fun LocalDateTime.atZone(zone: TimeZone) = ZonedDateTime(this, zone)
+@Suppress("NOTHING_TO_INLINE")
 inline fun Instant.atZone(zone: TimeZone) = ZonedDateTime(this.toLocalDateTime(zone), zone)
 
 fun nowLocal() = ZonedDateTime(now().toLocalDateTime(TimeZone.currentSystemDefault()), TimeZone.currentSystemDefault())
@@ -87,5 +89,7 @@ object OffsetDateTimeIso8601Serializer : KSerializer<OffsetDateTime> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.OffsetDateTime", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: OffsetDateTime) = encoder.encodeString(value.toString())
 }
+@Suppress("NOTHING_TO_INLINE")
 inline fun LocalDateTime.atOffset(offset: UtcOffset) = OffsetDateTime(this, offset)
+@Suppress("NOTHING_TO_INLINE")
 inline fun Instant.atOffset(offset: UtcOffset) = OffsetDateTime(this.toLocalDateTime(FixedOffsetTimeZone(offset)), offset)

@@ -160,7 +160,6 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                         } catch(e: Exception) {
                             throw e
                         }
-                        throw Exception()
                     }
                 })
             }

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.lightningkite.lightningserver.typed
 
 import kotlin.time.Duration
@@ -28,7 +30,7 @@ inline fun <reified USER, reified INPUT : Any, reified OUTPUT> HttpEndpoint.type
     successCode: HttpStatus = HttpStatus.OK,
     crossinline implementation: suspend (user: USER, input: INPUT) -> OUTPUT
 ) = typed(
-    authOptions = if (USER::class == kotlin.Unit::class) com.lightningkite.lightningserver.auth.noAuth else AuthOptions<HasId<*>?>(
+    authOptions = if (USER::class == Unit::class) noAuth else AuthOptions<HasId<*>?>(
         buildSet {
             val type = typeOf<USER>()
             if (type.isMarkedNullable) add(null)
@@ -82,6 +84,7 @@ fun <USER, INPUT : Any, OUTPUT> HttpEndpoint.typed(
         examples = examples,
         successCode = successCode,
         implementation = { input: INPUT ->
+            @Suppress("UNCHECKED_CAST")
             implementation(if(authOptions == noAuth) Unit as USER else this.user() as USER, input)
         }
     )
@@ -102,7 +105,7 @@ inline fun <reified USER, reified PATH, reified INPUT : Any, reified OUTPUT> Htt
     successCode: HttpStatus = HttpStatus.OK,
     crossinline implementation: suspend (user: USER, route: PATH, input: INPUT) -> OUTPUT
 ) = typed(
-    authOptions = if (USER::class == kotlin.Unit::class) com.lightningkite.lightningserver.auth.noAuth else AuthOptions<HasId<*>?>(
+    authOptions = if (USER::class == Unit::class) noAuth else AuthOptions(
         buildSet {
             val type = typeOf<USER>()
             if (type.isMarkedNullable) add(null)
@@ -157,6 +160,7 @@ fun <USER, PATH, INPUT : Any, OUTPUT> HttpEndpoint.typed(
     examples = examples,
     successCode = successCode,
     implementation = { input: INPUT ->
+        @Suppress("UNCHECKED_CAST")
         implementation(this.user() as USER, this.path1, input)
     }
 )
@@ -177,7 +181,7 @@ inline fun <reified USER, reified PATH, reified PATH2, reified INPUT : Any, reif
     successCode: HttpStatus = HttpStatus.OK,
     crossinline implementation: suspend (user: USER, path: PATH, path2: PATH2, input: INPUT) -> OUTPUT
 ) = typed(
-    authOptions = if (USER::class == kotlin.Unit::class) com.lightningkite.lightningserver.auth.noAuth else AuthOptions<HasId<*>?>(
+    authOptions = if (USER::class == Unit::class) noAuth else AuthOptions<HasId<*>?>(
         buildSet {
             val type = typeOf<USER>()
             if (type.isMarkedNullable) add(null)
@@ -243,6 +247,7 @@ fun <USERNN : HasId<*>, USER : USERNN?, PATH, PATH2, INPUT : Any, OUTPUT> HttpEn
     examples = examples,
     successCode = successCode,
     implementation = { input ->
+        @Suppress("UNCHECKED_CAST")
         implementation(this.user() as USER, this.path1, path2, input)
     }
 )

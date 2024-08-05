@@ -68,7 +68,7 @@ interface SecureHasher {
         )
         val public = run {
             val s = (pk as BCECPrivateKey).parameters
-            val q = s.g.multiply((pk as BCECPrivateKey).d)
+            val q = s.g.multiply(pk.d)
             factory.generatePublic(org.bouncycastle.jce.spec.ECPublicKeySpec(q, s))
         }
 
@@ -122,7 +122,6 @@ fun SecureHasher.signJwt(claims: JwtClaims): String = buildString {
         })).toByteArray())
     )
     append('.')
-    @Suppress("UNCHECKED_CAST")
     append(
         Base64.getUrlEncoder().withoutPadding().encodeToString(
             withDefaults.encodeToString(claims).toByteArray()
@@ -137,7 +136,7 @@ fun SecureHasher.verifyJwt(token: String, requiredAudience: String? = null): Jwt
     val parts = token.split('.')
     if (parts.size != 3) return null  // It's not a JWT, so we'll ignore it.
     val signature = Base64.getUrlDecoder().decode(parts[2])
-    val header: JwtHeader = Serialization.json.decodeFromString(Base64.getUrlDecoder().decode(parts[0]).toString(Charsets.UTF_8))
+    @Suppress("UNUSED_VARIABLE") val header: JwtHeader = Serialization.json.decodeFromString(Base64.getUrlDecoder().decode(parts[0]).toString(Charsets.UTF_8))
     val claims: JwtClaims = Serialization.json.decodeFromString(Base64.getUrlDecoder().decode(parts[1]).toString(Charsets.UTF_8))
     requiredAudience?.let { if (claims.aud != it) return null }  // It's for someone else.  Ignore it.
     if (System.currentTimeMillis() / 1000L > claims.exp) throw JwtExpiredException("JWT has expired.")

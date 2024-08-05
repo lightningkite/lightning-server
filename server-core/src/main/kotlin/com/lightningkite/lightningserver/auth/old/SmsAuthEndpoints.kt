@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.lightningkite.lightningserver.auth.old
 
 import com.lightningkite.lightningdb.HasId
@@ -55,7 +57,7 @@ open class SmsAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
             ),
         ),
         successCode = HttpStatus.NoContent,
-        implementation = { user: Unit, phoneUnsafe: String ->
+        implementation = { _: Unit, phoneUnsafe: String ->
             val phone = phoneUnsafe.filter { it.isDigit() }
             if(phone.isEmpty()) throw BadRequestException("Blank phone number given.")
             if(phone.isEmpty()) throw BadRequestException("Invalid phone number.")
@@ -73,7 +75,7 @@ open class SmsAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
         errorCases = listOf(),
         examples = listOf(ApiExample(PhonePinLogin("801-369-3729", pin.generate()), "jwt.jwt.jwt")),
         successCode = HttpStatus.OK,
-        implementation = { anon: Unit, input: PhonePinLogin ->
+        implementation = { _: Unit, input: PhonePinLogin ->
             val phone = input.phone.filter { it.isDigit() }
             pin.assert(phone, input.pin)
             base.token(phoneAccess.byPhone(input.phone))
@@ -100,7 +102,7 @@ open class SmsAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
         val phone = it.body!!.text().split('&')
             .associate { it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), Charsets.UTF_8) }
             .get("phone")!!.filter { it.isDigit() }
-        val basis = try {
+        try {
             loginSms.implementation(AuthAndPathParts(null, null, arrayOf()), phone)
         } catch (e: Exception) {
             e.printStackTrace()

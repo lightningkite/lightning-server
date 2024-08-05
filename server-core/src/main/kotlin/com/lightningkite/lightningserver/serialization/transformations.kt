@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.serialization
 
-import com.lightningkite.khrysalis.fatalError
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpContent

@@ -1,6 +1,5 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.khrysalis.IsCodableAndHashable
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory

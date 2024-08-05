@@ -1,6 +1,7 @@
 package com.lightningkite
 
 import com.lightningkite.lightningdb.*
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationStrategy
@@ -49,6 +50,7 @@ object Validators {
     inline fun <reified T : Annotation, V : Any> processor(crossinline action: (T, V) -> ValidationIssuePart?) {
         directProcessor(T::class) { a, b ->
             if (a is T) {
+                @Suppress("UNCHECKED_CAST")
                 if(b is Collection<*>)
                     b.asSequence().mapNotNull { action(a, it as V) }.firstOrNull()
                 else if(b is Map<*, *>)
@@ -60,10 +62,13 @@ object Validators {
     }
 
     inline fun <reified T : Annotation, V : Any> directProcessor(crossinline action: (T, V) -> ValidationIssuePart?) {
-        directProcessor(T::class) { a, b -> if (a is T) action(a, b as V) else null }
+        directProcessor(T::class) { a, b ->
+            @Suppress("UNCHECKED_CAST")
+            if (a is T) action(a, b as V) else null
+        }
     }
 
-    fun directProcessor(type: KClass<out Annotation>, action: (Annotation, Any?) -> ValidationIssuePart?) {
+    fun directProcessor(@Suppress("UNUSED_PARAMETER") type: KClass<out Annotation>, action: (Annotation, Any?) -> ValidationIssuePart?) {
         processors.add(action)
     }
 
@@ -71,6 +76,7 @@ object Validators {
     inline fun <reified T : Annotation, V : Any> suspendProcessor(crossinline action: suspend (T, V) -> ValidationIssuePart?) {
         directSuspendProcessor(T::class) { a, b ->
             if (a is T) {
+                @Suppress("UNCHECKED_CAST")
                 if(b is Collection<*>)
                     b.mapNotNull { action(a, it as V) }.firstOrNull()
                 else if(b is Map<*, *>)
@@ -81,9 +87,12 @@ object Validators {
         }
     }
     inline fun <reified T : Annotation, V : Any> directSuspendProcessor(crossinline action: suspend (T, V) -> ValidationIssuePart?) {
-        directSuspendProcessor(T::class) { a, b -> if (a is T) action(a, b as V) else null }
+        directSuspendProcessor(T::class) { a, b ->
+            @Suppress("UNCHECKED_CAST")
+            if (a is T) action(a, b as V) else null
+        }
     }
-    fun directSuspendProcessor(type: KClass<out Annotation>, action: suspend (Annotation, Any?) -> ValidationIssuePart?) {
+    fun directSuspendProcessor(@Suppress("UNUSED_PARAMETER") type: KClass<out Annotation>, action: suspend (Annotation, Any?) -> ValidationIssuePart?) {
         suspendProcessors.add(action)
     }
 
@@ -196,6 +205,7 @@ object Validators {
     }
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 private class ValidationEncoder(override val serializersModule: SerializersModule, val out: ValidationOut) :
     AbstractEncoder() {
 

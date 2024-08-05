@@ -79,7 +79,7 @@ interface Metrics: HealthCheckable {
         }
 
         suspend fun addToSumPerHandler(type: MetricType, value: Double) {
-            coroutineContext[ServerEntryPointElement.Key]?.metricSums?.compute(type) { key, it -> (it ?: 0.0) + value }
+            coroutineContext[ServerEntryPointElement.Key]?.metricSums?.compute(type) { _, it -> (it ?: 0.0) + value }
         }
 
         suspend fun <T> addPerformanceToSumPerHandler(type: MetricType, countType: MetricType? = null, action: suspend () -> T): T {

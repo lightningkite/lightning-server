@@ -1,19 +1,12 @@
-@file:SharedCode
 package com.lightningkite.lightningdb
 
-import com.lightningkite.khrysalis.Equatable
-import com.lightningkite.khrysalis.IsCodableAndHashable
-import com.lightningkite.khrysalis.JsName
-import com.lightningkite.khrysalis.SharedCode
 import kotlinx.serialization.Serializable
 
 
-// TODO: Deprecate
 @Serializable
-data class CollectionChanges<T: IsCodableAndHashable>(
+data class CollectionChanges<T>(
     val changes: List<EntryChange<T>> = listOf()
 ) {
-    @JsName("pair")
     constructor(old: T? = null, new: T? = null):this(changes = if(old != null || new != null) listOf(EntryChange(old, new)) else listOf())
 }
 
@@ -27,6 +20,6 @@ fun <T: HasId<ID>, ID: Comparable<ID>> List<T>.apply(changes: CollectionChanges<
 }
 
 // This will not convert well. Manually add the type argument to the return EntryChange on the swift side. "EntryChange<B>"
-inline fun <T: IsCodableAndHashable, B: IsCodableAndHashable> CollectionChanges<T>.map(mapper: (T)->B): CollectionChanges<B> {
+inline fun <T, B> CollectionChanges<T>.map(mapper: (T)->B): CollectionChanges<B> {
     return CollectionChanges<B>(changes = changes.map { it.map(mapper) })
 }

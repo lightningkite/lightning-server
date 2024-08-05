@@ -126,7 +126,7 @@ class CsvFormat(val stringDeferringConfig: StringDeferringConfig, val csvConfig:
                 )
             )
 
-            else -> decodeSequence(deserializer, string.iterator()).single()
+            else -> decodeToSequence(string.iterator(), deserializer).single()
         }
     }
 
@@ -138,7 +138,7 @@ class CsvFormat(val stringDeferringConfig: StringDeferringConfig, val csvConfig:
                 )
             )
 
-            else -> decodeSequence(deserializer, reader.iterator()).single()
+            else -> decodeToSequence(reader.iterator(), deserializer).single()
         }
     }
 

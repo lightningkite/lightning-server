@@ -3,8 +3,6 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.GeoCoordinate
-import com.lightningkite.khrysalis.IsEquatable
-import com.lightningkite.khrysalis.fatalError
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
 import kotlin.reflect.KClass
@@ -64,11 +62,12 @@ private val stringOptions: List<MySealedClassSerializer.Option<Condition<String>
 private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> =
     (commonOptions(inner) + inner.serializableProperties!!.let {
         it.mapIndexed { index, ser ->
+            @Suppress("UNCHECKED_CAST")
             MySealedClassSerializer.Option<Condition<T>, Condition.OnField<T, Any?>>(ConditionOnFieldSerializer(
                 ser as SerializableProperty<T, Any?>
             )) { it is Condition.OnField<*, *> && it.key.name == inner.descriptor.getElementName(index) }
         }
-    } + MySealedClassSerializer.Option<Condition<T>, Condition.FullTextSearch<T>>(Condition.FullTextSearch.serializer(inner)) { it is Condition.FullTextSearch<*> }) as List<MySealedClassSerializer.Option<Condition<T>, *>>
+    } + MySealedClassSerializer.Option(Condition.FullTextSearch.serializer(inner)) { it is Condition.FullTextSearch<*> })
 
 private val cache = HashMap<KSerializerKey, MySealedClassSerializerInterface<*>>()
 @Suppress("UNCHECKED_CAST")
@@ -99,6 +98,7 @@ class ConditionOnFieldSerializer<K : Any, V>(
     override fun outer(it: Condition<V>): Condition.OnField<K, V> = Condition.OnField(field, it)
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 class LazyRenamedSerialDescriptor(override val serialName: String, val getter: () -> SerialDescriptor) :
     SerialDescriptor {
     override val elementsCount: Int get() = getter().elementsCount
@@ -145,28 +145,28 @@ class ConditionNotSerializer<T>(val inner: KSerializer<T>) : WrappingSerializer<
     override fun outer(it: Condition<T>): Condition.Not<T> = Condition.Not(it)
 }
 
-class ConditionEqualSerializer<T : IsEquatable>(val inner: KSerializer<T>) :
+class ConditionEqualSerializer<T>(val inner: KSerializer<T>) :
     WrappingSerializer<Condition.Equal<T>, T>("Equal") {
     override fun getDeferred(): KSerializer<T> = inner
     override fun inner(it: Condition.Equal<T>): T = it.value
     override fun outer(it: T): Condition.Equal<T> = Condition.Equal(it)
 }
 
-class ConditionNotEqualSerializer<T : IsEquatable>(val inner: KSerializer<T>) :
+class ConditionNotEqualSerializer<T>(val inner: KSerializer<T>) :
     WrappingSerializer<Condition.NotEqual<T>, T>("NotEqual") {
     override fun getDeferred(): KSerializer<T> = inner
     override fun inner(it: Condition.NotEqual<T>): T = it.value
     override fun outer(it: T): Condition.NotEqual<T> = Condition.NotEqual(it)
 }
 
-class ConditionInsideSerializer<T : IsEquatable>(val inner: KSerializer<T>) :
+class ConditionInsideSerializer<T>(val inner: KSerializer<T>) :
     WrappingSerializer<Condition.Inside<T>, List<T>>("Inside") {
     override fun getDeferred() = ListSerializer(inner)
     override fun inner(it: Condition.Inside<T>): List<T> = it.values
     override fun outer(it: List<T>) = Condition.Inside(it)
 }
 
-class ConditionNotInsideSerializer<T : IsEquatable>(val inner: KSerializer<T>) :
+class ConditionNotInsideSerializer<T>(val inner: KSerializer<T>) :
     WrappingSerializer<Condition.NotInside<T>, List<T>>("NotInside") {
     override fun getDeferred() = ListSerializer(inner)
     override fun inner(it: Condition.NotInside<T>): List<T> = it.values

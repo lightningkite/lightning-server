@@ -270,7 +270,7 @@ private val Documentable.Companion.safeDocumentables
         .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }
 
 private class CodeEmitter(val packageName: String, val body: StringBuilder = StringBuilder()) : Appendable by body {
-    val imports = mutableSetOf<String>("com.lightningkite.khrysalis.SharedCode")
+    val imports = mutableSetOf<String>()
     fun append(type: KType) {
         imports.add(type.toString().substringBefore('<').removeSuffix("?"))
         body.append((type.classifier as? KClass<*>)?.simpleName)
@@ -287,7 +287,7 @@ private class CodeEmitter(val packageName: String, val body: StringBuilder = Str
     }
 
     fun dump(to: Appendable) = with(to) {
-        appendLine("@file:SharedCode")
+        appendLine("")
         appendLine("package $packageName")
         appendLine()
         imports

@@ -11,6 +11,7 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
 
 fun <T> Json.encodeUnwrappingString(serializer: KSerializer<T>, value: T): String {
+    @Suppress("UNCHECKED_CAST")
     val fullSerializer = if(serializer is ContextualSerializer<*>) serializersModule.getContextual(serializer.descriptor.capturedKClass!!) as KSerializer<T> else serializer
     return when {
         fullSerializer.descriptor.kind == PrimitiveKind.STRING && !fullSerializer.descriptor.isNullable -> encodeToJsonElement(
@@ -24,6 +25,7 @@ fun <T> Json.encodeUnwrappingString(serializer: KSerializer<T>, value: T): Strin
 
 @Suppress("UNCHECKED_CAST")
 fun <T> Json.decodeUnwrappingString(serializer: KSerializer<T>, value: String): T {
+    @Suppress("UNCHECKED_CAST")
     val fullSerializer = if(serializer is ContextualSerializer<*>) serializersModule.getContextual(serializer.descriptor.capturedKClass!!) as KSerializer<T> else serializer
     return when {
         fullSerializer.descriptor.kind == PrimitiveKind.STRING && !fullSerializer.descriptor.isNullable -> decodeFromJsonElement(

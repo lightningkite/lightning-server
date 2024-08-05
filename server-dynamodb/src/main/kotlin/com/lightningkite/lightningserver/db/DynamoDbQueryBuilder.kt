@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.khrysalis.IsCodableAndHashable
 import com.lightningkite.lightningdb.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
@@ -263,7 +262,7 @@ fun <T> Condition<T>.dynamo(serializer: KSerializer<T>, sortKey: String): Dynamo
         is Condition.OnField<*, *> -> {
             @Suppress("UNCHECKED_CAST")
             val inner =
-                (condition as Condition<IsCodableAndHashable>).dynamo(key.serializer as KSerializer<IsCodableAndHashable>, sortKey)
+                (condition as Condition<Any?>).dynamo(key.serializer as KSerializer<Any?>, sortKey)
             val indexed = key.name == sortKey
             if (indexed) {
                 DynamoCondition(
@@ -370,7 +369,7 @@ fun <T> Modification<T>.dynamo(serializer: KSerializer<T>): DynamoModification<T
         is Modification.OnField<*, *> -> {
             @Suppress("UNCHECKED_CAST")
             val inner =
-                (modification as Modification<IsCodableAndHashable>).dynamo(key.serializer as KSerializer<IsCodableAndHashable>)
+                (modification as Modification<Any?>).dynamo(key.serializer as KSerializer<Any?>)
             DynamoModification(
                 local = (this as Modification<T>).takeIf { inner.local != null },
                 set = inner.set.map {
@@ -417,6 +416,7 @@ fun <T> Modification<T>.dynamo(serializer: KSerializer<T>): DynamoModification<T
             filter.append(" = list_append(")
             key(field)
             filter.append(", ")
+            @Suppress("UNCHECKED_CAST")
             value(this@dynamo.items, serializer as KSerializer<List<Any?>>)
             filter.append(")")
         })
@@ -428,11 +428,13 @@ fun <T> Modification<T>.dynamo(serializer: KSerializer<T>): DynamoModification<T
 
         is Modification.SetAppend<*> -> DynamoModification<T>(add = listOf {
             key(field)
+            @Suppress("UNCHECKED_CAST")
             value(this@dynamo.items, serializer as KSerializer<Set<Any?>>)
         })
 
         is Modification.SetRemoveInstances<*> -> DynamoModification<T>(delete = listOf {
             key(field)
+            @Suppress("UNCHECKED_CAST")
             value(this@dynamo.items, serializer as KSerializer<Set<Any?>>)
         })
 

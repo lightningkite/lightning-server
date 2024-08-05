@@ -8,12 +8,11 @@ import java.io.File
 import java.util.UUID
 
 lateinit var comparable: KSClassDeclaration
-var khrysalisUsed = false
 
 class TableGenerator(
     val codeGenerator: CodeGenerator,
     val logger: KSPLogger,
-) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 1) {
+) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 2) {
     override fun interestedIn(resolver: Resolver): Set<KSFile> {
         return resolver.getAllFiles()
             .filter {
@@ -66,14 +65,7 @@ class TableGenerator(
                     fileName = "init"
                 ).use { out ->
                     with(TabAppendable(out)) {
-
-                        if(khrysalisUsed) {
-                            appendLine("@file:SharedCode")
-                        }
                         if(ksName.isNotEmpty()) appendLine("package ${ksName}")
-                        if(khrysalisUsed) {
-                            appendLine("import com.lightningkite.khrysalis.*")
-                        }
                         appendLine("fun prepareModels() {")
                         tab {
                             ksClassDeclarations

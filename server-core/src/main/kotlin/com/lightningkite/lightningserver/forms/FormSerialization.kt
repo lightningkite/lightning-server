@@ -13,7 +13,7 @@ import kotlinx.serialization.serializer
 
 typealias HtmlRenderer<T> = FlowContent.(inputKey: String, value: T) -> Unit
 
-class HtmlSerializer(val serializersModule: SerializersModule = EmptySerializersModule, val module: Module) {
+class HtmlSerializer(val serializersModule: SerializersModule = EmptySerializersModule(), val module: Module) {
     inline fun <reified T> render(value: T, into: FlowContent) = render(Serialization.module.serializer(), value, into)
     fun <T> render(serializer: SerializationStrategy<T>, value: T, into: FlowContent) {
         HtmlEncoder(into).encodeSerializableValue(serializer, value)

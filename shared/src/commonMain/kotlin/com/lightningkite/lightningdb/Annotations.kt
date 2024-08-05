@@ -8,7 +8,7 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlin.reflect.KClass
 import kotlin.time.ExperimentalTime
 
-@Retention(AnnotationRetention.RUNTIME)
+@Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.FUNCTION)
 annotation class CheckReturnValue
 
@@ -104,7 +104,7 @@ annotation class ExpectedPattern(val pattern: String)
  * A display name of the item in question.
  */
 @SerialInfo
-@Retention(AnnotationRetention.RUNTIME)
+@Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 annotation class DisplayName(val text: String)
 
@@ -112,17 +112,17 @@ annotation class DisplayName(val text: String)
  * Which mime types are valid
  */
 @SerialInfo
-@Retention(AnnotationRetention.RUNTIME)
+@Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 annotation class MimeType(vararg val types: String, val maxSize: Long = Long.MAX_VALUE)
 
 @SerialInfo
-@Retention(AnnotationRetention.RUNTIME)
+@Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 annotation class MaxLength(val size: Int)
 
 @SerialInfo
-@Retention(AnnotationRetention.RUNTIME)
+@Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 annotation class MaxSize(val size: Int)
 
@@ -130,7 +130,7 @@ annotation class MaxSize(val size: Int)
  * A description of the item in question.
  */
 @SerialInfo
-@Retention(AnnotationRetention.RUNTIME)
+@Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 annotation class Description(val text: String)
 

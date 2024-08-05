@@ -3,16 +3,14 @@ package com.lightningkite.lightningserver.exceptions
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.RequestAuth
-import com.lightningkite.lightningserver.auth.oauth.OauthClient
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.db.ModelInfoWithDefault
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.modelInfoWithDefault
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.typed.AuthAccessor
 import com.lightningkite.now
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.serializer
 import java.net.NetworkInterface
 
@@ -31,7 +29,9 @@ class GroupedDatabaseExceptionReporter(val packageName: String, val database: Da
                 }
             val contextString = context.toString()
             val server = System.getenv("AWS_LAMBDA_LOG_STREAM_NAME")?.takeUnless { it.isEmpty() }
-                ?: NetworkInterface.getNetworkInterfaces().toList().sortedBy { it.name }
+                ?: withContext(Dispatchers.IO) {
+                    NetworkInterface.getNetworkInterfaces()
+                }.toList().sortedBy { it.name }
                     .firstOrNull()?.hardwareAddress?.sumOf { it.hashCode() }?.toString(16) ?: "?"
             val message = t.message ?: "No message"
             val trace = t.stackTraceToString()
@@ -62,6 +62,7 @@ class GroupedDatabaseExceptionReporter(val packageName: String, val database: Da
     }
 
 
+    @Suppress("UNCHECKED_CAST")
     val modelInfo = modelInfoWithDefault(
         serialization = ModelSerializationInfo<ReportedExceptionGroup, Int>(
             serializer = Serialization.module.serializer(),

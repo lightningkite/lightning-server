@@ -56,9 +56,8 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
             )
         )
     }
-    return this.copy(after = ServerPath.Afterwards.TrailingSlash).get.handler { request ->
-        val rootRoute = this
-        HttpResponse(body = HttpContent.Html {
+    return this.copy(after = ServerPath.Afterwards.TrailingSlash).get.handler { _ ->
+        HttpResponse(body = HttpContent.html {
             head { title("${generalSettings().projectName} - Generated Documentation") }
             body {
                 h1 { +"API Docs" }
@@ -293,5 +292,3 @@ private fun FlowContent.type(type: KSerializer<*>) {
         }
     }
 }
-
-private fun FlowContent.type(type: KType) = type(Serialization.json.serializersModule.serializer(type))

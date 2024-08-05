@@ -42,7 +42,6 @@ data class MongoFields(
                 }
                 else -> {
                     try {
-                        if(it.shortName.asString() == "SharedCode") khrysalisUsed = true
                         appendLine(
                             "@file:${it.shortName.asString()}(${
                                 it.arguments.joinToString(", ") {
