@@ -13,7 +13,7 @@ var khrysalisUsed = false
 class TableGenerator(
     val codeGenerator: CodeGenerator,
     val logger: KSPLogger,
-) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 0) {
+) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 1) {
     override fun interestedIn(resolver: Resolver): Set<KSFile> {
         return resolver.getAllFiles()
             .filter {

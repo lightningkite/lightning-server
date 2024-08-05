@@ -34,11 +34,15 @@ abstract class CommonSymbolProcessor2(
             fileName = "$myId",
             extensionName = "txt",
             packageName = "com.lightningkite.lightningserver"
-        ).writer().use { it.appendLine("Will generate in common folder") }
+        ).writer().use {
+            it.appendLine("Will generate in common folder; analyzed files below")
+            interestedIn.forEach { f -> it.appendLine(f.filePath) }
+        }
         val outSample = myCodeGenerator.generatedFile.first().absoluteFile
         val projectFolder = generateSequence(outSample) { it.parentFile!! }
             .first { it.name == "build" }
             .parentFile!!
+        val common = interestedIn.any { it.filePath?.contains("/src/common", true) == true }
         val flavor = outSample.path.split(File.separatorChar)
             .dropWhile { it != "ksp" }
             .drop(2)
@@ -50,19 +54,31 @@ abstract class CommonSymbolProcessor2(
         val outFolder = projectFolder.resolve("build/generated/ksp/common/common$flavor/kotlin")
         outFolder.mkdirs()
 
-        processFiles(
-            version = version,
-            dependencies = interestedIn.asSequence().map { it.filePath.let(::File) },
-            lockFile = outFolder.resolve("$myId.lock"),
-            destinationFolder = outFolder.resolve(myId).also { it.mkdirs() },
-            action = {
-                fileCreator = label@{ dependencies, packageName, fileName, extensionName ->
-                    val packagePath = packageName.split('.').filter { it.isNotBlank() }.joinToString("") { "$it/" }
-                    this.file("${packagePath}$fileName.$extensionName")
+        if(common) {
+            processFiles(
+                version = version,
+                dependencies = interestedIn.asSequence().map { it.filePath.let(::File) },
+                lockFile = outFolder.resolve("$myId.lock"),
+                destinationFolder = outFolder.resolve(myId).also { it.mkdirs() },
+                action = {
+                    fileCreator = label@{ dependencies, packageName, fileName, extensionName ->
+                        val packagePath = packageName.split('.').filter { it.isNotBlank() }.joinToString("") { "$it/" }
+                        this.file("${packagePath}$fileName.$extensionName")
+                    }
+                    process2(resolver, interestedIn)
                 }
-                process2(resolver, interestedIn)
+            )
+        } else {
+            fileCreator = label@{ dependencies, packageName, fileName, extensionName ->
+                myCodeGenerator.createNewFile(
+                    dependencies,
+                    packageName,
+                    fileName,
+                    extensionName
+                ).bufferedWriter()
             }
-        )
+            process2(resolver, interestedIn)
+        }
 
         return listOf()
     }

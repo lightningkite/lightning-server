@@ -56,6 +56,8 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
 
     init {
         Authentication.isDeveloper = authRequired<TestUser> { it.get().isSuperAdmin }
+        Authentication.isAdmin = authRequired<TestUser> { it.get().isSuperAdmin }
+        Authentication.isSuperUser = authRequired<TestUser> { it.get().isSuperAdmin }
     }
 
     val earlyUpload = UploadEarlyEndpoint(path("upload"), files, database)
