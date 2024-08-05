@@ -17,10 +17,12 @@ data class ZonedDateTime(val dateTime: LocalDateTime, val zone: TimeZone) {
     override fun toString(): String = "$dateTime${zone.offsetAt(dateTime.toInstant(zone))}[${zone.id}]"
     companion object {
         fun parse(string: String): ZonedDateTime {
-            val dateTimeFinishedIndex = string.indexOfAny(charArrayOf('Z', '[', '+', '-'), 19)
+            var dateTimeFinishedIndex = string.indexOfAny(charArrayOf('Z', '[', '+', '-'), 17)
+            if(dateTimeFinishedIndex == -1) dateTimeFinishedIndex = string.length
             return ZonedDateTime(
                 LocalDateTime.parse(string.substring(0, dateTimeFinishedIndex)),
-                if(string.contains('[')) TimeZone.of(string.substringAfterLast('[').substringBefore(']'))
+                if(dateTimeFinishedIndex == string.length) TimeZone.UTC
+                else if(string.contains('[')) TimeZone.of(string.substringAfterLast('[').substringBefore(']'))
                 else if(string[dateTimeFinishedIndex] == 'Z') TimeZone.UTC
                 else FixedOffsetTimeZone(UtcOffset.parse(string.substring(dateTimeFinishedIndex, string.length)))
             )
@@ -56,10 +58,12 @@ data class OffsetDateTime(val dateTime: LocalDateTime, val offset: UtcOffset) {
     override fun toString(): String = "$dateTime$offset"
     companion object {
         fun parse(string: String): OffsetDateTime {
-            val dateTimeFinishedIndex = string.indexOfAny(charArrayOf('Z', '[', '+', '-'), 19)
+            var dateTimeFinishedIndex = string.indexOfAny(charArrayOf('Z', '[', '+', '-'), 19)
+            if(dateTimeFinishedIndex == -1) dateTimeFinishedIndex = string.length
             return OffsetDateTime(
                 LocalDateTime.parse(string.substring(0, dateTimeFinishedIndex)),
-                if(string.contains('[')) TimeZone.of(string.substringAfterLast('[').substringBefore(']')).offsetAt(now())
+                if(dateTimeFinishedIndex == string.length) UtcOffset.ZERO
+                else if(string.contains('[')) TimeZone.of(string.substringAfterLast('[').substringBefore(']')).offsetAt(now())
                 else if(string[dateTimeFinishedIndex] == 'Z') UtcOffset.ZERO
                 else UtcOffset.parse(string.substring(dateTimeFinishedIndex, string.length))
             )
