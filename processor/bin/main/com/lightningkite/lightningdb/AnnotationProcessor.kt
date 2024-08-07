@@ -5,7 +5,6 @@ import com.google.devtools.ksp.processing.*
 import com.google.devtools.ksp.symbol.*
 
 lateinit var comparable: KSClassDeclaration
-var khrysalisUsed = false
 
 class TableGenerator(
     val codeGenerator: CodeGenerator,
@@ -56,13 +55,7 @@ class TableGenerator(
                 ).bufferedWriter().use { out ->
                     with(TabAppendable(out)) {
 
-                        if(khrysalisUsed) {
-                            appendLine("@file:SharedCode")
-                        }
                         appendLine("package ${ksName}")
-                        if(khrysalisUsed) {
-                            appendLine("import com.lightningkite.khrysalis.*")
-                        }
                         appendLine("fun prepareModels() {")
                         tab {
                             ksClassDeclarations

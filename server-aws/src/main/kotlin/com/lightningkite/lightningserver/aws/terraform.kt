@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.lightningkite.lightningserver.aws
 
 import com.lightningkite.lightningserver.auth.JwtSigner
@@ -748,7 +750,7 @@ internal fun handlers() {
     TerraformHandler.handler<CacheSettings>(
         name = "DynamoDB",
         priority = 1,
-        settingOutput = { key ->
+        settingOutput = { _ ->
             """
                 {
                     url = "dynamodb://${'$'}{var.deployment_location}/${namePrefixUnderscores}"
@@ -785,7 +787,7 @@ internal fun handlers() {
         }
     )
     TerraformHandler.handler<SecretBasis>(
-        inputs = { key ->
+        inputs = { _ ->
             listOf(
             )
         },

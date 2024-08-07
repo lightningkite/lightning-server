@@ -1,25 +1,18 @@
-@file:SharedCode
+
 
 package com.lightningkite.lightningdb
 
 import com.lightningkite.*
 import com.lightningkite.khrysalis.*
+import com.lightningkite.GeoCoordinate
 import kotlinx.serialization.*
 import com.lightningkite.lightningdb.SerializableProperty
 
 @Serializable(ConditionSerializer::class)
-sealed class Condition<T : IsCodableAndHashable> {
-    open override fun hashCode(): Int {
-        fatalError()
-    }
-
-    open override fun equals(other: Any?): Boolean {
-        fatalError()
-    }
-
-    open operator fun invoke(on: T): Boolean {
-        fatalError()
-    }
+sealed class Condition<T> {
+    open override fun hashCode(): Int = throw NotImplementedError()
+    open override fun equals(other: Any?): Boolean = throw NotImplementedError()
+    open operator fun invoke(on: T): Boolean = throw NotImplementedError()
 
     infix fun and(other: Condition<T>): Condition.And<T> = Condition.And(listOf(this, other))
     infix fun or(other: Condition<T>): Condition.Or<T> = Condition.Or(listOf(this, other))
@@ -27,7 +20,7 @@ sealed class Condition<T : IsCodableAndHashable> {
 
     @Serializable(ConditionNeverSerializer::class)
     @SerialName("Never")
-    class Never<T : IsCodableAndHashable> : Condition<T>() {
+    class Never<T> : Condition<T>() {
         override fun invoke(on: T): Boolean = false
         override fun hashCode(): Int = 0
 
@@ -37,7 +30,7 @@ sealed class Condition<T : IsCodableAndHashable> {
 
     @Serializable(ConditionAlwaysSerializer::class)
     @SerialName("Always")
-    class Always<T : IsCodableAndHashable> : Condition<T>() {
+    class Always<T> : Condition<T>() {
         override fun invoke(on: T): Boolean = true
         override fun hashCode(): Int = 1
 
@@ -47,67 +40,67 @@ sealed class Condition<T : IsCodableAndHashable> {
 
     @Serializable(ConditionAndSerializer::class)
     @SerialName("And")
-    data class And<T : IsCodableAndHashable>(val conditions: List<Condition<T>>) : Condition<T>() {
+    data class And<T>(val conditions: List<Condition<T>>) : Condition<T>() {
         override fun invoke(on: T): Boolean = conditions.all { it(on) }
     }
 
     @Serializable(ConditionOrSerializer::class)
     @SerialName("Or")
-    data class Or<T : IsCodableAndHashable>(val conditions: List<Condition<T>>) : Condition<T>() {
+    data class Or<T>(val conditions: List<Condition<T>>) : Condition<T>() {
         override fun invoke(on: T): Boolean = conditions.any { it(on) }
     }
 
     @Serializable(ConditionNotSerializer::class)
     @SerialName("Not")
-    data class Not<T : IsCodableAndHashable>(val condition: Condition<T>) : Condition<T>() {
+    data class Not<T>(val condition: Condition<T>) : Condition<T>() {
         override fun invoke(on: T): Boolean = !condition(on)
     }
 
     @Serializable(ConditionEqualSerializer::class)
     @SerialName("Equal")
-    data class Equal<T : IsCodableAndHashable>(val value: T) : Condition<T>() {
+    data class Equal<T>(val value: T) : Condition<T>() {
         override fun invoke(on: T): Boolean = on == value
     }
 
     @Serializable(ConditionNotEqualSerializer::class)
     @SerialName("NotEqual")
-    data class NotEqual<T : IsCodableAndHashable>(val value: T) : Condition<T>() {
+    data class NotEqual<T>(val value: T) : Condition<T>() {
         override fun invoke(on: T): Boolean = on != value
     }
 
     @Serializable(ConditionInsideSerializer::class)
     @SerialName("Inside")
-    data class Inside<T : IsCodableAndHashable>(val values: List<T>) : Condition<T>() {
+    data class Inside<T>(val values: List<T>) : Condition<T>() {
         override fun invoke(on: T): Boolean = values.contains(on)
     }
 
     @Serializable(ConditionNotInsideSerializer::class)
     @SerialName("NotInside")
-    data class NotInside<T : IsCodableAndHashable>(val values: List<T>) : Condition<T>() {
+    data class NotInside<T>(val values: List<T>) : Condition<T>() {
         override fun invoke(on: T): Boolean = !values.contains(on)
     }
 
     @Serializable(ConditionGreaterThanSerializer::class)
     @SerialName("GreaterThan")
-    data class GreaterThan<T : ComparableCodableAndHashable<T>>(val value: T) : Condition<T>() {
+    data class GreaterThan<T: Comparable<T>>(val value: T) : Condition<T>() {
         override fun invoke(on: T): Boolean = on > value
     }
 
     @Serializable(ConditionLessThanSerializer::class)
     @SerialName("LessThan")
-    data class LessThan<T : ComparableCodableAndHashable<T>>(val value: T) : Condition<T>() {
+    data class LessThan<T: Comparable<T>>(val value: T) : Condition<T>() {
         override fun invoke(on: T): Boolean = on < value
     }
 
     @Serializable(ConditionGreaterThanOrEqualSerializer::class)
     @SerialName("GreaterThanOrEqual")
-    data class GreaterThanOrEqual<T : ComparableCodableAndHashable<T>>(val value: T) : Condition<T>() {
+    data class GreaterThanOrEqual<T: Comparable<T>>(val value: T) : Condition<T>() {
         override fun invoke(on: T): Boolean = on >= value
     }
 
     @Serializable(ConditionLessThanOrEqualSerializer::class)
     @SerialName("LessThanOrEqual")
-    data class LessThanOrEqual<T : ComparableCodableAndHashable<T>>(val value: T) : Condition<T>() {
+    data class LessThanOrEqual<T: Comparable<T>>(val value: T) : Condition<T>() {
         override fun invoke(on: T): Boolean = on <= value
     }
 
@@ -131,7 +124,7 @@ sealed class Condition<T : IsCodableAndHashable> {
 
     @Serializable
     @SerialName("FullTextSearch")
-    data class FullTextSearch<T : IsCodableAndHashable>(val value: String, val ignoreCase: Boolean = false) :
+    data class FullTextSearch<T>(val value: String, val ignoreCase: Boolean = false) :
         Condition<T>() {
         override fun invoke(on: T): Boolean {
             val asText = on.toString()
@@ -174,58 +167,58 @@ sealed class Condition<T : IsCodableAndHashable> {
     // TODO: Merge collection operations once Khrysalis is fully deprecated
     @Serializable(ConditionListAllElementsSerializer::class)
     @SerialName("ListAllElements")
-    data class ListAllElements<E : IsCodableAndHashable>(val condition: Condition<E>) : Condition<List<E>>() {
+    data class ListAllElements<E>(val condition: Condition<E>) : Condition<List<E>>() {
         override fun invoke(on: List<E>): Boolean = on.all { condition(it) }
     }
 
     @Serializable(ConditionListAnyElementsSerializer::class)
     @SerialName("ListAnyElements")
-    data class ListAnyElements<E : IsCodableAndHashable>(val condition: Condition<E>) : Condition<List<E>>() {
+    data class ListAnyElements<E>(val condition: Condition<E>) : Condition<List<E>>() {
         override fun invoke(on: List<E>): Boolean = on.any { condition(it) }
     }
 
     // TODO: Change to empty check
     @Serializable(ConditionListSizesEqualsSerializer::class)
     @SerialName("ListSizesEquals")
-    data class ListSizesEquals<E : IsCodableAndHashable>(val count: Int) : Condition<List<E>>() {
+    data class ListSizesEquals<E>(val count: Int) : Condition<List<E>>() {
         override fun invoke(on: List<E>): Boolean = on.size == count
     }
 
     @Serializable(ConditionSetAllElementsSerializer::class)
     @SerialName("SetAllElements")
-    data class SetAllElements<E : IsCodableAndHashable>(val condition: Condition<E>) : Condition<Set<E>>() {
+    data class SetAllElements<E>(val condition: Condition<E>) : Condition<Set<E>>() {
         override fun invoke(on: Set<E>): Boolean = on.all { condition(it) }
     }
 
     @Serializable(ConditionSetAnyElementsSerializer::class)
     @SerialName("SetAnyElements")
-    data class SetAnyElements<E : IsCodableAndHashable>(val condition: Condition<E>) : Condition<Set<E>>() {
+    data class SetAnyElements<E>(val condition: Condition<E>) : Condition<Set<E>>() {
         override fun invoke(on: Set<E>): Boolean = on.any { condition(it) }
     }
 
     // TODO: Change to empty check
     @Serializable(ConditionSetSizesEqualsSerializer::class)
     @SerialName("SetSizesEquals")
-    data class SetSizesEquals<E : IsCodableAndHashable>(val count: Int) : Condition<Set<E>>() {
+    data class SetSizesEquals<E>(val count: Int) : Condition<Set<E>>() {
         override fun invoke(on: Set<E>): Boolean = on.size == count
     }
 
     // TODO: Allow alternate keys once Khrysalis is fully deprecated
     @Serializable(ConditionExistsSerializer::class)
     @SerialName("Exists")
-    data class Exists<V : IsCodableAndHashable>(val key: String) : Condition<Map<String, V>>() {
+    data class Exists<V>(val key: String) : Condition<Map<String, V>>() {
         override fun invoke(on: Map<String, V>): Boolean = on.containsKey(key)
     }
 
     @Serializable
     @SerialName("OnKey")
-    data class OnKey<V : IsCodableAndHashable>(val key: String, val condition: Condition<V>) :
+    data class OnKey<V>(val key: String, val condition: Condition<V>) :
         Condition<Map<String, V>>() {
         @Suppress("UNCHECKED_CAST")
         override fun invoke(on: Map<String, V>): Boolean = on.containsKey(key) && condition(on[key] as V)
     }
 
-    data class OnField<K : IsCodableAndHashable, V : IsCodableAndHashable>(
+    data class OnField<K, V>(
         val key: SerializableProperty<in K, V>,
         val condition: Condition<V>,
     ) : Condition<K>() {
@@ -234,7 +227,7 @@ sealed class Condition<T : IsCodableAndHashable> {
 
     @Serializable(ConditionIfNotNullSerializer::class)
     @SerialName("IfNotNull")
-    data class IfNotNull<T : IsCodableAndHashable>(val condition: Condition<T>) : Condition<T?>() {
+    data class IfNotNull<T>(val condition: Condition<T>) : Condition<T?>() {
         override fun invoke(on: T?): Boolean = on != null && condition(on)
     }
 }

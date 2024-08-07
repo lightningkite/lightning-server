@@ -47,7 +47,7 @@ data class HttpResponse(
             headers: HttpHeaders.Builder.() -> Unit = {},
             builder: HTML.() -> Unit
         ) = HttpResponse(
-            body = HttpContent.Html(builder),
+            body = HttpContent.html(builder),
             status = status,
             headers = headers
         )
@@ -77,7 +77,7 @@ data class HttpResponse(
             status: HttpStatus = HttpStatus.OK,
             headers: HttpHeaders.Builder.() -> Unit = {}
         ) = HttpResponse(
-            body = HttpContent.Json(value),
+            body = HttpContent.json(value),
             status = status,
             headers = HttpHeaders(headers)
         )

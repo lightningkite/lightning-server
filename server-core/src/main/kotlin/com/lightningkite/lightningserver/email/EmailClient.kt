@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.serverhealth.HealthStatus
  * An interface for sending emails. This is used directly by the EmailSettings to abstract the implementation of
  * sending emails away, so it can go to multiple places.
  */
+@Suppress("DEPRECATION")
 interface EmailClient : HealthCheckable {
     suspend fun send(email: Email)
     suspend fun sendBulk(template: Email, personalizations: List<EmailPersonalization>) = personalizations.forEach {

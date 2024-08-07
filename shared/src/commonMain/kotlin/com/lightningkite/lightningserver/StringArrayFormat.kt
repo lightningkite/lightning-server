@@ -11,6 +11,7 @@ import kotlinx.serialization.modules.SerializersModule
 
 class StringArrayFormat(override val serializersModule: SerializersModule) : StringFormat {
 
+    @OptIn(ExperimentalSerializationApi::class)
     private inner class DataOutputEncoder(val output: (String)->Unit) : AbstractEncoder() {
         override val serializersModule: SerializersModule get() = this@StringArrayFormat.serializersModule
         override fun encodeBoolean(value: Boolean) { output(value.toString()) }
@@ -56,6 +57,7 @@ class StringArrayFormat(override val serializersModule: SerializersModule) : Str
         }
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     private inner class DataInputDecoder(val input: () -> String, var elementsCount: Int = 0, val seq: Boolean = false) : AbstractDecoder() {
         private var elementIndex = 0
         override val serializersModule: SerializersModule get() = this@StringArrayFormat.serializersModule

@@ -64,9 +64,9 @@ class CloudwatchMetrics(
                 events.map { it.metricType.name }.distinct().joinToString()
             }"
         )
-        events.chunked(1000).forEach { events ->
+        events.chunked(1000).forEach { eventSubset ->
             cw.putMetricData {
-                it.metricData(events.flatMap {
+                it.metricData(eventSubset.flatMap {
                     val unit = when (it.metricType.unit) {
                         MetricUnit.Seconds -> StandardUnit.SECONDS
                         MetricUnit.Microseconds -> StandardUnit.MICROSECONDS

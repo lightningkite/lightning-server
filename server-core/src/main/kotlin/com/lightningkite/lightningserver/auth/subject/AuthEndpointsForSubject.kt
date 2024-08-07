@@ -88,6 +88,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 requestAuth == null -> Condition.Never()
                 else -> Condition.OnField(
                     Session_subjectId(handler.subjectSerializer, handler.idSerializer),
+                    @Suppress("UNCHECKED_CAST")
                     Condition.Equal(requestAuth.rawId as ID)
                 )
             }
@@ -198,7 +199,6 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
     }
 
-    @Suppress("UNREACHABLE_CODE")
     val login = path("login").post.api(
         authOptions = noAuth,
         inputType = ListSerializer(Proof.serializer()),
@@ -255,7 +255,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         implementation = { futureSessionToken: String ->
             val future = FutureSession.fromToken(futureSessionToken)
             if (future.oauthClient != null) throw ForbiddenException("Please use the token endpoint for OAuth instead, so we can check your secret.")
-            val (s, secret) = newSessionPrivate(
+            val (_, secret) = newSessionPrivate(
                 label = future.label,
                 subjectId = future.subjectId,
                 derivedFrom = future.originalSessionId,
@@ -575,7 +575,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             val aapp = AuthAndPathParts<HasId<*>?, TypedServerPath0>(null, request, arrayOf())
             return when (method) {
                 is Authentication.StartedProofMethod -> {
-                    val key = method.start.implementation(aapp, input.value!!)
+                    val key = method.start.implementation(aapp, input.value)
                     HttpResponse(
                         body = HttpContent.Text(
                             string = HtmlDefaults.basePage(

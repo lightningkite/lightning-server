@@ -24,6 +24,10 @@ open class LocalCache(val entries: ConcurrentHashMap<String, Entry> = Concurrent
         entries[key] = Entry(value, timeToLive?.let { now() + it })
     }
 
+    fun clear() {
+        entries.clear()
+    }
+
     override suspend fun <T> setIfNotExists(
         key: String,
         value: T,

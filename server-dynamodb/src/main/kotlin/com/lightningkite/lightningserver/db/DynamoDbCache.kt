@@ -135,7 +135,7 @@ class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: St
     ): Boolean {
         ready.await()
         try {
-            val r = client.putItem {
+            client.putItem {
                 it.tableName(tableName)
                 it.expressionAttributeNames(mapOf("#k" to "key"))
                 it.conditionExpression("attribute_not_exists(#k)")

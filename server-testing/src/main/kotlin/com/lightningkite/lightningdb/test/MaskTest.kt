@@ -25,12 +25,12 @@ class MaskTest {
             it.float.mask(0f, it.string eq "test")
         }
         mask(model).also(::println)
-        val also = mask(
+        mask(
             partialOf<LargeTestModel>{
                 it.byte.assign(1)
                 it.byte assign 1.toByte()
                 it.short assign 1.toShort()
-                it.int assign 1.toInt()
+                it.int assign 1
                 it.long assign 1.toLong()
                 it.float assign 1f
             }
@@ -86,7 +86,6 @@ class MaskTest {
 
     @Test
     fun sort() {
-        val matchingMod = modification<LargeTestModel> { it.int assign 2 }
         val matchingSort = SortPart(path<LargeTestModel>().int)
         val notMatchingSortA = SortPart(path<LargeTestModel>().byte)
         val notMatchingSortV = SortPart(path<LargeTestModel>().string)
@@ -101,7 +100,6 @@ class MaskTest {
 
     @Test
     fun condition() {
-        val matchingMod = modification<LargeTestModel> { it.int assign 2 }
         val matchingSort = condition<LargeTestModel> { it.int eq 2 }
         val notMatchingSortA = condition<LargeTestModel> { it.byte eq 2 }
         val notMatchingSortV = condition<LargeTestModel> { it.string eq "" }

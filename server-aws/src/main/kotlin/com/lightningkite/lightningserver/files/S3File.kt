@@ -142,12 +142,10 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
                         ), Charsets.UTF_8
                     )
                 }
-                val accessKey = system.credentialProvider.resolveCredentials().accessKeyId()
                 val secretKey = system.credentialProvider.resolveCredentials().secretAccessKey()
                 val objectPath = path.unixPath
                 val date = headers["X-Amz-Date"] ?: return false
                 val algorithm = headers["X-Amz-Algorithm"] ?: return false
-                val expires = headers["X-Amz-Expires"] ?: return false
                 val credential = headers["X-Amz-Credential"] ?: return false
                 val scope = credential.substringAfter("/")
 
@@ -193,7 +191,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             val creds = system.creds()
             val accessKey = creds.access
             val tokenPreEncoded = creds.tokenPreEncoded
-            var dateOnly = ""
+            var dateOnly: String
             val date = now().atZone(TimeZone.UTC).run {
                 buildString {
                     this.append(date.year.toString().padStart(4, '0'))
@@ -243,7 +241,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
         } ?: url
 
     val officialSignedUrl: String
-        get() = system.signedUrlDuration?.let { e ->
+        get() = system.signedUrlDuration?.let { _ ->
             system.signer.presignGetObject {
                 it.signatureDuration(system.signedUrlDuration.toJavaDuration())
                 it.getObjectRequest {

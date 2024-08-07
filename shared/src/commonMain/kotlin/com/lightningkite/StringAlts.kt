@@ -54,7 +54,7 @@ value class TrimmedString @Deprecated("Use String.trimmed()") constructor(overri
     override fun mapRaw(action: (String) -> String): TrimmedString = raw.let(action).trimmed()
 }
 
-@Suppress("DEPRECATION")
+@Suppress("DEPRECATION", "NOTHING_TO_INLINE")
 inline fun String.trimmed(): TrimmedString = TrimmedString(this.trim())
 
 
@@ -73,7 +73,7 @@ value class CaselessString @Deprecated("Use String.caseless()") constructor(over
     override fun mapRaw(action: (String) -> String): CaselessString = raw.let(action).caseless()
 }
 
-@Suppress("DEPRECATION")
+@Suppress("DEPRECATION", "NOTHING_TO_INLINE")
 inline fun String.caseless(): CaselessString = CaselessString(this.lowercase())
 
 
@@ -92,7 +92,7 @@ value class TrimmedCaselessString @Deprecated("Use String.trimmedCaseless()") co
     override fun mapRaw(action: (String) -> String): TrimmedCaselessString = raw.let(action).trimmedCaseless()
 }
 
-@Suppress("DEPRECATION")
+@Suppress("DEPRECATION", "NOTHING_TO_INLINE")
 inline fun String.trimmedCaseless(): TrimmedCaselessString = TrimmedCaselessString(this.trim().lowercase())
 
 

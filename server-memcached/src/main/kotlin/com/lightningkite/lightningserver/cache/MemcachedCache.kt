@@ -51,11 +51,11 @@ class MemcachedCache(val client: MemcachedClient) : Cache, HealthCheckable {
 
     override suspend fun <T> set(key: String, value: T, serializer: KSerializer<T>, timeToLive: Duration?) =
         withContext(Dispatchers.IO) {
-            val succeed = client.set(
+            if(!client.set(
                 key,
                 timeToLive?.inWholeSeconds?.toInt() ?: Int.MAX_VALUE,
                 Serialization.Internal.json.encodeToString(serializer, value)
-            )
+            )) throw IllegalStateException("Failed to set")
             Unit
         }
 

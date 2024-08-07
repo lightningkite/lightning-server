@@ -1,13 +1,9 @@
-@file:SharedCode
-
 package com.lightningkite.lightningdb
 
-import com.lightningkite.khrysalis.IsCodableAndHashable
-import com.lightningkite.khrysalis.SharedCode
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Query<T : IsCodableAndHashable>(
+data class Query<T >(
     val condition: Condition<T> = Condition.Always<T>(),
     val orderBy: List<SortPart<T>> = listOf(),
     val skip: Int = 0,
@@ -16,7 +12,7 @@ data class Query<T : IsCodableAndHashable>(
 }
 
 
-inline fun <reified T : IsCodableAndHashable> Query(
+inline fun <reified T > Query(
     orderBy: List<SortPart<T>> = listOf(),
     skip: Int = 0,
     limit: Int = 100,

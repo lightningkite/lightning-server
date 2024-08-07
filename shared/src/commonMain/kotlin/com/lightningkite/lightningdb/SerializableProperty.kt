@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encoding.CompositeDecoder
@@ -15,6 +16,7 @@ interface SerializableProperty<A, B> {
     companion object {
     }
 }
+@OptIn(ExperimentalSerializationApi::class)
 fun <T> KSerializer<T>.tryFindAnnotations(propertyName: String): List<Annotation> {
     val i = descriptor.getElementIndex(propertyName)
     if (i < 0) return listOf()

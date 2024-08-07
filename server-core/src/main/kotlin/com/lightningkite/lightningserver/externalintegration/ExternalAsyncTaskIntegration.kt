@@ -48,6 +48,7 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
     }
 
     // Collection exposed to admins only for tasks
+    @Suppress("UNCHECKED_CAST")
     val info = modelInfoWithDefault<HasId<*>, ExternalAsyncTaskRequest, String>(
         authOptions = authOptions as AuthOptions<HasId<*>>,
         serialization = ModelSerializationInfo(

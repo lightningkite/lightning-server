@@ -246,8 +246,8 @@ class JsonSchemaBuilder(
         annotation { it: ExpectedPattern -> copy(pattern = it.pattern) }
         annotation { it: JsonSchemaFormat -> copy(format = it.format) }
         annotation { it: DisplayName -> copy(title = it.text) }
-        annotation { it: AdminHidden -> copy(uiWidget = "hidden") }
-        annotation { it: Multiline -> copy(uiWidget = "textarea") }
+        annotation { _: AdminHidden -> copy(uiWidget = "hidden") }
+        annotation { _: Multiline -> copy(uiWidget = "textarea") }
         annotation { it: UiWidget -> copy(uiWidget = it.type) }
         annotation { it: References -> copy(references = key(json.serializersModule.serializer(it.references.java))) }
         annotation { it: MultipleReferences ->

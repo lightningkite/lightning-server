@@ -30,7 +30,10 @@ import kotlin.time.toKotlinDuration
 
 class DbMapLikeFormat(val serializersModule: SerializersModule = Serialization.module) {
     fun <T> encode(serializer: KSerializer<T>, value: T, it: UpdateBuilder<*>, path: List<String> = listOf("")) {
-        val columns = it.targets.flatMap { it.columns }.map { it as Column<Any?> }.associateBy { it.name }
+        val columns = it.targets.flatMap { it.columns }.map {
+            @Suppress("UNCHECKED_CAST")
+            it as Column<Any?>
+        }.associateBy { it.name }
         DbLikeMapEncoder(
             serializersModule,
             { k, v ->
@@ -59,7 +62,10 @@ class DbMapLikeFormat(val serializersModule: SerializersModule = Serialization.m
     }
 
     fun <T> decode(serializer: KSerializer<T>, map: ResultRow, path: List<String> = listOf("")): T {
-        val columns = map.fieldIndex.keys.mapNotNull { it as? Column<Any?> }.associateBy { it.name }
+        val columns = map.fieldIndex.keys.mapNotNull {
+            @Suppress("UNCHECKED_CAST")
+            it as? Column<Any?>
+        }.associateBy { it.name }
         return DbLikeMapDecoder(
             serializersModule,
             keys = columns.keys,
@@ -150,7 +156,7 @@ class DbLikeMapDecoder(
         return CompositeDecoder.DECODE_DONE
     }
 
-    final override fun beginStructure(descriptor: SerialDescriptor): CompositeDecoder {
+    override fun beginStructure(descriptor: SerialDescriptor): CompositeDecoder {
         return when (descriptor.kind) {
             is StructureKind.CLASS -> DbLikeMapDecoder(
                 serializersModule,
@@ -205,6 +211,7 @@ class DbLikeMapDecoder(
     }
 
     override fun <T> decodeSerializableValue(deserializer: DeserializationStrategy<T>): T {
+        @Suppress("UNCHECKED_CAST")
         return when ((deserializer as? KSerializer<T>)?.nullElement() ?: deserializer) {
             UUIDSerializer -> getter(popTag()) as T
             LocalDateIso8601Serializer -> getter(popTag()).let { it as LocalDate }.toKotlinLocalDate() as T
@@ -424,7 +431,7 @@ class DbLikeMapEncoder(
         when ((serializer as? KSerializer<T>)?.nullElement() ?: serializer) {
             UUIDSerializer -> writer(popTag(), value)
             LocalDateIso8601Serializer -> writer(popTag(), (value as kotlinx.datetime.LocalDate).toJavaLocalDate())
-            InstantIso8601Serializer -> writer(popTag(), (value as kotlinx.datetime.Instant).toJavaInstant())
+            InstantIso8601Serializer -> writer(popTag(), (value as Instant).toJavaInstant())
             DurationSerializer -> writer(popTag(), (value as kotlin.time.Duration).toJavaDuration())
                 //LocalDateTimeSerializer -> writer(popTag(), value)
             LocalDateTimeIso8601Serializer -> writer(popTag(), (value as kotlinx.datetime.LocalDateTime).toJavaLocalDateTime())

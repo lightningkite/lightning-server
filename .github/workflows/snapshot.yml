@@ -1,6 +1,11 @@
 name: snapshot
 
 on:
+  workflow_dispatch:
+    branches:
+      - master
+      - development
+      - version-**
   push:
     branches:
       - master

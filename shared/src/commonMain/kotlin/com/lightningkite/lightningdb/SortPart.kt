@@ -1,21 +1,21 @@
-@file:SharedCode
 package com.lightningkite.lightningdb
 
-import com.lightningkite.khrysalis.IsCodableAndHashable
-import com.lightningkite.khrysalis.SharedCode
+
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlin.reflect.KProperty1
 
 @Serializable(SortPartSerializer::class)
 @Description("The name of the property to sort by.  Prepend a '-' if you wish to sort descending.")
-data class SortPart<T: IsCodableAndHashable>(
+data class SortPart<T>(
     val field: DataClassPathPartial<T>,
     val ascending: Boolean = true,
     val ignoreCase: Boolean = false
 )
 
-val <T: IsCodableAndHashable> List<SortPart<T>>.comparator: Comparator<T>? get() {
+@OptIn(ExperimentalSerializationApi::class)
+val <T> List<SortPart<T>>.comparator: Comparator<T>? get() {
     if(this.isEmpty()) return null
     return Comparator { a, b ->
         for(part in this) {

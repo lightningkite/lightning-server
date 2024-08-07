@@ -2,7 +2,6 @@ package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.core.ContentType
 import kotlinx.datetime.Instant
-import kotlinx.datetime.ZoneOffset
 import kotlinx.datetime.toJavaInstant
 import java.time.format.DateTimeFormatter
 

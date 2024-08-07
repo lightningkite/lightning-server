@@ -1,18 +1,17 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.khrysalis.IsCodableAndHashable
 import com.lightningkite.lightningdb.SerializableProperty
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.NothingSerializer
 
-fun <K, V : IsCodableAndHashable> Modification<K>.valueSetForDataClassPath(path: DataClassPath<K, V>): V? =
+fun <K, V> Modification<K>.valueSetForDataClassPath(path: DataClassPath<K, V>): V? =
     (forDataClassPath<V>(path.properties) as? Modification.Assign<V>)?.value
 
-fun <K, V : IsCodableAndHashable> Modification<K>.forDataClassPath(path: DataClassPath<K, V>): Modification<V>? =
+fun <K, V> Modification<K>.forDataClassPath(path: DataClassPath<K, V>): Modification<V>? =
     forDataClassPath<V>(path.properties)
 
 @Suppress("UNCHECKED_CAST")
-private fun <V : IsCodableAndHashable> Modification<*>.forDataClassPath(list: List<SerializableProperty<*, *>>): Modification<V>? {
+private fun <V> Modification<*>.forDataClassPath(list: List<SerializableProperty<*, *>>): Modification<V>? {
     return when (this) {
         is Modification.OnField<*, *> -> if (list.first() == this.key) {
             if (list.size == 1) modification as Modification<V>
@@ -85,6 +84,7 @@ fun <T> Condition<T>.emitReadPaths(out: (DataClassPathPartial<T>) -> Unit) = emi
     NothingSerializer() as KSerializer<T>
 )) { out(it as DataClassPathPartial<T>) }
 private fun Condition<*>.emitReadPaths(soFar: DataClassPath<*, *>, out: (DataClassPathPartial<*>) -> Unit) {
+    @Suppress("UNCHECKED_CAST")
     when (this) {
         is Condition.Always -> {}
         is Condition.Never -> {}
@@ -151,17 +151,15 @@ fun <T> Condition<T>.guaranteedAfter(modification: Modification<T>): Boolean {
         is Modification.SetPerElement<*> -> {
             @Suppress("UNCHECKED_CAST")
             ((this as? Condition.SetAllElements<Any?>)?.condition
-                ?: (this as? Condition.SetAnyElements<Any?>)?.condition)?.let {
-                (it as Condition<Any?>).guaranteedAfter<Any?>(modification.modification as Modification<Any?>)
-            } ?: false
+                        ?: (this as? Condition.SetAnyElements<Any?>)?.condition)?.guaranteedAfter<Any?>(modification.modification as Modification<Any?>)
+                ?: false
         }
 
         is Modification.ListPerElement<*> -> {
             @Suppress("UNCHECKED_CAST")
             ((this as? Condition.ListAllElements<Any?>)?.condition
-                ?: (this as? Condition.ListAnyElements<Any?>)?.condition)?.let {
-                (it as Condition<Any?>).guaranteedAfter<Any?>(modification.modification as Modification<Any?>)
-            } ?: false
+                        ?: (this as? Condition.ListAnyElements<Any?>)?.condition)?.guaranteedAfter<Any?>(modification.modification as Modification<Any?>)
+                ?: false
         }
 
         is Modification.Chain -> modification.modifications.all { guaranteedAfter(it) }
@@ -193,7 +191,7 @@ private fun <V> Modification<*>.map(
             if (list.size == 1) Modification.OnField(
                 key = this.key as SerializableProperty<Any?, Any?>,
                 modification = onModification(modification as Modification<V>) as Modification<Any?>
-            ) as Modification<Any?>
+            )
             else this.modification.map(list.drop(1), onModification)
         } else this
 

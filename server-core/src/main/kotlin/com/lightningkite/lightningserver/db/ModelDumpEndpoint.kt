@@ -97,17 +97,17 @@ open class ModelDumpEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
 
         when(it.request.type) {
             DumpType.CSV -> {
-                writer().use { out ->
-                    val emit = Serialization.csv.beginEncodingToAppendable(info.serialization.serializer, out)
+                writer().use { out2 ->
+                    val emit = Serialization.csv.beginEncodingToAppendable(info.serialization.serializer, out2)
                     flow.collect {
                         emit(it)
                     }
                 }
             }
             DumpType.JSON_LINES -> {
-                writer().use { out ->
+                writer().use { out2 ->
                     flow.collect {
-                        out.appendLine(Serialization.json.encodeToString(info.serialization.serializer, it))
+                        out2.appendLine(Serialization.json.encodeToString(info.serialization.serializer, it))
                     }
                 }
             }

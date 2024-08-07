@@ -14,3 +14,5 @@ local.tfvars
 
 bssoftware
 **/.DS_Store
+.kotlin
+kotlin-js-store/

@@ -23,7 +23,7 @@ public class StringDeferringEncoder(
 
     fun headers(root: SerialDescriptor): List<String> = buildList {
         assert(steadyHeaders)
-        var visited = HashSet<String>()
+        val visited = HashSet<String>()
         fun sub(descriptor: SerialDescriptor, prefix: String = "") {
             if(!visited.add(descriptor.serialName.removeSuffix("?"))) return
             for (i in 0 until descriptor.elementsCount) {
@@ -53,8 +53,7 @@ public class StringDeferringEncoder(
         sub(root)
     }
 
-    @Suppress("UNCHECKED_CAST")
-    final override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
+    override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
         when(serializer.descriptor.kind) {
             PolymorphicKind.SEALED,
             PolymorphicKind.OPEN,
@@ -89,7 +88,7 @@ public class StringDeferringEncoder(
 
     // ---- API ----
 
-    fun encodeTaggedNonNullMark(tag: String) {}
+    fun encodeTaggedNonNullMark() {}
     fun encodeTaggedInt(tag: String, value: Int): Unit = encodeTaggedValue(tag, value)
     fun encodeTaggedByte(tag: String, value: Byte): Unit = encodeTaggedValue(tag, value)
     fun encodeTaggedShort(tag: String, value: Short): Unit = encodeTaggedValue(tag, value)
@@ -100,11 +99,11 @@ public class StringDeferringEncoder(
     fun encodeTaggedChar(tag: String, value: Char): Unit = encodeTaggedValue(tag, value)
     fun encodeTaggedString(tag: String, value: String): Unit = encodeTaggedValue(tag, if(value.startsWith(config.deferMarker)) config.deferMarker + config.deferredFormat.encodeToString(String.serializer(), value) else value)
 
-    fun encodeTaggedInline(tag: String, inlineDescriptor: SerialDescriptor): Encoder =
+    fun encodeTaggedInline(tag: String): Encoder =
         this.apply { pushTag(tag) }
 
     override fun encodeInline(descriptor: SerialDescriptor): Encoder =
-        encodeTaggedInline(popTag(), descriptor)
+        encodeTaggedInline(popTag())
 
     // ---- Implementation of low-level API ----
 
@@ -114,7 +113,7 @@ public class StringDeferringEncoder(
         return true
     }
 
-    override fun encodeNotNullMark(): Unit = encodeTaggedNonNullMark(currentTag)
+    override fun encodeNotNullMark(): Unit = encodeTaggedNonNullMark()
     override fun encodeNull(): Unit = encodeTaggedNull(popTag())
     override fun encodeBoolean(value: Boolean): Unit = encodeTaggedBoolean(popTag(), value)
     override fun encodeByte(value: Byte): Unit = encodeTaggedByte(popTag(), value)
@@ -137,13 +136,7 @@ public class StringDeferringEncoder(
         if (tagStack.isNotEmpty()) {
             popTag()
         }
-        endEncode(descriptor)
     }
-
-    /**
-     * Format-specific replacement for [endStructure], because latter is overridden to manipulate tag stack.
-     */
-    fun endEncode(descriptor: SerialDescriptor) {}
 
     override fun encodeBooleanElement(descriptor: SerialDescriptor, index: Int, value: Boolean): Unit =
         encodeTaggedBoolean(descriptor.getTag(index), value)
@@ -176,7 +169,7 @@ public class StringDeferringEncoder(
         descriptor: SerialDescriptor,
         index: Int
     ): Encoder {
-        return encodeTaggedInline(descriptor.getTag(index), descriptor.getElementDescriptor(index))
+        return encodeTaggedInline(descriptor.getTag(index))
     }
 
     override fun <T : Any?> encodeSerializableElement(
@@ -203,8 +196,6 @@ public class StringDeferringEncoder(
     private val seenStack = arrayListOf<String>()
 
     private val tagStack = arrayListOf<String>()
-    private val currentTag: String
-        get() = tagStack.last()
     private val currentTagOrNull: String?
         get() = tagStack.lastOrNull()
 

@@ -48,8 +48,15 @@ class PostgresCollection<T : Any>(
         prepare.await()
         val items = t {
             table
-                .select { condition(condition, serializer, table).asOp() }
-                .orderBy(*orderBy.map { (if (it.ignoreCase && it.field.serializerAny.descriptor.kind == PrimitiveKind.STRING) (table.col[it.field.colName]!! as Column<String>).lowerCase() else table.col[it.field.colName]!!) to if (it.ascending) SortOrder.ASC else SortOrder.DESC }
+                .selectAll()
+                .where { condition(condition, serializer, table).asOp() }
+                .orderBy(*orderBy.map {
+                    @Suppress("UNCHECKED_CAST")
+                    (
+                            if (it.ignoreCase && it.field.serializerAny.descriptor.kind == PrimitiveKind.STRING)
+                                    (table.col[it.field.colName]!! as Column<String>).lowerCase()
+                            else table.col[it.field.colName]!!
+                    ) to if (it.ascending) SortOrder.ASC else SortOrder.DESC }
                     .toTypedArray())
                 .limit(limit, skip.toLong())
 //                .prep
@@ -62,7 +69,7 @@ class PostgresCollection<T : Any>(
         prepare.await()
         return t {
             table
-                .select { condition(condition, serializer, table).asOp() }
+                .selectAll().where { condition(condition, serializer, table).asOp() }
                 .count().toInt()
         }
     }
@@ -70,10 +77,11 @@ class PostgresCollection<T : Any>(
     override suspend fun <Key> groupCount(condition: Condition<T>, groupBy: DataClassPath<T, Key>): Map<Key, Int> {
         prepare.await()
         return t {
+            @Suppress("UNCHECKED_CAST")
             val groupCol = table.col[groupBy.colName] as Column<Key>
             val count = Count(stringLiteral("*"))
-            table.slice(groupCol, count)
-                .select { condition(condition, serializer, table).asOp() }
+            table.select(groupCol, count)
+                .where { condition(condition, serializer, table).asOp() }
                 .groupBy(table.col[groupBy.colName]!!).associate { it[groupCol] to it[count].toInt() }
         }
     }
@@ -85,6 +93,7 @@ class PostgresCollection<T : Any>(
     ): Double? {
         prepare.await()
         return t {
+            @Suppress("UNCHECKED_CAST")
             val valueCol = table.col[property.colName] as Column<Number>
             val agg = when (aggregate) {
                 Aggregate.Sum -> Sum(valueCol, DecimalColumnType(Int.MAX_VALUE, 8))
@@ -92,8 +101,8 @@ class PostgresCollection<T : Any>(
                 Aggregate.StandardDeviationSample -> StdDevSamp(valueCol, 8)
                 Aggregate.StandardDeviationPopulation -> StdDevPop(valueCol, 8)
             }
-            table.slice(agg)
-                .select { condition(condition, serializer, table).asOp() }
+            table.select(agg)
+                .where { condition(condition, serializer, table).asOp() }
                 .firstOrNull()?.get(agg)?.toDouble()
         }
     }
@@ -106,7 +115,9 @@ class PostgresCollection<T : Any>(
     ): Map<Key, Double?> {
         prepare.await()
         return t {
+            @Suppress("UNCHECKED_CAST")
             val groupCol = table.col[groupBy.colName] as Column<Key>
+            @Suppress("UNCHECKED_CAST")
             val valueCol = table.col[property.colName] as Column<Number>
             val agg = when (aggregate) {
                 Aggregate.Sum -> Sum(valueCol, DoubleColumnType())
@@ -114,8 +125,8 @@ class PostgresCollection<T : Any>(
                 Aggregate.StandardDeviationSample -> StdDevSamp(valueCol, 8)
                 Aggregate.StandardDeviationPopulation -> StdDevPop(valueCol, 8)
             }
-            table.slice(groupCol, agg)
-                .select { condition(condition, serializer, table).asOp() }
+            table.select(groupCol, agg)
+                .where { condition(condition, serializer, table).asOp() }
                 .groupBy(table.col[groupBy.colName]!!).associate { it[groupCol] to it[agg]?.toDouble() }
         }
     }

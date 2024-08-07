@@ -6,11 +6,7 @@ import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.tasks.Task
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -21,6 +17,7 @@ import kotlin.time.Duration.Companion.minutes
  */
 interface Engine {
     suspend fun launchTask(task: Task<Any?>, input: Any?)
+    @OptIn(DelicateCoroutinesApi::class)
     fun backgroundReportingAction(action: suspend ()->Unit) {
         GlobalScope.launch {
             while (true) {
@@ -48,6 +45,7 @@ interface Engine {
  */
 class LocalEngine(val websocketCache: Cache) : Engine {
     val logger = LoggerFactory.getLogger(this::class.java)
+    @OptIn(DelicateCoroutinesApi::class)
     override suspend fun launchTask(task: Task<Any?>, input: Any?) {
         GlobalScope.launch {
             Metrics.handlerPerformance(task) {

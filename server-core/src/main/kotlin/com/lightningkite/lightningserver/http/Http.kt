@@ -47,7 +47,7 @@ object Http {
                 HttpResponse(status = HttpStatus.InternalServerError)
             }
         }
-    var notFound: suspend (HttpEndpoint, HttpRequest) -> HttpResponse = { path, request ->
+    var notFound: suspend (HttpEndpoint, HttpRequest) -> HttpResponse = { path, _ ->
         HttpResponse.html(
             HttpStatus.NotFound, content = HtmlDefaults.basePage(
                 """

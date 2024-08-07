@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.lightningkite.lightningserver.auth.old
 
 import com.lightningkite.lightningdb.HasId
@@ -171,7 +173,7 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
         description = "Creates a new token for the user, which can be used to authenticate with the API via the header 'Authorization: Bearer [insert token here]'.",
         errorCases = listOf(),
         examples = listOf(ApiExample(input = Unit, output = "jwt.jwt.jwt")),
-        implementation = { input: Unit ->
+        implementation = { _: Unit ->
             token(user())
         }
     )

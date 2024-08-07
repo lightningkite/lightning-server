@@ -47,7 +47,6 @@ import kotlin.time.Duration.Companion.hours
 import com.lightningkite.lightningserver.core.ContentType as HttpContentType
 
 fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
-    val logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.ktor.lightningServer")
     val myEngine = LocalEngine(cache)
     engine = myEngine
     try {
@@ -126,7 +125,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                                         queryParameters = call.request.queryParameters.flattenEntries(),
                                         id = id,
                                         headers = call.request.headers.adapt(),
-                                        domain = call.request.origin.host,
+                                        domain = call.request.origin.serverHost,
                                         protocol = call.request.origin.scheme,
                                         sourceIp = call.request.origin.remoteHost,
                                         cache = cache
@@ -372,9 +371,11 @@ internal suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
             }
 
         },
-        domain = request.origin.host,
+        domain = request.origin.serverHost,
         protocol = request.origin.scheme,
-        sourceIp = request.origin.remoteHost
+        sourceIp = generalSettings().realIpHeader?.let {
+            request.header(it) ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
+        } ?: request.origin.remoteAddress
     )
 }
 

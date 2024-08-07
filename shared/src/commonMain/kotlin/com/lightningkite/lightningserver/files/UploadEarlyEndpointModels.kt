@@ -1,10 +1,10 @@
-@file:SharedCode
+
 @file:UseContextualSerialization(UUID::class, ServerFile::class, Instant::class)
 
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.UUID
-import com.lightningkite.khrysalis.SharedCode
+
 import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.ServerFile

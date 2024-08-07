@@ -166,7 +166,10 @@ private fun ApiEndpoint<*, *, *, *>.openApi(builder: JsonSchemaBuilder): OpenApi
                 ContentType.Application.Json.toString() to OpenApiMediaType(
                     schema = builder[this.inputType],
                     example = examples.firstOrNull()
-                        ?.let { example -> Serialization.json.encodeToJsonElement(inputType as KSerializer<Any?>, example.input) }
+                        ?.let { example ->
+                            @Suppress("UNCHECKED_CAST")
+                            Serialization.json.encodeToJsonElement(inputType as KSerializer<Any?>, example.input)
+                        }
                         ?: JsonNull,
 //                    examples = examples.groupBy { it.name }.flatMap {
 //                        if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->
@@ -194,7 +197,10 @@ private fun ApiEndpoint<*, *, *, *>.openApi(builder: JsonSchemaBuilder): OpenApi
                     ContentType.Application.Json.toString() to OpenApiMediaType(
                         schema = builder[this.outputType],
                         example = examples.firstOrNull()
-                            ?.let { example -> Serialization.json.encodeToJsonElement(outputType as KSerializer<Any?>, example.output) }
+                            ?.let { example ->
+                                @Suppress("UNCHECKED_CAST")
+                                Serialization.json.encodeToJsonElement(outputType as KSerializer<Any?>, example.output)
+                            }
                             ?: JsonNull,
 //                        examples = examples.groupBy { it.name }.flatMap {
 //                            if (it.value.size == 1) it.value else it.value.mapIndexed { index, it ->

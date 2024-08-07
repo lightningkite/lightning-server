@@ -45,7 +45,7 @@ data class ApiWebsocket<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
             parts = path.serializers.mapIndexed { idx, ser ->
                 val name = wildcards.get(idx).name
                 val str = event.parts[name] ?: throw BadRequestException("Route segment $name not found")
-                str.parseUrlPartOrBadRequest(path.serializers[idx])
+                str.parseUrlPartOrBadRequest(ser)
             }.toTypedArray(),
             event = event,
             outputSerializer = outputType,

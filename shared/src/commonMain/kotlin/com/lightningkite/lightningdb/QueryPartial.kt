@@ -1,10 +1,9 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.khrysalis.IsCodableAndHashable
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class QueryPartial<T: IsCodableAndHashable>(
+data class QueryPartial<T>(
     val fields: Set<DataClassPathPartial<T>>,
     val condition: Condition<T> = Condition.Always<T>(),
     val orderBy: List<SortPart<T>> = listOf(),

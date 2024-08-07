@@ -12,19 +12,25 @@ import com.lightningkite.lightningdb.SerializableProperty
 internal data class FieldSet2<V>(val serializer: KSerializer<V>, val fields: Map<String, ExpressionWithColumnType<Any?>>) {
     constructor(serializer: KSerializer<V>, table: SerialDescriptorTable) : this(
         serializer = serializer,
-        fields = table.col.mapValues { it.value as ExpressionWithColumnType<Any?> }
+        fields = table.col.mapValues {
+            @Suppress("UNCHECKED_CAST")
+            it.value as ExpressionWithColumnType<Any?>
+        }
     )
     val single: ExpressionWithColumnType<Any?> get() = fields[""] ?: throw IllegalStateException("No column found for ${serializer.descriptor.serialName}")
     fun single(value: V): Pair<ExpressionWithColumnType<Any?>, Expression<Any?>> = single to LiteralOp(single.columnType, formatSingle(value))
+    @Suppress("UNCHECKED_CAST")
     fun sub(property: SerializableProperty<V, *>) = FieldSet2<Any?>(
         serializer = property.serializer as KSerializer<Any?>,
         fields = fields.filter { it.key == property.name || it.key.startsWith(property.name + "__") }
             .mapKeys { it.key.substringAfter(property.name).removePrefix("__") }
     )
+    @Suppress("UNCHECKED_CAST")
     val exists: Expression<Boolean>
         get() = fields["exists"]?.let {
             it as Expression<Boolean>
         } ?: IsNotNullOp(fields.values.first())
+    @Suppress("UNCHECKED_CAST")
     val notExists: Expression<Boolean>
         get() = fields["exists"]?.let {
             NotOp(it as Expression<Boolean>)

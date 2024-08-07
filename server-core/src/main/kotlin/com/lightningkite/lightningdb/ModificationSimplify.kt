@@ -17,9 +17,10 @@ fun <T> Modification<T>.simplify(): Modification<T> {
             Modification.Assign(value)
         }
     } else if (this is Modification.OnField<*, *>) {
-        Modification.OnField<T, Any?>(
+        @Suppress("UNCHECKED_CAST")
+        Modification.OnField(
             key as SerializableProperty<T, Any?>,
             modification.simplify() as Modification<Any?>
-        ) as Modification<T>
+        )
     } else this
 }

@@ -1,11 +1,11 @@
-@file:SharedCode
+
 @file:UseContextualSerialization(UUID::class, Instant::class)
 package com.lightningkite.lightningdb
 
 import com.lightningkite.TrimmedCaselessString
 import com.lightningkite.UUID
 import com.lightningkite.ZonedDateTime
-import com.lightningkite.khrysalis.SharedCode
+
 import com.lightningkite.uuid
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable

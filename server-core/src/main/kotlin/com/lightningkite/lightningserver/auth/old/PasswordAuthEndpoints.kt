@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.lightningkite.lightningserver.auth.old
 
 import com.lightningkite.lightningdb.HasId
@@ -25,7 +27,7 @@ open class PasswordAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
         summary = "Password Login",
         description = "Log in with a password",
         errorCases = listOf(),
-        implementation = { anon: Unit, input: PasswordLogin ->
+        implementation = { _: Unit, input: PasswordLogin ->
             val user = info.byUsername(input.username, input.password)
             if (!input.password.checkAgainstHash(info.hashedPassword(user)))
                 throw BadRequestException(

@@ -13,7 +13,6 @@ plugins {
 }
 
 val kotlinVersion: String by project
-val khrysalisVersion: String by project
 val coroutines: String by project
 val awsVersion = "2.25.24"
 dependencies {

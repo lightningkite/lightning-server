@@ -5,6 +5,8 @@ import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathMatcher
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.utils.MutableMapWithChangeHandler
@@ -25,6 +27,18 @@ object WebSockets {
                 val created = ServerPathMatcher(handlers.keys.asSequence())
                 _matcher = created
                 created
+            }
+        }
+
+    private var fullAction: WsInterceptor = { r, c -> c(r) }
+    var interceptors = listOf<WsInterceptor>()
+        set(value) {
+            field = value
+            // WARNING: This will melt your brain
+            fullAction = interceptors.fold<WsInterceptor, WsInterceptor>({ request, handler -> handler(request) }) { total, wrapper ->
+                return@fold { request, handler ->
+                    total(request) { wrapper(it, handler) }
+                }
             }
         }
 
@@ -69,6 +83,8 @@ object WebSockets {
         suspend fun disconnect(event: DisconnectEvent)
     }
 }
+
+typealias WsInterceptor = suspend (request: Request, cont: suspend (Request) -> Unit) -> Unit
 
 data class VirtualSocket(val incoming: ReceiveChannel<String>, val send: suspend (String) -> Unit)
 

@@ -67,7 +67,7 @@ suspend fun doOnce(
     name: String,
     database: () -> Database,
     maxDuration: Duration = 60.seconds,
-    priority: Double = 0.0,
+    @Suppress("UNUSED_PARAMETER") priority: Double = 0.0,
     action: suspend () -> Unit,
 ) {
     prepareModels()

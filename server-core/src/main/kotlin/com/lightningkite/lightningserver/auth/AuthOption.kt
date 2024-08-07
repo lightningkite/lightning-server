@@ -18,10 +18,10 @@ class AuthOption(
 data class AuthOptions<out USER : HasId<*>?>(val options: Set<AuthOption?>)
 operator fun <USER: HasId<*>?> AuthOptions<USER>.plus(
     other: AuthOptions<USER>
-) = AuthOptions<USER>(options)
+) = AuthOptions<USER>(options + other.options)
 
 inline fun <reified USER : HasId<*>> authRequired(
-    scopes: Set<String>? = null,
+    scopes: Set<String>? = setOf("*"),
     maxAge: Duration? = null,
     limitationDescription: String? = null,
     crossinline additionalRequirement: suspend (RequestAuth<USER>) -> Boolean = { true }
@@ -33,33 +33,40 @@ inline fun <reified USER : HasId<*>> authRequired(
                 AuthType(type), scopes,
                 maxAge,
                 limitationDescription,
-                { additionalRequirement(it as RequestAuth<USER>) }
+                {
+                    @Suppress("UNCHECKED_CAST")
+                    additionalRequirement(it as RequestAuth<USER>)
+                }
             )
         )
     )
 }
 
 inline fun <reified USER : HasId<*>> authOptional(
-    scopes: Set<String>? = null,
+    scopes: Set<String>? = setOf("*"),
     maxAge: Duration? = null,
     limitationDescription: String? = null,
     crossinline additionalRequirement: suspend (RequestAuth<USER>) -> Boolean = { true }
 ): AuthOptions<USER?> {
     val type = typeOf<USER>()
+    @Suppress("UNCHECKED_CAST")
     return AuthOptions<USER?>(
         setOf(
             AuthOption(
                 AuthType(type), scopes,
                 maxAge,
                 limitationDescription,
-                { additionalRequirement(it as RequestAuth<USER>) }
+                {
+                    @Suppress("UNCHECKED_CAST")
+                    additionalRequirement(it as RequestAuth<USER>)
+                }
             ), null
         )
     )
 }
 
 inline fun <reified USER : HasId<*>?> authOptions(
-    scopes: Set<String>? = null,
+    scopes: Set<String>? = setOf("*"),
     maxAge: Duration? = null,
     limitationDescription: String? = null
 ): AuthOptions<USER> {

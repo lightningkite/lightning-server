@@ -144,6 +144,7 @@ internal class MapOp<A, B>(
     val filter: (FieldSet2<A>) -> Expression<Boolean> = { Op.TRUE },
 ): Op<List<B>>() {
     override fun toQueryBuilder(queryBuilder: QueryBuilder) {
+        @Suppress("UNCHECKED_CAST")
         val fs = FieldSet2<A>(
             sources.serializer.listElement()!! as KSerializer<A>,
             fields = sources.fields.mapValues {

@@ -8,7 +8,10 @@ fun <T, V> Modification<T>.forFieldOrNull(field: SerializableProperty<T, V>): Mo
         is Modification.Chain -> modifications.mapNotNull { it.forFieldOrNull(field) }.takeUnless { it.isEmpty() }
             ?.let { Modification.Chain(it) }
 
-        is Modification.OnField<*, *> -> if (this.key == field) this.modification as Modification<V> else null
+        is Modification.OnField<*, *> -> {
+            @Suppress("UNCHECKED_CAST")
+            if (this.key == field) this.modification as Modification<V> else null
+        }
         else -> null
     }
 }
@@ -17,9 +20,12 @@ fun <T, V> Modification<T>.vet(field: SerializableProperty<T, V>, onModification
     when (this) {
         is Modification.Assign -> onModification(Modification.Assign(field.get(this.value)))
         is Modification.Chain -> modifications.forEach { it.vet(field, onModification) }
-        is Modification.OnField<*, *> -> if (this.key == field) (this.modification as Modification<V>).vet(
-            onModification
-        ) else null
+        is Modification.OnField<*, *> -> if (this.key == field) {
+            @Suppress("UNCHECKED_CAST")
+            (this.modification as Modification<V>).vet(
+                onModification
+            )
+        }
 
         else -> {}
     }
@@ -64,11 +70,17 @@ fun <T, V> Modification<T>.map(
 ): Modification<T> {
     return when (this) {
         is Modification.Chain -> modifications.map { it.map(field, onModification) }.let { Modification.Chain(it) }
-        is Modification.OnField<*, *> -> if (this.key == field) (this as Modification.OnField<T, V>).copy(
-            modification = onModification(
-                modification
+        is Modification.OnField<*, *> -> if (this.key == field) {
+            @Suppress("UNCHECKED_CAST")
+            (this as Modification.OnField<T, V>).copy(
+                modification = onModification(
+                    modification
+                )
             )
-        ) else this as Modification<T>
+        } else {
+            @Suppress("USELESS_CAST")
+            this as Modification<T>
+        }
 
         is Modification.Assign -> Modification.Assign(
             field.setCopy(
@@ -87,11 +99,17 @@ suspend fun <T, V> Modification<T>.mapSuspend(
 ): Modification<T> {
     return when (this) {
         is Modification.Chain -> modifications.map { it.mapSuspend(field, onModification) }.let { Modification.Chain(it) }
-        is Modification.OnField<*, *> -> if (this.key == field) (this as Modification.OnField<T, V>).copy(
-            modification = onModification(
-                modification
+        is Modification.OnField<*, *> -> if (this.key == field) {
+            @Suppress("UNCHECKED_CAST")
+            (this as Modification.OnField<T, V>).copy(
+                modification = onModification(
+                    modification
+                )
             )
-        ) else this as Modification<T>
+        }else {
+            @Suppress("USELESS_CAST")
+            this as Modification<T>
+        }
 
         is Modification.Assign -> Modification.Assign(
             field.setCopy(

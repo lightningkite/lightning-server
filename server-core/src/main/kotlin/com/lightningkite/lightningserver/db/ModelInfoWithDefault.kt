@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.AuthAccessor
 import kotlinx.serialization.serializer
 
+@Suppress("DEPRECATION")
 @Deprecated("User newer version with auth accessor instead, as it enables more potential optimizations.")
 inline fun <reified USER: HasId<*>?, reified T : HasId<ID>, reified ID : Comparable<ID>> ModelInfoWithDefault(
     noinline getCollection: () -> FieldCollection<T>,
@@ -51,6 +52,7 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfoWithDefault(
     override suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<T> = forUser(collection(), auth.user())
 
     override val collectionName: String = modelName
+    @Suppress("UNCHECKED_CAST")
     override suspend fun defaultItem(auth: RequestAuth<USER & Any>?): T = defaultItem(auth?.get() as USER)
     override fun exampleItem(): T? = exampleItem()
 }

@@ -44,7 +44,7 @@ open class HttpStatusException(
             return HttpResponse(body = HttpContent.Text(string = HtmlDefaults.basePage("""
                 <h1>${status.toString().escapeHTML()}</h1>
                 <p>${message}</p>
-                ${detail.let { "<!--${it.escapeHTML()}-->" } ?: ""}
+                ${detail.let { "<!--${it.escapeHTML()}-->" }}
                 ${if (generalSettings().debug) "<!--${stackTraceToString().escapeHTML()}-->" else ""}
             """.trimIndent()), type = ContentType.Text.Html), headers = headers)
         }

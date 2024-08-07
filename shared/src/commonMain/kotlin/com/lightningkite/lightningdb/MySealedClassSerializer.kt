@@ -52,7 +52,7 @@ class MySealedClassSerializer<T : Any>(
                     s.serializer.descriptor,
                     isOptional = true,
                     annotations = listOfNotNull(this@MySealedClassSerializer.options[index].alternativeNames
-                        ?.let { JsonNames(*it.toTypedArray()) }) + s.annotations
+                        .let { JsonNames(*it.toTypedArray()) }) + s.annotations
                 )
             }
         }

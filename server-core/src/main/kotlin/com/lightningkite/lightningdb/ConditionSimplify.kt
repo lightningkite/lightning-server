@@ -12,12 +12,16 @@ fun <T> Condition<T>.simplify(): Condition<T> {
                 .groupBy { it.first }
                 .mapNotNull {
 //                    println("AND key ${it.key.map { it.name }}: merging parts ${it.value.map { it.second }}")
+                    @Suppress("UNCHECKED_CAST")
                     val keyCond = it.value.map { it.second as Condition<Any?> }.reduce(::reduceAnd).finalSimplify()
 //                    println("AND reduced to $keyCond")
                     when (keyCond) {
                         is Condition.Always -> return@mapNotNull null
                         is Condition.Never -> return Condition.Never<T>()
-                        else -> make(it.key, keyCond) as Condition<T>
+                        else -> {
+                            @Suppress("UNCHECKED_CAST")
+                            make(it.key, keyCond) as Condition<T>
+                        }
                     }
                 }
                 .let {
@@ -34,12 +38,18 @@ fun <T> Condition<T>.simplify(): Condition<T> {
                 .groupBy { it.first }
                 .mapNotNull {
 //                    println("OR key ${it.key.map { it.name }}: merging parts ${it.value.map { it.second }}")
-                    val keyCond = it.value.map { it.second as Condition<Any?> }.reduce(::reduceOr).finalSimplify()
+                    val keyCond = it.value.map {
+                        @Suppress("UNCHECKED_CAST")
+                        it.second as Condition<Any?>
+                    }.reduce(::reduceOr).finalSimplify()
 //                    println("OR reduced to $keyCond")
                     when (keyCond) {
                         is Condition.Always -> return Condition.Always<T>()
                         is Condition.Never -> return@mapNotNull null
-                        else -> make(it.key, keyCond) as Condition<T>
+                        else -> {
+                            @Suppress("UNCHECKED_CAST")
+                            make(it.key, keyCond) as Condition<T>
+                        }
                     }
                 }
                 .let {
@@ -99,6 +109,7 @@ private fun make(prop: List<SerializableProperty<*, *>>, cond: Condition<*>): Co
     ))
 }
 
+@Suppress("UNCHECKED_CAST")
 private fun <T> reduceAnd(a: Condition<T>, b: Condition<T>): Condition<T> {
     return when (a) {
         is Condition.Always -> b
@@ -200,6 +211,7 @@ private fun <T> reduceAnd(a: Condition<T>, b: Condition<T>): Condition<T> {
         else -> Condition.And(listOf(a, b))
     }
 }
+@Suppress("UNCHECKED_CAST")
 private fun <T> reduceOr(a: Condition<T>, b: Condition<T>): Condition<T> {
     return when (a) {
         is Condition.Always -> a

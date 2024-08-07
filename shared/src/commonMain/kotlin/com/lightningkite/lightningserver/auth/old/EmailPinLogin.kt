@@ -1,7 +1,7 @@
-@file:SharedCode
+
 package com.lightningkite.lightningserver.auth.old
 
-import com.lightningkite.khrysalis.SharedCode
+
 import kotlinx.serialization.Serializable
 
 @Serializable

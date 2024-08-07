@@ -28,17 +28,16 @@ class JwtTokenFormat(
         handler: Authentication.SubjectHandler<SUBJECT, ID>,
         auth: RequestAuth<SUBJECT>
     ): String {
-        @Suppress("UNCHECKED_CAST")
         return hasher().signJwt(
             JwtClaims(
                 iss = issuer,
                 sid = auth.sessionId,
-                sub = "${handler.name}|${Serialization.json.encodeUnwrappingString<ID>(handler.idSerializer, auth.id)}",
+                sub = "${handler.name}|${Serialization.json.encodeUnwrappingString(handler.idSerializer, auth.id)}",
                 aud = audience,
                 exp = now().plus(expiration).epochSeconds,
                 iat = auth.issuedAt.epochSeconds,
                 nbf = now().epochSeconds,
-                scope = auth.scopes?.joinToString(" "),
+                scope = auth.scopes.joinToString(" "),
                 thp = auth.thirdParty,
                 cache = Serialization.json.encodeToString(auth.cacheKeyMap())
             )

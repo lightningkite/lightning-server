@@ -62,7 +62,7 @@ fun Documentable.Companion.dartSdk(fileName: String, out: Appendable) = with(out
                     append("    ")
                     it.write().let { out.append(it) }
                     append("({")
-                    (it as? GeneratedSerializer<*>)?.childSerializers()?.forEachIndexed { index, sub ->
+                    (it as? GeneratedSerializer<*>)?.childSerializers()?.forEachIndexed { index, _ ->
                         append("required this.")
                         append(it.descriptor.getElementName(index).filter { it.isLetterOrDigit() })
                         append(",")

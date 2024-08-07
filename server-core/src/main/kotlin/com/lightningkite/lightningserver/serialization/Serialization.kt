@@ -30,6 +30,8 @@ import nl.adaptivity.xmlutil.serialization.XML
 import java.math.BigDecimal
 import kotlinx.datetime.*
 import kotlinx.serialization.*
+import nl.adaptivity.xmlutil.ExperimentalXmlUtilApi
+import nl.adaptivity.xmlutil.serialization.XmlSerializationPolicy
 import java.util.*
 import kotlin.collections.HashMap
 
@@ -98,9 +100,6 @@ abstract class Serialization {
     }
     var xml: XML by SetOnce {
         XML(module) {
-            this.unknownChildHandler = UnknownChildHandler { input, inputKind, descriptor, name, candidates ->
-                emptyList()
-            }
             this.xmlDeclMode = XmlDeclMode.Auto
             this.repairNamespaces = true
         }

@@ -16,10 +16,10 @@ fun FileObject.resolveRandom(prefix: String = "", extension: String) =
 
 suspend fun FileObject.exists() = head() != null
 
-suspend fun FileObject.local(out: File = File.createTempFile("downloaded", ".temp")): File {
-    out.outputStream().use { out ->
+suspend fun FileObject.local(@Suppress("BlockingMethodInNonBlockingContext") out: File = File.createTempFile("downloaded", ".temp")): File {
+    out.outputStream().use { outStream ->
         get()!!.stream().use {
-            it.copyTo(out)
+            it.copyTo(outStream)
         }
     }
     return out
@@ -48,10 +48,6 @@ suspend fun io.ktor.client.statement.HttpResponse.download(
 val FileObject.serverFile: ServerFile get() = ServerFile(url)
 
 suspend fun FileObject.toHttpContent(): HttpContent? = this.get()
-
-suspend fun FileObject.copyTo(other: FileObject) {
-    other.put(this.toHttpContent() ?: throw IOException("File disappeared or changed during transfer"))
-}
 
 val FileObject.nameWithoutExtension: String get() = this.name.substringBeforeLast('.')
 val FileObject.extension: String get() = this.name.substringAfterLast('.', "")

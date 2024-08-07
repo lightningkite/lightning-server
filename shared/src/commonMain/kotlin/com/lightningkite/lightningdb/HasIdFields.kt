@@ -1,6 +1,5 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.khrysalis.JsName
 import com.lightningkite.lightningdb.SerializableProperty
 import kotlinx.serialization.KSerializer
 import kotlin.jvm.JvmName
@@ -15,12 +14,10 @@ fun <Model: HasEmail> KSerializer<Model>.email() = serializableProperties!!.find
 fun <Model: HasPhoneNumber> KSerializer<Model>.phoneNumber() = serializableProperties!!.find { it.name == "phoneNumber" }!! as SerializableProperty<Model, String>
 
 @JvmName("emailMaybe")
-@JsName("emailMaybe")
 @Suppress("UNCHECKED_CAST")
 fun <Model: HasMaybeEmail> KSerializer<Model>.email() = serializableProperties!!.find { it.name == "email" }!! as SerializableProperty<Model, String?>
 
 @JvmName("phoneNumberMaybe")
-@JsName("phoneNumberMaybe")
 @Suppress("UNCHECKED_CAST")
 fun <Model: HasMaybePhoneNumber> KSerializer<Model>.phoneNumber() = serializableProperties!!.find { it.name == "phoneNumber" }!! as SerializableProperty<Model, String?>
 

@@ -45,11 +45,10 @@ class OauthProofEndpoints(
         Authentication.register(this)
     }
 
-    @Suppress("UNCHECKED_CAST")
     val callback = path("callback").oauthCallback<UUID>(
         oauthProviderInfo = provider,
         credentials = credentials
-    ) { response, uuid ->
+    ) { response, _ ->
         val profile = provider.getProfile(response)
         val email = profile.email ?: throw BadRequestException("No email was found for this profile.")
         HttpResponse.redirectToGet(continueUiAuthUrl() + "?proof=${Serialization.json.encodeToString(Proof.serializer(), proofHasher().makeProof(

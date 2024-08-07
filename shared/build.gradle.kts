@@ -10,10 +10,6 @@ plugins {
     `maven-publish`
 }
 
-val kotlinVersion: String by project
-val khrysalisVersion: String by project
-val kotlinXSerialization: String by project
-
 ksp {
     arg("generateFields", "true")
 }
@@ -43,12 +39,13 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinXSerialization")
-                api("org.jetbrains.kotlinx:kotlinx-serialization-properties:$kotlinXSerialization")
+                api(serverlibs.kotlinXJson)
+                api(serverlibs.kotlinXProperties)
+                api(serverlibs.kotlinXDatetime)
 
-                implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-                implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
-                api("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0-RC.2")
+                implementation(serverlibs.kotlinReflect)
+                implementation(serverlibs.kotlinStdLib)
+
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonMain/kotlin"))

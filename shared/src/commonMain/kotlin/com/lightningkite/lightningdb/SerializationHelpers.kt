@@ -80,9 +80,17 @@ class KSerializerKey(val kSerializer: KSerializer<*>, val nullable: Boolean) {
     override fun toString(): String = kSerializer.toString()
 }
 
+
+@Suppress("NOTHING_TO_INLINE")
 private inline infix fun Int.hashWith(other: Int): Int = this * 31 + other
+
+@Suppress("NOTHING_TO_INLINE")
 private inline infix fun Int.hashWith(other: Any): Int = this * 31 + other.hashCode()
+
+@Suppress("NOTHING_TO_INLINE")
 private inline infix fun Any.hashWith(other: Int): Int = this.hashCode() * 31 + other
+
+@Suppress("NOTHING_TO_INLINE")
 private inline infix fun Any.hashWith(other: Any): Int = this.hashCode() * 31 + other.hashCode()
 
 

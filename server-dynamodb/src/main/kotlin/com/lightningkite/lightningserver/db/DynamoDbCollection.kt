@@ -18,6 +18,7 @@ class DynamoDbCollection<T : Any>(
     val tableName: String,
 ) : FieldCollection<T> {
 
+    @Suppress("UNCHECKED_CAST")
     val idSerializer = serializer.serializableProperties!!.find { it.name == "_id" }!!.serializer as KSerializer<Any?>
 
     suspend fun findRaw(
@@ -108,7 +109,7 @@ class DynamoDbCollection<T : Any>(
         val c = condition.dynamo(serializer, "_id")
         if (c.never) return emptyFlow()
         val exactKey = condition.exactPrimaryKey()
-        if (exactKey != null && idSerializer != null) {
+        if (exactKey != null) {
             return flowOf(action(c, mapOf("_id" to idSerializer.toDynamo(exactKey))))
         } else {
             return findRaw(condition = condition, limit = limit).map {
@@ -169,7 +170,7 @@ class DynamoDbCollection<T : Any>(
         var changed = 0
         val m = modification.dynamo(serializer)
         perKey(condition) { c, key ->
-            val result = client.updateItem {
+            client.updateItem {
                 it.tableName(tableName)
                 it.apply(c, m)
                 it.key(key)
@@ -218,7 +219,7 @@ class DynamoDbCollection<T : Any>(
     override suspend fun deleteManyIgnoringOld(condition: Condition<T>): Int {
         var changed = 0
         perKey(condition) { c, key ->
-            val result = client.deleteItem {
+            client.deleteItem {
                 it.tableName(tableName)
                 it.apply(c)
                 it.key(key)

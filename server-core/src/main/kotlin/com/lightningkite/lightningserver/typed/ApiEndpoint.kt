@@ -40,7 +40,7 @@ data class ApiEndpoint<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
         parts = route.path.serializers.mapIndexed { idx, ser ->
             val name = wildcards.get(idx).name
             val str = request.parts[name] ?: throw BadRequestException("Route segment $name not found")
-            str.parseUrlPartOrBadRequest(route.path.serializers[idx])
+            str.parseUrlPartOrBadRequest(ser)
         }.toTypedArray()
     ).also {
         authOptions.assert(it.authOrNull)
@@ -53,7 +53,7 @@ data class ApiEndpoint<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
             else -> if (inputType == Unit.serializer()) Unit as INPUT else it.body?.parse(inputType) ?: throw BadRequestException("No request body provided")
         }
         Serialization.validateOrThrow(inputType, input)
-        @Suppress("UNCHECKED_CAST") val result = authAndPathParts(auth, it).implementation(input)
+        val result = authAndPathParts(auth, it).implementation(input)
         return HttpResponse(
             body = result.toHttpContent(it.headers.accept, outputType),
             status = successCode

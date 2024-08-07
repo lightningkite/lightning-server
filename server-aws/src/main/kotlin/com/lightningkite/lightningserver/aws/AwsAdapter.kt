@@ -85,7 +85,9 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         val logger: Logger = LoggerFactory.getLogger(AwsAdapter::class.java)
         var preventLambdaTimeoutReuse: Boolean = false
 
-        fun loadSettings(jclass: Class<*>) {
+        @Deprecated("Just load settings directly", ReplaceWith("loadSettings()"))
+        fun loadSettings(jclass: Class<*>) = loadSettings()
+        fun loadSettings() {
             logger.debug("Loading settings...")
             val root = File(System.getenv("LAMBDA_TASK_ROOT"))
             root.resolve("settings.json").takeIf { it.exists() }?.let {
@@ -276,6 +278,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     }
                 }
             }
+            @OptIn(DelicateCoroutinesApi::class)
             val backgroundRegularHealthActionsJob = GlobalScope.launch {
                 println("Running ${backgroundReportingActions.size} backgroundRegularHealthActions...")
                 backgroundReportingActions.forEach {

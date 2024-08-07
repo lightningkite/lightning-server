@@ -1,7 +1,7 @@
-@file:SharedCode
+
 package com.lightningkite.lightningdb
 
-import com.lightningkite.khrysalis.SharedCode
+
 import kotlinx.serialization.Serializable
 
 @Serializable
