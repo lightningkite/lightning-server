@@ -1,8 +1,11 @@
 package com.lightningkite.lightningserver
 
+import com.lightningkite.UUID
 import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningdb.insertOne
+import com.lightningkite.lightningdb.test.LargeTestModel
+import com.lightningkite.lightningdb.test.SimpleLargeTestModel
 import com.lightningkite.lightningdb.test.User
 import com.lightningkite.lightningdb.test.ValidatedModel
 import com.lightningkite.lightningserver.auth.JwtSigner
@@ -29,6 +32,7 @@ import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.files.fileObject
 import com.lightningkite.lightningserver.http.post
+import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.sms.SMSSettings
@@ -54,6 +58,10 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     val oauthGithub = setting<OauthProviderCredentials?>("oauth_github", null)
     val oauthMicrosoft = setting<OauthProviderCredentials?>("oauth_microsoft", null)
 
+    init {
+        Serialization.enablePublicJavaData()
+        Serialization.enablePublicProtobuf()
+    }
 
     val info = modelInfo<User, User, UUID>(
         getBaseCollection = { database().collection() },
@@ -75,6 +83,8 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     val sample2 = path("sample2").post.api(summary = "Test2", authOptions = noAuth) { input: Int -> input + 42 }
     val sample3 = path("sample3").post.api(summary = "Test3", authOptions = authRequired<User> { false }) { input: Int -> input + 42 }
     val sample4 = path("sample4").post.api(summary = "Test4", authOptions = noAuth) { input: ValidatedModel -> input }
+    val sample5 = path("sample5").post.api(summary = "Test5", authOptions = noAuth) { input: UUID -> input }
+    val sample6 = path("sample6").post.api(summary = "Test5", authOptions = noAuth) { input: SimpleLargeTestModel -> input }
     val bulk = path("bulk").bulkRequestEndpoint()
 
     init {

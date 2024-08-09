@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
@@ -83,7 +84,7 @@ data class Mask<T>(
 }
 
 inline fun <reified T> mask(builder: Mask.Builder<T>.(DataClassPath<T, T>)->Unit): Mask<T> {
-    return Mask.Builder<T>(serializerOrContextual()).apply { builder(path()) }.build()
+    return Mask.Builder<T>(Serialization.module.contextualSerializerIfHandled()).apply { builder(path()) }.build()
 }
 
 operator fun <T> Condition<T>.invoke(map: Partial<T>): Boolean? {

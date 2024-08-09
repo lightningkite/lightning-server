@@ -4,7 +4,6 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.db.ModelInfoWithDefault
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.modelInfoWithDefault
@@ -12,7 +11,6 @@ import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.*
-import kotlinx.serialization.serializer
 import java.util.Base64
 import kotlin.random.Random
 
@@ -32,8 +30,8 @@ class OauthClientEndpoints(
 
     val modelInfo = modelInfoWithDefault(
         serialization = ModelSerializationInfo<OauthClient, String>(
-            serializer = Serialization.module.serializer(),
-            idSerializer = Serialization.module.serializer()
+            serializer = Serialization.module.contextualSerializerIfHandled(),
+            idSerializer = Serialization.module.contextualSerializerIfHandled()
         ),
         authOptions = @Suppress("UNCHECKED_CAST") (maintainPermissions as AuthOptions<HasId<*>>) + noAuth,
         getBaseCollection = { database().collection<OauthClient>() },

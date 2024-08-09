@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.lightningdb.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.encryption.SecureHasher.*
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException
@@ -96,7 +97,7 @@ data class JwtSigner(
         ReplaceWith("token(subject, Duration.ofMillis(expireDuration))", "java.time.Duration")
     )
     inline fun <reified T> token(subject: T, expireDuration: Long): String =
-        token(Serialization.module.serializer(), subject, expireDuration.milliseconds)
+        token(Serialization.module.contextualSerializerIfHandled(), subject, expireDuration.milliseconds)
 
     @Deprecated(
         "Use the version with duration instead",
@@ -106,7 +107,7 @@ data class JwtSigner(
         token(serializer, subject, expireDuration.milliseconds)
 
     inline fun <reified T> token(subject: T, expireDuration: Duration = expiration): String =
-        token(Serialization.module.serializer(), subject, expireDuration)
+        token(Serialization.module.contextualSerializerIfHandled(), subject, expireDuration)
 
     fun <T> token(serializer: KSerializer<T>, subject: T, expireDuration: Duration = expiration): String {
         return hasher.signJwt(JwtClaims(
@@ -119,7 +120,7 @@ data class JwtSigner(
         ))
     }
 
-    inline fun <reified T> verify(token: String): T = verify(Serialization.module.serializer(), token)
+    inline fun <reified T> verify(token: String): T = verify(Serialization.module.contextualSerializerIfHandled(), token)
     fun <T> verify(serializer: KSerializer<T>, token: String): T {
         return try {
             hasher.verifyJwt(token, audience)!!.sub!!.let {

@@ -1,14 +1,10 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.CollectionChanges
-import com.lightningkite.lightningdb.FieldCollection
-import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.withChangeListeners
+import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.AuthAccessor
-import kotlinx.serialization.serializer
 
 @Suppress("DEPRECATION")
 @Deprecated("User newer version with auth accessor instead, as it enables more potential optimizations.")
@@ -16,7 +12,7 @@ inline fun <reified USER: HasId<*>?, reified T : HasId<ID>, reified ID : Compara
     noinline getCollection: () -> FieldCollection<T>,
     noinline getBaseCollection: () -> FieldCollection<T> = { getCollection() },
     noinline forUser: suspend FieldCollection<T>.(principal: USER) -> FieldCollection<T>,
-    modelName: String = Serialization.module.serializer<T>().descriptor.serialName.substringBefore('<').substringAfterLast('.'),
+    modelName: String = Serialization.module.contextualSerializerIfHandled<T>().descriptor.serialName.substringBefore('<').substringAfterLast('.'),
     noinline defaultItem: suspend (auth: USER) -> T,
     noinline exampleItem: ()->T? = { null },
 ): ModelInfoWithDefault<USER, T, ID> = ModelInfoWithDefault(

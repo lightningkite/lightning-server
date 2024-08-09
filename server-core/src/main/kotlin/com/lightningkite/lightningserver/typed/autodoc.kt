@@ -20,6 +20,7 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.internal.GeneratedSerializer
+import kotlinx.serialization.protobuf.schema.ProtoBufSchemaGenerator
 import kotlinx.serialization.serializer
 import kotlin.reflect.KType
 
@@ -53,6 +54,17 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
             HttpContent.OutStream(
                 write = { Documentable.kotlinSdk(packageName, it) },
                 type = ContentType.Application.Zip
+            )
+        )
+    }
+    get("sdk.protobuf").handler {
+        HttpResponse(
+            HttpContent.Text(
+                string = ProtoBufSchemaGenerator.generateSchemaText(
+                    Documentable.usedTypes.map { it.descriptor },
+                    packageName = packageName
+                ),
+                type = ContentType.Application.ProtoBufDeclaration
             )
         )
     }

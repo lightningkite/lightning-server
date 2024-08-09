@@ -1,12 +1,12 @@
 package com.lightningkite.lightningserver.typed
 
+import com.lightningkite.lightningdb.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.HttpEndpoint
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.serializer
 
 sealed interface TypedServerPath {
     val path: ServerPath
@@ -53,12 +53,12 @@ data class TypedHttpEndpoint<PathType: TypedServerPath>(
 @LightningServerDsl
 inline fun <reified A> TypedServerPath0.arg(name: String, description: String? = null): TypedServerPath1<A> = TypedServerPath1(
     path = path.copy(segments = path.segments + ServerPath.Segment.Wildcard(name)),
-    a = TypedServerPathParameter(name, description, Serialization.module.serializer()),
+    a = TypedServerPathParameter(name, description, Serialization.module.contextualSerializerIfHandled()),
 )
 @LightningServerDsl
 inline fun <reified A> ServerPath.arg(name: String, description: String? = null): TypedServerPath1<A> = TypedServerPath1(
     path = copy(segments = segments + ServerPath.Segment.Wildcard(name)),
-    a = TypedServerPathParameter(name, description, Serialization.module.serializer()),
+    a = TypedServerPathParameter(name, description, Serialization.module.contextualSerializerIfHandled()),
 )
 @LightningServerDsl
 fun <A> ServerPath.arg(name: String, serializer: KSerializer<A>, description: String? = null): TypedServerPath1<A> = TypedServerPath1(

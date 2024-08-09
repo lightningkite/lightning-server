@@ -1,10 +1,10 @@
 package com.lightningkite.lightningserver.auth.oauth
 
+import com.lightningkite.lightningdb.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.*
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.serializer
 
 class OauthCallbackEndpoint<STATE>(
     path: ServerPath,
@@ -67,7 +67,7 @@ inline fun <reified STATE> ServerPath.oauthCallback(
     },
     noinline onAccess: suspend (OauthResponse, STATE) -> HttpResponse
 ) = OauthCallbackEndpoint(
-    stateSerializer = Serialization.module.serializer<STATE>(),
+    stateSerializer = Serialization.module.contextualSerializerIfHandled<STATE>(),
     path = this,
     oauthProviderInfo = oauthProviderInfo,
     credentials = credentials,

@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.ServerFile
+import com.lightningkite.lightningdb.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.jsonschema.schema
 import com.lightningkite.lightningserver.routes.fullUrl
@@ -12,7 +13,6 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.getContextualDescriptor
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.serializer
 
 
 fun HEAD.includeFormScript() {
@@ -50,7 +50,7 @@ inline fun <reified T> FORM.insideHtmlForm(
     collapsed: Boolean = false,
     uploadEarlyEndpoint: UploadEarlyEndpoint? = UploadEarlyEndpoint.default,
 ): Unit =
-    insideHtmlForm(title, jsEditorName, Serialization.module.serializer(), defaultValue, collapsed, uploadEarlyEndpoint)
+    insideHtmlForm(title, jsEditorName, Serialization.module.contextualSerializerIfHandled(), defaultValue, collapsed, uploadEarlyEndpoint)
 
 fun <T> FORM.insideHtmlForm(
     title: String,
@@ -109,7 +109,7 @@ inline fun <reified T> FlowContent.jsForm(
     jsEditorName: String,
     defaultValue: T? = null,
     collapsed: Boolean = false,
-) = jsForm(title, jsEditorName, Serialization.module.serializer<T>(), defaultValue, collapsed)
+) = jsForm(title, jsEditorName, Serialization.module.contextualSerializerIfHandled<T>(), defaultValue, collapsed)
 
 fun <T> FlowContent.jsForm(
     title: String,
@@ -173,7 +173,7 @@ inline fun <reified T> FlowContent.display(
     jsEditorName: String,
     defaultValue: T? = null,
     collapsed: Boolean = false,
-) = displayUntyped(title, jsEditorName, Serialization.module.serializer<T>(), defaultValue, collapsed)
+) = displayUntyped(title, jsEditorName, Serialization.module.contextualSerializerIfHandled<T>(), defaultValue, collapsed)
 
 fun <T> FlowContent.displayUntyped(
     title: String,

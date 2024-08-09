@@ -15,12 +15,12 @@ class ModificationSimplifyTest {
     fun test() {
         prepareModels()
         val item = LargeTestModel()
-        val mods = listOf<Pair<Modification<LargeTestModel>, Modification<LargeTestModel>>>(
-            modification { it.int assign 1 } to modification { it.int assign 1 },
-            modification {
+        val mods = listOf(
+            modification<LargeTestModel> { it.int assign 1 } to modification<LargeTestModel> { it.int assign 1 },
+            modification<LargeTestModel> {
                 it assign item
                 it.int assign 1
-            } to modification { it assign item.copy(int = 1) },
+            } to modification<LargeTestModel> { it assign item.copy(int = 1) },
         )
         for((pre, post) in mods) {
             assertEquals(post, pre.simplify().also { println("$pre -> $it") })

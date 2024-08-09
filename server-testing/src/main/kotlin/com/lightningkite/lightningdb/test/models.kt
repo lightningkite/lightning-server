@@ -152,6 +152,26 @@ data class LargeTestModel(
 
 @GenerateDataClassPaths
 @Serializable
+data class SimpleLargeTestModel(
+    override val _id: UUID = uuid(),
+    var boolean: Boolean = false,
+    var byte: Byte = 0,
+    var short: Short = 0,
+    @Index var int: Int = 0,
+    var long: Long = 0,
+    var float: Float = 0f,
+    var double: Double = 0.0,
+    var char: Char = ' ',
+    var string: String = "",
+    var uuid: UUID = UUID(0L, 0L),
+    var instant: Instant = Instant.fromEpochMilliseconds(0L),
+    var listEmbedded: List<ClassUsedForEmbedding> = listOf(),
+) : HasId<UUID> {
+    companion object
+}
+
+@GenerateDataClassPaths
+@Serializable
 data class GeoTest(
     override val _id: UUID = uuid(),
     @Index val geo: GeoCoordinate = GeoCoordinate(41.727019, -111.8443002)

@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningdb.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.authChecked
@@ -20,7 +21,6 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.serializer
 import java.net.URLDecoder
 
 data class ApiWebsocket<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
@@ -85,8 +85,8 @@ inline fun <reified USER: HasId<*>?, PATH: TypedServerPath, reified INPUT, reifi
     noinline disconnect: suspend TypedWebSocketSender<OUTPUT>.() -> Unit,
 ): ApiWebsocket<USER, PATH, INPUT, OUTPUT> = apiWebsocket(
     authOptions = authOptions<USER>(),
-    inputType = Serialization.module.serializer(),
-    outputType = Serialization.module.serializer(),
+    inputType = Serialization.module.contextualSerializerIfHandled(),
+    outputType = Serialization.module.contextualSerializerIfHandled(),
     summary = summary,
     description = description,
     errorCases = errorCases,
@@ -137,8 +137,8 @@ inline fun <reified USER: HasId<*>?, reified INPUT, reified OUTPUT> ServerPath.a
     noinline disconnect: suspend TypedWebSocketSender<OUTPUT>.() -> Unit,
 ): ApiWebsocket<USER, TypedServerPath0, INPUT, OUTPUT> = apiWebsocket(
     authOptions = authOptions<USER>(),
-    inputType = Serialization.module.serializer(),
-    outputType = Serialization.module.serializer(),
+    inputType = Serialization.module.contextualSerializerIfHandled(),
+    outputType = Serialization.module.contextualSerializerIfHandled(),
     summary = summary,
     description = description,
     errorCases = errorCases,

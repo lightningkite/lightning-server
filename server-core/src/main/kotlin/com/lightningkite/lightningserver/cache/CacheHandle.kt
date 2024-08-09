@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.cache
 
+import com.lightningkite.lightningdb.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.serializer
 import kotlin.time.Duration
 
 /**
@@ -25,4 +25,4 @@ class CacheHandle<T>(val cache: () -> Cache, val key: String, val serializer: KS
 }
 
 inline operator fun <reified T> (() -> Cache).get(key: String) =
-    CacheHandle<T>(this, key, Serialization.module.serializer())
+    CacheHandle<T>(this, key, Serialization.module.contextualSerializerIfHandled())

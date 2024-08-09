@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.forms
 
 
+import com.lightningkite.lightningdb.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.html.FlowContent
 import kotlinx.serialization.SerializationException
@@ -9,12 +10,11 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.AbstractEncoder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.serializer
 
 typealias HtmlRenderer<T> = FlowContent.(inputKey: String, value: T) -> Unit
 
 class HtmlSerializer(val serializersModule: SerializersModule = EmptySerializersModule(), val module: Module) {
-    inline fun <reified T> render(value: T, into: FlowContent) = render(Serialization.module.serializer(), value, into)
+    inline fun <reified T> render(value: T, into: FlowContent) = render(Serialization.module.contextualSerializerIfHandled(), value, into)
     fun <T> render(serializer: SerializationStrategy<T>, value: T, into: FlowContent) {
         HtmlEncoder(into).encodeSerializableValue(serializer, value)
     }

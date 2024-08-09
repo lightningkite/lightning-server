@@ -3,6 +3,7 @@
 package com.lightningkite.lightningdb
 
 import kotlinx.serialization.*
+import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
@@ -15,6 +16,7 @@ import kotlinx.serialization.internal.GeneratedSerializer
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.reflect.KClass
+import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
 
@@ -204,7 +206,59 @@ fun KSerializer<*>.tryTypeParameterSerializers2(): Array<KSerializer<*>>? = when
 fun KSerializer<*>.tryChildSerializers(): Array<KSerializer<*>>? = (this as? GeneratedSerializer<*>)?.childSerializers()
 
 @Suppress("UNCHECKED_CAST")
-inline fun <reified T> serializerOrContextual(): KSerializer<T> {
-    val t = typeOf<T>()
-    return (serializerOrNull(t) ?: ContextualSerializer(t.classifier as KClass<*>)) as KSerializer<T>
+inline fun <reified T> serializerOrContextual(): KSerializer<T> = serializerOrContextual(typeOf<T>()) as KSerializer<T>
+fun serializerOrContextual(type: KType): KSerializer<*> {
+    val args = type.arguments.map { serializerOrContextual(it.type!!) }
+    val kclass = type.classifier as KClass<*>
+    return try {
+        EmptySerializersModule().serializer(
+            kClass = kclass,
+            typeArgumentsSerializers = args,
+            isNullable = type.isMarkedNullable
+        )
+    } catch(e: SerializationException) {
+        ContextualSerializer(kclass, null, args.toTypedArray()).let {
+            @Suppress("UNCHECKED_CAST")
+            if(type.isMarkedNullable) (it as KSerializer<Any>).nullable
+            else it
+        }
+    }
+}
+
+@Suppress("UNCHECKED_CAST")
+inline fun <reified T> SerializersModule.contextualSerializerIfHandled(): KSerializer<T> = contextualSerializerIfHandled(typeOf<T>()) as KSerializer<T>
+fun SerializersModule.contextualSerializerIfHandled(type: KType): KSerializer<*> {
+    val args = type.arguments.map { contextualSerializerIfHandled(it.type!!) }
+    val kclass = type.classifier as KClass<*>
+    return try {
+        getContextual(type)?.let { c ->
+            ContextualSerializer(kclass, null, args.toTypedArray()).let {
+                @Suppress("UNCHECKED_CAST")
+                if(type.isMarkedNullable) (it as KSerializer<Any>).nullable
+                else it
+            }
+        } ?: EmptySerializersModule().serializer(
+            kClass = kclass,
+            typeArgumentsSerializers = args,
+            isNullable = type.isMarkedNullable
+        )
+    } catch(e: SerializationException) {
+        ContextualSerializer(kclass, null, args.toTypedArray()).let {
+            @Suppress("UNCHECKED_CAST")
+            if(type.isMarkedNullable) (it as KSerializer<Any>).nullable
+            else it
+        }
+    }
+}
+
+@Suppress("UNCHECKED_CAST")
+inline fun <reified T> SerializersModule.serializerPreferContextual(): KSerializer<T> = serializerPreferContextual(typeOf<T>()) as KSerializer<T>
+fun SerializersModule.serializerPreferContextual(type: KType): KSerializer<*> {
+    return this.getContextual(type.classifier as KClass<*>, type.arguments.map { serializerPreferContextual(it.type!!) }) ?: serializer(type)
+}
+
+@Suppress("UNCHECKED_CAST")
+inline fun <reified T> SerializersModule.getContextual(): KSerializer<T>? = getContextual(typeOf<T>()) as KSerializer<T>?
+fun SerializersModule.getContextual(type: KType): KSerializer<*>? {
+    return this.getContextual(type.classifier as KClass<*>, type.arguments.map { getContextual(it.type!!) ?: serializer(it.type!!) })
 }

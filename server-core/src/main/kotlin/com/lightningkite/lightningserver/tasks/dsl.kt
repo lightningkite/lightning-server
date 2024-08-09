@@ -11,7 +11,6 @@ import kotlinx.datetime.Instant
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import kotlinx.serialization.serializer
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -20,7 +19,7 @@ inline fun <reified INPUT> task(
     name: String,
     noinline implementation: suspend Task.RunningTask<INPUT>.(INPUT) -> Unit,
 ) =
-    task(name, Serialization.module.serializer<INPUT>(), implementation)
+    task(name, Serialization.module.contextualSerializerIfHandled<INPUT>(), implementation)
 
 @LightningServerDsl
 fun <INPUT> task(

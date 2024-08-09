@@ -427,8 +427,8 @@ server. You can add it to your server like any other path:
 
     val auth = AuthEndpoints(
         path = path("auth"),
-        userSerializer = Serialization.module.serializer(),
-        idSerializer = Serialization.module.serializer(),
+        userSerializer = Serialization.module.contextualSerializerIfHandled(),
+        idSerializer = Serialization.module.contextualSerializerIfHandled(),
         authRequirement = AuthInfo&lt;User&gt;(),
         jwtSigner = userSigner,
         email = email,

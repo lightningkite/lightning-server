@@ -30,6 +30,7 @@ dependencies {
     api(serverlibs.mongoBson)
     api(serverlibs.kBson)
     api(serverlibs.kaml)
+    api(serverlibs.serializationProtobuf)
     api(serverlibs.kotlinReflect)
     implementation(serverlibs.bouncyCastleBcprov)
     implementation(serverlibs.bouncyCastleBcpkix)

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
@@ -72,5 +73,5 @@ data class UpdateRestrictions<T>(
  * DSL for defining [UpdateRestrictions]
  */
 inline fun <reified T> updateRestrictions(builder: UpdateRestrictions.Builder<T>.(DataClassPath<T, T>)->Unit): UpdateRestrictions<T> {
-    return UpdateRestrictions.Builder<T>(serializerOrContextual()).apply { builder(path<T>()) }.build()
+    return UpdateRestrictions.Builder<T>(Serialization.module.contextualSerializerIfHandled()).apply { builder(path<T>()) }.build()
 }
