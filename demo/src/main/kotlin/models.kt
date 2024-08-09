@@ -1,4 +1,4 @@
-@file:UseContextualSerialization(Instant::class, UUID::class, ServerFile::class)
+@file:UseContextualSerialization(UUID::class, ServerFile::class)
 package com.lightningkite.lightningserver.demo
 
 import com.lightningkite.lightningdb.*
@@ -10,6 +10,7 @@ import kotlinx.datetime.Instant
 import java.util.*
 import com.lightningkite.UUID
 import com.lightningkite.uuid
+import kotlinx.serialization.Contextual
 
 @Serializable
 @GenerateDataClassPaths
@@ -17,7 +18,7 @@ import com.lightningkite.uuid
 @Description("A model for testing Lightning Server.")
 data class TestModel(
     override val _id: UUID = uuid(),
-    val timestamp: Instant = now(),
+    @Contextual val timestamp: Instant = now(),
     val name: String = "No Name",
     @Description("The number") val number: Int = 3123,
     @MimeType("text/html") @Multiline val content: String = "",

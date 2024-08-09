@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.websocket.WebSockets
 import com.lightningkite.lightningserver.websocket.WsInterceptor
 import com.lightningkite.now
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -54,7 +55,7 @@ class RateLimiter(
     data class RateLimitInfo(
         val remainingTime: Duration,
         val id: String,
-        val availableAfter: Instant
+        @Contextual val availableAfter: Instant
     )
 
     @OptIn(ExperimentalContracts::class)

@@ -8,6 +8,7 @@ import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.now
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
@@ -40,8 +41,8 @@ fun defineAfterSettings(priority: Double = 0.0, action: suspend () -> Unit) = Ta
 @Serializable
 data class ActionHasOccurred(
     override val _id: String,
-    val started: Instant? = null,
-    val completed: Instant? = null,
+    @Contextual val started: Instant? = null,
+    @Contextual val completed: Instant? = null,
     val errorMessage: String? = null,
 ) : HasId<String>
 

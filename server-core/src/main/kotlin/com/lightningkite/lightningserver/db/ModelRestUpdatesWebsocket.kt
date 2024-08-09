@@ -20,6 +20,7 @@ import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import com.lightningkite.now
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlin.time.Duration.Companion.days
@@ -199,7 +200,7 @@ data class __WebSocketDatabaseUpdatesSubscription(
     val user: RequestAuthSerializable?, //USER
     val condition: String, //Condition<T>
     val mask: String, //Mask<T>
-    val establishedAt: Instant,
+    @Contextual val establishedAt: Instant,
     val relevant: Set<Int>? = null,
 ) : HasId<WebSocketIdentifier>
 

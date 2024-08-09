@@ -31,7 +31,6 @@ import java.math.BigDecimal
 import kotlinx.datetime.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.StructureKind
-import kotlinx.serialization.protobuf.ProtoBuf
 import nl.adaptivity.xmlutil.ExperimentalXmlUtilApi
 import nl.adaptivity.xmlutil.serialization.XmlSerializationPolicy
 import org.bson.BsonDocument
@@ -139,9 +138,9 @@ abstract class Serialization {
     var formData: FormDataFormat by SetOnce {
         FormDataFormat(StringDeferringConfig(module, deferredFormat = json))
     }
-    var protobuf: ProtoBuf by SetOnce {
-        ProtoBuf { this.serializersModule = module }
-    }
+//    var protobuf: ProtoBuf by SetOnce {
+//        ProtoBuf { this.serializersModule = module }
+//    }
 
     interface HttpContentParser {
         val contentType: ContentType
@@ -227,9 +226,9 @@ abstract class Serialization {
     fun enablePublicJavaData() {
         handler(BinaryFormatHandler({ javaData }, ContentType.Application.StructuredBytes))
     }
-    fun enablePublicProtobuf() {
-        handler(BinaryFormatHandler({ protobuf }, ContentType.Application.ProtoBuf))
-    }
+//    fun enablePublicProtobuf() {
+//        handler(BinaryFormatHandler({ protobuf }, ContentType.Application.ProtoBuf))
+//    }
     fun enablePublicXml() {
         handler(StringFormatHandler({ xml }, ContentType.Text.Xml))
     }

@@ -21,6 +21,7 @@ import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
 import com.lightningkite.lightningdb.SerializableProperty
 import com.lightningkite.now
+import kotlinx.serialization.Contextual
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -189,6 +190,6 @@ data class __WebSocketDatabaseChangeSubscription(
     val user: RequestAuthSerializable?, //USER
     val condition: String, //Query<T>
     val mask: String, //Mask<T>
-    val establishedAt: Instant,
+    @Contextual val establishedAt: Instant,
     val relevant: Set<Int>? = null,
 ) : HasId<WebSocketIdentifier>
