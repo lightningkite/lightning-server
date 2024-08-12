@@ -7,7 +7,7 @@ import kotlinx.serialization.serializer
 import kotlin.js.JsName
 import kotlin.jvm.JvmName
 
-inline fun <reified T> path(): DataClassPath<T, T> = DataClassPathSelf(serializer<T>())
+inline fun <reified T> path(): DataClassPath<T, T> = DataClassPathSelf(serializerOrContextual<T>())
 
 inline fun <reified T> condition(setup: (DataClassPath<T, T>) -> Condition<T>): Condition<T> =
     path<T>().let(setup)
