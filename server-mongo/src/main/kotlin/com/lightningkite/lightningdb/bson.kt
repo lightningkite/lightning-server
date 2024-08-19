@@ -1,19 +1,15 @@
 package com.lightningkite.lightningdb
 
 import com.github.jershell.kbson.*
-import com.lightningkite.GeoCoordinate
 import com.lightningkite.GeoCoordinateGeoJsonSerializer
-import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.mongodb.client.model.UpdateOptions
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.descriptors.*
 import org.bson.BsonDocument
-import org.bson.BsonDocumentWriter
 import org.bson.BsonNumber
 import org.bson.BsonTimestamp
 import org.bson.BsonType
@@ -26,8 +22,6 @@ import kotlinx.datetime.*
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
-import com.lightningkite.lightningdb.SerializableProperty
-import org.bson.BsonArray
 
 fun documentOf(): Document {
     return Document()

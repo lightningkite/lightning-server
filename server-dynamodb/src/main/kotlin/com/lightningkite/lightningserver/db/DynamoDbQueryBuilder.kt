@@ -2,11 +2,8 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
-import java.lang.IllegalArgumentException
-import com.lightningkite.lightningdb.SerializableProperty
 
 data class DynamoCondition<T>(
     val local: Condition<T>? = null,

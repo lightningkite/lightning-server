@@ -2,9 +2,7 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.descriptors.StructureKind
 import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.ops.InListOrNotInListBaseOp
 import org.jetbrains.exposed.sql.ops.SingleValueInListOp
 import org.jetbrains.exposed.sql.statements.UpdateBuilder
 import com.lightningkite.lightningdb.SerializableProperty
