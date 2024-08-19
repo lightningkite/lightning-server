@@ -28,8 +28,8 @@ data class RequestAuthSerializable(
     val subjectType: String,
     val sessionId: UUID?,
     val id: String,
-    val issuedAt: Instant,
-    val expiresAt: Instant,
+    @Contextual val issuedAt: Instant,
+    @Contextual val expiresAt: Instant,
     @Description("The scopes permitted.  * indicates root access.")
     val scopes: Set<String>,
     val cache: CacheKeyMap = CacheKeyMap(mapOf()),

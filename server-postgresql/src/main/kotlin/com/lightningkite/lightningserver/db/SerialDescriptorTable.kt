@@ -128,169 +128,143 @@ data class SerialDescriptorColumns(val descriptor: SerialDescriptor, val columns
 
 internal data class ColumnTypeInfo(val key: List<String>, val type: ColumnType, val descriptorPath: List<Int>)
 
-internal fun SerialDescriptor.columnType(): List<ColumnTypeInfo> = when (this.unnull()) {
-    UUIDSerializer.descriptor -> listOf(
-        ColumnTypeInfo(
-            listOf<String>(),
-            UUIDColumnType().also { it.nullable = this.isNullable },
-            listOf()
-        )
-    )
-
-    LocalDateIso8601Serializer.descriptor -> listOf(
-        ColumnTypeInfo(
-            listOf<String>(),
-            JavaLocalDateColumnType().also { it.nullable = this.isNullable },
-            listOf()
-        )
-    )
-
-    InstantIso8601Serializer.descriptor -> listOf(
-        ColumnTypeInfo(
-            listOf<String>(),
-            JavaInstantColumnType().also { it.nullable = this.isNullable },
-            listOf()
-        )
-    )
-
-    DurationSerializer.descriptor -> listOf(
-        ColumnTypeInfo(
-            listOf<String>(),
-            JavaDurationColumnType().also { it.nullable = this.isNullable },
-            listOf()
-        )
-    )
-    LocalDateTimeIso8601Serializer.descriptor -> listOf(
-        ColumnTypeInfo(
-            listOf<String>(),
-            JavaLocalDateTimeColumnType().also { it.nullable = this.isNullable },
-            listOf()
-        )
-    )
-    LocalTimeIso8601Serializer.descriptor -> listOf(
-        ColumnTypeInfo(
-            listOf<String>(),
-            JavaLocalTimeColumnType().also { it.nullable = this.isNullable },
-            listOf()
-        )
-    )
-
-    else -> when (kind) {
-        SerialKind.CONTEXTUAL -> throw Error()
-        PolymorphicKind.OPEN -> throw NotImplementedError()
-        PolymorphicKind.SEALED -> throw NotImplementedError()
-        PrimitiveKind.BOOLEAN -> listOf(
+internal fun SerialDescriptor.columnType(): List<ColumnTypeInfo> {
+    if (this.kind == SerialKind.CONTEXTUAL)
+        return Serialization.module.getContextualDescriptor(this)!!.let { if(this.isNullable) it.nullable else it }.columnType()
+    return when (this.unnull()) {
+        UUIDSerializer.descriptor -> listOf(
             ColumnTypeInfo(
                 listOf<String>(),
-                BooleanColumnType().also { it.nullable = this.isNullable },
+                UUIDColumnType().also { it.nullable = this.isNullable },
                 listOf()
             )
         )
 
-        PrimitiveKind.BYTE -> listOf(
+        LocalDateIso8601Serializer.descriptor, com.lightningkite.lightningdb.LocalDateIso8601Serializer.descriptor -> listOf(
             ColumnTypeInfo(
                 listOf<String>(),
-                ByteColumnType().also { it.nullable = this.isNullable },
+                JavaLocalDateColumnType().also { it.nullable = this.isNullable },
                 listOf()
             )
         )
 
-        PrimitiveKind.CHAR -> listOf(
+        InstantIso8601Serializer.descriptor, com.lightningkite.lightningdb.InstantIso8601Serializer.descriptor -> listOf(
             ColumnTypeInfo(
                 listOf<String>(),
-                CharColumnType(1).also { it.nullable = this.isNullable },
+                JavaInstantColumnType().also { it.nullable = this.isNullable },
                 listOf()
             )
         )
 
-        PrimitiveKind.DOUBLE -> listOf(
+        DurationSerializer.descriptor -> listOf(
             ColumnTypeInfo(
                 listOf<String>(),
-                DoubleColumnType().also { it.nullable = this.isNullable },
+                JavaDurationColumnType().also { it.nullable = this.isNullable },
                 listOf()
             )
         )
 
-        PrimitiveKind.FLOAT -> listOf(
+        LocalDateTimeIso8601Serializer.descriptor, com.lightningkite.lightningdb.LocalDateTimeIso8601Serializer.descriptor -> listOf(
             ColumnTypeInfo(
                 listOf<String>(),
-                FloatColumnType().also { it.nullable = this.isNullable },
+                JavaLocalDateTimeColumnType().also { it.nullable = this.isNullable },
                 listOf()
             )
         )
 
-        PrimitiveKind.INT -> listOf(
+        LocalTimeIso8601Serializer.descriptor, com.lightningkite.lightningdb.LocalTimeIso8601Serializer.descriptor -> listOf(
             ColumnTypeInfo(
                 listOf<String>(),
-                IntegerColumnType().also { it.nullable = this.isNullable },
+                JavaLocalTimeColumnType().also { it.nullable = this.isNullable },
                 listOf()
             )
         )
 
-        PrimitiveKind.LONG -> listOf(
-            ColumnTypeInfo(
-                listOf<String>(),
-                LongColumnType().also { it.nullable = this.isNullable },
-                listOf()
-            )
-        )
-
-        PrimitiveKind.SHORT -> listOf(
-            ColumnTypeInfo(
-                listOf<String>(),
-                ShortColumnType().also { it.nullable = this.isNullable },
-                listOf()
-            )
-        )
-
-        PrimitiveKind.STRING -> listOf(
-            ColumnTypeInfo(
-                listOf<String>(),
-                TextColumnType().also { it.nullable = this.isNullable },
-                listOf()
-            )
-        )
-
-        SerialKind.ENUM -> listOf(
-            ColumnTypeInfo(
-                listOf<String>(),
-                TextColumnType().also { it.nullable = this.isNullable },
-                listOf()
-            )
-        )
-
-        StructureKind.LIST -> getRealElementDescriptor(0).columnType()
-            .map {
+        else -> when (kind) {
+            SerialKind.CONTEXTUAL -> throw Error()
+            PolymorphicKind.OPEN -> throw NotImplementedError()
+            PolymorphicKind.SEALED -> throw NotImplementedError()
+            PrimitiveKind.BOOLEAN -> listOf(
                 ColumnTypeInfo(
-                    it.key,
-                    ArrayColumnType(it.type).also { it.nullable = this.isNullable },
-                    listOf(0) + it.descriptorPath
-                )
-            }
-
-        StructureKind.CLASS -> {
-            val nullCol = if (isNullable) listOf(
-                ColumnTypeInfo(
-                    listOf<String>("exists"),
-                    BooleanColumnType(),
+                    listOf<String>(),
+                    BooleanColumnType().also { it.nullable = this.isNullable },
                     listOf()
                 )
-            ) else listOf()
-            nullCol + (0 until elementsCount).flatMap { index ->
-                this.getRealElementDescriptor(index).columnType().map { sub ->
-                    ColumnTypeInfo(
-                        key = (listOf(getElementName(index)) + sub.key),
-                        type = sub.type.also {
-                            it.nullable = it.nullable || isNullable
-                        },
-                        descriptorPath = listOf(index) + sub.descriptorPath
-                    )
-                }
-            }
-        }
+            )
 
-        StructureKind.MAP -> {
-            getRealElementDescriptor(0).columnType()
+            PrimitiveKind.BYTE -> listOf(
+                ColumnTypeInfo(
+                    listOf<String>(),
+                    ByteColumnType().also { it.nullable = this.isNullable },
+                    listOf()
+                )
+            )
+
+            PrimitiveKind.CHAR -> listOf(
+                ColumnTypeInfo(
+                    listOf<String>(),
+                    CharColumnType(1).also { it.nullable = this.isNullable },
+                    listOf()
+                )
+            )
+
+            PrimitiveKind.DOUBLE -> listOf(
+                ColumnTypeInfo(
+                    listOf<String>(),
+                    DoubleColumnType().also { it.nullable = this.isNullable },
+                    listOf()
+                )
+            )
+
+            PrimitiveKind.FLOAT -> listOf(
+                ColumnTypeInfo(
+                    listOf<String>(),
+                    FloatColumnType().also { it.nullable = this.isNullable },
+                    listOf()
+                )
+            )
+
+            PrimitiveKind.INT -> listOf(
+                ColumnTypeInfo(
+                    listOf<String>(),
+                    IntegerColumnType().also { it.nullable = this.isNullable },
+                    listOf()
+                )
+            )
+
+            PrimitiveKind.LONG -> listOf(
+                ColumnTypeInfo(
+                    listOf<String>(),
+                    LongColumnType().also { it.nullable = this.isNullable },
+                    listOf()
+                )
+            )
+
+            PrimitiveKind.SHORT -> listOf(
+                ColumnTypeInfo(
+                    listOf<String>(),
+                    ShortColumnType().also { it.nullable = this.isNullable },
+                    listOf()
+                )
+            )
+
+            PrimitiveKind.STRING -> listOf(
+                ColumnTypeInfo(
+                    listOf<String>(),
+                    TextColumnType().also { it.nullable = this.isNullable },
+                    listOf()
+                )
+            )
+
+            SerialKind.ENUM -> listOf(
+                ColumnTypeInfo(
+                    listOf<String>(),
+                    TextColumnType().also { it.nullable = this.isNullable },
+                    listOf()
+                )
+            )
+
+            StructureKind.LIST -> getElementDescriptor(0).columnType()
                 .map {
                     ColumnTypeInfo(
                         it.key,
@@ -298,35 +272,56 @@ internal fun SerialDescriptor.columnType(): List<ColumnTypeInfo> = when (this.un
                         listOf(0) + it.descriptorPath
                     )
                 }
-                .plus(
-                    getRealElementDescriptor(1).columnType().map {
+
+            StructureKind.CLASS -> {
+                val nullCol = if (isNullable) listOf(
+                    ColumnTypeInfo(
+                        listOf<String>("exists"),
+                        BooleanColumnType(),
+                        listOf()
+                    )
+                ) else listOf()
+                nullCol + (0 until elementsCount).flatMap { index ->
+                    this.getElementDescriptor(index).columnType().map { sub ->
                         ColumnTypeInfo(
-                            it.key + "value",
-                            ArrayColumnType(it.type).also { it.nullable = this.isNullable },
-                            listOf(1) + it.descriptorPath
+                            key = (listOf(getElementName(index)) + sub.key),
+                            type = sub.type.also {
+                                it.nullable = it.nullable || isNullable
+                            },
+                            descriptorPath = listOf(index) + sub.descriptorPath
                         )
-                    })
-        }
+                    }
+                }
+            }
 
-        StructureKind.OBJECT -> listOf(
-            ColumnTypeInfo(
-                listOf<String>(),
-                TextColumnType().also { it.nullable = this.isNullable },
-                listOf()
+            StructureKind.MAP -> {
+                getElementDescriptor(0).columnType()
+                    .map {
+                        ColumnTypeInfo(
+                            it.key,
+                            ArrayColumnType(it.type).also { it.nullable = this.isNullable },
+                            listOf(0) + it.descriptorPath
+                        )
+                    }
+                    .plus(
+                        getElementDescriptor(1).columnType().map {
+                            ColumnTypeInfo(
+                                it.key + "value",
+                                ArrayColumnType(it.type).also { it.nullable = this.isNullable },
+                                listOf(1) + it.descriptorPath
+                            )
+                        })
+            }
+
+            StructureKind.OBJECT -> listOf(
+                ColumnTypeInfo(
+                    listOf<String>(),
+                    TextColumnType().also { it.nullable = this.isNullable },
+                    listOf()
+                )
             )
-        )
-    }
-}
-
-private fun SerialDescriptor.getRealElementDescriptor(index: Int): SerialDescriptor {
-    val e = getElementDescriptor(index)
-    return if (e.kind == SerialKind.CONTEXTUAL) {
-        if (e.isNullable) {
-            SerialDescriptorForNullable(Serialization.module.getContextualDescriptor(e)!!)
-        } else {
-            Serialization.module.getContextualDescriptor(e)!!
         }
-    } else e
+    }
 }
 
 private fun SerialDescriptor.unnull(): SerialDescriptor = this.nullElement() ?: this

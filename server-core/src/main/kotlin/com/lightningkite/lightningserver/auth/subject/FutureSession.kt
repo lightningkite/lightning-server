@@ -6,6 +6,7 @@ import com.lightningkite.lightningdb.References
 import com.lightningkite.lightningserver.auth.oauth.OauthClient
 import com.lightningkite.now
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlin.time.Duration.Companion.minutes
@@ -14,9 +15,9 @@ import kotlin.time.Duration.Companion.minutes
 internal data class FutureSession<ID>(
     val subjectId: ID,
     val scopes: Set<String>,
-    val expires: Instant = now().plus(5.minutes),
+    @Contextual val expires: Instant = now().plus(5.minutes),
     val originalSessionId: UUID?,
     val label: String? = null,
-    val sessionExpiration: Instant? = null,
+    @Contextual val sessionExpiration: Instant? = null,
     @References(OauthClient::class) val oauthClient: String? = null
 )

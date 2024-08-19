@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.serialization
 
+import com.lightningkite.lightningdb.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpContent
@@ -29,7 +30,7 @@ fun <T> HttpRequest.queryParameters(serializer: KSerializer<T>): T {
     }
 }
 
-suspend inline fun <reified T> HttpContent.parse(): T = parse(Serialization.module.serializer())
+suspend inline fun <reified T> HttpContent.parse(): T = parse(Serialization.module.contextualSerializerIfHandled())
 suspend fun <T> HttpContent.parse(serializer: KSerializer<T>): T {
     try {
         val parser = Serialization.parsers[this.type]
@@ -59,7 +60,7 @@ suspend fun <T> HttpContent.parseWithDefault(serializer: KSerializer<T>, default
 }
 
 suspend inline fun <reified T> T.toHttpContent(acceptedTypes: List<ContentType>): HttpContent? =
-    toHttpContent(acceptedTypes, Serialization.module.serializer())
+    toHttpContent(acceptedTypes, Serialization.module.contextualSerializerIfHandled())
 
 suspend fun <T> T.toHttpContent(acceptedTypes: List<ContentType>, serializer: KSerializer<T>): HttpContent? {
     if (this == Unit) return null

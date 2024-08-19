@@ -1,8 +1,6 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.IsRawString
-import com.lightningkite.khrysalis.JsName
-import com.lightningkite.khrysalis.SharedCode
 import kotlin.jvm.JvmName
 
 inline fun <reified T> modification(setup: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit): Modification<T> {
@@ -59,6 +57,7 @@ class ModificationBuilder<K>() {
         modifications.add(mapModification(Modification.AppendString(value)))
     }
 
+    @JvmName("plusAssignRaw")
     infix operator fun <T : IsRawString> DataClassPath<K, T>.plusAssign(value: String) {
         modifications.add(mapModification(Modification.AppendRawString(value)))
     }

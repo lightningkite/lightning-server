@@ -4,14 +4,9 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.GeoCoordinate
 import com.lightningkite.IsRawString
-import com.lightningkite.khrysalis.IsEquatable
-import com.lightningkite.khrysalis.fatalError
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
-import kotlin.reflect.KClass
 import kotlinx.serialization.descriptors.*
-
-import com.lightningkite.lightningdb.SerializableProperty
 
 private fun <T> commonOptions(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> = listOf(
     MySealedClassSerializer.Option(Condition.Never.serializer(inner)) { it is Condition.Never },

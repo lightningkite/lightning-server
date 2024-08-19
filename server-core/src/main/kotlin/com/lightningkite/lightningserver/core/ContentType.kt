@@ -51,6 +51,7 @@ class ContentType(val type: String, val subtype: String, val parameters: Map<Str
         public val HalJson: ContentType = ContentType("application", "hal+json")
         public val JavaScript: ContentType = ContentType("application", "javascript")
         public val OctetStream: ContentType = ContentType("application", "octet-stream")
+        public val StructuredBytes: ContentType = ContentType("application", "x-structured-bytes")
         public val FontWoff: ContentType = ContentType("application", "font-woff")
         public val Rss: ContentType = ContentType("application", "rss+xml")
         public val Xml: ContentType = ContentType("application", "xml")
@@ -75,6 +76,8 @@ class ContentType(val type: String, val subtype: String, val parameters: Map<Str
             "vnd.openxmlformats-officedocument.presentationml.presentation"
         )
         public val ProtoBuf: ContentType = ContentType("application", "protobuf")
+        public val ProtoBufText: ContentType = ContentType("application", "x-protobuf-text")
+        public val ProtoBufDeclaration: ContentType = ContentType("application", "x-protobuf-declaration")
         public val Wasm: ContentType = ContentType("application", "wasm")
         public val ProblemJson: ContentType = ContentType("application", "problem+json")
         public val ProblemXml: ContentType = ContentType("application", "problem+xml")
@@ -148,6 +151,7 @@ class ContentType(val type: String, val subtype: String, val parameters: Map<Str
         public val Xml: ContentType = ContentType("text", "xml", mapOf("charset" to "UTF-8"))
         public val EventStream: ContentType = ContentType("text", "event-stream", mapOf("charset" to "UTF-8"))
         public val UriList: ContentType = ContentType("text", "uri-list", mapOf("charset" to "UTF-8"))
+        public val Yaml: ContentType = ContentType("text", "vnd.yaml", mapOf("charset" to "UTF-8"))
     }
 
     /**

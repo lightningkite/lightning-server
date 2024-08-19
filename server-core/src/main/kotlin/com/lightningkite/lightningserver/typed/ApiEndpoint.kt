@@ -1,12 +1,12 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningdb.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.BadRequestException
-import com.lightningkite.lightningserver.exceptions.UnauthorizedException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.parse
@@ -14,7 +14,6 @@ import com.lightningkite.lightningserver.serialization.queryParameters
 import com.lightningkite.lightningserver.serialization.toHttpContent
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.serializer
 import java.net.URLDecoder
 
 data class ApiEndpoint<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
@@ -118,8 +117,8 @@ inline fun <USER: HasId<*>?, PATH: TypedServerPath, reified INPUT, reified OUTPU
     val api = ApiEndpoint<USER, PATH, INPUT, OUTPUT>(
         route = this,
         authOptions = authOptions,
-        inputType = Serialization.module.serializer<INPUT>(),
-        outputType = Serialization.module.serializer<OUTPUT>(),
+        inputType = Serialization.module.contextualSerializerIfHandled<INPUT>(),
+        outputType = Serialization.module.contextualSerializerIfHandled<OUTPUT>(),
         summary = summary,
         description = description,
         errorCases = errorCases,
@@ -177,8 +176,8 @@ inline fun <USER: HasId<*>?, reified INPUT, reified OUTPUT> HttpEndpoint.api(
     val api = ApiEndpoint<USER, TypedServerPath0, INPUT, OUTPUT>(
         route = TypedHttpEndpoint(TypedServerPath0(path), method),
         authOptions = authOptions,
-        inputType = Serialization.module.serializer<INPUT>(),
-        outputType = Serialization.module.serializer<OUTPUT>(),
+        inputType = Serialization.module.contextualSerializerIfHandled<INPUT>(),
+        outputType = Serialization.module.contextualSerializerIfHandled<OUTPUT>(),
         summary = summary,
         description = description,
         errorCases = errorCases,

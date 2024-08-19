@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlin.time.Duration
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Contextual
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.time.Duration.Companion.minutes
@@ -19,7 +20,7 @@ data class MetricSpanStats(
     override val _id: String,
     @Index val endpoint: String,
     @Index val type: String,
-    val timeStamp: Instant = Instant.DISTANT_PAST,
+    @Contextual val timeStamp: Instant = Instant.DISTANT_PAST,
     @Index val timeSpan: Duration = 1.minutes,
     val min: Double,
     val max: Double,

@@ -3,10 +3,10 @@ agp="8.2.2"
 androidDesugaring="2.0.4"
 angusMail="2.0.3"
 awsVersion="2.25.24"
-awssdk="2.17.232"
+awssdk="2.25.24"
 azureFunctions="3.1.0"
 azureStorage="12.25.3"
-bouncyCastle="1.77"
+bouncyCastle="1.78.1"
 bson="5.1.0"
 coroutines="1.8.1"
 dokka="1.9.20"
@@ -20,10 +20,10 @@ graalVmNative="0.9.24"
 guava="33.0.0-jre"
 hierynomusSshj="0.38.0"
 javaJwt="4.4.0"
-kaml="0.58.0"
+kaml="0.61.0"
 kbson="0.5.0"
 kotlin="2.0.0"
-kotlinXSerialization="1.6.3"
+kotlinXSerialization="1.7.1"
 kotlinXDatetime="0.6.0"
 kotlinHtmlJvm="0.11.0"
 kotlinerCli="1.0.3"
@@ -40,12 +40,13 @@ oneTimePass="2.4.0"
 orgCrac="0.1.3"
 postgresql="42.7.3"
 proguard="7.3.2"
+#noinspection GradleDependency,OutdatedLibrary
 sentry9="1.7.30"
 sentry="7.9.0"
-serializationLibs="1.6.3"
+serializationLibs="1.7.1"
 serializationXmlUtil="0.86.3"
-shadow="7.1.0"
-xmlUtilJvm="0.86.3"
+shadow="8.1.1"
+xmlUtilJvm="0.90.1"
 clamAv="2.1.2"
 apacheTika="2.9.2"
 
@@ -120,6 +121,7 @@ sentry9Logback={module="io.sentry:sentry-logback", version.ref="sentry9"}
 sentry={module="io.sentry:sentry", version.ref="sentry"}
 serialization={module="org.jetbrains.kotlin:kotlin-serialization", version.ref="kotlin"}
 serializationCbor={module="org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref="serializationLibs"}
+serializationProtobuf={module="org.jetbrains.kotlinx:kotlinx-serialization-protobuf", version.ref="serializationLibs"}
 serializationProperties={module="org.jetbrains.kotlinx:kotlinx-serialization-properties", version.ref="serializationLibs"}
 xmlUtilJvm={module="io.github.pdvrieze.xmlutil:serialization-jvm", version.ref="xmlUtilJvm"}
 

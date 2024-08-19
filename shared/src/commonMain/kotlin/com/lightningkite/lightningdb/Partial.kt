@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.serializer
 
 data class Partial<T>(val parts: MutableMap<SerializableProperty<T, *>, Any?> = mutableMapOf()) {
     constructor(item: T, paths: Set<DataClassPathPartial<T>>) : this() {
@@ -36,7 +37,7 @@ inline fun <reified T> partialOf(builder: PartialBuilder<T>.(DataClassPathSelf<T
     PartialBuilder<T>().apply {
         builder(
             DataClassPathSelf(
-                serializerOrContextual()
+                serializer()
             )
         )
     }.parts.let { Partial(it) }

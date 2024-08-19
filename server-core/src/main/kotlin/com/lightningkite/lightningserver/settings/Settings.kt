@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.settings
 
+import com.lightningkite.lightningdb.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.encryption.secretBasis
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.logger
@@ -10,7 +11,6 @@ import com.lightningkite.lightningserver.metrics.metricsSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.serializer
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -117,7 +117,7 @@ inline fun <reified Goal> setting(
     name = name,
     default = default,
     optional = optional,
-    serializer = Serialization.module.serializer<Goal>(),
+    serializer = Serialization.module.contextualSerializerIfHandled<Goal>(),
     description = description,
     getter = { it }
 )
@@ -132,7 +132,7 @@ inline fun <reified Serializable : () -> Goal, Goal> setting(
     name = name,
     default = default,
     optional = optional,
-    serializer = Serialization.module.serializer<Serializable>(),
+    serializer = Serialization.module.contextualSerializerIfHandled<Serializable>(),
     description = description,
     getter = { it() }
 )
@@ -147,7 +147,7 @@ inline fun <reified Serializable : () -> Goal, Goal : Metricable<Goal>> setting(
     name = name,
     default = default,
     optional = optional,
-    serializer = Serialization.module.serializer<Serializable>(),
+    serializer = Serialization.module.contextualSerializerIfHandled<Serializable>(),
     description = description,
     getter = { it().withMetrics(name) }
 )

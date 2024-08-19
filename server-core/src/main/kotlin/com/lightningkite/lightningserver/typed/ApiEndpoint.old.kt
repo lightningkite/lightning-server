@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.typed
 
 import kotlin.time.Duration
 import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningdb.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
@@ -11,7 +12,6 @@ import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.serializer
 import kotlin.reflect.typeOf
 
 /**
@@ -43,8 +43,8 @@ inline fun <reified USER, reified INPUT : Any, reified OUTPUT> HttpEndpoint.type
             )
         }
     ),
-    inputType = Serialization.module.serializer(),
-    outputType = Serialization.module.serializer(),
+    inputType = Serialization.module.contextualSerializerIfHandled(),
+    outputType = Serialization.module.contextualSerializerIfHandled(),
 
     summary = summary,
     description = description,
@@ -118,9 +118,9 @@ inline fun <reified USER, reified PATH, reified INPUT : Any, reified OUTPUT> Htt
             )
         }
     ),
-    inputType = Serialization.module.serializer(),
-    outputType = Serialization.module.serializer(),
-    pathType = Serialization.module.serializer(),
+    inputType = Serialization.module.contextualSerializerIfHandled(),
+    outputType = Serialization.module.contextualSerializerIfHandled(),
+    pathType = Serialization.module.contextualSerializerIfHandled(),
 
     summary = summary,
     description = description,
@@ -194,10 +194,10 @@ inline fun <reified USER, reified PATH, reified PATH2, reified INPUT : Any, reif
             )
         }
     ),
-    inputType = Serialization.module.serializer(),
-    outputType = Serialization.module.serializer(),
-    pathType = Serialization.module.serializer(),
-    path2Type = Serialization.module.serializer(),
+    inputType = Serialization.module.contextualSerializerIfHandled(),
+    outputType = Serialization.module.contextualSerializerIfHandled(),
+    pathType = Serialization.module.contextualSerializerIfHandled(),
+    path2Type = Serialization.module.contextualSerializerIfHandled(),
 
     summary = summary,
     description = description,

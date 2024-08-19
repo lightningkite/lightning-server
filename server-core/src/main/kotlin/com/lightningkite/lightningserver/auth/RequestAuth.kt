@@ -18,12 +18,13 @@ import kotlin.time.Duration
 import kotlinx.datetime.Instant
 import com.lightningkite.UUID
 import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
+import kotlinx.serialization.Contextual
 
 data class RequestAuth<SUBJECT : HasId<*>>(
     val subject: Authentication.SubjectHandler<SUBJECT, *>,
     val sessionId: UUID?,
     val rawId: Comparable<*>,
-    val issuedAt: Instant,
+    @Contextual val issuedAt: Instant,
     @Description("The scopes permitted.  * indicates root access.")
     val scopes: Set<String> = setOf("*"),
     val thirdParty: String? = null,
@@ -121,7 +122,7 @@ data class RequestAuth<SUBJECT : HasId<*>>(
     }
 
     @Serializable
-    data class ExpiringValue<T>(val value: T, val expiresAt: Instant)
+    data class ExpiringValue<T>(val value: T, @Contextual val expiresAt: Instant)
 
     val cache = HashMap<CacheKey<SUBJECT, *, *>, ExpiringValue<*>>()
 

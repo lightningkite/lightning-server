@@ -11,7 +11,6 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.now
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.serializer
 import java.net.NetworkInterface
 
 class GroupedDatabaseExceptionReporter(val packageName: String, val database: Database): ExceptionReporter {
@@ -65,8 +64,8 @@ class GroupedDatabaseExceptionReporter(val packageName: String, val database: Da
     @Suppress("UNCHECKED_CAST")
     val modelInfo = modelInfoWithDefault(
         serialization = ModelSerializationInfo<ReportedExceptionGroup, Int>(
-            serializer = Serialization.module.serializer(),
-            idSerializer = Serialization.module.serializer()
+            serializer = Serialization.module.contextualSerializerIfHandled(),
+            idSerializer = Serialization.module.contextualSerializerIfHandled()
         ),
         authOptions = Authentication.isDeveloper as AuthOptions<HasId<*>>,
         getBaseCollection = { database.collection<ReportedExceptionGroup>() },

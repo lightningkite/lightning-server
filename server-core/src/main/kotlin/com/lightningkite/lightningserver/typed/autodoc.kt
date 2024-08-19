@@ -20,6 +20,7 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.internal.GeneratedSerializer
+//import kotlinx.serialization.protobuf.schema.ProtoBufSchemaGenerator
 import kotlinx.serialization.serializer
 import kotlin.reflect.KType
 
@@ -56,6 +57,17 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
             )
         )
     }
+//    get("sdk.protobuf").handler {
+//        HttpResponse(
+//            HttpContent.Text(
+//                string = ProtoBufSchemaGenerator.generateSchemaText(
+//                    Documentable.usedTypes.map { it.descriptor },
+//                    packageName = packageName
+//                ),
+//                type = ContentType.Application.ProtoBufDeclaration
+//            )
+//        )
+//    }
     return this.copy(after = ServerPath.Afterwards.TrailingSlash).get.handler { _ ->
         HttpResponse(body = HttpContent.html {
             head { title("${generalSettings().projectName} - Generated Documentation") }
@@ -66,6 +78,7 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
                     ol {
                         li { a(href = "sdk.ts") { +"Typescript SDK" } }
                         li { a(href = "sdk.zip") { +"Kotlin SDK" } }
+                        li { a(href = "sdk.protobuf") { +"Protobuf Types" } }
                         li { a(href = "sdk.dart") { +"Dart SDK" } }
                         li { a(href = "#types") { +"Types" } }
                     }

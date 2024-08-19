@@ -90,7 +90,7 @@ class MaskTest {
         val notMatchingSortA = SortPart(path<LargeTestModel>().byte)
         val notMatchingSortV = SortPart(path<LargeTestModel>().string)
 
-        val mask = mask { always(it.int.maskedTo(2)) }
+        val mask = mask<LargeTestModel> { always(it.int.maskedTo(2)) }
 
         assertTrue(mask.permitSort(listOf(matchingSort)) is Condition.Never)
         assertTrue(mask.permitSort(listOf(notMatchingSortA)) is Condition.Always)
@@ -104,7 +104,7 @@ class MaskTest {
         val notMatchingSortA = condition<LargeTestModel> { it.byte eq 2 }
         val notMatchingSortV = condition<LargeTestModel> { it.string eq "" }
 
-        val mask = mask { always(it.int.maskedTo(2)) }
+        val mask = mask<LargeTestModel> { always(it.int.maskedTo(2)) }
 
         assertTrue(mask(matchingSort) is Condition.Never)
         assertTrue(mask(notMatchingSortA) is Condition.Always)
