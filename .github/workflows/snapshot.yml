@@ -13,8 +13,42 @@ on:
       - version-**
 
 jobs:
-  release:
-    name: Test and Upload SnapShot
+  releaseServer:
+    name: Server Test and Upload Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-java@v2
+        with:
+          java-version: '17'
+          distribution: 'adopt'
+          cache: gradle
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+      - name: Validate Gradle wrapper
+        uses: gradle/wrapper-validation-action@v1
+      - name: Clean
+        run: ./gradlew clean
+      - name: Test
+        run: ./gradlew test
+      - uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: test_results
+          path: |
+            build/reports/tests/**
+            */build/reports/tests/**
+          retention-days: 10
+      - name: Build
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+        run: |
+          ./gradlew publishMainPublicationToSonatypeRepository
+  releaseShared:
+    name: Shared Test and Upload Release
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
@@ -45,4 +79,5 @@ jobs:
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
           OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
-        run: ./gradlew publishAllPublicationsToSonatypeRepository
+        run: |
+          ./gradlew shared:publishAllPublicationsToSonatypeRepository
