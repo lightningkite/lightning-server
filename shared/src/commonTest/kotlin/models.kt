@@ -1,13 +1,13 @@
 
 @file:UseContextualSerialization(UUID::class, Instant::class)
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningdb.testing
 
 import com.lightningkite.TrimmedCaselessString
 import com.lightningkite.UUID
 import com.lightningkite.ZonedDateTime
+import com.lightningkite.lightningdb.*
 
 import com.lightningkite.uuid
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
@@ -22,7 +22,7 @@ data class User(
     @MaxLength(10) var email: TrimmedCaselessString,
     val name: String = email.raw,
     var age: Long = 0,
-    var friends: List<UUID> = listOf()
+    @MultipleReferences(User::class) var friends: List<UUID> = listOf()
 ) : HasId<UUID> {
     companion object
 }
@@ -74,7 +74,7 @@ data class ClassUsedForEmbedding(
 @GenerateDataClassPaths
 @Serializable
 data class RecursiveEmbed(
-    var embedded:RecursiveEmbed? = null,
+    var embedded: RecursiveEmbed? = null,
     var value2:String = "value2"
 )
 
@@ -88,10 +88,12 @@ data class EmbeddedNullable(
     companion object
 }
 
+@Description("A large test model that checks a lot of cases")
 @GenerateDataClassPaths
 @Serializable
 data class LargeTestModel(
     override val _id: UUID = uuid(),
+    val enumEntry: SampleA = SampleA.A,
     var boolean: Boolean = false,
     var byte: Byte = 0,
     var short: Short = 0,
@@ -100,7 +102,8 @@ data class LargeTestModel(
     var float: Float = 0f,
     var double: Double = 0.0,
     var char: Char = ' ',
-    var string: String = "",
+    @Description("Sample description")
+    @MaxLength(25) var string: String = "",
     var instant: Instant = Instant.DISTANT_PAST,
     val zonedDateTime: ZonedDateTime = ZonedDateTime(LocalDateTime(2000, 1, 1, 0, 0), TimeZone.currentSystemDefault()),
     var list: List<Int> = listOf(),

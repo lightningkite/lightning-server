@@ -2,6 +2,19 @@ package com.lightningkite.lightningdb
 
 import com.google.devtools.ksp.symbol.*
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.decapitalizeAsciiOnly
+import kotlin.reflect.KClass
+
+fun KSClassDeclaration.handleSerializableAnno(out: TabAppendable) {
+    try {
+        out.appendLine(
+            """
+            SerializableAnnotation.parser<${simpleName.asString()}>("${qualifiedName?.asString()}") { SerializableAnnotation("${qualifiedName?.asString()}", values = mapOf(${(this.primaryConstructor?.parameters ?: listOf()).mapNotNull { it.name }.joinToString { "\"${it.asString()}\" to SerializableAnnotationValue(it.${it.asString()})" }})) }
+        """.trimIndent()
+        )
+    } catch(e: Exception) {
+        out.appendLine("/* ${e.stackTraceToString()} */")
+    }
+}
 
 data class MongoFields(
     val declaration: KSClassDeclaration
@@ -100,6 +113,9 @@ data class MongoFields(
                     appendLine("""override fun setCopy(receiver: $typeReference, value: ${field.kotlinType.toKotlin()}) = receiver.copy(${field.name} = value)""")
                     appendLine("""override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${field.kotlinType.resolve().toKotlinSerializer(contextualTypes)}""")
                     appendLine("""override val annotations: List<Annotation> = $classReference.serializer().tryFindAnnotations("${field.name}")""")
+                    field.default?.let {
+                        appendLine("""override val default: ${field.kotlinType.toKotlin()} = $it""")
+                    }
                 }
                 appendLine("}")
             }
@@ -130,6 +146,9 @@ data class MongoFields(
                     appendLine("""override fun setCopy(receiver: $typeReference, value: ${field.kotlinType.toKotlin()}) = receiver.copy(${field.name} = value)""")
                     appendLine("""override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${field.kotlinType.resolve().toKotlinSerializer(contextualTypes)}""")
                     appendLine("""override val annotations: List<Annotation> = $classReference.serializer($nothings).tryFindAnnotations("${field.name}")""")
+                    field.default?.let {
+                        appendLine("""override val default: ${field.kotlinType.toKotlin()} = $it""")
+                    }
                     appendLine("""override fun hashCode(): Int = ${field.name.hashCode() * 31 + simpleName.hashCode()}""")
                     appendLine("""override fun equals(other: Any?): Boolean = other is ${simpleName}_${field.name}<${declaration.typeParameters.joinToString(", ") { "* "}}>""")
                 }
@@ -269,3 +288,21 @@ private val KSType.modificationType: String
             else it
         }
     }
+
+private fun ResolvedAnnotation.writeSerialzable(): String {
+    return "SerializableAnnotation(fqn = \"${this.type.qualifiedName?.asString()}\", values = mapOf(${this.arguments.entries.joinToString { "\"${it.key}\" to \"${it.value.jsonRender()}\"" }}))"
+}
+
+private fun Any?.jsonRender(): String {
+    return when(this) {
+        is KClass<*> -> "\"" + (this.qualifiedName) + "\""
+        is KSType -> "\"" + (this.declaration?.qualifiedName?.asString() ?: "") + "\""
+        is KSTypeReference -> "\"" + (this.tryResolve()?.declaration?.qualifiedName?.asString() ?: "") + "\""
+        is KSClassDeclaration -> "\"" + (this.qualifiedName?.asString() ?: "") + "\""
+        is Array<*> -> joinToString(", ", "[", "]") { it.jsonRender() }
+        is String -> "\"$this\""
+        null -> "null"
+//        else -> "$this (${this::class})"
+        else -> toString()
+    }.replace("\"", "\\\"")
+}

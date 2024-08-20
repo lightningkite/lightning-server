@@ -5,6 +5,7 @@ package com.lightningkite.lightningdb
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
@@ -196,7 +197,27 @@ fun KSerializer<*>.tryTypeParameterSerializers2(): Array<KSerializer<*>>? = when
             ?: (this as? ConditionSerializer<*>)?.inner?.let { arrayOf(it) }
             ?: (this as? ModificationSerializer<*>)?.inner?.let { arrayOf(it) }
             ?: (this as? PartialSerializer<*>)?.source?.let { arrayOf(it) }
-            ?: (this as? SortPartSerializer<*>)?.inner?.let { arrayOf(it) }
+    }
+    is PrimitiveKind.STRING -> {
+        (this as? SortPartSerializer<*>)?.inner?.let { arrayOf(it) }
+            ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
+    }
+    else -> null
+}
+
+@OptIn(InternalSerializationApi::class)
+fun KSerializer<*>.tryTypeParameterSerializers3(): Array<KSerializer<*>>? = when(descriptor.kind) {
+    is StructureKind.LIST -> arrayOf(innerElement())
+    is StructureKind.MAP -> arrayOf(innerElement(), innerElement2())
+    is StructureKind.CLASS -> {
+        tryTypeParameterSerializers()
+            ?: (this as? GeneratedSerializer<*>)?.typeParametersSerializers()
+            ?: (this as? ConditionSerializer<*>)?.inner?.let { arrayOf(it) }
+            ?: (this as? ModificationSerializer<*>)?.inner?.let { arrayOf(it) }
+            ?: (this as? PartialSerializer<*>)?.source?.let { arrayOf(it) }
+    }
+    is PrimitiveKind.STRING -> {
+        (this as? SortPartSerializer<*>)?.inner?.let { arrayOf(it) }
             ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
     }
     else -> null

@@ -12,6 +12,7 @@ import com.lightningkite.lightningserver.jsonschema.lightningServerSchema
 import com.lightningkite.lightningserver.jsonschema.openApiDescription
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.schedule.Scheduler
+import com.lightningkite.lightningserver.schema.lightningServerKSchema
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serverhealth.healthCheck
 import com.lightningkite.lightningserver.settings.generalSettings
@@ -91,6 +92,9 @@ class MetaEndpoints(
             ),
             status = HttpStatus.OK
         )
+    }
+    val kschema = path("kschema").get.handler {
+        HttpResponse.json(lightningServerKSchema)
     }
     val openApi = path("openapi").get.handler {
         when (it.headers.accept.firstOrNull()) {

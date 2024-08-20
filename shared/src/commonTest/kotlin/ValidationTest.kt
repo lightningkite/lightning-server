@@ -18,6 +18,7 @@ data class Sample(
 class ValidationTest {
     init {
         com.lightningkite.prepareModels()
+        com.lightningkite.lightningdb.testing.prepareModels()
     }
 
     inline fun <reified T> assertPasses(item: T) {

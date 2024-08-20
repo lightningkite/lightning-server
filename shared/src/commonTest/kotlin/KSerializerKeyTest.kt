@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.UUID
+import com.lightningkite.lightningdb.testing.*
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ContextualSerializer
@@ -21,6 +22,7 @@ class KSerializerKeyTest {
 
     init {
         com.lightningkite.lightningdb.prepareModels()
+        com.lightningkite.lightningdb.testing.prepareModels()
     }
 
     /**

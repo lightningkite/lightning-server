@@ -3,23 +3,17 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.*
-import kotlinx.datetime.Clock
+import com.lightningkite.lightningdb.testing.*
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.descriptors.*
-import kotlinx.serialization.encoding.AbstractDecoder
-import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.internal.GeneratedSerializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.modules.EmptySerializersModule
-import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.properties.Properties
 import kotlinx.serialization.properties.decodeFromStringMap
 import kotlinx.serialization.properties.encodeToStringMap
-import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -33,6 +27,7 @@ class SerializationTest {
 
     init {
         com.lightningkite.lightningdb.prepareModels()
+        com.lightningkite.lightningdb.testing.prepareModels()
     }
 
     @Test

@@ -12,8 +12,20 @@ interface SerializableProperty<A, B> {
     fun setCopy(receiver: A, value: B): A
     val serializer: KSerializer<B>
     val annotations: List<Annotation> get() = listOf()
+    val default: B? get() = null
+    val serializableAnnotations: List<SerializableAnnotation> get() = annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) }
 
     companion object {
+    }
+
+    class FromVirtualField(val source: VirtualField): SerializableProperty<VirtualInstance, Any?> {
+        override val name: String get() = source.name
+        override val serializer: KSerializer<Any?> get() = source.type.serializer()
+        override val annotations: List<Annotation> get() = listOf()
+        override fun get(receiver: VirtualInstance): Any? = receiver.values[source.index]
+        override fun setCopy(receiver: VirtualInstance, value: Any?): VirtualInstance = VirtualInstance(receiver.type, receiver.values.toMutableList().also {
+            it[source.index] = value
+        })
     }
 }
 @OptIn(ExperimentalSerializationApi::class)
@@ -25,6 +37,7 @@ fun <T> KSerializer<T>.tryFindAnnotations(propertyName: String): List<Annotation
 private val serClassToList = HashMap<KClass<*>, (Array<KSerializer<*>>)->Array<SerializableProperty<*, *>>>()
 @Suppress("UNCHECKED_CAST")
 val <T> KSerializer<T>.serializableProperties: Array<SerializableProperty<T, *>>? get() = (serClassToList[this::class]?.invoke(tryTypeParameterSerializers() ?: arrayOf())) as? Array<SerializableProperty<T, *>>
+    ?: (this as? VirtualStructure)?.serializableProperties as? Array<SerializableProperty<T, *>>
 fun <T, S: KSerializer<T>> S.properties(action: (Array<KSerializer<Nothing>>)->Array<SerializableProperty<T, *>>) {
     @Suppress("UNCHECKED_CAST")
     serClassToList[this::class] = action as (Array<KSerializer<*>>)->Array<SerializableProperty<*, *>>
@@ -46,4 +59,3 @@ fun <T, S: KSerializer<T>> S.properties(action: (Array<KSerializer<Nothing>>)->A
 //    override fun get(receiver: List<T>): T = receiver.first()
 //    override fun setCopy(receiver: List<T>, value: T): List<T> = listOf(value) + receiver.drop(1)
 //}
-

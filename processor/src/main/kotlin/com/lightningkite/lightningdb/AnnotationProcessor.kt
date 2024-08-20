@@ -12,14 +12,18 @@ lateinit var comparable: KSClassDeclaration
 class TableGenerator(
     val codeGenerator: CodeGenerator,
     val logger: KSPLogger,
-) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 2) {
+) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 16) {
     override fun interestedIn(resolver: Resolver): Set<KSFile> {
         return resolver.getAllFiles()
             .filter {
                 it.declarations
                     .filterIsInstance<KSClassDeclaration>()
                     .flatMap { sequenceOf(it) + it.declarations.filterIsInstance<KSClassDeclaration>() }
-                    .any { it.annotation("DatabaseModel") != null || it.annotation("GenerateDataClassPaths") != null }
+                    .any {
+                        it.annotation("DatabaseModel") != null ||
+                                it.annotation("GenerateDataClassPaths") != null ||
+                                it.annotation("SerialInfo", "kotlinx.serialization") != null
+                    }
             }
             .toSet()
     }
@@ -30,6 +34,11 @@ class TableGenerator(
             .filterIsInstance<KSClassDeclaration>()
             .flatMap { sequenceOf(it) + it.declarations.filterIsInstance<KSClassDeclaration>() }
             .filter { it.annotation("DatabaseModel") != null || it.annotation("GenerateDataClassPaths") != null }
+        val allToProcess = files
+            .flatMap { it.declarations }
+            .filterIsInstance<KSClassDeclaration>()
+            .flatMap { sequenceOf(it) + it.declarations.filterIsInstance<KSClassDeclaration>() }
+            .filter { it.annotation("DatabaseModel") != null || it.annotation("GenerateDataClassPaths") != null || it.annotation("SerialInfo", "kotlinx.serialization") != null }
 
         val seen = HashSet<KSClassDeclaration>()
         resolver.getClassDeclarationByName("kotlin.Comparable")?.let { comparable = it }
@@ -54,23 +63,25 @@ class TableGenerator(
 
         seen.clear()
 
-        allDatabaseModels
-            .map { MongoFields(it) }
-            .distinct()
+        allToProcess
             .groupBy { it.packageName }
             .forEach { ksName, ksClassDeclarations ->
                 createNewFile(
                     dependencies = Dependencies.ALL_FILES,
-                    packageName = ksName,
+                    packageName = ksName.asString(),
                     fileName = "init"
                 ).use { out ->
                     with(TabAppendable(out)) {
-                        if(ksName.isNotEmpty()) appendLine("package ${ksName}")
+                        if(ksName.asString().isNotEmpty()) appendLine("package ${ksName.asString()}")
                         appendLine("fun prepareModels() {")
                         tab {
                             ksClassDeclarations
                                 .forEach {
-                                    appendLine("    prepare${it.simpleName}Fields()")
+                                    if(it.annotation("DatabaseModel") != null || it.annotation("GenerateDataClassPaths") != null) {
+                                        appendLine("    prepare${it.simpleName.asString()}Fields()")
+                                    } else {
+                                        it.handleSerializableAnno(this)
+                                    }
                                 }
                         }
                         appendLine("}")

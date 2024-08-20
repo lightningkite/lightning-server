@@ -5,16 +5,22 @@ import com.google.devtools.ksp.symbol.*
 data class Field(
     val name: String,
     val kotlinType: KSTypeReference,
-    val annotations: List<ResolvedAnnotation>
+    val annotations: List<ResolvedAnnotation>,
+    val default: String?,
 ) {
     val nullable: Boolean = kotlinType.isMarkedNullable
 }
 
-fun KSPropertyDeclaration.toField(): Field {
+private fun toField(owner: KSClassDeclaration, param: KSValueParameter, property: KSPropertyDeclaration): Field {
     return Field(
-        name = this.simpleName.getShortName(),
-        kotlinType = this.type,
-        annotations = this.annotations.map { it.resolve() }.toList()
+        name = property.simpleName.getShortName(),
+        kotlinType = property.type,
+        annotations = property.annotations.map { it.resolve() }.toList(),
+        default = param.defaultText?.takeUnless {
+            owner.primaryConstructor?.parameters?.any { other ->
+                it.contains(other.name?.asString() ?: "???")
+            } == true
+        },
     )
 }
 
@@ -23,6 +29,5 @@ fun KSClassDeclaration.fields(): List<Field> {
     return (primaryConstructor ?: throw IllegalArgumentException("No primary constructor found for ${this.qualifiedName?.asString()}"))
         .parameters
         .filter { it.isVal || it.isVar }
-        .mapNotNull { allProps[it.name?.getShortName()] }
-        .map { it.toField() }
+        .mapNotNull { toField(this, it, allProps[it.name?.getShortName()] ?: return@mapNotNull  null) }
 }
