@@ -3,9 +3,7 @@ package com.lightningkite.lightningserver.auth.oauth
 
 import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.References
-import com.lightningkite.lightningdb.ServerFile
-import kotlinx.datetime.Clock
+import com.lightningkite.lightningserver.files.ServerFile
 import com.lightningkite.now
 import com.lightningkite.uuid
 import kotlinx.serialization.Serializable

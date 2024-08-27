@@ -3,8 +3,6 @@ package com.lightningkite.lightningdb
 
 import kotlinx.serialization.Serializable
 
-import com.lightningkite.lightningdb.SerializableProperty
-
 interface HasId<ID : Comparable<ID>> {
     val _id: ID
 }

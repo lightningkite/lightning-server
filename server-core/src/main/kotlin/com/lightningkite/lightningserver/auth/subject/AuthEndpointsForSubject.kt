@@ -1,7 +1,9 @@
 package com.lightningkite.lightningserver.auth.subject
 
 import com.lightningkite.UUID
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.*
@@ -28,6 +30,7 @@ import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.websocket.WebSockets
 import com.lightningkite.now
+import com.lightningkite.serialization.DataClassPathSelf
 import io.ktor.http.*
 import kotlinx.datetime.Instant
 import kotlinx.serialization.ContextualSerializer
@@ -52,7 +55,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 ) : ServerPathGroup(path), Authentication.Reader {
 
     init {
-        prepareModels()
+        prepareModelsServerCore()
         path.docName = "${handler.name}Auth"
     }
 

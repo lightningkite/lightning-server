@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.uuid
@@ -8,8 +7,6 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.utils.io.jvm.javaio.*
 import java.io.File
-import java.io.IOException
-import java.util.*
 
 fun FileObject.resolveRandom(prefix: String = "", extension: String) =
     resolve(prefix + uuid().toString() + ".$extension")

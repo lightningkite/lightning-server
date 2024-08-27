@@ -2,8 +2,10 @@
 package com.lightningkite.lightningdb
 
 
+import kotlinx.serialization.Serializable
 import kotlin.math.sqrt
 
+@Serializable
 enum class Aggregate {
     Sum,
     Average,

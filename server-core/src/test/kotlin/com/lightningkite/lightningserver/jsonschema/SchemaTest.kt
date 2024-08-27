@@ -2,9 +2,14 @@
 
 package com.lightningkite.lightningserver.jsonschema
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
+import com.lightningkite.lightningserver.files.ServerFile
+import com.lightningkite.lightningserver.prepareModelsServerCoreTest
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.prepareModelsShared
 import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.properties.Properties
@@ -14,9 +19,14 @@ import java.net.URLEncoder
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import java.util.*
-import kotlin.test.assertTrue
 
 class SchemaTest {
+    init {
+
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerCoreTest()
+    }
 
     @Test
     fun quick() {
@@ -26,21 +36,18 @@ class SchemaTest {
 
     @Test
     fun condition() {
-        prepareModels()
         val schema = Json.schema(Condition.serializer(Post.serializer()))
         println(Serialization.jsonWithoutDefaults.encodeToString(schema))
     }
 
     @Test
     fun modification() {
-        prepareModels()
         val schema = Json.schema(Modification.serializer(Post.serializer()))
         println(Serialization.jsonWithoutDefaults.encodeToString(schema))
     }
 
     @Test
     fun params() {
-        prepareModels()
         println(
             Properties.encodeToStringMap(condition<Post> { (it.author eq "Bill") and (it.title eq "Bills Greatest") }).entries.joinToString(
                 "&"

@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpContent
@@ -13,7 +12,6 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import org.slf4j.LoggerFactory
-import java.net.URLDecoder
 import java.util.*
 
 /**
@@ -27,7 +25,7 @@ object ExternalServerFileSerializer : KSerializer<ServerFile> {
     @OptIn(ExperimentalSerializationApi::class)
     override val descriptor: SerialDescriptor = object : SerialDescriptor {
         override val kind: SerialKind = PrimitiveKind.STRING
-        override val serialName: String = "com.lightningkite.lightningdb.ServerFile"
+        override val serialName: String = "com.lightningkite.lightningserver.files.ServerFile"
         override val elementsCount: Int get() = 0
         override fun getElementName(index: Int): String = error()
         override fun getElementIndex(name: String): Int = error()

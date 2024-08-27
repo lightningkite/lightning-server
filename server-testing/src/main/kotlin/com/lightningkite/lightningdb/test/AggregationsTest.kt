@@ -1,16 +1,23 @@
 package com.lightningkite.lightningdb.test
 
+import com.lightningkite.prepareModelsServerCore
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
 import com.lightningkite.lightningdb.*
+import com.lightningkite.prepareModelsShared
+import com.lightningkite.serialization.*
 import kotlin.test.assertNull
 
 abstract class AggregationsTest() {
 
-    init { prepareModels() }
+    init {
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerTesting()
+    }
     abstract val database: Database
 
     @Test

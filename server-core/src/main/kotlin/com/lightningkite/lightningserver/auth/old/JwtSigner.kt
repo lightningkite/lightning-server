@@ -2,7 +2,7 @@
 
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningdb.contextualSerializerIfHandled
+import com.lightningkite.serialization.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.encryption.SecureHasher.*
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException

@@ -4,39 +4,32 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.GeoCoordinate
 import kotlinx.serialization.*
-import com.lightningkite.lightningdb.SerializableProperty
+import com.lightningkite.serialization.SerializableProperty
+import kotlin.jvm.JvmName
 
 @Serializable(ConditionSerializer::class)
-sealed class Condition<T> {
+sealed class Condition<in T> {
     open override fun hashCode(): Int = throw NotImplementedError()
     open override fun equals(other: Any?): Boolean = throw NotImplementedError()
     open operator fun invoke(on: T): Boolean = throw NotImplementedError()
 
-    infix fun and(other: Condition<T>): Condition.And<T> = Condition.And(listOf(this, other))
-    infix fun or(other: Condition<T>): Condition.Or<T> = Condition.Or(listOf(this, other))
-    operator fun not(): Condition.Not<T> = Condition.Not(this)
-
-    @Serializable(ConditionNeverSerializer::class)
     @SerialName("Never")
-    class Never<T> : Condition<T>() {
-        override fun invoke(on: T): Boolean = false
-        override fun hashCode(): Int = 0
-
-        @Suppress("UNCHECKED_CAST")
-        override fun equals(other: Any?): Boolean = (other as? Condition.Never<T>) != null
-
+    @Serializable
+    data object Never : Condition<Any?>() {
+        @Deprecated("Just use it directly", ReplaceWith("Condition.Never")) inline operator fun invoke() = this
+        @JvmName("invokeOp")
+        @Deprecated("Just use it directly", ReplaceWith("Condition.Never")) inline operator fun <T> invoke() = this
+        override fun invoke(on: Any?): Boolean = false
         override fun toString(): String = "false"
     }
 
-    @Serializable(ConditionAlwaysSerializer::class)
     @SerialName("Always")
-    class Always<T> : Condition<T>() {
-        override fun invoke(on: T): Boolean = true
-        override fun hashCode(): Int = 1
-
-        @Suppress("UNCHECKED_CAST")
-        override fun equals(other: Any?): Boolean = (other as? Condition.Always<T>) != null
-
+    @Serializable
+    data object Always : Condition<Any?>() {
+        @Deprecated("Just use it directly", ReplaceWith("Condition.Always")) inline operator fun invoke() = this
+        @JvmName("invokeOp")
+        @Deprecated("Just use it directly", ReplaceWith("Condition.Always")) inline operator fun <T> invoke() = this
+        override fun invoke(on: Any?): Boolean = true
         override fun toString(): String = "true"
     }
 
@@ -261,3 +254,7 @@ sealed class Condition<T> {
         override fun toString(): String = " != null && $condition"
     }
 }
+
+infix fun <T> Condition<T>.and(other: Condition<T>): Condition.And<T> = Condition.And(listOf(this, other))
+infix fun <T> Condition<T>.or(other: Condition<T>): Condition.Or<T> = Condition.Or(listOf(this, other))
+operator fun <T> Condition<T>.not(): Condition.Not<T> = Condition.Not(this)

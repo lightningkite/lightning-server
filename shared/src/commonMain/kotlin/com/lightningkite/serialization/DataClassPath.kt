@@ -1,17 +1,12 @@
 @file:OptIn(ExperimentalSerializationApi::class)
 
-package com.lightningkite.lightningdb
+package com.lightningkite.serialization
 
+import com.lightningkite.lightningdb.Condition
+import com.lightningkite.lightningdb.Modification
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.SerialKind
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.internal.GeneratedSerializer
-import com.lightningkite.lightningdb.SerializableProperty
 import kotlin.js.JsName
 import kotlin.jvm.JvmName
 
@@ -64,7 +59,8 @@ data class DataClassPathAccess<K, M, V>(
         try {
             second.get(it)
         } catch (e: Exception) {
-            throw IllegalArgumentException("Could not get $second on ${it}")
+            e.printStackTrace()
+            throw IllegalArgumentException("Could not get ${second.name} on ${it}", e)
         }
     }
 
@@ -110,7 +106,7 @@ data class DataClassPathList<K, V>(val wraps: DataClassPath<K, List<V>>) :
         wraps.mapCondition(Condition.ListAllElements(condition))
 
     override fun mapModification(modification: Modification<V>): Modification<K> =
-        wraps.mapModification(Modification.ListPerElement(Condition.Always(), modification))
+        wraps.mapModification(Modification.ListPerElement(Condition.Always, modification))
 
     @Suppress("UNCHECKED_CAST")
     override val serializer: KSerializer<V> get() = wraps.serializer.listElement()!! as KSerializer<V>
@@ -128,7 +124,7 @@ data class DataClassPathSet<K, V>(val wraps: DataClassPath<K, Set<V>>) :
         wraps.mapCondition(Condition.SetAllElements(condition))
 
     override fun mapModification(modification: Modification<V>): Modification<K> =
-        wraps.mapModification(Modification.SetPerElement(Condition.Always(), modification))
+        wraps.mapModification(Modification.SetPerElement(Condition.Always, modification))
 
     @Suppress("UNCHECKED_CAST")
     override val serializer: KSerializer<V> get() = wraps.serializer.listElement()!! as KSerializer<V>

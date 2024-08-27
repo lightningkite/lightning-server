@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.files.serverFile
 import com.lightningkite.lightningserver.serialization.Serialization

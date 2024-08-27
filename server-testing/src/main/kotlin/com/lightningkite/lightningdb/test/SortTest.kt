@@ -1,10 +1,13 @@
 package com.lightningkite.lightningdb.test
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import com.lightningkite.now
+import com.lightningkite.prepareModelsShared
 import org.junit.Before
 import org.junit.Test
 import kotlinx.datetime.Instant
@@ -13,7 +16,11 @@ import kotlin.time.Duration.Companion.minutes
 
 abstract class SortTest {
 
-    init { prepareModels() }
+    init {
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerTesting()
+    }
     abstract val database: Database
 
     @Test

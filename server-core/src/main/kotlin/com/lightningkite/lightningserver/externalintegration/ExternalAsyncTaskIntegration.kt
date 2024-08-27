@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.externalintegration
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.core.ServerPath
@@ -44,7 +46,7 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
     val idempotentBasedOnOurData: Boolean = false,
 ) : ServerPathGroup(path) {
     init {
-        prepareModels()
+        prepareModelsServerCore()
     }
 
     // Collection exposed to admins only for tasks

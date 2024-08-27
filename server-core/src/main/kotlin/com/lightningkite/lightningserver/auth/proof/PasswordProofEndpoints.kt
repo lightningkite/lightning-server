@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.auth.proof
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.get
@@ -62,7 +64,7 @@ class PasswordProofEndpoints(
     }
 
     init {
-        prepareModels()
+        prepareModelsServerCore()
         Tasks.onSettingsReady {
             Authentication.subjects.forEach {
                 @Suppress("UNCHECKED_CAST")

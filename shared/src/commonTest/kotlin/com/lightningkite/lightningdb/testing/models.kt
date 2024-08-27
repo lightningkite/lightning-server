@@ -6,6 +6,7 @@ import com.lightningkite.TrimmedCaselessString
 import com.lightningkite.UUID
 import com.lightningkite.ZonedDateTime
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 
 import com.lightningkite.uuid
 import kotlinx.serialization.Serializable
@@ -44,6 +45,16 @@ data class Employee(
     override val _id: UUID = uuid(),
     var dictionary: Map<String, Int> = mapOf(),
 ) : HasId<UUID> {
+    companion object
+}
+
+@GenerateDataClassPaths()
+@Serializable
+data class GenericBox<T>(
+    val value: T,
+    val nullable: T?,
+    val list: List<T>,
+) {
     companion object
 }
 

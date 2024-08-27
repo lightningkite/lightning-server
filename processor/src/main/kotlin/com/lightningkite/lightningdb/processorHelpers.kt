@@ -27,13 +27,13 @@ fun KSTypeReference.toKotlin(annotations: Sequence<KSAnnotation>? = null): Strin
     this.resolve().toKotlin(annotations ?: sequenceOf())
 
 fun KSType.toKotlin(annotations: Sequence<KSAnnotation> = this.annotations): String {
-    (this.declaration as? KSTypeParameter)?.let { return it.name.asString() }
+    (this.declaration as? KSTypeParameter)?.let { return it.name.asString() + if (isMarkedNullable) "?" else "" }
 
     val annotationString = annotations.joinToString(" ") {
         it.toString()
     }.let { if (it.isBlank()) "" else "$it " }
 
-    return annotationString + (declaration.safeLocalReference() + if (arguments.isNotEmpty() && this.declaration !is KSTypeAlias) {
+    return annotationString + (declaration.safeLocalReference() + if (arguments.isNotEmpty()) {
         arguments.joinToString(", ", "<", ">") { it.type?.toKotlin() ?: "*" }
     } else "") + if (isMarkedNullable) "?" else ""
 }
@@ -42,18 +42,27 @@ fun KSType.toKotlinSerializer(contextualTypes: List<KSDeclaration>): String {
     val allAnnos = this.annotations.asSequence() + generateSequence((this as? KSTypeAlias)?.type?.tryResolve()) {
         (it as? KSTypeAlias)?.type?.tryResolve()
     }.flatMap { it.annotations }
-    if(allAnnos.any { it.resolve().type.qualifiedName?.asString() == "kotlinx.serialization.Contextual" }) return "ContextualSerializer(${this.makeNotNullable().toKotlin(sequenceOf())}::class)" + if (isMarkedNullable) ".nullable" else ""
-    if(this.declaration in contextualTypes) return "ContextualSerializer(${this.makeNotNullable().toKotlin(sequenceOf())}::class)" + if (isMarkedNullable) ".nullable" else ""
-    if((this.declaration as? KSTypeAlias)?.type?.tryResolve()?.declaration in contextualTypes) return "ContextualSerializer(${this.makeNotNullable().toKotlin(sequenceOf())}::class)" + if (isMarkedNullable) ".nullable" else ""
-    val typeArgsAndEnding = arguments.joinToString(", ", "(", ")") { it.type?.resolve()?.toKotlinSerializer(contextualTypes) ?: "*" } + if (isMarkedNullable) ".nullable" else ""
-    when(this.declaration.qualifiedName?.asString()) {
-        "kotlin.collections.List" -> return "ListSerializer$typeArgsAndEnding"
-        "kotlin.collections.Set" -> return "SetSerializer$typeArgsAndEnding"
-        "kotlin.collections.Map" -> return "MapSerializer$typeArgsAndEnding"
-    }
-    (this.declaration as? KSTypeParameter)?.let { return it.name.asString().decapitalizeAsciiOnly() }
+    return run {
+        if (allAnnos.any { it.resolve().type.qualifiedName?.asString() == "kotlinx.serialization.Contextual" }) return@run "ContextualSerializer(${
+            this.makeNotNullable().toKotlin(sequenceOf())
+        }::class)"
+        if (this.declaration in contextualTypes) return@run "ContextualSerializer(${
+            this.makeNotNullable().toKotlin(sequenceOf())
+        }::class)"
+        if ((this.declaration as? KSTypeAlias)?.type?.tryResolve()?.declaration in contextualTypes) return@run "ContextualSerializer(${
+            this.makeNotNullable().toKotlin(sequenceOf())
+        }::class)"
+        val typeArgsAndEnding =
+            arguments.joinToString(", ", "(", ")") { it.type?.resolve()?.toKotlinSerializer(contextualTypes) ?: "*" }
+        when (this.declaration.qualifiedName?.asString()) {
+            "kotlin.collections.List" -> return@run "ListSerializer$typeArgsAndEnding"
+            "kotlin.collections.Set" -> return@run "SetSerializer$typeArgsAndEnding"
+            "kotlin.collections.Map" -> return@run "MapSerializer$typeArgsAndEnding"
+        }
+        (this.declaration as? KSTypeParameter)?.let { return@run it.name.asString().decapitalizeAsciiOnly() }
 
-    return declaration.safeLocalReference() + ".serializer$typeArgsAndEnding"
+        return@run declaration.safeLocalReference() + ".serializer$typeArgsAndEnding"
+    } + if (isMarkedNullable) ".nullable2" else ""
 }
 
 fun KSType.toKotlinLeast(annotations: Sequence<KSAnnotation> = this.annotations, alreadyProcessed: Set<KSName> = setOf()): String {

@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.lightningdb.SerializableProperty
+import com.lightningkite.serialization.*
+import com.lightningkite.serialization.SerializableProperty
 
 /**
  * Defines permissions for accessing a model in a database.

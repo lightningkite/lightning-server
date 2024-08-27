@@ -2,9 +2,8 @@
 
 package com.lightningkite.lightningdb
 
-import com.lightningkite.ShouldValidateSub
+import com.lightningkite.serialization.SerializableProperty
 import kotlinx.serialization.*
-import com.lightningkite.lightningdb.SerializableProperty
 
 @Serializable(ModificationSerializer::class)
 sealed class Modification<T>  {
@@ -12,12 +11,25 @@ sealed class Modification<T>  {
     open override fun equals(other: Any?): Boolean { throw NotImplementedError() }
     open operator fun invoke(on: T): T { throw NotImplementedError() }
     open fun invokeDefault(): T { throw NotImplementedError() }
+    open val isNothing: Boolean get() = false
 
     @Deprecated("Use the modification {} builder instead")
     infix fun then(other: Modification<T>): Modification.Chain<T> = Modification.Chain(listOf(this, other))
 
+    @Serializable
+    data object Nothing: Modification<Any?>() {
+        override val isNothing: Boolean get() = true
+        @Suppress("UNCHECKED_CAST")
+        inline operator fun <T> invoke(): Modification<T> = this as Modification<T>
+        override fun invoke(on: Any?): Any? = on
+        override fun invokeDefault(): Any? = throw IllegalStateException()
+        override fun toString(): String = ""
+    }
+
     @Serializable(ModificationChainSerializer::class)
     data class Chain<T>(val modifications: List<Modification<T>>): Modification<T>() {
+        override val isNothing: Boolean
+            get() = modifications.all { it.isNothing }
         override fun invoke(on: T): T = modifications.fold(on) { item, mod -> mod(item) }
         override fun invokeDefault(): T {
             val on = modifications[0].invokeDefault()

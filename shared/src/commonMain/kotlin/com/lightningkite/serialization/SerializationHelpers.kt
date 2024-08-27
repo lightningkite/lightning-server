@@ -1,7 +1,11 @@
 @file:Suppress("OPT_IN_USAGE", "OPT_IN_OVERRIDE")
 
-package com.lightningkite.lightningdb
+package com.lightningkite.serialization
 
+import com.lightningkite.lightningdb.ConditionSerializer
+import com.lightningkite.lightningdb.LazyRenamedSerialDescriptor
+import com.lightningkite.lightningdb.ModificationSerializer
+import com.lightningkite.lightningdb.SortPartSerializer
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
@@ -30,6 +34,12 @@ abstract class WrappingSerializer<OUTER, INNER>(val name: String) : KSerializer<
     override fun deserialize(decoder: Decoder): OUTER = outer(decoder.decodeSerializableValue(to))
     override fun serialize(encoder: Encoder, value: OUTER) =
         encoder.encodeSerializableValue(to, inner(value))
+}
+
+abstract class TrueObjectSerializer<T>(name: String, val value: T): WrappingSerializer<T, Boolean>(name) {
+    override fun getDeferred(): KSerializer<Boolean> = Boolean.serializer()
+    override fun inner(it: T): Boolean = true
+    override fun outer(it: Boolean) = value
 }
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -116,7 +126,7 @@ private object FakerDecoder : AbstractDecoder() {
 }
 
 private class CheatingBastardDecoder(var count: Int = 0) : AbstractDecoder() {
-    override val serializersModule: SerializersModule = com.lightningkite.lightningdb.ClientModule
+    override val serializersModule: SerializersModule = com.lightningkite.serialization.ClientModule
     var counter = 0
     override fun decodeElementIndex(descriptor: SerialDescriptor): Int {
         return counter++.let {
@@ -225,6 +235,8 @@ fun KSerializer<*>.tryTypeParameterSerializers3(): Array<KSerializer<*>>? = when
 
 @OptIn(InternalSerializationApi::class)
 fun KSerializer<*>.tryChildSerializers(): Array<KSerializer<*>>? = (this as? GeneratedSerializer<*>)?.childSerializers()
+@Suppress("UNCHECKED_CAST")
+val <T> KSerializer<T>.nullable2: KSerializer<T?> get() = if(this.descriptor.isNullable) this as KSerializer<T?> else (this as KSerializer<Any>).nullable as KSerializer<T?>
 
 @Suppress("UNCHECKED_CAST")
 inline fun <reified T> serializerOrContextual(): KSerializer<T> = serializerOrContextual(typeOf<T>()) as KSerializer<T>

@@ -1,4 +1,4 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.serialization
 
 import com.lightningkite.*
 import kotlinx.datetime.Instant
@@ -12,7 +12,6 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.modules.SerializersModule
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 

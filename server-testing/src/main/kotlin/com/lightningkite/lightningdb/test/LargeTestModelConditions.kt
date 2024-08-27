@@ -2,9 +2,9 @@ package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.Condition
 import kotlinx.datetime.Instant
-import com.lightningkite.lightningdb.SerializableProperty
 import kotlinx.datetime.Clock
 import com.lightningkite.now
+import com.lightningkite.serialization.SerializableProperty
 import kotlin.time.Duration.Companion.seconds
 
 object LargeTestModelConditions {

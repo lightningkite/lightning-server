@@ -4,7 +4,7 @@ package com.lightningkite.lightningserver.typed
 
 import kotlin.time.Duration
 import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.contextualSerializerIfHandled
+import com.lightningkite.serialization.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.LightningServerDsl

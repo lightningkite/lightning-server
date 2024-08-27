@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.auth.proof
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.get
@@ -27,6 +29,7 @@ import com.lightningkite.lightningserver.typed.*
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
 import com.lightningkite.now
+import com.lightningkite.serialization.DataClassPathSelf
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
@@ -75,7 +78,7 @@ class OneTimePasswordProofEndpoints(
     }
 
     init {
-        prepareModels()
+        prepareModelsServerCore()
         Tasks.onSettingsReady {
             Authentication.subjects.forEach {
                 @Suppress("UNCHECKED_CAST")

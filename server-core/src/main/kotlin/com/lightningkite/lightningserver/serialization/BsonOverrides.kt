@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.github.jershell.kbson.*
-import com.lightningkite.lightningdb.DurationMsSerializer
+import com.lightningkite.serialization.DurationMsSerializer
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.*

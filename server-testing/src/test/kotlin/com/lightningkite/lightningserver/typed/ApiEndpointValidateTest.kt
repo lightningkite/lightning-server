@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.contextualSerializerIfHandled
+import com.lightningkite.serialization.contextualSerializerIfHandled
 import com.lightningkite.lightningdb.test.ClassUsedForEmbedding
 import com.lightningkite.lightningdb.test.LargeTestModel
 import com.lightningkite.lightningdb.test.SimpleLargeTestModel

@@ -1,8 +1,9 @@
 @file:UseContextualSerialization(UUID::class)
 package com.lightningkite.lightningserver
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningdb.prepareModels
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.oauth.OauthClientEndpoints
 import com.lightningkite.lightningserver.auth.proof.*
@@ -29,6 +30,7 @@ import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.sms.SMSSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.testmodels.*
+import com.lightningkite.prepareModelsShared
 import com.lightningkite.uuid
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.GlobalScope
@@ -80,8 +82,9 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
 
 
     init {
-        prepareModels()
-        com.lightningkite.lightningserver.testmodels.prepareModels()
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerCoreTest()
     }
 
     val userInfo = modelInfoWithDefault<TestUser, TestUser, UUID>(

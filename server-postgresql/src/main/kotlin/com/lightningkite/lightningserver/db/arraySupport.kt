@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.listElement
+import com.lightningkite.serialization.listElement
 import kotlinx.serialization.KSerializer
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq

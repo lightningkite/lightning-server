@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
@@ -10,9 +12,6 @@ import com.lightningkite.lightningserver.filescanner.copyAndScan
 import com.lightningkite.lightningserver.filescanner.scan
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.typed.api
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import com.lightningkite.now
 import com.lightningkite.uuid
 import io.ktor.http.*
@@ -54,7 +53,7 @@ class UploadEarlyEndpoint(
         return safeFo
     }
     init {
-        prepareModels()
+        prepareModelsServerCore()
         FileSystem.register(this)
         FileSystem.default = files
         ExternalServerFileSerializer.uploadFile = {

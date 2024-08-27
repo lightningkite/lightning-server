@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalSerializationApi::class)
 
-package com.lightningkite.lightningdb
+package com.lightningkite.serialization
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -9,8 +9,6 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.internal.GeneratedSerializer
-import com.lightningkite.lightningdb.SerializableProperty
 import kotlinx.serialization.SerializationException
 
 
@@ -32,7 +30,9 @@ private class SerializablePropertyParser<T>(val serializer: KSerializer<T>) {
     }
 }
 
-class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializer<DataClassPathPartial<T>> {
+class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializerWithDefault<DataClassPathPartial<T>> {
+    override val default: DataClassPathPartial<T>
+        get() = DataClassPathSelf(inner)
     @OptIn(ExperimentalSerializationApi::class)
     override val descriptor: SerialDescriptor = object: SerialDescriptor {
         override val kind: SerialKind = PrimitiveKind.STRING

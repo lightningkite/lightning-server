@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.auth.old
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.AuthType
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.db.ModelInfo

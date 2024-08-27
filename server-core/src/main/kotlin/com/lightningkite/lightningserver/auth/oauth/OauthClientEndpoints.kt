@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.auth.oauth
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
@@ -11,6 +13,7 @@ import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.*
+import com.lightningkite.serialization.contextualSerializerIfHandled
 import java.util.Base64
 import kotlin.random.Random
 
@@ -25,7 +28,7 @@ class OauthClientEndpoints(
     }
     init {
         instance = this
-        prepareModels()
+        prepareModelsServerCore()
     }
 
     val modelInfo = modelInfoWithDefault(

@@ -45,6 +45,14 @@ annotation class AdminTitleFields(val fields: Array<String>)
 annotation class AdminHidden()
 
 /**
+ * Hide this field in admin forms.
+ */
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class AdminViewOnly()
+
+/**
  * Multiline widget in admin.
  */
 @SerialInfo
@@ -109,6 +117,14 @@ annotation class ExpectedPattern(val pattern: String)
 annotation class DisplayName(val text: String)
 
 /**
+ * Hint for what should be placed here
+ */
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class Hint(val text: String)
+
+/**
  * Which mime types are valid
  */
 @SerialInfo
@@ -125,6 +141,11 @@ annotation class MaxLength(val size: Int)
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 annotation class MaxSize(val size: Int)
+
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class Denormalized(val calculationId: String = "")
 
 /**
  * A description of the item in question.
@@ -148,7 +169,8 @@ annotation class GenerateDataClassPaths
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 annotation class References(
-    val references: KClass<*>
+    val references: KClass<*>,
+    val reverseName: String = ""
 )
 
 
@@ -156,8 +178,39 @@ annotation class References(
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 annotation class MultipleReferences(
-    val references: KClass<*>
+    val references: KClass<*>,
+    val reverseName: String = ""
 )
+
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class DoesNotNeedLabel
+
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class Group(val name: String)
+
+/**
+ * [text] should be formatted as "_ in stock"
+ */
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class Sentence(val text: String)
+
+/**
+ * An integer indicating how important this is.
+ * Corresponds to header sizes.
+ * 1-6 represent H1-H6
+ * 7 represents text
+ * 8 represents subtext
+ */
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+annotation class Importance(val size: Int)
 
 
 @SerialInfo

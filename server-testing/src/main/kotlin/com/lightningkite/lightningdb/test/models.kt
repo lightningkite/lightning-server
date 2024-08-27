@@ -3,14 +3,15 @@ package com.lightningkite.lightningdb.test
 
 import com.lightningkite.GeoCoordinate
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningdb.HasId
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
 import java.util.*
-import com.lightningkite.lightningdb.*
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.files.ServerFile
 import com.lightningkite.uuid
 
 @GenerateDataClassPaths()

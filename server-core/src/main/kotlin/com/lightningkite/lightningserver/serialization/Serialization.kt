@@ -3,18 +3,22 @@ package com.lightningkite.lightningserver.serialization
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import com.github.jershell.kbson.*
-import com.lightningkite.ValidationIssue
-import com.lightningkite.ValidationIssuePart
-import com.lightningkite.Validators
+import com.lightningkite.validation.ValidationIssue
+import com.lightningkite.validation.ValidationIssuePart
+import com.lightningkite.validation.Validators
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.SetOnce
 import com.lightningkite.lightningserver.StringArrayFormat
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
+import com.lightningkite.lightningserver.files.ServerFile
 import com.lightningkite.lightningserver.files.fileObject
 import com.lightningkite.lightningserver.http.HttpContent
-import com.lightningkite.validate
+import com.lightningkite.serialization.ClientModule
+import com.lightningkite.serialization.SerializationRegistry
+import com.lightningkite.validation.validate
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialKind
@@ -24,18 +28,10 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.overwriteWith
 import kotlinx.serialization.modules.serializersModuleOf
 import kotlinx.serialization.properties.Properties
-import nl.adaptivity.xmlutil.XmlDeclMode
-import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
 import nl.adaptivity.xmlutil.serialization.XML
-import java.math.BigDecimal
 import kotlinx.datetime.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.StructureKind
-import nl.adaptivity.xmlutil.ExperimentalXmlUtilApi
-import nl.adaptivity.xmlutil.serialization.XmlSerializationPolicy
-import org.bson.BsonDocument
-import org.bson.BsonDocumentWriter
-import org.bson.BsonValue
 import java.util.*
 import kotlin.collections.HashMap
 
@@ -88,6 +84,7 @@ abstract class Serialization {
     var additionalModule: SerializersModule by SetOnce { SerializersModule { } }
     protected abstract fun defaultModule(): SerializersModule
     var module: SerializersModule by SetOnce { defaultModule() }
+    var registry: SerializationRegistry by SetOnce { SerializationRegistry(defaultModule()) }
     var json: Json by SetOnce {
         Json {
             ignoreUnknownKeys = true

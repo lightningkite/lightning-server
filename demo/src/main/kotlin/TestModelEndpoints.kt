@@ -1,6 +1,7 @@
-package com.lightningkite.lightningserver.demo
+package com.lightningkite.lightningserverdemo
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.RequestAuth

@@ -2,11 +2,15 @@
 
 package com.lightningkite.lightningserver.tasks
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.now
+import com.lightningkite.serialization.contextualSerializerIfHandled
+import com.lightningkite.serialization.notNull
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
@@ -54,7 +58,7 @@ fun startupOnce(
     priority: Double = 0.0,
     action: suspend () -> Unit,
 ): StartupAction {
-    prepareModels()
+    prepareModelsServerCore()
     return startup(priority) {
         doOnce(name, database, maxDuration, priority, action)
     }
@@ -70,7 +74,7 @@ suspend fun doOnce(
     @Suppress("UNUSED_PARAMETER") priority: Double = 0.0,
     action: suspend () -> Unit,
 ) {
-    prepareModels()
+    prepareModelsServerCore()
     val a = database().collection<ActionHasOccurred>()
     val existing = a.get(name)
     if (existing == null) {

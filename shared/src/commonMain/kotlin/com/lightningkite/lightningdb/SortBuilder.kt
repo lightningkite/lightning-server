@@ -1,6 +1,6 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.lightningdb.SerializableProperty
+import com.lightningkite.serialization.DataClassPath
 import kotlinx.serialization.KSerializer
 
 inline fun <reified T> sort(setup: SortBuilder<T>.(DataClassPath<T, T>) -> Unit): List<SortPart<T>> {

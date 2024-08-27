@@ -1,6 +1,9 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.prepareModelsServerCore
+import com.lightningkite.lightningdb.test.prepareModelsServerTesting
 import com.lightningkite.lightningserver.exceptions.BadRequestException
+import com.lightningkite.prepareModelsShared
 import com.mongodb.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -12,7 +15,11 @@ class TestMongoExceptions : MongoTest() {
     @Test
     fun testUniqueError(): Unit = runBlocking {
 
-        prepareModels()
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerTesting()
+        prepareModelsServerMongo()
+        prepareModelsServerMongoTest()
 
         val collection =
             (db.collection<IndexingTestModel>("MongoExceptions_unique") as MongoFieldCollection<IndexingTestModel>)

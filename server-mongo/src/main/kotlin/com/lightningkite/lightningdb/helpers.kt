@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.serialization.DataClassPathPartial
 import com.mongodb.client.model.changestream.UpdateDescription
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -10,7 +11,6 @@ import org.bson.codecs.DecoderContext
 import org.bson.codecs.EncoderContext
 import org.bson.codecs.configuration.CodecRegistry
 import java.util.*
-import com.lightningkite.lightningdb.SerializableProperty
 import kotlin.reflect.typeOf
 
 fun BsonValue.setPath(path: String, value: BsonValue) {

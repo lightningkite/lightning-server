@@ -1,11 +1,10 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.lightningdb.LazyRenamedSerialDescriptor
-import com.lightningkite.lightningdb.ServerFile
+import com.lightningkite.lightningserver.files.ServerFile
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
-import com.lightningkite.lightningserver.files.resolveRandom
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.toMultipartContent

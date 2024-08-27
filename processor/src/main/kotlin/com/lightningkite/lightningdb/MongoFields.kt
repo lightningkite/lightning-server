@@ -8,10 +8,13 @@ fun KSClassDeclaration.handleSerializableAnno(out: TabAppendable) {
     try {
         out.appendLine(
             """
-            SerializableAnnotation.parser<${simpleName.asString()}>("${qualifiedName?.asString()}") { SerializableAnnotation("${qualifiedName?.asString()}", values = mapOf(${(this.primaryConstructor?.parameters ?: listOf()).mapNotNull { it.name }.joinToString { "\"${it.asString()}\" to SerializableAnnotationValue(it.${it.asString()})" }})) }
+            SerializableAnnotation.parser<${qualifiedName?.asString()}>("${qualifiedName?.asString()}") { SerializableAnnotation("${qualifiedName?.asString()}", values = mapOf(${
+                (this.primaryConstructor?.parameters ?: listOf()).mapNotNull { it.name }
+                    .joinToString { "\"${it.asString()}\" to SerializableAnnotationValue(it.${it.asString()})" }
+            })) }
         """.trimIndent()
         )
-    } catch(e: Exception) {
+    } catch (e: Exception) {
         out.appendLine("/* ${e.stackTraceToString()} */")
     }
 }
@@ -20,57 +23,32 @@ data class MongoFields(
     val declaration: KSClassDeclaration
 ) {
     val packageName: String get() = declaration.packageName.asString()
-    val typeReference: String get() = declaration.safeLocalReference() + (declaration.typeParameters.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.name.asString() } ?: "")
+    val typeReference: String
+        get() = declaration.safeLocalReference() + (declaration.typeParameters.takeUnless { it.isEmpty() }
+            ?.joinToString(", ", "<", ">") { it.name.asString() } ?: "")
     val classReference: String get() = declaration.safeLocalReference()
     val simpleName: String get() = declaration.simpleName.getShortName()
     val fields by lazy { declaration.fields() }
     val hasId by lazy { declaration.superTypes.any { it.resolve().declaration.qualifiedName?.asString() == "com.lightningkite.lightningdb.HasId" } }
 
     fun write(out: TabAppendable) = with(out) {
-        declaration.containingFile?.annotations?.forEach {
-            when (it.shortName.asString()) {
-                "UseContextualSerialization" -> {
-                    it.resolve().arguments
-                    appendLine(
-                        "@file:${it.shortName.asString()}(${
-                            it.arguments.first().let { argument ->
-                                argument.value
-                                    ?.toString()
-                                    ?.removePrefix("[")
-                                    ?.removeSuffix("]")
-                                    ?.split(", ")
-                                    ?.joinToString { "$it::class" }
-                            }
-                        })"
-                    )
-                }
-                else -> {
-                    try {
-                        appendLine(
-                            "@file:${it.shortName.asString()}(${
-                                it.arguments.joinToString(", ") {
-                                    when (val v = it.value) {
-                                        is List<*> -> v.joinToString { it.toString() }
-                                    }
-                                    it.value.toString()
-                                }
-                            })"
-                        )
-                    } catch (e: Exception) {
-                        throw Exception("Failed to generate file annotations for file $simpleName and annotation ${it.shortName}")
-                    }
-                }
-            }
-        }
+        appendLine("""// Automatically generated based off ${declaration.containingFile?.fileName}""")
         appendLine("""@file:OptIn(ExperimentalSerializationApi::class, InternalSerializationApi::class)""")
-        appendLine("""@file:Suppress("UNCHECKED_CAST", "UNUSED_PARAMETER", "UnusedImport")""")
+        if (declaration.typeParameters.isEmpty())
+            appendLine("""@file:Suppress("UnusedImport")""")
+        else
+            appendLine("""@file:Suppress("UNCHECKED_CAST", "UNUSED_PARAMETER", "UnusedImport")""")
         appendLine()
-        if(packageName.isNotEmpty()) appendLine("package ${packageName}")
+        if (packageName.isNotEmpty()) appendLine("package ${packageName}")
         appendLine()
         declaration.containingFile?.ktFile?.importList?.imports
             ?.map { it.importPath.toString() }
             ?.plus(
                 listOf(
+                    "com.lightningkite.serialization.*",
+                    "com.lightningkite.serialization.DataClassPath",
+                    "com.lightningkite.serialization.DataClassPathSelf",
+                    "com.lightningkite.serialization.SerializableProperty",
                     "com.lightningkite.lightningdb.*",
                     "kotlin.reflect.*",
                     "kotlinx.serialization.*",
@@ -83,7 +61,10 @@ data class MongoFields(
             ?.distinct()
             ?.forEach { appendLine("import $it") }
         appendLine()
-        val contextualTypes = declaration.containingFile?.annotation("UseContextualSerialization", "kotlinx.serialization")?.arguments?.firstOrNull()
+        val contextualTypes = declaration.containingFile?.annotation(
+            "UseContextualSerialization",
+            "kotlinx.serialization"
+        )?.arguments?.firstOrNull()
             ?.value
             ?.let {
                 @Suppress("UNCHECKED_CAST")
@@ -92,7 +73,7 @@ data class MongoFields(
             ?.map { it.declaration }
             ?: listOf()
         appendLine("// Contextual types: ${contextualTypes.joinToString { it.qualifiedName?.asString() ?: "-" }}")
-        if(declaration.typeParameters.isEmpty()) {
+        if (declaration.typeParameters.isEmpty()) {
             appendLine("fun prepare${simpleName}Fields() {")
             tab {
                 appendLine("val props: Array<SerializableProperty<$classReference, *>> = arrayOf(${fields.joinToString { field -> "${simpleName}_${field.name}" }})")
@@ -100,7 +81,7 @@ data class MongoFields(
             }
             appendLine("}")
             for (field in fields) {
-                appendLine("val <K> DataClassPath<K, $typeReference>.${field.name}: DataClassPath<K, ${field.kotlinType.toKotlin()}> get() = this[${classReference}_${field.name}]")
+                appendLine("val <K> DataClassPath<K, $typeReference>.${field.name}: DataClassPath<K, ${field.kotlinType.toKotlin()}> get() = this[${simpleName}_${field.name}]")
             }
             appendLine("inline val $typeReference.Companion.path: DataClassPath<$typeReference, $typeReference> get() = path<$typeReference>()")
             appendLine()
@@ -111,7 +92,11 @@ data class MongoFields(
                     appendLine("""override val name: String = "${field.name}"""")
                     appendLine("""override fun get(receiver: $typeReference): ${field.kotlinType.toKotlin()} = receiver.${field.name}""")
                     appendLine("""override fun setCopy(receiver: $typeReference, value: ${field.kotlinType.toKotlin()}) = receiver.copy(${field.name} = value)""")
-                    appendLine("""override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${field.kotlinType.resolve().toKotlinSerializer(contextualTypes)}""")
+                    appendLine(
+                        """override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${
+                            field.kotlinType.resolve().toKotlinSerializer(contextualTypes)
+                        }"""
+                    )
                     appendLine("""override val annotations: List<Annotation> = $classReference.serializer().tryFindAnnotations("${field.name}")""")
                     field.default?.let {
                         appendLine("""override val default: ${field.kotlinType.toKotlin()} = $it""")
@@ -126,7 +111,7 @@ data class MongoFields(
                 appendLine("$classReference.serializer($nothings).properties { args -> arrayOf(")
                 tab {
                     val args = declaration.typeParameters.indices.joinToString(", ") { "args[$it]" }
-                    for(field in fields) {
+                    for (field in fields) {
                         appendLine("${simpleName}_${field.name}($args),")
                     }
                 }
@@ -134,28 +119,58 @@ data class MongoFields(
             }
             appendLine("}")
             for (field in fields) {
-                appendLine("inline val <ROOT, ${declaration.typeParameters.joinToString(", ") { it.name.asString() + ": " + (it.bounds.firstOrNull()?.toKotlin() ?: "Any?") }}> DataClassPath<ROOT, $typeReference>.${field.name}: DataClassPath<ROOT, ${field.kotlinType.toKotlin()}> get() = this.serializer.tryTypeParameterSerializers()!!.let { this[${simpleName}_${field.name}(${declaration.typeParameters.withIndex().joinToString(", ") { "it[${it.index}] as KSerializer<${it.value.name.asString()}>" }})] }")
+                appendLine(
+                    "inline val <ROOT, ${
+                        declaration.typeParameters.joinToString(", ") {
+                            it.name.asString() + ": " + (it.bounds.firstOrNull()?.toKotlin() ?: "Any?")
+                        }
+                    }> DataClassPath<ROOT, $typeReference>.${field.name}: DataClassPath<ROOT, ${field.kotlinType.toKotlin()}> get() = this.serializer.tryTypeParameterSerializers()!!.let { this[${simpleName}_${field.name}(${
+                        declaration.typeParameters.withIndex()
+                            .joinToString(", ") { "it[${it.index}] as KSerializer<${it.value.name.asString()}>" }
+                    })] }"
+                )
             }
             appendLine()
             appendLine()
             for (field in fields) {
-                appendLine("class ${simpleName}_${field.name}<${declaration.typeParameters.joinToString(", ") { it.name.asString() + ": " + (it.bounds.firstOrNull()?.toKotlin() ?: "Any?") }}>(${declaration.typeParameters.joinToString(", ") { it.name.asString().decapitalizeAsciiOnly() + ": KSerializer<${it.name.asString()}>" }}): SerializableProperty<$typeReference, ${field.kotlinType.toKotlin()}> {")
+                appendLine(
+                    "class ${simpleName}_${field.name}<${
+                        declaration.typeParameters.joinToString(", ") {
+                            it.name.asString() + ": " + (it.bounds.firstOrNull()?.toKotlin() ?: "Any?")
+                        }
+                    }>(${
+                        declaration.typeParameters.joinToString(", ") {
+                            it.name.asString().decapitalizeAsciiOnly() + ": KSerializer<${it.name.asString()}>"
+                        }
+                    }): SerializableProperty<$typeReference, ${field.kotlinType.toKotlin()}> {"
+                )
                 tab {
                     appendLine("""override val name: String = "${field.name}"""")
                     appendLine("""override fun get(receiver: $typeReference): ${field.kotlinType.toKotlin()} = receiver.${field.name}""")
                     appendLine("""override fun setCopy(receiver: $typeReference, value: ${field.kotlinType.toKotlin()}) = receiver.copy(${field.name} = value)""")
-                    appendLine("""override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${field.kotlinType.resolve().toKotlinSerializer(contextualTypes)}""")
+                    appendLine(
+                        """override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${
+                            field.kotlinType.resolve().toKotlinSerializer(contextualTypes)
+                        }"""
+                    )
                     appendLine("""override val annotations: List<Annotation> = $classReference.serializer($nothings).tryFindAnnotations("${field.name}")""")
                     field.default?.let {
                         appendLine("""override val default: ${field.kotlinType.toKotlin()} = $it""")
                     }
                     appendLine("""override fun hashCode(): Int = ${field.name.hashCode() * 31 + simpleName.hashCode()}""")
-                    appendLine("""override fun equals(other: Any?): Boolean = other is ${simpleName}_${field.name}<${declaration.typeParameters.joinToString(", ") { "* "}}>""")
+                    appendLine(
+                        """override fun equals(other: Any?): Boolean = other is ${simpleName}_${field.name}<${
+                            declaration.typeParameters.joinToString(
+                                ", "
+                            ) { "* " }
+                        }>"""
+                    )
                 }
                 appendLine("}")
             }
         }
     }
+
     fun writeTs(out: TabAppendable) {
         out.appendLine("---")
         for (field in fields) {
@@ -165,6 +180,7 @@ data class MongoFields(
             out.appendLine("  template: '~this~.prop(\"${field.name}\")'")
         }
     }
+
     fun writeSwift(out: TabAppendable) {
         out.appendLine("---")
         for (field in fields) {
@@ -196,6 +212,7 @@ private val KSType.useCustomType: Boolean
             "com.lightningkite.UUID",
             "kotlinx.datetime.Instant",
             "org.litote.kmongo.Id" -> false
+
             else -> true
         }
     }
@@ -216,6 +233,7 @@ private val KSType.conditionType: String
             "kotlinx.datetime.Instant",
             "com.lightningkite.lightningdb.UUIDFor",
             "kotlin.Char" -> "ComparableCondition" + "<${this.makeNotNullable().toKotlin()}>"
+
             "kotlin.collections.List" -> "ArrayCondition" + "<${
                 this.arguments[0].run {
                     "${
@@ -223,6 +241,7 @@ private val KSType.conditionType: String
                     }, ${type!!.resolve().conditionType}"
                 }
             }>"
+
             "kotlin.collections.Map" -> "MapCondition" + "<${
                 this.arguments[1].run {
                     "${
@@ -230,9 +249,11 @@ private val KSType.conditionType: String
                     }, ${type!!.resolve().conditionType}"
                 }
             }>"
+
             "kotlin.Boolean", "org.litote.kmongo.Id", "kotlin.Pair" -> "EquatableCondition" + "<${
                 this.makeNotNullable().toKotlin()
             }>"
+
             else -> {
                 if ((declaration as? KSClassDeclaration)?.classKind == ClassKind.ENUM_CLASS) "EquatableCondition<$name>" else "${name}Condition"
             }
@@ -254,6 +275,7 @@ private val KSType.modificationType: String
             "kotlin.Long",
             "kotlin.Float",
             "kotlin.Double" -> "NumberModification" + "<${this.makeNotNullable().toKotlin(annotations)}>"
+
             "java.util.UUID",
             "com.lightningkite.UUID",
             "com.lightningkite.lightningdb.UUIDFor",
@@ -261,6 +283,7 @@ private val KSType.modificationType: String
             "kotlin.String", "kotlin.Char" -> "ComparableModification" + "<${
                 this.makeNotNullable().toKotlin(annotations)
             }>"
+
             "kotlin.collections.List" -> "ArrayModification" + "<${
                 this.arguments[0].run {
                     "${
@@ -268,6 +291,7 @@ private val KSType.modificationType: String
                     }, ${type!!.resolve().conditionType}, ${type!!.resolve().modificationType}"
                 }
             }>"
+
             "kotlin.collections.Map" -> "MapModification" + "<${
                 this.arguments[1].run {
                     "${
@@ -275,9 +299,11 @@ private val KSType.modificationType: String
                     }, ${type!!.resolve().modificationType}"
                 }
             }>"
+
             "kotlin.Boolean", "org.litote.kmongo.Id", "kotlin.Pair" -> "EquatableModification" + "<${
                 this.makeNotNullable().toKotlin()
             }>"
+
             else -> {
                 if ((declaration as? KSClassDeclaration)?.classKind == ClassKind.ENUM_CLASS) "EquatableModification<$name>" else "${name}Modification"
             }
@@ -294,7 +320,7 @@ private fun ResolvedAnnotation.writeSerialzable(): String {
 }
 
 private fun Any?.jsonRender(): String {
-    return when(this) {
+    return when (this) {
         is KClass<*> -> "\"" + (this.qualifiedName) + "\""
         is KSType -> "\"" + (this.declaration?.qualifiedName?.asString() ?: "") + "\""
         is KSTypeReference -> "\"" + (this.tryResolve()?.declaration?.qualifiedName?.asString() ?: "") + "\""

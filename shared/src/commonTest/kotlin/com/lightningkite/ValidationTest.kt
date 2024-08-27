@@ -1,6 +1,8 @@
 package com.lightningkite
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
+import com.lightningkite.validation.validateFast
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
@@ -17,8 +19,8 @@ data class Sample(
 
 class ValidationTest {
     init {
-        com.lightningkite.prepareModels()
-        com.lightningkite.lightningdb.testing.prepareModels()
+        prepareModelsShared()
+        prepareModelsSharedTest()
     }
 
     inline fun <reified T> assertPasses(item: T) {

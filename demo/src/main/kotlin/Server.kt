@@ -1,6 +1,7 @@
-package com.lightningkite.lightningserver.demo
+package com.lightningkite.lightningserverdemo
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.old.*
 import com.lightningkite.lightningserver.auth.old.BaseAuthEndpoints
@@ -51,7 +52,9 @@ import kotlin.time.Duration
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.minutes
 import com.lightningkite.UUID
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningserver.files.S3File
+import com.lightningkite.prepareModelsShared
 import com.lightningkite.uuid
 
 object Server : ServerPathGroup(ServerPath.root) {
@@ -70,7 +73,9 @@ object Server : ServerPathGroup(ServerPath.root) {
         MemcachedCache
         SentryExceptionReporter
         S3FileSystem
-        prepareModels()
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsDemo()
         Tasks.onSettingsReady {
             Metrics.main()
             println("Files started, got ${files().root.url}")

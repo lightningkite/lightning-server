@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.lightningdb.ServerFile
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.Disconnectable
 import com.lightningkite.lightningserver.exceptions.BadRequestException

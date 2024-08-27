@@ -1,9 +1,9 @@
 package com.lightningkite.lightningserver.auth.oauth
 
-import com.lightningkite.lightningdb.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.*
+import com.lightningkite.serialization.contextualSerializerIfHandled
 import kotlinx.serialization.KSerializer
 
 class OauthCallbackEndpoint<STATE>(

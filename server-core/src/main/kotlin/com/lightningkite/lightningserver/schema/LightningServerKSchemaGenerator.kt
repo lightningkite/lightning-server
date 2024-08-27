@@ -1,44 +1,57 @@
 package com.lightningkite.lightningserver.schema
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
-import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
-import com.lightningkite.lightningserver.jsonschema.JsonSchemaBuilder
-import com.lightningkite.lightningserver.jsonschema.LightningServerSchema
-import com.lightningkite.lightningserver.jsonschema.LightningServerSchemaEndpoint
-import com.lightningkite.lightningserver.jsonschema.LightningServerSchemaModel
 import com.lightningkite.lightningserver.kabobCase
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.titleCase
 import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.docGroup
+import com.lightningkite.registerShared
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.elementNames
 
 
 val lightningServerKSchema: LightningServerKSchema by lazy {
-    val vtypes = Documentable.endpoints.flatMap {
+    val registry = SerializationRegistry(Serialization.module).also {
+        it.registerShared()
+    }
+    Documentable.endpoints.flatMap {
         sequenceOf(it.inputType, it.outputType) + it.route.path.serializers.asSequence()
-    }.distinctBy { KSerializerKey(it) }.map { it.makeVirtualType() }
+    }.forEach {
+        registry.registerVirtual(it)
+    }
     LightningServerKSchema(
-        uploadEarlyEndpoint = UploadEarlyEndpoint.default?.path?.fullUrl(),
+        baseUrl = generalSettings().publicUrl,
+        baseWsUrl = generalSettings().wsUrl,
         endpoints = Documentable.endpoints.map {
             LightningServerKSchemaEndpoint(
                 group = it.docGroup,
                 method = it.route.method.toString(),
                 path = it.path.path.toString(),
-                routes = it.route.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().map { it.name }.zip(it.route.path.serializers.map { it.virtualTypeReference() }).associate { it },
-                input = it.inputType.virtualTypeReference(),
-                output = it.outputType.virtualTypeReference(),
+                routes = it.route.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().map { it.name }.zip(it.route.path.serializers.map { it.virtualTypeReference(registry) }).associate { it },
+                input = it.inputType.virtualTypeReference(registry),
+                output = it.outputType.virtualTypeReference(registry),
             )
-        }.toList(),
+        }.toList() + Documentable.websockets.map {
+            LightningServerKSchemaEndpoint(
+                group = it.docGroup,
+                method = "WEBSOCKET",
+                path = it.path.path.toString(),
+                routes = it.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().map { it.name }.zip(it.path.serializers.map { it.virtualTypeReference(registry) }).associate { it },
+                input = it.inputType.virtualTypeReference(registry),
+                output = it.outputType.virtualTypeReference(registry),
+            )
+        },
         models = ModelRestEndpoints.all.associate {
             it.collectionName.kabobCase() to LightningServerKSchemaModel(
                 collectionName = it.collectionName.titleCase(),
-                url = it.path.fullUrl(),
-                type = it.info.serialization.serializer.virtualTypeReference(),
+                path = it.path.toString(),
+                type = it.info.serialization.serializer.virtualTypeReference(registry),
                 searchFields = it.info.serialization.serializer.descriptor.annotations
                     .filterIsInstance<AdminSearchFields>()
                     .firstOrNull()
@@ -70,7 +83,7 @@ val lightningServerKSchema: LightningServerKSchema by lazy {
                     }
             )
         },
-        enums = vtypes.filterIsInstance<VirtualEnum>().associate { it.serialName to it },
-        structures = vtypes.filterIsInstance<VirtualStructure>().associate { it.serialName to it },
+        enums = @Suppress("UNCHECKED_CAST") registry.virtualTypes.filterValues { it is VirtualEnum } as Map<String, VirtualEnum>,
+        structures = @Suppress("UNCHECKED_CAST") registry.virtualTypes.filterValues { it is VirtualStruct } as Map<String, VirtualStruct>,
     )
 }

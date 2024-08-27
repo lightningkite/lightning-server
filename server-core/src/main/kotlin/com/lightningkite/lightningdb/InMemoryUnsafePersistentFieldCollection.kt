@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.serialization.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.actor
 import kotlinx.serialization.KSerializer

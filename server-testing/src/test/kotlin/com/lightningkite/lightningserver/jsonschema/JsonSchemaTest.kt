@@ -16,6 +16,6 @@ class JsonSchemaTest {
         val schema = Serialization.jsonWithoutDefaults.schema(HasServerFiles.serializer())
             .also(::println)
             .also { println(Json(Serialization.jsonWithoutDefaults) { prettyPrint = true }.encodeToString(it)) }
-        assertEquals("#/definitions/com.lightningkite.lightningdb.ServerFile", schema.definitions["com.lightningkite.lightningdb.test.HasServerFiles"]!!.properties!!["file"]!!.ref)
+        assertEquals("#/definitions/com.lightningkite.lightningserver.files.ServerFile", schema.definitions["com.lightningkite.lightningdb.test.HasServerFiles"]!!.properties!!["file"]!!.ref)
     }
 }

@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningdb.ServerFile
-import com.lightningkite.lightningdb.contextualSerializerIfHandled
+import com.lightningkite.lightningserver.files.ServerFile
+import com.lightningkite.serialization.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.jsonschema.schema
 import com.lightningkite.lightningserver.routes.fullUrl

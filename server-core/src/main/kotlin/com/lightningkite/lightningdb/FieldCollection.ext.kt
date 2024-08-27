@@ -1,9 +1,10 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.serialization.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
-import com.lightningkite.lightningdb.SerializableProperty
+import com.lightningkite.serialization.SerializableProperty
 
 /**
  * Returns a Flow that will contain ALL the instances of *Model* in the collection.

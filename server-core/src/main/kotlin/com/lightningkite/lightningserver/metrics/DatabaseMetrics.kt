@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.metrics
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.accepts
@@ -23,6 +25,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import com.lightningkite.now
+import com.lightningkite.serialization.DurationSerializer
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -31,7 +34,7 @@ import kotlin.time.Duration.Companion.minutes
 class DatabaseMetrics(override val settings: MetricSettings, val database: () -> Database) :
     ServerPathGroup(ServerPath.root.path("meta/metrics")), Metrics {
     init {
-        prepareModels()
+        prepareModelsServerCore()
     }
 
     val keepFor: Map<Duration, Duration> = mapOf(

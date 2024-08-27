@@ -1,8 +1,7 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.condition
-import com.lightningkite.lightningdb.eq
-import com.lightningkite.lightningdb.inside
+import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningdb.test.*
 import org.junit.Test
 import kotlin.test.assertEquals

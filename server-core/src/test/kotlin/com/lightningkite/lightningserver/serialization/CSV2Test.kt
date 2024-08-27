@@ -1,16 +1,14 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.ClientModule
-import com.lightningkite.lightningdb.ServerFile
-import com.lightningkite.lightningdb.ServerFileSerialization
+import com.lightningkite.lightningserver.files.ServerFile
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.files.serverFile
+import com.lightningkite.serialization.ClientModule
 import com.lightningkite.uuid
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.properties.Properties
 import org.junit.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals

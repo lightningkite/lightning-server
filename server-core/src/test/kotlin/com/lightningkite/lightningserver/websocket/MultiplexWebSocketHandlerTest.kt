@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.websocket
 
-import com.lightningkite.lightningdb.MultiplexMessage
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.serialization.Serialization

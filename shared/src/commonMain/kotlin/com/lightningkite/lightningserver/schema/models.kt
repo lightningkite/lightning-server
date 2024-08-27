@@ -1,15 +1,16 @@
 package com.lightningkite.lightningserver.schema
 
-import com.lightningkite.lightningdb.VirtualEnum
-import com.lightningkite.lightningdb.VirtualStructure
-import com.lightningkite.lightningdb.VirtualTypeReference
+import com.lightningkite.serialization.VirtualEnum
+import com.lightningkite.serialization.VirtualStruct
+import com.lightningkite.serialization.VirtualTypeReference
 import kotlinx.serialization.Serializable
 
 
 @Serializable
 data class LightningServerKSchema(
-    val uploadEarlyEndpoint: String? = null,
-    val structures: Map<String, VirtualStructure>,
+    val baseUrl: String,
+    val baseWsUrl: String,
+    val structures: Map<String, VirtualStruct>,
     val enums: Map<String, VirtualEnum>,
     val endpoints: List<LightningServerKSchemaEndpoint>,
     val models: Map<String, LightningServerKSchemaModel>,
@@ -19,7 +20,7 @@ data class LightningServerKSchema(
 data class LightningServerKSchemaModel(
     val collectionName: String,
     val type: VirtualTypeReference,
-    val url: String,
+    val path: String,
     val searchFields: List<String>,
     val tableColumns: List<String>,
     val titleFields: List<String>,

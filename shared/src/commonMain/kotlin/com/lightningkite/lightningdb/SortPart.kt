@@ -1,6 +1,8 @@
 package com.lightningkite.lightningdb
 
 
+import com.lightningkite.serialization.DataClassPathPartial
+import com.lightningkite.serialization.compare
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind

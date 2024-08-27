@@ -31,19 +31,19 @@
   template: '~this~.notNull()'
 
 
-- id: com.lightningkite.lightningdb.ServerFile
+- id: com.lightningkite.lightningserver.files.ServerFile
   type: call
   template: '~0~'
 
-- id: com.lightningkite.lightningdb.ServerFile
+- id: com.lightningkite.lightningserver.files.ServerFile
   type: type
   template: 'string'
 
-- id: com.lightningkite.lightningdb.ServerFile
+- id: com.lightningkite.lightningserver.files.ServerFile
   type: typeRef
   template: 'String'
 
-- id: com.lightningkite.lightningdb.ServerFile.location
+- id: com.lightningkite.lightningserver.files.ServerFile.location
   type: get
   template: ~this~
 

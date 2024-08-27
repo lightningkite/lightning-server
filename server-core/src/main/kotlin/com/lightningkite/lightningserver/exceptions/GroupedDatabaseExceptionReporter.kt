@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.exceptions
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.core.ServerPath
@@ -9,13 +11,14 @@ import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.modelInfoWithDefault
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.now
+import com.lightningkite.serialization.contextualSerializerIfHandled
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.NetworkInterface
 
 class GroupedDatabaseExceptionReporter(val packageName: String, val database: Database): ExceptionReporter {
     init {
-        prepareModels()
+        prepareModelsServerCore()
     }
     override suspend fun report(t: Throwable, context: Any?): Boolean {
         try {

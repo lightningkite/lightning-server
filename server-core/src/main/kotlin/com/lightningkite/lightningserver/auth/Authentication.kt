@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.auth
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.SetOnce
 import com.lightningkite.lightningserver.auth.proof.*
@@ -21,7 +22,7 @@ import kotlin.time.Duration.Companion.minutes
 object Authentication {
 
     init {
-        com.lightningkite.lightningserver.auth.proof.prepareModels()
+        prepareModelsServerCore()
     }
 
     interface Reader {

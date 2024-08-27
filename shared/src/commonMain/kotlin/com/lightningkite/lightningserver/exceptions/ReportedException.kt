@@ -2,6 +2,7 @@
 package com.lightningkite.lightningserver.exceptions
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import kotlinx.datetime.Clock
 import com.lightningkite.now
 import kotlinx.serialization.Contextual

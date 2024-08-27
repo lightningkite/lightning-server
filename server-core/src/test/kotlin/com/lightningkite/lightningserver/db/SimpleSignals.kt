@@ -1,10 +1,13 @@
 package com.lightningkite.lightningserver.db
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.testmodels.TempThing
 import com.lightningkite.lightningserver.testmodels.TempThing__id
 import com.lightningkite.lightningserver.testmodels._id
+import com.lightningkite.prepareModelsShared
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Ignore
@@ -30,8 +33,8 @@ class SimpleSignals {
 
     @Before
     fun setup() {
-        prepareModels()
-        com.lightningkite.lightningserver.testmodels.prepareModels()
+        prepareModelsShared()
+        prepareModelsServerCore()
         collection = TestSettings.database().collection<TempThing>()
         runBlocking { collection.deleteManyIgnoringOld(Condition.Always()) }
     }

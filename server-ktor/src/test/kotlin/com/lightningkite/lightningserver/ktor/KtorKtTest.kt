@@ -1,7 +1,5 @@
 package com.lightningkite.lightningserver.ktor
 
-import com.lightningkite.lightningdb.ClientModule
-import com.lightningkite.lightningdb.MultiplexMessage
 import com.lightningkite.lightningserver.SetOnce
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.LocalCache
@@ -13,9 +11,11 @@ import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.pubsub.PubSubSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.GeneralServerSettings
+import com.lightningkite.lightningserver.websocket.MultiplexMessage
 import com.lightningkite.lightningserver.websocket.MultiplexWebSocketHandler
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import com.lightningkite.lightningserver.websocket.websocket
+import com.lightningkite.serialization.ClientModule
 import com.lightningkite.uuid
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.websocket.*

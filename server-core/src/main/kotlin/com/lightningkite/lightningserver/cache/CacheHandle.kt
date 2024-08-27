@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.cache
 
-import com.lightningkite.lightningdb.contextualSerializerIfHandled
+import com.lightningkite.serialization.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.KSerializer
 import kotlin.time.Duration

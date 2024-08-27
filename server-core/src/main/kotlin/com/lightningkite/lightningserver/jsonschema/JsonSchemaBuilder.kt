@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.jsonschema
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
@@ -10,6 +11,7 @@ import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.docGroup
+import com.lightningkite.serialization.*
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ArraySerializer
 import kotlinx.serialization.descriptors.*
@@ -262,7 +264,7 @@ class JsonSchemaBuilder(
             )
         }
         annotation { it: MimeType -> copy(mimeType = it.types.joinToString(", ")) }
-        override("com.lightningkite.lightningdb.ServerFile") {
+        override("com.lightningkite.lightningserver.files.ServerFile") {
             JsonSchemaType(
                 title = "Server File",
                 type = JsonType3(JsonType2.STRING),

@@ -1,14 +1,21 @@
 package com.lightningkite.lightningdb.test
 
+import com.lightningkite.prepareModelsServerCore
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import kotlinx.datetime.Instant
 import kotlin.test.assertEquals
 import com.lightningkite.lightningdb.*
+import com.lightningkite.prepareModelsShared
+import com.lightningkite.serialization.*
 
 abstract class ModificationTests() {
 
-    init { prepareModels() }
+    init {
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerTesting()
+    }
     abstract val database: Database
 
     @Test fun test_orderedOneMods() = runBlocking {

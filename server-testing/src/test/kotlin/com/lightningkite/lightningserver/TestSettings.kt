@@ -1,13 +1,13 @@
 package com.lightningkite.lightningserver
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.ServerFile
+import com.lightningkite.lightningserver.files.ServerFile
 import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningdb.insertOne
-import com.lightningkite.lightningdb.test.LargeTestModel
 import com.lightningkite.lightningdb.test.SimpleLargeTestModel
 import com.lightningkite.lightningdb.test.User
 import com.lightningkite.lightningdb.test.ValidatedModel
+import com.lightningkite.lightningdb.test.prepareModelsServerTesting
 import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.auth.authOptions
 import com.lightningkite.lightningserver.auth.authRequired
@@ -38,11 +38,11 @@ import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.sms.SMSSettings
 import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.bulkRequestEndpoint
+import com.lightningkite.prepareModelsServerCore
+import com.lightningkite.prepareModelsShared
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
-import kotlin.time.Duration
-import java.util.*
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
@@ -88,8 +88,9 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     val bulk = path("bulk").bulkRequestEndpoint()
 
     init {
-        com.lightningkite.lightningdb.test.prepareModels()
-        com.lightningkite.lightningdb.prepareModels()
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerTesting()
         Settings.populateDefaults()
         engine = LocalEngine(LocalCache)
     }

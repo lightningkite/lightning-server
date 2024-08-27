@@ -268,6 +268,7 @@ class MetaEndpoints(
         openApi,
         openApiJson,
         schema,
+        kschema,
         paths,
         wsTester
     )

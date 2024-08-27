@@ -1,13 +1,14 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.StructureKind
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.ops.InListOrNotInListBaseOp
 import org.jetbrains.exposed.sql.ops.SingleValueInListOp
 import org.jetbrains.exposed.sql.statements.UpdateBuilder
-import com.lightningkite.lightningdb.SerializableProperty
+import com.lightningkite.serialization.SerializableProperty
 
 internal data class FieldSet2<V>(val serializer: KSerializer<V>, val fields: Map<String, ExpressionWithColumnType<Any?>>) {
     constructor(serializer: KSerializer<V>, table: SerialDescriptorTable) : this(
@@ -303,6 +304,7 @@ private fun <T> FieldModifier.modification(
     fieldSet: FieldSet2<T>
 ): Unit {
     when(modification) {
+        is Modification.Nothing -> Modification.Nothing
         is Modification.Chain -> modification.modifications.forEach { modification(modification, fieldSet) }
         is Modification.Assign -> modifyEach(fieldSet, modification.value) { type, it, old -> it }
         is Modification.IfNotNull<*> -> modification<Any?>(modification.modification as Modification<Any?>, fieldSet as FieldSet2<Any?>)
@@ -326,7 +328,7 @@ private fun <T> FieldModifier.modification(
                             result = modify(f.fields[it.key]!!)
                         }
                     }.modification(modification.modification as Modification<Any?>, f)
-                    if(modification.condition is Condition.Always<*>) result
+                    if(modification.condition is Condition.Always) result
                     else with(SqlExpressionBuilder) {
                         case()
                             .When(condition(modification.condition as Condition<Any?>, f), result)
@@ -376,7 +378,7 @@ private fun <T> FieldModifier.modification(
                             result = modify(f.fields[it.key]!!)
                         }
                     }.modification(modification.modification as Modification<Any?>, f)
-                    if(modification.condition is Condition.Always<*>) result
+                    if(modification.condition is Condition.Always) result
                     else with(SqlExpressionBuilder) {
                         case()
                             .When(condition(modification.condition as Condition<Any?>, f), result)

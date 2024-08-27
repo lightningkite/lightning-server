@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.lightningserver.auth.oauth.prepareModels
+import com.lightningkite.serialization.*
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningserver.metrics.Metricable
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
@@ -27,7 +28,7 @@ interface Database : HealthCheckable, Metricable<Database> {
      * Will attempt inserting data into the database to confirm that the connection is alive and available.
      */
     override suspend fun healthCheck(): HealthStatus {
-        prepareModels()
+        prepareModelsServerCore()
         try {
             val c = collection<HealthCheckTestModel>()
             val id = "HealthCheck"

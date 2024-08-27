@@ -1,9 +1,9 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.serializableProperties
-import com.lightningkite.lightningdb.contextualSerializerIfHandled
+import com.lightningkite.serialization.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.serialization.serializableProperties
 import kotlinx.serialization.KSerializer
 
 inline fun <reified T : HasId<ID>, reified ID : Comparable<ID>> ModelSerializationInfo(): ModelSerializationInfo<T, ID> {

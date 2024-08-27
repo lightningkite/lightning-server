@@ -7,12 +7,14 @@ import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
 import kotlin.reflect.KClass
 import kotlinx.serialization.descriptors.*
-
-import com.lightningkite.lightningdb.SerializableProperty
+import com.lightningkite.serialization.*
+import com.lightningkite.serialization.WrappingSerializer
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 private fun <T> commonOptions(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> = listOf(
-    MySealedClassSerializer.Option(Condition.Never.serializer(inner)) { it is Condition.Never },
-    MySealedClassSerializer.Option(Condition.Always.serializer(inner)) { it is Condition.Always },
+    MySealedClassSerializer.Option(Condition.Never.serializer()) { it is Condition.Never },
+    MySealedClassSerializer.Option(Condition.Always.serializer()) { it is Condition.Always },
     MySealedClassSerializer.Option(Condition.And.serializer(inner)) { it is Condition.And },
     MySealedClassSerializer.Option(Condition.Or.serializer(inner)) { it is Condition.Or },
     MySealedClassSerializer.Option(Condition.Not.serializer(inner)) { it is Condition.Not },
@@ -88,7 +90,9 @@ class ConditionSerializer<T>(val inner: KSerializer<T>): MySealedClassSerializer
         }
         r as List<MySealedClassSerializer.Option<Condition<T>, out Condition<T>>>
     })
-} as MySealedClassSerializerInterface<Condition<T>>)
+} as MySealedClassSerializerInterface<Condition<T>>), KSerializerWithDefault<Condition<T>> {
+    override val default: Condition<T> = Condition.Never()
+}
 
 class ConditionOnFieldSerializer<K : Any, V>(
     val field: SerializableProperty<K, V>
@@ -108,21 +112,6 @@ class LazyRenamedSerialDescriptor(override val serialName: String, val getter: (
     override fun getElementIndex(name: String): Int = getter().getElementIndex(name)
     override fun getElementName(index: Int): String = getter().getElementName(index)
     override fun isElementOptional(index: Int): Boolean = getter().isElementOptional(index)
-}
-
-
-class ConditionNeverSerializer<T>(val inner: KSerializer<T>) :
-    WrappingSerializer<Condition.Never<T>, Boolean>("Never") {
-    override fun getDeferred(): KSerializer<Boolean> = Boolean.serializer()
-    override fun inner(it: Condition.Never<T>): Boolean = true
-    override fun outer(it: Boolean) = Condition.Never<T>()
-}
-
-class ConditionAlwaysSerializer<T>(val inner: KSerializer<T>) :
-    WrappingSerializer<Condition.Always<T>, Boolean>("Always") {
-    override fun getDeferred(): KSerializer<Boolean> = Boolean.serializer()
-    override fun inner(it: Condition.Always<T>): Boolean = true
-    override fun outer(it: Boolean) = Condition.Always<T>()
 }
 
 class ConditionAndSerializer<T>(val inner: KSerializer<T>) :

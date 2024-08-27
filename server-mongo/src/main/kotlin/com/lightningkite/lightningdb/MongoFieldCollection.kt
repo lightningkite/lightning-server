@@ -3,6 +3,7 @@ package com.lightningkite.lightningdb
 import com.lightningkite.GeoCoordinateGeoJsonSerializer
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.serialization.DataClassPath
 import com.mongodb.MongoCommandException
 import com.mongodb.client.model.*
 import com.mongodb.kotlin.client.coroutine.MongoCollection
@@ -67,8 +68,9 @@ class MongoFieldCollection<Model : Any>(
     ): EntryChange<Model> {
         val cs = condition.simplify()
         if (cs is Condition.Never) return EntryChange(null, null)
-        if (modification is Modification.Chain && modification.modifications.isEmpty()) return EntryChange(null, null)
-        val m = modification.simplify().bson(serializer)
+        val simplifiedModification = modification.simplify()
+        if (simplifiedModification.isNothing) return EntryChange(null, null)
+        val m = simplifiedModification.bson(serializer)
         return access {
             // TODO: Ugly hack for handling weird upserts
             if (m.upsert(model, serializer)) {
@@ -115,9 +117,10 @@ class MongoFieldCollection<Model : Any>(
     ): Boolean {
         val cs = condition.simplify()
         if (cs is Condition.Never) return false
-        if (modification is Modification.Chain && modification.modifications.isEmpty()) return false
+        val simplifiedModification = modification.simplify()
+        if (simplifiedModification.isNothing) return false
+        val m = simplifiedModification.bson(serializer)
         return access {
-            val m = modification.simplify().bson(serializer)
             // TODO: Ugly hack for handling weird upserts
             if (m.upsert(model, serializer)) {
                 updateOne(cs.bson(serializer), m.document, m.options).matchedCount > 0
@@ -139,8 +142,9 @@ class MongoFieldCollection<Model : Any>(
     ): EntryChange<Model> {
         val cs = condition.simplify()
         if (cs is Condition.Never) return EntryChange(null, null)
-        if (modification is Modification.Chain && modification.modifications.isEmpty()) return EntryChange(null, null)
-        val m = modification.simplify().bson(serializer)
+        val simplifiedModification = modification.simplify()
+        if (simplifiedModification.isNothing) return EntryChange(null, null)
+        val m = simplifiedModification.bson(serializer)
         val before = access<Model?> {
             findOneAndUpdate(
                 cs.bson(serializer),
@@ -167,8 +171,9 @@ class MongoFieldCollection<Model : Any>(
     ): Boolean {
         val cs = condition.simplify()
         if (cs is Condition.Never) return false
-        if (modification is Modification.Chain && modification.modifications.isEmpty()) return false
-        val m = modification.simplify().bson(serializer)
+        val simplifiedModification = modification.simplify()
+        if (simplifiedModification.isNothing) return false
+        val m = simplifiedModification.bson(serializer)
         return access { updateOne(cs.bson(serializer), m.document, m.options).matchedCount != 0L }
     }
 
@@ -178,8 +183,9 @@ class MongoFieldCollection<Model : Any>(
     ): CollectionChanges<Model> {
         val cs = condition.simplify()
         if (cs is Condition.Never) return CollectionChanges()
-        if (modification is Modification.Chain && modification.modifications.isEmpty()) return CollectionChanges()
-        val m = modification.simplify().bson(serializer)
+        val simplifiedModification = modification.simplify()
+        if (simplifiedModification.isNothing) return CollectionChanges()
+        val m = simplifiedModification.bson(serializer)
         val changes = ArrayList<EntryChange<Model>>()
         // TODO: Don't love that we have to do this in chunks, but I guess we'll live.  Could this be done with pipelines?
         access {
@@ -200,8 +206,9 @@ class MongoFieldCollection<Model : Any>(
     ): Int {
         val cs = condition.simplify()
         if (cs is Condition.Never) return 0
-        if (modification is Modification.Chain && modification.modifications.isEmpty()) return 0
-        val m = modification.simplify().bson(serializer)
+        val simplifiedModification = modification.simplify()
+        if (simplifiedModification.isNothing) return 0
+        val m = simplifiedModification.bson(serializer)
         return access {
             updateMany(
                 cs.bson(serializer),

@@ -1,9 +1,11 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.AuthAccessor
+import com.lightningkite.serialization.contextualSerializerIfHandled
 
 @Suppress("DEPRECATION")
 @Deprecated("User newer version with auth accessor instead, as it enables more potential optimizations.")

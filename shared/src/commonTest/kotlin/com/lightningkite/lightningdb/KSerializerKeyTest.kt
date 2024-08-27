@@ -2,6 +2,10 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.UUID
 import com.lightningkite.lightningdb.testing.*
+import com.lightningkite.prepareModelsShared
+import com.lightningkite.prepareModelsSharedTest
+import com.lightningkite.serialization.ClientModule
+import com.lightningkite.serialization.KSerializerKey
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ContextualSerializer
@@ -21,8 +25,8 @@ class KSerializerKeyTest {
     val myProperties = Properties(ClientModule)
 
     init {
-        com.lightningkite.lightningdb.prepareModels()
-        com.lightningkite.lightningdb.testing.prepareModels()
+        prepareModelsShared()
+        prepareModelsSharedTest()
     }
 
     /**

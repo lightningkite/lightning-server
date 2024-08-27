@@ -4,6 +4,9 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.*
 import com.lightningkite.lightningdb.testing.*
+import com.lightningkite.serialization.ClientModule
+import com.lightningkite.serialization.*
+import com.lightningkite.serialization.partialOf
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -26,8 +29,8 @@ class SerializationTest {
     val myProperties = Properties(ClientModule)
 
     init {
-        com.lightningkite.lightningdb.prepareModels()
-        com.lightningkite.lightningdb.testing.prepareModels()
+        prepareModelsShared()
+        prepareModelsSharedTest()
     }
 
     @Test
@@ -159,8 +162,8 @@ class SerializationTest {
     @Test fun conditions() {
         val sampleCondition = path<LargeTestModel>().int eq 2
         val sampleInstance = LargeTestModel()
-        Condition.Never<LargeTestModel>().cycle()
-        Condition.Always<LargeTestModel>().cycle()
+        (Condition.Never as Condition<LargeTestModel>).cycle()
+        (Condition.Always as Condition<LargeTestModel>).cycle()
         Condition.And(listOf(sampleCondition)).cycle()
         Condition.Or(listOf(sampleCondition)).cycle()
         Condition.Not(sampleCondition).cycle()
@@ -194,6 +197,8 @@ class SerializationTest {
             it.int assign 2
             it.boolean assign true
         }.cycle()
+        assertEquals(Modification.Nothing<LargeTestModel>(), Modification.serializer(LargeTestModel.serializer()).default())
+        Modification.Nothing<LargeTestModel>().cycle()
         modification<LargeTestModel> {it.intNullable.notNull += 1 }.cycle()
         modification<LargeTestModel> {it.int assign 2 }.cycle()
         modification<LargeTestModel> {it.int coerceAtMost 2 }.cycle()

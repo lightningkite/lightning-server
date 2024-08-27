@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow

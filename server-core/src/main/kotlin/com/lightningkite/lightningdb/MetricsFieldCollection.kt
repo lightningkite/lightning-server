@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.metrics.MetricType
 import com.lightningkite.lightningserver.metrics.MetricUnit
 import com.lightningkite.lightningserver.metrics.Metrics

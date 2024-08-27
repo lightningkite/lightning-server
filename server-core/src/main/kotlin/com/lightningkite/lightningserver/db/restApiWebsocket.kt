@@ -2,7 +2,9 @@
 
 package com.lightningkite.lightningserver.db
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
@@ -19,8 +21,9 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
-import com.lightningkite.lightningdb.SerializableProperty
+import com.lightningkite.serialization.SerializableProperty
 import com.lightningkite.now
+import com.lightningkite.serialization.notNull
 import kotlinx.serialization.Contextual
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -32,7 +35,7 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebs
     info: ModelInfo<USER, T, ID>,
     key: SerializableProperty<T, *>? = null,
 ): ApiWebsocket<USER, TypedServerPath0, Query<T>, ListChange<T>> {
-    prepareModels()
+    prepareModelsServerCore()
     val modelName = info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
     val modelIdentifier = info.serialization.serializer.descriptor.serialName
     val helper = RestApiWebsocketHelper[database]

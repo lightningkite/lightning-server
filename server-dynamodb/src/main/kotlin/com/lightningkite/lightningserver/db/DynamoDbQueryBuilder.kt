@@ -1,12 +1,13 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
 import java.lang.IllegalArgumentException
-import com.lightningkite.lightningdb.SerializableProperty
+import com.lightningkite.serialization.SerializableProperty
 
 data class DynamoCondition<T>(
     val local: Condition<T>? = null,
@@ -321,6 +322,8 @@ fun <T> Condition<T>.dynamo(serializer: KSerializer<T>, sortKey: String): Dynamo
 
 fun <T> Modification<T>.dynamo(serializer: KSerializer<T>): DynamoModification<T> {
     return when (this) {
+        is Modification.Nothing -> DynamoModification()
+
         is Modification.Chain -> {
             val subs = this.modifications.map { it.dynamo(serializer) }
             DynamoModification(

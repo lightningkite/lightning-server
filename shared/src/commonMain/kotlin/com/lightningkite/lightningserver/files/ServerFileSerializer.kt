@@ -1,20 +1,19 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.files
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-object ServerFileSerialization : KSerializer<ServerFile> {
+object ServerFileSerializer : KSerializer<ServerFile> {
     //Description("A URL referencing a file that the server owns.")
     @OptIn(ExperimentalSerializationApi::class)
     override val descriptor: SerialDescriptor = object: SerialDescriptor {
         override val kind: SerialKind = PrimitiveKind.STRING
-        override val serialName: String = "com.lightningkite.lightningdb.ServerFile"
+        override val serialName: String = "com.lightningkite.lightningserver.files.ServerFile"
         override val elementsCount: Int get() = 0
         override fun getElementName(index: Int): String = error()
         override fun getElementIndex(name: String): Int = error()

@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.datetime.*
 import kotlinx.serialization.*
@@ -214,11 +215,11 @@ class DbLikeMapDecoder(
         @Suppress("UNCHECKED_CAST")
         return when ((deserializer as? KSerializer<T>)?.nullElement() ?: deserializer) {
             UUIDSerializer -> getter(popTag()) as T
-            LocalDateIso8601Serializer, com.lightningkite.lightningdb.LocalDateIso8601Serializer -> getter(popTag()).let { it as LocalDate }.toKotlinLocalDate() as T
-            InstantIso8601Serializer, com.lightningkite.lightningdb.InstantIso8601Serializer -> getter(popTag()).let { it as java.time.Instant }.toKotlinInstant() as T
-            DurationSerializer, com.lightningkite.lightningdb.DurationSerializer -> getter(popTag()).let { it as Duration }.toKotlinDuration() as T
-            LocalDateTimeIso8601Serializer, com.lightningkite.lightningdb.LocalDateTimeIso8601Serializer -> getter(popTag()).let { it as LocalDateTime }.toKotlinLocalDateTime() as T
-            LocalTimeIso8601Serializer, com.lightningkite.lightningdb.LocalTimeIso8601Serializer -> getter(popTag()) .let { it as LocalTime }.toKotlinLocalTime() as T
+            LocalDateIso8601Serializer, com.lightningkite.serialization.LocalDateIso8601Serializer -> getter(popTag()).let { it as LocalDate }.toKotlinLocalDate() as T
+            InstantIso8601Serializer, com.lightningkite.serialization.InstantIso8601Serializer -> getter(popTag()).let { it as java.time.Instant }.toKotlinInstant() as T
+            DurationSerializer, com.lightningkite.serialization.DurationSerializer -> getter(popTag()).let { it as Duration }.toKotlinDuration() as T
+            LocalDateTimeIso8601Serializer, com.lightningkite.serialization.LocalDateTimeIso8601Serializer -> getter(popTag()).let { it as LocalDateTime }.toKotlinLocalDateTime() as T
+            LocalTimeIso8601Serializer, com.lightningkite.serialization.LocalTimeIso8601Serializer -> getter(popTag()) .let { it as LocalTime }.toKotlinLocalTime() as T
 
             else -> super.decodeSerializableValue(deserializer)
         }
@@ -430,12 +431,12 @@ class DbLikeMapEncoder(
     override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
         when ((serializer as? KSerializer<T>)?.nullElement() ?: serializer) {
             UUIDSerializer -> writer(popTag(), value)
-            LocalDateIso8601Serializer, com.lightningkite.lightningdb.LocalDateIso8601Serializer -> writer(popTag(), (value as kotlinx.datetime.LocalDate).toJavaLocalDate())
-            InstantIso8601Serializer, com.lightningkite.lightningdb.InstantIso8601Serializer -> writer(popTag(), (value as Instant).toJavaInstant())
-            DurationSerializer, com.lightningkite.lightningdb.DurationSerializer -> writer(popTag(), (value as kotlin.time.Duration).toJavaDuration())
+            LocalDateIso8601Serializer, com.lightningkite.serialization.LocalDateIso8601Serializer -> writer(popTag(), (value as kotlinx.datetime.LocalDate).toJavaLocalDate())
+            InstantIso8601Serializer, com.lightningkite.serialization.InstantIso8601Serializer -> writer(popTag(), (value as Instant).toJavaInstant())
+            DurationSerializer, com.lightningkite.serialization.DurationSerializer -> writer(popTag(), (value as kotlin.time.Duration).toJavaDuration())
                 //LocalDateTimeSerializer -> writer(popTag(), value)
-            LocalDateTimeIso8601Serializer, com.lightningkite.lightningdb.LocalDateTimeIso8601Serializer -> writer(popTag(), (value as kotlinx.datetime.LocalDateTime).toJavaLocalDateTime())
-            LocalTimeIso8601Serializer, com.lightningkite.lightningdb.LocalTimeIso8601Serializer -> writer(popTag(), (value as kotlinx.datetime.LocalTime).toJavaLocalTime())
+            LocalDateTimeIso8601Serializer, com.lightningkite.serialization.LocalDateTimeIso8601Serializer -> writer(popTag(), (value as kotlinx.datetime.LocalDateTime).toJavaLocalDateTime())
+            LocalTimeIso8601Serializer, com.lightningkite.serialization.LocalTimeIso8601Serializer -> writer(popTag(), (value as kotlinx.datetime.LocalTime).toJavaLocalTime())
 
             else -> super.encodeSerializableValue(serializer, value)
         }

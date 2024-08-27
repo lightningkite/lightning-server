@@ -3,8 +3,6 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.Description
-import com.lightningkite.lightningdb.nullElement
-import com.lightningkite.lightningdb.serializableProperties
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
@@ -23,6 +21,7 @@ import kotlinx.serialization.internal.GeneratedSerializer
 //import kotlinx.serialization.protobuf.schema.ProtoBufSchemaGenerator
 import kotlinx.serialization.serializer
 import kotlin.reflect.KType
+import com.lightningkite.serialization.*
 
 @Deprecated(
     "Use apiDocs instead",

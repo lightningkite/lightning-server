@@ -4,6 +4,7 @@ package com.lightningkite.lightningdb.test
 
 import com.lightningkite.GeoCoordinate
 import com.lightningkite.kilometers
+import com.lightningkite.prepareModelsServerCore
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -12,11 +13,17 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import com.lightningkite.lightningdb.*
+import com.lightningkite.prepareModelsShared
+import com.lightningkite.serialization.*
 import java.util.*
 
 abstract class ConditionTests() {
 
-    init { prepareModels() }
+    init {
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerTesting()
+    }
     abstract val database: Database
 
     @Test open fun test_geodistance_1() = runBlocking {

@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.lightningdb.SerializableProperty
+import com.lightningkite.serialization.*
+import com.lightningkite.serialization.SerializableProperty
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.NothingSerializer
 

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.serialization.*
 class UniqueViolationException(
     cause: Throwable?,
     val key: String? = null,

@@ -2,15 +2,16 @@
 
 package com.lightningkite.lightningdb
 
-import com.lightningkite.ShouldValidateSub
+import com.lightningkite.validation.ShouldValidateSub
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
 import kotlinx.serialization.descriptors.*
-import kotlinx.serialization.encoding.*
+import com.lightningkite.serialization.*
+import com.lightningkite.serialization.WrappingSerializer
 
-import com.lightningkite.lightningdb.SerializableProperty
-
+@Suppress("UNCHECKED_CAST")
 private fun <T> commonOptions(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Modification<T>, *>> = listOf(
+    MySealedClassSerializer.Option(Modification.Nothing.serializer() as KSerializer<Modification<T>>) { it is Modification.Nothing },
     MySealedClassSerializer.Option(Modification.Chain.serializer(inner)) { it is Modification.Chain },
     MySealedClassSerializer.Option(Modification.Assign.serializer(inner)) { it is Modification.Assign },
 )
@@ -129,11 +130,14 @@ data class ModificationSerializer<T>(val inner: KSerializer<T>) :
             }
             r as List<MySealedClassSerializer.Option<Modification<T>, out Modification<T>>>
         })
-    } as MySealedClassSerializerInterface<Modification<T>>)
+    } as MySealedClassSerializerInterface<Modification<T>>), KSerializerWithDefault<Modification<T>> {
+    override val default: Modification<T> = Modification.Nothing()
+}
 
 class ModificationOnFieldSerializer<K : Any, V>(
     val field: SerializableProperty<K, V>
-) : WrappingSerializer<Modification.OnField<K, V>, Modification<V>>(field.name), ShouldValidateSub<Modification.OnField<K, V>> {
+) : WrappingSerializer<Modification.OnField<K, V>, Modification<V>>(field.name),
+    ShouldValidateSub<Modification.OnField<K, V>> {
     override fun getDeferred(): KSerializer<Modification<V>> = Modification.serializer(field.serializer)
     override fun inner(it: Modification.OnField<K, V>): Modification<V> = it.modification
     override fun outer(it: Modification<V>): Modification.OnField<K, V> = Modification.OnField(field, it)

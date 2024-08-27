@@ -3,6 +3,11 @@ package com.lightningkite.lightningdb
 import com.lightningkite.Distance
 import com.lightningkite.GeoCoordinate
 import com.lightningkite.miles
+import com.lightningkite.serialization.serializerOrContextual
+import com.lightningkite.serialization.DataClassPathSelf
+import com.lightningkite.serialization.DataClassPath
+import com.lightningkite.serialization.DataClassPathAccess
+import com.lightningkite.serialization.DataClassPathNotNull
 import kotlinx.serialization.serializer
 import kotlin.js.JsName
 import kotlin.jvm.JvmName
@@ -11,7 +16,7 @@ inline fun <reified T> path(): DataClassPath<T, T> = DataClassPathSelf(serialize
 
 inline fun <reified T> condition(setup: (DataClassPath<T, T>) -> Condition<T>): Condition<T> =
     path<T>().let(setup)
-fun <T> condition(boolean: Boolean): Condition<T> = if(boolean) Condition.Always() else Condition.Never()
+fun <T> condition(boolean: Boolean): Condition<T> = if(boolean) Condition.Always() else Condition.Never
 
 val <K> DataClassPath<K, K>.always: Condition<K> get() = Condition.Always<K>()
 val <K> DataClassPath<K, K>.never: Condition<K> get() = Condition.Never<K>()

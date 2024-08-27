@@ -1,9 +1,8 @@
 package com.lightningkite.lightningserver.serialization
 
-import com.lightningkite.lightningdb.ServerFile
+import com.lightningkite.lightningserver.files.ServerFile
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
-import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
 import com.lightningkite.lightningserver.files.FileSystem
 import com.lightningkite.lightningserver.files.fileObject
 import com.lightningkite.lightningserver.files.resolveRandom

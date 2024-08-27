@@ -1,6 +1,8 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.serialization
 
 import com.lightningkite.*
+import com.lightningkite.lightningserver.files.ServerFile
+import com.lightningkite.lightningserver.files.ServerFileSerializer
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
@@ -18,6 +20,6 @@ val ClientModule = SerializersModule {
     contextual(OffsetDateTime::class, OffsetDateTimeIso8601Serializer)
     contextual(ZonedDateTime::class, ZonedDateTimeIso8601Serializer)
     contextual(Duration::class, DurationSerializer)
-    contextual(ServerFile::class, ServerFileSerialization)
+    contextual(ServerFile::class, ServerFileSerializer)
     contextual(GeoCoordinate::class, GeoCoordinateArraySerializer)
 }

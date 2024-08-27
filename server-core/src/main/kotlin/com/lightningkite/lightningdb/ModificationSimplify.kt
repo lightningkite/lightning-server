@@ -1,9 +1,11 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.lightningdb.SerializableProperty
+import com.lightningkite.serialization.*
+import com.lightningkite.serialization.SerializableProperty
 
 fun <T> Modification<T>.simplify(): Modification<T> {
     return if (this is Modification.Chain) {
+        if(modifications.isEmpty()) return Modification.Nothing<T>()
         val flattened = this.modifications.map { it.simplify() }.flatMap {
             (it as? Modification.Chain)?.modifications ?: listOf(it)
         }

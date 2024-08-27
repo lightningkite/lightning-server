@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningdb.Index
 import com.lightningkite.lightningserver.serialization.Serialization
 import io.ktor.websocket.Serializer
@@ -140,7 +141,7 @@ internal fun SerialDescriptor.columnType(): List<ColumnTypeInfo> {
             )
         )
 
-        LocalDateIso8601Serializer.descriptor, com.lightningkite.lightningdb.LocalDateIso8601Serializer.descriptor -> listOf(
+        LocalDateIso8601Serializer.descriptor, com.lightningkite.serialization.LocalDateIso8601Serializer.descriptor -> listOf(
             ColumnTypeInfo(
                 listOf<String>(),
                 JavaLocalDateColumnType().also { it.nullable = this.isNullable },
@@ -148,7 +149,7 @@ internal fun SerialDescriptor.columnType(): List<ColumnTypeInfo> {
             )
         )
 
-        InstantIso8601Serializer.descriptor, com.lightningkite.lightningdb.InstantIso8601Serializer.descriptor -> listOf(
+        InstantIso8601Serializer.descriptor, com.lightningkite.serialization.InstantIso8601Serializer.descriptor -> listOf(
             ColumnTypeInfo(
                 listOf<String>(),
                 JavaInstantColumnType().also { it.nullable = this.isNullable },
@@ -164,7 +165,7 @@ internal fun SerialDescriptor.columnType(): List<ColumnTypeInfo> {
             )
         )
 
-        LocalDateTimeIso8601Serializer.descriptor, com.lightningkite.lightningdb.LocalDateTimeIso8601Serializer.descriptor -> listOf(
+        LocalDateTimeIso8601Serializer.descriptor, com.lightningkite.serialization.LocalDateTimeIso8601Serializer.descriptor -> listOf(
             ColumnTypeInfo(
                 listOf<String>(),
                 JavaLocalDateTimeColumnType().also { it.nullable = this.isNullable },
@@ -172,7 +173,7 @@ internal fun SerialDescriptor.columnType(): List<ColumnTypeInfo> {
             )
         )
 
-        LocalTimeIso8601Serializer.descriptor, com.lightningkite.lightningdb.LocalTimeIso8601Serializer.descriptor -> listOf(
+        LocalTimeIso8601Serializer.descriptor, com.lightningkite.serialization.LocalTimeIso8601Serializer.descriptor -> listOf(
             ColumnTypeInfo(
                 listOf<String>(),
                 JavaLocalTimeColumnType().also { it.nullable = this.isNullable },

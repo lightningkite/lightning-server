@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.serialization.DataClassPathPartial
 import kotlinx.serialization.Serializable
 
 @Serializable

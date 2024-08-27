@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable

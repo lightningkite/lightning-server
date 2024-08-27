@@ -4,6 +4,8 @@ import com.lightningkite.lightningdb.Modification
 import com.lightningkite.lightningdb.modification
 import com.lightningkite.lightningdb.simplify
 import com.lightningkite.lightningserver.TestSettings
+import com.lightningkite.prepareModelsServerCore
+import com.lightningkite.prepareModelsShared
 import org.junit.Test
 import kotlin.test.assertEquals
 
@@ -13,7 +15,9 @@ class ModificationSimplifyTest {
     }
     @Test
     fun test() {
-        prepareModels()
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerTesting()
         val item = LargeTestModel()
         val mods = listOf(
             modification<LargeTestModel> { it.int assign 1 } to modification<LargeTestModel> { it.int assign 1 },

@@ -1,7 +1,10 @@
 @file:UseContextualSerialization(UUID::class)
 package com.lightningkite.lightningdb.test
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.prepareModelsShared
+import com.lightningkite.serialization.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -11,13 +14,16 @@ import java.util.*
 import kotlin.test.assertContains
 
 abstract class MetaTest {
-    init { prepareModels() }
+    init {
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerTesting()
+    }
     abstract val database: Database
 
     @Test
     fun test(): Unit = runBlocking {
         val c = database.collection<MetaTestModel>()
-        prepareModels()
         val toInsert = MetaTestModel(
             condition = condition { it.int gt 3 },
             modification = modification { it.int += 2 }

@@ -2,8 +2,8 @@ package com.lightningkite
 
 import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
-import org.junit.Assert.*
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class StringAltsTest {
     @Test fun test() {

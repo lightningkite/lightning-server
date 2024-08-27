@@ -1,10 +1,7 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.serialization
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.encoding.CompositeDecoder
-import kotlin.reflect.KClass
 
 interface SerializableProperty<A, B> {
     val name: String
@@ -18,9 +15,9 @@ interface SerializableProperty<A, B> {
     companion object {
     }
 
-    class FromVirtualField(val source: VirtualField): SerializableProperty<VirtualInstance, Any?> {
+    class FromVirtualField(val source: VirtualField, val registry: SerializationRegistry, val context: Map<String, KSerializer<*>>): SerializableProperty<VirtualInstance, Any?> {
         override val name: String get() = source.name
-        override val serializer: KSerializer<Any?> get() = source.type.serializer()
+        override val serializer: KSerializer<Any?> by lazy { source.type.serializer(registry, context) }
         override val annotations: List<Annotation> get() = listOf()
         override fun get(receiver: VirtualInstance): Any? = receiver.values[source.index]
         override fun setCopy(receiver: VirtualInstance, value: Any?): VirtualInstance = VirtualInstance(receiver.type, receiver.values.toMutableList().also {
@@ -34,13 +31,13 @@ fun <T> KSerializer<T>.tryFindAnnotations(propertyName: String): List<Annotation
     if (i < 0) return listOf()
     else return descriptor.getElementAnnotations(i)
 }
-private val serClassToList = HashMap<KClass<*>, (Array<KSerializer<*>>)->Array<SerializableProperty<*, *>>>()
+private val serClassToList = HashMap<String, (Array<KSerializer<*>>)->Array<SerializableProperty<*, *>>>()
 @Suppress("UNCHECKED_CAST")
-val <T> KSerializer<T>.serializableProperties: Array<SerializableProperty<T, *>>? get() = (serClassToList[this::class]?.invoke(tryTypeParameterSerializers() ?: arrayOf())) as? Array<SerializableProperty<T, *>>
-    ?: (this as? VirtualStructure)?.serializableProperties as? Array<SerializableProperty<T, *>>
+val <T> KSerializer<T>.serializableProperties: Array<SerializableProperty<T, *>>? get() = (serClassToList[this.descriptor.serialName]?.invoke(tryTypeParameterSerializers() ?: arrayOf())) as? Array<SerializableProperty<T, *>>
+    ?: (this as? VirtualStruct.Concrete)?.serializableProperties as? Array<SerializableProperty<T, *>>
 fun <T, S: KSerializer<T>> S.properties(action: (Array<KSerializer<Nothing>>)->Array<SerializableProperty<T, *>>) {
     @Suppress("UNCHECKED_CAST")
-    serClassToList[this::class] = action as (Array<KSerializer<*>>)->Array<SerializableProperty<*, *>>
+    serClassToList[descriptor.serialName] = action as (Array<KSerializer<*>>)->Array<SerializableProperty<*, *>>
 }
 
 

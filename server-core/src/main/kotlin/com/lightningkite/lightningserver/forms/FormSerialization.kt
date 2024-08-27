@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.forms
 
 
-import com.lightningkite.lightningdb.contextualSerializerIfHandled
+import com.lightningkite.serialization.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.html.FlowContent
 import kotlinx.serialization.SerializationException

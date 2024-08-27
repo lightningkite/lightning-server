@@ -2,14 +2,12 @@
 
 package com.lightningkite.lightningdb
 
-import com.lightningkite.ShouldValidateSub
+import com.lightningkite.serialization.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
-import kotlinx.serialization.internal.GeneratedSerializer
 import kotlinx.serialization.json.JsonNames
 import kotlin.IllegalStateException
-import kotlin.reflect.KClass
 
 interface MySealedClassSerializerInterface<T : Any> : KSerializer<T> {
     val options: List<MySealedClassSerializer.Option<T, out T>>
@@ -43,6 +41,9 @@ class MySealedClassSerializer<T : Any>(
                 throw IllegalStateException("No serializer inside ${descriptor.serialName} found for ${item}")
         }
 
+    fun getOption(item: T): Option<T, *> = options.find { it.isInstance(item) }
+        ?: throw IllegalStateException("No serializer inside ${descriptor.serialName} found for ${item}")
+
     override val descriptor: SerialDescriptor = defer(serialName, StructureKind.CLASS) {
         buildClassSerialDescriptor(serialName) {
             this.annotations = this@MySealedClassSerializer.annotations
@@ -59,11 +60,18 @@ class MySealedClassSerializer<T : Any>(
     }
 
     override fun deserialize(decoder: Decoder): T {
+        if(decoder is DefaultDecoder) return options.first().serializer.default()
         return decoder.decodeStructure(descriptor) {
             val index = decodeElementIndex(descriptor)
-            if (index == CompositeDecoder.DECODE_DONE) throw SerializationException("Single key expected, but received none.")
+            if (index == CompositeDecoder.DECODE_DONE) {
+                throw SerializationException("Single key expected, but received none.")
+            }
             if (index == CompositeDecoder.UNKNOWN_NAME) throw SerializationException("Unknown key received.")
-            val result = decodeSerializableElement(descriptor, index, options[index].serializer)
+            val serializer = options[index].serializer
+            val result = if (serializer.descriptor.kind == StructureKind.OBJECT) {
+                decodeBooleanElement(descriptor, index)
+                serializer.default()
+            } else decodeSerializableElement(descriptor, index, serializer)
             if (decodeElementIndex(descriptor) != CompositeDecoder.DECODE_DONE) throw SerializationException("Single key expected, but received multiple.")
             result
         }
@@ -72,13 +80,18 @@ class MySealedClassSerializer<T : Any>(
     override fun serialize(encoder: Encoder, value: T) {
         encoder.encodeStructure(descriptor) {
             val index = getIndex(value)
-            @Suppress("UNCHECKED_CAST")
-            this.encodeSerializableElement<Any?>(
-                descriptor,
-                index,
-                options[index].serializer as KSerializer<Any?>,
-                value
-            )
+            val serializer = options[index].serializer as KSerializer<Any?>
+            if(serializer.descriptor.kind == StructureKind.OBJECT) {
+                encodeBooleanElement(descriptor, index, true)
+            } else {
+                @Suppress("UNCHECKED_CAST")
+                this.encodeSerializableElement<Any?>(
+                    descriptor,
+                    index,
+                    serializer,
+                    value
+                )
+            }
         }
     }
 }

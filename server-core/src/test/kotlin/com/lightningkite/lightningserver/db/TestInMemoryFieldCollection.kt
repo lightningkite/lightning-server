@@ -1,10 +1,13 @@
 package com.lightningkite.lightningserver.db
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.InMemoryFieldCollection
 import com.lightningkite.lightningdb.UniqueViolationException
 import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningdb.insertOne
+import com.lightningkite.lightningserver.prepareModelsServerCoreTest
 import com.lightningkite.lightningserver.testmodels.*
+import com.lightningkite.prepareModelsShared
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Test
@@ -18,12 +21,14 @@ class TestInMemoryFieldCollection {
     lateinit var comboCollection: InMemoryFieldCollection<UniqueComboClass>
     lateinit var setJankCollection: InMemoryFieldCollection<UniqueSetJankClass>
     lateinit var comboJankCollection: InMemoryFieldCollection<UniqueComboJankClass>
+    init {
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerCoreTest()
+    }
 
     @Before
     fun setup(){
-
-        prepareModels()
-        com.lightningkite.lightningserver.testmodels.prepareModels()
         fieldCollection = InMemoryDatabase().collection<UniqueFieldClass>() as InMemoryFieldCollection
         setCollection = InMemoryDatabase().collection<UniqueSetClass>() as InMemoryFieldCollection
         comboCollection = InMemoryDatabase().collection<UniqueComboClass>() as InMemoryFieldCollection

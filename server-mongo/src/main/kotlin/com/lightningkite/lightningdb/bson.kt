@@ -4,6 +4,7 @@ import com.github.jershell.kbson.*
 import com.lightningkite.GeoCoordinate
 import com.lightningkite.GeoCoordinateGeoJsonSerializer
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.mongodb.client.model.UpdateOptions
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -26,7 +27,6 @@ import kotlinx.datetime.*
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
-import com.lightningkite.lightningdb.SerializableProperty
 import org.bson.BsonArray
 
 fun documentOf(): Document {
@@ -115,6 +115,7 @@ private fun <T> Condition<T>.dump(serializer: KSerializer<T>, into: Document = D
 private fun <T> Modification<T>.dump(serializer: KSerializer<T>, update: UpdateWithOptions = UpdateWithOptions(), key: String?): UpdateWithOptions {
     val into = update.document
     when(this) {
+        is Modification.Nothing -> TODO("Not supported")
         is Modification.Chain -> modifications.forEach { it.dump(serializer, update, key) }
         is Modification.Assign -> into["\$set", key] = value.let { Serialization.Internal.bson.stringifyAny(serializer, it) }
         is Modification.CoerceAtLeast -> into["\$max", key] = value.let { Serialization.Internal.bson.stringifyAny(serializer, it) }

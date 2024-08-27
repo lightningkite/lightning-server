@@ -1,9 +1,12 @@
 package com.lightningkite.lightningdb.test
 
+import com.lightningkite.prepareModelsServerCore
 import org.junit.Test
 import kotlinx.datetime.Instant
 import kotlin.test.assertEquals
 import com.lightningkite.lightningdb.*
+import com.lightningkite.prepareModelsShared
+import com.lightningkite.serialization.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.toList
@@ -14,7 +17,11 @@ import kotlin.random.Random
 
 abstract class OperationsTests() {
 
-    init { prepareModels() }
+    init {
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerTesting()
+    }
     abstract val database: Database
 
     @Test fun test_partials(): Unit = runBlocking {

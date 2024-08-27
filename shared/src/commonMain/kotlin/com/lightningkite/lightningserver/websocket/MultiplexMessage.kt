@@ -1,6 +1,4 @@
-
-package com.lightningkite.lightningdb
-
+package com.lightningkite.lightningserver.websocket
 
 import kotlinx.serialization.Serializable
 

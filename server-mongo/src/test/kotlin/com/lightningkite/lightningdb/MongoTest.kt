@@ -2,6 +2,9 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.UUID
+import com.lightningkite.prepareModelsServerCore
+import com.lightningkite.lightningdb.test.prepareModelsServerTesting
+import com.lightningkite.prepareModelsShared
 import com.mongodb.kotlin.client.coroutine.MongoClient
 import kotlinx.serialization.UseContextualSerialization
 import org.junit.AfterClass
@@ -20,7 +23,11 @@ abstract class MongoTest {
         fun start() {
             mongoClient = testMongo()
             db = MongoDatabase("default") { mongoClient!! }
-            com.lightningkite.lightningdb.test.prepareModels()
+            prepareModelsShared()
+            prepareModelsServerCore()
+            prepareModelsServerTesting()
+            prepareModelsServerMongo()
+            prepareModelsServerMongoTest()
         }
 
         @AfterClass

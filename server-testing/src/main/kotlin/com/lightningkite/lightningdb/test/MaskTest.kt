@@ -1,12 +1,17 @@
 package com.lightningkite.lightningdb.test
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.prepareModelsShared
+import com.lightningkite.serialization.*
 import org.junit.Assert.*
 import org.junit.Test
 
 class MaskTest {
     init {
-        prepareModels()
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerTesting()
     }
 
     @Test fun mask() {

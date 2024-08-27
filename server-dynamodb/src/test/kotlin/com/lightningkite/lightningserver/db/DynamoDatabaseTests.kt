@@ -2,6 +2,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningdb.Condition
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.flow.toList
@@ -18,12 +19,18 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.*
 import java.net.URI
 import com.lightningkite.UUID
+import com.lightningkite.prepareModelsServerCore
+import com.lightningkite.prepareModelsShared
 import com.lightningkite.uuid
+import prepareModelsServerDynamodb
 
 class DynamoDBTests() {
     @Test
     fun test() {
-        prepareModels()
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerDynamodb()
+        prepareModelsServerDynamodbTest()
         runBlocking {
             val database = DynamoDatabase(embeddedDynamo())
             println("Defining table")

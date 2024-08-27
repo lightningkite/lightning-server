@@ -1,10 +1,11 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.serialization.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onStart
 import kotlinx.serialization.KSerializer
-import com.lightningkite.lightningdb.SerializableProperty
+import com.lightningkite.serialization.SerializableProperty
 import kotlin.reflect.KType
 
 /**

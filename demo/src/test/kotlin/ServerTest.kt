@@ -1,5 +1,5 @@
 import com.lightningkite.lightningserver.db.DatabaseSettings
-import com.lightningkite.lightningserver.demo.Server
+import com.lightningkite.lightningserverdemo.Server
 import com.lightningkite.lightningserver.engine.UnitTestEngine
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.jsonschema.lightningServerSchema

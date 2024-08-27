@@ -209,8 +209,8 @@ com.lightningkite.lightningdb.mapValueElement
 com.lightningkite.lightningdb.nullElement
 com.lightningkite.lightningdb.defer
 com.lightningkite.lightningdb.TypeArgSerialDescriptor
-com.lightningkite.lightningdb.ServerFile
-com.lightningkite.lightningdb.ServerFileSerialization
+com.lightningkite.lightningserver.files.ServerFile
+com.lightningkite.lightningserver.files.ServerFileSerialization
 com.lightningkite.lightningdb.sort
 com.lightningkite.lightningdb.SortBuilder
 com.lightningkite.lightningdb.SortPart

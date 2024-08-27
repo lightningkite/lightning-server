@@ -1,6 +1,8 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.test.*
+import com.lightningkite.prepareModelsShared
 import com.mongodb.kotlin.client.coroutine.MongoClient
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -20,7 +22,11 @@ class MongoAggregationsTest : AggregationsTest() {
         fun start() {
             mongoClient = testMongo()
             defaultMongo = MongoDatabase("default") { mongoClient!! }
-            prepareModels()
+            prepareModelsShared()
+            prepareModelsServerCore()
+            prepareModelsServerTesting()
+            prepareModelsServerMongo()
+            prepareModelsServerMongoTest()
         }
 
         @AfterClass
@@ -39,12 +45,19 @@ class MongoConditionTests : ConditionTests() {
         var mongoClient: MongoClient? = null
         lateinit var defaultMongo: MongoDatabase
 
+        init {
+            prepareModelsShared()
+            prepareModelsServerCore()
+            prepareModelsServerMongo()
+            prepareModelsServerMongoTest()
+            prepareModelsServerTesting()
+        }
+
         @BeforeClass
         @JvmStatic
         fun start() {
             mongoClient = testMongo()
             defaultMongo = MongoDatabase("default") { mongoClient!! }
-            prepareModels()
         }
 
         @AfterClass
@@ -96,7 +109,11 @@ class MongoModificationTests : ModificationTests() {
         fun start() {
             mongoClient = testMongo()
             defaultMongo = MongoDatabase("default") { mongoClient!! }
-            prepareModels()
+            prepareModelsShared()
+            prepareModelsServerCore()
+            prepareModelsServerMongo()
+            prepareModelsServerMongoTest()
+            prepareModelsServerTesting()
         }
 
         @AfterClass
@@ -120,7 +137,11 @@ class MongoOperationsTests : OperationsTests() {
         fun start() {
             mongoClient = testMongo()
             defaultMongo = MongoDatabase("default") { mongoClient!! }
-            prepareModels()
+            prepareModelsShared()
+            prepareModelsServerCore()
+            prepareModelsServerMongo()
+            prepareModelsServerMongoTest()
+            prepareModelsServerTesting()
         }
 
         @AfterClass
@@ -144,7 +165,11 @@ class MongoSortTest : SortTest() {
         fun start() {
             mongoClient = testMongo()
             defaultMongo = MongoDatabase("default") { mongoClient!! }
-            prepareModels()
+            prepareModelsShared()
+            prepareModelsServerCore()
+            prepareModelsServerMongo()
+            prepareModelsServerMongoTest()
+            prepareModelsServerTesting()
         }
 
         @AfterClass
@@ -168,7 +193,11 @@ class MongoMetaTest : MetaTest() {
         fun start() {
             mongoClient = testMongo()
             defaultMongo = MongoDatabase("default") { mongoClient!! }
-            prepareModels()
+            prepareModelsShared()
+            prepareModelsServerCore()
+            prepareModelsServerMongo()
+            prepareModelsServerMongoTest()
+            prepareModelsServerTesting()
         }
 
         @AfterClass

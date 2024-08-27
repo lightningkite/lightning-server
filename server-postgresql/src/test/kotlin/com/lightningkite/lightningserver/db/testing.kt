@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningdb.test.*
 import io.zonky.test.db.postgres.junit.EmbeddedPostgresRules
 import kotlinx.coroutines.flow.firstOrNull

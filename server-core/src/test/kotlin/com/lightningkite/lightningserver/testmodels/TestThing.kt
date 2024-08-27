@@ -3,6 +3,7 @@
 package com.lightningkite.lightningserver.testmodels
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import java.util.*

@@ -2,7 +2,9 @@
 
 package com.lightningkite.lightningserver.db
 
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
+import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.exceptions.NotFoundException
@@ -15,11 +17,12 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
-import com.lightningkite.lightningdb.SerializableProperty
+import com.lightningkite.serialization.SerializableProperty
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import com.lightningkite.now
+import com.lightningkite.serialization.notNull
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -34,7 +37,7 @@ class ModelRestUpdatesWebsocket<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<
     key: SerializableProperty<T, *>? = null,
 ): ServerPathGroup(path) {
     init {
-        prepareModels()
+        prepareModelsServerCore()
     }
     private val modelName = info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
     private val modelIdentifier = info.serialization.serializer.descriptor.serialName
