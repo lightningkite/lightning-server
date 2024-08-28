@@ -1,8 +1,10 @@
 package com.lightningkite.serialization
 
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.serializer
 
+@Serializable(PartialSerializer::class)
 data class Partial<T>(val parts: MutableMap<SerializableProperty<T, *>, Any?> = mutableMapOf()) {
     constructor(item: T, paths: Set<DataClassPathPartial<T>>) : this() {
         paths.forEach { it.setMap(item, this) }

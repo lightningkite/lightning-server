@@ -23,7 +23,7 @@ val lightningServerKSchema: LightningServerKSchema by lazy {
     Documentable.endpoints.flatMap {
         sequenceOf(it.inputType, it.outputType) + it.route.path.serializers.asSequence()
     }.forEach {
-        registry.registerVirtual(it)
+        registry.registerVirtualDeep(it)
     }
     LightningServerKSchema(
         baseUrl = generalSettings().publicUrl,

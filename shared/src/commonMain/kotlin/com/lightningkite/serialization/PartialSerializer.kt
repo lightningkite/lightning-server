@@ -11,23 +11,24 @@ import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.encoding.*
 
 class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> {
-    private val childSerializers = this.source.serializableProperties!!.map {
-        if(it.serializer.descriptor.isNullable) {
-            val nn = it.serializer.nullElement()!!
-            if (nn.serializableProperties != null) {
-                PartialSerializer(nn).nullable
-            } else it.serializer
-        } else {
-            if (it.serializer.serializableProperties != null) {
-                PartialSerializer(it.serializer)
-            } else it.serializer
-        }
+    private val childSerializers by lazy {
+        this.source.serializableProperties?.map {
+            if (it.serializer.descriptor.isNullable) {
+                val nn = it.serializer.nullElement()!!
+                if (nn.serializableProperties != null) {
+                    PartialSerializer(nn).nullable
+                } else it.serializer
+            } else {
+                if (it.serializer.serializableProperties != null) {
+                    PartialSerializer(it.serializer)
+                } else it.serializer
+            }
+        } ?: listOf()
     }
-    override val descriptor: SerialDescriptor
-        get() {
+    override val descriptor: SerialDescriptor by lazy {
             try {
                 val sourceDescriptor = source.descriptor
-                return buildClassSerialDescriptor("com.lightningkite.lightningdb.Partial", sourceDescriptor) {
+                buildClassSerialDescriptor("com.lightningkite.lightningdb.Partial", sourceDescriptor) {
                     if(sourceDescriptor.elementsCount != childSerializers.size) {
                         throw IllegalStateException("Mismatch in child serializer count; ${sourceDescriptor.elementsCount} vs ${childSerializers.size}; ${sourceDescriptor.elementNames.joinToString()} vs ${childSerializers.joinToString { it.descriptor.serialName }}")
                     }

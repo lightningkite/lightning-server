@@ -45,6 +45,18 @@ class VirtualTypesTest {
             }
         }.also { println("Performance: ${it / 10000}") }
     }
+    @Test fun testSerializableAnnotation() {
+        val serializer = LargeTestModel.serializer()
+
+        val virtualRegistry = SerializationRegistry.master.virtualize { it.contains("testing") }
+        val vtype = virtualRegistry.virtualTypes[serializer.descriptor.serialName] as VirtualStruct
+        val vtypeSerializer = virtualRegistry[serializer.descriptor.serialName, serializer.tryTypeParameterSerializers3() ?: arrayOf()] as VirtualStruct.Concrete
+
+        assertEquals(
+            vtype.fields.find { it.name == "string" }!!.annotations,
+            vtypeSerializer.serializableProperties.find { it.name == "string" }!!.serializableAnnotations
+        )
+    }
     @Test fun testStructure() = testVirtualVersion(LargeTestModel.serializer(), LargeTestModel())
     @Test fun testGeneric() = testVirtualVersion(GenericBox.serializer(Int.serializer()), GenericBox(value = 1, nullable = 2, list = listOf(3, 4)))
 //    @Test fun testEnum() {

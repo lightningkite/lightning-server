@@ -19,6 +19,7 @@ interface SerializableProperty<A, B> {
         override val name: String get() = source.name
         override val serializer: KSerializer<Any?> by lazy { source.type.serializer(registry, context) }
         override val annotations: List<Annotation> get() = listOf()
+        override val serializableAnnotations: List<SerializableAnnotation> get() = source.annotations
         override fun get(receiver: VirtualInstance): Any? = receiver.values[source.index]
         override fun setCopy(receiver: VirtualInstance, value: Any?): VirtualInstance = VirtualInstance(receiver.type, receiver.values.toMutableList().also {
             it[source.index] = value

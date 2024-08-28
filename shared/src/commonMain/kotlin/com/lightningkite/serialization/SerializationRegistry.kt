@@ -40,7 +40,6 @@ class SerializationRegistry(val module: SerializersModule) {
                     kClass,
                     fallbackSerializer = null,
                     typeArgumentsSerializers = Array(10) { NothingSerializer() })
-                println("Registering ${sample.descriptor.serialName} due to module")
                 factory[sample.descriptor.serialName] = { provider(it.toList()) }
             }
 
@@ -170,13 +169,19 @@ class SerializationRegistry(val module: SerializersModule) {
         }
     }
 
-    fun registerVirtual(type: KSerializer<*>) {
+    fun registerVirtualDeep(type: KSerializer<*>) {
+        if(registerVirtual(type) != null) {
+            type.tryChildSerializers()?.forEach { registerVirtual(it) }
+        }
+        type.tryTypeParameterSerializers3()?.forEach { registerVirtual(it) }
+    }
+    fun registerVirtual(type: KSerializer<*>): VirtualType? {
         type.nullElement()?.let { return registerVirtual(it) }
-        if (type.descriptor.serialName !in direct && type.descriptor.serialName !in factory) {
+        return if (type.descriptor.serialName !in direct && type.descriptor.serialName !in factory) {
             // virtualize me!
             if(type.tryTypeParameterSerializers3().isNullOrEmpty()) registerVirtualWithoutTypeParameters(type)
             else registerVirtualWithTypeParameters(type.descriptor.serialName, master.factory[type.descriptor.serialName] ?: throw IllegalStateException("${type.descriptor.serialName} not registered in master"))
-        }
+        } else null
     }
 
     @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)

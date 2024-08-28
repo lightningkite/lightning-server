@@ -124,9 +124,11 @@ data class VirtualEnum(
     override val annotations: List<SerializableAnnotation>,
     val options: List<VirtualEnumOption>,
 ) : VirtualType, KSerializer<VirtualEnumValue> {
+    @Transient
     private val map = options.associateBy { it.name }
     override fun serializer(registry: SerializationRegistry, arguments: Array<KSerializer<*>>): KSerializer<*> = this
     override fun toString(): String = "Virtual $serialName { ${options.joinToString()} }"
+    @Transient
     override val descriptor: SerialDescriptor = object : SerialDescriptor {
         @ExperimentalSerializationApi
         override val elementsCount: Int get() = options.size
