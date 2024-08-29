@@ -19,20 +19,31 @@ class LocalFileTest {
     fun test() {
         TestSettings
         runBlocking {
-            val system = LocalFileSystem(File("./build/test-files").absoluteFile, "local-file-test", null, signer = SecureHasher.HS256(Random.nextBytes(16)))
+            val system = LocalFileSystem(
+                File("./build/test-files").absoluteFile,
+                "local-file-test",
+                null,
+                signer = SecureHasher.HS256(Random.nextBytes(16))
+            )
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
             testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
-            assertEquals(message, testFile.get()!!.stream().reader().readText())
+            assertEquals(message, testFile.get()!!.stream().use { it.reader().readText() })
             assertNotNull(testFile.head())
             assertContains(testFile.parent!!.list()!!, testFile)
         }
     }
 
-    @Test fun signTest() {
+    @Test
+    fun signTest() {
         TestSettings
         runBlocking {
-            val system = LocalFileSystem(File("./build/test-files").absoluteFile, "local-file-test", 1.hours, signer = SecureHasher.HS256(Random.nextBytes(16)))
+            val system = LocalFileSystem(
+                File("./build/test-files").absoluteFile,
+                "local-file-test",
+                1.hours,
+                signer = SecureHasher.HS256(Random.nextBytes(16))
+            )
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
             testFile.put(HttpContent.Text(message, ContentType.Text.Plain))

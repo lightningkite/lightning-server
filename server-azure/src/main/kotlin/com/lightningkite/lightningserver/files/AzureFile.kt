@@ -30,7 +30,8 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
         get() = path.name
 
     override val parent: FileObject?
-        get() = path.parentFile?.let { AzureFile(system, path) } ?: if (path.unixPath.isNotEmpty()) system.root else null
+        get() = path.parentFile?.let { AzureFile(system, path) }
+            ?: if (path.unixPath.isNotEmpty()) system.root else null
 
     override suspend fun head(): FileInfo? = withContext(Dispatchers.IO) {
         try {
@@ -62,9 +63,9 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
     override suspend fun put(content: HttpContent) {
         withContext(Dispatchers.IO) {
             content.length?.let {
-                client.upload(content.stream(), it, true)
+                content.stream().use { stream -> client.upload(stream, it, true) }
             } ?: run {
-                client.upload(BinaryData.fromStream(content.stream()), true)
+                client.upload(content.stream().use { stream -> BinaryData.fromStream(stream) }, true)
             }
             client.setHttpHeaders(BlobHttpHeaders().setContentType(content.type.toString()))
         }
@@ -92,24 +93,28 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
     override val url: String
         get() = client.blobUrl
 
-    override val signedUrl: String get() {
-        val offsetDateTime = now().plus(system.signedUrlExpirationSeconds.seconds)
-        val sasPermission = BlobSasPermission().setReadPermission(true)
+    override val signedUrl: String
+        get() {
+            val offsetDateTime = now().plus(system.signedUrlExpirationSeconds.seconds)
+            val sasPermission = BlobSasPermission().setReadPermission(true)
 
-        val signatureValues = BlobServiceSasSignatureValues(offsetDateTime.toJavaInstant().atOffset(ZoneOffset.UTC), sasPermission)
+            val signatureValues =
+                BlobServiceSasSignatureValues(offsetDateTime.toJavaInstant().atOffset(ZoneOffset.UTC), sasPermission)
 
-        signatureValues.startTime = now().minus(10.minutes).toJavaInstant().atOffset(ZoneOffset.UTC)
-        signatureValues.protocol = SasProtocol.HTTPS_ONLY
+            signatureValues.startTime = now().minus(10.minutes).toJavaInstant().atOffset(ZoneOffset.UTC)
+            signatureValues.protocol = SasProtocol.HTTPS_ONLY
 
-        // Sign the url for this object
-        return client.blobUrl + "?" + client.generateSas(signatureValues)
-    }
+            // Sign the url for this object
+            return client.blobUrl + "?" + client.generateSas(signatureValues)
+        }
 
     override fun uploadUrl(timeout: Duration): String {
         val offsetDateTime = now().plus(timeout)
-        val sasPermission = BlobSasPermission().setWritePermission(true).setCreatePermission(true).setAddPermission(true)
+        val sasPermission =
+            BlobSasPermission().setWritePermission(true).setCreatePermission(true).setAddPermission(true)
 
-        val signatureValues = BlobServiceSasSignatureValues(offsetDateTime.toJavaInstant().atOffset(ZoneOffset.UTC), sasPermission)
+        val signatureValues =
+            BlobServiceSasSignatureValues(offsetDateTime.toJavaInstant().atOffset(ZoneOffset.UTC), sasPermission)
 
         signatureValues.startTime = now().minus(10.minutes).toJavaInstant().atOffset(ZoneOffset.UTC)
         signatureValues.protocol = SasProtocol.HTTPS_ONLY
@@ -117,5 +122,6 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
         // Sign the url for this object
         return client.blobUrl + "?" + client.generateSas(signatureValues)
     }
+
     override fun toString(): String = url
 }

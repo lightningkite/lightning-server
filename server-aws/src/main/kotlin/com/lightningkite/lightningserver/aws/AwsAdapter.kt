@@ -174,7 +174,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                         }.await().let {
                             it.logResult()
                         }
-                    } catch(e: Exception) {
+                    } catch (e: Exception) {
                         throw Exception("Failed to call ${task.name}", e)
                     }
                 }
@@ -243,7 +243,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                         Serialization.json.decodeFromJsonElement<APIGatewayV2HTTPEvent>(
                             asJson
                         ).also { roughContext = it.httpMethod + " " + it.path }
-                    ){ roughContext = it }
+                    ) { roughContext = it }
 
                     asJson["requestContext"]?.jsonObject?.containsKey("connectionId") == true -> handleWebsocket(
                         Serialization.json.decodeFromJsonElement<APIGatewayV2WebsocketRequest>(asJson)
@@ -278,6 +278,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     }
                 }
             }
+
             @OptIn(DelicateCoroutinesApi::class)
             val backgroundRegularHealthActionsJob = GlobalScope.launch {
                 println("Running ${backgroundReportingActions.size} backgroundRegularHealthActions...")
@@ -331,7 +332,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         }
     }
 
-    private class AwsTaskInvokeException(message: String? = null, cause: Exception? = null): Exception(message, cause)
+    private class AwsTaskInvokeException(message: String? = null, cause: Exception? = null) : Exception(message, cause)
 
     suspend fun handleTask(event: TaskInvoke): APIGatewayV2HTTPResponse {
         return coroutineScope {
@@ -342,8 +343,12 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 APIGatewayV2HTTPResponse(statusCode = 404, body = "Task ${event.taskName} not found")
             } else try {
                 Metrics.handlerPerformance(task) {
-                    val payload = when(event.format) {
-                        TaskDataFormat.Json -> Serialization.Internal.json.decodeFromString(task.serializer, event.input)
+                    val payload = when (event.format) {
+                        TaskDataFormat.Json -> Serialization.Internal.json.decodeFromString(
+                            task.serializer,
+                            event.input
+                        )
+
                         TaskDataFormat.JsonGzip -> {
                             val data = ByteArrayInputStream(Base64.getDecoder().decode(event.input)).use {
                                 GZIPInputStream(it).readBytes()
@@ -372,6 +377,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
     val wsType = "aws"
 
     private fun wsCache(id: String) = PrefixCache(cache(), id + "/")
+
     init {
         WebSocketIdentifier.register(
             type = wsType,
@@ -471,7 +477,11 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                 APIGatewayV2HTTPResponse(200)
             else {
                 val lkEvent =
-                    WebSockets.MessageEvent(WebSocketIdentifier(wsType, event.requestContext.connectionId), wsCache, event.body)
+                    WebSockets.MessageEvent(
+                        WebSocketIdentifier(wsType, event.requestContext.connectionId),
+                        wsCache,
+                        event.body
+                    )
                 try {
                     rootWs.message(lkEvent)
                     APIGatewayV2HTTPResponse(200)
@@ -500,7 +510,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
         }
     }
 
-    suspend fun handleHttp(event: APIGatewayV2HTTPEvent, setRoughContext: (String)->Unit): APIGatewayV2HTTPResponse {
+    suspend fun handleHttp(event: APIGatewayV2HTTPEvent, setRoughContext: (String) -> Unit): APIGatewayV2HTTPResponse {
         val method = HttpMethod(event.httpMethod)
         val path = event.path.removePrefix("/" + event.requestContext.stage)
         val headers = HttpHeaders(event.multiValueHeaders.entries.flatMap { it.value.map { v -> it.key to v } })
@@ -605,7 +615,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     APIGatewayV2HTTPResponse(
                         statusCode = result.status.code,
                         headers = outHeaders,
-                        body = Base64.getEncoder().encodeToString(b.stream().readAllBytes()),
+                        body = Base64.getEncoder().encodeToString(b.stream().use { it.readAllBytes() }),
                         isBase64Encoded = true
                     )
                 }

@@ -42,7 +42,7 @@ abstract class FileSystemTests {
             val testFile = system.root.resolve("test.txt")
             val message = "Hello world!"
             testFile.put(HttpContent.Text(message, ContentType.Text.Plain))
-            assertEquals(message, testFile.get()!!.stream().reader().readText())
+            assertEquals(message, testFile.get()!!.stream().use { it.reader().readText() })
             testFile.delete()
         }
     }
@@ -92,7 +92,7 @@ abstract class FileSystemTests {
                 testFileNotIncluded.put(HttpContent.Text(message, ContentType.Text.Plain))
                 assertContains(testFile.parent!!.list()!!.also { println(it) }, testFile)
                 assertFalse(testFileNotIncluded in testFile.parent!!.list()!!)
-                testFile.get()!!.stream().readAllBytes()
+                testFile.get()!!.stream().use { it.readAllBytes() }
             }
         }
     }
