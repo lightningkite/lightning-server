@@ -23,8 +23,8 @@ import java.util.Enumeration
 
 sealed class HttpContent {
     abstract suspend fun stream(): InputStream
-    suspend fun text(): String = stream().reader().readText()
-    suspend fun bytes(): ByteArray = stream().readBytes()
+    suspend fun text(): String = stream().use { it.reader().readText() }
+    suspend fun bytes(): ByteArray = stream().use { it.readBytes() }
     abstract val length: Long?
     abstract val type: ContentType
 
@@ -45,7 +45,7 @@ sealed class HttpContent {
     data class Stream(
         val getStream: suspend () -> InputStream,
         override val length: Long? = null,
-        override val type: ContentType
+        override val type: ContentType,
     ) : HttpContent() {
         override suspend fun stream(): InputStream = getStream()
     }
@@ -53,7 +53,7 @@ sealed class HttpContent {
     data class OutStream(
         val write: (OutputStream) -> Unit,
         override val length: Long? = null,
-        override val type: ContentType
+        override val type: ContentType,
     ) : HttpContent() {
         override suspend fun stream(): InputStream {
             val bytes = ByteArrayOutputStream()
@@ -71,29 +71,34 @@ sealed class HttpContent {
         companion object Part {
             @Deprecated("Use lowercase function instead", ReplaceWith("formItem(key, value)"))
             fun FormItem(key: String, value: String) = formItem(key, value)
+
             @Deprecated("Use lowercase function instead", ReplaceWith("dataItem(key, filename, headers, content)"))
             fun DataItem(
                 key: String,
                 filename: String,
                 headers: HttpHeaders,
-                content: HttpContent
+                content: HttpContent,
             ) = dataItem(key, filename, headers, content)
 
-            fun formItem(key: String, value: String) : HttpContentAndHeaders = HttpContentAndHeaders(
+            fun formItem(key: String, value: String): HttpContentAndHeaders = HttpContentAndHeaders(
                 headers = HttpHeaders {
                     set(HttpHeader.ContentDisposition, HttpHeaderValue("form-data", mapOf("name" to key)))
                 },
                 content = HttpContent.Text(value, ContentType.Text.Plain)
             )
+
             fun dataItem(
                 key: String,
                 filename: String,
                 headers: HttpHeaders,
-                content: HttpContent
+                content: HttpContent,
             ) = HttpContentAndHeaders(
                 headers = HttpHeaders {
                     set(headers)
-                    set(HttpHeader.ContentDisposition, HttpHeaderValue("form-data", mapOf("name" to key, "filename" to filename)))
+                    set(
+                        HttpHeader.ContentDisposition,
+                        HttpHeaderValue("form-data", mapOf("name" to key, "filename" to filename))
+                    )
                 },
                 content = content
             )
@@ -117,7 +122,7 @@ sealed class HttpContent {
 
         @Deprecated("Use the lowercase version", ReplaceWith("json"))
         inline fun <reified T> Json(
-            value: T
+            value: T,
         ): Text = HttpContent.Text(
             string = Serialization.json.encodeToString(value),
             type = ContentType.Application.Json
@@ -137,7 +142,7 @@ sealed class HttpContent {
         )
 
         inline fun <reified T> json(
-            value: T
+            value: T,
         ): Text = HttpContent.Text(
             string = Serialization.json.encodeToString(value),
             type = ContentType.Application.Json
@@ -166,7 +171,7 @@ suspend fun HttpContent.download(
     destination: File = File.createTempFile(
         "temp",
         type.extension,
-    )
+    ),
 ): File {
     destination.outputStream().use { out ->
         stream().use {

@@ -30,22 +30,25 @@ abstract class AzureAdapter {
         val matches = cors.allowedDomains.any {
             it == "*" || it == origin || origin.endsWith(it.removePrefix("*"))
         }
-        if(!matches) {
+        if (!matches) {
             return
         }
         responseBuilder.header(HttpHeader.AccessControlAllowOrigin, origin)
-        responseBuilder.header(HttpHeader.AccessControlAllowMethods, inHeaders[HttpHeader.AccessControlRequestMethod] ?: "GET")
+        responseBuilder.header(
+            HttpHeader.AccessControlAllowMethods,
+            inHeaders[HttpHeader.AccessControlRequestMethod] ?: "GET"
+        )
         responseBuilder.header(HttpHeader.AccessControlAllowHeaders, cors.allowedHeaders.joinToString(", "))
         responseBuilder.header(HttpHeader.AccessControlAllowCredentials, "true")
     }
 
     open fun http(
         request: HttpRequestMessage<Optional<String>>,
-        context: ExecutionContext
+        context: ExecutionContext,
     ): HttpResponseMessage {
         val inHeaders = HttpHeaders(request.headers)
         logger.debug("--> ${request.uri} ${request.httpMethod}")
-        if(request.httpMethod == com.microsoft.azure.functions.HttpMethod.OPTIONS) {
+        if (request.httpMethod == com.microsoft.azure.functions.HttpMethod.OPTIONS) {
             return request.createResponseBuilder(HttpStatus.NO_CONTENT)
                 .apply { processCors(request, this) }
                 .build()
@@ -67,7 +70,9 @@ abstract class AzureAdapter {
                         queryParameters = request.queryParameters.entries.map { it.toPair() },
                         headers = inHeaders,
                         body = if (inHeaders.contentType == ContentType.MultiPart.FormData) {
-                            ByteArrayInputStream(request.body.get().toByteArray(Charset.defaultCharset())).toMultipartContent(inHeaders.contentType!!)
+                            ByteArrayInputStream(
+                                request.body.get().toByteArray(Charset.defaultCharset())
+                            ).toMultipartContent(inHeaders.contentType!!)
                         } else if (request.body.isPresent)
                             HttpContent.Text(
                                 request.body.get(),
@@ -80,7 +85,7 @@ abstract class AzureAdapter {
                     )
                     val result = try {
                         Http.endpoints[match.endpoint]!!.invoke(request2)
-                    } catch(e: HttpStatusException) {
+                    } catch (e: HttpStatusException) {
                         e.toResponse(request2)
                     }
                     logger.debug("<-- ${request.uri} ${request.httpMethod} ${result.status}")
@@ -105,7 +110,7 @@ abstract class AzureAdapter {
                 }
                 response.body?.let {
                     runBlocking {
-                        body(it.stream().readBytes())
+                        body(it.stream().use { it.readBytes() })
                     }
                     header(HttpHeader.ContentType, it.type.toString())
                 }

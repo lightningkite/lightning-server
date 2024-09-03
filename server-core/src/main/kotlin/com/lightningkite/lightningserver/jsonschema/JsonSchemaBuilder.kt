@@ -492,8 +492,8 @@ class JsonSchemaBuilder(
                     properties = mapOf()
                 ).applyAnnotations(annos)
 
-                PolymorphicKind.SEALED -> TODO()
-                PolymorphicKind.OPEN -> TODO()
+                PolymorphicKind.SEALED -> throw Error("Cannot generate JSON Schema for polymorphic type ${ser.descriptor.serialName}")
+                PolymorphicKind.OPEN -> throw Error("Cannot generate JSON Schema for polymorphic type ${ser.descriptor.serialName}")
                 SerialKind.CONTEXTUAL -> throw Error("This should not be reachable - ${ser.descriptor.serialName} could be unwrapped no further")
             }
         } catch(e: Exception) {

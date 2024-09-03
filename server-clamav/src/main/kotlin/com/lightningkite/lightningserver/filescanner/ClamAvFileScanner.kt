@@ -28,7 +28,7 @@ class ClamAvFileScanner(
     }
 
     override fun scan(claimedType: ContentType, data: InputStream) {
-        when(val r = get().scan(data)) {
+        when(val r = data.use{ stream -> get().scan(stream) }) {
             ScanResult.OK -> {}
             is ScanResult.VirusFound -> throw BadRequestException("File seems to contain malicious content; ${r.foundViruses.keys.joinToString()}")
         }

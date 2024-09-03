@@ -37,7 +37,7 @@ class PasswordProofEndpoints(
     val database: () -> Database,
     val cache: () -> Cache,
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
-    val evaluatePassword: (String) -> Unit = {  }
+    val evaluatePassword: (String) -> Unit = { }
 ) : ServerPathGroup(path), Authentication.DirectProofMethod {
     init {
         path.docName = "PasswordProof"
@@ -68,28 +68,36 @@ class PasswordProofEndpoints(
         Tasks.onSettingsReady {
             Authentication.subjects.forEach {
                 @Suppress("UNCHECKED_CAST")
-                ModelRestEndpoints<HasId<*>, PasswordSecret<Comparable<Any>>, Comparable<Any>>(path("secrets/${it.value.name.lowercase()}"), modelInfo< HasId<*>, PasswordSecret<Comparable<Any>>, Comparable<Any>>(
-                    serialization = ModelSerializationInfo(PasswordSecret.serializer(it.value.idSerializer as KSerializer<Comparable<Any>>), it.value.idSerializer as KSerializer<Comparable<Any>>),
-                    authOptions = Authentication.isAdmin as AuthOptions<HasId<*>>,
-                    getBaseCollection = { table(it.value) },
-                    getCollection = { c ->
-                        c.withPermissions(ModelPermissions(
-                            create = Condition.Always(),
-                            read = Condition.Always(),
-                            readMask = Mask(
-                                listOf(
-                                    Condition.Never<PasswordSecret<Comparable<Any>>>() to Modification.OnField(
-                                        PasswordSecret_hash(it.value.idSerializer as KSerializer<Comparable<Any>>),
-                                        Modification.Assign("")
-                                    )
+                ModelRestEndpoints<HasId<*>, PasswordSecret<Comparable<Any>>, Comparable<Any>>(
+                    path("secrets/${it.value.name.lowercase()}"),
+                    modelInfo<HasId<*>, PasswordSecret<Comparable<Any>>, Comparable<Any>>(
+                        serialization = ModelSerializationInfo(
+                            PasswordSecret.serializer(it.value.idSerializer as KSerializer<Comparable<Any>>),
+                            it.value.idSerializer as KSerializer<Comparable<Any>>
+                        ),
+                        authOptions = Authentication.isAdmin as AuthOptions<HasId<*>>,
+                        getBaseCollection = { table(it.value) },
+                        getCollection = { c ->
+                            c.withPermissions(
+                                ModelPermissions(
+                                    create = Condition.Always(),
+                                    read = Condition.Always(),
+                                    readMask = Mask(
+                                        listOf(
+                                            Condition.Never<PasswordSecret<Comparable<Any>>>() to Modification.OnField(
+                                                PasswordSecret_hash(it.value.idSerializer as KSerializer<Comparable<Any>>),
+                                                Modification.Assign("")
+                                            )
+                                        )
+                                    ),
+                                    update = Condition.Always(),
+                                    delete = Condition.Always(),
                                 )
-                            ),
-                            update = Condition.Always(),
-                            delete = Condition.Always(),
-                        ))
-                    },
-                    modelName = "PasswordSecret For ${it.value.name}"
-                ))
+                            )
+                        },
+                        modelName = "PasswordSecret For ${it.value.name}"
+                    )
+                )
             }
         }
     }
@@ -104,6 +112,53 @@ class PasswordProofEndpoints(
         return handler to Serialization.json.decodeUnwrappingString(handler.idSerializer, id.substringAfter('|'))
     }
 
+    val establishAdmin =
+        path("admin/establish").arg("subject", String.serializer()).arg("id", String.serializer()).post.api(
+            summary = "Set Other Password",
+            inputType = EstablishPassword.serializer(),
+            outputType = Unit.serializer(),
+            description = "Generates a new One Time Password configuration.",
+            authOptions = Authentication.isAdmin,
+            errorCases = listOf(),
+            examples = listOf(),
+            implementation = { value: EstablishPassword ->
+                val subject = Authentication.subjects.values.find { it.name == path1 }
+                    ?: throw BadRequestException("No such subject; subjects are ${Authentication.subjects.values.joinToString { it.name }}")
+                @Suppress("UNCHECKED_CAST")
+                val id = Serialization.fromString(path2, subject.idSerializer) as Comparable<Comparable<*>>
+                @Suppress("UNCHECKED_CAST")
+                establish(
+                    subject as Authentication.SubjectHandler<HasId<Comparable<Comparable<*>>>, Comparable<Comparable<*>>>,
+                    id,
+                    value
+                )
+                Unit
+            }
+        )
+
+    suspend fun <T : HasId<ID>, ID : Comparable<ID>> establish(
+        subject: Authentication.SubjectHandler<T, ID>,
+        id: ID,
+        password: EstablishPassword
+    ) {
+        val value = password
+        evaluatePassword(value.password)
+        if (value.hint?.contains(
+                value.password,
+                true
+            ) == true
+        ) throw BadRequestException("Hint cannot contain the password itself!")
+        @Suppress("UNCHECKED_CAST")
+        val secret = PasswordSecret(
+            _id = id as Comparable<Any>,
+            hash = value.password.secureHash(),
+            hint = value.hint,
+        )
+        @Suppress("UNCHECKED_CAST")
+        table(subject).deleteOneById(id as Comparable<Any>)
+        table(subject).insertOne(secret)
+    }
+
     val establish = path("establish").post.api(
         summary = "Establish a Password",
         inputType = EstablishPassword.serializer(),
@@ -113,17 +168,12 @@ class PasswordProofEndpoints(
         errorCases = listOf(),
         examples = listOf(),
         implementation = { value: EstablishPassword ->
-            evaluatePassword(value.password)
-            if(value.hint?.contains(value.password, true) == true) throw BadRequestException("Hint cannot contain the password itself!")
             @Suppress("UNCHECKED_CAST")
-            val secret = PasswordSecret(
-                _id = auth.rawId as Comparable<Any>,
-                hash = value.password.secureHash(),
-                hint = value.hint,
+            establish(
+                auth.subject as Authentication.SubjectHandler<HasId<Comparable<Comparable<*>>>, Comparable<Comparable<*>>>,
+                auth.rawId as Comparable<Comparable<*>>,
+                value
             )
-            @Suppress("UNCHECKED_CAST")
-            table(auth.subject).deleteOneById(auth.rawId as Comparable<Any>)
-            table(auth.subject).insertOne(secret)
             Unit
         }
     )
@@ -218,6 +268,7 @@ class PasswordProofEndpoints(
         @Suppress("UNCHECKED_CAST")
         return table(handler).get(item._id as Comparable<Any>) != null
     }
+
     suspend fun <ID : Comparable<ID>> established(handler: Authentication.SubjectHandler<*, ID>, id: ID): Boolean {
         @Suppress("UNCHECKED_CAST")
         return table(handler).get(id as Comparable<Any>) != null
