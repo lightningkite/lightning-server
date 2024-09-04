@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.decodeUnwrappingString
+import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.TypedServerPath0
 import kotlinx.serialization.KSerializer
@@ -44,7 +45,10 @@ object Authentication {
 
         suspend fun fetch(id: ID): SUBJECT
         suspend fun findUser(property: String, value: String): SUBJECT? {
-            return if(property == "_id") fetch(Serialization.json.decodeUnwrappingString(idSerializer, value)) else null
+            return when (property) {
+                "$name/_id" -> fetch(Serialization.json.decodeUnwrappingString(idSerializer, value))
+                else -> null
+            }
         }
         suspend fun permitMasquerade(
             other: SubjectHandler<*, *>,
@@ -55,6 +59,7 @@ object Authentication {
         suspend fun desiredStrengthFor(result: SUBJECT): Int = 5
         fun get(property: String): Boolean = subjectSerializer.descriptor.getElementIndex(property) != CompositeDecoder.UNKNOWN_NAME
         fun get(subject: SUBJECT, property: String): String? {
+            if (property == "$name/_id") return Serialization.json.encodeUnwrappingString(idSerializer, subject._id)
             return Serialization.properties.encodeToStringMap(subjectSerializer, subject)[property]
         }
 
@@ -87,6 +92,10 @@ object Authentication {
 
     interface DirectProofMethod : ProofMethod {
         val prove: ApiEndpoint<HasId<*>?, TypedServerPath0, IdentificationAndPassword, Proof>
+    }
+
+    interface StringProofMethod : ProofMethod {
+        val prove: ApiEndpoint<HasId<*>?, TypedServerPath0, String, Proof>
     }
 
     interface StartedProofMethod : ProofMethod {

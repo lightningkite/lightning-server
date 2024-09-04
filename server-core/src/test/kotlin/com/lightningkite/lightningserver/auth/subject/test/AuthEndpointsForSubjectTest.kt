@@ -3,9 +3,7 @@
 package com.lightningkite.lightningserver.auth.subject.test
 
 import com.lightningkite.default
-import com.lightningkite.lightningdb.get
-import com.lightningkite.lightningdb.modification
-import com.lightningkite.lightningdb.updateOneById
+import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.auth.oauth.OauthAccessType
@@ -73,15 +71,19 @@ class AuthEndpointsForSubjectTest {
 
         // Set up OTP
         TestSettings.proofOtp.establish.test(self, EstablishOtp("Test Label"))
-        @Suppress("UNCHECKED_CAST") var secret = TestSettings.proofOtp.table(TestSettings.subjectHandler).get(self._id as Comparable<Any>)!!
-        assertFalse(secret.active)
+        @Suppress("UNCHECKED_CAST") var secret = TestSettings.proofOtp.modelInfo.collection().findOne(
+            condition { it.subjectType.eq(TestSettings.testUserSubject.handler.name) and it.subjectId.eq(self._id.toString()) }
+        )!!
+        assertNull(secret.lastUsedAt)
         run {
             // Can still log in with email pin only before confirmation
-            assertNotNull(TestSettings.testUserSubject.login.test(null, listOf(proof1)).session)
+            assertNotNull(TestSettings.testUserSubject.login.test(null, listOf(proof1)).also { println(it) }.session)
         }
         TestSettings.proofOtp.confirm.test(self, secret.generator.generate())
-        secret = TestSettings.proofOtp.table(TestSettings.subjectHandler).get(self._id as Comparable<Any>)!!
-        assertTrue(secret.active)
+        secret = TestSettings.proofOtp.modelInfo.collection().findOne(
+            condition { it.subjectType.eq(TestSettings.testUserSubject.handler.name) and it.subjectId.eq(self._id.toString()) }
+        )!!
+        assertNotNull(secret.lastUsedAt)
 
         // Set up Password
         TestSettings.proofPassword.establish.test(self, EstablishPassword("test"))
@@ -93,20 +95,44 @@ class AuthEndpointsForSubjectTest {
         assertTrue(r1.options.any { it.method == TestSettings.proofPassword.info })
         val proof2 = TestSettings.proofOtp.prove.test(null, IdentificationAndPassword(
             type = TestSettings.subjectHandler.name,
-            property = "_id",
+            property = "${TestSettings.subjectHandler.name}/_id",
             value = r1.id.toString(),
             password = secret.generator.generate()
         ))
         assert(TestSettings.testUserSubject.proofHasher().verify(proof2))
         val proof3 = TestSettings.proofPassword.prove.test(null, IdentificationAndPassword(
             type = TestSettings.subjectHandler.name,
-            property = "_id",
+            property = "${TestSettings.subjectHandler.name}/_id",
             value = r1.id.toString(),
             password = "test"
         ))
         assert(TestSettings.testUserSubject.proofHasher().verify(proof3))
         val r2 = TestSettings.testUserSubject.login.test(null, listOf(proof1, proof2, proof3))
         assertNotNull(r2.session)
+
+        // Set up Known Device
+        val known = TestSettings.proofKnown.establish.test(self, Unit)
+
+        // Can skip OTP using known device
+        run {
+            val r1 = TestSettings.testUserSubject.login.test(null, listOf(proof1))
+            assertNull(r1.session)
+            assertTrue(r1.options.any { it.method == TestSettings.proofOtp.info })
+            assertTrue(r1.options.any { it.method == TestSettings.proofPassword.info })
+            val proof2 = TestSettings.proofKnown.prove.test(null, known)
+            assert(TestSettings.testUserSubject.proofHasher().verify(proof2))
+            val proof3 = TestSettings.proofPassword.prove.test(
+                null, IdentificationAndPassword(
+                    type = TestSettings.subjectHandler.name,
+                    property = "${TestSettings.subjectHandler.name}/_id",
+                    value = r1.id.toString(),
+                    password = "test"
+                )
+            )
+            assert(TestSettings.testUserSubject.proofHasher().verify(proof3))
+            val r2 = TestSettings.testUserSubject.login.test(null, listOf(proof1, proof2, proof3))
+            assertNotNull(r2.session)
+        }
     }
 
     @Test
@@ -128,15 +154,19 @@ class AuthEndpointsForSubjectTest {
 
         // Set up OTP
         TestSettings.proofOtp.establish.test(self, EstablishOtp("Test Label"))
-        @Suppress("UNCHECKED_CAST") var secret = TestSettings.proofOtp.table(TestSettings.subjectHandler).get(self._id as Comparable<Any>)!!
-        assertFalse(secret.active)
+        @Suppress("UNCHECKED_CAST") var secret = TestSettings.proofOtp.modelInfo.collection().findOne(
+            condition { it.subjectType.eq(TestSettings.testUserSubject.handler.name) and it.subjectId.eq(self._id.toString()) }
+        )!!
+        assertNull(secret.lastUsedAt)
         run {
             // Can still log in with email pin only before confirmation
             assertNotNull(TestSettings.testUserSubject.login.test(null, listOf(proof1)).session)
         }
         TestSettings.proofOtp.confirm.test(self, secret.generator.generate())
-        secret = TestSettings.proofOtp.table(TestSettings.subjectHandler).get(self._id as Comparable<Any>)!!
-        assertTrue(secret.active)
+        secret = TestSettings.proofOtp.modelInfo.collection().findOne(
+            condition { it.subjectType.eq(TestSettings.testUserSubject.handler.name) and it.subjectId.eq(self._id.toString()) }
+        )!!
+        assertNotNull(secret.lastUsedAt)
 
         // Set up Password
         TestSettings.proofPassword.establish.test(self, EstablishPassword("test"))

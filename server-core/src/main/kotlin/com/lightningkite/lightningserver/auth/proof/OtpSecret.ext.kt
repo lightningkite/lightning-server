@@ -25,16 +25,17 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Duration.Companion.seconds
 
-fun <ID: Comparable<ID>> OtpSecret(
-    _id: ID,
+fun OtpSecret(
+    subjectType: String,
+    subjectId: String,
     secret: ByteArray,
     label: String,
     issuer: String,
     config: TimeBasedOneTimePasswordConfig,
-    active: Boolean,
-) = OtpSecret<ID>(
-    _id = _id,
-    Base32.encode(secret).toString(Charsets.UTF_8),
+): OtpSecret = OtpSecret(
+    subjectId = subjectId,
+    subjectType = subjectType,
+    secretBase32 = Base32.encode(secret).toString(Charsets.UTF_8),
     digits = config.codeDigits,
     label = label,
     issuer = issuer,
@@ -52,12 +53,11 @@ fun <ID: Comparable<ID>> OtpSecret(
         HmacAlgorithm.SHA1 -> OtpHashAlgorithm.SHA1
         HmacAlgorithm.SHA256 -> OtpHashAlgorithm.SHA256
         HmacAlgorithm.SHA512 -> OtpHashAlgorithm.SHA512
-    },
-    active = active,
+    }
 )
 
-val OtpSecret<*>.secret: ByteArray get() = Base32.decode(secretBase32)
-val OtpSecret<*>.url: String
+val OtpSecret.secret: ByteArray get() = Base32.decode(secretBase32)
+val OtpSecret.url: String
     get() = OtpAuthUriBuilder.forTotp(secretBase32.toByteArray())
         .label(label, issuer)
         .issuer(issuer)
@@ -73,7 +73,7 @@ val OtpSecret<*>.url: String
         .buildToString()
         .replace("+", "%20")
         .replace("/?", "?")
-val OtpSecret<*>.config: TimeBasedOneTimePasswordConfig
+val OtpSecret.config: TimeBasedOneTimePasswordConfig
     get() = TimeBasedOneTimePasswordConfig(
         timeStep = period.inWholeMilliseconds,
         timeStepUnit = TimeUnit.MILLISECONDS,
@@ -84,8 +84,8 @@ val OtpSecret<*>.config: TimeBasedOneTimePasswordConfig
             OtpHashAlgorithm.SHA512 -> HmacAlgorithm.SHA512
         }
     )
-val OtpSecret<*>.generator: TimeBasedOneTimePasswordGenerator get() = TimeBasedOneTimePasswordGenerator(secret, config)
-val OtpSecret<*>.code: String get() = generator.generate()
+val OtpSecret.generator: TimeBasedOneTimePasswordGenerator get() = TimeBasedOneTimePasswordGenerator(secret, config)
+val OtpSecret.code: String get() = generator.generate()
 
 
 private fun signingInfo(

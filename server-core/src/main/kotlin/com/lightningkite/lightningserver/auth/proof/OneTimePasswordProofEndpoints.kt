@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.auth.proof
 
-import com.lightningkite.prepareModelsServerCore
+import com.lightningkite.UUID
 import com.lightningkite.lightningdb.*
 import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
@@ -30,6 +30,8 @@ import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
 import com.lightningkite.now
 import com.lightningkite.serialization.DataClassPathSelf
+import com.lightningkite.uuid
+import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
@@ -60,64 +62,52 @@ class OneTimePasswordProofEndpoints(
     override val info: ProofMethodInfo = ProofMethodInfo(
         via = "otp",
         property = null,
-        strength = 10
+        strength = 5
     )
 
     init {
         Authentication.register(this)
     }
 
-    private val tables = HashMap<String, FieldCollection<OtpSecret<Comparable<Any>>>>()
+    private val active get() = condition<OtpSecret> { it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())) }
 
-    @Suppress("UNCHECKED_CAST")
-    fun table(subjectHandler: Authentication.SubjectHandler<*, *>) = tables.getOrPut(subjectHandler.name) {
-        database().collection(
-            OtpSecret.serializer(subjectHandler.idSerializer),
-            "OtpSecretFor${subjectHandler.name}"
-        ) as FieldCollection<OtpSecret<Comparable<Any>>>
-    }
-
-    init {
-        prepareModelsServerCore()
-        Tasks.onSettingsReady {
-            Authentication.subjects.forEach {
-                @Suppress("UNCHECKED_CAST")
-                ModelRestEndpoints(
-                    path("secrets/${it.value.name.lowercase()}"),
-                    modelInfo(
-                        serialization = ModelSerializationInfo(
-                            OtpSecret.serializer(it.value.idSerializer as KSerializer<Comparable<Any>>),
-                            it.value.idSerializer as KSerializer<Comparable<Any>>
-                        ),
-                        authOptions = Authentication.isAdmin as AuthOptions<HasId<*>>,
-                        getBaseCollection = { table(it.value) },
-                        getCollection = { collection ->
-                            collection.withPermissions(
-                                ModelPermissions(
-                                    create = Condition.Always(),
-                                    read = Condition.Always(),
-                                    readMask = Mask(
-                                        listOf(
-                                            Condition.Never<OtpSecret<Comparable<Any>>>() to Modification.OnField(
-                                                OtpSecret_secretBase32(it.value.idSerializer as KSerializer<Comparable<Any>>),
-                                                Modification.Assign("")
-                                            )
-                                        )
-                                    ),
-                                    update = Condition.Always(),
-                                    delete = Condition.Always(),
-                                )
-                            )
-                        },
-                        modelName = "OtpSecret For ${it.value.name}"
-                    )
+    val modelInfo = modelInfo(
+        serialization = ModelSerializationInfo<OtpSecret, UUID>(),
+        authOptions = anyAuthRoot + Authentication.isAdmin,
+        getBaseCollection = { database().collection() },
+        forUser = {
+            val admin = condition<OtpSecret>(Authentication.isAdmin.accepts(authOrNull))
+            val mine = authOrNull?.let { a ->
+                condition<OtpSecret> {
+                    it.subjectId.eq(a.idString) and it.subjectType.eq(a.subject.name)
+                }
+            } ?: Condition.Never
+            val active = condition<OtpSecret> { it.disabledAt.eq(null) }
+            it.withPermissions(
+                ModelPermissions(
+                    create = Condition.Never,
+                    read = admin or mine,
+                    readMask = mask {
+                        it.secretBase32.mask("")
+                    },
+                    update = admin or (mine and active),
+                    updateRestrictions = updateRestrictions {
+                        it.subjectType.cannotBeModified()
+                        it.subjectId.cannotBeModified()
+                        it.secretBase32.cannotBeModified()
+                        it.issuer.cannotBeModified()
+                        it.period.cannotBeModified()
+                        it.digits.cannotBeModified()
+                        it.algorithm.cannotBeModified()
+                        it.establishedAt.cannotBeModified()
+                    },
+                    delete = Condition.Never,
                 )
-            }
+            )
         }
-    }
+    )
 
-    fun <ID : Comparable<ID>> key(subjectHandler: Authentication.SubjectHandler<*, ID>, id: ID): String =
-        subjectHandler.name + "|" + Serialization.json.encodeUnwrappingString(subjectHandler.idSerializer, id)
+    val rest = ModelRestEndpoints(path("secrets"), modelInfo)
 
     val establish = path("establish").post.api(
         summary = "Establish an One Time Password",
@@ -128,74 +118,22 @@ class OneTimePasswordProofEndpoints(
         errorCases = listOf(),
         examples = listOf(),
         implementation = { input: EstablishOtp ->
-            @Suppress("UNCHECKED_CAST")
+            modelInfo.collection().updateMany(condition {
+                it.subjectId.eq(auth.idString) and it.subjectType.eq(auth.subject.name)
+            }, modification {
+                it.disabledAt assign now()
+                it.secretBase32 assign ""
+            })
             val secret = OtpSecret(
-                _id = auth.rawId as Comparable<Any>,
+                subjectId = auth.idString,
+                subjectType = auth.subject.name,
                 secret = ByteArray(32).also { SecureRandom.getInstanceStrong().nextBytes(it) },
                 label = input.label ?: "",
                 issuer = generalSettings().projectName,
                 config = config,
-                active = false,
             )
-            table(auth.subject).insertOne(secret)
+            modelInfo.collection().insertOne(secret)
             secret.url
-        }
-    )
-
-    val confirm = path("existing").post.api(
-        summary = "Confirm One Time Password",
-        inputType = String.serializer(),
-        outputType = Unit.serializer(),
-        description = "Confirms your OTP, making it fully active",
-        authOptions = anyAuthRoot,
-        errorCases = listOf(),
-        examples = listOf(),
-        implementation = { code: String ->
-            @Suppress("UNCHECKED_CAST")
-            table(auth.subject).get(auth.rawId as Comparable<Any>) ?: throw NotFoundException()
-            prove.implementation(
-                AuthAndPathParts(null, null, arrayOf()),
-                IdentificationAndPassword(
-                    auth.subject.name,
-                    "_id",
-                    auth.idString.also { println("Confirming info got $it for idstring") },
-                    code
-                )
-            )
-            Unit
-        }
-    )
-
-    val disable = path("existing").delete.api(
-        summary = "Disable One Time Password",
-        inputType = Unit.serializer(),
-        outputType = Boolean.serializer(),
-        description = "Disables your one-time password.",
-        authOptions = anyAuthRoot,
-        errorCases = listOf(),
-        examples = listOf(),
-        implementation = { _: Unit ->
-            @Suppress("UNCHECKED_CAST")
-            table(auth.subject).deleteOneById(auth.rawId as Comparable<Any>)
-        }
-    )
-
-    val check = path("existing").get.api(
-        summary = "Check One Time Password",
-        inputType = Unit.serializer(),
-        outputType = SecretMetadata.serializer().nullable,
-        description = "Returns information about your OTP, if one exists.",
-        authOptions = anyAuthRoot,
-        errorCases = listOf(),
-        examples = listOf(),
-        implementation = { _: Unit ->
-            @Suppress("UNCHECKED_CAST")
-            table(auth.subject).get(auth.rawId as Comparable<Any>)?.let {
-                SecretMetadata(
-                    establishedAt = it.establishedAt,
-                    label = it.label
-                )
-            }
         }
     )
 
@@ -208,13 +146,13 @@ class OneTimePasswordProofEndpoints(
             ApiExample(
                 input = IdentificationAndPassword(
                     "User",
-                    "_id",
+                    "User/_id",
                     "some-id",
                     "000000"
                 ),
                 output = Proof(
                     via = info.via,
-                    property = "_id",
+                    property = "User/_id",
                     strength = info.strength,
                     value = "some-id",
                     at = now(),
@@ -224,39 +162,60 @@ class OneTimePasswordProofEndpoints(
         ),
         successCode = HttpStatus.OK,
         implementation = { input: IdentificationAndPassword ->
-            val postedAt = now()
-            val cacheKey = "otp-count-${input.property}-${input.value}"
-            val ct = (cache().get<Int>(cacheKey) ?: 0)
-            if (ct > 5) throw BadRequestException("Too many attempts; please wait 5 minutes.")
-            cache().add(cacheKey, 1, 5.minutes)
-            val subject = input.type
-            val handler = Authentication.subjects.values.find { it.name == subject }
-                ?: throw IllegalArgumentException("No subject $subject recognized")
-            val item = handler.findUser(input.property, input.value)
-                ?: throw BadRequestException("User ID and code do not match")
-            val id = item._id
+            val now = now()
+            cache().constrainAttemptRate(
+                cacheKey = "otp-count-${input.property}-${input.value}"
+            ) {
+                val subject = input.type
+                val handler = Authentication.subjects.values.find { it.name == subject }
+                    ?: throw IllegalArgumentException("No subject $subject recognized")
+                val subjectId = handler.findUserIdString(input.property, input.value)
+                    ?: throw BadRequestException("User ID and code do not match")
 
-            @Suppress("UNCHECKED_CAST")
-            val secret = table(handler).get(id as Comparable<Any>)
-                ?: throw BadRequestException("User ID and code do not match")
-            if (!secret.generator.isValid(
-                    input.password,
-                    postedAt.toJavaInstant()
-                )
-            ) throw BadRequestException("User ID and code do not match")
-            if (!secret.active) {
-                val table = table(handler)
-                table.updateOneById(id, modification(DataClassPathSelf(table.serializer)) {
-                    it.active assign true
+                val active = modelInfo.collection().find(condition {
+                    it.subjectId.eq(subjectId) and it.subjectType.eq(subject) and active
+                }).toList()
+
+                val matching = active.find { it.generator.isValid(input.password, now.toJavaInstant()) }
+                    ?: throw BadRequestException("User ID and code do not match")
+
+                modelInfo.collection().updateOneById(matching._id, modification {
+                    it.lastUsedAt assign now
                 })
+
+                proofHasher().makeProof(
+                    info = info,
+                    property = input.property,
+                    value = input.value,
+                    at = now()
+                )
             }
-            cache().remove(cacheKey)
-            proofHasher().makeProof(
-                info = info,
-                property = input.property,
-                value = input.value,
-                at = now()
+        }
+    )
+
+    val confirm = path("existing").get.api(
+        summary = "Confirm One Time Password",
+        inputType = String.serializer(),
+        outputType = Unit.serializer(),
+        description = "Confirms your OTP, making it fully active",
+        authOptions = anyAuthRoot,
+        errorCases = listOf(),
+        examples = listOf(),
+        implementation = { code: String ->
+            val active = modelInfo.collection().find(condition {
+                it.subjectId.eq(auth.idString) and it.subjectType.eq(auth.subject.name) and it.disabledAt.eq(null)
+            }).toList()
+            if(active.isEmpty()) throw NotFoundException()
+            prove.implementation(
+                AuthAndPathParts(null, null, arrayOf()),
+                IdentificationAndPassword(
+                    auth.subject.name,
+                    "${auth.subject.name}/_id",
+                    auth.idString.also { println("Confirming info got $it for idstring") },
+                    code
+                )
             )
+            Unit
         }
     )
 
@@ -265,18 +224,11 @@ class OneTimePasswordProofEndpoints(
         item: SUBJECT
     ): Boolean {
         @Suppress("UNCHECKED_CAST")
-        return table(handler).get(item._id as Comparable<Any>)?.active == true
-    }
-    suspend fun <ID : Comparable<ID>> established(handler: Authentication.SubjectHandler<*, ID>, id: ID): Boolean {
-        @Suppress("UNCHECKED_CAST")
-        return table(handler).get(id as Comparable<Any>)?.active == true
-    }
-
-    suspend fun <ID : Comparable<ID>> proofOption(handler: Authentication.SubjectHandler<*, ID>, id: ID): ProofOption? {
-        return if (established(handler, id)) {
-            ProofOption(info, key(handler, id))
-        } else {
-            null
-        }
+        return modelInfo.collection().count(condition {
+            it.subjectId.eq(handler.idString(item._id)) and
+                    it.subjectType.eq(handler.name) and
+                    active and
+                    it.lastUsedAt.neq(null)
+        }) > 0
     }
 }

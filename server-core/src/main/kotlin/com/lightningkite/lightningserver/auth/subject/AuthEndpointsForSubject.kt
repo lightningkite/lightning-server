@@ -218,7 +218,9 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             val users = proofs.mapNotNull { handler.findUser(it.property, it.value) }.distinctBy { it._id }
             val subject = users.singleOrNull() ?: throw HttpStatusException(errorNoSingleUser)
             proofs.forEach {
-                if(handler.get(subject, it.property) != it.value) throw HttpStatusException(errorIrrelevantProof.copy(data = it.via))
+                if(handler.get(subject, it.property) != it.value) {
+                    throw HttpStatusException(errorIrrelevantProof.copy(data = it.via))
+                }
             }
             val strength = proofs.groupBy { it.property }.values.sumOf { it.maxOf { it.strength } }
             val proofMethods = handler.proofMethods

@@ -110,6 +110,11 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         }
     )
 
+    val proofKnown = KnownDeviceProofEndpoints(
+        ServerPath(uuid().toString()),
+        database,
+        cache
+    )
     val proofPassword = PasswordProofEndpoints(
         ServerPath(uuid().toString()),
         database,
@@ -135,10 +140,8 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
                     "email" -> userInfo.collection().findOne(condition { it.email eq value }) ?: run {
                         userInfo.collection().insertOne(TestUser(email = value))
                     }
-
                     "phone" -> userInfo.collection().find(condition { it.phoneNumber eq value }).toList().singleOrNull()
-                    "_id" -> userInfo.collection().get(uuid(value))
-                    else -> null
+                    else -> super.findUser(property, value)
                 }
             } catch(e: Exception) {
                 throw Exception("Failed to find $property = $value", e)
@@ -153,7 +156,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
             }
         }
 
-        override suspend fun desiredStrengthFor(result: TestUser): Int = if(result.isSuperAdmin) 20 else 5
+        override suspend fun desiredStrengthFor(result: TestUser): Int = if(result.isSuperAdmin) 16 else 5
 
         override suspend fun permitMasquerade(
             other: Authentication.SubjectHandler<*, *>,

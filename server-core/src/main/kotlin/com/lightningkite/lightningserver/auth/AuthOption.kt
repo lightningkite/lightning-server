@@ -4,6 +4,7 @@ import com.lightningkite.lightningdb.Description
 import com.lightningkite.lightningdb.HasId
 import kotlin.time.Duration
 import kotlin.reflect.typeOf
+import kotlin.time.Duration.Companion.minutes
 
 class AuthOption(
     val type: AuthType,
@@ -85,4 +86,4 @@ inline fun <reified USER : HasId<*>?> authOptions(
 
 val noAuth: AuthOptions<HasId<*>?> = AuthOptions(setOf(null))
 val anyAuth: AuthOptions<HasId<*>> = AuthOptions(setOf(AuthOption(AuthType.any, scopes = setOf())))
-val anyAuthRoot: AuthOptions<HasId<*>> = AuthOptions(setOf(AuthOption(AuthType.any)))
+val anyAuthRoot: AuthOptions<HasId<*>> = AuthOptions(setOf(AuthOption(AuthType.any, maxAge = 10.minutes)))
