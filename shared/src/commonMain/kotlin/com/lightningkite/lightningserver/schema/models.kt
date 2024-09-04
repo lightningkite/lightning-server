@@ -13,25 +13,25 @@ data class LightningServerKSchema(
     val structures: Map<String, VirtualStruct>,
     val enums: Map<String, VirtualEnum>,
     val endpoints: List<LightningServerKSchemaEndpoint>,
-    val models: Map<String, LightningServerKSchemaModel>,
+    val interfaces: List<LightningServerKSchemaInterface>,
 )
 
 @Serializable
-data class LightningServerKSchemaModel(
-    val collectionName: String,
-    val type: VirtualTypeReference,
+data class LightningServerKSchemaInterface(
+    val matches: VirtualTypeReference,
     val path: String,
-    val searchFields: List<String>,
-    val tableColumns: List<String>,
-    val titleFields: List<String>,
 )
 
 @Serializable
 data class LightningServerKSchemaEndpoint(
     val group: String? = null,
+    val description: String,
+    val summary: String,
     val method: String,
     val path: String,
     val routes: Map<String, VirtualTypeReference>,
     val input: VirtualTypeReference,
     val output: VirtualTypeReference,
+    val docGroup: String?,
+    val belongsToInterface: VirtualTypeReference?,
 )

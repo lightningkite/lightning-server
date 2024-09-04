@@ -12,6 +12,7 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.ApiExample
+import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.now
 import kotlinx.serialization.encoding.CompositeDecoder
@@ -35,8 +36,10 @@ abstract class PinBasedProofEndpoints(
         property = property,
         strength = 10
     )
+    abstract val interfaceInfo: Documentable.InterfaceInfo
 
     override val start = path("start").post.api(
+        belongsToInterface = interfaceInfo,
         authOptions = noAuth,
         summary = "Begin $name Ownership Proof",
         description = "Sends a login code to the given ${name.lowercase()}.  The message will contain both a PIN that can be combined with the returned key to log in.",
@@ -70,6 +73,7 @@ abstract class PinBasedProofEndpoints(
         )
     }
     override val prove = path("prove").post.api(
+        belongsToInterface = interfaceInfo,
         authOptions = noAuth,
         summary = "Prove ${info.property} ownership",
         description = "Logs in to the given account with a PIN that was sent earlier and the key from that request.  Note that the PIN expires in ${pin.expiration.inWholeMinutes} minutes, and you are only permitted ${pin.maxAttempts} attempts.",

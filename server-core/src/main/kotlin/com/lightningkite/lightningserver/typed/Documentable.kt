@@ -26,10 +26,13 @@ interface Documentable {
     val authOptions: AuthOptions<*>
     val belongsToInterface: InterfaceInfo?
 
-    data class InterfaceInfo(val name: String, val subtypes: List<KSerializer<*>>)
+    class InterfaceInfo(val path: ServerPath, val name: String, val subtypes: List<KSerializer<*>>)
 
     companion object {
         val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *, *>>()
+        val interfaces get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *, *>>()
+            .mapNotNull { it.belongsToInterface }
+            .distinct()
         val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *, *, *>>()
         val all get() = endpoints + websockets
         val usedTypes: Collection<KSerializer<*>>

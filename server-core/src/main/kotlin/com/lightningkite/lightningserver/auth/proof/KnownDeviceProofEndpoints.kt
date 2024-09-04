@@ -48,9 +48,11 @@ class KnownDeviceProofEndpoints(
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
 ) : ServerPathGroup(path), Authentication.StringProofMethod {
     init {
-        path.docName = "OneTimePasswordProof"
+        path.docName = "KnownDeviceProof"
     }
 
+    val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "KnownDeviceProofClientEndpoints", listOf())
+    val loggedInInterfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "AuthenticatedKnownDeviceProofClientEndpoints", listOf())
     override val info: ProofMethodInfo = ProofMethodInfo(
         via = "known-device",
         property = null,
@@ -123,6 +125,7 @@ class KnownDeviceProofEndpoints(
     }
 
     val establish = path("establish").post.api(
+        belongsToInterface = loggedInInterfaceInfo,
         summary = "Establish Known Device",
         inputType = Unit.serializer(),
         outputType = String.serializer(),
@@ -145,6 +148,7 @@ class KnownDeviceProofEndpoints(
     )
 
     override val prove = path("prove").post.api(
+        belongsToInterface = interfaceInfo,
         authOptions = noAuth,
         summary = "Prove Known Device",
         description = "Get proof that your device is known.",

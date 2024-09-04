@@ -5,6 +5,7 @@ import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.kabobCase
+import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
@@ -36,6 +37,12 @@ val lightningServerKSchema: LightningServerKSchema by lazy {
                 routes = it.route.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().map { it.name }.zip(it.route.path.serializers.map { it.virtualTypeReference(registry) }).associate { it },
                 input = it.inputType.virtualTypeReference(registry),
                 output = it.outputType.virtualTypeReference(registry),
+                summary = it.summary,
+                description = it.description,
+                docGroup = it.docGroup,
+                belongsToInterface = it.belongsToInterface?.let {
+                    VirtualTypeReference(it.name, it.subtypes.map { it.virtualTypeReference(registry) }, false)
+                },
             )
         }.toList() + Documentable.websockets.map {
             LightningServerKSchemaEndpoint(
@@ -45,44 +52,20 @@ val lightningServerKSchema: LightningServerKSchema by lazy {
                 routes = it.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>().map { it.name }.zip(it.path.serializers.map { it.virtualTypeReference(registry) }).associate { it },
                 input = it.inputType.virtualTypeReference(registry),
                 output = it.outputType.virtualTypeReference(registry),
+                summary = it.summary,
+                description = it.description,
+                docGroup = it.docGroup,
+                belongsToInterface = it.belongsToInterface?.let {
+                    VirtualTypeReference(it.name, it.subtypes.map { it.virtualTypeReference(registry) }, false)
+                },
             )
         },
-        models = ModelRestEndpoints.all.associate {
-            it.collectionName.kabobCase() to LightningServerKSchemaModel(
-                collectionName = it.collectionName.titleCase(),
+        interfaces = Documentable.interfaces.map {
+            LightningServerKSchemaInterface(
                 path = it.path.toString(),
-                type = it.info.serialization.serializer.virtualTypeReference(registry),
-                searchFields = it.info.serialization.serializer.descriptor.annotations
-                    .filterIsInstance<AdminSearchFields>()
-                    .firstOrNull()
-                    ?.fields?.toList()
-                    ?: it.info.serialization.serializer.descriptor.let {
-                        (0 until it.elementsCount)
-                            .filter { index -> it.getElementDescriptor(index).kind == PrimitiveKind.STRING }
-                            .map { index -> it.getElementName(index) }
-                    },
-                tableColumns = it.info.serialization.serializer.descriptor.annotations
-                    .filterIsInstance<AdminTableColumns>()
-                    .firstOrNull()
-                    ?.fields?.toList()
-                    ?: it.info.serialization.serializer.descriptor.let {
-                        (0 until it.elementsCount)
-                            .take(3)
-                            .map { index -> it.getElementName(index) }
-                    },
-                titleFields = it.info.serialization.serializer.descriptor.annotations
-                    .filterIsInstance<AdminTitleFields>()
-                    .firstOrNull()
-                    ?.fields?.toList()
-                    ?: it.info.serialization.serializer.descriptor.elementNames.toSet().let {
-                        when {
-                            it.contains("name") -> listOf("name")
-                            it.contains("key") -> listOf("key")
-                            else -> listOf("_id")
-                        }
-                    }
+                matches = VirtualTypeReference(it.name, it.subtypes.map { it.virtualTypeReference(registry) }, false)
             )
-        },
+        }.toList(),
         enums = @Suppress("UNCHECKED_CAST") registry.virtualTypes.filterValues { it is VirtualEnum } as Map<String, VirtualEnum>,
         structures = @Suppress("UNCHECKED_CAST") registry.virtualTypes.filterValues { it is VirtualStruct } as Map<String, VirtualStruct>,
     )

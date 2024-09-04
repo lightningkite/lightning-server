@@ -61,6 +61,8 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     private val sessionSerializer = Session.serializer(handler.subjectSerializer, handler.idSerializer)
     private val dataClassPath = DataClassPathSelf(sessionSerializer)
+    val unauthInterface = Documentable.InterfaceInfo(path, "AuthClientEndpoints", listOf(handler.idSerializer))
+    val authInterface = Documentable.InterfaceInfo(path, "AuthenticatedAuthClientEndpoints", listOf(handler.subjectSerializer, handler.idSerializer))
 
     val sessionInfo = modelInfo<HasId<*>?, Session<SUBJECT, ID>, UUID>(
         modelName = "${handler.name}Session",
@@ -203,6 +205,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     }
 
     val login = path("login").post.api(
+        belongsToInterface = unauthInterface,
         authOptions = noAuth,
         inputType = ListSerializer(Proof.serializer()),
         outputType = IdAndAuthMethods.serializer(handler.idSerializer),
@@ -251,6 +254,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val openSession = path("open-session").post.api(
+        belongsToInterface = unauthInterface,
         authOptions = noAuth,
         summary = "Open Session",
         description = "Exchanges a future session token for a full session token.",
@@ -273,6 +277,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val createSubSession = path("sub-session").post.api(
+        belongsToInterface = authInterface,
         authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType))),
         inputType = SubSessionRequest.serializer(),
         outputType = String.serializer(),
@@ -305,6 +310,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val generateOauthCode = path("generate-oauth-code").get.api(
+        belongsToInterface = authInterface,
         authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType))),
         summary = "Generate Oauth Code",
         errorCases = listOf(),
@@ -327,6 +333,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val token = path("token").post.api(
+        belongsToInterface = unauthInterface,
         authOptions = noAuth,
         summary = "Get Token",
         errorCases = listOf(),
@@ -384,6 +391,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val tokenSimple = path("token/simple").post.api(
+        belongsToInterface = unauthInterface,
         authOptions = noAuth,
         summary = "Get Token Simple",
         errorCases = listOf(),
@@ -395,6 +403,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val self = path("self").get.api(
+        belongsToInterface = authInterface,
         summary = "Get Self",
         authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType, scopes = setOf("self")))),
         errorCases = listOf(),
@@ -428,6 +437,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     )
 
     val sessionTerminate = sessions.path("terminate").post.api(
+        belongsToInterface = authInterface,
         authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType, scopes = null))),
         inputType = Unit.serializer(),
         outputType = Unit.serializer(),
@@ -440,6 +450,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
     )
     val otherSessionTerminate = sessions.path.arg<UUID>("sessionId").path("terminate").post.api(
+        belongsToInterface = authInterface,
         authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType, scopes = null))),
         inputType = Unit.serializer(),
         outputType = Unit.serializer(),

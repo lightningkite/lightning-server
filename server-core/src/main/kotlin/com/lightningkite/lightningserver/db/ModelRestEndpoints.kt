@@ -43,7 +43,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     val detailPath = path.arg<ID>("id", info.serialization.idSerializer)
     val wholePath = TypedServerPath0(path)
     val bulkPath = TypedServerPath0(path).path("bulk")
-    val interfaceName = Documentable.InterfaceInfo("ClientModelRestEndpoints", listOf(
+    val interfaceName = Documentable.InterfaceInfo(path, "ClientModelRestEndpoints", listOf(
         info.serialization.serializer,
         info.serialization.idSerializer
     ))

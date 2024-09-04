@@ -42,7 +42,7 @@ class ModelRestUpdatesWebsocket<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<
     private val modelName = info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
     private val modelIdentifier = info.serialization.serializer.descriptor.serialName
     private val helper = ModelRestUpdatesWebsocketHelper[database]
-    private val interfaceName = Documentable.InterfaceInfo("ClientModelRestEndpointsPlusUpdatesWebsocket", listOf(
+    private val interfaceName = Documentable.InterfaceInfo(path, "ClientModelRestEndpointsPlusUpdatesWebsocket", listOf(
         info.serialization.serializer,
         info.serialization.idSerializer
     ))

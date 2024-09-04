@@ -39,7 +39,7 @@ fun <USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebs
     val modelName = info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
     val modelIdentifier = info.serialization.serializer.descriptor.serialName
     val helper = RestApiWebsocketHelper[database]
-    val interfaceName = Documentable.InterfaceInfo("ClientModelRestEndpointsPlusWs", listOf(
+    val interfaceName = Documentable.InterfaceInfo(this, "ClientModelRestEndpointsPlusWs", listOf(
         info.serialization.serializer,
         info.serialization.idSerializer
     ))

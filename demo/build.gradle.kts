@@ -58,7 +58,7 @@ tasks.create("lambda", Copy::class.java) {
 tasks.create("rebuildTerraform", JavaExec::class.java) {
     group = "deploy"
     classpath(sourceSets.main.get().runtimeClasspath)
-    mainClass.set("com.lightningkite.lightningserver.demo.MainKt")
+    mainClass.set("com.lightningkite.lightningserverdemo.MainKt")
     args("terraform")
     workingDir(project.rootDir)
 }

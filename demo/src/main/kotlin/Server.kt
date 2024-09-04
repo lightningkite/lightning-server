@@ -232,6 +232,7 @@ object Server : ServerPathGroup(ServerPath.root) {
     })
     val proofOtp = OneTimePasswordProofEndpoints(path("proof/otp"), database, cache)
     val proofPassword = PasswordProofEndpoints(path("proof/password"), database, cache)
+    val proofDevices = KnownDeviceProofEndpoints(path("proof/devices"), database, cache)
     val subjects = AuthEndpointsForSubject(
         path("subject"),
         object : Authentication.SubjectHandler<User, UUID> {

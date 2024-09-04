@@ -68,6 +68,8 @@ class OneTimePasswordProofEndpoints(
     init {
         Authentication.register(this)
     }
+    val loggedInInterfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "AuthenticatedOneTimePasswordProofClientEndpoints", listOf())
+    val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "OneTimePasswordProofClientEndpoints", listOf())
 
     private val active get() = condition<OtpSecret> { it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())) }
 
@@ -110,7 +112,8 @@ class OneTimePasswordProofEndpoints(
     val rest = ModelRestEndpoints(path("secrets"), modelInfo)
 
     val establish = path("establish").post.api(
-        summary = "Establish an One Time Password",
+        belongsToInterface = loggedInInterfaceInfo,
+        summary = "Establish One Time Password",
         inputType = EstablishOtp.serializer(),
         outputType = String.serializer(),
         description = "Generates a new One Time Password configuration.",
@@ -139,6 +142,7 @@ class OneTimePasswordProofEndpoints(
 
     override val prove = path("prove").post.api(
         authOptions = noAuth,
+        belongsToInterface = interfaceInfo,
         summary = "Prove OTP",
         description = "Logs in to the given account with an OTP code.  Limits to 10 attempts per hour.",
         errorCases = listOf(),
@@ -194,6 +198,7 @@ class OneTimePasswordProofEndpoints(
     )
 
     val confirm = path("existing").get.api(
+        belongsToInterface = loggedInInterfaceInfo,
         summary = "Confirm One Time Password",
         inputType = String.serializer(),
         outputType = Unit.serializer(),

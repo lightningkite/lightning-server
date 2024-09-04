@@ -18,6 +18,7 @@ import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.ApiExample
+import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.datetime.Instant
 import java.util.*
@@ -34,6 +35,8 @@ class EmailProofEndpoints(
         path.docName = "EmailProof"
         Authentication.register(this)
     }
+
+    override val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "EmailProofClientEndpoints", listOf())
 
     override val exampleTarget: String
         get() = "test@test.com"

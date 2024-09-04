@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.sms.SMSClient
 import com.lightningkite.lightningserver.typed.ApiEndpoint
 import com.lightningkite.lightningserver.typed.ApiExample
+import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.datetime.Instant
 import java.util.*
@@ -32,6 +33,8 @@ class SmsProofEndpoints(
     init {
         path.docName = "SmsProof"
     }
+
+    override val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "SmsProofClientEndpoints", listOf())
 
     init {
         Authentication.register(this)

@@ -55,6 +55,9 @@ class PasswordProofEndpoints(
         Authentication.register(this)
     }
 
+    val loggedInInterfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "AuthenticatedPasswordProofClientEndpoints", listOf())
+    val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "PasswordProofClientEndpoints", listOf())
+
     private val active get() = condition<PasswordSecret> { it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())) }
 
     val modelInfo = modelInfo(
@@ -118,7 +121,8 @@ class PasswordProofEndpoints(
     }
 
     val establish = path("establish").post.api<HasId<*>, EstablishPassword, Unit>(
-        summary = "Establish a Password",
+        belongsToInterface = loggedInInterfaceInfo,
+        summary = "Establish Password",
         inputType = EstablishPassword.serializer(),
         outputType = Unit.serializer(),
         description = "Set your password",
@@ -137,6 +141,7 @@ class PasswordProofEndpoints(
     )
 
     override val prove = path("prove").post.api(
+        belongsToInterface = interfaceInfo,
         authOptions = noAuth,
         summary = "Prove password ownership",
         description = "Logs in to the given account with a password.",
