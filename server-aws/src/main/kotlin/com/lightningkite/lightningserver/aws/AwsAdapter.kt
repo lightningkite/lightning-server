@@ -26,6 +26,7 @@ import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.CorsSettings
 import com.lightningkite.lightningserver.settings.Settings
+import com.lightningkite.lightningserver.settings.SettingsSerializer
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Task
 import com.lightningkite.lightningserver.tasks.Tasks
@@ -111,7 +112,7 @@ abstract class AwsAdapter : RequestStreamHandler, Resource {
                     OpenSsl.decryptAesCbcPkcs5Sha256(bytes, sha256Password.toByteArray())
                 }
                 ?: bytes
-            Serialization.Internal.json.decodeFromString<Settings>(decryptedBytes.toString(Charsets.UTF_8))
+            Serialization.Internal.json.decodeFromString(SettingsSerializer(), decryptedBytes.toString(Charsets.UTF_8))
         }
 
         val region by lazy { Region.of(System.getenv("AWS_REGION")) }

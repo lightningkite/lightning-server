@@ -9,7 +9,7 @@ import kotlinx.serialization.encoding.*
 import kotlinx.serialization.json.JsonObject
 import java.io.File
 
-object SettingsSerializer : KSerializer<Settings> {
+class SettingsSerializer() : KSerializer<Settings> {
     val parts = Settings.requirements.values.sortedBy { it.name }
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("Settings") {
         for (setting in parts) {
@@ -24,6 +24,7 @@ object SettingsSerializer : KSerializer<Settings> {
         decoder.decodeStructure(descriptor) {
             while (true) {
                 val index = decodeElementIndex(descriptor)
+                println("Parsing settings index $index, AKA ${if(index in 0..<descriptor.elementsCount) descriptor.getElementName(index) else "X"}")
                 if (index == CompositeDecoder.DECODE_DONE) break
                 if (index == CompositeDecoder.UNKNOWN_NAME) continue
                 if (index == parts.size) {

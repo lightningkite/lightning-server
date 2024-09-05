@@ -14,7 +14,6 @@ import kotlinx.serialization.SerializationException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
-@kotlinx.serialization.Serializable(SettingsSerializer::class)
 object Settings {
     var lazyLoadResources = false
     var sealed = false

@@ -101,6 +101,7 @@ class TableGenerator(
                 // undo stupid Android bullshit
                 val isTest = it.endsWith("Test")
                 it
+                    .removeSuffix("Common")
                     .removeSuffix("Test")
                     .removeSuffix("Unit")
                     .removeSuffix("Debug")

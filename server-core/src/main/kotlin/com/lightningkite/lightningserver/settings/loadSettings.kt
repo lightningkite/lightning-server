@@ -23,13 +23,13 @@ fun loadSettings(settingsFile: File): Settings {
             serializersModule = Serialization.module
         }
         Settings.populateDefaults()
-        settingsFile.writeText(json.encodeToString(Settings))
+        settingsFile.writeText(json.encodeToString(SettingsSerializer(), Settings))
 
         logger.error("Need a settings file - example generated at ${settingsFile.absolutePath}.")
         exitProcess(1)
     }
     try {
-        return Serialization.json.decodeFromStream(settingsFile.inputStream())
+        return Serialization.json.decodeFromStream(SettingsSerializer(), settingsFile.inputStream())
     } catch (e: SerializationException) {
         val json = Json {
             encodeDefaults = true
@@ -40,7 +40,7 @@ fun loadSettings(settingsFile: File): Settings {
         logger.error("Settings were incorrect.  Suggested updates are inside ${suggested.absolutePath}.")
         logger.error(e.message)
         Settings.repair()
-        suggested.writeText(json.encodeToString(Settings))
+        suggested.writeText(json.encodeToString(SettingsSerializer(), Settings))
         e.printStackTrace()
         exitProcess(1)
     }
