@@ -29,6 +29,7 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.serializer
 import kotlin.time.Duration
 import java.util.*
+import com.lightningkite.UUID
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 

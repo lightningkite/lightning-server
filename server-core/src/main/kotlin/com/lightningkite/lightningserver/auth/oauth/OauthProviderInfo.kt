@@ -20,6 +20,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonPrimitive
 import java.util.*
+import com.lightningkite.UUID
 
 class OauthProviderInfo(
     val niceName: String,

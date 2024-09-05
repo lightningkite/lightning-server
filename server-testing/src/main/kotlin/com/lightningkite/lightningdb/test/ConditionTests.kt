@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 import com.lightningkite.lightningdb.*
 import com.lightningkite.prepareModelsShared
 import com.lightningkite.serialization.*
-import java.util.*
+import com.lightningkite.UUID
 
 abstract class ConditionTests() {
 

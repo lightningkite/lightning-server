@@ -8,6 +8,7 @@ import com.lightningkite.uuid
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.takeWhile
 import java.util.*
+import com.lightningkite.UUID
 
 class WebSocketIdentifierPubSub(val type: String = "ws-pubsub", val pubSub: PubSub, val cache: Cache) {
     val closeMessage = "___close____"

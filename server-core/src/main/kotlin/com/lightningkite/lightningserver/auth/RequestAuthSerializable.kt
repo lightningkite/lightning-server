@@ -22,6 +22,7 @@ import kotlinx.serialization.json.JsonObject
 import java.io.File
 import kotlinx.datetime.Instant
 import java.util.*
+import com.lightningkite.UUID
 
 @Serializable
 data class RequestAuthSerializable(

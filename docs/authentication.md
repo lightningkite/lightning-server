@@ -21,6 +21,7 @@ import com.lightningkite.lightningserver.settings.*
 import kotlinx.serialization.*
 import java.time.Instant
 import java.util.*
+import com.lightningkite.UUID
 
 // Our primary server definition.
 object Server : ServerPathGroup(ServerPath.root) {

@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.serialization
 
+import com.lightningkite.DeferToContextualUuidSerializer
 import com.lightningkite.lightningserver.metrics.roundTo
 import com.lightningkite.uuid
 import com.lightningkite.now
@@ -70,6 +71,6 @@ class SerializationTest {
         assertIs<InstantIso8601Serializer>(ClientModule.serializerPreferContextual<Instant>())
         assertIsNot<ContextualSerializer<*>>(ClientModule.contextualSerializerIfHandled<Int>())
         assertIs<ContextualSerializer<*>>(ClientModule.contextualSerializerIfHandled<Instant>())
-        assertIs<ContextualSerializer<*>>(EmptySerializersModule().contextualSerializerIfHandled<UUID>())
+        assertIs<DeferToContextualUuidSerializer>(EmptySerializersModule().contextualSerializerIfHandled<UUID>())
     }
 }

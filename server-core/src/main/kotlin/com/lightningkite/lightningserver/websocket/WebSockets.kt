@@ -15,6 +15,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
 import java.util.*
+import com.lightningkite.UUID
 
 object WebSockets {
     val handlers: MutableMap<ServerPath, Handler> = MutableMapWithChangeHandler<ServerPath, Handler> {

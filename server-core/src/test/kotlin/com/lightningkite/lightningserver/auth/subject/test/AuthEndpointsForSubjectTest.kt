@@ -27,6 +27,7 @@ import kotlinx.datetime.Instant
 import kotlinx.serialization.UseContextualSerialization
 import org.junit.Test
 import java.util.*
+import com.lightningkite.UUID
 import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds

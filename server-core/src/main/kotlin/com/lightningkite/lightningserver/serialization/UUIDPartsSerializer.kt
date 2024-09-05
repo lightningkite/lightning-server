@@ -11,6 +11,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.datetime.Instant
 import java.util.*
+import com.lightningkite.UUID
 
 object UUIDPartsSerializer: KSerializer<UUID> {
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("UUID") {
@@ -37,8 +38,8 @@ object UUIDPartsSerializer: KSerializer<UUID> {
 
     override fun serialize(encoder: Encoder, value: UUID) {
         val s = encoder.beginStructure(descriptor)
-        s.encodeLongElement(descriptor, 0, value.mostSignificantBits)
-        s.encodeLongElement(descriptor, 1, value.leastSignificantBits)
+        s.encodeLongElement(descriptor, 0, value.mostSignificantBits.toLong())
+        s.encodeLongElement(descriptor, 1, value.leastSignificantBits.toLong())
         s.endStructure(descriptor)
     }
 }

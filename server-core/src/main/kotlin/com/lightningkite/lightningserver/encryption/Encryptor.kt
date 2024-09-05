@@ -9,6 +9,7 @@ import java.io.OutputStream
 import java.security.SecureRandom
 import java.security.spec.KeySpec
 import java.util.*
+import com.lightningkite.UUID
 import javax.crypto.Cipher
 import javax.crypto.CipherInputStream
 import javax.crypto.CipherOutputStream

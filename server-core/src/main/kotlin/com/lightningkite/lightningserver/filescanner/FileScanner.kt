@@ -10,6 +10,7 @@ import kotlinx.serialization.Serializable
 import java.io.InputStream
 import java.net.URLConnection
 import java.util.*
+import com.lightningkite.UUID
 
 
 interface FileScanner {

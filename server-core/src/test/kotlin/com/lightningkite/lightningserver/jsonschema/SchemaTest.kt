@@ -19,6 +19,8 @@ import java.net.URLEncoder
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import java.util.*
+import com.lightningkite.UUID
+import kotlin.test.assertTrue
 
 class SchemaTest {
     init {

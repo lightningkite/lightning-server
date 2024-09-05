@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver
 
 import java.util.*
+import com.lightningkite.UUID
 
 
 val `casing separator regex` = Regex("([-_\\s]+([A-Z]*[a-z0-9]+))|([-_\\s]*[A-Z]+)")

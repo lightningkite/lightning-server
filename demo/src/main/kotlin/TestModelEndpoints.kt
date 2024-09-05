@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.*
 import com.lightningkite.lightningserver.typed.AuthAccessor
 import java.util.*
+import com.lightningkite.UUID
 import kotlin.random.Random
 
 class TestModelEndpoints(path: ServerPath): ServerPathGroup(path) {

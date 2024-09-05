@@ -58,6 +58,7 @@ import java.io.OutputStream
 import java.net.URI
 import kotlin.time.Duration
 import java.util.*
+import com.lightningkite.UUID
 import org.crac.Resource
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream

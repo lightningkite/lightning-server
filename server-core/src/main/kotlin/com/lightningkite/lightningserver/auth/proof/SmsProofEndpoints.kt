@@ -21,6 +21,7 @@ import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.typed
 import kotlinx.datetime.Instant
 import java.util.*
+import com.lightningkite.UUID
 
 class SmsProofEndpoints(
     path: ServerPath,

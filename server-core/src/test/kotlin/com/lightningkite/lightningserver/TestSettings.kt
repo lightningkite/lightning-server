@@ -44,6 +44,7 @@ import kotlinx.serialization.UseContextualSerialization
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration
 import java.util.*
+import com.lightningkite.UUID
 import kotlin.time.Duration.Companion.minutes
 
 object TestSettings: ServerPathGroup(ServerPath.root) {

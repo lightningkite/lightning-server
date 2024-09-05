@@ -7,6 +7,9 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.utils.io.jvm.javaio.*
 import java.io.File
+import java.io.IOException
+import java.util.*
+import com.lightningkite.UUID
 
 fun FileObject.resolveRandom(prefix: String = "", extension: String) =
     resolve(prefix + uuid().toString() + ".$extension")

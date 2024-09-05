@@ -29,6 +29,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Test
 import java.util.*
+import com.lightningkite.UUID
 import com.lightningkite.lightningserver.websocket.WebSockets as MyWebSockets
 
 class KtorKtTest {

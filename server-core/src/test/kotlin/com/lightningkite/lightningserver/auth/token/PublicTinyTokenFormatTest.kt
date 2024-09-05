@@ -15,6 +15,7 @@ import kotlinx.serialization.builtins.serializer
 import org.junit.Test
 import kotlin.time.Duration
 import java.util.*
+import com.lightningkite.UUID
 import kotlin.time.Duration.Companion.seconds
 
 class PublicTinyTokenFormatTest: TokenFormatTest() {

@@ -14,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.UseContextualSerialization
 import org.junit.Test
 import java.util.*
+import com.lightningkite.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 

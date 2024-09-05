@@ -17,10 +17,14 @@ import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 import kotlin.reflect.KProperty
 import kotlin.time.Duration
+import com.lightningkite.UUID
+import com.lightningkite.toJavaUuid
+import com.lightningkite.toKotlinUuid
+import org.bson.UuidRepresentation
 
 val BsonOverrides = SerializersModule {
     contextual(Duration::class, DurationMsSerializer)
-    contextual(UUID::class, com.github.jershell.kbson.UUIDSerializer)
+    contextual(UUID::class, UUIDSerializer)
 //    contextual(ObjectId::class, ObjectIdSerializer)
     contextual(BigDecimal::class, BigDecimalSerializer)
     contextual(ByteArray::class, ByteArraySerializer)
@@ -126,5 +130,32 @@ object MongoLocaleSerializer : KSerializer<Locale> {
 
     override fun serialize(encoder: Encoder, value: Locale) {
         encoder.encodeString(value.toLanguageTag())
+    }
+}
+
+@Serializer(forClass = UUID::class)
+object UUIDSerializer : KSerializer<UUID> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.UUID", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: UUID) {
+        encoder as BsonEncoder
+        encoder.encodeUUID(value.toJavaUuid(), UuidRepresentation.STANDARD)
+    }
+
+    override fun deserialize(decoder: Decoder): UUID {
+        return when (decoder) {
+            is FlexibleDecoder -> {
+                when (decoder.reader.currentBsonType) {
+                    BsonType.STRING -> {
+                        java.util.UUID.fromString(decoder.decodeString()).toKotlinUuid()
+                    }
+                    BsonType.BINARY -> {
+                        decoder.reader.readBinaryData().asUuid(UuidRepresentation.STANDARD).toKotlinUuid()
+                    }
+                    else -> throw SerializationException("Unsupported ${decoder.reader.currentBsonType} reading object id")
+                }
+            }
+            else -> throw SerializationException("Unknown decoder type")
+        }
     }
 }

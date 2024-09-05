@@ -14,6 +14,7 @@ import java.security.Security
 import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
 import java.util.*
+import com.lightningkite.UUID
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 

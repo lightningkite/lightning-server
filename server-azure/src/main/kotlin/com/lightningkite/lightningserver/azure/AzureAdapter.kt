@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
 import java.nio.charset.Charset
 import java.util.*
+import com.lightningkite.UUID
 import com.lightningkite.lightningserver.http.HttpStatus as HttpStatus1
 
 abstract class AzureAdapter {

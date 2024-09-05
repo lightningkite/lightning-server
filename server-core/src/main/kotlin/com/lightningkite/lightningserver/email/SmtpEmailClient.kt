@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.email
 import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.settings.generalSettings
 import java.util.*
+import com.lightningkite.UUID
 import jakarta.mail.Authenticator
 import jakarta.mail.PasswordAuthentication
 import jakarta.mail.Session

@@ -16,6 +16,7 @@ import org.junit.Test
 import kotlin.time.Duration
 import kotlinx.datetime.Instant
 import java.util.*
+import com.lightningkite.UUID
 import kotlin.test.assertFailsWith
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes

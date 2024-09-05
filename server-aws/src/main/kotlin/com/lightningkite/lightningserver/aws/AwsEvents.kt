@@ -4,6 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.util.*
+import com.lightningkite.UUID
 
 @Serializable
 data class APIGatewayV2HTTPEvent(
