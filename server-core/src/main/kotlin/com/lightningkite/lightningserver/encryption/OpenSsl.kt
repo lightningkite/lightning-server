@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.encryption
 
 import java.security.MessageDigest
 import java.util.*
+import com.lightningkite.UUID
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec

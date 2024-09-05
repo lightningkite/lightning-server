@@ -40,7 +40,7 @@ class MySealedClassSerializer<T : Any>(
     private fun getIndex(item: T): Int = options.indexOfFirst { it.isInstance(item) }
         .also {
             if (it == -1)
-                throw IllegalStateException("No serializer inside ${descriptor.serialName} found for ${item}")
+                throw IllegalStateException("No serializer inside ${descriptor.serialName} found for ${item::class}; options are ${options.joinToString { it.serializer.descriptor.serialName }}")
         }
 
     override val descriptor: SerialDescriptor = defer(serialName, StructureKind.CLASS) {

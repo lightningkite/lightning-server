@@ -23,6 +23,7 @@ import kotlinx.datetime.serializers.LocalDateIso8601Serializer
 import kotlinx.datetime.serializers.LocalDateTimeIso8601Serializer
 import kotlinx.datetime.serializers.LocalTimeIso8601Serializer
 import java.util.*
+import com.lightningkite.UUID
 
 class SerialDescriptorTable(name: String, val descriptor: SerialDescriptor) : Table(name.replace(".", "__")) {
     val columnsByDotPath = HashMap<List<String>, ArrayList<Column<Any?>>>()

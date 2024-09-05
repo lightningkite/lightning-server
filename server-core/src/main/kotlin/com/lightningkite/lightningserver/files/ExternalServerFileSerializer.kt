@@ -15,6 +15,7 @@ import kotlinx.serialization.encoding.Encoder
 import org.slf4j.LoggerFactory
 import java.net.URLDecoder
 import java.util.*
+import com.lightningkite.UUID
 
 /**
  * Used to serialize and deserialize a ServerFile as a String. This will also handle security for ServerFiles.

@@ -21,6 +21,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import kotlin.time.Duration
 import java.util.*
+import com.lightningkite.UUID
 import kotlin.test.assertEquals
 import kotlin.test.fail
 import kotlin.time.Duration.Companion.hours

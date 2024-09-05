@@ -10,6 +10,7 @@ import org.bson.codecs.DecoderContext
 import org.bson.codecs.EncoderContext
 import org.bson.codecs.configuration.CodecRegistry
 import java.util.*
+import com.lightningkite.UUID
 import com.lightningkite.lightningdb.SerializableProperty
 import kotlin.reflect.typeOf
 

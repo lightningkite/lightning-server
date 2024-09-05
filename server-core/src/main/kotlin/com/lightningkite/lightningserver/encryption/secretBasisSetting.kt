@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.encryption
 import com.lightningkite.lightningserver.settings.setting
 import kotlinx.serialization.Serializable
 import java.util.*
+import com.lightningkite.UUID
 import kotlin.random.Random
 
 @Serializable

@@ -12,7 +12,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import com.lightningkite.lightningdb.*
-import java.util.*
+import com.lightningkite.UUID
 
 abstract class ConditionTests() {
 

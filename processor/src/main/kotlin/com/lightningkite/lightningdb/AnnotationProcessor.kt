@@ -5,7 +5,6 @@ import com.google.devtools.ksp.processing.*
 import com.google.devtools.ksp.symbol.*
 import java.io.BufferedWriter
 import java.io.File
-import java.util.UUID
 
 lateinit var comparable: KSClassDeclaration
 

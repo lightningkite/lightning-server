@@ -276,7 +276,7 @@ class JsonSchemaBuilder(
                 links = listOf(JsonSchemaTypeLink("{{self}}", "View File"))
             )
         }
-        override("java.util.UUID") {
+        override("com.lightningkite.UUID") {
             JsonSchemaType(
                 title = "UUID",
                 type = JsonType3(JsonType2.STRING),

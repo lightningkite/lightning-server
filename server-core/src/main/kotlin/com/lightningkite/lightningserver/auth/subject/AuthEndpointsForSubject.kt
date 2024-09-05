@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.auth.subject
 
-import com.lightningkite.UUID
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.LSError
@@ -39,6 +38,7 @@ import kotlinx.serialization.json.jsonObject
 import org.jetbrains.annotations.TestOnly
 import java.security.SecureRandom
 import java.util.*
+import com.lightningkite.UUID
 import kotlin.math.min
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import java.util.*
+import com.lightningkite.UUID
 
 
 private suspend fun HttpContentAndHeaders.into(part: MimePart) {

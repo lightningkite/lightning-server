@@ -10,6 +10,7 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.*
+import com.lightningkite.UUID
 
 /**
  * An InMemoryFieldCollection with the added feature of loading data from a file at creation

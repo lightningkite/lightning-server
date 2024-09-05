@@ -12,6 +12,7 @@ import software.amazon.awssdk.core.async.SdkPublisher
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
 import software.amazon.awssdk.services.dynamodb.paginators.ScanPublisher
 import java.util.*
+import com.lightningkite.UUID
 
 
 fun <T> SdkPublisher<Map<String, AttributeValue>>.parse(serializer: KSerializer<T>): Flow<T> {

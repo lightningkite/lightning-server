@@ -37,6 +37,7 @@ import org.bson.BsonDocument
 import org.bson.BsonDocumentWriter
 import org.bson.BsonValue
 import java.util.*
+import com.lightningkite.UUID
 import kotlin.collections.HashMap
 
 /**

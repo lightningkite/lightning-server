@@ -1,15 +1,18 @@
 package com.lightningkite
 
 import kotlinx.browser.window
+import kotlinx.serialization.Serializable
 
-@Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
-actual data class UUIDRaw(val string: String): Comparable<UUIDRaw> {
+@Serializable(DeferToContextualUuidSerializer::class)
+actual data class UUID(val string: String): Comparable<UUID> {
     init {
         if(!uuidRegex.matches(string)) throw IllegalArgumentException("Invalid UUID string: $string")
     }
-    actual override fun compareTo(other: UUIDRaw): Int = this.string.compareTo(other.string)
+    actual override fun compareTo(other: UUID): Int = this.string.compareTo(other.string)
     override fun toString(): String = string
+    actual companion object {
+        private val uuidRegex = Regex("^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\$")
+        actual fun random(): UUID = UUID(window.asDynamic().crypto.randomUUID() as String)
+        actual fun parse(uuidString: String): UUID = UUID(uuidString)
+    }
 }
-private val uuidRegex = Regex("^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\$")
-actual fun uuid(): UUIDRaw = UUIDRaw(window.asDynamic().crypto.randomUUID() as String)
-actual fun uuid(string: String): UUIDRaw = UUIDRaw(string)

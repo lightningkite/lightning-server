@@ -1,7 +1,10 @@
 package com.lightningkite.lightningserver.db
 
+import com.lightningkite.UUID
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.toJavaUuid
+import com.lightningkite.toKotlinUuid
 import kotlinx.datetime.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -213,7 +216,7 @@ class DbLikeMapDecoder(
     override fun <T> decodeSerializableValue(deserializer: DeserializationStrategy<T>): T {
         @Suppress("UNCHECKED_CAST")
         return when ((deserializer as? KSerializer<T>)?.nullElement() ?: deserializer) {
-            UUIDSerializer -> getter(popTag()) as T
+            UUIDSerializer -> getter(popTag()).let { it as java.util.UUID }.toKotlinUuid() as T
             LocalDateIso8601Serializer, com.lightningkite.lightningdb.LocalDateIso8601Serializer -> getter(popTag()).let { it as LocalDate }.toKotlinLocalDate() as T
             InstantIso8601Serializer, com.lightningkite.lightningdb.InstantIso8601Serializer -> getter(popTag()).let { it as java.time.Instant }.toKotlinInstant() as T
             DurationSerializer, com.lightningkite.lightningdb.DurationSerializer -> getter(popTag()).let { it as Duration }.toKotlinDuration() as T
@@ -429,7 +432,7 @@ class DbLikeMapEncoder(
 
     override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
         when ((serializer as? KSerializer<T>)?.nullElement() ?: serializer) {
-            UUIDSerializer -> writer(popTag(), value)
+            UUIDSerializer -> writer(popTag(), (value as com.lightningkite.UUID).toJavaUuid())
             LocalDateIso8601Serializer, com.lightningkite.lightningdb.LocalDateIso8601Serializer -> writer(popTag(), (value as kotlinx.datetime.LocalDate).toJavaLocalDate())
             InstantIso8601Serializer, com.lightningkite.lightningdb.InstantIso8601Serializer -> writer(popTag(), (value as Instant).toJavaInstant())
             DurationSerializer, com.lightningkite.lightningdb.DurationSerializer -> writer(popTag(), (value as kotlin.time.Duration).toJavaDuration())

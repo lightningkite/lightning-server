@@ -7,7 +7,7 @@ import com.lightningkite.now
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import org.junit.Assert.*
-import java.util.UUID
+import com.lightningkite.UUID
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.milliseconds
 

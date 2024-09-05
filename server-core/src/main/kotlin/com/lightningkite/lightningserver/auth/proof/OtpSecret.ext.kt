@@ -15,6 +15,7 @@ import org.bouncycastle.util.encoders.Base32
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 import java.util.*
+import com.lightningkite.UUID
 import kotlin.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.days

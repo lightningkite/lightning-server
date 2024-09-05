@@ -12,7 +12,7 @@ value class RefreshToken(val string: String) {
     val valid: Boolean get() = string.startsWith(prefix)
     val type: String get() = string.drop(prefix.length).substringBefore('/')
     val _id: UUID
-        get() = java.util.UUID.fromString(
+        get() = UUID.parse(
             string.drop(prefix.length).substringAfter('/').substringBefore(':', "")
         )
     val plainTextSecret: String get() = string.drop(prefix.length).substringAfter('/').substringAfter(':', "")

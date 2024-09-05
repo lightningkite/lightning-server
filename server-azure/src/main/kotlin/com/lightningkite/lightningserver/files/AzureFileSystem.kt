@@ -5,6 +5,7 @@ import com.azure.storage.common.StorageSharedKeyCredential
 import java.io.File
 import kotlin.time.Duration
 import java.util.*
+import com.lightningkite.UUID
 import kotlin.time.Duration.Companion.days
 
 class AzureFileSystem(

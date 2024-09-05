@@ -26,6 +26,7 @@ import io.ktor.http.*
 import kotlin.time.Duration
 import kotlinx.datetime.*
 import java.util.*
+import com.lightningkite.UUID
 
 class OauthProofEndpoints(
     path: ServerPath,

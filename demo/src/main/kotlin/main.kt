@@ -19,6 +19,7 @@ import kotlinx.serialization.*
 import java.io.File
 import kotlinx.datetime.Instant
 import java.util.*
+import com.lightningkite.UUID
 
 fun setup() {
     Server

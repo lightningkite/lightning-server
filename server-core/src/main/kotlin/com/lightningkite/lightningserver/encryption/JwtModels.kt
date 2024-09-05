@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.encryption
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
-import java.util.UUID
+import com.lightningkite.UUID
 
 @Serializable
 data class JwtHeader(val typ: String = "JWT", val alg: String = "HS256")
