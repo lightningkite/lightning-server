@@ -24,7 +24,6 @@ class SettingsSerializer() : KSerializer<Settings> {
         decoder.decodeStructure(descriptor) {
             while (true) {
                 val index = decodeElementIndex(descriptor)
-                println("Parsing settings index $index, AKA ${if(index in 0..<descriptor.elementsCount) descriptor.getElementName(index) else "X"}")
                 if (index == CompositeDecoder.DECODE_DONE) break
                 if (index == CompositeDecoder.UNKNOWN_NAME) continue
                 if (index == parts.size) {
