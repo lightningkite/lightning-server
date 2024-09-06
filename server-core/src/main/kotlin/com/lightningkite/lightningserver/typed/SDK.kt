@@ -10,6 +10,7 @@ import com.lightningkite.serialization.mapValueElement
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
 import java.io.File
 import java.io.OutputStream
@@ -313,7 +314,7 @@ private fun KSerializer<*>.kotlinTypeString(emitter: CodeEmitter): String {
         }>"
 
         this.descriptor.kind == StructureKind.LIST -> "List<${this.listElement()!!.kotlinTypeString(emitter)}>"
-        this is ContextualSerializer<*> -> this.uncontextualize().kotlinTypeString(emitter)
+        this.descriptor.kind == SerialKind.CONTEXTUAL -> this.uncontextualize().kotlinTypeString(emitter)
         else -> {
             descriptor.serialName.substringBefore('<').removeSuffix("?").takeIf { it.contains('.') }
                 ?.let { emitter.imports.add(it) }

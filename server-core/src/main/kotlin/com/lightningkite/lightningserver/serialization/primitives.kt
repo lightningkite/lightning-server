@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.serialization
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.capturedKClass
 import kotlinx.serialization.descriptors.nullable
 import kotlinx.serialization.json.Json
@@ -12,7 +13,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 fun <T> Json.encodeUnwrappingString(serializer: KSerializer<T>, value: T): String {
     @Suppress("UNCHECKED_CAST")
-    val fullSerializer = if(serializer is ContextualSerializer<*>) serializersModule.getContextual(serializer.descriptor.capturedKClass!!) as KSerializer<T> else serializer
+    val fullSerializer = if(serializer.descriptor.kind == SerialKind.CONTEXTUAL) serializersModule.getContextual(serializer.descriptor.capturedKClass!!) as KSerializer<T> else serializer
     return when {
         fullSerializer.descriptor.kind == PrimitiveKind.STRING && !fullSerializer.descriptor.isNullable -> encodeToJsonElement(
             fullSerializer,
@@ -26,7 +27,7 @@ fun <T> Json.encodeUnwrappingString(serializer: KSerializer<T>, value: T): Strin
 @Suppress("UNCHECKED_CAST")
 fun <T> Json.decodeUnwrappingString(serializer: KSerializer<T>, value: String): T {
     @Suppress("UNCHECKED_CAST")
-    val fullSerializer = if(serializer is ContextualSerializer<*>) serializersModule.getContextual(serializer.descriptor.capturedKClass!!) as KSerializer<T> else serializer
+    val fullSerializer = if(serializer.descriptor.kind == SerialKind.CONTEXTUAL) serializersModule.getContextual(serializer.descriptor.capturedKClass!!) as KSerializer<T> else serializer
     return when {
         fullSerializer.descriptor.kind == PrimitiveKind.STRING && !fullSerializer.descriptor.isNullable -> decodeFromJsonElement(
             fullSerializer,

@@ -516,7 +516,7 @@ class JsonSchemaBuilder(
     @Suppress("UNCHECKED_CAST")
     fun KSerializer<*>.unwrap(): KSerializer<*> {
         return if(this.descriptor.isNullable) this.innerElement()
-        else if(this is ContextualSerializer) return Serialization.module.getContextual<Any>(this.descriptor.capturedKClass as KClass<Any>) as KSerializer<*>
+        else if(this.descriptor.kind == SerialKind.CONTEXTUAL) return Serialization.module.getContextual<Any>(this.descriptor.capturedKClass as KClass<Any>) as KSerializer<*>
         else this
     }
 

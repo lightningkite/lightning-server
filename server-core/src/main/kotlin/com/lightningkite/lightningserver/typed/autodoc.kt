@@ -282,7 +282,7 @@ private fun FlowContent.type(type: KSerializer<*>) {
         +"?"
         return
     }
-    if (type is ContextualSerializer) {
+    if (type.descriptor.kind == SerialKind.CONTEXTUAL) {
         type(type.uncontextualize())
         return
     }

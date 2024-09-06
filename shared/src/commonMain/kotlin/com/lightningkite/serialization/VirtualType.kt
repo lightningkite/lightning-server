@@ -344,7 +344,7 @@ sealed class SerializableAnnotationValue {
 @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
 fun KSerializer<*>.virtualTypeReference(registry: SerializationRegistry): VirtualTypeReference {
     val o = nullElement() ?: this
-    if (o is ContextualSerializer<*>) {
+    if (o.descriptor.kind == SerialKind.CONTEXTUAL) {
         registry.module.getContextualDescriptor(o.descriptor)?.let {
             return VirtualTypeReference(
                 serialName = it.serialName,
