@@ -9,10 +9,12 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Test
+import kotlin.test.assertContains
 
 class SchemaTest {
     @Test fun nestedEnum() {
         TestSettings
         println(lightningServerKSchema.enums)
+        assertContains(lightningServerKSchema.enums.keys, "com.lightningkite.lightningdb.test.TestEnum")
     }
 }
