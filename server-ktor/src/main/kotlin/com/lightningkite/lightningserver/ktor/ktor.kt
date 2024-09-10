@@ -10,7 +10,9 @@ import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.pubsub.PubSub
 import com.lightningkite.lightningserver.schedule.Schedule
+import com.lightningkite.lightningserver.schedule.ScheduledTask
 import com.lightningkite.lightningserver.schedule.Scheduler
+import com.lightningkite.lightningserver.schedule.plus
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.websocket.QueryParamWebSocketHandler
@@ -262,23 +264,38 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                 }
             }
         }
-        Scheduler.schedules.values.forEach {
+        Scheduler.schedules.values.forEach { it: ScheduledTask ->
+
+            fun Schedule.calculateNextRun(now: Instant): Long {
+                return when (this) {
+                    is Schedule.Frequency -> now.toEpochMilliseconds() + gap.inWholeMilliseconds
+                    is Schedule.Daily -> {
+                        val local = now.toLocalDateTime(zone)
+                        LocalDateTime(
+                            if (local.time > time)
+                                local.date.plus(DatePeriod(days = 1))
+                            else
+                                local.date,
+                            time
+                        )
+                            .toInstant(zone)
+                            .toEpochMilliseconds()
+                    }
+
+                    is Schedule.Cron -> now
+                        .toLocalDateTime(zone)
+                        .plus(cron)
+                        .toInstant(zone)
+                        .toEpochMilliseconds()
+                }
+            }
+
+
             @Suppress("OPT_IN_USAGE")
             GlobalScope.launch {
                 while (true) {
                     val upcomingRun = cache.get<Long>(it.name + "-nextRun") ?: run {
-                        val time = when (val s = it.schedule) {
-                            is Schedule.Daily -> {
-                                val now = now()
-                                val runTimeToday = now.toLocalDateTime(s.zone).date.atTime(s.time).toInstant(s.zone)
-                                if (now > runTimeToday) runTimeToday.plus(1.days).toEpochMilliseconds()
-                                else runTimeToday.toEpochMilliseconds()
-                            }
-
-                            is Schedule.Frequency -> {
-                                System.currentTimeMillis()
-                            }
-                        }
+                        val time = it.schedule.calculateNextRun(now())
                         cache.set<Long>(it.name + "-nextRun", time)
                         time
                     }
@@ -292,15 +309,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                         } catch (t: Throwable) {
                             exceptionSettings().report(t)
                         }
-                        val nextRun = when (val s = it.schedule) {
-                            is Schedule.Daily -> LocalDateTime(
-                                now().toLocalDateTime(s.zone).date.plus(DatePeriod(days = 1)),
-                                s.time
-                            ).toInstant(s.zone)
-                                .toEpochMilliseconds()
-
-                            is Schedule.Frequency -> upcomingRun + s.gap.inWholeMilliseconds
-                        }
+                        val nextRun = it.schedule.calculateNextRun(now())
                         cache.set<Long>(it.name + "-nextRun", nextRun)
                         cache.remove(it.name + "-lock")
                     } else {
@@ -374,7 +383,8 @@ internal suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
         domain = request.origin.serverHost,
         protocol = request.origin.scheme,
         sourceIp = generalSettings().realIpHeader?.let {
-            request.header(it) ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
+            request.header(it)
+                ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
         } ?: request.origin.remoteAddress
     )
 }

@@ -1665,6 +1665,37 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                     }
                 )
             }
+
+            is Schedule.Cron -> {
+                TerraformSection(
+                    name = "schedule_${it.name}",
+                    emit = {
+                        appendLine(
+                            """
+                    resource "aws_cloudwatch_event_rule" "scheduled_task_${safeName}" {
+                      name                = "${namePrefix}_${safeName}"
+                      schedule_expression = "cron(${s.cron})"
+                    }
+                    resource "aws_cloudwatch_event_target" "scheduled_task_${safeName}" {
+                      rule      = aws_cloudwatch_event_rule.scheduled_task_${safeName}.name
+                      target_id = "lambda"
+                      arn       = aws_lambda_alias.main.arn
+                      input     = "{\"scheduled\": \"${it.name}\"}"
+                    }
+                    resource "aws_lambda_permission" "scheduled_task_${safeName}" {
+                      action        = "lambda:InvokeFunction"
+                      function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
+                      principal     = "events.amazonaws.com"
+                      source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
+                      lifecycle {
+                        create_before_destroy = $createBeforeDestroy
+                      }
+                    }
+                """.trimIndent()
+                        )
+                    }
+                )
+            }
         }
     }
 }
