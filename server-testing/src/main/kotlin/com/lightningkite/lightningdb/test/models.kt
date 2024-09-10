@@ -173,6 +173,24 @@ data class SimpleLargeTestModel(
 
 @GenerateDataClassPaths
 @Serializable
+data class NestedEnumTestModel(
+    override val _id: UUID = uuid(),
+    val thing: NestedEnumHolder = NestedEnumHolder()
+) : HasId<UUID> {
+    companion object
+}
+
+@GenerateDataClassPaths
+@Serializable
+data class NestedEnumHolder(
+    val enumValue: TestEnum = TestEnum.One
+)
+
+@Serializable
+enum class TestEnum { One, Two }
+
+@GenerateDataClassPaths
+@Serializable
 data class GeoTest(
     override val _id: UUID = uuid(),
     @Index val geo: GeoCoordinate = GeoCoordinate(41.727019, -111.8443002)

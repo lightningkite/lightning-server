@@ -2,7 +2,8 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.Distance
 import com.lightningkite.GeoCoordinate
-import com.lightningkite.miles
+import com.lightningkite.Length
+import com.lightningkite.Length.Companion.miles
 import com.lightningkite.serialization.serializerOrContextual
 import com.lightningkite.serialization.DataClassPathSelf
 import com.lightningkite.serialization.DataClassPath
@@ -35,7 +36,7 @@ infix fun <K> DataClassPath<K, Int>.allSet(mask: Int) = mapCondition(Condition.I
 infix fun <K> DataClassPath<K, Int>.anyClear(mask: Int) = mapCondition(Condition.IntBitsAnyClear(mask))
 infix fun <K> DataClassPath<K, Int>.anySet(mask: Int) = mapCondition(Condition.IntBitsAnySet(mask))
 infix fun <K> DataClassPath<K, String>.contains(value: String) = mapCondition(Condition.StringContains(value, ignoreCase = true))
-fun <K> DataClassPath<K, GeoCoordinate>.distanceBetween(value: GeoCoordinate, greaterThan: Distance = 0.0.miles, lessThan: Distance = 100_000.0.miles) = mapCondition(Condition.GeoDistance(value, greaterThan.kilometers, lessThan.kilometers))
+fun <K> DataClassPath<K, GeoCoordinate>.distanceBetween(value: GeoCoordinate, greaterThan: Length = 0.0.miles, lessThan: Length = 100_000.0.miles) = mapCondition(Condition.GeoDistance(value, greaterThan.kilometers, lessThan.kilometers))
 @JsName("xDataClassPathContainsCased") fun <K> DataClassPath<K, String>.contains(value: String, ignoreCase: Boolean) = mapCondition(Condition.StringContains(value, ignoreCase = ignoreCase))
 fun <K, V> DataClassPath<K, V>.fullTextSearch(value: String, ignoreCase: Boolean, ) = mapCondition(Condition.FullTextSearch<V>(value, ignoreCase = ignoreCase))
 @JsName("xDataClassPathListAll") @JvmName("listAll") inline infix fun <K, reified T> DataClassPath<K, List<T>>.all(condition: (DataClassPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAllElements(path<T>().let(condition)))

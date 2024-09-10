@@ -101,11 +101,11 @@ data class RequestAuth<SUBJECT : HasId<*>>(
 
         companion object {
             private val _allCacheKeys = ArrayList<CacheKey<*, *, *>>()
-            private var used: Boolean = false
+            private var used: Exception? = null
             val allCacheKeys: List<CacheKey<*, *, *>>
                 get() {
-                    if (!used) {
-                        used = true
+                    if (used == null) {
+                        used = Exception("WARN: Cache key not added!  Cache keys were already used here:")
                         _allCacheKeys.sortBy { it.name }
                         _allCacheKeys.forEachIndexed { index, cacheKey -> cacheKey.serializationIndex = index }
                     }
@@ -114,8 +114,7 @@ data class RequestAuth<SUBJECT : HasId<*>>(
         }
 
         init {
-            if (used) println("WARN: Cache key not added!")
-            else _allCacheKeys.add(this)
+            used?.printStackTrace() ?: _allCacheKeys.add(this)
         }
 
         override fun toString(): String = name

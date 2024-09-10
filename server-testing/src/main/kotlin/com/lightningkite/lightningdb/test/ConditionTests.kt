@@ -3,7 +3,7 @@
 package com.lightningkite.lightningdb.test
 
 import com.lightningkite.GeoCoordinate
-import com.lightningkite.kilometers
+import com.lightningkite.Length.Companion.kilometers
 import com.lightningkite.prepareModelsServerCore
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking

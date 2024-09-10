@@ -177,9 +177,9 @@ class SerializationRegistry(val module: SerializersModule) {
 
     fun registerVirtualDeep(type: KSerializer<*>) {
         if(registerVirtual(type) != null) {
-            type.tryChildSerializers()?.forEach { registerVirtual(it) }
+            type.tryChildSerializers()?.forEach { registerVirtualDeep(it) }
         }
-        type.tryTypeParameterSerializers3()?.forEach { registerVirtual(it) }
+        type.tryTypeParameterSerializers3()?.forEach { registerVirtualDeep(it) }
     }
     fun registerVirtual(type: KSerializer<*>): VirtualType? {
         type.nullElement()?.let { return registerVirtual(it) }

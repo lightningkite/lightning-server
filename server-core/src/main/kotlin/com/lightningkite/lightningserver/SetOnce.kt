@@ -26,10 +26,12 @@ open class SetOnce<T>(
     private var value: T? = null
     var set = false
         private set
+    private var setStackTrace: Exception? = null
 
     override fun getValue(thisRef: Any?, property: KProperty<*>): T {
         if (!set) {
             value = makeDefault()
+            setStackTrace = Exception("$this was set via value request here")
             set = true
         }
         @Suppress("UNCHECKED_CAST")
@@ -37,20 +39,9 @@ open class SetOnce<T>(
     }
 
     override fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
-        if (set && !allowOverwrite) throw IllegalAccessError("This property (${property.name}) can only be set once.")
+        if (set && !allowOverwrite) throw IllegalStateException("This property (${property.name}) can only be set once.", setStackTrace)
+        setStackTrace = Exception("$this was set via setting here")
         set = true
         this.value = value
     }
-}
-
-/**
- * A Helper abstract class for using SetOnce that provides a class/object a single instance of a property.
- * This was specifically designed for and used in all the Settings classes in Batteries as companion objects.
- * Use this when you create your own Settings classes.
- */
-abstract class SettingSingleton<T>(makeDefault: () -> T = { throw IllegalAccessError("This property has not been set yet.") }) {
-    private val instanceSetOnce: SetOnce<T> = SetOnce(makeDefault)
-    val isConfigured: Boolean get() = instanceSetOnce.set
-    var instance: T by instanceSetOnce
-        internal set
 }

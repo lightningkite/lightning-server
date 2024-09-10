@@ -16,7 +16,7 @@ lateinit var comparable: KSClassDeclaration
 class TableGenerator(
     val codeGenerator: CodeGenerator,
     val logger: KSPLogger,
-) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 9) {
+) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 10) {
     fun KSClassDeclaration.isSerializable(): Boolean = this.annotation("Serializable", "kotlinx.serialization") != null
     fun KSClassDeclaration.isPlainSerializable(): Boolean =
         this.annotation("Serializable", "kotlinx.serialization")?.let {
@@ -48,6 +48,7 @@ class TableGenerator(
 
     @OptIn(KspExperimental::class)
     override fun process2(resolver: Resolver, files: Set<KSFile>) {
+        if(files.isEmpty()) return
         val allDatabaseModels = files
             .flatMap { it.declarations }
             .filterIsInstance<KSClassDeclaration>()

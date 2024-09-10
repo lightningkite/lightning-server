@@ -306,7 +306,7 @@ class MongoFieldCollection<Model : Any>(
     }
 
     @Serializable
-    data class KeyHolder<Key>(val _id: Key)
+    private data class KeyHolder<Key>(val _id: Key)
 
     override suspend fun count(condition: Condition<Model>): Int {
         val cs = condition.simplify()

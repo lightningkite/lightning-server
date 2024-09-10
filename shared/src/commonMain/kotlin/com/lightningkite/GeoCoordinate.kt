@@ -1,5 +1,6 @@
 package com.lightningkite
 
+import com.lightningkite.Length.Companion.miles
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -18,7 +19,7 @@ import kotlin.math.sin
 data class GeoCoordinate(val latitude: Double, val longitude: Double) {
     infix fun distanceToKilometers(other: GeoCoordinate): Double = distanceTo(other).kilometers
     infix fun distanceToMiles(other: GeoCoordinate): Double = distanceTo(other).miles
-    infix fun distanceTo(other: GeoCoordinate): Distance {
+    infix fun distanceTo(other: GeoCoordinate): Length {
         val theta: Double = this.longitude - other.longitude
         var dist: Double = (sin(deg2rad(this.latitude))
                 * sin(deg2rad(other.latitude))
@@ -32,15 +33,8 @@ data class GeoCoordinate(val latitude: Double, val longitude: Double) {
     }
 }
 
-@JvmInline
-@Serializable
-value class Distance(val kilometers: Double) {
-    val miles: Double get() = kilometers / 1.609344
-}
-val Double.miles get() = Distance(kilometers = this * 1.609344)
-val Double.kilometers get() = Distance(kilometers = this)
-val Int.miles get() = Distance(kilometers = this * 1.609344)
-val Int.kilometers get() = Distance(kilometers = this.toDouble())
+@Deprecated("Use Length instead", ReplaceWith("Length"))
+typealias Distance = Length
 
 object GeoCoordinateGeoJsonSerializer: KSerializer<GeoCoordinate> {
 
