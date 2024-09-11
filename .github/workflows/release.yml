@@ -22,8 +22,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v4
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
 
       - name: Clean
         run: ./gradlew clean
@@ -66,8 +66,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v4
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
 
       - name: Clean
         run: ./gradlew clean

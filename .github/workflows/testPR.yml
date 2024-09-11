@@ -2,7 +2,7 @@ name: TestPullRequest
 
 on:
   pull_request:
-    branches: master
+    branches: version-2
   workflow_dispatch:
 
 jobs:
@@ -20,6 +20,12 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Clean
+        run: ./gradlew clean
 
       - name: Run Tests
         run: ./gradlew test
