@@ -56,6 +56,7 @@ import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningserver.files.S3File
 import com.lightningkite.prepareModelsShared
 import com.lightningkite.uuid
+import kotlinx.html.*
 
 object Server : ServerPathGroup(ServerPath.root) {
 
@@ -256,6 +257,25 @@ object Server : ServerPathGroup(ServerPath.root) {
         },
         database = database
     )
+
+    val sample = get("page").handler {
+        HttpResponse.html {
+
+            head {
+
+            }
+
+            body {
+                div {
+                    p { +"My text here"  }
+                }
+                input(InputType.email) {
+                    id = "asdf"
+                }
+            }
+
+        }
+    }
 }
 
 object EmailCacheKey : RequestAuth.CacheKey<User, UUID, String>() {

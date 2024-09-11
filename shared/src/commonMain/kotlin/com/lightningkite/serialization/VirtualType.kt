@@ -2,6 +2,7 @@
 
 package com.lightningkite.serialization
 
+import com.lightningkite.lightningdb.HasId
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.CompositeDecoder
@@ -27,6 +28,8 @@ data class VirtualStruct(
     val fields: List<VirtualField>,
     val parameters: List<VirtualTypeParameter>,
 ) : VirtualType {
+    val idField = fields.find { it.name == "_id" }
+
     operator fun invoke(registry: SerializationRegistry, vararg arguments: KSerializer<*>) =
         Concrete(registry, arguments)
 
@@ -64,7 +67,6 @@ data class VirtualStruct(
 
         @Transient
         override val descriptor: SerialDescriptor by lazy {
-            println("Getting descriptor for $serialName")
             buildClassSerialDescriptor(serialName) {
                 for (field in fields)
                     element(
@@ -185,7 +187,9 @@ class VirtualEnumValue(
 data class VirtualInstance(
     val type: VirtualStruct.Concrete,
     val values: List<Any?>
-) {
+): HasId<Comparable<Comparable<*>>> {
+    override val _id: Comparable<Comparable<*>>
+        get() = type.struct.idField?.let { values[it.index] as Comparable<Comparable<*>> } ?: values.hashCode() as Comparable<Comparable<*>>
     override fun toString(): String =
         "${type.struct.serialName}(${values.zip(type.struct.fields).joinToString { "${it.second.name}=${it.first}" }})"
 }
