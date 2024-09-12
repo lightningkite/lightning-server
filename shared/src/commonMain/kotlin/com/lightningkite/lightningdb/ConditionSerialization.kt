@@ -3,12 +3,10 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.GeoCoordinate
+import com.lightningkite.IsRawString
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
-import kotlin.reflect.KClass
 import kotlinx.serialization.descriptors.*
-
-import com.lightningkite.lightningdb.SerializableProperty
 
 private fun <T> commonOptions(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> = listOf(
     MySealedClassSerializer.Option(Condition.Never.serializer(inner)) { it is Condition.Never },
@@ -59,6 +57,8 @@ private val stringOptions: List<MySealedClassSerializer.Option<Condition<String>
     MySealedClassSerializer.Option(Condition.StringContains.serializer(), setOf("Search")) { it is Condition.StringContains },
     MySealedClassSerializer.Option(Condition.RegexMatches.serializer()) { it is Condition.RegexMatches },
 )
+private fun <T : IsRawString> rawStringOptions(element: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> = comparableOptions(element) +
+    listOf(MySealedClassSerializer.Option(Condition.RawStringContains.serializer(element), setOf("Search")) { it is Condition.RawStringContains })
 private fun <T: Any> classOptionsReflective(inner: KSerializer<T>): List<MySealedClassSerializer.Option<Condition<T>, *>> =
     (commonOptions(inner) + inner.serializableProperties!!.let {
         it.mapIndexed { index, ser ->
@@ -76,6 +76,7 @@ class ConditionSerializer<T>(val inner: KSerializer<T>): MySealedClassSerializer
         val r = when {
             inner.descriptor.isNullable -> nullableOptions(inner.innerElement() as KSerializer<Any>)
             inner.descriptor.serialName == "kotlin.String" -> stringOptions
+            IsRawString.Companion.serialNames.contains(inner.descriptor.serialName) -> rawStringOptions(inner as KSerializer<IsRawString>)
             inner.descriptor.serialName == "kotlin.Int" -> intOptions
             inner.descriptor.serialName == "com.lightningkite.GeoCoordinate" -> geocoordinateOptions
             inner.descriptor.kind == StructureKind.MAP -> stringMapOptions(inner.innerElement2())

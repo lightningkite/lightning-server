@@ -2,9 +2,7 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.descriptors.StructureKind
 import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.ops.InListOrNotInListBaseOp
 import org.jetbrains.exposed.sql.ops.SingleValueInListOp
 import org.jetbrains.exposed.sql.statements.UpdateBuilder
 import com.lightningkite.lightningdb.SerializableProperty
@@ -203,6 +201,14 @@ private fun <T> ISqlExpressionBuilder.condition(
                 LikeEscapeOp(col, LiteralOp(TextColumnType(), condition.value), true, null)
         }
 
+        is Condition.RawStringContains -> {
+            val col = fieldSet.single
+            if (condition.ignoreCase)
+                InsensitiveLikeEscapeOp(col, LiteralOp(TextColumnType(), condition.value), true, null)
+            else
+                LikeEscapeOp(col, LiteralOp(TextColumnType(), condition.value), true, null)
+        }
+
         is Condition.RegexMatches -> {
             val col = fieldSet.single
             RegexpOp(col as Column<String>, LiteralOp(TextColumnType(), condition.pattern), true)
@@ -311,6 +317,7 @@ private fun <T> FieldModifier.modification(
         is Modification.Increment -> modifySingle(fieldSet) { type, old -> PlusOp(fieldSet.formatSingleExpression(modification.by), old, type) }
         is Modification.Multiply -> modifySingle(fieldSet) { type, old -> TimesOp(fieldSet.formatSingleExpression(modification.by), old, type) }
         is Modification.AppendString -> modifySingle(fieldSet) { type, old -> Concat("", old, fieldSet.formatSingleExpression(modification.value as T)) as Expression<Any?> }
+        is Modification.AppendRawString -> modifySingle(fieldSet) { type, old -> Concat("", old, fieldSet.formatSingleExpression(modification.value as T)) as Expression<Any?> }
         is Modification.ListAppend<*> -> modifyEach(fieldSet, modification.items as T) { type, it, old -> ConcatOp(old, it) }
         is Modification.ListRemove<*> -> fieldSet.fields.forEach {
             modify(it.key) { old -> MapOp(fieldSet as FieldSet2<List<Any?>>, { f -> f.fields[it.key]!! }, { SqlExpressionBuilder.run { NotOp(condition(modification.condition as Condition<Any?>, it)) } }) as Expression<Any?> }

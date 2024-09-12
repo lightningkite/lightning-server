@@ -1,19 +1,15 @@
 package com.lightningkite.lightningdb
 
 import com.github.jershell.kbson.*
-import com.lightningkite.GeoCoordinate
 import com.lightningkite.GeoCoordinateGeoJsonSerializer
-import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.mongodb.client.model.UpdateOptions
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.descriptors.*
 import org.bson.BsonDocument
-import org.bson.BsonDocumentWriter
 import org.bson.BsonNumber
 import org.bson.BsonTimestamp
 import org.bson.BsonType
@@ -26,8 +22,6 @@ import kotlinx.datetime.*
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
-import com.lightningkite.lightningdb.SerializableProperty
-import org.bson.BsonArray
 
 fun documentOf(): Document {
     return Document()
@@ -94,6 +88,12 @@ private fun <T> Condition<T>.dump(serializer: KSerializer<T>, into: Document = D
                 it["\$options"] = if(this.ignoreCase) "i" else ""
             }
         }
+        is Condition.RawStringContains -> {
+            into.sub(key).also {
+                it["\$regex"] = Regex.escape(this.value)
+                it["\$options"] = if(this.ignoreCase) "i" else ""
+            }
+        }
         is Condition.RegexMatches -> {
             into.sub(key).also {
                 it["\$regex"] = this.pattern
@@ -122,6 +122,7 @@ private fun <T> Modification<T>.dump(serializer: KSerializer<T>, update: UpdateW
         is Modification.Increment -> into["\$inc", key] = by.let { Serialization.Internal.bson.stringifyAny(serializer, it) }
         is Modification.Multiply -> into["\$mul", key] = by.let { Serialization.Internal.bson.stringifyAny(serializer, it) }
         is Modification.AppendString -> TODO("Appending strings is not supported yet")
+        is Modification.AppendRawString -> TODO("Appending raw strings is not supported yet")
         is Modification.IfNotNull<*> -> (modification as Modification<Any?>).dump(serializer.nullElement()!! as KSerializer<Any?>, update, key)
         is Modification.OnField<*, *> ->
             (modification as Modification<Any?>).dump(this.key.serializer as KSerializer<Any?>, update, if (key == null) this.key.name else "$key.${this.key.name}")

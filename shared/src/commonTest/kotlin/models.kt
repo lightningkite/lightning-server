@@ -2,11 +2,8 @@
 @file:UseContextualSerialization(UUID::class, Instant::class)
 package com.lightningkite.lightningdb
 
-import com.lightningkite.TrimmedCaselessString
-import com.lightningkite.UUID
-import com.lightningkite.ZonedDateTime
+import com.lightningkite.*
 
-import com.lightningkite.uuid
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
@@ -101,6 +98,9 @@ data class LargeTestModel(
     var double: Double = 0.0,
     var char: Char = ' ',
     var string: String = "",
+    var trimmedString: TrimmedString = "".trimmed(),
+    var caselessString: CaselessString = "".caseless(),
+    var trimmedCaselessString: TrimmedCaselessString = "".trimmedCaseless(),
     var instant: Instant = Instant.DISTANT_PAST,
     val zonedDateTime: ZonedDateTime = ZonedDateTime(LocalDateTime(2000, 1, 1, 0, 0), TimeZone.currentSystemDefault()),
     var list: List<Int> = listOf(),
