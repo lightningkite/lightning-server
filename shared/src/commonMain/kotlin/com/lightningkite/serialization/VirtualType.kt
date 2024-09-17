@@ -39,7 +39,7 @@ data class VirtualStruct(
     override fun toString(): String = "virtual data class $serialName${parameters.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.name } ?: ""}(${fields.joinToString()})"
 
     inner class Concrete(val registry: SerializationRegistry, val arguments: Array<out KSerializer<*>>) :
-        KSerializer<VirtualInstance> {
+        KSerializer<VirtualInstance>, VirtualType by this@VirtualStruct {
         val struct = this@VirtualStruct
         init { if(arguments.size < parameters.size) throw IllegalArgumentException("VirtualStructure ${serialName} needs ${parameters.size} parameters, but we only got ${arguments.size}") }
         val context = parameters.indices.associate { parameters[it].name to arguments[it] }
@@ -187,11 +187,23 @@ class VirtualEnumValue(
 data class VirtualInstance(
     val type: VirtualStruct.Concrete,
     val values: List<Any?>
-): HasId<Comparable<Comparable<*>>> {
+): HasId<Comparable<Comparable<*>>>, Comparable<VirtualInstance> {
     override val _id: Comparable<Comparable<*>>
         get() = type.struct.idField?.let { values[it.index] as Comparable<Comparable<*>> } ?: values.hashCode() as Comparable<Comparable<*>>
     override fun toString(): String =
         "${type.struct.serialName}(${values.zip(type.struct.fields).joinToString { "${it.second.name}=${it.first}" }})"
+
+    override fun compareTo(other: VirtualInstance): Int {
+        for(i in values.indices) {
+            val t = this.values[i]
+            val o = other.values[i]
+            if(t is Comparable<*>) {
+                val r = (t as Comparable<Any?>).compareTo(o)
+                if(r != 0) return r
+            }
+        }
+        return 0
+    }
 }
 
 @Serializable

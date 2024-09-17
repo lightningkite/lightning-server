@@ -14,7 +14,13 @@ data class SortPart<T>(
     val field: DataClassPathPartial<T>,
     val ascending: Boolean = true,
     val ignoreCase: Boolean = false
-)
+) {
+    override fun toString(): String = buildString {
+        if(!ascending) append('-')
+        if(ignoreCase) append('~')
+        append(field.toString())
+    }
+}
 
 @OptIn(ExperimentalSerializationApi::class)
 val <T> List<SortPart<T>>.comparator: Comparator<T>? get() {

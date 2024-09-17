@@ -135,12 +135,12 @@ annotation class MimeType(vararg val types: String, val maxSize: Long = Long.MAX
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
-annotation class MaxLength(val size: Int)
+annotation class MaxLength(val size: Int, val average: Int = -1)
 
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
-annotation class MaxSize(val size: Int)
+annotation class MaxSize(val size: Int, val average: Int = -1)
 
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)

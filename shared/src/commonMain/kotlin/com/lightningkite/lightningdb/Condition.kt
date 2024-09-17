@@ -15,6 +15,7 @@ sealed class Condition<in T> {
 
     @SerialName("Never")
     @Serializable
+    @DisplayName("None")
     data object Never : Condition<Any?>() {
         @Deprecated("Just use it directly", ReplaceWith("Condition.Never")) inline operator fun invoke() = this
         @JvmName("invokeOp")
@@ -25,6 +26,7 @@ sealed class Condition<in T> {
 
     @SerialName("Always")
     @Serializable
+    @DisplayName("All")
     data object Always : Condition<Any?>() {
         @Deprecated("Just use it directly", ReplaceWith("Condition.Always")) inline operator fun invoke() = this
         @JvmName("invokeOp")
@@ -112,7 +114,7 @@ sealed class Condition<in T> {
 
     @Serializable
     @SerialName("StringContains")
-    data class StringContains(val value: String, val ignoreCase: Boolean = false) : Condition<String>() {
+    data class StringContains(@DoesNotNeedLabel val value: String, val ignoreCase: Boolean = false) : Condition<String>() {
         override fun invoke(on: String): Boolean = on.contains(value, ignoreCase)
         override fun toString(): String = ".contains($value, $ignoreCase)"
     }
@@ -126,7 +128,7 @@ sealed class Condition<in T> {
 
     @Serializable
     @SerialName("FullTextSearch")
-    data class FullTextSearch<T>(val value: String, val ignoreCase: Boolean = false) :
+    data class FullTextSearch<T>(@DoesNotNeedLabel val value: String, val ignoreCase: Boolean = false) :
         Condition<T>() {
         override fun invoke(on: T): Boolean {
             val asText = on.toString()
@@ -137,7 +139,7 @@ sealed class Condition<in T> {
 
     @Serializable
     @SerialName("RegexMatches")
-    data class RegexMatches(val pattern: String, val ignoreCase: Boolean = false) : Condition<String>() {
+    data class RegexMatches(@DoesNotNeedLabel val pattern: String, val ignoreCase: Boolean = false) : Condition<String>() {
         @Transient
         val regex = Regex(pattern, if (ignoreCase) setOf(RegexOption.IGNORE_CASE) else setOf())
         override fun invoke(on: String): Boolean = regex.matches(on)
@@ -251,7 +253,7 @@ sealed class Condition<in T> {
     @SerialName("IfNotNull")
     data class IfNotNull<T>(val condition: Condition<T>) : Condition<T?>() {
         override fun invoke(on: T?): Boolean = on != null && condition(on)
-        override fun toString(): String = " != null && $condition"
+        override fun toString(): String = "? $condition"
     }
 }
 
