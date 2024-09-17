@@ -15,6 +15,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class FileLockerTest {
+    @Test fun testChecksum() {
+        val base = File("../shared/src/commonMain/kotlin/com/lightningkite")
+        println(base.absolutePath)
+        repeat(5) {
+            println(base.walkTopDown().filter { it.extension == "kt" }.checksum())
+        }
+    }
+
     @Test
     fun test() {
         /*

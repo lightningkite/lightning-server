@@ -16,7 +16,7 @@ lateinit var comparable: KSClassDeclaration
 class TableGenerator(
     val codeGenerator: CodeGenerator,
     val logger: KSPLogger,
-) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 10) {
+) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 11) {
     fun KSClassDeclaration.isSerializable(): Boolean = this.annotation("Serializable", "kotlinx.serialization") != null
     fun KSClassDeclaration.isPlainSerializable(): Boolean =
         this.annotation("Serializable", "kotlinx.serialization")?.let {
@@ -101,9 +101,12 @@ class TableGenerator(
             .let {
                 // undo stupid Android bullshit
                 val isTest = it.endsWith("Test")
+                val isMain = it.endsWith("Main")
                 it
                     .removeSuffix("Common")
+                    .removeSuffix("Main")
                     .removeSuffix("Test")
+                    .removeSuffix("Common")
                     .removeSuffix("Unit")
                     .removeSuffix("Debug")
                     .removeSuffix("Release")
