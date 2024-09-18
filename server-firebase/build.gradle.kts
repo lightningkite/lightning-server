@@ -17,7 +17,7 @@ val khrysalisVersion: String by project
 dependencies {
     api(project(":server-core"))
 
-    api("com.google.firebase:firebase-admin:9.1.1")
+    api("com.google.firebase:firebase-admin:9.3.0")
 
     ksp(project(":processor"))
     kspTest(project(":processor"))

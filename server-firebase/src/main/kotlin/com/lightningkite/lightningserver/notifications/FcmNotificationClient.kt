@@ -9,7 +9,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import com.google.firebase.messaging.Notification as FCMNotification
 
-
 /**
  * The concrete implementation of NotificationClient that will use Firebase Messaging to send push notifications to
  * clients.
@@ -144,7 +143,7 @@ object FcmNotificationClient : NotificationClient {
             }
             .forEach {
                 withContext(Dispatchers.IO) {
-                    FirebaseMessaging.getInstance().sendMulticast(it)
+                    FirebaseMessaging.getInstance().sendEachForMulticast(it)
                 }
             }
 
