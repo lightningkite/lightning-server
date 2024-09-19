@@ -26,17 +26,17 @@ abstract class PinBasedProofEndpoints(
     val property: String,
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val pin: PinHandler,
+    val interfaceInfo: Documentable.InterfaceInfo,
+    val exampleTarget: String
 ) : ServerPathGroup(path), Authentication.StartedProofMethod {
 
     open fun normalize(to: String): String = to.lowercase().trim()
     abstract suspend fun send(to: String, pin: String)
-    abstract val exampleTarget: String
-    override val info: ProofMethodInfo = ProofMethodInfo(
+    final override val info: ProofMethodInfo = ProofMethodInfo(
         via = name,
         property = property,
         strength = 10
     )
-    abstract val interfaceInfo: Documentable.InterfaceInfo
 
     override val start = path("start").post.api(
         belongsToInterface = interfaceInfo,

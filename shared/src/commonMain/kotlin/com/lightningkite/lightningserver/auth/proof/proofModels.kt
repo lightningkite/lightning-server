@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.auth.proof
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
+import kotlin.time.Duration
 
 @Serializable
 data class FinishProof(
@@ -40,4 +41,16 @@ data class Proof(
     val value: String,
     val at: Instant,
     val signature: String,
+)
+
+@Serializable
+data class KnownDeviceOptions(
+    val duration: Duration,
+    val strength: Int
+)
+
+@Serializable
+data class KnownDeviceSecretAndExpiration(
+    val secret: String,
+    val expiresAt: Instant
 )

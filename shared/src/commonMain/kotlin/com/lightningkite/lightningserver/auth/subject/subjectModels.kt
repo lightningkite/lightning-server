@@ -6,7 +6,6 @@ import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.References
 import com.lightningkite.lightningserver.auth.oauth.OauthClient
 import com.lightningkite.lightningserver.auth.proof.ProofOption
-import kotlinx.datetime.Clock
 import com.lightningkite.now
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
@@ -14,8 +13,8 @@ import kotlin.time.Duration
 import kotlinx.datetime.Instant
 import com.lightningkite.UUID
 import com.lightningkite.lightningdb.AdminTableColumns
+import com.lightningkite.lightningserver.auth.proof.Proof
 import com.lightningkite.uuid
-import kotlin.time.Duration.Companion.minutes
 
 @Serializable
 data class SubSessionRequest(
@@ -46,9 +45,26 @@ data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
 
 @Serializable
+data class LogInRequest(
+    val proofs: List<Proof>,
+    val label: String = "Root Session",
+    val scopes: Set<String> = setOf("*"),
+    val expires: Instant? = null,
+)
+
+@Serializable
 data class IdAndAuthMethods<ID>(
-    val id: ID? = null,
+    val id: ID,
     val options: List<ProofOption> = listOf(),
     val strengthRequired: Int = 1,
     val session: String? = null,
+)
+
+@Serializable
+data class ProofsCheckResult<ID>(
+    val id: ID,
+    val options: List<ProofOption> = listOf(),
+    val strengthRequired: Int = 1,
+    val readyToLogIn: Boolean,
+    val maxExpiration: Instant?,
 )

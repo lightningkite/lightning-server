@@ -5,7 +5,6 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cache.Cache
-import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.modelInfo
@@ -13,31 +12,15 @@ import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.exceptions.BadRequestException
-import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.routes.docName
-import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
-import com.lightningkite.lightningserver.settings.generalSettings
-import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.*
-import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
-import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
 import com.lightningkite.now
-import com.lightningkite.serialization.DataClassPathSelf
 import com.lightningkite.uuid
-import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.InternalSerializationApi
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
-import java.security.SecureRandom
-import kotlinx.datetime.toJavaInstant
-import kotlinx.serialization.builtins.nullable
-import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
 
 @OptIn(InternalSerializationApi::class)
 class KnownDeviceProofEndpoints(
@@ -109,9 +92,10 @@ class KnownDeviceProofEndpoints(
         subject: Authentication.SubjectHandler<T, ID>,
         id: ID,
         deviceInfo: String
-    ): String {
+    ): KnownDeviceSecretAndExpiration {
         val secretValue = uuid().toString()
         val secretId = uuid()
+        val exp = now() + expires()
         @Suppress("UNCHECKED_CAST")
         val secret = KnownDeviceSecret(
             _id = secretId,
@@ -121,7 +105,7 @@ class KnownDeviceProofEndpoints(
             deviceInfo = deviceInfo
         )
         modelInfo.collection().insertOne(secret)
-        return "$secretId/$secretValue"
+        return KnownDeviceSecretAndExpiration("$secretId/$secretValue", exp)
     }
 
     val establish = path("establish").post.api(
@@ -143,6 +127,46 @@ class KnownDeviceProofEndpoints(
                     val ip = rawRequest?.sourceIp
                     "$agent / $ip"
                 }
+            ).secret
+        }
+    )
+
+    val establish2 = path("establish2").post.api(
+        belongsToInterface = loggedInInterfaceInfo,
+        summary = "Establish Known Device V2",
+        inputType = Unit.serializer(),
+        outputType = KnownDeviceSecretAndExpiration.serializer(),
+        description = "Establishes a new known device.  You can use the returned string to gain partial authentication later.",
+        authOptions = anyAuthRoot,
+        errorCases = listOf(),
+        examples = listOf(),
+        implementation = { value: Unit ->
+            @Suppress("UNCHECKED_CAST")
+            establish(
+                auth.subject as Authentication.SubjectHandler<HasId<Comparable<Comparable<*>>>, Comparable<Comparable<*>>>,
+                auth.rawId as Comparable<Comparable<*>>,
+                run {
+                    val agent = rawRequest?.headers?.get(HttpHeader.UserAgent)
+                    val ip = rawRequest?.sourceIp
+                    "$agent / $ip"
+                }
+            )
+        }
+    )
+
+    val options = path("options").get.api(
+        belongsToInterface = loggedInInterfaceInfo,
+        summary = "Known Device Options",
+        inputType = Unit.serializer(),
+        outputType = KnownDeviceOptions.serializer(),
+        description = "Gives information about how valuable working from a known device is and for how long it works.",
+        authOptions = anyAuthRoot,
+        errorCases = listOf(),
+        examples = listOf(),
+        implementation = { value: Unit ->
+            KnownDeviceOptions(
+                duration = expires(),
+                strength = info.strength
             )
         }
     )

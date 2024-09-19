@@ -31,16 +31,19 @@ class EmailProofEndpoints(
     val emailTemplate: suspend (String, String) -> Email,
     proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val verifyEmail: suspend (String) -> Boolean = { true },
-) : PinBasedProofEndpoints(path, "email", "email", proofHasher, pin) {
+) : PinBasedProofEndpoints(
+    path = path,
+    name = "email",
+    property = "email",
+    proofHasher = proofHasher,
+    interfaceInfo = Documentable.InterfaceInfo(path, "EmailProofClientEndpoints", listOf()),
+    pin = pin,
+    exampleTarget = "test@test.com"
+) {
     init {
         path.docName = "EmailProof"
         Authentication.register(this)
     }
-
-    override val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "EmailProofClientEndpoints", listOf())
-
-    override val exampleTarget: String
-        get() = "test@test.com"
 
     override suspend fun send(to: String, pin: String) {
         if(verifyEmail(to))

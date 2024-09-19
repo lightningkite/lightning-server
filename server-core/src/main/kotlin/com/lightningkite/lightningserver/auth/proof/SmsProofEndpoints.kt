@@ -30,19 +30,22 @@ class SmsProofEndpoints(
     val smsTemplate: suspend (pin: String) -> String = { code -> "Your ${generalSettings().projectName} code is ${code}. Don't share this with anyone." },
     proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val verifyPhone: suspend (String) -> Boolean = { true },
-) : PinBasedProofEndpoints(path, "sms", "phone", proofHasher, pin) {
+) : PinBasedProofEndpoints(
+    path,
+    "sms",
+    "phone",
+    proofHasher,
+    pin,
+    interfaceInfo = Documentable.InterfaceInfo(path, "SmsProofClientEndpoints", listOf()),
+    exampleTarget = "800-1000-100"
+) {
     init {
         path.docName = "SmsProof"
     }
 
-    override val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "SmsProofClientEndpoints", listOf())
-
     init {
         Authentication.register(this)
     }
-
-    override val exampleTarget: String
-        get() = "800-1000-100"
 
     override suspend fun send(to: String, pin: String) {
         if (verifyPhone(to))

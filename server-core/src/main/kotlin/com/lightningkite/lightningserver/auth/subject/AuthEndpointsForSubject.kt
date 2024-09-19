@@ -213,6 +213,48 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         description = "Attempt to log in as a ${handler.name} using various proofs.",
         errorCases = listOf(errorNoSingleUser, errorInvalidProof, errorIrrelevantProof),
         implementation = { proofs: List<Proof> ->
+            login2.implementation(this, LogInRequest(proofs))
+        }
+    )
+
+    val login2 = path("login2").post.api(
+        belongsToInterface = unauthInterface,
+        authOptions = noAuth,
+        inputType = LogInRequest.serializer(),
+        outputType = IdAndAuthMethods.serializer(handler.idSerializer),
+        summary = "Log In V2",
+        description = "Attempt to log in as a ${handler.name} using various proofs.",
+        errorCases = listOf(errorNoSingleUser, errorInvalidProof, errorIrrelevantProof),
+        implementation = { input: LogInRequest ->
+            proofsCheck.implementation(this, input.proofs).let {
+                IdAndAuthMethods(
+                    id = it.id,
+                    options = it.options,
+                    strengthRequired = it.strengthRequired,
+                    session = if(it.readyToLogIn) newSessionPrivate(
+                        subjectId = it.id,
+                        scopes = input.scopes,
+                        label = input.label,
+                        expires = run {
+                            val a = it.maxExpiration
+                            val b = input.expires
+                            if(a != null && b != null) minOf(a, b) else a ?: b
+                        },
+                    ).second.string else null
+                )
+            }
+        }
+    )
+
+    val proofsCheck = path("proofs-check").post.api(
+        belongsToInterface = unauthInterface,
+        authOptions = noAuth,
+        inputType = ListSerializer(Proof.serializer()),
+        outputType = ProofsCheckResult.serializer(handler.idSerializer),
+        summary = "Check Proofs",
+        description = "See if we could log in as a ${handler.name} using various proofs.",
+        errorCases = listOf(errorNoSingleUser, errorInvalidProof, errorIrrelevantProof),
+        implementation = { proofs: List<Proof> ->
             proofs.forEach {
                 if (!proofHasher().verify(it)) throw HttpStatusException(errorInvalidProof.copy(data = it.via))
                 if (now() > it.at + 1.hours) throw HttpStatusException(errorExpiredProof.copy(data = it.via))
@@ -230,13 +272,9 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 .filter { it.established(handler, subject) }
             val maxStrengthPossible = proofMethods.groupBy { it.info.property }.values.sumOf { it.maxOf { it.info.strength } }
             val actStrenReq = min(handler.desiredStrengthFor(subject), maxStrengthPossible)
-            IdAndAuthMethods(
-                session = if (strength >= actStrenReq) newSessionPrivate(
-                    subjectId = subject._id,
-                    scopes = setOf("*"),
-                    label = "Root Session",
-                    expires = handler.getSessionExpiration(subject),
-                ).second.string else null,
+            ProofsCheckResult(
+                readyToLogIn = strength >= actStrenReq,
+                maxExpiration = handler.getSessionExpiration(subject),
                 id = subject._id,
                 options = proofMethods
                     .filter { it.info.via !in used }
