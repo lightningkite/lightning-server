@@ -61,8 +61,8 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     private val sessionSerializer = Session.serializer(handler.subjectSerializer, handler.idSerializer)
     private val dataClassPath = DataClassPathSelf(sessionSerializer)
-    val unauthInterface = Documentable.InterfaceInfo(path, "AuthClientEndpoints", listOf(handler.idSerializer))
-    val authInterface = Documentable.InterfaceInfo(path, "AuthenticatedAuthClientEndpoints", listOf(handler.subjectSerializer, handler.idSerializer))
+    val unauthInterface = Documentable.InterfaceInfo(path, "UserAuthClientEndpoints", listOf(handler.idSerializer))
+    val authInterface = Documentable.InterfaceInfo(path, "AuthenticatedUserAuthClientEndpoints", listOf(handler.subjectSerializer, handler.idSerializer))
 
     val sessionInfo = modelInfo<HasId<*>?, Session<SUBJECT, ID>, UUID>(
         modelName = "${handler.name}Session",

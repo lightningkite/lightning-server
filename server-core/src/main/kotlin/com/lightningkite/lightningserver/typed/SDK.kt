@@ -47,9 +47,11 @@ fun Documentable.Companion.kotlinApi(packageName: String): String = CodeEmitter(
     imports.add("com.lightningkite.lightningdb.*")
     imports.add("com.lightningkite.lightningserver.db.*")
     imports.add("kotlinx.datetime.*")
+    imports.add("com.lightningkite.lightningserver.auth.*")
     imports.add("com.lightningkite.lightningserver.auth.oauth.*")
     imports.add("com.lightningkite.lightningserver.auth.proof.*")
     imports.add("com.lightningkite.lightningserver.auth.subject.*")
+    imports.add("com.lightningkite.serialization.*")
     val byGroup = safeDocumentables
         .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }.groupBy { it.docGroupIdentifier }
     val groups = byGroup.keys.filterNotNull()
@@ -80,6 +82,8 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
     imports.add("com.lightningkite.kiteui.*")
     imports.add("com.lightningkite.lightningdb.*")
     imports.add("com.lightningkite.lightningserver.db.*")
+    imports.add("com.lightningkite.lightningserver.auth.*")
+    imports.add("com.lightningkite.serialization.*")
     imports.add("kotlinx.datetime.*")
     run {
         val sessionClassName = "AbstractAnonymousSession"
@@ -190,6 +194,9 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
     imports.add("com.lightningkite.lightningdb.*")
     imports.add("com.lightningkite.kiteui.*")
     imports.add("kotlinx.datetime.*")
+    imports.add("com.lightningkite.serialization.*")
+    imports.add("com.lightningkite.lightningserver.db.*")
+    imports.add("com.lightningkite.lightningserver.auth.*")
     val byGroup = safeDocumentables.groupBy { it.docGroupIdentifier }
     val groups = byGroup.keys.filterNotNull()
     appendLine("class LiveApi(val httpUrl: String, val socketUrl: String): Api {")
