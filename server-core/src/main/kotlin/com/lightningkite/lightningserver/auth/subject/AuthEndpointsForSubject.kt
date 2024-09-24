@@ -474,7 +474,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         info = sessionInfo
     )
 
-    val sessionTerminate = sessions.path("terminate").post.api(
+    val sessionTerminate = path("terminate").post.api(
         belongsToInterface = authInterface,
         authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType, scopes = null))),
         inputType = Unit.serializer(),
@@ -487,7 +487,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             })
         }
     )
-    val otherSessionTerminate = sessions.path.arg<UUID>("sessionId").path("terminate").post.api(
+    val otherSessionTerminate = path.arg<UUID>("sessionId").path("terminate").post.api(
         belongsToInterface = authInterface,
         authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType, scopes = null))),
         inputType = Unit.serializer(),

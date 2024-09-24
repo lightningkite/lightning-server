@@ -424,7 +424,7 @@ private fun KSerializer<*>.write(): String = nullElement()?.let { it.write() + "
             StructureKind.OBJECT,
             SerialKind.ENUM,
             StructureKind.CLASS -> {
-                if (descriptor.serialName == "com.lightningkite.lightningdb.Partial") {
+                if (descriptor.serialName == "com.lightningkite.serialization.Partial") {
                     out.append("DeepPartial")
                 } else {
                     out.append(descriptor.simpleSerialName)

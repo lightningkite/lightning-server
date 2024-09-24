@@ -28,7 +28,7 @@ class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> 
     override val descriptor: SerialDescriptor by lazy {
             try {
                 val sourceDescriptor = source.descriptor
-                buildClassSerialDescriptor("com.lightningkite.lightningdb.Partial", sourceDescriptor) {
+                buildClassSerialDescriptor("com.lightningkite.serialization.Partial", sourceDescriptor) {
                     if(sourceDescriptor.elementsCount != childSerializers.size) {
                         throw IllegalStateException("Mismatch in child serializer count; ${sourceDescriptor.elementsCount} vs ${childSerializers.size}; ${sourceDescriptor.elementNames.joinToString()} vs ${childSerializers.joinToString { it.descriptor.serialName }}")
                     }

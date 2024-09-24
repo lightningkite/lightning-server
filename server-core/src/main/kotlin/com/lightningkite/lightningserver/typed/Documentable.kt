@@ -26,7 +26,9 @@ interface Documentable {
     val authOptions: AuthOptions<*>
     val belongsToInterface: InterfaceInfo?
 
-    class InterfaceInfo(val path: ServerPath, val name: String, val subtypes: List<KSerializer<*>>)
+    class InterfaceInfo(val path: ServerPath, val name: String, val subtypes: List<KSerializer<*>>) {
+        override fun toString(): String = "$name at $path"
+    }
 
     companion object {
         val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *, *>>()
