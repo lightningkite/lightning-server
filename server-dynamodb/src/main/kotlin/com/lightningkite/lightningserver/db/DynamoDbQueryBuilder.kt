@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.db
 import com.lightningkite.lightningdb.*
 import com.lightningkite.serialization.*
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
 import java.lang.IllegalArgumentException
@@ -213,6 +212,14 @@ fun <T> Condition<T>.dynamo(serializer: KSerializer<T>, sortKey: String): Dynamo
             filter.append(")")
         })
 
+        is Condition.RawStringContains -> DynamoCondition(writeFilter = {
+            filter.append("contains(")
+            key(field)
+            filter.append(", ")
+            value(value, String.serializer())
+            filter.append(")")
+        })
+
         is Condition.SetSizesEquals<*> -> DynamoCondition(writeFilter = {
             filter.append("size(")
             key(field)
@@ -356,6 +363,14 @@ fun <T> Modification<T>.dynamo(serializer: KSerializer<T>): DynamoModification<T
         })
 
         is Modification.AppendString -> DynamoModification<T>(set = listOf {
+            key(field)
+            filter.append(" = ")
+            key(field)
+            filter.append(" + ")
+            value(this@dynamo.value, String.serializer())
+        })
+
+        is Modification.AppendRawString -> DynamoModification<T>(set = listOf {
             key(field)
             filter.append(" = ")
             key(field)

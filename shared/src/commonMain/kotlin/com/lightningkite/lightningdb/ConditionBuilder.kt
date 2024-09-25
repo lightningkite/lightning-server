@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.*
 import com.lightningkite.Distance
 import com.lightningkite.GeoCoordinate
 import com.lightningkite.Length
@@ -35,9 +36,11 @@ infix fun <K> DataClassPath<K, Int>.allClear(mask: Int) = mapCondition(Condition
 infix fun <K> DataClassPath<K, Int>.allSet(mask: Int) = mapCondition(Condition.IntBitsSet(mask))
 infix fun <K> DataClassPath<K, Int>.anyClear(mask: Int) = mapCondition(Condition.IntBitsAnyClear(mask))
 infix fun <K> DataClassPath<K, Int>.anySet(mask: Int) = mapCondition(Condition.IntBitsAnySet(mask))
+@JvmName("containsRaw") infix fun <K, T : IsRawString> DataClassPath<K, T>.contains(value: String) = mapCondition(Condition.RawStringContains(value, ignoreCase = true))
 infix fun <K> DataClassPath<K, String>.contains(value: String) = mapCondition(Condition.StringContains(value, ignoreCase = true))
 fun <K> DataClassPath<K, GeoCoordinate>.distanceBetween(value: GeoCoordinate, greaterThan: Length = 0.0.miles, lessThan: Length = 100_000.0.miles) = mapCondition(Condition.GeoDistance(value, greaterThan.kilometers, lessThan.kilometers))
 @JsName("xDataClassPathContainsCased") fun <K> DataClassPath<K, String>.contains(value: String, ignoreCase: Boolean) = mapCondition(Condition.StringContains(value, ignoreCase = ignoreCase))
+@JvmName("containsRaw") @JsName("xDataClassPathContainsRawCased") fun <K, T : IsRawString> DataClassPath<K, T>.contains(value: String, ignoreCase: Boolean) = mapCondition(Condition.RawStringContains(value, ignoreCase = ignoreCase))
 fun <K, V> DataClassPath<K, V>.fullTextSearch(value: String, ignoreCase: Boolean, ) = mapCondition(Condition.FullTextSearch<V>(value, ignoreCase = ignoreCase))
 @JsName("xDataClassPathListAll") @JvmName("listAll") inline infix fun <K, reified T> DataClassPath<K, List<T>>.all(condition: (DataClassPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAllElements(path<T>().let(condition)))
 @JsName("xDataClassPathListAny") @JvmName("listAny") inline infix fun <K, reified T> DataClassPath<K, List<T>>.any(condition: (DataClassPath<T, T>) -> Condition<T>) = mapCondition(Condition.ListAnyElements(path<T>().let(condition)))

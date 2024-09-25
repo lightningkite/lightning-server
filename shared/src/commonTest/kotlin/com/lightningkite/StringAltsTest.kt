@@ -27,6 +27,9 @@ class StringAltsTest {
         assertEquals(" jOsEph@LigHTNINGkite.com  ".trimmedCaseless(), testItem.trimmedCaseless)
         assertEquals(" jOsEph@LigHTNINGkite.com  ".trimmed(), testItem.trimmed)
         assertEquals(" jOsEph@LigHTNINGkite.com  ".caseless(), testItem.caseless)
+        assertEquals("joseph@lightningkite.com", " jOsEph".trimmedCaseless().mapRaw { "$it@LigHTNINGkite.com  " }.raw)
+        assertEquals("jOsEph@LigHTNINGkite.com", " jOsEph".trimmed().mapRaw { "$it@LigHTNINGkite.com  " }.raw)
+        assertEquals(" joseph@lightningkite.com  ", " jOsEph".caseless().mapRaw { "$it@LigHTNINGkite.com  " }.raw)
     }
 
     @Serializable

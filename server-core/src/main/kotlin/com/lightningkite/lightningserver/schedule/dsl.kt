@@ -17,3 +17,10 @@ fun schedule(name: String, time: LocalTime, action: suspend () -> Unit): Schedul
     Scheduler.schedules[name] = task
     return task
 }
+
+@LightningServerDsl
+fun schedule(name: String, cron: CronPattern, action: suspend () -> Unit): ScheduledTask {
+    val task = ScheduledTask(name, Schedule.Cron(cron), action)
+    Scheduler.schedules[name] = task
+    return task
+}

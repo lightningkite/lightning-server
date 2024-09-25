@@ -2,7 +2,6 @@ package com.lightningkite
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -10,23 +9,33 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.jvm.JvmInline
 
-interface IsRawString {
+interface IsRawString : Comparable<IsRawString> {
     val raw: String
+    fun mapRaw(action: (String) -> String): IsRawString
+    override fun compareTo(other: IsRawString): Int = raw.compareTo(other.raw)
+
+    companion object {
+        val serialNames = setOf(
+            "TrimmedString",
+            "CaselessString",
+            "TrimmedCaselessString",
+        )
+    }
 }
 
 object TrimOnSerialize: KSerializer<String> {
     override fun deserialize(decoder: Decoder): String = decoder.decodeString().trim()
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TrimmedString", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TrimOnSerialize", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: String) = encoder.encodeString(value)
 }
 object LowercaseOnSerialize: KSerializer<String> {
     override fun deserialize(decoder: Decoder): String = decoder.decodeString().lowercase()
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("CaselessString", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("LowercaseOnSerialize", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: String) = encoder.encodeString(value)
 }
 object TrimLowercaseOnSerialize: KSerializer<String> {
     override fun deserialize(decoder: Decoder): String = decoder.decodeString().trim().lowercase()
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("CaselessString", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TrimLowercaseOnSerialize", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: String) = encoder.encodeString(value)
 }
 
@@ -39,12 +48,11 @@ object TrimmedStringSerializer : KSerializer<TrimmedString> {
 
 @Serializable(TrimmedStringSerializer::class)
 @JvmInline
-value class TrimmedString @Deprecated("Use String.trimmed()") constructor(override val raw: String) : Comparable<TrimmedString>, IsRawString {
-    override fun compareTo(other: TrimmedString): Int = raw.compareTo(other.raw)
-    override fun toString(): String = raw
-}
+value class TrimmedString @Deprecated("Use String.trimmed()") constructor(override val raw: String) : IsRawString {
 
-inline fun TrimmedString.map(action: (String) -> String): TrimmedString = raw.let(action).trimmed()
+    override fun toString(): String = raw
+    override fun mapRaw(action: (String) -> String): TrimmedString = raw.let(action).trimmed()
+}
 
 @Suppress("DEPRECATION", "NOTHING_TO_INLINE")
 inline fun String.trimmed(): TrimmedString = TrimmedString(this.trim())
@@ -60,12 +68,10 @@ object CaselessStringSerializer : KSerializer<CaselessString> {
 
 @Serializable(CaselessStringSerializer::class)
 @JvmInline
-value class CaselessString @Deprecated("Use String.caseless()") constructor(override val raw: String) : Comparable<CaselessString>, IsRawString {
-    override fun compareTo(other: CaselessString): Int = raw.compareTo(other.raw)
+value class CaselessString @Deprecated("Use String.caseless()") constructor(override val raw: String) : IsRawString {
     override fun toString(): String = raw
+    override fun mapRaw(action: (String) -> String): CaselessString = raw.let(action).caseless()
 }
-
-inline fun CaselessString.map(action: (String) -> String): CaselessString = raw.let(action).caseless()
 
 @Suppress("DEPRECATION", "NOTHING_TO_INLINE")
 inline fun String.caseless(): CaselessString = CaselessString(this.lowercase())
@@ -81,12 +87,10 @@ object TrimmedCaselessStringSerializer : KSerializer<TrimmedCaselessString> {
 
 @Serializable(TrimmedCaselessStringSerializer::class)
 @JvmInline
-value class TrimmedCaselessString @Deprecated("Use String.trimmedCaseless()") constructor(override val raw: String) : Comparable<TrimmedCaselessString>, IsRawString {
-    override fun compareTo(other: TrimmedCaselessString): Int = raw.compareTo(other.raw)
+value class TrimmedCaselessString @Deprecated("Use String.trimmedCaseless()") constructor(override val raw: String) : IsRawString {
     override fun toString(): String = raw
+    override fun mapRaw(action: (String) -> String): TrimmedCaselessString = raw.let(action).trimmedCaseless()
 }
-
-inline fun TrimmedCaselessString.map(action: (String) -> String): TrimmedCaselessString = raw.let(action).trimmedCaseless()
 
 @Suppress("DEPRECATION", "NOTHING_TO_INLINE")
 inline fun String.trimmedCaseless(): TrimmedCaselessString = TrimmedCaselessString(this.trim().lowercase())
