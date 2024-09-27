@@ -15,4 +15,5 @@ data class ScheduledTask(val name: String, val schedule: Schedule, val handler: 
 sealed class Schedule {
     data class Frequency(val gap: Duration) : Schedule()
     data class Daily(val time: LocalTime, val zone: TimeZone = TimeZone.currentSystemDefault()) : Schedule()
+    data class Cron(val cron: CronPattern, val zone: TimeZone = TimeZone.currentSystemDefault()) : Schedule()
 }

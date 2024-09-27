@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningdb
 
+import com.lightningkite.*
 import com.lightningkite.GeoCoordinate
 import kotlinx.serialization.*
 import com.lightningkite.serialization.SerializableProperty
@@ -116,6 +117,13 @@ sealed class Condition<in T> {
     @SerialName("StringContains")
     data class StringContains(@DoesNotNeedLabel val value: String, val ignoreCase: Boolean = false) : Condition<String>() {
         override fun invoke(on: String): Boolean = on.contains(value, ignoreCase)
+        override fun toString(): String = ".contains($value, $ignoreCase)"
+    }
+
+    @Serializable
+    @SerialName("StringContains")
+    data class RawStringContains<T: IsRawString>(val value: String, val ignoreCase: Boolean = false) : Condition<T>() {
+        override fun invoke(on: T): Boolean = on.raw.contains(value, ignoreCase)
         override fun toString(): String = ".contains($value, $ignoreCase)"
     }
 

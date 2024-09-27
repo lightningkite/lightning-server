@@ -9,6 +9,7 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.serialization.*
 
 import com.lightningkite.uuid
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
@@ -115,6 +116,9 @@ data class LargeTestModel(
     var char: Char = ' ',
     @Description("Sample description")
     @MaxLength(25) var string: String = "",
+    var trimmedString: TrimmedString = "".trimmed(),
+    var caselessString: CaselessString = "".caseless(),
+    var trimmedCaselessString: TrimmedCaselessString = "".trimmedCaseless(),
     var instant: Instant = Instant.DISTANT_PAST,
     val zonedDateTime: ZonedDateTime = ZonedDateTime(LocalDateTime(2000, 1, 1, 0, 0), TimeZone.currentSystemDefault()),
     var list: List<Int> = listOf(),
