@@ -2,16 +2,14 @@
 
 package com.lightningkite.lightningdb
 
-import com.lightningkite.IsRawString
+import com.lightningkite.*
 import com.lightningkite.serialization.SerializableProperty
 import kotlinx.serialization.*
 
 @Serializable(ModificationSerializer::class)
 sealed class Modification<T>  {
-    open override fun hashCode(): Int { throw NotImplementedError() }
-    open override fun equals(other: Any?): Boolean { throw NotImplementedError() }
-    open operator fun invoke(on: T): T { throw NotImplementedError() }
-    open fun invokeDefault(): T { throw NotImplementedError() }
+    abstract operator fun invoke(on: T): T
+//    abstract fun invokeDefault(): T
     open val isNothing: Boolean get() = false
 
     @Deprecated("Use the modification {} builder instead")
@@ -23,7 +21,7 @@ sealed class Modification<T>  {
         @Suppress("UNCHECKED_CAST")
         inline operator fun <T> invoke(): Modification<T> = this as Modification<T>
         override fun invoke(on: Any?): Any? = on
-        override fun invokeDefault(): Any? = throw IllegalStateException()
+//        override fun invokeDefault(): Any? = throw IllegalStateException()
         override fun toString(): String = ""
     }
 

@@ -2,13 +2,11 @@
 @file:UseContextualSerialization(UUID::class, Instant::class)
 package com.lightningkite.lightningdb.testing
 
-import com.lightningkite.TrimmedCaselessString
-import com.lightningkite.UUID
-import com.lightningkite.ZonedDateTime
+import com.lightningkite.*
 import com.lightningkite.lightningdb.*
 import com.lightningkite.serialization.*
 
-import com.lightningkite.uuid
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant

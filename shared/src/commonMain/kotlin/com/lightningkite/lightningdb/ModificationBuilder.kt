@@ -1,5 +1,6 @@
 package com.lightningkite.lightningdb
 
+import com.lightningkite.IsRawString
 import com.lightningkite.serialization.DataClassPath
 import com.lightningkite.IsRawString
 import kotlin.jvm.JvmName
