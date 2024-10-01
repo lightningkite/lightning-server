@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningdb
 
+import com.lightningkite.IsRawString
 import com.lightningkite.serialization.SerializableProperty
 import kotlinx.serialization.*
 

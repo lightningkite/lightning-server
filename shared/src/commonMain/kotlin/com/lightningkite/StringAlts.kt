@@ -96,3 +96,72 @@ value class TrimmedCaselessString @Deprecated("Use String.trimmedCaseless()") co
 inline fun String.trimmedCaseless(): TrimmedCaselessString = TrimmedCaselessString(this.trim().lowercase())
 
 
+
+
+
+object EmailAddressSerializer : KSerializer<EmailAddress> {
+    override fun deserialize(decoder: Decoder): EmailAddress = decoder.decodeString().toEmailAddress()
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("EmailAddress", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: EmailAddress) = encoder.encodeString(value.raw)
+}
+
+@Serializable(EmailAddressSerializer::class)
+@JvmInline
+value class EmailAddress @Deprecated("Use String.toEmailAddress()") constructor(override val raw: String) : IsRawString {
+    override fun toString(): String = raw
+    val domain get() = raw.substringAfter('@')
+    val localPart get() = raw.substringBefore('@').substringBefore('+')
+    val account get() = raw.substringBefore('@').substringBefore('+').filter { it.isLetter() }
+    val plusAddress get() = raw.substringBefore('+', "")
+    fun toBaseAccount() = "$account@$domain".toEmailAddress()
+    val url: String get() = "mailto:$raw"
+    override fun mapRaw(action: (String) -> String): EmailAddress = raw.let(action).toEmailAddress()
+}
+
+private val emailRegex = Regex("(?:[a-z0-9!#\$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#\$%&'*+/=?^_`{|}~-]+)*|\"(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)\\])")
+@Suppress("DEPRECATION")
+fun String.toEmailAddress(): EmailAddress {
+    val fixed = this.trim().lowercase()
+    if (emailRegex.matches(fixed)) return EmailAddress(fixed)
+    else throw IllegalArgumentException("$fixed is not an email address.")
+}
+
+
+object PhoneNumberSerializer : KSerializer<PhoneNumber> {
+    override fun deserialize(decoder: Decoder): PhoneNumber = decoder.decodeString().toPhoneNumber()
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("PhoneNumber", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: PhoneNumber) = encoder.encodeString(value.raw)
+}
+
+@Serializable(PhoneNumberSerializer::class)
+@JvmInline
+/**
+ * RFC 2806
+ * '+' + country code + subscriber number, no parens/spacing/other formatting
+ * Assumes US by default when parsing.
+ */
+value class PhoneNumber @Deprecated("Use String.toPhoneNumber()") constructor(override val raw: String) : IsRawString {
+    // TODO: Would be nice to have more local formats here, or all?  Keep small for now
+    override fun toString(): String = when {
+        //+18013693729
+        //012345678901
+        raw.startsWith("+1") -> "+1 (${raw.substring(2, 5)}) ${raw.substring(5, 8)}-${raw.substring(8)}"
+        else -> raw
+    }
+    val url: String get() = "tel:$raw"
+    override fun mapRaw(action: (String) -> String): PhoneNumber = raw.let(action).toPhoneNumber()
+}
+
+private val punctuation = setOf(' ', '-', '.', ',', '(', ')', '[', ']', '<', '>')
+
+@Suppress("DEPRECATION")
+fun String.toPhoneNumber(): PhoneNumber {
+    val fixed = this.lowercase().filter { it !in punctuation }
+    if(fixed.startsWith('+')) {
+        return PhoneNumber(fixed)
+    } else if(fixed.length == 10) {
+        return PhoneNumber("+1$fixed")
+    } else {
+        throw IllegalArgumentException("Phone numbers should begin with a '+' and your country code.")
+    }
+}

@@ -162,7 +162,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
         for (entry in byGroup[null] ?: listOf()) {
             append("    ")
             if(entry.belongsToInterface != null) append("override ")
-            this.functionHeader(entry, skipAuth = entry.primaryAuthName == userType)
+            this.functionHeader(entry, skipAuth = true)
             append(" = api.")
             functionCall(entry, skipAuth = false, nullAuth = entry.primaryAuthName != userType)
             appendLine()
@@ -181,7 +181,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
             for (entry in byGroup[group]!!) {
                 append("        ")
                 if(entry.belongsToInterface != null) append("override ")
-                this.functionHeader(entry, skipAuth = entry.primaryAuthName == userType)
+                this.functionHeader(entry, skipAuth = true)
                 append(" = api.")
                 functionCall(entry, skipAuth = false, nullAuth = entry.primaryAuthName != userType)
                 appendLine()

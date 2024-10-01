@@ -13,6 +13,7 @@ import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.titleCase
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.serialization.*
 import kotlinx.coroutines.flow.toList
@@ -233,7 +234,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
                 info.collection(this)
                     .insertMany(values)
             } catch (e: UniqueViolationException) {
-                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+                throw BadRequestException(detail = "unique", message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists", cause = e)
             }
         }
     )
@@ -254,7 +255,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
                     .insertOne(value)
                     ?: throw ForbiddenException("Value was not posted as requested.")
             } catch (e: UniqueViolationException) {
-                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+                throw BadRequestException(detail = "unique", message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists", cause = e)
             }
         }
     )
@@ -276,7 +277,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
                     .new
                     ?: throw NotFoundException()
             } catch (e: UniqueViolationException) {
-                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+                throw BadRequestException(detail = "unique", message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists", cause = e)
             }
         }
     )
@@ -305,7 +306,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
 //                        .new
 //                        ?: throw NotFoundException()
 //                } catch (e: UniqueViolationException) {
-//                    throw BadRequestException(detail = "unique", message = e.message, cause = e)
+//                    throw BadRequestException(detail = "unique", message = e.ke?y.titleCase()",?.let { it already exists${ c } ?: "Already existsause = e)
 //                }
 //            }
 //        )
@@ -329,7 +330,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
                 val db = info.collection(this)
                 values.map { db.replaceOneById(it._id, it) }.mapNotNull { it.new }
             } catch (e: UniqueViolationException) {
-                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+                throw BadRequestException(detail = "unique", message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists", cause = e)
             }
         }
     )
@@ -357,7 +358,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
                     .new
                     ?: throw NotFoundException()
             } catch (e: UniqueViolationException) {
-                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+                throw BadRequestException(detail = "unique", message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists", cause = e)
             }
         }
     )
@@ -387,7 +388,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
                 info.collection(this)
                     .updateManyIgnoringResult(input)
             } catch (e: UniqueViolationException) {
-                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+                throw BadRequestException(detail = "unique", message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists", cause = e)
             }
         }
     )
@@ -421,7 +422,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
                     .updateOneById(path1, input)
                     .also { if (it.old == null && it.new == null) throw NotFoundException() }
             } catch (e: UniqueViolationException) {
-                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+                throw BadRequestException(detail = "unique", message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists", cause = e)
             }
         }
     )
@@ -456,7 +457,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
                     .also { if (it.old == null && it.new == null) throw NotFoundException() }
                     .new!!
             } catch (e: UniqueViolationException) {
-                throw BadRequestException(detail = "unique", message = e.message, cause = e)
+                throw BadRequestException(detail = "unique", message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists", cause = e)
             }
         }
     )

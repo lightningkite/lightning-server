@@ -134,7 +134,7 @@ class ModificationBuilder<K>() {
         modifications.add(
             mapModification(
                 Modification.ListPerElement(
-                    condition = Condition.Always<T>(),
+                    condition = Condition.Always,
                     modification = builder.build()
                 )
             )
@@ -148,7 +148,7 @@ class ModificationBuilder<K>() {
         modifications.add(
             mapModification(
                 Modification.SetPerElement(
-                    condition = Condition.Always<T>(),
+                    condition = Condition.Always,
                     modification = builder.build()
                 )
             )
