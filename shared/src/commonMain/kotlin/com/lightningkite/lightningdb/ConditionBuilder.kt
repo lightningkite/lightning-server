@@ -39,7 +39,6 @@ infix fun <K> DataClassPath<K, Int>.anyClear(mask: Int) = mapCondition(Condition
 infix fun <K> DataClassPath<K, Int>.anySet(mask: Int) = mapCondition(Condition.IntBitsAnySet(mask))
 @JvmName("containsRaw") infix fun <K, T : IsRawString> DataClassPath<K, T>.contains(value: String) = mapCondition(Condition.RawStringContains(value, ignoreCase = true))
 infix fun <K> DataClassPath<K, String>.contains(value: String) = mapCondition(Condition.StringContains(value, ignoreCase = true))
-@JvmName("containsRaw") infix fun <K, T : IsRawString> DataClassPath<K, T>.contains(value: String) = mapCondition(Condition.RawStringContains(value, ignoreCase = true))
 fun <K> DataClassPath<K, GeoCoordinate>.distanceBetween(value: GeoCoordinate, greaterThan: Length = 0.0.miles, lessThan: Length = 100_000.0.miles) = mapCondition(Condition.GeoDistance(value, greaterThan.kilometers, lessThan.kilometers))
 @JsName("xDataClassPathContainsCased") fun <K> DataClassPath<K, String>.contains(value: String, ignoreCase: Boolean) = mapCondition(Condition.StringContains(value, ignoreCase = ignoreCase))
 @JvmName("containsRaw") @JsName("xDataClassPathContainsRawCased") fun <K, T : IsRawString> DataClassPath<K, T>.contains(value: String, ignoreCase: Boolean) = mapCondition(Condition.RawStringContains(value, ignoreCase = ignoreCase))

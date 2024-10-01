@@ -1,8 +1,6 @@
 package com.lightningkite.serialization
 
-import com.lightningkite.GeoCoordinateArraySerializer
-import com.lightningkite.OffsetDateTimeIso8601Serializer
-import com.lightningkite.ZonedDateTimeIso8601Serializer
+import com.lightningkite.*
 import com.lightningkite.lightningserver.files.ServerFileSerializer
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
@@ -122,6 +120,11 @@ class SerializationRegistry(val module: SerializersModule) {
         register(ZonedDateTimeIso8601Serializer)
         register(ServerFileSerializer)
         register(GeoCoordinateArraySerializer)
+        register(TrimmedStringSerializer)
+        register(TrimmedCaselessStringSerializer)
+        register(CaselessStringSerializer)
+        register(EmailAddressSerializer)
+        register(PhoneNumberSerializer)
         register(ListSerializer(NothingSerializer()).descriptor.serialName) { ListSerializer(it[0]) }
         register(SetSerializer(NothingSerializer()).descriptor.serialName) { SetSerializer(it[0]) }
         register(MapSerializer(NothingSerializer(), NothingSerializer()).descriptor.serialName) {

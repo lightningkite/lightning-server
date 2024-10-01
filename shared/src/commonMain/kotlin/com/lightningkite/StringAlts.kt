@@ -108,12 +108,22 @@ object EmailAddressSerializer : KSerializer<EmailAddress> {
 @Serializable(EmailAddressSerializer::class)
 @JvmInline
 value class EmailAddress @Deprecated("Use String.toEmailAddress()") constructor(override val raw: String) : IsRawString {
+    companion object {
+        private val commentRegex = Regex("\\([^)]+\\)")
+    }
     override fun toString(): String = raw
+    val subAddressChar: Char get() = when(domain) {
+        "yahoo.com", -> '-'
+        else -> '+'
+    }
     val domain get() = raw.substringAfter('@')
-    val localPart get() = raw.substringBefore('@').substringBefore('+')
-    val account get() = raw.substringBefore('@').substringBefore('+').filter { it.isLetter() }
-    val plusAddress get() = raw.substringBefore('+', "")
-    fun toBaseAccount() = "$account@$domain".toEmailAddress()
+    val localPart get() = raw.substringBefore('@')
+    val probableAccount get() = raw.substringBefore('@').substringBefore(subAddressChar).let {
+        if(domain == "gmail.com") it.replace(".", "")
+        else it
+    }.replace(commentRegex, "")
+    val subAddress get() = raw.substringBefore('@').substringAfter(subAddressChar, "")
+    fun toProbableBaseEmailAddress() = "$probableAccount@$domain".toEmailAddress()
     val url: String get() = "mailto:$raw"
     override fun mapRaw(action: (String) -> String): EmailAddress = raw.let(action).toEmailAddress()
 }
