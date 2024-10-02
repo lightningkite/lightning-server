@@ -1062,7 +1062,7 @@ abstract class ModificationTests() {
         assertEquals(modification(item), result)
         Unit
     }
-    @Test fun test_Map_setField() = runBlocking {
+    @Test open fun test_Map_setField() = runBlocking {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Map_setField")
         val item = LargeTestModel(map = mapOf("a" to 1))
         collection.insertOne(item)
@@ -1073,7 +1073,7 @@ abstract class ModificationTests() {
         assertEquals(modification(item), result)
         Unit
     }
-    @Test fun test_Map_modifyField() = runBlocking {
+    @Test open fun test_Map_modifyField() = runBlocking {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Map_setField")
         val item = LargeTestModel(map = mapOf("a" to 1))
         collection.insertOne(item)
@@ -1086,7 +1086,7 @@ abstract class ModificationTests() {
         assertEquals(modification(item), result)
         Unit
     }
-    @Test fun test_Map_unsetField() = runBlocking {
+    @Test open fun test_Map_unsetField() = runBlocking {
         val collection = database.collection<LargeTestModel>("LargeTestModel_test_Map_setField")
         val item = LargeTestModel(map = mapOf("a" to 1, "b" to 2))
         collection.insertOne(item)

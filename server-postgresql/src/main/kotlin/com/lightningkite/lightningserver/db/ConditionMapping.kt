@@ -311,7 +311,7 @@ private fun <T> FieldModifier.modification(
 ): Unit {
     when(modification) {
         is Modification.Nothing -> Modification.Nothing
-        is Modification.Chain -> modification.modifications.forEach { modification(modification, fieldSet) }
+        is Modification.Chain -> modification.modifications.forEach { modification(it, fieldSet) }
         is Modification.Assign -> modifyEach(fieldSet, modification.value) { type, it, old -> it }
         is Modification.IfNotNull<*> -> modification<Any?>(modification.modification as Modification<Any?>, fieldSet as FieldSet2<Any?>)
         is Modification.CoerceAtMost -> modifySingle(fieldSet) { type, old -> CustomFunction("LEAST", type, fieldSet.formatSingleExpression(modification.value), old) }
