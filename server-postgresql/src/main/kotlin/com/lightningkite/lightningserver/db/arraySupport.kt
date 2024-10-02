@@ -41,7 +41,7 @@ class ArrayColumnType(val type: ColumnType) : ColumnType() {
             is Array<*> -> value.toList()
             is List<*> -> value
             else -> error("Not sure how to parse ${value} (${value::class.qualifiedName}) from the database!")
-        }.joinToString(",", "ARRAY[", "]") { type.valueToString(it) }
+        }.joinToString(",", "ARRAY[", "]::${type.sqlType()}[]") { type.valueToString(it) }
     }
 
     override fun notNullValueToDB(value: Any): Any {
