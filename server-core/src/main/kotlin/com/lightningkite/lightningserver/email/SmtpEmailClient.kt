@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.email
 
-import com.lightningkite.lightningserver.logger
 import com.lightningkite.lightningserver.settings.generalSettings
 import java.util.*
 import com.lightningkite.UUID
@@ -39,7 +38,7 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
     )
 
     override suspend fun send(email: Email) {
-        if(email.to.isEmpty() && email.cc.isEmpty() && email.bcc.isEmpty()) return
+        if (email.to.isEmpty() && email.cc.isEmpty() && email.bcc.isEmpty()) return
         Transport.send(
             email.copy(
                 fromEmail = email.fromEmail ?: smtpConfig.fromEmail,
@@ -72,6 +71,26 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
                                 .also { if (it.isEmpty()) return@forEach }
                         )
                     }
+            }
+    }
+
+
+    override suspend fun sendBulk(emails: Collection<Email>) {
+        if (emails.isEmpty()) return
+        session.transport
+            .also { it.connect() }
+            .use { transport ->
+                emails.forEach { email ->
+                    transport.sendMessage(
+                        email.toJavaX(session).also { it.saveChanges() },
+                        email.to
+                            .plus(email.cc)
+                            .plus(email.bcc)
+                            .map { InternetAddress(it.value, it.label) }
+                            .toTypedArray()
+                            .also { if (it.isEmpty()) return@forEach }
+                    )
+                }
             }
     }
 }

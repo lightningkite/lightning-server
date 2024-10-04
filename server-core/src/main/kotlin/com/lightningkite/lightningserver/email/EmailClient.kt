@@ -13,6 +13,9 @@ interface EmailClient : HealthCheckable {
     suspend fun sendBulk(template: Email, personalizations: List<EmailPersonalization>) = personalizations.forEach {
         send(it(template))
     }
+    suspend fun sendBulk(emails: Collection<Email>) = emails.forEach {
+        send(it)
+    }
 
     @Deprecated(
         "Prefer send(Email)"
