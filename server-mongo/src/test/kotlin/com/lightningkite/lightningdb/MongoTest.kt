@@ -26,7 +26,6 @@ abstract class MongoTest {
             prepareModelsShared()
             prepareModelsServerCore()
             prepareModelsServerTesting()
-            prepareModelsServerMongo()
             prepareModelsServerMongoTest()
         }
 

@@ -18,7 +18,6 @@ class TestMongoExceptions : MongoTest() {
         prepareModelsShared()
         prepareModelsServerCore()
         prepareModelsServerTesting()
-        prepareModelsServerMongo()
         prepareModelsServerMongoTest()
 
         val collection =

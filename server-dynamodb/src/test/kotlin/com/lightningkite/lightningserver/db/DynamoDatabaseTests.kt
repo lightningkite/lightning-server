@@ -22,14 +22,12 @@ import com.lightningkite.UUID
 import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.prepareModelsShared
 import com.lightningkite.uuid
-import prepareModelsServerDynamodb
 
 class DynamoDBTests() {
     @Test
     fun test() {
         prepareModelsShared()
         prepareModelsServerCore()
-        prepareModelsServerDynamodb()
         prepareModelsServerDynamodbTest()
         runBlocking {
             val database = DynamoDatabase(embeddedDynamo())

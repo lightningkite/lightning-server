@@ -25,7 +25,6 @@ class MongoAggregationsTest : AggregationsTest() {
             prepareModelsShared()
             prepareModelsServerCore()
             prepareModelsServerTesting()
-            prepareModelsServerMongo()
             prepareModelsServerMongoTest()
         }
 
@@ -48,7 +47,6 @@ class MongoConditionTests : ConditionTests() {
         init {
             prepareModelsShared()
             prepareModelsServerCore()
-            prepareModelsServerMongo()
             prepareModelsServerMongoTest()
             prepareModelsServerTesting()
         }
@@ -111,7 +109,6 @@ class MongoModificationTests : ModificationTests() {
             defaultMongo = MongoDatabase("default") { mongoClient!! }
             prepareModelsShared()
             prepareModelsServerCore()
-            prepareModelsServerMongo()
             prepareModelsServerMongoTest()
             prepareModelsServerTesting()
         }
@@ -139,7 +136,6 @@ class MongoOperationsTests : OperationsTests() {
             defaultMongo = MongoDatabase("default") { mongoClient!! }
             prepareModelsShared()
             prepareModelsServerCore()
-            prepareModelsServerMongo()
             prepareModelsServerMongoTest()
             prepareModelsServerTesting()
         }
@@ -167,7 +163,6 @@ class MongoSortTest : SortTest() {
             defaultMongo = MongoDatabase("default") { mongoClient!! }
             prepareModelsShared()
             prepareModelsServerCore()
-            prepareModelsServerMongo()
             prepareModelsServerMongoTest()
             prepareModelsServerTesting()
         }
@@ -195,7 +190,6 @@ class MongoMetaTest : MetaTest() {
             defaultMongo = MongoDatabase("default") { mongoClient!! }
             prepareModelsShared()
             prepareModelsServerCore()
-            prepareModelsServerMongo()
             prepareModelsServerMongoTest()
             prepareModelsServerTesting()
         }
