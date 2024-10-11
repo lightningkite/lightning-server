@@ -8,6 +8,7 @@ import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.prepareModelsShared
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ModificationSimplifyTest {
     init {
@@ -53,5 +54,30 @@ class ModificationSimplifyTest {
         ).forEach {
             assertEquals(it(item), it.simplify()(item))
         }
+    }
+
+    @Test
+    fun testFiltersNothing(){
+
+        val modWithNothing = Modification.Chain<LargeTestModel>(listOf(
+            Modification.Nothing(),
+            modification { it.int assign 1 }
+        ))
+
+        var simplified = modWithNothing.simplify()
+        assertTrue(simplified is Modification.Chain)
+        assertEquals(1, simplified.modifications.size)
+        assertTrue(simplified.modifications.first() is Modification.OnField<*,*>)
+
+
+        val nothingDuringSimplification = Modification.Chain<LargeTestModel>(listOf(
+            Modification.Chain(emptyList()),
+            modification { it.int assign 1 }
+        ))
+        simplified = nothingDuringSimplification.simplify()
+        assertTrue(simplified is Modification.Chain)
+        assertEquals(1, simplified.modifications.size)
+        assertTrue(simplified.modifications.first() is Modification.OnField<*,*>)
+
     }
 }

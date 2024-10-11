@@ -40,7 +40,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api(serverlibs.kotlinXJson)
-                api(serverlibs.kotlinXProperties)
+                api(serverlibs.serializationProperties)
                 api(serverlibs.kotlinXDatetime)
 
                 implementation(serverlibs.kotlinReflect)

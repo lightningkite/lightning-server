@@ -3,7 +3,6 @@ agp="8.2.2"
 androidDesugaring="2.1.2"
 angusMail="2.0.3"
 awsVersion="2.25.24"
-awssdk="2.25.24"
 azureFunctions="3.1.0"
 azureStorage="12.25.3"
 bouncyCastle="1.78.1"
@@ -26,7 +25,7 @@ kotlin="2.0.20"
 kotlinXSerialization="1.7.1"
 kotlinXDatetime="0.6.0"
 kotlinHtmlJvm="0.11.0"
-kotlinerCli="1.0.3"
+kotlinerCli="1.0.5"
 ksp="2.0.20-1.0.25"
 ktor="2.3.12"
 lambdaJavaCore="1.2.3"
@@ -61,7 +60,6 @@ awsLambda={module="software.amazon.awssdk:lambda", version.ref="awsVersion"}
 awsRds={module="software.amazon.awssdk:rds", version.ref="awsVersion"}
 awsS3={module="software.amazon.awssdk:s3", version.ref="awsVersion"}
 awsSes={module="software.amazon.awssdk:ses", version.ref="awsVersion"}
-awssdk={module="software.amazon.awssdk:s3", version.ref="awssdk"}
 azureFunctions={module="com.microsoft.azure.functions:azure-functions-java-library", version.ref="azureFunctions"}
 azureStorage={module="com.azure:azure-storage-blob", version.ref="azureStorage"}
 bouncyCastleBcpkix={module="org.bouncycastle:bcpkix-jdk18on", version.ref="bouncyCastle"}
@@ -85,14 +83,12 @@ kBson={module="com.github.jershell:kbson", version.ref="kbson"}
 kaml={module="com.charleskorn.kaml:kaml", version.ref="kaml"}
 kotlinCompiler={module="org.jetbrains.kotlin:kotlin-compiler", version.ref="kotlin"}
 kotlinHtmlJvm={module="org.jetbrains.kotlinx:kotlinx-html-jvm", version.ref="kotlinHtmlJvm"}
-kotlinJvmHtml={module="org.jetbrains.kotlinx:kotlinx-html-jvm", version.ref="kotlinHtmlJvm"}
 kotlinReflect={module="org.jetbrains.kotlin:kotlin-reflect", version.ref="kotlin"}
 kotlinStdLib={module="org.jetbrains.kotlin:kotlin-stdlib", version.ref="kotlin"}
 kotlinTest={module="org.jetbrains.kotlin:kotlin-test-junit", version.ref="kotlin"}
 kotlinerCli={module="com.lightningkite:kotliner-cli", version.ref="kotlinerCli"}
 kotlinXDatetime={module="org.jetbrains.kotlinx:kotlinx-datetime", version.ref="kotlinXDatetime"}
 kotlinXJson={module="org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref="kotlinXSerialization"}
-kotlinXProperties={module="org.jetbrains.kotlinx:kotlinx-serialization-properties", version.ref="kotlinXSerialization"}
 ksp={module="com.google.devtools.ksp:symbol-processing-api", version.ref="ksp"}
 ktorCallLogging={module="io.ktor:ktor-server-call-logging", version.ref="ktor"}
 ktorCioJvm={module="io.ktor:ktor-server-cio-jvm", version.ref="ktor"}

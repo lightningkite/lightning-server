@@ -24,7 +24,6 @@ dependencies {
     implementation(serverlibs.coroutinesCore)
     api(serverlibs.kotlinHtmlJvm)
     api(serverlibs.oneTimePass)
-    api(serverlibs.serializationProperties)
     api(serverlibs.serializationCbor)
     api(serverlibs.xmlUtilJvm)
     api(serverlibs.mongoBson)

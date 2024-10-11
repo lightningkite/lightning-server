@@ -10,7 +10,7 @@ fun <T> Modification<T>.simplify(): Modification<T> {
             (it as? Modification.Chain)?.modifications ?: listOf(it)
         }
         val lastAssignment = flattened.indexOfLast { it is Modification.Assign }
-        if (lastAssignment == -1) Modification.Chain(flattened)
+        if (lastAssignment == -1) Modification.Chain(flattened.filter { it !is Modification.Nothing })
         else {
             var value = (flattened[lastAssignment] as Modification.Assign<T>).value
             for (mod in flattened.subList(lastAssignment + 1, flattened.size)) {

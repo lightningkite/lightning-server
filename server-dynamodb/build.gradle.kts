@@ -16,7 +16,6 @@ dependencies {
     api(project(":server-core"))
     implementation(serverlibs.coroutinesJdk)
     implementation(serverlibs.coroutinesReactive)
-    api(platform(serverlibs.awssdk))
     api(serverlibs.dynamodb)
     testImplementation(serverlibs.kotlinTest)
     testImplementation(project(":server-testing"))
