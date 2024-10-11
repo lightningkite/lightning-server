@@ -48,6 +48,18 @@ class PathsKtTest {
             assertTrue(condition.readsResultOf(modification {it.listEmbedded.forEach { it.value2 assign 3 } }))
             assertTrue(condition.readsResultOf(modification {it.listEmbedded.forEach { it.value2.plusAssign(1) } }))
         }
+        assertTrue(
+            condition<LargeTestModel> { it.fullTextSearch("asdf", true) }.readsResultOf(
+                modification<LargeTestModel> { it.string assign "asdf" },
+                listOf(path<LargeTestModel>().string.properties, path<LargeTestModel>().stringNullable.properties)
+            )
+        )
+        assertFalse(
+            condition<LargeTestModel> { it.fullTextSearch("asdf", true) }.readsResultOf(
+                modification<LargeTestModel> { it.int assign 2 },
+                listOf(path<LargeTestModel>().string.properties, path<LargeTestModel>().stringNullable.properties)
+            )
+        )
     }
 
     @Test

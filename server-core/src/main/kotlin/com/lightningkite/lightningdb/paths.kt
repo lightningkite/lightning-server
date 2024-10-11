@@ -100,39 +100,55 @@ private fun Condition<*>.emitReadPaths(soFar: DataClassPath<*, *>, out: (DataCla
     // PATH: (((root, a), b), c)
 }
 
-fun <T> Condition<T>.readsResultOf(modification: Modification<T>): Boolean {
+fun <T> Condition<T>.readsResultOf(modification: Modification<T>, tableTextPaths: List<List<SerializableProperty<*, *>>> = listOf()): Boolean {
     return when (this) {
         is Condition.Always -> false
         is Condition.Never -> false
         is Condition.OnField<*, *> -> {
             val field = modification as? Modification.OnField<*, *> ?: return false
             @Suppress("UNCHECKED_CAST")
-            field.key == this.key && (this.condition as Condition<Any?>).readsResultOf(field.modification as Modification<Any?>)
+            field.key == this.key && (this.condition as Condition<Any?>).readsResultOf(field.modification as Modification<Any?>, tableTextPaths.mapNotNull {
+                if(it.isEmpty()) null
+                else if(it[0] == key) it.drop(1)
+                else null
+            })
         }
 
         is Condition.ListAllElements<*> -> @Suppress("UNCHECKED_CAST") (this.condition as Condition<Any?>).readsResultOf(
-            (modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false
+            (modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false,
+            tableTextPaths
         )
 
         is Condition.ListAnyElements<*> -> @Suppress("UNCHECKED_CAST") (this.condition as Condition<Any?>).readsResultOf(
-            (modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false
+            (modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false,
+            tableTextPaths
         )
 
         is Condition.SetAllElements<*> -> @Suppress("UNCHECKED_CAST") (this.condition as Condition<Any?>).readsResultOf(
-            (modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false
+            (modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false,
+            tableTextPaths
         )
 
         is Condition.SetAnyElements<*> -> @Suppress("UNCHECKED_CAST") (this.condition as Condition<Any?>).readsResultOf(
-            (modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false
+            (modification as? Modification.ListPerElement<*>)?.modification as? Modification<Any?> ?: return false,
+            tableTextPaths
         )
 
-        is Condition.And -> this.conditions.any { it.readsResultOf(modification) }
-        is Condition.Or -> this.conditions.any { it.readsResultOf(modification) }
+        is Condition.And -> this.conditions.any { it.readsResultOf(modification, tableTextPaths) }
+        is Condition.Or -> this.conditions.any { it.readsResultOf(modification, tableTextPaths) }
         is Condition.IfNotNull<*> -> {
             @Suppress("UNCHECKED_CAST")
             (this.condition as Condition<Any?>).readsResultOf(
-                (modification as? Modification.IfNotNull<Any?>)?.modification ?: modification as Modification<Any?>
+                (modification as? Modification.IfNotNull<Any?>)?.modification ?: modification as Modification<Any?>,
+                tableTextPaths
             )
+        }
+
+        is Condition.FullTextSearch -> {
+            tableTextPaths.any {
+                it.reversed().fold(Condition.Equal<Any?>(null)) { acc: Condition<Any?>, it: SerializableProperty<*, *> -> Condition.OnField(it as SerializableProperty<Any?, Any?>, acc) }
+                    .readsResultOf(modification, listOf())
+            }
         }
 
         else -> true

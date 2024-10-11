@@ -53,10 +53,10 @@ data class Mask<T>(
             else -> Condition.And(totalConditions)
         }
     }
-    operator fun invoke(condition: Condition<T>): Condition<T> {
+    operator fun invoke(condition: Condition<T>, tableTextPaths: List<List<SerializableProperty<*, *>>> = listOf()): Condition<T> {
         val totalConditions = ArrayList<Condition<T>>()
         for(pair in pairs) {
-            if(condition.readsResultOf(pair.second)) totalConditions.add(pair.first)
+            if(condition.readsResultOf(pair.second, tableTextPaths)) totalConditions.add(pair.first)
         }
         return when(totalConditions.size) {
             0 -> Condition.Always()
