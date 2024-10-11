@@ -13,6 +13,9 @@ open class ModelPermissionsFieldCollection<Model : Any>(
     val permissions: ModelPermissions<Model>
 ) : FieldCollection<Model> {
     override val serializer: KSerializer<Model> get() = wraps.serializer
+    private val textIndexPaths = serializer.descriptor.annotations.filterIsInstance<TextIndex>()
+        .firstOrNull()?.fields?.map { DataClassPathSerializer(serializer).fromString(it).properties }
+        ?: listOf()
 
     override suspend fun find(
         condition: Condition<Model>,
@@ -23,7 +26,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
     ): Flow<Model> {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
         return wraps.find(
-            condition = condition and permissions.read and sortImposedConditions and permissions.readMask(condition),
+            condition = condition and permissions.read and sortImposedConditions and permissions.readMask(condition, textIndexPaths),
             orderBy = orderBy,
             skip = skip,
             limit = limit,
@@ -48,7 +51,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         }
         return wraps.findPartial(
             fields = allFields,
-            condition = condition and permissions.read and sortImposedConditions and permissions.readMask(condition),
+            condition = condition and permissions.read and sortImposedConditions and permissions.readMask(condition, textIndexPaths),
             orderBy = orderBy,
             skip = skip,
             limit = limit,
@@ -68,7 +71,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         groupBy: DataClassPath<Model, Key>
     ): Map<Key, Int> {
         return wraps.groupCount(
-            condition and permissions.read and permissions.readMask(groupBy) and permissions.readMask(condition),
+            condition and permissions.read and permissions.readMask(groupBy) and permissions.readMask(condition, textIndexPaths),
             groupBy
         )
     }
@@ -77,7 +80,8 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         aggregate: Aggregate,
         condition: Condition<Model>,
         property: DataClassPath<Model, N>
-    ): Double? = wraps.aggregate(aggregate, condition and permissions.read and permissions.readMask(condition), property)
+    ): Double? =
+        wraps.aggregate(aggregate, condition and permissions.read and permissions.readMask(condition, textIndexPaths), property)
 
     override suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
@@ -86,12 +90,16 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         property: DataClassPath<Model, N>
     ): Map<Key, Double?> = wraps.groupAggregate(
         aggregate,
-        condition and permissions.read and permissions.readMask(groupBy) and permissions.readMask(condition),
+        condition and permissions.read and permissions.readMask(groupBy) and permissions.readMask(condition, textIndexPaths),
         groupBy,
         property
     )
 
-    override suspend fun replaceOne(condition: Condition<Model>, model: Model, orderBy: List<SortPart<Model>>): EntryChange<Model> {
+    override suspend fun replaceOne(
+        condition: Condition<Model>,
+        model: Model,
+        orderBy: List<SortPart<Model>>
+    ): EntryChange<Model> {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
         return wraps.replaceOne(
             condition and permissions.allowed(Modification.Assign(model)) and sortImposedConditions,
@@ -116,7 +124,11 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         orderBy: List<SortPart<Model>>
     ): EntryChange<Model> {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
-        return wraps.updateOne(condition and permissions.allowed(modification) and sortImposedConditions, modification, orderBy)
+        return wraps.updateOne(
+            condition and permissions.allowed(modification) and sortImposedConditions,
+            modification,
+            orderBy
+        )
             .map { permissions.mask(it) }
     }
 
@@ -126,7 +138,11 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         orderBy: List<SortPart<Model>>
     ): Boolean {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
-        return wraps.updateOneIgnoringResult(condition and permissions.allowed(modification) and sortImposedConditions, modification, orderBy)
+        return wraps.updateOneIgnoringResult(
+            condition and permissions.allowed(modification) and sortImposedConditions,
+            modification,
+            orderBy
+        )
     }
 
     override suspend fun updateManyIgnoringResult(condition: Condition<Model>, modification: Modification<Model>): Int {
@@ -174,14 +190,17 @@ open class ModelPermissionsFieldCollection<Model : Any>(
 
     override suspend fun deleteOne(condition: Condition<Model>, orderBy: List<SortPart<Model>>): Model? {
         val sortImposedConditions = permissions.readMask.permitSort(orderBy)
-        return wraps.deleteOne(condition and permissions.delete and sortImposedConditions, orderBy)?.let { permissions.mask(it) }
+        return wraps.deleteOne(condition and permissions.delete and sortImposedConditions, orderBy)
+            ?.let { permissions.mask(it) }
     }
 
     override suspend fun deleteMany(condition: Condition<Model>): List<Model> {
         return wraps.deleteMany(condition and permissions.delete).map { permissions.mask(it) }
     }
 
-    override suspend fun fullCondition(condition: Condition<Model>): Condition<Model> = permissions.read and condition and permissions.readMask(condition)
+    override suspend fun fullCondition(condition: Condition<Model>): Condition<Model> =
+        permissions.read and condition and permissions.readMask(condition, textIndexPaths)
+
     override suspend fun mask(): Mask<Model> = permissions.readMask
 }
 

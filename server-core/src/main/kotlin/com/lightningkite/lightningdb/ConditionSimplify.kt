@@ -17,8 +17,8 @@ fun <T> Condition<T>.simplify(): Condition<T> {
                     val keyCond = it.value.map { it.second as Condition<Any?> }.reduce(::reduceAnd).finalSimplify()
 //                    println("AND reduced to $keyCond")
                     when (keyCond) {
-                        is Condition.Always -> return@mapNotNull null
-                        is Condition.Never -> return Condition.Never<T>()
+                        Condition.Always -> return@mapNotNull null
+                        Condition.Never -> return Condition.Never
                         else -> {
                             @Suppress("UNCHECKED_CAST")
                             make(it.key, keyCond) as Condition<T>
@@ -45,8 +45,8 @@ fun <T> Condition<T>.simplify(): Condition<T> {
                     }.reduce(::reduceOr).finalSimplify()
 //                    println("OR reduced to $keyCond")
                     when (keyCond) {
-                        is Condition.Always -> return Condition.Always<T>()
-                        is Condition.Never -> return@mapNotNull null
+                        Condition.Always -> return Condition.Always
+                        Condition.Never -> return@mapNotNull null
                         else -> {
                             @Suppress("UNCHECKED_CAST")
                             make(it.key, keyCond) as Condition<T>
@@ -66,6 +66,8 @@ fun <T> Condition<T>.simplify(): Condition<T> {
 }
 
 private fun <T> Condition<T>.finalSimplify(): Condition<T> = when(this) {
+    is Condition.And -> if(conditions.any { it == Condition.Never }) Condition.Never else this
+    is Condition.Or -> if(conditions.any { it == Condition.Always }) Condition.Always else this
     is Condition.Inside -> if(values.isEmpty()) Condition.Never() else this
     is Condition.NotInside -> if(values.isEmpty()) Condition.Always() else this
     else -> this

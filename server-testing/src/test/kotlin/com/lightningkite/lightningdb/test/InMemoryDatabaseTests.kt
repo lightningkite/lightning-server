@@ -15,6 +15,7 @@ import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.test
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 import java.io.File
 import kotlin.test.assertEquals
@@ -112,6 +113,7 @@ class SecurityTest() {
                 read = Condition.Always(),
                 readMask = mask {
                     always(it.intNullable.maskedTo(null))
+                    always(it.string.maskedTo(""))
                 },
                 update = Condition.Always(),
                 delete = Condition.Always(),
@@ -126,6 +128,41 @@ class SecurityTest() {
             assertEquals(4, results.size)
             for(r in results) assertEquals(null, r.intNullable)
         }
+    }
+
+    @Test fun ftsPositive(): Unit = runBlocking {
+        val unsecured = TestSettings.database().collection<LargeTestModel>("SecurityTest_test")
+        val secured = unsecured.withPermissions(ModelPermissions(
+            create = Condition.Always(),
+            read = Condition.Always(),
+            readMask = mask {
+                always(it.intNullable.maskedTo(null))
+                always(it.string.maskedTo(""))
+            },
+            update = Condition.Always(),
+            delete = Condition.Always(),
+        ))
+        assertEquals(
+            Condition.Never,
+            secured.fullCondition(condition { it.fullTextSearch("zsadf", true) }).simplify()
+        )
+    }
+
+    @Test fun ftsNegative(): Unit = runBlocking {
+        val unsecured = TestSettings.database().collection<LargeTestModel>("SecurityTest_test")
+        val secured = unsecured.withPermissions(ModelPermissions(
+            create = Condition.Always(),
+            read = Condition.Always(),
+            readMask = mask {
+                always(it.intNullable.maskedTo(null))
+            },
+            update = Condition.Always(),
+            delete = Condition.Always(),
+        ))
+        assertNotEquals(
+            Condition.Never,
+            secured.fullCondition(condition { it.fullTextSearch("zsadf", true) }).simplify()
+        )
     }
 }
 

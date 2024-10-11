@@ -114,6 +114,7 @@ data class EmbeddedNullable(
 
 @GenerateDataClassPaths
 @Serializable
+@TextIndex(["string", "embedded.value1"])
 data class LargeTestModel(
     override val _id: UUID = uuid(),
     var boolean: Boolean = false,
