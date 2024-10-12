@@ -14,6 +14,7 @@ import com.lightningkite.lightningserver.auth.token.TokenFormat
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
+import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.modelInfo
@@ -503,11 +504,26 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     )
 
     private suspend fun RefreshToken.session(request: Request?): Session<SUBJECT, ID>? {
-        if (!valid) return null
-        if (type != handler.name) return null
-        val session = sessionInfo.collection().get(_id) ?: return null
-        if (!plainTextSecret.checkAgainstHash(session.secretHash)) return null
-        if (session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()) return null
+        if (!valid) {
+//            if(generalSettings().debug) println("Auth failed because !valid")
+            return null
+        }
+        if (type != handler.name) {
+//            if(generalSettings().debug) println("Auth failed because type != handler.name")
+            return null
+        }
+        val session = sessionInfo.collection().get(_id) ?: run {
+//            if(generalSettings().debug) println("Auth failed because session does not exist")
+            return null
+        }
+        if (!plainTextSecret.checkAgainstHash(session.secretHash)) {
+//            if(generalSettings().debug) println("Auth failed because !plainTextSecret.checkAgainstHash(session.secretHash)")
+            return null
+        }
+        if (session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()) {
+//            if(generalSettings().debug) println("Auth failed because session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()")
+            return null
+        }
         sessionInfo.collection().updateOneById(_id, modification(dataClassPath) {
             it.lastUsed assign now()
             it.userAgents addAll setOf(request?.headers?.get(HttpHeader.UserAgent) ?: "")

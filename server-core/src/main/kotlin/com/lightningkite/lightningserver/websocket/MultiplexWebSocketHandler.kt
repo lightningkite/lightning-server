@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -73,8 +74,14 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
                 domain = event.domain,
                 protocol = event.protocol,
                 sourceIp = event.sourceIp,
-                headers = event.headers.entries + (event.queryParameter("jwt")?.let { listOf("Authorization" to it) }
-                    ?: listOf())
+                headers = event.headers.entries + ((event.queryParameter("jwt") ?: event.queryParameter("authorization"))?.let {
+//                    if(generalSettings().debug) println("Passing on authorization $it")
+                    listOf("Authorization" to it)
+                }
+                    ?: run {
+//                    if(generalSettings().debug) println("Passing on no authorization... ${event.queryParameters}")
+                        listOf()
+                    })
             ),
             timeToLive = 1.days
         )

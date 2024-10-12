@@ -65,6 +65,17 @@ class TextConditionTest: MongoTest() {
     }
 
     @Test
+    fun testTextSearchMisspell() = runBlocking {
+        val collection = defaultMongo.collection<ModelWithTextIndex>() as MongoFieldCollection<ModelWithTextIndex>
+        val value1 = ModelWithTextIndex(string = "One Two Three")
+        val value2 = ModelWithTextIndex(string = "Five Six Seven")
+        collection.insertOne(value1)
+        collection.insertOne(value2)
+
+        println(collection.find(path<ModelWithTextIndex>().fullTextSearch("Threee", true)).toList())
+    }
+
+    @Test
     fun testContains() = runBlocking {
         val collection = defaultMongo.collection<ModelWithTextIndex>("TextConditionSearchTest") as MongoFieldCollection<ModelWithTextIndex>
         val value1 = ModelWithTextIndex(string = "One Two Three")
