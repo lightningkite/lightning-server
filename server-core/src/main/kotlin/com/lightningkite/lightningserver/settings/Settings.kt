@@ -19,6 +19,11 @@ object Settings {
     var sealed = false
         private set
 
+    fun clear() {
+        sealed = false
+        values.clear()
+    }
+
     fun populate(map: Map<String, Any?>) {
         if (sealed) throw IllegalStateException("Settings have already been populated.")
         values.putAll(map.mapValues { Box(it.value) })

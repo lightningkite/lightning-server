@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlin.reflect.KType
 
-class MongoDatabase(val databaseName: String, private val makeClient: () -> MongoClient) : Database, Disconnectable {
+class MongoDatabase(val databaseName: String, val atlasSearch: Boolean = false, private val makeClient: () -> MongoClient) : Database, Disconnectable {
 
     companion object {
         init {
@@ -24,7 +24,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                 Regex("""mongodb://.*/(?<databaseName>[^?]+)(?:\?.*)?""")
                     .matchEntire(it.url)
                     ?.let { match ->
-                        MongoDatabase(databaseName = match.groups["databaseName"]!!.value) {
+                        MongoDatabase(databaseName = match.groups["databaseName"]!!.value, atlasSearch = false) {
                             MongoClient.create(MongoClientSettings.builder()
                                 .applyConnectionString(ConnectionString(it.url))
                                 .uuidRepresentation(UuidRepresentation.STANDARD)
@@ -45,9 +45,11 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                 Regex("""mongodb\+srv://.*/(?<databaseName>[^?]+)(?:\?.*)?""")
                     .matchEntire(it.url)
                     ?.let { match ->
-                        MongoDatabase(databaseName = match.groups["databaseName"]!!.value) {
+                        val atlasSearch = it.url.contains("atlasSearch=true")
+                        val withoutAtlasSearch = it.url.replace("?atlasSearch=true", "").replace("&atlasSearch=true", "")
+                        MongoDatabase(databaseName = match.groups["databaseName"]!!.value, atlasSearch = atlasSearch) {
                             MongoClient.create(MongoClientSettings.builder()
-                                .applyConnectionString(ConnectionString(it.url))
+                                .applyConnectionString(ConnectionString(withoutAtlasSearch))
                                 .uuidRepresentation(UuidRepresentation.STANDARD)
                                 .applyToConnectionPoolSettings {
                                     if (Settings.isServerless) {
@@ -69,7 +71,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                         val params: Map<String, List<String>>? = match.groups["params"]?.value?.let { params ->
                             DatabaseSettings.parseParameterString(params)
                         }
-                        MongoDatabase(databaseName = "default") {
+                        MongoDatabase(databaseName = "default", atlasSearch = false) {
                             testMongo(version = params?.get("mongoVersion")?.firstOrNull())
                         }
                     }
@@ -83,7 +85,7 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
                         val params: Map<String, List<String>>? = match.groups["params"]?.value?.let { params ->
                             DatabaseSettings.parseParameterString(params)
                         }
-                        MongoDatabase(databaseName = params?.get("databaseName")?.firstOrNull() ?: "default") {
+                        MongoDatabase(databaseName = params?.get("databaseName")?.firstOrNull() ?: "default", atlasSearch = false) {
                             embeddedMongo(
                                 databaseFolder = File(folder),
                                 port = params?.get("port")?.firstOrNull()?.toIntOrNull(),
@@ -126,13 +128,15 @@ class MongoDatabase(val databaseName: String, private val makeClient: () -> Mong
     override fun <T : Any> collection(serializer: KSerializer<T>, name: String): MongoFieldCollection<T> =
         (collections.getOrPut(serializer to name) {
             lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-                MongoFieldCollection(serializer, object : MongoCollectionAccess {
+                MongoFieldCollection(serializer, atlasSearch = atlasSearch, object : MongoCollectionAccess {
+                    override suspend fun <T> wholeDb(action: suspend com.mongodb.kotlin.client.coroutine.MongoDatabase.() -> T): T {
+                        return action(databaseLazy.value)
+                    }
                     override suspend fun <T> run(action: suspend MongoCollection<BsonDocument>.() -> T): T = run2(action, 0)
                     suspend fun <T> run2(action: suspend MongoCollection<BsonDocument>.() -> T, tries: Int = 0): T {
                         val it = (coroutineCollections.getOrPut(serializer to name) {
                             lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-                                databaseLazy.value
-                                    .getCollection(name, BsonDocument::class.java)
+                                databaseLazy.value.getCollection(name, BsonDocument::class.java)
                             }
                         } as Lazy<MongoCollection<BsonDocument>>).value
                         try {

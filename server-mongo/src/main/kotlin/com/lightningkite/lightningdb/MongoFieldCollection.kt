@@ -3,9 +3,12 @@ package com.lightningkite.lightningdb
 import com.lightningkite.GeoCoordinateGeoJsonSerializer
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.serialization.DataClassPath
+import com.lightningkite.serialization.*
 import com.mongodb.MongoCommandException
 import com.mongodb.client.model.*
+import com.mongodb.client.model.search.SearchOperator
+import com.mongodb.client.model.search.SearchOptions
+import com.mongodb.client.model.search.SearchPath
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Job
@@ -15,15 +18,22 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.elementDescriptors
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.serializer
+import org.bson.BsonBoolean
 import org.bson.BsonDocument
+import org.bson.BsonValue
 import org.bson.conversions.Bson
 import java.util.concurrent.TimeUnit
+import kotlin.reflect.KClass
 
 class MongoFieldCollection<Model : Any>(
     override val serializer: KSerializer<Model>,
+    val atlasSearch: Boolean,
     private val access: MongoCollectionAccess,
 ) : FieldCollection<Model> {
+
+    var defaultThreshold: Double = 0.5
 
     private suspend inline fun <T> access(crossinline action: suspend MongoCollection<BsonDocument>.() -> T): T {
         return access.run {
@@ -277,31 +287,51 @@ class MongoFieldCollection<Model : Any>(
         val cs = condition.simplify()
         if (cs is Condition.Never) return emptyFlow()
         return access {
-            find(cs.bson(serializer))
-                .let {
-                    if (skip != 0) it.skip(skip)
-                    else it
+            var anyFts: Condition.FullTextSearch<*>? = null
+            condition.walk { if (it is Condition.FullTextSearch) anyFts = it }
+
+            aggregate<BsonDocument>(
+                buildList {
+                    if(anyFts != null && atlasSearch) {
+                        add(documentOf(
+                            "\$search" to documentOf(
+                                "index" to "default",
+                                "text" to documentOf(
+                                    "query" to anyFts!!.value,
+                                    "fuzzy" to documentOf(),
+                                    "path" to documentOf("wildcard" to "*")
+                                )
+                            )
+                        ))
+                        add(Aggregates.project(Projections.metaSearchScore("search_score").toBsonDocument().apply {
+                            for(field in serializer.descriptor.elementNames) put(field, BsonBoolean(true))
+                        }))
+//                        add(Aggregates.addFields(Field("search_score", documentOf("\$meta" to "search_score"))))
+                        add(Aggregates.match(Filters.gte("search_score", anyFts!!.threshold ?: defaultThreshold)))
+                        add(Aggregates.match(cs.bson(serializer, atlasSearch = true)))
+                    } else {
+                        add(Aggregates.match(cs.bson(serializer)))
+                    }
+
+                    if (anyFts != null && !atlasSearch) {
+                        add(Aggregates.project(Projections.metaTextScore("text_search_score")))
+                        add(Aggregates.sort(sort(orderBy, Sorts.metaTextScore("text_search_score"))))
+                    } else if(orderBy.isNotEmpty()) {
+                        add(Aggregates.sort(sort(orderBy)))
+                    }
+                    add(Aggregates.skip(skip))
+                    add(Aggregates.limit(limit))
                 }
-                .let {
-                    if (limit != Int.MAX_VALUE) it.limit(limit)
-                    else it
-                }
-                .maxTime(maxQueryMs, TimeUnit.MILLISECONDS)
-                .let {
-                    var anyFts = false
-                    condition.walk { if (it is Condition.FullTextSearch) anyFts = true }
-                    val mts = if (anyFts) {
-                        it.projection(Projections.metaTextScore("text_search_score"))
-                        Sorts.metaTextScore("text_search_score")
-                    } else null
-                    it.sort(sort(orderBy, mts))
-                }
+            )
                 .let {
                     if (orderBy.any { it.ignoreCase }) {
                         it.collation(Collation.builder().locale("en").build())
                     } else it
                 }
-                .map { Serialization.Internal.bson.load(serializer, it) }
+                .maxTime(maxQueryMs, TimeUnit.MILLISECONDS)
+                .map {
+                    Serialization.Internal.bson.load(serializer, it)
+                }
         }
     }
 
@@ -401,34 +431,115 @@ class MongoFieldCollection<Model : Any>(
             val requireCompletion = ArrayList<Job>()
 
             serializer.descriptor.annotations.filterIsInstance<TextIndex>().firstOrNull()?.let {
+                defaultThreshold = it.defaultThreshold
                 requireCompletion += launch {
-                    val name = "${namespace.fullName}TextIndex"
-                    val keys = documentOf(*it.fields.map { it to "text" }.toTypedArray())
-                    val options = IndexOptions().name(name)
-                    try {
-                        createIndex(keys, options)
-                    } catch (e: MongoCommandException) {
-                        if(e.errorCode == 85) {
-                            //there is an exception if the parameters of an existing index are changed.
-                            //then drop the index and create a new one
-                            try {
-                                dropIndex(name)
-                                createIndex(
-                                    keys,
-                                    options
-                                )
-                            } catch (e2: MongoCommandException) {
-                                Exception(
-                                    "Creating text index failed on ${this@prepare.namespace.fullName}",
-                                    e
-                                ).report()
-                                Exception(
-                                    "Creating text index failed on ${this@prepare.namespace.fullName} even after attempted removal",
-                                    e2
-                                ).report()
+                    if(atlasSearch) {
+                        val name = "default"
+                        val keys = documentOf()
+                        val ser = DataClassPathSerializer(serializer)
+                        for(key in it.fields) {
+                            val path = ser.fromString(key)
+                            @Suppress("UNCHECKED_CAST")
+                            fun KSerializer<*>.unwrap(): KSerializer<*> {
+                                return when {
+                                    this.descriptor.isNullable -> this.innerElement()
+                                    this.descriptor.kind == StructureKind.LIST -> this.innerElement()
+                                    this.descriptor.kind == SerialKind.CONTEXTUAL -> Serialization.module.getContextual<Any>(this.descriptor.capturedKClass as KClass<Any>) as KSerializer<*>
+                                    else -> this
+                                }
                             }
-                        } else {
-                            e.report()
+                            val type = path.serializerAny.unwrap()
+                            val mongoType = when(type.descriptor.serialName) {
+                                "kotlin.Boolean" -> "boolean"
+                                "kotlinx.datetime.Instant" -> "date"
+                                "kotlin.Byte",
+                                "kotlin.Short",
+                                "kotlin.Int",
+                                "kotlin.Long",
+                                "kotlin.UByte",
+                                "kotlin.UShort",
+                                "kotlin.UInt",
+                                "kotlin.ULong",
+                                "kotlin.Float",
+                                "kotlin.Double",
+                                -> "number"
+                                "kotlin.String" -> "string"
+                                "com.lightningkite.UUID" -> "uuid"
+                                else -> continue
+                            }
+                            keys[key] = listOf(documentOf("type" to mongoType))
+                        }
+                        val existing = listSearchIndexes().name(name).toList().firstOrNull()
+                        if(existing == null) {
+                            try {
+                                createSearchIndex(
+                                    name, documentOf(
+                                        "mappings" to documentOf(
+                                            "dynamic" to false,
+                                            "fields" to keys
+                                        )
+                                    )
+                                )
+                            } catch(e: MongoCommandException) {
+                                if(e.errorCode == 26) {
+                                    access.wholeDb {
+                                        createCollection(this@prepare.namespace.collectionName)
+                                    }
+                                    createSearchIndex(
+                                        name, documentOf(
+                                            "mappings" to documentOf(
+                                                "dynamic" to false,
+                                                "fields" to keys
+                                            )
+                                        )
+                                    )
+                                } else throw e
+                            }
+                        } else if(it.fields.any {
+                                existing.getEmbedded(listOf("latestDefinition", "mappings", "fields", it), Any::class.java) == null
+                            }) {
+                            try {
+                                updateSearchIndex(
+                                    name, documentOf(
+                                        "mappings" to documentOf(
+                                            "dynamic" to false,
+                                            "fields" to keys
+                                        )
+                                    )
+                                )
+                            } catch(e: NoSuchElementException) {
+                                // suppress dumb issue in library
+                            }
+                        }
+                    } else {
+                        val name = "${namespace.fullName}TextIndex"
+                        val options = IndexOptions().name(name)
+                        val keys = documentOf(*it.fields.map { it.replace("?", "") to "text" }.toTypedArray())
+                        try {
+                            createIndex(keys, options)
+                        } catch (e: MongoCommandException) {
+                            if (e.errorCode == 85) {
+                                //there is an exception if the parameters of an existing index are changed.
+                                //then drop the index and create a new one
+                                try {
+                                    dropIndex(name)
+                                    createIndex(
+                                        keys,
+                                        options
+                                    )
+                                } catch (e2: MongoCommandException) {
+                                    Exception(
+                                        "Creating text index failed on ${this@prepare.namespace.fullName}",
+                                        e
+                                    ).report()
+                                    Exception(
+                                        "Creating text index failed on ${this@prepare.namespace.fullName} even after attempted removal",
+                                        e2
+                                    ).report()
+                                }
+                            } else {
+                                e.report()
+                            }
                         }
                     }
                 }

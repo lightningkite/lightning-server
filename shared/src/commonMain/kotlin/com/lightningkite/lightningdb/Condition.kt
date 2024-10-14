@@ -136,13 +136,17 @@ sealed class Condition<in T> {
 
     @Serializable
     @SerialName("FullTextSearch")
-    data class FullTextSearch<T>(@DoesNotNeedLabel val value: String, val ignoreCase: Boolean = false) :
+    data class FullTextSearch<T>(
+        @DoesNotNeedLabel val value: String,
+        val ignoreCase: Boolean = false,
+        val threshold: Double? = null,
+    ) :
         Condition<T>() {
         override fun invoke(on: T): Boolean {
             val asText = on.toString()
             return value.split(' ').all { asText.contains(it, ignoreCase) }
         }
-        override fun toString(): String = ".fullTextSearch($value, $ignoreCase)"
+        override fun toString(): String = ".fullTextSearch($value, $ignoreCase, $threshold)"
     }
 
     @Serializable
