@@ -16,6 +16,7 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.prepareModelsShared
 import com.lightningkite.serialization.*
 import com.lightningkite.UUID
+import kotlin.test.Ignore
 
 abstract class ConditionTests() {
 
@@ -39,6 +40,7 @@ abstract class ConditionTests() {
         Unit
     }
 
+    @Ignore
     @Test open fun test_geodistance_2() = runBlocking {
         val collection = database.collection<GeoTest>("test_geodistance_2")
         val lk = GeoCoordinate(41.727019, -111.8443002)

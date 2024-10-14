@@ -81,10 +81,14 @@ private fun <T> Condition<T>.dump(serializer: KSerializer<T>, into: Document = D
         }
 //        is Condition.Not -> condition.dump(serializer, into.sub(key)["\$not"], key)
         is Condition.OnKey<*> -> (condition as Condition<Any?>).dump(serializer.mapValueElement() as KSerializer<Any?>, into, if (key == null) this.key else "$key.${this.key}", atlasSearch = atlasSearch)
-        is Condition.GeoDistance -> into.sub(key)["\$near"] = documentOf(
-            "\$maxDistance" to this.lessThanKilometers * 1000,
-            "\$minDistance" to this.greaterThanKilometers * 1000,
-            "\$geometry" to Serialization.Internal.bson.stringifyAny(GeoCoordinateGeoJsonSerializer, this.value),
+        is Condition.GeoDistance -> into.sub(key)["\$geoWithin"] = documentOf(
+            "\$centerSphere" to listOf(
+                listOf(this.value.longitude, this.value.latitude),
+                this.lessThanKilometers / 6378.1
+            )
+//            "\$maxDistance" to this.lessThanKilometers * 1000,
+//            "\$minDistance" to this.greaterThanKilometers * 1000,
+//            "\$geometry" to Serialization.Internal.bson.stringifyAny(GeoCoordinateGeoJsonSerializer, this.value),
         )
         is Condition.StringContains -> {
             into.sub(key).also {

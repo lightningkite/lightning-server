@@ -314,7 +314,9 @@ class MongoFieldCollection<Model : Any>(
                     }
 
                     if (anyFts != null && !atlasSearch) {
-                        add(Aggregates.project(Projections.metaTextScore("text_search_score")))
+                        add(Aggregates.project(Projections.metaSearchScore("text_search_score").toBsonDocument().apply {
+                            for(field in serializer.descriptor.elementNames) put(field, BsonBoolean(true))
+                        }))
                         add(Aggregates.sort(sort(orderBy, Sorts.metaTextScore("text_search_score"))))
                     } else if(orderBy.isNotEmpty()) {
                         add(Aggregates.sort(sort(orderBy)))
