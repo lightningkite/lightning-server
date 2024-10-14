@@ -300,6 +300,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                         time
                     }
                     delay((upcomingRun - System.currentTimeMillis()).coerceAtLeast(1L))
+                    val nextRun = it.schedule.calculateNextRun(now())
                     if (cache.setIfNotExists(it.name + "-lock", true)) {
                         cache.set(it.name + "-lock", true, 1.hours)
                         try {
@@ -309,7 +310,6 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                         } catch (t: Throwable) {
                             exceptionSettings().report(t)
                         }
-                        val nextRun = it.schedule.calculateNextRun(now())
                         cache.set<Long>(it.name + "-nextRun", nextRun)
                         cache.remove(it.name + "-lock")
                     } else {
