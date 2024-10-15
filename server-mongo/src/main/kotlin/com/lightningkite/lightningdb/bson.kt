@@ -112,7 +112,7 @@ private fun <T> Condition<T>.dump(serializer: KSerializer<T>, into: Document = D
             if(atlasSearch) {}
             else into["\$text"] = documentOf(
                 "\$search" to value,
-                "\$caseSensitive" to !this.ignoreCase
+                "\$caseSensitive" to false
             )
         }
         is Condition.SetSizesEquals<*> -> into.sub(key)["\$size"] = count

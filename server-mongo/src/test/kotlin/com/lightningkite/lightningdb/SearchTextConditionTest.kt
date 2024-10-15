@@ -31,7 +31,7 @@ class SearchTextConditionTest {
 
     @Serializable
     @GenerateDataClassPaths
-    @TextIndex(["string", "otherField", "anotherField"], 0.1)
+    @TextIndex(["string", "otherField", "anotherField"])
     data class ModelWithTextIndex2(
         override val _id: UUID = uuid(),
         val string: String = "nothere",
@@ -89,48 +89,24 @@ class SearchTextConditionTest {
         delay(1.seconds)
 
         var query = "One"
-        var condition = path<ModelWithTextIndex2>().fullTextSearch(query, false)
+        var condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
         var results = collection.find(condition).toList()
         assertContains(results, value1)
 
-        // TODO: Respect caps sensitivity?
-//        query = "one"
-//        condition = path<ModelWithTextIndex2>().fullTextSearch(query, false)
-//        results = collection.find(condition).toList()
-//        assertFalse(results.contains(value1))
+        query = "One two three"
+        condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
+        results = collection.find(condition).toList()
+        assertContains(results, value1)
+
+        query = "One two four"
+        condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
+        results = collection.find(condition).toList()
+        assertTrue(results.isEmpty())
 
         query = "one"
-        condition = path<ModelWithTextIndex2>().fullTextSearch(query, true)
+        condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
-
-        query = "four two"
-        condition = path<ModelWithTextIndex2>().fullTextSearch(query, true)
-        results = collection.find(condition).toList()
-        assertContains(results, value1)
-
-        query = "four five"
-        condition = path<ModelWithTextIndex2>().fullTextSearch(query, true)
-        results = collection.find(condition).toList()
-        assertContains(results, value2)
-
-        query = "three five"
-        condition = path<ModelWithTextIndex2>().fullTextSearch(query, true)
-        results = collection.find(condition).toList()
-        assertContains(results, value1)
-        assertContains(results, value2)
-    }
-
-    @Test
-    fun testTextSearchMisspell() = runBlocking {
-        val defaultMongo = db ?: return@runBlocking
-        val collection = defaultMongo.collection<ModelWithTextIndex2>() as MongoFieldCollection<ModelWithTextIndex2>
-
-        println("(Threee, true)" + collection.find(path<ModelWithTextIndex2>().fullTextSearch("Threee", true)).toList())
-        println("(Threee, true, 0.5)" + collection.find(path<ModelWithTextIndex2>().fullTextSearch("Threee", true, 0.5)).toList())
-        println("(One two three, true, 0.5)" + collection.find(path<ModelWithTextIndex2>().fullTextSearch("One two three", true, 0.5)).toList())
-        println("(three five, true, 0.25)" + collection.find(path<ModelWithTextIndex2>().fullTextSearch("three five", true, 0.25)).toList())
-        println("(three five, true, 0.5)" + collection.find(path<ModelWithTextIndex2>().fullTextSearch("three five", true, 0.5)).toList())
     }
 
 }

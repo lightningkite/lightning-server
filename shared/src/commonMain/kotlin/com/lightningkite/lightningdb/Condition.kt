@@ -138,15 +138,15 @@ sealed class Condition<in T> {
     @SerialName("FullTextSearch")
     data class FullTextSearch<T>(
         @DoesNotNeedLabel val value: String,
-        val ignoreCase: Boolean = false,
-        val threshold: Double? = null,
+        val requireAllTermsPresent: Boolean = true,
+        val levenshteinDistance: Int = 2,
     ) :
         Condition<T>() {
         override fun invoke(on: T): Boolean {
-            val asText = on.toString()
-            return value.split(' ').all { asText.contains(it, ignoreCase) }
+            // WARNING: This is a really really rough approximation
+            return TextQuery.fromString(value).fuzzyPresent(on.toString(), levenshteinDistance)
         }
-        override fun toString(): String = ".fullTextSearch($value, $ignoreCase, $threshold)"
+        override fun toString(): String = ".fullTextSearch($value, $requireAllTermsPresent, $levenshteinDistance)"
     }
 
     @Serializable

@@ -33,7 +33,12 @@ class MongoFieldCollection<Model : Any>(
     private val access: MongoCollectionAccess,
 ) : FieldCollection<Model> {
 
-    var defaultThreshold: Double = 0.5
+    val indexedTextFields by lazy {
+        val ser = DataClassPathSerializer(serializer)
+        serializer.descriptor.annotations.filterIsInstance<TextIndex>().firstOrNull()?.fields?.map {
+            ser.fromString(it)
+        }
+    }
 
     private suspend inline fun <T> access(crossinline action: suspend MongoCollection<BsonDocument>.() -> T): T {
         return access.run {
@@ -290,6 +295,8 @@ class MongoFieldCollection<Model : Any>(
             var anyFts: Condition.FullTextSearch<*>? = null
             condition.walk { if (it is Condition.FullTextSearch) anyFts = it }
 
+            val kotlinSkipLimit = anyFts != null && atlasSearch && anyFts!!.requireAllTermsPresent
+
             aggregate<BsonDocument>(
                 buildList {
                     if(anyFts != null && atlasSearch) {
@@ -306,8 +313,6 @@ class MongoFieldCollection<Model : Any>(
                         add(Aggregates.project(Projections.metaSearchScore("search_score").toBsonDocument().apply {
                             for(field in serializer.descriptor.elementNames) put(field, BsonBoolean(true))
                         }))
-//                        add(Aggregates.addFields(Field("search_score", documentOf("\$meta" to "search_score"))))
-                        add(Aggregates.match(Filters.gte("search_score", anyFts!!.threshold ?: defaultThreshold)))
                         add(Aggregates.match(cs.bson(serializer, atlasSearch = true)))
                     } else {
                         add(Aggregates.match(cs.bson(serializer)))
@@ -321,8 +326,10 @@ class MongoFieldCollection<Model : Any>(
                     } else if(orderBy.isNotEmpty()) {
                         add(Aggregates.sort(sort(orderBy)))
                     }
-                    add(Aggregates.skip(skip))
-                    add(Aggregates.limit(limit))
+                    if(!kotlinSkipLimit) {
+                        add(Aggregates.skip(skip))
+                        add(Aggregates.limit(limit))
+                    }
                 }
             )
                 .let {
@@ -333,6 +340,18 @@ class MongoFieldCollection<Model : Any>(
                 .maxTime(maxQueryMs, TimeUnit.MILLISECONDS)
                 .map {
                     Serialization.Internal.bson.load(serializer, it)
+                }
+                .let {
+                    if(kotlinSkipLimit) {
+                        val dist = anyFts!!.levenshteinDistance
+                        val textQuery = TextQuery.fromString(anyFts!!.value)
+                        it.filter {
+                            val str = indexedTextFields!!.joinToString { f ->
+                                f.getAny(it)?.toString() ?: ""
+                            }
+                            textQuery.fuzzyPresent(str, dist)
+                        }.drop(skip).take(limit)
+                    } else it
                 }
         }
     }
@@ -431,9 +450,7 @@ class MongoFieldCollection<Model : Any>(
         if (preparedAlready) return
         coroutineScope {
             val requireCompletion = ArrayList<Job>()
-
             serializer.descriptor.annotations.filterIsInstance<TextIndex>().firstOrNull()?.let {
-                defaultThreshold = it.defaultThreshold
                 requireCompletion += launch {
                     if(atlasSearch) {
                         val name = "default"

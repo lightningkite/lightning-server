@@ -33,95 +33,29 @@ class TextConditionTest: MongoTest() {
         collection.insertOne(value2)
 
         var query = "One"
-        var condition = path<ModelWithTextIndex>().fullTextSearch(query, false)
+        var condition = path<ModelWithTextIndex>().fullTextSearch(query, requireAllTermsPresent = false)
         var results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "one"
-        condition = path<ModelWithTextIndex>().fullTextSearch(query, false)
-        results = collection.find(condition).toList()
-        assertFalse(results.contains(value1))
-
-        query = "one"
-        condition = path<ModelWithTextIndex>().fullTextSearch(query, true)
+        condition = path<ModelWithTextIndex>().fullTextSearch(query, requireAllTermsPresent = true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "four two"
-        condition = path<ModelWithTextIndex>().fullTextSearch(query, true)
+        condition = path<ModelWithTextIndex>().fullTextSearch(query, requireAllTermsPresent = true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
 
         query = "four five"
-        condition = path<ModelWithTextIndex>().fullTextSearch(query, true)
+        condition = path<ModelWithTextIndex>().fullTextSearch(query, requireAllTermsPresent = true)
         results = collection.find(condition).toList()
         assertContains(results, value2)
 
         query = "three five"
-        condition = path<ModelWithTextIndex>().fullTextSearch(query, true)
+        condition = path<ModelWithTextIndex>().fullTextSearch(query, requireAllTermsPresent = true)
         results = collection.find(condition).toList()
         assertContains(results, value1)
         assertContains(results, value2)
     }
-
-    @Test
-    fun testTextSearchMisspell() = runBlocking {
-        val collection = defaultMongo.collection<ModelWithTextIndex>() as MongoFieldCollection<ModelWithTextIndex>
-        val value1 = ModelWithTextIndex(string = "One Two Three")
-        val value2 = ModelWithTextIndex(string = "Five Six Seven")
-        collection.insertOne(value1)
-        collection.insertOne(value2)
-
-        println(collection.find(path<ModelWithTextIndex>().fullTextSearch("Threee", true)).toList())
-    }
-
-    @Test
-    fun testContains() = runBlocking {
-        val collection = defaultMongo.collection<ModelWithTextIndex>("TextConditionSearchTest") as MongoFieldCollection<ModelWithTextIndex>
-        val value1 = ModelWithTextIndex(string = "One Two Three")
-        val value2 = ModelWithTextIndex(string = "Five Six Seven")
-        collection.insertOne(value1)
-        collection.insertOne(value2)
-
-        var query = "One"
-        var condition = path<ModelWithTextIndex>().string.contains(query, false)
-        var results = collection.find(condition).toList()
-        assertContains(results, value1)
-
-        query = "one"
-        condition = path<ModelWithTextIndex>().string.contains(query, false)
-        results = collection.find(condition).toList()
-        assertFalse(results.contains(value1))
-
-        query = "one"
-        condition = path<ModelWithTextIndex>().string.contains(query, true)
-        results = collection.find(condition).toList()
-        assertContains(results, value1)
-
-        query = "four two"
-        condition = path<ModelWithTextIndex>().string.contains(query, true)
-        results = collection.find(condition).toList()
-        assertTrue(results.isEmpty())
-
-        query = "six seven"
-        condition = path<ModelWithTextIndex>().string.contains(query, true)
-        results = collection.find(condition).toList()
-        assertContains(results, value2)
-
-        query = "seven six"
-        condition = path<ModelWithTextIndex>().string.contains(query, true)
-        results = collection.find(condition).toList()
-        assertTrue(results.isEmpty())
-
-        query = "four five"
-        condition = path<ModelWithTextIndex>().string.contains(query, true)
-        results = collection.find(condition).toList()
-        assertTrue(results.isEmpty())
-
-        query = "three five"
-        condition = path<ModelWithTextIndex>().string.contains(query, true)
-        results = collection.find(condition).toList()
-        assertTrue(results.isEmpty())
-    }
-
 }

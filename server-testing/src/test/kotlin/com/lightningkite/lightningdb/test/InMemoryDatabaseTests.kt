@@ -144,7 +144,7 @@ class SecurityTest() {
         ))
         assertEquals(
             Condition.Never,
-            secured.fullCondition(condition { it.fullTextSearch("zsadf", true) }).simplify()
+            secured.fullCondition(condition { it.fullTextSearch("zsadf") }).simplify()
         )
     }
 
@@ -161,7 +161,7 @@ class SecurityTest() {
         ))
         assertNotEquals(
             Condition.Never,
-            secured.fullCondition(condition { it.fullTextSearch("zsadf", true) }).simplify()
+            secured.fullCondition(condition { it.fullTextSearch("zsadf") }).simplify()
         )
     }
 }

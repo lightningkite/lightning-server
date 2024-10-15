@@ -12,6 +12,7 @@ import org.bson.codecs.EncoderContext
 import org.bson.codecs.configuration.CodecRegistry
 import java.util.*
 import com.lightningkite.UUID
+import kotlin.math.min
 import kotlin.reflect.typeOf
 
 fun BsonValue.setPath(path: String, value: BsonValue) {
@@ -50,7 +51,7 @@ fun BsonValue.removePath(path: String) {
     }
 }
 
-fun <T: Any> Codec<T>.fromUpdateDescription(on: T, updateDescription: UpdateDescription): T {
+fun <T : Any> Codec<T>.fromUpdateDescription(on: T, updateDescription: UpdateDescription): T {
     val doc = BsonDocument()
     val writer = BsonDocumentWriter(doc)
     this.encode(writer, on, EncoderContext.builder().build())
@@ -62,8 +63,12 @@ fun <T: Any> Codec<T>.fromUpdateDescription(on: T, updateDescription: UpdateDesc
     }
     return this.decode(BsonDocumentReader(doc), DecoderContext.builder().build())
 }
+
 fun <T> Codec<T>.fromDocument(doc: Document, registry: CodecRegistry): T {
-    return this.decode(BsonDocumentReader(BsonDocumentWrapper.asBsonDocument(doc, registry)), DecoderContext.builder().build())
+    return this.decode(
+        BsonDocumentReader(BsonDocumentWrapper.asBsonDocument(doc, registry)),
+        DecoderContext.builder().build()
+    )
 }
 
 val DataClassPathPartial<*>.mongo: String get() = properties.joinToString(".") { it.name }

@@ -228,7 +228,7 @@ annotation class Unique
 @SerialInfo
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-annotation class TextIndex(val fields: Array<String>, val defaultThreshold: Double = 0.5)
+annotation class TextIndex(val fields: Array<String>)
 
 
 @SerialInfo
