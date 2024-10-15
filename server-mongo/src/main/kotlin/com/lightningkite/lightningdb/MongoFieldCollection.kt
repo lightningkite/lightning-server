@@ -10,11 +10,8 @@ import com.mongodb.client.model.search.SearchOperator
 import com.mongodb.client.model.search.SearchOptions
 import com.mongodb.client.model.search.SearchPath
 import com.mongodb.kotlin.client.coroutine.MongoCollection
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -295,8 +292,6 @@ class MongoFieldCollection<Model : Any>(
             var anyFts: Condition.FullTextSearch<*>? = null
             condition.walk { if (it is Condition.FullTextSearch) anyFts = it }
 
-            val kotlinSkipLimit = anyFts != null && atlasSearch && anyFts!!.requireAllTermsPresent
-
             aggregate<BsonDocument>(
                 buildList {
                     if(anyFts != null && atlasSearch) {
@@ -306,7 +301,8 @@ class MongoFieldCollection<Model : Any>(
                                 "text" to documentOf(
                                     "query" to anyFts!!.value,
                                     "fuzzy" to documentOf(),
-                                    "path" to documentOf("wildcard" to "*")
+                                    "path" to documentOf("wildcard" to "*"),
+                                    "matchCriteria" to if(anyFts!!.requireAllTermsPresent) "all" else "any"
                                 )
                             )
                         ))
@@ -326,10 +322,8 @@ class MongoFieldCollection<Model : Any>(
                     } else if(orderBy.isNotEmpty()) {
                         add(Aggregates.sort(sort(orderBy)))
                     }
-                    if(!kotlinSkipLimit) {
-                        add(Aggregates.skip(skip))
-                        add(Aggregates.limit(limit))
-                    }
+                    add(Aggregates.skip(skip))
+                    add(Aggregates.limit(limit))
                 }
             )
                 .let {
@@ -341,18 +335,12 @@ class MongoFieldCollection<Model : Any>(
                 .map {
                     Serialization.Internal.bson.load(serializer, it)
                 }
-                .let {
-                    if(kotlinSkipLimit) {
-                        val dist = anyFts!!.levenshteinDistance
-                        val textQuery = TextQuery.fromString(anyFts!!.value)
-                        it.filter {
-                            val str = indexedTextFields!!.joinToString { f ->
-                                f.getAny(it)?.toString() ?: ""
-                            }
-                            textQuery.fuzzyPresent(str, dist)
-                        }.drop(skip).take(limit)
-                    } else it
-                }
+        }
+    }
+    private class EndFlowException: Exception() {
+        override fun fillInStackTrace(): Throwable {
+            stackTrace = emptyArray()
+            return this
         }
     }
 

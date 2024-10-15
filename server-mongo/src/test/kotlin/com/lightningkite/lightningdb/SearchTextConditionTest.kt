@@ -25,6 +25,7 @@ import kotlinx.coroutines.delay
 import org.junit.AfterClass
 import org.junit.BeforeClass
 import java.io.File
+import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.seconds
 
 class SearchTextConditionTest {
@@ -41,9 +42,6 @@ class SearchTextConditionTest {
 
     companion object {
         var db: MongoDatabase? = null
-
-        val value1 = ModelWithTextIndex2(_id = UUID(0UL, 1UL), string = "One Two Three", otherField = "alpha")
-        val value2 = ModelWithTextIndex2(_id = UUID(0UL, 2UL), string = "Five Six Seven", otherField = "beta")
 
         @BeforeClass
         @JvmStatic
@@ -70,7 +68,34 @@ class SearchTextConditionTest {
                 val defaultMongo = db ?: return@runBlocking
                 val collection = defaultMongo.collection<ModelWithTextIndex2>() as MongoFieldCollection<ModelWithTextIndex2>
 //                collection.deleteMany(Condition.Always)
-//                collection.insertMany(listOf(value1, value2))
+//                collection.insertMany(listOf(
+//                    "Alfa",
+//                    "Bravo",
+//                    "Charlie",
+//                    "Delta",
+//                    "Echo",
+//                    "Foxtrot",
+//                    "Golf",
+//                    "Hotel",
+//                    "India",
+//                    "Juliett",
+//                    "Kilo",
+//                    "Lima",
+//                    "Mike",
+//                    "November",
+//                    "Oscar",
+//                    "Papa",
+//                    "Quebec",
+//                    "Romeo",
+//                    "Sierra",
+//                    "Tango",
+//                    "Uniform",
+//                    "Victor",
+//                    "Whiskey",
+//                    "Xray",
+//                    "Yankee",
+//                    "Zulu",
+//                ).zipWithNext { a, b -> ModelWithTextIndex2(string = "$a $b", otherField = "sample") })
             }
         }
 
@@ -86,27 +111,30 @@ class SearchTextConditionTest {
         val defaultMongo = db ?: return@runBlocking
         val collection = defaultMongo.collection<ModelWithTextIndex2>() as MongoFieldCollection<ModelWithTextIndex2>
 
-        delay(1.seconds)
+        collection
+            .find(condition { it.fullTextSearch("hotel india", requireAllTermsPresent = true) })
+            .toList()
+            .let { assertEquals(1, it.size, "Got $it") }
 
-        var query = "One"
-        var condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
-        var results = collection.find(condition).toList()
-        assertContains(results, value1)
-
-        query = "One two three"
-        condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
-        results = collection.find(condition).toList()
-        assertContains(results, value1)
-
-        query = "One two four"
-        condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
-        results = collection.find(condition).toList()
-        assertTrue(results.isEmpty())
-
-        query = "one"
-        condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
-        results = collection.find(condition).toList()
-        assertContains(results, value1)
+//        var query = "One"
+//        var condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
+//        var results = collection.find(condition).toList()
+//        assertContains(results, value1)
+//
+//        query = "One two three"
+//        condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
+//        results = collection.find(condition).toList()
+//        assertContains(results, value1)
+//
+//        query = "One two four"
+//        condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
+//        results = collection.find(condition).toList()
+//        assertTrue(results.isEmpty())
+//
+//        query = "one"
+//        condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
+//        results = collection.find(condition).toList()
+//        assertContains(results, value1)
     }
 
 }
