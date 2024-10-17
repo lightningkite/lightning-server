@@ -104,6 +104,7 @@ auctionDay,auction,venue,company,auctionDate,city,state,country,wasMigrated,lotN
         b = listOf(1),
         c = mapOf("key" to 1)
     )
+    val basisButNull = basis.copy(a = null)
 
     @Test
     fun testParse() {
@@ -140,12 +141,53 @@ auctionDay,auction,venue,company,auctionDate,city,state,country,wasMigrated,lotN
                     "a.x" to "42",
                     "a.z" to "null",
                     "a.a.x" to "-1",
-                    "a.a.a" to "false",
+                    "a.a.a" to "null",
                     "b.0" to "1",
                     "c.0" to "key",
                     "c.1" to "1"
                 )
             ).decodeSerializableValue(serializer)
+        )
+        assertEquals(
+            basis,
+            StringDeferringDecoder(
+                config = stringDeferringConfig,
+                descriptor = serializer.descriptor,
+                map = mapOf(
+                    "x" to "1",
+                    "y" to "fdsa",
+                    "z" to "notnull",
+                    "a" to "true",
+                    "a.x" to "42",
+                    "a.z" to "null",
+                    "a.a.x" to "-1",
+                    "a.a.a" to "null",
+                    "a.a.a.x" to "1",
+                    "b.0" to "1",
+                    "c.0" to "key",
+                    "c.1" to "1"
+                )
+            ).decodeSerializableValue(serializer)
+        )
+        assertEquals(
+            basisButNull,
+            StringDeferringDecoder(
+                config = stringDeferringConfig,
+                descriptor = serializer.descriptor,
+                map = mapOf(
+                    "x" to "1",
+                    "y" to "fdsa",
+                    "z" to "notnull",
+                    "a" to "null",
+//                    "a.x" to "42",
+//                    "a.z" to "null",
+//                    "a.a.x" to "-1",
+//                    "a.a.a" to "false",
+                    "b.0" to "1",
+                    "c.0" to "key",
+                    "c.1" to "1"
+                )
+            ).decodeSerializableValue(serializer).also { println(it) }
         )
         assertEquals(
             basis,

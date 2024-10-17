@@ -4,6 +4,7 @@ package com.lightningkite.lightningserver.serialization
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
+import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.internal.AbstractPolymorphicSerializer
@@ -47,7 +48,11 @@ class StringDeferringDecoder(
     fun decodeTaggedEnum(tag: String, enumDescriptor: SerialDescriptor): Int {
         val taggedValue = map.getValue(tag)
         return enumDescriptor.getElementIndex(taggedValue)
-            .also { if (it == CompositeDecoder.UNKNOWN_NAME) throw SerializationException("Enum '${enumDescriptor.serialName}' does not contain element with name '$taggedValue'") }
+            .also {
+                val caseInsensitiveMatch = enumDescriptor.elementNames.indexOfFirst { it.equals(taggedValue, ignoreCase = true) }
+                if(caseInsensitiveMatch != -1) return caseInsensitiveMatch
+                if (it == CompositeDecoder.UNKNOWN_NAME) throw SerializationException("Enum '${enumDescriptor.serialName}' does not contain element with name '$taggedValue'")
+            }
     }
 
     override fun decodeElementIndex(descriptor: SerialDescriptor): Int {
@@ -86,7 +91,13 @@ class StringDeferringDecoder(
 
     fun decodeTaggedNotNullMark(tag: String): Boolean {
         val v = map[tag]
-        return (v != config.nullMarker && v?.lowercase() != "false") || map.keys.any { it.startsWith(tag + ".") }
+        if(v == config.nullMarker) {
+            return false
+        }
+        if(map.keys.any { it.startsWith("$tag.") }) {
+            if (v?.equals("false", ignoreCase = true) == true) return false
+        }
+        return true
     }
 
     fun decodeTaggedInline(tag: String): Decoder = this.apply { pushTag(tag) }
