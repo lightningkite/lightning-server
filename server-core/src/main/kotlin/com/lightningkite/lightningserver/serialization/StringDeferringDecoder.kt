@@ -50,7 +50,7 @@ class StringDeferringDecoder(
         return enumDescriptor.getElementIndex(taggedValue)
             .also {
                 val caseInsensitiveMatch = enumDescriptor.elementNames.indexOfFirst { it.equals(taggedValue, ignoreCase = true) }
-                if(caseInsensitiveMatch != -1) return caseInsensitiveMatch
+                if (caseInsensitiveMatch != -1) return caseInsensitiveMatch
                 if (it == CompositeDecoder.UNKNOWN_NAME) throw SerializationException("Enum '${enumDescriptor.serialName}' does not contain element with name '$taggedValue'")
             }
     }
@@ -70,14 +70,14 @@ class StringDeferringDecoder(
     }
 
     fun decodeTaggedBoolean(tag: String): Boolean = ewrap(tag, "Boolean") { it.toBoolean() }
-    fun decodeTaggedByte(tag: String): Byte = ewrap(tag, "Byte") { it.toByte() }
-    fun decodeTaggedShort(tag: String): Short = ewrap(tag, "Short") { it.toShort() }
-    fun decodeTaggedInt(tag: String): Int = ewrap(tag, "Int") { it.toInt() }
-    fun decodeTaggedLong(tag: String): Long = ewrap(tag, "Long") { it.toLong() }
-    fun decodeTaggedFloat(tag: String): Float = ewrap(tag, "Float") { it.toFloat() }
-    fun decodeTaggedDouble(tag: String): Double = ewrap(tag, "Double") { it.toDouble() }
+    fun decodeTaggedByte(tag: String): Byte = ewrap(tag, "Byte") { it.filter { it.isDigit() || it == '-' || it == '.' }.toByte() }
+    fun decodeTaggedShort(tag: String): Short = ewrap(tag, "Short") { it.filter { it.isDigit() || it == '-' || it == '.' }.toShort() }
+    fun decodeTaggedInt(tag: String): Int = ewrap(tag, "Int") { it.filter { it.isDigit() || it == '-' || it == '.' }.toInt() }
+    fun decodeTaggedLong(tag: String): Long = ewrap(tag, "Long") { it.filter { it.isDigit() || it == '-' || it == '.' }.toLong() }
+    fun decodeTaggedFloat(tag: String): Float = ewrap(tag, "Float") { it.filter { it.isDigit() || it == '-' || it == '.' }.toFloat() }
+    fun decodeTaggedDouble(tag: String): Double = ewrap(tag, "Double") { it.filter { it.isDigit() || it == '-' || it == '.' }.toDouble() }
     fun decodeTaggedChar(tag: String): Char = ewrap(tag, "Char") { it.single() }
-    fun decodeTaggedString(tag: String): String = ewrap(tag, "String") { it }
+    fun decodeTaggedString(tag: String): String = map[tag] ?: ""
 
     inline fun <T> ewrap(tag: String, type: String, action: (String)->T): T {
         return try {
