@@ -143,7 +143,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
             .mapValues { it.value.filter { !it.authOptions.options.contains(null).not() || it.primaryAuthName == null || it.primaryAuthName == userType } }
         val groups = byGroup.keys.filterNotNull()
         val sessionClassName = "${userType.substringAfterLast('.')}Session"
-        append("abstract class Abstract$sessionClassName(api: Api, ${userType.userTypeTokenName()}: String, ${userType.userTypeAccessTokenName()}: suspend () -> String)")
+        append("abstract class Abstract$sessionClassName(api: Api, ${userType.userTypeTokenName()}: String, ${userType.userTypeAccessTokenName()}: suspend () -> String, masquerade: String? = null)")
         byGroup[null]!!.mapNotNull { it.belongsToInterface }.distinct().let {
             if(it.isNotEmpty()) {
                 append(": ")
@@ -156,8 +156,9 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
         appendLine("    abstract val api: Api")
         appendLine("    abstract val ${userType.userTypeTokenName()}: String")
         appendLine("    abstract val ${userType.userTypeAccessTokenName()}: suspend () -> String")
+        appendLine("    open val masquerade: String? = null")
         for (group in groups) {
-            appendLine("    val ${group.groupToPartName()}: $sessionClassName${group.groupToInterfaceName()} = $sessionClassName${group.groupToInterfaceName()}(api.${group.groupToPartName()}, ${userType.userTypeTokenName()}, ${userType.userTypeAccessTokenName()})")
+            appendLine("    val ${group.groupToPartName()}: $sessionClassName${group.groupToInterfaceName()} = $sessionClassName${group.groupToInterfaceName()}(api.${group.groupToPartName()}, ${userType.userTypeTokenName()}, ${userType.userTypeAccessTokenName()}, masquerade)")
         }
         for (entry in byGroup[null] ?: listOf()) {
             append("    ")
@@ -399,12 +400,14 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false): Li
             Arg(name = "input", type = it)
         }?.let(::listOf),
         documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
-            if (documentable.authOptions.options.contains(null).not())
-                Arg(name = it.userTypeAccessTokenName(), stringType = "suspend () -> String", isAuth = true)
-            else
-                Arg(name = it.userTypeAccessTokenName(), stringType = "(suspend () -> String)?", default = "null", isAuth = true)
-        }?.let(::listOf),
-        Arg(name = "masquerade", stringType = "String?", default = "null", isAuth = true).takeUnless { skipAuth }?.let(::listOf)
+            listOf(
+                if (documentable.authOptions.options.contains(null).not())
+                    Arg(name = it.userTypeAccessTokenName(), stringType = "suspend () -> String", isAuth = true)
+                else
+                    Arg(name = it.userTypeAccessTokenName(), stringType = "(suspend () -> String)?", default = "null", isAuth = true),
+                Arg(name = "masquerade", stringType = "String?", default = "null", isAuth = true)
+            )
+        }
     ).flatten()
 
     is ApiWebsocket<*, *, *, *> -> listOfNotNull(
