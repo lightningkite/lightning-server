@@ -122,7 +122,7 @@ class ModelRestUpdatesWebsocket<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<
                 }
             val c = try {
                 Serialization.json.decodeFromString(
-                    Query.serializer(info.serialization.serializer),
+                    Condition.serializer(info.serialization.serializer),
                     it.condition
                 )
             } catch (e: Exception) {
@@ -130,8 +130,8 @@ class ModelRestUpdatesWebsocket<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<
             }
             val toSend = changes.changes.map { entry ->
                 ListChange(
-                    old = entry.old?.takeIf { c.condition(it) }?.let { m(it) },
-                    new = entry.new?.takeIf { c.condition(it) }?.let { m(it) },
+                    old = entry.old?.takeIf { c(it) }?.let { m(it) },
+                    new = entry.new?.takeIf { c(it) }?.let { m(it) },
                 )
             }.filter { it.old != null || it.new != null }
 
