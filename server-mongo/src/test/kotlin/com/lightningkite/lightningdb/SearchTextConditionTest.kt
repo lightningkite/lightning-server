@@ -116,6 +116,16 @@ class SearchTextConditionTest {
             .toList()
             .let { assertEquals(1, it.size, "Got $it") }
 
+        collection
+            .find(condition { it.fullTextSearch("india hotel", requireAllTermsPresent = true) })
+            .toList()
+            .let { assertEquals(1, it.size, "Got $it") }
+
+        collection
+            .find(condition { it.fullTextSearch("hotel", requireAllTermsPresent = true) })
+            .toList()
+            .let { assertEquals(2, it.size, "Got $it") }
+
 //        var query = "One"
 //        var condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
 //        var results = collection.find(condition).toList()

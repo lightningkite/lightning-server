@@ -7,16 +7,19 @@ variable "lambda_memory_size" {
     type = number
     default = 1024
     nullable = false
+    description = "The amount of ram available (in Megabytes) to the virtual machine running in Lambda."
 }
 variable "lambda_timeout" {
     type = number
     default = 30
     nullable = false
+    description = "How long an individual lambda invocation can run before forcefully being shut down."
 }
 variable "lambda_snapstart" {
     type = bool
     default = false
     nullable = false
+    description = "Whether or not lambda will deploy with SnapStart which compromises deploy time for shorter cold start time."
 }
 
 ##########
@@ -102,6 +105,18 @@ resource "aws_iam_role_policy_attachment" "insights_policy" {
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy"
 }
 
+resource "aws_iam_role_policy_attachment" "files" {
+  role       = aws_iam_role.main_exec.id
+  policy_arn = aws_iam_policy.files.arn
+}
+
+
+resource "aws_iam_role_policy_attachment" "metrics" {
+  role       = aws_iam_role.main_exec.id
+  policy_arn = aws_iam_policy.metrics.arn
+}
+
+
 resource "aws_s3_object" "app_storage" {
   bucket = aws_s3_bucket.lambda_bucket.id
 
@@ -120,7 +135,7 @@ resource "aws_lambda_function" "main" {
   s3_key    = aws_s3_object.app_storage.key
 
   runtime = "java17"
-  handler = "com.lightningkite.lightningserver.demo.AwsHandler"
+  handler = "com.lightningkite.lightningserverdemo.AwsHandler"
   
   memory_size = "${var.lambda_memory_size}"
   timeout = var.lambda_timeout
@@ -205,11 +220,11 @@ resource "null_resource" "lambda_jar_source" {
     always = timestamp()
   }
   provisioner "local-exec" {
-    command = local.is_windows ? "if(test-path \"${path.module}/build/lambda/\") { rd -Recurse \"${path.module}/build/lambda/\" }" : "rm -rf \"${path.module}/build/lambda/\""
+    command = (local.is_windows ? "if(test-path \"${path.module}/build/lambda/\") { rd -Recurse \"${path.module}/build/lambda/\" }" : "rm -rf \"${path.module}/build/lambda/\"")
     interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
   }
   provisioner "local-exec" {
-    command = local.is_windows ? "cp -r -force \"${path.module}/../../build/dist/lambda/.\" \"${path.module}/build/lambda/\"" : "cp -rf \"${path.module}/../../build/dist/lambda/.\" \"${path.module}/build/lambda/\""
+    command = (local.is_windows ? "cp -r -force \"${path.module}/../../build/dist/lambda/.\" \"${path.module}/build/lambda/\"" : "cp -rf \"${path.module}/../../build/dist/lambda/.\" \"${path.module}/build/lambda/\"")
     interpreter = local.is_windows ? ["PowerShell", "-Command"] : []
   }
   provisioner "local-exec" {

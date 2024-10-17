@@ -5,7 +5,7 @@
 
 variable "metrics_tracked" {
     type = list(string)
-    default = ["Health Checks Run", "Execution Time"]
+    default = ["Execution Time", "Health Checks Run"]
     nullable = false
 }
 variable "metrics_namespace" {
@@ -44,9 +44,5 @@ resource "aws_iam_policy" "metrics" {
       },
     ]
   })
-}
-resource "aws_iam_role_policy_attachment" "metrics" {
-  role       = aws_iam_role.main_exec.name
-  policy_arn = aws_iam_policy.metrics.arn
 }
 

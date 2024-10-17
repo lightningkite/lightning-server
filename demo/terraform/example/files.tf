@@ -95,8 +95,4 @@ resource "aws_iam_policy" "files" {
     ]
   })
 }
-resource "aws_iam_role_policy_attachment" "files" {
-  role       = aws_iam_role.main_exec.name
-  policy_arn = aws_iam_policy.files.arn
-}
 

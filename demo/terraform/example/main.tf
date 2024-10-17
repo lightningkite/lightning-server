@@ -4,17 +4,9 @@ terraform {
       source = "hashicorp/aws"
       version = "~> 4.30"
     }
-    local = {
-      source = "hashicorp/local"
-      version = "~> 2.2"
-    }
     random = {
       source = "hashicorp/random"
       version = "~> 3.1.0"
-    }
-    null = {
-      source = "hashicorp/null"
-      version = "~> 3.2"
     }
     archive = {
       source = "hashicorp/archive"
@@ -23,6 +15,14 @@ terraform {
     mongodbatlas = {
       source = "mongodb/mongodbatlas"
       version = "~> 1.4"
+    }
+    local = {
+      source = "hashicorp/local"
+      version = "~> 2.2"
+    }
+    null = {
+      source = "hashicorp/null"
+      version = "~> 3.2"
     }
   }
   backend "s3" {

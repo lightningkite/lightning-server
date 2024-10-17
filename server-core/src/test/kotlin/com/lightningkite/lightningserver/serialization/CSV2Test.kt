@@ -156,6 +156,26 @@ auctionDay,auction,venue,company,auctionDate,city,state,country,wasMigrated,lotN
                     "x" to "1",
                     "y" to "fdsa",
                     "z" to "notnull",
+                    "a" to "false",
+                    "a.x" to "42",
+                    "a.z" to "null",
+                    "a.a.x" to "-1",
+                    "a.a.a" to "false",
+                    "b.0" to "1",
+                    "c.0" to "key",
+                    "c.1" to "1"
+                )
+            ).decodeSerializableValue(serializer).also { println(it) }
+        )
+        assertEquals(
+            basis,
+            StringDeferringDecoder(
+                config = stringDeferringConfig,
+                descriptor = serializer.descriptor,
+                map = mapOf(
+                    "x" to "1",
+                    "y" to "fdsa",
+                    "z" to "notnull",
                     "a" to "%{\"x\": 42, \"a\":{\"x\":-1}}",
                     "b" to "%[1]",
                     "c" to "%{\"key\":1}"
