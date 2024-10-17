@@ -168,7 +168,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
             appendLine()
         }
         for (group in groups) {
-            append("    class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()},val ${userType.userTypeTokenName()}:String, val ${userType.userTypeAccessTokenName()}: suspend () -> String)")
+            append("    class $sessionClassName${group.groupToInterfaceName()}(val api: Api.${group.groupToInterfaceName()},val ${userType.userTypeTokenName()}:String, val ${userType.userTypeAccessTokenName()}: suspend () -> String, val masquerade: String?)")
             byGroup[group]!!.mapNotNull { it.belongsToInterface }.distinct().let {
                 if(it.isNotEmpty()) {
                     append(": ")
@@ -217,6 +217,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                 appendLine("        method = HttpMethod.${entry.route.method},")
                 entry.primaryAuthName?.let {
                     appendLine("            token = ${it.userTypeAccessTokenName()},")
+                    appendLine("            masquerade = masquerade,")
                 }
                 entry.inputType.takeUnless { it == Unit.serializer() }?.let {
                     appendLine("        body = input")
@@ -251,6 +252,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                     appendLine("            method = HttpMethod.${entry.route.method},")
                     entry.primaryAuthName?.let {
                         appendLine("            token = ${it.userTypeAccessTokenName()},")
+                        appendLine("            masquerade = masquerade,")
                     }
                     entry.inputType.takeUnless { it == Unit.serializer() }?.let {
                         appendLine("            body = input")
@@ -402,6 +404,7 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false): Li
             else
                 Arg(name = it.userTypeAccessTokenName(), stringType = "(suspend () -> String)?", default = "null", isAuth = true)
         }?.let(::listOf),
+        Arg(name = "masquerade", stringType = "String?", default = "null", isAuth = true).takeUnless { skipAuth }?.let(::listOf)
     ).flatten()
 
     is ApiWebsocket<*, *, *, *> -> listOfNotNull(
