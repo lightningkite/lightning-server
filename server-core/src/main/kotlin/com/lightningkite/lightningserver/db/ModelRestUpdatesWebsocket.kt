@@ -135,18 +135,25 @@ class ModelRestUpdatesWebsocket<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<
                 )
             }.filter { it.old != null || it.new != null }
 
-            jobs.add(launch {
-                val updates = CollectionUpdates(
-                    updates = toSend.mapNotNull { it.new }.toSet(),
-                    remove = toSend.mapNotNull { it.old.takeIf { _ -> it.new == null }?._id }.toSet()
-                )
-                val size = Serialization.json.encodeToString(CollectionUpdates.serializer(info.serialization.serializer, info.serialization.idSerializer), updates).length
-                if (size >= 24000) {
-                    websocket.send(it._id, CollectionUpdates(overload = true))
-                } else {
-                    websocket.send(it._id, updates)
-                }
-            })
+            if(toSend.isNotEmpty()) {
+                jobs.add(launch {
+                    val updates = CollectionUpdates(
+                        updates = toSend.mapNotNull { it.new }.toSet(),
+                        remove = toSend.mapNotNull { it.old.takeIf { _ -> it.new == null }?._id }.toSet()
+                    )
+                    val size = Serialization.json.encodeToString(
+                        CollectionUpdates.serializer(
+                            info.serialization.serializer,
+                            info.serialization.idSerializer
+                        ), updates
+                    ).length
+                    if (size >= 24000) {
+                        websocket.send(it._id, CollectionUpdates(overload = true))
+                    } else {
+                        websocket.send(it._id, updates)
+                    }
+                })
+            }
         }
         jobs.forEach { it.join() }
     }
