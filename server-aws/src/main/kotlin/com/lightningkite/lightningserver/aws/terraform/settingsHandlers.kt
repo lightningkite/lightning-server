@@ -517,6 +517,183 @@ object SettingsHandlers {
             """.trimIndent()
         }
     )
+    val `MongoDB Serverless on Existing Project` = TerraformHandler.handler<DatabaseSettings>(
+        name = "MongoDB Serverless on Existing Project",
+        priority = 0,
+        providers = listOf(TerraformProvider.mongodbatlas),
+        inputs = { key ->
+            listOf(
+                TerraformInput.string("${key}_org_id", null),
+                TerraformInput.boolean("${key}_continuous_backup", false),
+                TerraformInput.string("${key}_project_id", null)
+            )
+        },
+        emit = {
+            appendLine(
+                """
+                resource "random_password" "${key}" {
+                  length           = 32
+                  special          = true
+                  override_special = "-_"
+                }
+                resource "mongodbatlas_serverless_instance" "$key" {
+                  project_id   = var.${key}_project_id
+                  name         = "$namePrefixSafe$key"
+
+                  provider_settings_backing_provider_name = "AWS"
+                  provider_settings_provider_name = "SERVERLESS"
+                  provider_settings_region_name = replace(upper(var.deployment_location), "-", "_")
+                  
+                  continuous_backup_enabled = var.${key}_continuous_backup
+                }
+                resource "mongodbatlas_database_user" "$key" {
+                  username           = "$namePrefixSafe$key-main"
+                  password           = random_password.$key.result
+                  project_id         = var.${key}_project_id
+                  auth_database_name = "admin"
+
+                  roles {
+                    role_name     = "readWrite"
+                    database_name = "default"
+                  }
+
+                  roles {
+                    role_name     = "readAnyDatabase"
+                    database_name = "admin"
+                  }
+
+                }
+            """.trimIndent()
+            )
+            if (project.vpc) {
+                appendLine(
+                    """
+                resource "mongodbatlas_project_ip_access_list" "$key" {
+                  for_each = toset(${project.natGatewayIp})
+                  project_id   = var.${key}_project_id
+                  cidr_block = "${'$'}{each.value}/32"
+                  comment    = "NAT Gateway"
+                }
+                """.trimIndent()
+                )
+            } else {
+                appendLine(
+                    """
+                resource "mongodbatlas_project_ip_access_list" "$key" {
+                  project_id   = var.${key}_project_id
+                  cidr_block = "0.0.0.0/0"
+                  comment    = "Anywhere"
+                }
+                """.trimIndent()
+                )
+            }
+        },
+        settingOutput = { key ->
+            """
+                {
+                  url = "mongodb+srv://$namePrefixSafe$key-main:${'$'}{random_password.${key}.result}@${'$'}{replace(mongodbatlas_serverless_instance.$key.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
+                }
+            """.trimIndent()
+        }
+    )
+    val `MongoDB Dedicated on Existing Project` = TerraformHandler.handler<DatabaseSettings>(
+        name = "MongoDB Dedicated on Existing Project",
+        priority = 0,
+        providers = listOf(TerraformProvider.mongodbatlas),
+        inputs = { key ->
+            listOf(
+                TerraformInput.string("${key}_org_id", null),
+                TerraformInput.string("${key}_min_size", "M10"),
+                TerraformInput.string("${key}_max_size", "M40"),
+                TerraformInput.string("${key}_project_id", null)
+            )
+        },
+        emit = {
+            appendLine(
+                """
+                resource "random_password" "${key}" {
+                  length           = 32
+                  special          = true
+                  override_special = "-_"
+                }
+                resource "mongodbatlas_advanced_cluster" "database" {
+                  project_id   = var.${key}_project_id
+                  name         = "$namePrefixSafe$key"
+                  cluster_type = "REPLICASET"
+                #  lifecycle { ignore_changes = [instance_size] }
+                  replication_specs {
+                    region_configs {
+                      auto_scaling {
+                        compute_enabled = true
+                        compute_min_instance_size = "M10"
+                        compute_max_instance_size = var.${key}_max_size
+                        compute_scale_down_enabled = true
+                        disk_gb_enabled = true
+                      }
+                      electable_specs {
+                        instance_size = var.${key}_min_size
+                        node_count    = 3
+                      }
+                      analytics_specs {
+                        instance_size = var.${key}_min_size
+                        node_count    = 1
+                      }
+                      priority      = 7
+                      provider_name = "AWS"
+                      region_name   = replace(upper(var.deployment_location), "-", "_")
+                    }
+                  }
+                }
+                resource "mongodbatlas_database_user" "$key" {
+                  username           = "$namePrefixSafe$key-main"
+                  password           = random_password.$key.result
+                  project_id         = var.${key}_project_id
+                  auth_database_name = "admin"
+
+                  roles {
+                    role_name     = "readWrite"
+                    database_name = "default"
+                  }
+
+                  roles {
+                    role_name     = "readAnyDatabase"
+                    database_name = "admin"
+                  }
+
+                }
+            """.trimIndent()
+            )
+            if (project.vpc) {
+                appendLine(
+                    """
+                resource "mongodbatlas_project_ip_access_list" "$key" {
+                  for_each = toset(${project.natGatewayIp})
+                  project_id   = var.${key}_project_id
+                  cidr_block = "${'$'}{each.value}/32"
+                  comment    = "NAT Gateway"
+                }
+                """.trimIndent()
+                )
+            } else {
+                appendLine(
+                    """
+                resource "mongodbatlas_project_ip_access_list" "$key" {
+                  project_id   = var.${key}_project_id
+                  cidr_block = "0.0.0.0/0"
+                  comment    = "Anywhere"
+                }
+                """.trimIndent()
+                )
+            }
+        },
+        settingOutput = { key ->
+            """
+                {
+                  url = "mongodb+srv://$namePrefixSafe$key-main:${'$'}{random_password.${key}.result}@${'$'}{replace(mongodbatlas_advanced_cluster.$key.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
+                }
+            """.trimIndent()
+        }
+    )
     val ElastiCache = TerraformHandler.handler<CacheSettings>(
         name = "ElastiCache",
         inputs = { key ->

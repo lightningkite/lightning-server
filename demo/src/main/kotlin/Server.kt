@@ -129,6 +129,10 @@ object Server : ServerPathGroup(ServerPath.root) {
         HttpResponse.plainText("Hello ${it.user<User?>()}")
     }
 
+    val die2 = path("oom").get.handler {
+        throw OutOfMemoryError("Fake")
+    }
+
     val socket = path("socket").websocket(
         connect = { println("Connected $it - you are ${it.user<User?>()}") },
         message = {
