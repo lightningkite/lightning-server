@@ -23,5 +23,6 @@ expect class UUID: Comparable<UUID> {
 }
 @Deprecated("Use UUID.v4() instead", ReplaceWith("UUID.v4()", "com.lightningkite.UUID")) fun uuid(): UUID = UUID.random()
 @Deprecated("Use UUID.parse(string) instead", ReplaceWith("UUID.parse(string)", "com.lightningkite.UUID")) fun uuid(string: String): UUID = UUID.parse(string)
+@Deprecated("Use UUID.parse(string) instead", ReplaceWith("UUID.parse(string)", "com.lightningkite.UUID")) fun UUID.Companion.fromString(string: String): UUID = UUID.parse(string)
 
 
