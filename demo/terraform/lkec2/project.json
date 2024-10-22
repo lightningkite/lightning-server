@@ -1,0 +1,28 @@
+{
+    "projectName": "demo-example-single-ec2",
+    "bucket": "lightningkite-terraform",
+    "bucketPathOverride": null,
+    "core": "SingleEC2",
+    "vpc": true,
+    "existingVpc": true,
+    "domain": true,
+    "profile": "lk",
+    "createBeforeDestroy": false,
+    "handlers": {
+        "general": "Standard",
+        "database": "MongoDB Serverless",
+        "cache": "DynamoDB",
+        "secretBasis": "Standard",
+        "jwt": "Standard",
+        "sms": "Direct",
+        "logging": "Direct",
+        "files": "S3",
+        "metrics": "Cloudwatch",
+        "exceptions": "Direct",
+        "email": "SMTP through SES",
+        "oauth_github": "Direct",
+        "oauth_apple": "Direct",
+        "oauth_google": "Direct",
+        "oauth_microsoft": "Direct"
+    }
+}

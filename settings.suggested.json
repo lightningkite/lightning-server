@@ -1,0 +1,64 @@
+{
+  "cache": {
+    "url": "local",
+    "uri": null,
+    "connectionString": null,
+    "databaseNumber": null
+  },
+  "database": {
+    "url": "ram-unsafe-persist:///Users/jivie/Projects/lightning-server/./local/database"
+  },
+  "email": {
+    "url": "console",
+    "fromEmail": null
+  },
+  "exceptions": {
+    "url": "none",
+    "sentryDsn": null
+  },
+  "files": {
+    "url": "file:///Users/jivie/Projects/lightning-server/./local/files?secret=ntaylud81d25fMI5uvioFHbJ0x0=",
+    "signedUrlExpiration": null
+  },
+  "general": {
+    "projectName": "My Project",
+    "host": "0.0.0.0",
+    "port": 8080,
+    "publicUrl": "http://0.0.0.0:8080",
+    "wsUrl": "ws://0.0.0.0:8080",
+    "debug": true,
+    "cors": null
+  },
+  "jwt": {
+    "expiration": "365d",
+    "emailExpiration": "1h",
+    "secret": "H<Mb,LVv()h^.OIvE]k=XnGtC1J2(*WApbS-i6`y?4U)0E}S~pa`Mn/Wu<v%3'L8",
+    "issuer": null,
+    "audience": null
+  },
+  "logging": {
+    "default": {
+      "filePattern": null,
+      "toConsole": true,
+      "level": "DEBUG",
+      "additive": false
+    },
+    "logger": null
+  },
+  "metrics": {
+    "url": "none",
+    "trackingByEntryPoint": [
+      "Execution Time"
+    ],
+    "trackingTotalsOnly": []
+  },
+  "oauth_apple": null,
+  "oauth_github": null,
+  "oauth_google": null,
+  "oauth_microsoft": null,
+  "secretBasis": "hKtV2BilK2BaYGrD7AB+GNg+Fh0SgfrwipDbonJT/LZV0B6KXqF4j3cBa4wtWERXoJHFdScBNT292YH+u3or1A==",
+  "sms": {
+    "url": "console",
+    "from": null
+  }
+}

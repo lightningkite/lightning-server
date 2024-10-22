@@ -49,13 +49,13 @@ object DurationSerializer : KSerializer<Duration> {
             throw SerializationException(e.message)
         }
 
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("kotlin.time.Duration", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("kotlin.time.Duration.loose", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: Duration) = encoder.encodeString(value.toString())
 }
 
 object InstantIso8601Serializer : KSerializer<Instant> {
 
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("kotlinx.datetime.Instant", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("kotlinx.datetime.Instant.loose", PrimitiveKind.STRING)
 
     override fun deserialize(decoder: Decoder): Instant =
         try {
@@ -70,7 +70,7 @@ object InstantIso8601Serializer : KSerializer<Instant> {
 
 object LocalDateIso8601Serializer : KSerializer<LocalDate> {
 
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("kotlinx.datetime.LocalDate", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("kotlinx.datetime.LocalDate.loose", PrimitiveKind.STRING)
 
     override fun deserialize(decoder: Decoder): LocalDate =
         try {
@@ -85,7 +85,7 @@ object LocalDateIso8601Serializer : KSerializer<LocalDate> {
 
 object LocalTimeIso8601Serializer : KSerializer<LocalTime> {
 
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("kotlinx.datetime.LocalTime", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("kotlinx.datetime.LocalTime.loose", PrimitiveKind.STRING)
 
     override fun deserialize(decoder: Decoder): LocalTime =
         try {
@@ -100,7 +100,7 @@ object LocalTimeIso8601Serializer : KSerializer<LocalTime> {
 
 object LocalDateTimeIso8601Serializer : KSerializer<LocalDateTime> {
 
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("kotlinx.datetime.LocalDateTime", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("kotlinx.datetime.LocalDateTime.loose", PrimitiveKind.STRING)
 
     override fun deserialize(decoder: Decoder): LocalDateTime =
         try {

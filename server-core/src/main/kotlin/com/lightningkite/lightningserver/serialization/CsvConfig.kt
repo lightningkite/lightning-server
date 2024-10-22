@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.serialization
 
 import java.io.Reader
+import kotlin.math.min
 
 data class CsvConfig(
     val fieldSeparator: Char = ',',
@@ -79,7 +80,7 @@ fun Sequence<List<String>>.asMaps(config: CsvConfig = CsvConfig.default): Sequen
         val keys = iter.next()
         while (iter.hasNext()) {
             val values = iter.next()
-            yield((0 until keys.size).asSequence().filter { values[it] != config.defaultValue }.associate {
+            yield((0 until min(keys.size, values.size)).asSequence().filter { values[it] != config.defaultValue }.associate {
                 keys[it] to values[it]
             })
         }

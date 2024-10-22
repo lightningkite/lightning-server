@@ -1,0 +1,4 @@
+#!/bin/bash
+export AWS_PROFILE=lk
+export $(cat ~/.mongo/profiles/lk.env | xargs)
+terraform "$@"

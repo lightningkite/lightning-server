@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.serialization
 
 
 import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.elementNames
@@ -57,10 +58,19 @@ class StringDeferringDecoder(
 
     override fun decodeElementIndex(descriptor: SerialDescriptor): Int {
         while (currentIndex < size) {
-            val name = descriptor.getTag(currentIndex++)
-            if (map.keys.any {
+            val index = currentIndex++
+            val desc = descriptor.getElementDescriptor(index)
+            val name = descriptor.getTag(index)
+
+            if (
+                desc.kind == PrimitiveKind.STRING ||
+                !descriptor.isElementOptional(index) && desc.isNullable ||
+                map.keys.any {
                     it.startsWith(name) && (it.length == name.length || it[name.length] == '.')
-                }) return currentIndex - 1
+                }
+            ) {
+                return index
+            }
             if (isCollection) {
                 // if map does not contain key we look for, then indices in collection have ended
                 break
@@ -96,8 +106,9 @@ class StringDeferringDecoder(
         }
         if(map.keys.any { it.startsWith("$tag.") }) {
             if (v?.equals("false", ignoreCase = true) == true) return false
+            return true
         }
-        return true
+        return v != null
     }
 
     fun decodeTaggedInline(tag: String): Decoder = this.apply { pushTag(tag) }

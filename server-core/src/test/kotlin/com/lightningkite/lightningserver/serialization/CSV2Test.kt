@@ -92,6 +92,13 @@ auctionDay,auction,venue,company,auctionDate,city,state,country,wasMigrated,lotN
         val c: Map<String, Int> = mapOf(),
     )
 
+    @Serializable
+    data class TestWeirdCases(
+        val title: String,
+        val blankable: String,
+        val nullable: Int?
+    )
+
     val stringDeferringConfig = StringDeferringConfig(ClientModule)
     val csv = CsvFormat(stringDeferringConfig)
     val formData = FormDataFormat(stringDeferringConfig)
@@ -105,6 +112,35 @@ auctionDay,auction,venue,company,auctionDate,city,state,country,wasMigrated,lotN
         c = mapOf("key" to 1)
     )
     val basisButNull = basis.copy(a = null)
+
+    @Test
+    fun alternatives() {
+        val format = CsvFormat(stringDeferringConfig)
+        assertEquals(
+            listOf(
+                TestWeirdCases("Normal", "asdf", 1),
+                TestWeirdCases("NormalNull", "asdf", null),
+                TestWeirdCases("BlankAndNull", "", null),
+                TestWeirdCases("BlankAndNull2", "", null),
+            ),
+            format.decodeFromString("""
+                title,blankable,nullable
+                Normal,asdf,1
+                NormalNull,asdf,null
+                BlankAndNull,,
+                BlankAndNull2
+            """.trimIndent())
+        )
+        assertEquals(
+            listOf(
+                TestWeirdCases("BlankAndNull2", "", null),
+            ),
+            format.decodeFromString("""
+                title
+                BlankAndNull2
+            """.trimIndent())
+        )
+    }
 
     @Test
     fun testParse() {
@@ -311,6 +347,17 @@ auctionDay,auction,venue,company,auctionDate,city,state,country,wasMigrated,lotN
             it.printStackTrace()
             assertContains(it.message!!, "b", ignoreCase = true)
             assertContains(it.message!!, "record 2", ignoreCase = true)
+        }
+    }
+
+    @Test fun missingEntriesParse() {
+        """
+        first,second,third
+        1,2
+        3,4,5
+        6,7
+        """.trimIndent().iterator().csvLines().asMaps().forEach {
+            println(it)
         }
     }
 }
