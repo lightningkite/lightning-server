@@ -21,11 +21,12 @@ import com.lightningkite.UUID
 import com.lightningkite.toJavaUuid
 import com.lightningkite.toKotlinUuid
 import org.bson.UuidRepresentation
+import org.bson.types.ObjectId
 
 val BsonOverrides = SerializersModule {
     contextual(Duration::class, DurationMsSerializer)
     contextual(UUID::class, UUIDSerializer)
-//    contextual(ObjectId::class, ObjectIdSerializer)
+    contextual(ObjectId::class, ObjectIdSerializer)
     contextual(BigDecimal::class, BigDecimalSerializer)
     contextual(ByteArray::class, ByteArraySerializer)
     contextual(Instant::class, MongoInstantSerializer)
