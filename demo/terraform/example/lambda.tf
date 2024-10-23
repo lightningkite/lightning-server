@@ -256,5 +256,15 @@ data "archive_file" "lambda" {
   output_path = "${path.module}/build/lambda.jar"
 }
 
+data "aws_caller_identity" "current" {}
+resource "aws_lambda_permission" "scheduled_tasks" {
+  action        = "lambda:InvokeFunction"
+  function_name = "${aws_lambda_alias.main.function_name}:${aws_lambda_alias.main.name}"
+  principal     = "events.amazonaws.com"
+  source_arn    = "arn:aws:events:${var.deployment_location}:${data.aws_caller_identity.current.account_id}:rule/demo-example_*"
+  lifecycle {
+    create_before_destroy = false
+  }
+}
 
 

@@ -377,15 +377,6 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                       arn       = aws_lambda_alias.main.arn
                       input     = "{\"scheduled\": \"${it.name}\"}"
                     }
-                    resource "aws_lambda_permission" "scheduled_task_${safeName}" {
-                      action        = "lambda:InvokeFunction"
-                      function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
-                      principal     = "events.amazonaws.com"
-                      source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
-                      lifecycle {
-                        create_before_destroy = $createBeforeDestroy
-                      }
-                    }
                 """.trimIndent()
                         )
                     }
@@ -408,15 +399,6 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                       arn       = aws_lambda_alias.main.arn
                       input     = "{\"scheduled\": \"${it.name}\"}"
                     }
-                    resource "aws_lambda_permission" "scheduled_task_${safeName}" {
-                      action        = "lambda:InvokeFunction"
-                      function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
-                      principal     = "events.amazonaws.com"
-                      source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
-                      lifecycle {
-                        create_before_destroy = $createBeforeDestroy
-                      }
-                    }
                 """.trimIndent()
                         )
                     }
@@ -438,15 +420,6 @@ internal fun scheduleAwsHandlers(projectInfo: TerraformProjectInfo) = with(proje
                       target_id = "lambda"
                       arn       = aws_lambda_alias.main.arn
                       input     = "{\"scheduled\": \"${it.name}\"}"
-                    }
-                    resource "aws_lambda_permission" "scheduled_task_${safeName}" {
-                      action        = "lambda:InvokeFunction"
-                      function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
-                      principal     = "events.amazonaws.com"
-                      source_arn    = aws_cloudwatch_event_rule.scheduled_task_${safeName}.arn
-                      lifecycle {
-                        create_before_destroy = $createBeforeDestroy
-                      }
                     }
                 """.trimIndent()
                         )
@@ -683,6 +656,16 @@ internal fun awsLambdaHandler(
           output_path = "${'$'}{path.module}/build/lambda.jar"
         }
         
+        data "aws_caller_identity" "current" {}
+        resource "aws_lambda_permission" "scheduled_tasks" {
+          action        = "lambda:InvokeFunction"
+          function_name = "${'$'}{aws_lambda_alias.main.function_name}:${'$'}{aws_lambda_alias.main.name}"
+          principal     = "events.amazonaws.com"
+          source_arn    = "arn:aws:events:${'$'}{var.deployment_location}:${'$'}{data.aws_caller_identity.current.account_id}:rule/${project.namePrefix}_*"
+          lifecycle {
+            create_before_destroy = ${project.createBeforeDestroy}
+          }
+        }
         
     """.trimIndent()
         )
