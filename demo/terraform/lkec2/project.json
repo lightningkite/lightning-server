@@ -1,0 +1,24 @@
+{
+    "projectName": "demo",
+    "bucket": "your-deployment-bucket",
+    "bucketPathOverride": null,
+    "core": "Lambda",
+    "vpc": false,
+    "existingVpc": false,
+    "domain": true,
+    "profile": "default",
+    "createBeforeDestroy": false,
+    "handlers": {
+        "general": "Standard",
+        "database": "AuroraDB Serverless V2",
+        "cache": "DynamoDB",
+        "secretBasis": "Standard",
+        "jwt": "Standard",
+        "sms": "Direct",
+        "logging": "Direct",
+        "files": "S3",
+        "metrics": "Cloudwatch",
+        "exceptions": "Direct",
+        "email": "SMTP through SES"
+    }
+}
