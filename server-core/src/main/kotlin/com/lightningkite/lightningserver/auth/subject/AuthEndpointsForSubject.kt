@@ -129,7 +129,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         val token =
             request.headers[HttpHeader.Authorization]?.removePrefix("bearer ")?.removePrefix("Bearer ")
                 ?: request.headers.cookies[HttpHeader.Authorization]
-                ?: request.queryParameters.find { it.first == "authorization" }?.second?.takeIf { request is WebSockets.ConnectEvent }
+                ?: request.queryParameters.find { it.first == "authorization" }?.second
                 ?: return null
         return tokenToAuth(token, request)
     }

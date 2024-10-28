@@ -109,8 +109,23 @@ private fun <T> Condition<T>.dump(serializer: KSerializer<T>, into: Document = D
             }
         }
         is Condition.FullTextSearch -> {
-            if(atlasSearch) {}
-            else into["\$text"] = documentOf(
+            if(atlasSearch) {
+                val terms = value.split(' ')
+                val ser = DataClassPathSerializer(serializer)
+                val paths = serializer.descriptor.annotations.filterIsInstance<TextIndex>().firstOrNull()?.fields?.map {
+                    ser.fromString(it) as DataClassPath<T, String>
+                }?.takeIf { it.isNotEmpty() } ?: return into
+                val subs = terms.filter { !it.termShouldUseFuzzySearch() }
+                    .map { term ->
+                        Condition.Or(paths.map { it.mapCondition(Condition.StringContains(term, true)) })
+                    }
+                if(subs.isNotEmpty()) {
+                    if (this.requireAllTermsPresent)
+                        Condition.And(subs).dump(serializer, into, key, atlasSearch)
+                    else
+                        Condition.Or(subs).dump(serializer, into, key, atlasSearch)
+                }
+            } else into["\$text"] = documentOf(
                 "\$search" to value,
                 "\$caseSensitive" to false
             )

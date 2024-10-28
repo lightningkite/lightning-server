@@ -119,7 +119,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                                     WebSockets.WsHandlerType.CONNECT
                                 )
                             ) {
-                                entry.value.connect(
+                                WebSockets.interceptConnect(
                                     WebSockets.ConnectEvent(
                                         path = entry.key,
                                         parts = parts,
@@ -132,7 +132,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                                         sourceIp = call.request.origin.remoteHost,
                                         cache = cache
                                     )
-                                )
+                                ) { entry.value.connect(it) }
                             }
                             for (incoming in this.incoming) {
                                 Metrics.handlerPerformance(
@@ -141,13 +141,13 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                                         WebSockets.WsHandlerType.MESSAGE
                                     )
                                 ) {
-                                    entry.value.message(
+                                    WebSockets.interceptMessage(
                                         WebSockets.MessageEvent(
                                             id = id,
                                             content = (incoming as? Frame.Text)?.readText() ?: "",
                                             cache = cache
                                         )
-                                    )
+                                    ) { entry.value.message(it) }
                                 }
                             }
                         } finally {
@@ -158,7 +158,9 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                                         WebSockets.WsHandlerType.DISCONNECT
                                     )
                                 ) {
-                                    entry.value.disconnect(WebSockets.DisconnectEvent(id, cache = cache))
+                                    WebSockets.interceptDisconnect(WebSockets.DisconnectEvent(id, cache = cache)) {
+                                        entry.value.disconnect(it)
+                                    }
                                 }
                             } finally {
                                 ws.markDisconnect(id)
@@ -243,6 +245,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                             } else
                                 call.respondText("", contentType = null, status = null, configure = { })
                         }
+
                         is HttpContent.Binary -> call.respondBytes(
                             b.bytes,
                             ContentType.parse(b.type.toString())

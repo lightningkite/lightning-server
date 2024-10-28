@@ -11,8 +11,8 @@ value class WebSocketIdentifier(val string: String) : Comparable<WebSocketIdenti
 
     val type: String get() = string.substringBefore('|')
     val id: String get() = string.substringAfter('|')
-    suspend fun send(content: String): Boolean = Companion.send(type, id, content)
-    suspend fun close(): Boolean = Companion.close(type, id)
+    suspend fun send(content: String): Boolean = WebSockets.interceptSend(this, content) { id, content -> Companion.send(id.type, id.id, content) }
+    suspend fun close(): Boolean = WebSockets.interceptClose(this) { id -> Companion.close(id.type, id.id) }
 
     companion object {
         fun register(
@@ -30,12 +30,12 @@ value class WebSocketIdentifier(val string: String) : Comparable<WebSocketIdenti
         }
 
         private val senders = HashMap<String, suspend (id: String, value: String) -> Boolean>()
-        suspend fun send(type: String, id: String, value: String): Boolean {
+        internal suspend fun send(type: String, id: String, value: String): Boolean {
             return senders[type]?.invoke(id, value) ?: false
         }
 
         private val closers = HashMap<String, suspend (id: String) -> Boolean>()
-        suspend fun close(type: String, id: String): Boolean {
+        internal suspend fun close(type: String, id: String): Boolean {
             return closers[type]?.invoke(id) ?: false
         }
     }

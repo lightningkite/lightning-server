@@ -64,9 +64,9 @@ class SearchTextConditionTest {
                 return
             }
             db = DatabaseSettings(url.readText())() as MongoDatabase
-            runBlocking {
-                val defaultMongo = db ?: return@runBlocking
-                val collection = defaultMongo.collection<ModelWithTextIndex2>() as MongoFieldCollection<ModelWithTextIndex2>
+//            runBlocking {
+//                val defaultMongo = db ?: return@runBlocking
+//                val collection = defaultMongo.collection<ModelWithTextIndex2>() as MongoFieldCollection<ModelWithTextIndex2>
 //                collection.deleteMany(Condition.Always)
 //                collection.insertMany(listOf(
 //                    "Alfa",
@@ -95,8 +95,10 @@ class SearchTextConditionTest {
 //                    "Xray",
 //                    "Yankee",
 //                    "Zulu",
+//                    "911",
+//                    "GTX",
 //                ).zipWithNext { a, b -> ModelWithTextIndex2(string = "$a $b", otherField = "sample") })
-            }
+//            }
         }
 
         @AfterClass
@@ -115,6 +117,36 @@ class SearchTextConditionTest {
             .find(condition { it.fullTextSearch("hotel india", requireAllTermsPresent = true) })
             .toList()
             .let { assertEquals(1, it.size, "Got $it") }
+
+        collection
+            .find(condition { it.fullTextSearch("hoze india", requireAllTermsPresent = true) })
+            .toList()
+            .let { assertEquals(1, it.size, "Got $it") }
+
+        collection
+            .find(condition { it.fullTextSearch("hoze indey", requireAllTermsPresent = true) })
+            .toList()
+            .let { assertEquals(1, it.size, "Got $it") }
+
+        collection
+            .find(condition { it.fullTextSearch("gtz", requireAllTermsPresent = true) })
+            .toList()
+            .let { assertEquals(0, it.size, "Got $it") }
+
+        collection
+            .find(condition { it.fullTextSearch("gtx", requireAllTermsPresent = true) })
+            .toList()
+            .let { assertEquals(1, it.size, "Got $it") }
+
+        collection
+            .find(condition { it.fullTextSearch("922", requireAllTermsPresent = true) })
+            .toList()
+            .let { assertEquals(0, it.size, "Got $it") }
+
+        collection
+            .find(condition { it.fullTextSearch("911", requireAllTermsPresent = true) })
+            .toList()
+            .let { assertEquals(2, it.size, "Got $it") }
 
 //        var query = "One"
 //        var condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)

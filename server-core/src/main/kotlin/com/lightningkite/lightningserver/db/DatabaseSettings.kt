@@ -14,6 +14,8 @@ import kotlinx.serialization.serializer
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.reflect.KType
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Settings that define what database to use and how to connect to it.
@@ -40,7 +42,17 @@ data class DatabaseSettings(
             register("ram-unsafe-persist") { InMemoryUnsafePersistenceDatabase(File(it.url.substringAfter("://"))) }
             register("delay") {
                 val x = it.url.substringAfter("://")
-                val delay = x.substringBefore("/").toLong()
+                val delayString = x.substringBefore("/")
+                val delay = delayString.toLongOrNull()?.let { it.milliseconds .. it.milliseconds }
+                    ?: delayString.takeIf { it.contains('-') }?.let {
+                        Duration.parse(it.substringBefore('-').trim()) ..
+                        Duration.parse(it.substringAfter('-').trim())
+                    }
+                    ?: delayString.takeUnless { it.isBlank() }?.let {
+                        val duration = Duration.parse(it.trim())
+                        duration.times(0.5)..duration
+                    }
+                    ?: 350.milliseconds..750.milliseconds
                 val wraps = x.substringAfter("/")
                 parse(wraps.substringBefore("://"), DatabaseSettings(wraps)).delayed(delay)
             }

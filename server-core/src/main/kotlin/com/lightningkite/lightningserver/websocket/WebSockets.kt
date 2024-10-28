@@ -31,16 +31,80 @@ object WebSockets {
             }
         }
 
-    private var fullAction: WsInterceptor = { r, c -> c(r) }
-    var interceptors = listOf<WsInterceptor>()
+    var interceptConnect: WsConnectInterceptor = { r, c -> c(r) }
+        private set
+    var interceptorsConnect = listOf<WsConnectInterceptor>()
         set(value) {
             field = value
             // WARNING: This will melt your brain
-            fullAction = interceptors.fold<WsInterceptor, WsInterceptor>({ request, handler -> handler(request) }) { total, wrapper ->
-                return@fold { request, handler ->
-                    total(request) { wrapper(it, handler) }
+            interceptConnect =
+                interceptorsConnect.fold<WsConnectInterceptor, WsConnectInterceptor>({ request, handler ->
+                    handler(request)
+                }) { total, wrapper ->
+                    return@fold { request, handler ->
+                        total(request) { wrapper(it, handler) }
+                    }
                 }
-            }
+        }
+    var interceptMessage: WsMessageInterceptor = { r, c -> c(r) }
+        private set
+    var interceptorsMessage = listOf<WsMessageInterceptor>()
+        set(value) {
+            field = value
+            // WARNING: This will melt your brain
+            interceptMessage =
+                interceptorsMessage.fold<WsMessageInterceptor, WsMessageInterceptor>({ request, handler ->
+                    handler(request)
+                }) { total, wrapper ->
+                    return@fold { request, handler ->
+                        total(request) { wrapper(it, handler) }
+                    }
+                }
+        }
+    var interceptDisconnect: WsDisconnectInterceptor = { r, c -> c(r) }
+        private set
+    var interceptorsDisconnect = listOf<WsDisconnectInterceptor>()
+        set(value) {
+            field = value
+            // WARNING: This will melt your brain
+            interceptDisconnect =
+                interceptorsDisconnect.fold<WsDisconnectInterceptor, WsDisconnectInterceptor>({ request, handler ->
+                    handler(request)
+                }) { total, wrapper ->
+                    return@fold { request, handler ->
+                        total(request) { wrapper(it, handler) }
+                    }
+                }
+        }
+    var interceptSend: WsSendInterceptor = { id, content, c -> c(id, content) }
+        private set
+    var interceptorsSend = listOf<WsSendInterceptor>()
+        set(value) {
+            field = value
+            // WARNING: This will melt your brain
+            interceptSend =
+                value.fold<WsSendInterceptor, WsSendInterceptor>({ id, content, handler ->
+                    handler(id, content)
+                }) { total, wrapper ->
+                    return@fold { id, content, handler ->
+                        total(id, content) { id, content -> wrapper(id, content, handler) }
+                    }
+                }
+        }
+    var interceptClose: WsCloseInterceptor = { id, c -> c(id) }
+        private set
+    var interceptorsClose = listOf<WsCloseInterceptor>()
+        set(value) {
+            field = value
+            // WARNING: This will melt your brain
+            interceptClose =
+                value.fold<WsCloseInterceptor, WsCloseInterceptor>({ id, handler ->
+                    handler(id)
+                }) { total, wrapper ->
+                    return@fold { id, handler ->
+                        total(id) { id -> wrapper(id, handler) }
+                    }
+                }
         }
 
     class ConnectEvent(
@@ -54,18 +118,21 @@ object WebSockets {
         override val domain: String,
         override val protocol: String,
         override val sourceIp: String,
-    ): Request {
+    ) : Request {
         fun queryParameter(key: String): String? = queryParameters.find { it.first == key }?.second
 
         private val cacheCalc = HashMap<Request.CacheKey<*>, Any?>()
         override suspend fun <T> cache(key: Request.CacheKey<T>): T {
             @Suppress("UNCHECKED_CAST")
-            if(cacheCalc.containsKey(key)) return cacheCalc[key] as T
+            if (cacheCalc.containsKey(key)) return cacheCalc[key] as T
             val calculated = key.calculate(this)
             cacheCalc[key] = calculated
             return calculated
         }
     }
+
+    @Deprecated("use interceptorsConnect instead", ReplaceWith("interceptorsConnect"))
+    var interceptors by ::interceptorsConnect
 
     class MessageEvent(val id: WebSocketIdentifier, val cache: Cache, val content: String)
     class DisconnectEvent(val id: WebSocketIdentifier, val cache: Cache)
@@ -85,7 +152,12 @@ object WebSockets {
     }
 }
 
-typealias WsInterceptor = suspend (request: Request, cont: suspend (Request) -> Unit) -> Unit
+typealias WsInterceptor = suspend (request: WebSockets.ConnectEvent, cont: suspend (WebSockets.ConnectEvent) -> Unit) -> Unit
+typealias WsConnectInterceptor = suspend (request: WebSockets.ConnectEvent, cont: suspend (WebSockets.ConnectEvent) -> Unit) -> Unit
+typealias WsMessageInterceptor = suspend (request: WebSockets.MessageEvent, cont: suspend (WebSockets.MessageEvent) -> Unit) -> Unit
+typealias WsDisconnectInterceptor = suspend (request: WebSockets.DisconnectEvent, cont: suspend (WebSockets.DisconnectEvent) -> Unit) -> Unit
+typealias WsSendInterceptor = suspend (destination: WebSocketIdentifier, message: String, cont: suspend (destination: WebSocketIdentifier, message: String) -> Boolean) -> Boolean
+typealias WsCloseInterceptor = suspend (destination: WebSocketIdentifier, cont: suspend (destination: WebSocketIdentifier) -> Boolean) -> Boolean
 
 data class VirtualSocket(val incoming: ReceiveChannel<String>, val send: suspend (String) -> Unit)
 
