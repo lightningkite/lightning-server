@@ -14,7 +14,7 @@
 ##########
 
 resource "aws_cloudwatch_event_rule" "scheduled_task_cleanupUploads" {
-  name                = "demo-example_cleanupUploads"
+  name                = "demo_cleanupUploads"
   schedule_expression = "rate(1440 minutes)"
 }
 resource "aws_cloudwatch_event_target" "scheduled_task_cleanupUploads" {

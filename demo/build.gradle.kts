@@ -61,6 +61,7 @@ tasks.create("rebuildTerraform", JavaExec::class.java) {
     mainClass.set("com.lightningkite.lightningserverdemo.MainKt")
     args("terraform")
     workingDir(project.rootDir)
+    inputs.files(*file("terraform").walkTopDown().filter { it.name == "project.json" }.toList().toTypedArray())
 }
 
 fun env(name: String, profile: String) {
@@ -94,6 +95,7 @@ fun env(name: String, profile: String) {
     }
 }
 env("example", "default")
+env("lkec2", "lk")
 
 tasks.create("proguardTest", ProGuardTask::class) {
     this.injars(tasks.getByName("shadowJar"))

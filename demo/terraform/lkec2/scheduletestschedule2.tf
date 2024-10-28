@@ -14,7 +14,7 @@
 ##########
 
 resource "aws_cloudwatch_event_rule" "scheduled_task_testschedule2" {
-  name                = "demo-example_testschedule2"
+  name                = "demo_testschedule2"
   schedule_expression = "rate(1 minute)"
 }
 resource "aws_cloudwatch_event_target" "scheduled_task_testschedule2" {

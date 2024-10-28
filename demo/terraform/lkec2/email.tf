@@ -18,7 +18,7 @@ variable "reporting_email" {
 ##########
 
 resource "aws_iam_user" "email" {
-  name = "demo-example-single-ec2-email-user"
+  name = "demo-email-user"
 }
 
 resource "aws_iam_access_key" "email" {
@@ -33,7 +33,7 @@ data "aws_iam_policy_document" "email" {
 }
 
 resource "aws_iam_policy" "email" {
-  name = "demo-example-single-ec2-email-policy"
+  name = "demo-email-policy"
   description = "Allows sending of e-mails via Simple Email Service"
   policy      = data.aws_iam_policy_document.email.json
 }
@@ -43,23 +43,6 @@ resource "aws_iam_user_policy_attachment" "email" {
   policy_arn = aws_iam_policy.email.arn
 }
 
-resource "aws_security_group" "email" {
-  name   = "demo-example-single-ec2-email"
-  vpc_id = data.aws_vpc.main.id
-
-  ingress {
-    from_port   = 587
-    to_port     = 587
-    protocol    = "tcp"
-    cidr_blocks = [data.aws_vpc.main.cidr_block]
-  }
-}
-resource "aws_vpc_endpoint" "email" {
-  vpc_id = data.aws_vpc.main.id
-  service_name = "com.amazonaws.${var.deployment_location}.email-smtp"
-  security_group_ids = [aws_security_group.email.id]
-  vpc_endpoint_type = "Interface"
-}
 resource "aws_ses_domain_identity" "email" {
   domain = var.domain_name
 }

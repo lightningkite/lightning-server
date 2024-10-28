@@ -1,3 +1,2 @@
-$env:AWS_PROFILE = "lk"
-. ~/.mongo/profiles/lk.ps1
+$env:AWS_PROFILE = "default"
 terraform $args

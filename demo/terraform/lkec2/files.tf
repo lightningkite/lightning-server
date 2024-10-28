@@ -19,7 +19,7 @@ variable "files_expiry" {
 ##########
 
 resource "aws_s3_bucket" "files" {
-  bucket_prefix = "demo-example-single-ec2-files"
+  bucket_prefix = "demo-files"
   force_destroy = var.debug
 }
 resource "aws_s3_bucket_cors_configuration" "files" {
@@ -76,9 +76,9 @@ POLICY
 #   acl    = var.files_expiry == null ? "public-read" : "private" 
 # }
 resource "aws_iam_policy" "files" {
-  name        = "demo-example-single-ec2-files"
-  path = "/demo/example/single/ec2/files/"
-  description = "Access to the demo-example-single-ec2_files bucket"
+  name        = "demo-files"
+  path = "/demo/files/"
+  description = "Access to the demo_files bucket"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [

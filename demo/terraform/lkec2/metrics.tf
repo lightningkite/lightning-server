@@ -10,7 +10,7 @@ variable "metrics_tracked" {
 }
 variable "metrics_namespace" {
     type = string
-    default = "demo-example-single-ec2"
+    default = "demo"
     nullable = false
 }
 
@@ -24,8 +24,8 @@ variable "metrics_namespace" {
 ##########
 
 resource "aws_iam_policy" "metrics" {
-  name        = "demo-example-single-ec2-metrics"
-  path = "/demo/example/single/ec2/metrics/"
+  name        = "demo-metrics"
+  path = "/demo/metrics/"
   description = "Access to publish metrics"
   policy = jsonencode({
     Version = "2012-10-17"

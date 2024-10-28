@@ -2,6 +2,7 @@
     "projectName": "demo-example",
     "bucket": "ivieleague-deployment-states",
     "bucketPathOverride": "demo/example",
+    "core": "Lambda",
     "vpc": false,
     "existingVpc": false,
     "domain": true,

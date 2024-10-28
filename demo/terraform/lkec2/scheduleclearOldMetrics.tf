@@ -14,7 +14,7 @@
 ##########
 
 resource "aws_cloudwatch_event_rule" "scheduled_task_clearOldMetrics" {
-  name                = "demo-example_clearOldMetrics"
+  name                = "demo_clearOldMetrics"
   schedule_expression = "rate(60 minutes)"
 }
 resource "aws_cloudwatch_event_target" "scheduled_task_clearOldMetrics" {

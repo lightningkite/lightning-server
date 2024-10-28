@@ -14,7 +14,7 @@
 ##########
 
 resource "aws_cloudwatch_event_rule" "scheduled_task_WebsocketDatabaseChangeSubscriptionCleanup" {
-  name                = "demo-example_WebsocketDatabaseChangeSubscriptionCleanup"
+  name                = "demo_WebsocketDatabaseChangeSubscriptionCleanup"
   schedule_expression = "rate(5 minutes)"
 }
 resource "aws_cloudwatch_event_target" "scheduled_task_WebsocketDatabaseChangeSubscriptionCleanup" {
