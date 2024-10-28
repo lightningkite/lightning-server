@@ -64,14 +64,15 @@ class StringDeferringDecoder(
 
             if (
                 (descriptor.kind == StructureKind.CLASS && (
-                    desc.kind == PrimitiveKind.STRING ||
-                    !descriptor.isElementOptional(index) && desc.isNullable
+                    !descriptor.isElementOptional(index) && (desc.kind == PrimitiveKind.STRING || desc.isNullable)
                 )) ||
                 map.keys.any {
                     it.startsWith(name) && (it.length == name.length || it[name.length] == '.')
                 }
             ) {
                 return index
+            } else {
+                println("NO")
             }
             if (isCollection) {
                 // if map does not contain key we look for, then indices in collection have ended
