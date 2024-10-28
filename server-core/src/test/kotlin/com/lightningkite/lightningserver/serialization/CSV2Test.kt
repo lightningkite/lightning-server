@@ -1,11 +1,13 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.UUID
+import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.files.ServerFile
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.files.serverFile
 import com.lightningkite.serialization.ClientModule
 import com.lightningkite.uuid
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -359,5 +361,76 @@ auctionDay,auction,venue,company,auctionDate,city,state,country,wasMigrated,lotN
         """.trimIndent().iterator().csvLines().asMaps().forEach {
             println(it)
         }
+    }
+
+    @Test fun parsetester() {
+        """
+        auctionDay,auction,venue,company,auctionDate,city,state,country,lotNumber,sortOrder,lotType,year,make,model,bodyStyle,trim,engine,provenance,interiorColor,exteriorColor,odometer.amount,odometer.unit,vin,externalImages.0,link,charity,custom,ignoreInPortfolios,reserve,estimatedHighPrice,estimatedHighPrice.without.currency,estimatedHighPrice.without.original,estimatedLowPrice,estimatedLowPrice.without.currency,estimatedLowPrice.without.original
+        ad2f9001-bc43-4567-b897-8f408de80800,4cd834bd-5fe8-4401-8701-128af928b25f,e963ce68-d26c-4233-8f63-97931ed46cf0,f0ddceec-9b04-4f38-aa8c-5d2796bfd6d0,2024-10-28,Phoenix,AZ,US,240,240,652f3f63-101a-45d6-9c14-eb2ccc514729,,Porsche,356 B Coupe,,,,,N/A,Black,,,N/A,https://rmsothebys-cdn.azureedge.net/2/8/3/4/2/0/283420923ee3bd998acb17e4c0fd8eee6ec23c3f.jpg,https://rmsothebys.com/auctions/rk24/lots/r0209-porsche-356-b-coupe/,FALSE,FALSE,FALSE,FALSE,TRUE,USD,"6,000",TRUE,USD,3000
+        """.trimIndent().iterator().csvLines().asMaps().forEach {
+            println(it)
+        }
+    }
+
+    @Serializable
+    data class HasList(
+        val x: List<Int> = listOf(),
+        val y: String = "",
+    )
+    @Test fun hasList() {
+        Serialization.csv.roundTripTest(ListSerializer(HasList.serializer()), listOf(HasList(x = listOf(1, 2)), HasList(x = listOf(3, 4))))
+    }
+
+    @GenerateDataClassPaths
+    @Serializable
+//@TextIndex(["search"])
+    @IndexSet(["make", "model", "series", "year"])
+    @AdminTableColumns(["make", "model", "year", "auctionDate"])
+    @AdminSearchFields(["make", "model"])
+    @AdminTitleFields(["make", "model", "year", "auctionDate"])
+    data class Lot(
+        override val _id: UUID = uuid(),
+        val auctionDay: UUID,
+        val auction: UUID,
+        val venue: UUID,
+        val company: UUID,
+        @Denormalized @Index val auctionDate: LocalDate,
+        @Denormalized val city: String? = null,
+        val state: String? = null,
+        val country: String? = null,
+
+        val wasMigrated: Boolean = false,
+
+        val lotNumber: String,
+        val sortOrder: Double,
+
+        val lotType: UUID,
+        val year: Int? = null,
+        /*@References(Make::class)*/ val make: String,
+        /*@References(Model::class)*/ val model: String,
+        val bodyStyle: String? = null,
+        val trim: String? = null,
+        val engine: String? = null,
+        val provenance: String = "", //TODO: To Remove
+        @Denormalized val search: String = "",
+
+        val interiorColor: String,
+        val exteriorColor: String,
+
+        val vin: String,
+
+        val link: String? = null,
+        val externalImages: List<String> = listOf(),
+
+        val charity: Boolean = false,
+        val custom: Boolean = false,
+        val ignoreInPortfolios: Boolean = false,
+    ) : HasId<UUID>
+    @Test fun hp() {
+        val data = """
+        auctionDay,auction,venue,company,auctionDate,city,state,country,lotNumber,sortOrder,lotType,year,make,model,bodyStyle,trim,engine,provenance,interiorColor,exteriorColor,odometer.amount,odometer.unit,vin,externalImages.0,link,charity,custom,ignoreInPortfolios,reserve,estimatedHighPrice,estimatedHighPrice.without.currency,estimatedHighPrice.without.original,estimatedLowPrice,estimatedLowPrice.without.currency,estimatedLowPrice.without.original
+        ad2f9001-bc43-4567-b897-8f408de80800,4cd834bd-5fe8-4401-8701-128af928b25f,e963ce68-d26c-4233-8f63-97931ed46cf0,f0ddceec-9b04-4f38-aa8c-5d2796bfd6d0,2024-10-28,Phoenix,AZ,US,240,240,652f3f63-101a-45d6-9c14-eb2ccc514729,,Porsche,356 B Coupe,,,,,N/A,Black,,,N/A,https://rmsothebys-cdn.azureedge.net/2/8/3/4/2/0/283420923ee3bd998acb17e4c0fd8eee6ec23c3f.jpg,https://rmsothebys.com/auctions/rk24/lots/r0209-porsche-356-b-coupe/,FALSE,FALSE,FALSE,FALSE,TRUE,USD,"6,000",TRUE,USD,3000
+        """.trimIndent()
+        Serialization.csv.decodeFromString<List<Lot>>(data)
     }
 }

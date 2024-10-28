@@ -114,6 +114,11 @@ class SearchTextConditionTest {
         val collection = defaultMongo.collection<ModelWithTextIndex2>() as MongoFieldCollection<ModelWithTextIndex2>
 
         collection
+            .find(condition { it.fullTextSearch("hotel", requireAllTermsPresent = true) })
+            .toList()
+            .let { assertEquals(2, it.size, "Got $it") }
+        collection
+
             .find(condition { it.fullTextSearch("hotel india", requireAllTermsPresent = true) })
             .toList()
             .let { assertEquals(1, it.size, "Got $it") }

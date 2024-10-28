@@ -63,8 +63,10 @@ class StringDeferringDecoder(
             val name = descriptor.getTag(index)
 
             if (
-                desc.kind == PrimitiveKind.STRING ||
-                !descriptor.isElementOptional(index) && desc.isNullable ||
+                (descriptor.kind == StructureKind.CLASS && (
+                    desc.kind == PrimitiveKind.STRING ||
+                    !descriptor.isElementOptional(index) && desc.isNullable
+                )) ||
                 map.keys.any {
                     it.startsWith(name) && (it.length == name.length || it[name.length] == '.')
                 }
