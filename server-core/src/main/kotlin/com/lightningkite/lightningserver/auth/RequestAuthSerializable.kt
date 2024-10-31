@@ -77,7 +77,7 @@ fun RequestAuth<*>.cacheKeyMap(cache: CacheKeyMap): RequestAuth<*> {
 }
 
 object CacheKeyMapSerializer : KSerializer<CacheKeyMap> {
-    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("CacheKeyMap") {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("com.lightningkite.lightningserver.auth.CacheKeyMap") {
         for (key in RequestAuth.CacheKey.allCacheKeys) {
             element(key.name, RequestAuth.ExpiringValue.serializer(key.serializer).descriptor, isOptional = true)
         }

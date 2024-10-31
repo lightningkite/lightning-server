@@ -14,7 +14,7 @@ import java.util.*
 import com.lightningkite.UUID
 
 object UUIDPartsSerializer: KSerializer<UUID> {
-    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("UUID") {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("com.lightningkite.UUID/parts") {
         element("mostSignificantBits", Long.serializer().descriptor)
         element("leastSignificantBits", Long.serializer().descriptor)
     }
@@ -45,7 +45,7 @@ object UUIDPartsSerializer: KSerializer<UUID> {
 }
 
 object InstantLongSerializer: KSerializer<Instant> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Instant", PrimitiveKind.LONG)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("kotlinx.datetime.Instant/epochMilliseconds", PrimitiveKind.LONG)
 
     override fun deserialize(decoder: Decoder): Instant {
         return Instant.fromEpochMilliseconds(decoder.decodeLong())

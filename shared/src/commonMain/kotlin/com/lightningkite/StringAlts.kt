@@ -25,24 +25,24 @@ interface IsRawString : Comparable<IsRawString> {
 
 object TrimOnSerialize: KSerializer<String> {
     override fun deserialize(decoder: Decoder): String = decoder.decodeString().trim()
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TrimOnSerialize", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("kotlin.String/TrimOnSerialize", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: String) = encoder.encodeString(value)
 }
 object LowercaseOnSerialize: KSerializer<String> {
     override fun deserialize(decoder: Decoder): String = decoder.decodeString().lowercase()
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("LowercaseOnSerialize", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("kotlin.String/LowercaseOnSerialize", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: String) = encoder.encodeString(value)
 }
 object TrimLowercaseOnSerialize: KSerializer<String> {
     override fun deserialize(decoder: Decoder): String = decoder.decodeString().trim().lowercase()
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TrimLowercaseOnSerialize", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("kotlin.String/TrimLowercaseOnSerialize", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: String) = encoder.encodeString(value)
 }
 
 
 object TrimmedStringSerializer : KSerializer<TrimmedString> {
     override fun deserialize(decoder: Decoder): TrimmedString = decoder.decodeString().trimmed()
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TrimmedString", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.TrimmedString", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: TrimmedString) = encoder.encodeString(value.raw)
 }
 
@@ -59,10 +59,9 @@ inline fun String.trimmed(): TrimmedString = TrimmedString(this.trim())
 
 
 
-
 object CaselessStringSerializer : KSerializer<CaselessString> {
     override fun deserialize(decoder: Decoder): CaselessString = decoder.decodeString().caseless()
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("CaselessString", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.CaselessString", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: CaselessString) = encoder.encodeString(value.raw)
 }
 
@@ -81,7 +80,7 @@ inline fun String.caseless(): CaselessString = CaselessString(this.lowercase())
 
 object TrimmedCaselessStringSerializer : KSerializer<TrimmedCaselessString> {
     override fun deserialize(decoder: Decoder): TrimmedCaselessString = decoder.decodeString().trimmedCaseless()
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TrimmedCaselessString", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.TrimmedCaselessString", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: TrimmedCaselessString) = encoder.encodeString(value.raw)
 }
 
@@ -101,7 +100,7 @@ inline fun String.trimmedCaseless(): TrimmedCaselessString = TrimmedCaselessStri
 
 object EmailAddressSerializer : KSerializer<EmailAddress> {
     override fun deserialize(decoder: Decoder): EmailAddress = decoder.decodeString().toEmailAddress()
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("EmailAddress", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.EmailAddress", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: EmailAddress) = encoder.encodeString(value.raw)
 }
 
@@ -139,7 +138,7 @@ fun String.toEmailAddress(): EmailAddress {
 
 object PhoneNumberSerializer : KSerializer<PhoneNumber> {
     override fun deserialize(decoder: Decoder): PhoneNumber = decoder.decodeString().toPhoneNumber()
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("PhoneNumber", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.PhoneNumber", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: PhoneNumber) = encoder.encodeString(value.raw)
 }
 

@@ -40,7 +40,7 @@ object GeoCoordinateGeoJsonSerializer: KSerializer<GeoCoordinate> {
 
     val das = DoubleArraySerializer()
 
-    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("com.lightningkite.GeoCoordinate") {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("com.lightningkite.GeoCoordinate/geojson") {
         element("type", String.serializer().descriptor)
         element("coordinates", das.descriptor)
     }
@@ -76,7 +76,7 @@ object GeoCoordinateGeoJsonSerializer: KSerializer<GeoCoordinate> {
 object GeoCoordinateArraySerializer: KSerializer<GeoCoordinate> {
     val delegate = DoubleArraySerializer()
 
-    override val descriptor: SerialDescriptor = SerialDescriptor("com.lightningkite.GeoCoordinate.array", delegate.descriptor)
+    override val descriptor: SerialDescriptor = SerialDescriptor("com.lightningkite.GeoCoordinate/longLatArray", delegate.descriptor)
 
     override fun deserialize(decoder: Decoder): GeoCoordinate {
         return decoder.decodeSerializableValue(delegate).let { GeoCoordinate(longitude = it[0], latitude = it[1]) }

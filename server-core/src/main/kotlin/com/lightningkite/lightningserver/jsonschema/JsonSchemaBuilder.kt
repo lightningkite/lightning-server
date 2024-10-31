@@ -160,7 +160,7 @@ object JsonType3Serializer : KSerializer<JsonType3> {
     val single = JsonType2.serializer()
 
     @OptIn(InternalSerializationApi::class)
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("JsonType3", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.jsonschema.JsonType3", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: JsonType3) {
         if (value.nullable) encoder.encodeSerializableValue(multi, arrayOf(value.inner, JsonType2.NULL))

@@ -11,7 +11,7 @@ import java.io.File
 
 class SettingsSerializer() : KSerializer<Settings> {
     val parts = Settings.requirements.values.sortedBy { it.name }
-    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("Settings") {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("com.lightningkite.lightningserver.settings.Settings") {
         for (setting in parts) {
             element(setting.name, setting.serializer.descriptor, isOptional = true)
         }

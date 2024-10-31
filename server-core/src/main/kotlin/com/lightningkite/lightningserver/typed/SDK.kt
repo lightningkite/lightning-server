@@ -286,7 +286,7 @@ private val Documentable.Companion.safeDocumentables
 private class CodeEmitter(val packageName: String, val body: StringBuilder = StringBuilder()) : Appendable by body {
     val imports = mutableSetOf<String>()
     fun append(type: KType) {
-        imports.add(type.toString().substringBefore('<').removeSuffix("?"))
+        imports.add(type.toString().substringBefore('/').substringBefore('<').removeSuffix("?"))
         body.append((type.classifier as? KClass<*>)?.simpleName)
         type.arguments.takeIf { it.isNotEmpty() }?.let {
             body.append('<')
@@ -330,9 +330,9 @@ private fun KSerializer<*>.kotlinTypeString(emitter: CodeEmitter): String {
         this.descriptor.kind == StructureKind.LIST -> "List<${this.listElement()!!.kotlinTypeString(emitter)}>"
         this.descriptor.kind == SerialKind.CONTEXTUAL -> this.uncontextualize().kotlinTypeString(emitter)
         else -> {
-            descriptor.serialName.substringBefore('<').removeSuffix("?").takeIf { it.contains('.') }
+            descriptor.serialName.substringBefore('/').substringBefore('<').removeSuffix("?").takeIf { it.contains('.') }
                 ?.let { emitter.imports.add(it) }
-            descriptor.serialName.substringBefore('<')
+            descriptor.serialName.substringBefore('/').substringBefore('<')
                 .substringAfterLast('.') + (tryTypeParameterSerializers2()?.takeUnless { it.isEmpty() }
                 ?.joinToString(", ", "<", ">") { it.kotlinTypeString(emitter) } ?: "")
         }

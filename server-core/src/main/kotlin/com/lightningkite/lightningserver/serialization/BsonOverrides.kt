@@ -46,7 +46,7 @@ val BsonOverrides = SerializersModule {
  */
 abstract class TemporalExtendedJsonSerializer<T> : KSerializer<T> {
 
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor(javaClass.simpleName, PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor(javaClass.name + "/bson", PrimitiveKind.STRING)
 
     /**
      * Returns the number of milliseconds since January 1, 1970, 00:00:00 GMT
@@ -126,7 +126,7 @@ object MongoLocalTimeSerializer : TemporalExtendedJsonSerializer<LocalTime>() {
 //@Serializer(forClass = Locale::class)
 object MongoLocaleSerializer : KSerializer<Locale> {
 
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("LocaleSerializer", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.util.Locale/bson", PrimitiveKind.STRING)
     override fun deserialize(decoder: Decoder): Locale = Locale.forLanguageTag(decoder.decodeString())
 
     override fun serialize(encoder: Encoder, value: Locale) {
@@ -136,7 +136,7 @@ object MongoLocaleSerializer : KSerializer<Locale> {
 
 @Serializer(forClass = UUID::class)
 object UUIDSerializer : KSerializer<UUID> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.UUID", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.UUID/bson", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: UUID) {
         encoder as BsonEncoder
