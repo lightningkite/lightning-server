@@ -55,11 +55,16 @@ data class TextQuery(
     fun fuzzyPresent(input: String, off: Int = 2): Boolean {
         val words = input.split(' ', '\n', '\t')
         return exact.all {
-            input.contains(it)
+            input.contains(it, true)
         } && loose.all { l ->
-            words.any { w -> levenshtein(l.lowercase(), w.lowercase()) <= off }
+            words.any { w ->
+                if(l.termShouldUseFuzzySearch())
+                    levenshtein(l.lowercase(), w.lowercase()) <= off
+                else
+                    input.contains(l, true)
+            }
         } && reject.none {
-            input.contains(it)
+            input.contains(it, true)
         }
     }
 

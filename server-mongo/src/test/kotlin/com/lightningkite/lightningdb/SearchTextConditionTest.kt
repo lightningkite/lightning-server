@@ -153,25 +153,15 @@ class SearchTextConditionTest {
             .toList()
             .let { assertEquals(2, it.size, "Got $it") }
 
-//        var query = "One"
-//        var condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
-//        var results = collection.find(condition).toList()
-//        assertContains(results, value1)
-//
-//        query = "One two three"
-//        condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
-//        results = collection.find(condition).toList()
-//        assertContains(results, value1)
-//
-//        query = "One two four"
-//        condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
-//        results = collection.find(condition).toList()
-//        assertTrue(results.isEmpty())
-//
-//        query = "one"
-//        condition = path<ModelWithTextIndex2>().fullTextSearch(query, requireAllTermsPresent = true)
-//        results = collection.find(condition).toList()
-//        assertContains(results, value1)
+        collection
+            .find(condition { it.fullTextSearch("911 gtx", requireAllTermsPresent = true) })
+            .toList()
+            .let { assertEquals(1, it.size, "Got $it") }
+
+        collection
+            .find(condition { it.fullTextSearch("911 gtz", requireAllTermsPresent = true) })
+            .toList()
+            .let { assertEquals(0, it.size, "Got $it") }
     }
 
 }
