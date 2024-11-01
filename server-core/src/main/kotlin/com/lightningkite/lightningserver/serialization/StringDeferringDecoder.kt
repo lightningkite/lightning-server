@@ -71,8 +71,6 @@ class StringDeferringDecoder(
                 }
             ) {
                 return index
-            } else {
-                println("NO")
             }
             if (isCollection) {
                 // if map does not contain key we look for, then indices in collection have ended
