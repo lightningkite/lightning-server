@@ -131,6 +131,9 @@ class SerializationTest {
         val restored = myJson.decodeFromString(serializer, asText)
         assertEquals(item, restored)
     }
+    @Test fun dataClassPathForgotQuestionMark() {
+        println(DataClassPathSerializer(LargeTestModel.serializer()).fromString("embeddedNullable.value1"))
+    }
 
     @Test fun oldSearchStyle() {
         myJson.decodeFromString<Condition<String>>("""

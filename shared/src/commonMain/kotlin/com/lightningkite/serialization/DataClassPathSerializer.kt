@@ -14,7 +14,7 @@ import kotlinx.serialization.SerializationException
 
 private class SerializablePropertyParser<T>(val serializer: KSerializer<T>) {
     val children = run {
-        serializer.serializableProperties!!.associateBy {it.name }
+        (serializer.serializableProperties ?: throw SerializationException("${serializer.descriptor.serialName} does not have any serializable properties")).associateBy {it.name }
     }
     companion object {
         val existing = HashMap<KSerializerKey, SerializablePropertyParser<*>>()
@@ -60,16 +60,21 @@ class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializerWithDefa
     fun fromString(value: String): DataClassPathPartial<T> {
         var current: DataClassPathPartial<T>? = null
         var currentSerializer: KSerializer<*> = inner
-        for(part in value.split('.')) {
+        val valueParts = value.split('.')
+        for((index, part) in valueParts.withIndex()) {
             val name = part.removeSuffix("?")
             if(name == "this") continue
-            val prop = try{ SerializablePropertyParser[currentSerializer](name) } catch (e:IllegalStateException) { throw SerializationException(message = e.message, cause = e)}
+            val prop = try{
+                SerializablePropertyParser[currentSerializer](name)
+            } catch (e:IllegalStateException) {
+                throw SerializationException(message = e.message, cause = e)
+            }
             currentSerializer = prop.serializer
             val c = current
             @Suppress("UNCHECKED_CAST")
             current = if(c == null) DataClassPathAccess(DataClassPathSelf<T>(inner), prop as SerializableProperty<T, Any?>)
             else DataClassPathAccess(c as DataClassPath<T, Any?>, prop as SerializableProperty<Any?, Any?>)
-            if(part.endsWith('?')) {
+            if(part.endsWith('?') || prop.serializer.descriptor.isNullable && index != valueParts.lastIndex) {
                 @Suppress("UNCHECKED_CAST")
                 current = DataClassPathNotNull(current as DataClassPath<T, Any?>)
                 currentSerializer = currentSerializer.nullElement()!!
