@@ -25,6 +25,7 @@ import kotlin.test.assertNull
 class SerializationTest {
     val myJson = Json {
         serializersModule = ClientModule
+        encodeDefaults = true
     }
     val myProperties = Properties(ClientModule)
 
@@ -84,6 +85,15 @@ class SerializationTest {
     @Test fun partial4() {
         val serializer = PartialSerializer(LargeTestModel.serializer())
         val part = Partial(LargeTestModel(), setOf(path<LargeTestModel>().embeddedNullable.notNull.value2))
+        val asText = myJson.encodeToString(serializer, part)
+        println(asText)
+        val restored = myJson.decodeFromString(serializer, asText)
+        assertEquals(part, restored)
+        println(restored)
+    }
+    @Test fun partial5() {
+        val serializer = PartialSerializer(LargeTestModel.serializer())
+        val part = Partial(LargeTestModel(), setOf(path<LargeTestModel>().embedded))
         val asText = myJson.encodeToString(serializer, part)
         println(asText)
         val restored = myJson.decodeFromString(serializer, asText)

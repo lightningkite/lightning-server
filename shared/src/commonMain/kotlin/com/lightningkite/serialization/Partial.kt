@@ -6,7 +6,10 @@ import kotlinx.serialization.serializer
 
 @Serializable(PartialSerializer::class)
 data class Partial<T>(val parts: MutableMap<SerializableProperty<T, *>, Any?> = mutableMapOf()) {
-    constructor(item: T, paths: Set<DataClassPathPartial<T>>) : this() {
+    constructor(item: T, paths: Iterable<DataClassPathPartial<T>>) : this() {
+        paths.forEach { it.setMap(item, this) }
+    }
+    constructor(item: T, paths: Array<DataClassPathPartial<T>>) : this() {
         paths.forEach { it.setMap(item, this) }
     }
 }
