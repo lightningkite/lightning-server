@@ -82,7 +82,7 @@ class ConditionSerializer<T>(val inner: KSerializer<T>): MySealedClassSerializer
             inner.descriptor.serialName.substringBefore('/') == "kotlin.String" -> stringOptions
             IsRawString.Companion.serialNames.contains(inner.descriptor.serialName) -> rawStringOptions(inner as KSerializer<IsRawString>)
             inner.descriptor.serialName == "kotlin.Int" -> intOptions
-            inner.descriptor.serialName == "com.lightningkite.GeoCoordinate" -> geocoordinateOptions
+            inner.descriptor.serialName.substringBefore('/') == "com.lightningkite.GeoCoordinate" -> geocoordinateOptions
             inner.descriptor.kind == StructureKind.MAP -> stringMapOptions(inner.innerElement2())
             inner.descriptor.kind == StructureKind.LIST -> {
                 if(inner.descriptor.serialName.contains("Set")) setOptions(inner.innerElement())
