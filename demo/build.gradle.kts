@@ -40,9 +40,16 @@ kotlin {
 }
 
 application {
-    mainClass.set("com.lightningkite.lightningserver.demo.MainKt")
+    mainClass.set("com.lightningkite.lightningserverdemo.MainKt")
 }
 
+tasks.create("serve", JavaExec::class.java) {
+    group = "application"
+    classpath(sourceSets.main.get().runtimeClasspath)
+    mainClass.set("com.lightningkite.lightningserverdemo.MainKt")
+    args("serve")
+    workingDir(project.rootDir)
+}
 
 tasks.create("lambda", Copy::class.java) {
     group = "deploy"

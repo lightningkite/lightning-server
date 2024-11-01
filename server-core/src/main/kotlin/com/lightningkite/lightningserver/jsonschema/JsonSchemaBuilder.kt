@@ -361,7 +361,7 @@ class JsonSchemaBuilder(
     fun key(serializer: KSerializer<*>): String {
         val key = KSerializerKey(serializer)
         existingKeys1[key]?.let { return it }
-        val baseName = serializer.descriptor.serialName
+        val baseName = serializer.descriptor.serialName.replace('/', '_')
         var index = 0
         while (true) {
             val name = baseName + (if (index == 0) "" else index.toString())
