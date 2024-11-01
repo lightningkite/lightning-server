@@ -115,11 +115,18 @@ class SerializationRegistry(val module: SerializersModule) {
         register(LocalDateIso8601Serializer)
         register(LocalTimeIso8601Serializer)
         register(LocalDateTimeIso8601Serializer)
+        register(kotlinx.datetime.serializers.InstantIso8601Serializer)
+        register(kotlinx.datetime.serializers.LocalDateIso8601Serializer)
+        register(kotlinx.datetime.serializers.LocalTimeIso8601Serializer)
+        register(kotlinx.datetime.serializers.LocalDateTimeIso8601Serializer)
         register(UUIDSerializer)
         register(OffsetDateTimeIso8601Serializer)
         register(ZonedDateTimeIso8601Serializer)
         register(ServerFileSerializer)
         register(GeoCoordinateArraySerializer)
+        register(TrimOnSerialize)
+        register(TrimLowercaseOnSerialize)
+        register(LowercaseOnSerialize)
         register(TrimmedStringSerializer)
         register(TrimmedCaselessStringSerializer)
         register(CaselessStringSerializer)
@@ -179,6 +186,7 @@ class SerializationRegistry(val module: SerializersModule) {
     }
 
     fun registerVirtualDeep(type: KSerializer<*>) {
+        type.nullElement()?.let { return registerVirtualDeep(it) }
         if(registerVirtual(type) != null) {
             type.tryChildSerializers()?.forEach { registerVirtualDeep(it) }
         }
