@@ -91,6 +91,24 @@ class SerializationTest {
         assertEquals(part, restored)
         println(restored)
     }
+    @Test fun partial6() {
+        val serializer = PartialSerializer(LargeTestModel.serializer())
+        val part = Partial(LargeTestModel(embeddedNullable = ClassUsedForEmbedding()), setOf(path<LargeTestModel>().embeddedNullable))
+        val asText = myJson.encodeToString(serializer, part)
+        println(asText)
+        val restored = myJson.decodeFromString(serializer, asText)
+        assertEquals(part, restored)
+        println(restored)
+    }
+    @Test fun partial7() {
+        val serializer = PartialSerializer(LargeTestModel.serializer())
+        val part = Partial(LargeTestModel(), setOf(path<LargeTestModel>().embeddedNullable))
+        val asText = myJson.encodeToString(serializer, part)
+        println(asText)
+        val restored = myJson.decodeFromString(serializer, asText)
+        assertEquals(part, restored)
+        println(restored)
+    }
     @Test fun partial5() {
         val serializer = PartialSerializer(LargeTestModel.serializer())
         val part = Partial(LargeTestModel(), setOf(path<LargeTestModel>().embedded))

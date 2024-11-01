@@ -124,7 +124,7 @@ data class ModificationSerializer<T>(val inner: KSerializer<T>) :
         MySealedClassSerializer<Modification<T>>("com.lightningkite.lightningdb.Modification", {
             val r = when {
                 inner.nullElement() != null -> nullableOptions(inner.nullElement()!! as KSerializer<Any>)
-                inner.descriptor.serialName == "kotlin.String" -> stringOptions
+                inner.descriptor.serialName.substringBefore('/') == "kotlin.String" -> stringOptions
                 inner.descriptor.serialName in numlist -> numberOptions(inner as KSerializer<Int>)
                 IsRawString.Companion.serialNames.contains(inner.descriptor.serialName) -> rawStringOptions(inner as KSerializer<IsRawString>)
                 inner.descriptor.kind == StructureKind.MAP -> stringMapOptions(inner.mapValueElement()!!)

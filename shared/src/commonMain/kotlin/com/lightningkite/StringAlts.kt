@@ -16,9 +16,11 @@ interface IsRawString : Comparable<IsRawString> {
 
     companion object {
         val serialNames = setOf(
-            "TrimmedString",
-            "CaselessString",
-            "TrimmedCaselessString",
+            "com.lightningkite.TrimmedString",
+            "com.lightningkite.CaselessString",
+            "com.lightningkite.TrimmedCaselessString",
+            "com.lightningkite.EmailAddress",
+            "com.lightningkite.PhoneNumber",
         )
     }
 }

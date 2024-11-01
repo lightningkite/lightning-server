@@ -413,7 +413,7 @@ class JsonSchemaBuilder(
             }
 
             val ser = serializer.unwrap()
-            overrides[ser.descriptor.serialName.substringBefore('<')]?.let {
+            overrides[ser.descriptor.serialName.substringBefore('/').substringBefore('<')]?.let {
                 return defining(ser) { it(ser) }.applyAnnotations(annos)
             }
             return when (ser.descriptor.kind) {
@@ -433,7 +433,7 @@ class JsonSchemaBuilder(
 
                 SerialKind.ENUM -> defining(serializer) {
                     JsonSchemaType(
-                        title = ser.descriptor.serialName.substringBefore('<').substringAfterLast('.').titleCase(),
+                        title = ser.descriptor.serialName.substringBefore('/').substringBefore('<').substringAfterLast('.').titleCase(),
                         type = JsonType3(JsonType2.STRING),
                         oneOf = (0 until ser.descriptor.elementsCount)
                             .map {
@@ -462,7 +462,7 @@ class JsonSchemaBuilder(
 
                 StructureKind.CLASS -> defining(serializer) {
                     JsonSchemaType(
-                        title = ser.descriptor.serialName.substringBefore('<').substringAfterLast('.').titleCase(),
+                        title = ser.descriptor.serialName.substringBefore('/').substringBefore('<').substringAfterLast('.').titleCase(),
                         type = JsonType3(JsonType2.OBJECT),
                         properties = ser.serializableProperties?.associate {
                             val propTitle = it.name.titleCase()

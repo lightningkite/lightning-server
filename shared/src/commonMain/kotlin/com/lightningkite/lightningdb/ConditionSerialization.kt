@@ -79,7 +79,7 @@ class ConditionSerializer<T>(val inner: KSerializer<T>): MySealedClassSerializer
     MySealedClassSerializer<Condition<T>>("com.lightningkite.lightningdb.Condition", {
         val r = when {
             inner.descriptor.isNullable -> nullableOptions(inner.innerElement() as KSerializer<Any>)
-            inner.descriptor.serialName == "kotlin.String" -> stringOptions
+            inner.descriptor.serialName.substringBefore('/') == "kotlin.String" -> stringOptions
             IsRawString.Companion.serialNames.contains(inner.descriptor.serialName) -> rawStringOptions(inner as KSerializer<IsRawString>)
             inner.descriptor.serialName == "kotlin.Int" -> intOptions
             inner.descriptor.serialName == "com.lightningkite.GeoCoordinate" -> geocoordinateOptions

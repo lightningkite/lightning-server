@@ -30,11 +30,11 @@ class HelpersKtTest {
         )
     }
     @Test fun requireTermsPresent() {
-        assertTrue(TextQuery(loose = setOf("one", "two")).fuzzyPresent("one two three"))
-        assertTrue(TextQuery(loose = setOf("one", "twoo")).fuzzyPresent("one two three"))
-        assertTrue(TextQuery(loose = setOf("one", "too")).fuzzyPresent("one two three"))
-        assertTrue(TextQuery(loose = setOf("ONE", "TOO")).fuzzyPresent("one two three"))
-        assertFalse(TextQuery(loose = setOf("one", "four")).fuzzyPresent("one two three"))
-        assertFalse(TextQuery(loose = setOf("one", "fsd")).fuzzyPresent("one two three"))
+        assertTrue(TextQuery(loose = setOf("four", "three")).fuzzyPresent("one two three four"))
+        assertTrue(TextQuery(loose = setOf("four", "threee")).fuzzyPresent("one two three four"))
+        assertTrue(TextQuery(loose = setOf("four", "thre")).fuzzyPresent("one two three four"))
+        assertTrue(TextQuery(loose = setOf("FOUR", "THRE")).fuzzyPresent("one two three four"))
+        assertFalse(TextQuery(loose = setOf("four", "five")).fuzzyPresent("one two three four"))
+        assertFalse(TextQuery(loose = setOf("four", "fsd")).fuzzyPresent("one two three four"))
     }
 }

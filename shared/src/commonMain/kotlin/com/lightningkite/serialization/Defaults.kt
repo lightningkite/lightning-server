@@ -26,12 +26,13 @@ object DefaultDecoder : Decoder {
         defaults[InstantIso8601Serializer.descriptor.serialName] = Instant.fromEpochMilliseconds(0)
         defaults[LocalTimeIso8601Serializer.descriptor.serialName] = LocalTime(0, 0, 0)
         defaults[LocalDateIso8601Serializer.descriptor.serialName] = LocalDate(1970, 1, 1)
-        defaults[LocalDateTimeIso8601Serializer.descriptor.serialName] =
-            LocalDateTime(LocalDate(1970, 1, 1), LocalTime(0, 0, 0))
-        defaults[ZonedDateTimeIso8601Serializer.descriptor.serialName] =
-            ZonedDateTime(LocalDateTime(LocalDate(1970, 1, 1), LocalTime(0, 0, 0)), TimeZone.UTC)
-        defaults[OffsetDateTimeIso8601Serializer.descriptor.serialName] =
-            OffsetDateTime(LocalDateTime(LocalDate(1970, 1, 1), LocalTime(0, 0, 0)), UtcOffset.ZERO)
+        defaults[LocalDateTimeIso8601Serializer.descriptor.serialName] = LocalDateTime(LocalDate(1970, 1, 1), LocalTime(0, 0, 0))
+        defaults[kotlinx.datetime.serializers.InstantIso8601Serializer.descriptor.serialName] = Instant.fromEpochMilliseconds(0)
+        defaults[kotlinx.datetime.serializers.LocalTimeIso8601Serializer.descriptor.serialName] = LocalTime(0, 0, 0)
+        defaults[kotlinx.datetime.serializers.LocalDateIso8601Serializer.descriptor.serialName] = LocalDate(1970, 1, 1)
+        defaults[kotlinx.datetime.serializers.LocalDateTimeIso8601Serializer.descriptor.serialName] = LocalDateTime(LocalDate(1970, 1, 1), LocalTime(0, 0, 0))
+        defaults[ZonedDateTimeIso8601Serializer.descriptor.serialName] = ZonedDateTime(LocalDateTime(LocalDate(1970, 1, 1), LocalTime(0, 0, 0)), TimeZone.UTC)
+        defaults[OffsetDateTimeIso8601Serializer.descriptor.serialName] = OffsetDateTime(LocalDateTime(LocalDate(1970, 1, 1), LocalTime(0, 0, 0)), UtcOffset.ZERO)
     }
 
     override var serializersModule: SerializersModule = ClientModule

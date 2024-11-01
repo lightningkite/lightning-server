@@ -95,7 +95,8 @@ fun <K> DataClassPathPartial<K>.setMap(key: K, out: Partial<K>) {
     run {
         @Suppress("UNCHECKED_CAST")
         val prop = properties.last() as SerializableProperty<Any?, *>
-        prop.serializer.serializableProperties?.let { props ->
+        val unwrapped = prop.serializer.nullElement() ?: prop.serializer
+        unwrapped.serializableProperties?.let { props ->
             current.parts[properties.last() as SerializableProperty<Any?, *>] = getAny(key)?.let {
                 @Suppress("UNCHECKED_CAST")
                 Partial<Any>(it, props.map { DataClassPathAccess<Any, Any, Any?>(DataClassPathSelf(prop.serializer as KSerializer<Any>), it as SerializableProperty<Any, Any?>) })

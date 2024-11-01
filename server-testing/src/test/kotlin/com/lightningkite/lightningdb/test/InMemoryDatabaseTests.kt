@@ -20,6 +20,7 @@ import org.junit.Test
 import java.io.File
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 
 class RamAggregationsTest: AggregationsTest() {
     override val database: Database = InMemoryDatabase()
@@ -41,22 +42,22 @@ class RamMetaTest: MetaTest() {
 }
 
 class DelayRamAggregationsTest: AggregationsTest() {
-    override val database: Database = InMemoryDatabase().delayed(5L)
+    override val database: Database = InMemoryDatabase().delayed(5.milliseconds..6.milliseconds)
 }
 class DelayRamConditionTests: ConditionTests() {
-    override val database: Database = InMemoryDatabase().delayed(5L)
+    override val database: Database = InMemoryDatabase().delayed(5.milliseconds..6.milliseconds)
 }
 class DelayRamModificationTests: ModificationTests() {
-    override val database: Database = InMemoryDatabase().delayed(5L)
+    override val database: Database = InMemoryDatabase().delayed(5.milliseconds..6.milliseconds)
 }
 class DelayRamOperationsTests: OperationsTests() {
-    override val database: Database = InMemoryDatabase().delayed(5L)
+    override val database: Database = InMemoryDatabase().delayed(5.milliseconds..6.milliseconds)
 }
 class DelayRamSortTest: SortTest() {
-    override val database: Database = InMemoryDatabase().delayed(5L)
+    override val database: Database = InMemoryDatabase().delayed(5.milliseconds..6.milliseconds)
 }
 class DelayRamMetaTest: MetaTest() {
-    override val database: Database = InMemoryDatabase().delayed(5L)
+    override val database: Database = InMemoryDatabase().delayed(5.milliseconds..6.milliseconds)
 }
 
 class LocalCacheTest: CacheTest() {
