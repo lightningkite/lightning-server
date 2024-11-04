@@ -77,7 +77,7 @@ class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializerWithDefa
             if(part.endsWith('?') || prop.serializer.descriptor.isNullable && index != valueParts.lastIndex) {
                 @Suppress("UNCHECKED_CAST")
                 current = DataClassPathNotNull(current as DataClassPath<T, Any?>)
-                currentSerializer = currentSerializer.nullElement()!!
+                currentSerializer = currentSerializer.nullElement() ?: throw SerializationException("${prop.name} is not nullable")
             }
         }
 
