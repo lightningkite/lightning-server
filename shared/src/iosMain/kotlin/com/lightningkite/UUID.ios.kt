@@ -1,5 +1,11 @@
+@file:OptIn(ExperimentalForeignApi::class)
+
 package com.lightningkite
 
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.usePinned
 import kotlinx.serialization.Serializable
 import platform.Foundation.NSUUID
 
@@ -12,6 +18,19 @@ actual class UUID(val ns: NSUUID): Comparable<UUID> {
     actual companion object {
         actual fun random(): UUID = UUID(NSUUID())
         actual fun parse(uuidString: String): UUID = UUID(NSUUID(uuidString))
+        actual fun parse(bytes: ByteArray): UUID {
+            return bytes.usePinned {
+                UUID(NSUUID(it.addressOf(0).reinterpret()))
+            }
+        }
+    }
+
+    actual fun toBytes(): ByteArray  {
+        val out = ByteArray(16)
+        out.usePinned { p ->
+            ns.getUUIDBytes(p.addressOf(0).reinterpret())
+        }
+        return out
     }
 }
 

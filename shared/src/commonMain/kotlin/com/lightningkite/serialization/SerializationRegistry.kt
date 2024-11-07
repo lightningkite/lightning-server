@@ -242,7 +242,7 @@ class SerializationRegistry(val module: SerializersModule) {
                         annotations = it.annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) },
                         defaultJson = it.default?.let { default ->
                             @Suppress("UNCHECKED_CAST")
-                            defjs.encodeToString(it.serializer as KSerializer<Any?>, default)
+                            DefaultDecoder.json.encodeToString(it.serializer as KSerializer<Any?>, default)
                         }
                     )
                 } ?: (value as? GeneratedSerializer<*>)?.let {
@@ -321,7 +321,7 @@ class SerializationRegistry(val module: SerializersModule) {
                         annotations = it.annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) },
                         defaultJson = it.default?.let { default ->
                             @Suppress("UNCHECKED_CAST")
-                            defjs.encodeToString(it.serializer as KSerializer<Any?>, default)
+                            DefaultDecoder.json.encodeToString(it.serializer as KSerializer<Any?>, default)
                         }
                     )
                 } ?: (value as? GeneratedSerializer<*>)?.let {
@@ -382,4 +382,3 @@ class SerializationRegistry(val module: SerializersModule) {
     }
 }
 
-private val defjs = Json { serializersModule = DefaultDecoder.serializersModule }

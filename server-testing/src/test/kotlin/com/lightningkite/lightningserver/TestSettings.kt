@@ -59,7 +59,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
 
     init {
         Serialization.enablePublicJavaData()
-//        Serialization.enablePublicProtobuf()
+        Serialization.enablePublicProtobuf()
     }
 
     val info = modelInfo<User, User, UUID>(

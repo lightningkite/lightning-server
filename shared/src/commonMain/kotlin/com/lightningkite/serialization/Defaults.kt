@@ -8,6 +8,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.time.Duration.Companion.seconds
 
@@ -36,6 +37,7 @@ object DefaultDecoder : Decoder {
     }
 
     override var serializersModule: SerializersModule = ClientModule
+    val json by lazy { Json { serializersModule = DefaultDecoder.serializersModule } }
     override fun decodeBoolean() = false
     override fun decodeByte() = 0.toByte()
     override fun decodeChar() = ' '

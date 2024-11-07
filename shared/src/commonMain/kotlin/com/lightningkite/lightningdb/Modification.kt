@@ -30,6 +30,7 @@ sealed class Modification<T>  {
         override val isNothing: Boolean
             get() = modifications.all { it.isNothing }
         override fun invoke(on: T): T = modifications.fold(on) { item, mod -> mod(item) }
+        override fun toString(): String = modifications.joinToString("; ") { it.toString() }
     }
 
     @Serializable(ModificationIfNotNullSerializer::class)

@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.cache.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.engine.LocalEngine
 import com.lightningkite.lightningserver.engine.engine
+import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -101,8 +102,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                         val parts = HashMap<String, String>()
                         var wildcard: String? = null
                         call.parameters.forEach { s, strings ->
-                            if (strings.size > 1) wildcard = strings.joinToString("/")
-                            parts[s] = strings.single()
+                            parts[s] = strings.joinToString("/")
                         }
                         val id = ws.connect()
                         val cache = LocalCache()

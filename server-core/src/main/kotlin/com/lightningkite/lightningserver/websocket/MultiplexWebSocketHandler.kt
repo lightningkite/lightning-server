@@ -85,6 +85,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
             ),
             timeToLive = 1.days
         )
+        channels(event.id).set(setOf(), 8.hours)
     }
 
     override suspend fun message(event: WebSockets.MessageEvent) {

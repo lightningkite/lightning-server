@@ -34,6 +34,7 @@ import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.StructureKind
 import java.util.*
 import com.lightningkite.UUID
+import kotlinx.serialization.protobuf.ProtoBuf
 import kotlin.collections.HashMap
 
 /**
@@ -136,9 +137,9 @@ abstract class Serialization {
     var formData: FormDataFormat by SetOnce {
         FormDataFormat(StringDeferringConfig(module, deferredFormat = json))
     }
-//    var protobuf: ProtoBuf by SetOnce {
-//        ProtoBuf { this.serializersModule = module }
-//    }
+    var protobuf: ProtoBuf by SetOnce {
+        ProtoBuf { this.serializersModule = module.overwriteWith(ProtoBufOverrides) }
+    }
 
     interface HttpContentParser {
         val contentType: ContentType
@@ -224,9 +225,9 @@ abstract class Serialization {
     fun enablePublicJavaData() {
         handler(BinaryFormatHandler({ javaData }, ContentType.Application.StructuredBytes))
     }
-//    fun enablePublicProtobuf() {
-//        handler(BinaryFormatHandler({ protobuf }, ContentType.Application.ProtoBuf))
-//    }
+    fun enablePublicProtobuf() {
+        handler(BinaryFormatHandler({ protobuf }, ContentType.Application.ProtoBuf))
+    }
     fun enablePublicXml() {
         handler(StringFormatHandler({ xml }, ContentType.Text.Xml))
     }

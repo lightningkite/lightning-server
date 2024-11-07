@@ -131,6 +131,16 @@ class SerializationTest {
         val restored = myJson.decodeFromString(serializer, asText)
         assertEquals(item, restored)
     }
+    @Test fun partialMods() {
+        val p = partialOf<LargeTestModel> {
+            it.int assign 3
+            it.embedded assign partialOf<ClassUsedForEmbedding> {
+                it.value2 assign 4
+            }
+            it.embeddedNullable assign ClassUsedForEmbedding("test")
+        }
+        println(p.toModification())
+    }
     @Test fun dataClassPathForgotQuestionMark() {
         println(DataClassPathSerializer(LargeTestModel.serializer()).fromString("embeddedNullable.value1"))
     }

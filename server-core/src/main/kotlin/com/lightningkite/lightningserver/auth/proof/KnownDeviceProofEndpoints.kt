@@ -160,7 +160,7 @@ class KnownDeviceProofEndpoints(
         inputType = Unit.serializer(),
         outputType = KnownDeviceOptions.serializer(),
         description = "Gives information about how valuable working from a known device is and for how long it works.",
-        authOptions = anyAuthRoot,
+        authOptions = noAuth,
         errorCases = listOf(),
         examples = listOf(),
         implementation = { value: Unit ->

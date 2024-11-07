@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
@@ -15,6 +16,7 @@ class QueryParamWebSocketHandler(val cache: () -> Cache) : WebSockets.Handler {
             WebSockets.matcher.match(other) ?: throw NotFoundException("No web socket handler found for '$other'")
         val otherHandler =
             WebSockets.handlers[match.path] ?: throw NotFoundException("No web socket handler found for '$other'")
+        if(otherHandler == this) throw BadRequestException("No valid handler given; recursive path ${match.path} given")
         cache().set("${event.id}-path", match.path.toString())
         val fixedQueryParameters = event.queryParameters.mapNotNull {
             if (it.first == "path") {

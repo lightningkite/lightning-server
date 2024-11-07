@@ -1,3 +1,4 @@
+@file:UseContextualSerialization(Instant::class, UUID::class)
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.DeferToContextualUuidSerializer
@@ -10,6 +11,7 @@ import kotlinx.datetime.Instant
 import kotlin.time.Duration.Companion.milliseconds
 import com.lightningkite.UUID
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.prepareModelsServerCoreTest
 import com.lightningkite.serialization.*
 import kotlinx.serialization.*
 import kotlinx.serialization.modules.EmptySerializersModule
@@ -18,11 +20,12 @@ import kotlin.reflect.KClass
 import kotlin.test.assertIs
 import kotlin.test.assertIsNot
 
+@GenerateDataClassPaths
 @Serializable
 data class BsonSerTest(
     val x: Int = 42,
-    @Contextual val y: Instant = now().roundTo(1.milliseconds),
-    @Contextual val z: UUID = uuid()
+    val y: Instant = now().roundTo(1.milliseconds),
+    val z: UUID = uuid()
 )
 
 class SerializationTest {
@@ -30,6 +33,48 @@ class SerializationTest {
         val v = BsonSerTest()
         println(Serialization.bson.stringify(BsonSerTest.serializer(), v).toJson())
         assertEquals(v, Serialization.bson.load(BsonSerTest.serializer(), Serialization.bson.dump(BsonSerTest.serializer(), v)))
+    }
+    @OptIn(ExperimentalStdlibApi::class)
+    @Test fun protobuf() {
+        val v = BsonSerTest(x = -15)
+        val asBuffer = Serialization.protobuf.encodeToByteArray(BsonSerTest.serializer(), v)
+        println(Serialization.protobuf.schema.generateSchemaText(BsonSerTest.serializer(), "com.lightningkite.lightningserver.serialization"))
+        println(asBuffer.toHexString())
+        assertEquals(v, Serialization.protobuf.decodeFromByteArray(BsonSerTest.serializer(), asBuffer))
+    }
+    @OptIn(ExperimentalStdlibApi::class)
+    @Test fun protobufPartial() {
+        prepareModelsServerCoreTest()
+        val v = partialOf<BsonSerTest> {
+            it.x assign 15
+            it.y assign now().roundTo(1.milliseconds)
+            it.z assign uuid()
+        }
+        val s = PartialSerializer(BsonSerTest.serializer())
+        val asBuffer = Serialization.protobuf.encodeToByteArray(s, v)
+        println(Serialization.protobuf.schema.generateSchemaText(s, "com.lightningkite.lightningserver.serialization"))
+        println(asBuffer.toHexString())
+        assertEquals(v, Serialization.protobuf.decodeFromByteArray(s, asBuffer))
+    }
+    @OptIn(ExperimentalStdlibApi::class)
+    @Test fun javaData() {
+        val v = BsonSerTest(x = -15)
+        val asBuffer = Serialization.javaData.encodeToByteArray(BsonSerTest.serializer(), v)
+        println(asBuffer.toHexString())
+        assertEquals(v, Serialization.javaData.decodeFromByteArray(BsonSerTest.serializer(), asBuffer))
+    }
+    @OptIn(ExperimentalStdlibApi::class)
+    @Test fun javaDataPartial() {
+        prepareModelsServerCoreTest()
+        val v = partialOf<BsonSerTest> {
+            it.x assign 15
+            it.y assign now().roundTo(1.milliseconds)
+            it.z assign uuid()
+        }
+        val s = PartialSerializer(BsonSerTest.serializer())
+        val asBuffer = Serialization.javaData.encodeToByteArray(s, v)
+        println(asBuffer.toHexString())
+        assertEquals(v, Serialization.javaData.decodeFromByteArray(s, asBuffer))
     }
     @Test fun contextual() {
         assertIs<ContextualSerializer<*>>(Serialization.module.contextualSerializerIfHandled<UUID>())

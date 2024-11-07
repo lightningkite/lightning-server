@@ -2,7 +2,12 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.serialization.DataClassPath
 import com.lightningkite.IsRawString
+import com.lightningkite.serialization.DataClassPathSelf
+import com.lightningkite.serialization.DataClassPathWithValue
 import kotlin.jvm.JvmName
+import com.lightningkite.serialization.Partial
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.serializer
 
 inline fun <reified T> modification(setup: ModificationBuilder<T>.(DataClassPath<T, T>) -> Unit): Modification<T> {
     return ModificationBuilder<T>().apply {
@@ -200,4 +205,12 @@ class ModificationBuilder<K>() {
     infix fun <T> DataClassPath<K, Map<String, T>>.removeKeys(fields: Set<String>) {
         modifications.add(mapModification(Modification.RemoveKeys(fields)))
     }
+}
+
+fun <T, V> DataClassPathWithValue<T, V>.modify(): Modification<T> = path.mapModification(Modification.Assign(value))
+inline fun <reified T> Partial<T>.toModification(): Modification<T> = toModification(serializer())
+fun <T> Partial<T>.toModification(serializer: KSerializer<T>): Modification<T> {
+    val out = ArrayList<Modification<T>>()
+    perPath(DataClassPathSelf(serializer)) { out += it.modify() }
+    return Modification.Chain(out)
 }

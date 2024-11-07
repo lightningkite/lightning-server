@@ -73,6 +73,31 @@ class MetaEndpoints(
         })
     }
 
+    private suspend fun openAdmin2(): HttpResponse {
+        val inject = buildJsonObject {
+            put("url", generalSettings().publicUrl)
+        }
+        val page = client.get("https://lsadmin.cs.lightningkite.com").bodyAsText()
+            .let { original ->
+                (original.substringBeforeLast("</body>") + """
+                    <script type="application/json" id="injectedBackendInformation">${inject}</script>
+                    </body>
+                """.trimIndent() + original.substringAfterLast("</body>"))
+            }
+            .let { original ->
+                (original.substringBeforeLast("</head>") + """
+                    <base href="${path("admin2/").fullUrl()}">
+                    </head>
+                """.trimIndent() + original.substringAfterLast("</head>"))
+            }
+        return HttpResponse.html(content = page, headers = {
+            set(
+                "Content-Security-Policy",
+                "script-src 'unsafe-eval' ${generalSettings().publicUrl}/ https://lsadmin.cs.lightningkite.com/"
+            )
+        })
+    }
+
     val bulk = path("bulk").bulkRequestEndpoint()
 
     val admin = path("admin/").get.handler {
@@ -83,6 +108,15 @@ class MetaEndpoints(
             HttpResponse.pathMovedOld("https://lightning-server-admin.s3.us-west-2.amazonaws.com/${it.wildcard}")
         else
             openAdmin(it)
+    }
+    val admin2 = path("admin2/").get.handler {
+        openAdmin2()
+    }
+    val admin2Resources = path("admin2/{...}").get.handler {
+        if (it.wildcard?.contains(".") == true)
+            HttpResponse.pathMovedOld("https://lsadmin.cs.lightningkite.com/${it.wildcard}")
+        else
+            openAdmin2()
     }
     val schema = path("schema").get.handler {
         HttpResponse(
@@ -265,6 +299,7 @@ class MetaEndpoints(
         health.route.endpoint,
         isOnline,
         admin,
+        admin2,
         openApi,
         openApiJson,
         schema,
