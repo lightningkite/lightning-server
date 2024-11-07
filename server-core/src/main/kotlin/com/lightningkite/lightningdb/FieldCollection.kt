@@ -56,7 +56,7 @@ interface FieldCollection<Model : Any> {
         limit = limit,
         maxQueryMs = maxQueryMs
     ).map {
-        Partial(it, fields)
+        partialOf(it, fields)
     }
 
     /**

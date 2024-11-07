@@ -18,6 +18,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.capturedKClass
 import kotlinx.serialization.internal.GeneratedSerializer
+import kotlinx.serialization.modules.SerializersModule
 
 interface Documentable {
     val path: TypedServerPath
@@ -95,9 +96,9 @@ internal fun KSerializer<*>.subAndChildSerializers(): Array<KSerializer<*>> = nu
     ?: (this as? DataClassPathSerializer<*>)?.inner?.let { arrayOf(it) }
     ?: arrayOf()
 
-internal fun KSerializer<*>.uncontextualize(): KSerializer<*> {
+internal fun KSerializer<*>.uncontextualize(module: SerializersModule = Serialization.json.serializersModule): KSerializer<*> {
     return if (this.descriptor.kind == SerialKind.CONTEXTUAL) {
-        Serialization.json.serializersModule.getContextual(
+        module.getContextual(
             descriptor.capturedKClass ?: throw IllegalStateException("No captured KClass found for $descriptor")
         )
             ?: throw IllegalStateException("No contextual serializer found for ${descriptor.capturedKClass!!.qualifiedName}")

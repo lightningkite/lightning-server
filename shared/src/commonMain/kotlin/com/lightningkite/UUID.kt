@@ -16,9 +16,11 @@ object DeferToContextualUuidSerializer: KSerializer<UUID> by ContextualSerialize
 @Serializable(DeferToContextualUuidSerializer::class)
 expect class UUID: Comparable<UUID> {
     override fun compareTo(other: UUID): Int
+    fun toBytes(): ByteArray
     companion object {
         fun random(): UUID
         fun parse(uuidString: String): UUID
+        fun parse(bytes: ByteArray): UUID
     }
 }
 @Deprecated("Use UUID.v4() instead", ReplaceWith("UUID.v4()", "com.lightningkite.UUID")) fun uuid(): UUID = UUID.random()

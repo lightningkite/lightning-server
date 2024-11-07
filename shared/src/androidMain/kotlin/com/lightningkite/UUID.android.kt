@@ -15,9 +15,45 @@ actual data class UUID(
         else
             this.leastSignificantBits.compareTo(other.leastSignificantBits)
     }
+    actual fun toBytes(): ByteArray = byteArrayOf(
+        mostSignificantBits.shr(8 * 7).toByte(),
+        mostSignificantBits.shr(8 * 6).toByte(),
+        mostSignificantBits.shr(8 * 5).toByte(),
+        mostSignificantBits.shr(8 * 4).toByte(),
+        mostSignificantBits.shr(8 * 3).toByte(),
+        mostSignificantBits.shr(8 * 2).toByte(),
+        mostSignificantBits.shr(8 * 1).toByte(),
+        mostSignificantBits.shr(8 * 0).toByte(),
+        leastSignificantBits.shr(8 * 7).toByte(),
+        leastSignificantBits.shr(8 * 6).toByte(),
+        leastSignificantBits.shr(8 * 5).toByte(),
+        leastSignificantBits.shr(8 * 4).toByte(),
+        leastSignificantBits.shr(8 * 3).toByte(),
+        leastSignificantBits.shr(8 * 2).toByte(),
+        leastSignificantBits.shr(8 * 1).toByte(),
+        leastSignificantBits.shr(8 * 0).toByte(),
+    )
     actual companion object {
         actual fun random(): UUID = java.util.UUID.randomUUID().let { UUID(it.mostSignificantBits.toULong(), it.leastSignificantBits.toULong()) }
         actual fun parse(uuidString: String): UUID = java.util.UUID.fromString(uuidString).let { UUID(it.mostSignificantBits.toULong(), it.leastSignificantBits.toULong()) }
+        actual fun parse(bytes: ByteArray): UUID = UUID(
+            bytes[0].toUByte().toULong().shl(8*7) or
+                    bytes[1].toUByte().toULong().shl(8*6) or
+                    bytes[2].toUByte().toULong().shl(8*5) or
+                    bytes[3].toUByte().toULong().shl(8*4) or
+                    bytes[4].toUByte().toULong().shl(8*3) or
+                    bytes[5].toUByte().toULong().shl(8*2) or
+                    bytes[6].toUByte().toULong().shl(8*1) or
+                    bytes[7].toUByte().toULong().shl(8*0) ,
+            bytes[8].toUByte().toULong().shl(8*7) or
+                    bytes[9].toUByte().toULong().shl(8*6) or
+                    bytes[10].toUByte().toULong().shl(8*5) or
+                    bytes[11].toUByte().toULong().shl(8*4) or
+                    bytes[12].toUByte().toULong().shl(8*3) or
+                    bytes[13].toUByte().toULong().shl(8*2) or
+                    bytes[14].toUByte().toULong().shl(8*1) or
+                    bytes[15].toUByte().toULong().shl(8*0) ,
+        )
     }
 
     override fun toString(): String {

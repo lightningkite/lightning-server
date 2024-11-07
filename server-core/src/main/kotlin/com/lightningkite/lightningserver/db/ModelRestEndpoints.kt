@@ -178,7 +178,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
                             condition = cond,
                             orderBy = sampleSorts.randomOrNull() ?: listOf()
                         ),
-                        List(10) { Partial(exampleItem()!!, paths) }
+                        List(10) { partialOf(exampleItem()!!, paths) }
                     )
                 }
             } catch (e: Exception) {
@@ -454,6 +454,34 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
             try {
                 info.collection(this)
                     .updateOneById(path1, input)
+                    .also { if (it.old == null && it.new == null) throw NotFoundException() }
+                    .new!!
+            } catch (e: UniqueViolationException) {
+                throw BadRequestException(detail = "unique", message = e.key?.titleCase()?.let { "$it already exists" } ?: "Already exists", cause = e)
+            }
+        }
+    )
+
+    val modifySimple = detailPath.path("simplified").patch.api(
+//        belongsToInterface = interfaceName,
+        belongsToInterface = null,
+        authOptions = info.authOptions,
+        inputType = Partial.serializer(info.serialization.serializer),
+        outputType = info.serialization.serializer,
+        summary = "Simplified Modify",
+        description = "Modifies a ${collectionName} by ID, returning the new value.",
+        errorCases = listOf(
+            LSError(
+                http = HttpStatus.NotFound.code,
+                detail = "",
+                message = "There was no known object by that ID.",
+                data = ""
+            )
+        ),
+        implementation = { input: Partial<T> ->
+            try {
+                info.collection(this)
+                    .updateOneById(path1, input.toModification(info.serialization.serializer))
                     .also { if (it.old == null && it.new == null) throw NotFoundException() }
                     .new!!
             } catch (e: UniqueViolationException) {

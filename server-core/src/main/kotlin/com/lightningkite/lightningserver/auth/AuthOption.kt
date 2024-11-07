@@ -14,6 +14,7 @@ class AuthOption(
     val limitationDescription: String? = null,
     val additionalRequirement: suspend (RequestAuth<*>) -> Boolean = { true }
 ) {
+    override fun toString(): String = "$type $scopes $maxAge"
 }
 
 data class AuthOptions<out USER : HasId<*>?>(val options: Set<AuthOption?>)

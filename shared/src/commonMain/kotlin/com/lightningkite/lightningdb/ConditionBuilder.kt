@@ -6,11 +6,8 @@ import com.lightningkite.GeoCoordinate
 import com.lightningkite.IsRawString
 import com.lightningkite.Length
 import com.lightningkite.Length.Companion.miles
-import com.lightningkite.serialization.serializerOrContextual
-import com.lightningkite.serialization.DataClassPathSelf
-import com.lightningkite.serialization.DataClassPath
-import com.lightningkite.serialization.DataClassPathAccess
-import com.lightningkite.serialization.DataClassPathNotNull
+import com.lightningkite.serialization.*
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 import kotlin.js.JsName
 import kotlin.jvm.JvmName
@@ -66,3 +63,11 @@ infix fun <K, T> DataClassPath<K, T>.notIn(values: List<T>) = mapCondition(Condi
 @JsName("xDataClassPathListSizedEqual") @JvmName("listSizedEqual") infix fun <K, T> DataClassPath<K, List<T>>.sizesEquals(count: Int) = mapCondition(Condition.ListSizesEquals(count))
 @Deprecated("Size equals will be removed in the future in favor of something that detects empty specifically")
 @JsName("xDataClassPathSetSizedEqual") @JvmName("setSizedEqual") infix fun <K, T> DataClassPath<K, Set<T>>.sizesEquals(count: Int) = mapCondition(Condition.SetSizesEquals(count))
+
+fun <T, V> DataClassPathWithValue<T, V>.eq(): Condition<T> = path.mapCondition(Condition.Equal(value))
+inline fun <reified T> Partial<T>.toCondition(): Condition<T> = toCondition(serializer())
+fun <T> Partial<T>.toCondition(serializer: KSerializer<T>): Condition<T> {
+    val out = ArrayList<Condition<T>>()
+    perPath(DataClassPathSelf(serializer)) { out += it.eq() }
+    return Condition.And(out)
+}

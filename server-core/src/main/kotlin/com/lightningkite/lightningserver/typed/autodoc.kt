@@ -7,7 +7,9 @@ import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.serialization.ProtoBufSchemaGeneratorAlt
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.serialization.schema
 import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.html.*
 import kotlinx.serialization.ContextualSerializer
@@ -18,10 +20,10 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.internal.GeneratedSerializer
-//import kotlinx.serialization.protobuf.schema.ProtoBufSchemaGenerator
 import kotlinx.serialization.serializer
 import kotlin.reflect.KType
 import com.lightningkite.serialization.*
+import kotlinx.serialization.protobuf.schema.ProtoBufSchemaGenerator
 
 @Deprecated(
     "Use apiDocs instead",
@@ -56,17 +58,17 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
             )
         )
     }
-//    get("sdk.protobuf").handler {
-//        HttpResponse(
-//            HttpContent.Text(
-//                string = ProtoBufSchemaGenerator.generateSchemaText(
-//                    Documentable.usedTypes.map { it.descriptor },
-//                    packageName = packageName
-//                ),
-//                type = ContentType.Application.ProtoBufDeclaration
-//            )
-//        )
-//    }
+    get("sdk.protobuf").handler {
+        HttpResponse(
+            HttpContent.Text(
+                string = Serialization.protobuf.schema.generateSchemaText(
+                    Documentable.usedTypes.toList(),
+                    packageName = packageName
+                ),
+                type = ContentType.Application.ProtoBufDeclaration
+            )
+        )
+    }
     return this.copy(after = ServerPath.Afterwards.TrailingSlash).get.handler { _ ->
         HttpResponse(body = HttpContent.html {
             head { title("${generalSettings().projectName} - Generated Documentation") }

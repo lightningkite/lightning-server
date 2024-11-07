@@ -38,6 +38,7 @@ data class VirtualStruct(
 
     override fun toString(): String = "virtual data class $serialName${parameters.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.name } ?: ""}(${fields.joinToString()})"
 
+    object DefaultNotPresent
     inner class Concrete(val registry: SerializationRegistry, val arguments: Array<out KSerializer<*>>) :
         KSerializer<VirtualInstance>, VirtualType by this@VirtualStruct {
         val struct = this@VirtualStruct
@@ -53,6 +54,11 @@ data class VirtualStruct(
         val serializers by lazy {
             fields.map {
                 it.type.serializer(registry, context)
+            }
+        }
+        val specifiedDefaults by lazy {
+            fields.zip(serializers) { field, serializer ->
+                field.defaultJson?.let { DefaultDecoder.json.decodeFromString(serializer, it) } ?: DefaultNotPresent
             }
         }
         val defaults by lazy {
@@ -110,7 +116,7 @@ data class VirtualStruct(
             val s = encoder.beginStructure(descriptor)
             for ((index, field) in fields.withIndex()) {
                 val v = value.values[index]
-                if (v != defaults[index] || s.shouldEncodeElementDefault(descriptor, index)) {
+                if (v != specifiedDefaults[index] || s.shouldEncodeElementDefault(descriptor, index)) {
                     val ser = serializers[index]
                     s.encodeSerializableElement(descriptor, index, ser, v)
                 }
