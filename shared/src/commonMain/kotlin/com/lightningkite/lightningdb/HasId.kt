@@ -3,7 +3,7 @@ package com.lightningkite.lightningdb
 
 import kotlinx.serialization.Serializable
 
-interface HasId<ID : Comparable<ID>> {
+interface HasId<out ID : Comparable<@UnsafeVariance ID>> {
     val _id: ID
 }
 
