@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.serialization
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpContent
+import com.lightningkite.lightningserver.websocket.WebSocketFrame
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
@@ -42,5 +43,16 @@ open class StringFormatHandler(
             stringFormat().encodeToString(serializer, value),
             contentType
         )
+    }
+
+    override suspend fun <T> invoke(content: WebSocketFrame, serializer: KSerializer<T>): T {
+        return when (content) {
+            is WebSocketFrame.Binary -> stringFormat().decodeFromString(serializer, content.content.toString(Charsets.UTF_8))
+            is WebSocketFrame.Text -> stringFormat().decodeFromString(serializer, content.content)
+        }
+    }
+
+    override suspend fun <T> ws(contentType: ContentType, serializer: KSerializer<T>, value: T): WebSocketFrame {
+        return WebSocketFrame.Text(stringFormat().encodeToString(serializer, value))
     }
 }

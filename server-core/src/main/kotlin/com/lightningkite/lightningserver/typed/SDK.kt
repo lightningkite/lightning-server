@@ -226,7 +226,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                 appendLine("    )")
             }
 
-            is ApiWebsocket<*, *, *, *> -> {
+            is ApiWebsocket<*, *, *, *, *> -> {
                 appendLine(" = multiplexedSocket(")
                 appendLine("        socketUrl = socketUrl, ")
                 appendLine("        path = \"${entry.path.path.escaped}\", ")
@@ -261,7 +261,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
                     appendLine("        )")
                 }
 
-                is ApiWebsocket<*, *, *, *> -> {
+                is ApiWebsocket<*, *, *, *, *> -> {
                     appendLine(" = multiplexedSocket(")
                     appendLine("            socketUrl = socketUrl, ")
                     appendLine("            path = \"${entry.path.path.escaped}\", ")
@@ -280,7 +280,7 @@ fun Documentable.Companion.kotlinLiveApi(packageName: String): String = CodeEmit
 
 private val Documentable.Companion.safeDocumentables
     get() = (Http.endpoints.values.filterIsInstance<ApiEndpoint<*, *, *, *>>()
-        .filter { it.route.method != HttpMethod.GET || it.inputType == Unit.serializer() } + WebSockets.handlers.values.filterIsInstance<ApiWebsocket<*, *, *, *>>())
+        .filter { it.route.method != HttpMethod.GET || it.inputType == Unit.serializer() } + WebSockets.handlers.values.filterIsInstance<ApiWebsocket<*, *, *, *, *>>())
         .distinctBy { it.docGroupIdentifier.toString() + "/" + it.summary }
 
 private class CodeEmitter(val packageName: String, val body: StringBuilder = StringBuilder()) : Appendable by body {
@@ -356,7 +356,7 @@ private fun CodeEmitter.functionHeader(documentable: Documentable, skipAuth: Boo
             append(documentable.outputType.kotlinTypeString(this))
         }
 
-        is ApiWebsocket<*, *, *, *> -> {
+        is ApiWebsocket<*, *, *, *, *> -> {
             append("TypedWebSocket<")
             append(documentable.inputType.kotlinTypeString(this))
             append(", ")
@@ -410,7 +410,7 @@ private fun arguments(documentable: Documentable, skipAuth: Boolean = false): Li
         }
     ).flatten()
 
-    is ApiWebsocket<*, *, *, *> -> listOfNotNull(
+    is ApiWebsocket<*, *, *, *, *> -> listOfNotNull(
         documentable.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
             .map {
                 Arg(name = it.name, stringType = "String")

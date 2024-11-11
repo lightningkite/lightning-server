@@ -29,7 +29,7 @@ class MultiplexWebSocketHandlerTest {
                         )
                     )
                 )
-                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
+                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive().text).apply {
                     assertEquals("first", channel)
                     assertEquals(true, start)
                     assertEquals(null, error)
@@ -45,7 +45,7 @@ class MultiplexWebSocketHandlerTest {
                         )
                     )
                 )
-                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
+                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive().text).apply {
                     assertEquals("second", channel)
                     assertEquals(true, start)
                     assertEquals(null, error)
@@ -61,7 +61,7 @@ class MultiplexWebSocketHandlerTest {
                         )
                     )
                 )
-                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
+                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive().text).apply {
                     assertEquals("first", channel)
                     assertEquals("Sending first", data)
                     assertEquals(null, error)
@@ -76,7 +76,7 @@ class MultiplexWebSocketHandlerTest {
                         )
                     )
                 )
-                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
+                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive().text).apply {
                     assertEquals("second", channel)
                     assertEquals("Sending second", data)
                     assertEquals(null, error)
@@ -85,7 +85,7 @@ class MultiplexWebSocketHandlerTest {
                 }
 
                 this.send(Serialization.json.encodeToString(MultiplexMessage(channel = "first", end = true)))
-                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
+                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive().text).apply {
                     assertEquals("first", channel)
                     assertEquals(null, data)
                     assertEquals(null, error)
@@ -93,7 +93,7 @@ class MultiplexWebSocketHandlerTest {
                     assertEquals(true, end)
                 }
                 this.send(Serialization.json.encodeToString(MultiplexMessage(channel = "second", end = true)))
-                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
+                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive().text).apply {
                     assertEquals("second", channel)
                     assertEquals(null, data)
                     assertEquals(null, error)
@@ -111,8 +111,8 @@ class MultiplexWebSocketHandlerTest {
         val firstMirror = WebSocketsTest.TestMirrorSocket()
         val first = ServerPath.root.path("first").websocket(firstMirror)
         val secondMirror = object : WebSocketsTest.TestMirrorSocket() {
-            override suspend fun message(event: WebSockets.MessageEvent) {
-                super.message(event)
+            override suspend fun messageFromClient(connection: MidWebsocket<String>, frame: WebSocketFrame) {
+                super.messageFromClient(connection, frame)
                 throw Exception("oops")
             }
         }
@@ -129,7 +129,7 @@ class MultiplexWebSocketHandlerTest {
                         )
                     )
                 )
-                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
+                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive().text).apply {
                     assertEquals("first", channel)
                     assertEquals(true, start)
                     assertEquals(null, error)
@@ -145,7 +145,7 @@ class MultiplexWebSocketHandlerTest {
                         )
                     )
                 )
-                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
+                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive().text).apply {
                     assertEquals("second", channel)
                     assertEquals(true, start)
                     assertEquals(null, error)
@@ -161,7 +161,7 @@ class MultiplexWebSocketHandlerTest {
                         )
                     )
                 )
-                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
+                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive().text).apply {
                     assertEquals("first", channel)
                     assertEquals("Sending first", data)
                     assertEquals(null, error)
@@ -176,14 +176,14 @@ class MultiplexWebSocketHandlerTest {
                         )
                     )
                 )
-                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
+                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive().text).apply {
                     assertEquals("second", channel)
                     assertEquals("Sending second", data)
                     assertEquals(null, error)
                     assertEquals(false, start)
                     assertEquals(false, end)
                 }
-                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
+                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive().text).apply {
                     assertEquals("second", channel)
                     assertEquals(null, data)
                     assertEquals("oops", error)
@@ -199,15 +199,15 @@ class MultiplexWebSocketHandlerTest {
                         )
                     )
                 )
-                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
+                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive().text).apply {
                     assertEquals("second", channel)
                     assertNotNull(error)
                     assertEquals(false, start)
-                    assertEquals(false, end)
+                    assertEquals(true, end)
                 }
 
                 this.send(Serialization.json.encodeToString(MultiplexMessage(channel = "first", end = true)))
-                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive()).apply {
+                Serialization.json.decodeFromString<MultiplexMessage>(this.incoming.receive().text).apply {
                     assertEquals("first", channel)
                     assertEquals(null, data)
                     assertEquals(null, error)

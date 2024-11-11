@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.metrics.Metrics
+import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.pubsub.PubSub
 import com.lightningkite.lightningserver.schedule.Schedule
 import com.lightningkite.lightningserver.schedule.ScheduledTask
@@ -16,9 +17,20 @@ import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.schedule.plus
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
+import com.lightningkite.lightningserver.websocket.LocalMidWebsocket
+import com.lightningkite.lightningserver.websocket.MidWebsocket
 import com.lightningkite.lightningserver.websocket.QueryParamWebSocketHandler
-import com.lightningkite.lightningserver.websocket.WebSocketIdentifierPubSub
+import com.lightningkite.lightningserver.websocket.WebSocketClose
+import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
+import com.lightningkite.lightningserver.websocket.WebSocketFrame
+import com.lightningkite.lightningserver.websocket.WebSocketFrame.*
+import com.lightningkite.lightningserver.websocket.WebSocketHandler
+import com.lightningkite.lightningserver.websocket.WebSocketTopic
 import com.lightningkite.lightningserver.websocket.WebSockets
+import com.lightningkite.lightningserver.websocket.didConnectTracked
+import com.lightningkite.lightningserver.websocket.disconnectTracked
+import com.lightningkite.lightningserver.websocket.messageFromClientTracked
+import com.lightningkite.lightningserver.websocket.willConnectTracked
 import com.lightningkite.now
 import io.ktor.http.*
 import io.ktor.http.HttpMethod
@@ -38,19 +50,21 @@ import io.ktor.util.*
 import io.ktor.utils.io.jvm.javaio.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.*
+import kotlinx.serialization.KSerializer
 import org.slf4j.LoggerFactory
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import com.lightningkite.lightningserver.core.ContentType as HttpContentType
 
 fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
-    val myEngine = LocalEngine(cache)
+    val myEngine = LocalEngine(pubSub)
     engine = myEngine
     try {
         runBlocking { Tasks.onSettingsReady() }
@@ -77,93 +91,71 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                 }
             }
         }
-//        install(StatusPages) {
-//            exception<Exception> { call, it ->
-//                call.respondText(
-//                    status = HttpStatusCode.InternalServerError,
-//                    contentType = ContentType.Text.Html,
-//                    text = HtmlDefaults.basePage(
-//                        """
-//            <h1>Oh no!</h1>
-//            <p>Something went wrong.  We're terribly sorry.  If this continues, see if you can contact the developer.</p>
-//        """.trimIndent()
-//                    )
-//                )
-//                call.adapt(HttpEndpoint(call.request.path(), MyHttpMethod(call.request.httpMethod.value)))
-//                    .reportException(it)
-//            }
-//        }
-        val ws = WebSocketIdentifierPubSub(pubSub = pubSub, cache = cache)
         WebSockets.handlers.put(ServerPath.root, QueryParamWebSocketHandler { cache })
-        WebSockets.handlers.forEach { entry ->
+        WebSockets.handlers.forEach { (path, rawHandler) ->
+            @Suppress("UNCHECKED_CAST")
+            rawHandler as WebSocketHandler<Any?>
             routing {
-                route(entry.key.toString()) {
+                route(path.toString()) {
                     webSocket {
+                        val handler = WebSockets.fullInterceptor(rawHandler)
                         val parts = HashMap<String, String>()
                         var wildcard: String? = null
                         call.parameters.forEach { s, strings ->
                             parts[s] = strings.joinToString("/")
                         }
-                        val id = ws.connect()
-                        val cache = LocalCache()
+                        val request = WebSocketConnectRequest(
+                            path = path,
+                            parts = parts,
+                            wildcard = wildcard,
+                            queryParameters = call.request.queryParameters.flattenEntries(),
+                            headers = call.request.headers.adapt(),
+                            domain = call.request.origin.serverHost,
+                            protocol = call.request.origin.scheme,
+                            sourceIp = call.request.origin.remoteHost,
+                            cache = cache
+                        )
+                        val startingState = handler.willConnectTracked(path, request)
+                        var closingMid: MidWebsocket<Any?>? = null
                         try {
-                            launch {
-                                ws.listenForWebSocketMessage(id).collect {
-                                    send(it)
-                                }
-                                close(CloseReason(CloseReason.Codes.NORMAL, "Server has shut down the connection."))
-                            }
-                            Metrics.handlerPerformance(
-                                WebSockets.HandlerSection(
-                                    entry.key,
-                                    WebSockets.WsHandlerType.CONNECT
-                                )
+
+                            val mid = object : LocalMidWebsocket<Any?>(
+                                startingState = startingState,
+                                handler = handler,
+                                path = path,
+                                pubSub = pubSub,
+                                scope = this@webSocket
                             ) {
-                                WebSockets.interceptConnect(
-                                    WebSockets.ConnectEvent(
-                                        path = entry.key,
-                                        parts = parts,
-                                        wildcard = wildcard,
-                                        queryParameters = call.request.queryParameters.flattenEntries(),
-                                        id = id,
-                                        headers = call.request.headers.adapt(),
-                                        domain = call.request.origin.serverHost,
-                                        protocol = call.request.origin.scheme,
-                                        sourceIp = call.request.origin.remoteHost,
-                                        cache = cache
+                                override suspend fun send(frame: WebSocketFrame) {
+                                    this@webSocket.send(
+                                        when (frame) {
+                                            is WebSocketFrame.Binary -> Frame.Binary(true, frame.content)
+                                            is WebSocketFrame.Text -> Frame.Text(frame.content)
+                                        }
                                     )
-                                ) { entry.value.connect(it) }
-                            }
-                            for (incoming in this.incoming) {
-                                Metrics.handlerPerformance(
-                                    WebSockets.HandlerSection(
-                                        entry.key,
-                                        WebSockets.WsHandlerType.MESSAGE
-                                    )
-                                ) {
-                                    WebSockets.interceptMessage(
-                                        WebSockets.MessageEvent(
-                                            id = id,
-                                            content = (incoming as? Frame.Text)?.readText() ?: "",
-                                            cache = cache
-                                        )
-                                    ) { entry.value.message(it) }
                                 }
+
+                                override suspend fun close(reason: WebSocketClose) {
+                                    this@webSocket.close(CloseReason(reason.code, reason.name))
+                                }
+                            }
+                            closingMid = mid
+
+                            handler.didConnectTracked(path, mid, request)
+
+                            for (incoming in this.incoming) {
+                                val m = when (incoming) {
+                                    is Frame.Binary -> Binary(incoming.data)
+                                    is Frame.Text -> Text(incoming.readText())
+                                    is Frame.Close -> continue
+                                    is Frame.Ping -> continue
+                                    is Frame.Pong -> continue
+                                }
+                                handler.messageFromClientTracked(path, mid, m)
                             }
                         } finally {
-                            try {
-                                Metrics.handlerPerformance(
-                                    WebSockets.HandlerSection(
-                                        entry.key,
-                                        WebSockets.WsHandlerType.DISCONNECT
-                                    )
-                                ) {
-                                    WebSockets.interceptDisconnect(WebSockets.DisconnectEvent(id, cache = cache)) {
-                                        entry.value.disconnect(it)
-                                    }
-                                }
-                            } finally {
-                                ws.markDisconnect(id)
+                            closingMid?.let { mid ->
+                                handler.disconnectTracked(path, mid, WebSocketClose.NORMAL)
                             }
                         }
                     }

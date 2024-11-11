@@ -4,9 +4,11 @@ import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
+import com.lightningkite.lightningserver.pubsub.LocalPubSub
+import com.lightningkite.lightningserver.pubsub.PubSub
 import com.lightningkite.lightningserver.tasks.Task
-import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import kotlinx.coroutines.*
+import kotlinx.serialization.KSerializer
 import org.slf4j.LoggerFactory
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -17,6 +19,7 @@ import kotlin.time.Duration.Companion.minutes
  */
 interface Engine {
     suspend fun launchTask(task: Task<Any?>, input: Any?)
+    suspend fun <T> publish(topic: String, serializer: KSerializer<T>, output: T)
     @OptIn(DelicateCoroutinesApi::class)
     fun backgroundReportingAction(action: suspend ()->Unit) {
         GlobalScope.launch {
@@ -43,8 +46,11 @@ interface Engine {
  * This will run asynchronously with no regard for whether the task finishes or fails. This is useful
  * during local development, as well deployment in non-serverless environments when you can.
  */
-class LocalEngine(val websocketCache: Cache) : Engine {
+class LocalEngine(val pubSub: PubSub) : Engine {
     val logger = LoggerFactory.getLogger(this::class.java)
+    override suspend fun <T> publish(topic: String, serializer: KSerializer<T>, output: T) {
+        pubSub.get(topic, serializer).emit(output)
+    }
     @OptIn(DelicateCoroutinesApi::class)
     override suspend fun launchTask(task: Task<Any?>, input: Any?) {
         GlobalScope.launch {
@@ -63,6 +69,10 @@ class LocalEngine(val websocketCache: Cache) : Engine {
  */
 object UnitTestEngine : Engine {
     val logger = LoggerFactory.getLogger(this::class.java)
+    override suspend fun <T> publish(topic: String, serializer: KSerializer<T>, output: T) {
+        println("TOPIC $topic PUBLISHES $output")
+        LocalPubSub.get(topic, serializer).emit(output)
+    }
 
     override suspend fun launchTask(task: Task<Any?>, input: Any?) {
         coroutineScope {

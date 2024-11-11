@@ -69,9 +69,7 @@ object Http {
             // WARNING: This will melt your brain
             fullAction =
                 interceptors.fold<HttpInterceptor, HttpInterceptor>({ request, handler -> handler(request) }) { total, wrapper ->
-                    return@fold { request, handler ->
-                        total(request) { wrapper(it, handler) }
-                    }
+                    return@fold { request, handler -> total(request) { wrapper(it, handler) } }
                 }
         }
     private var fullAction: HttpInterceptor = { req, cont -> cont(req) }

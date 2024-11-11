@@ -72,11 +72,9 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         forUser = { it },
     )
     val ws = ServerPath("test").restApiWebsocket<HasId<*>?, TestThing, UUID>(
-        database,
         info = wsModelInfo
     )
     val ws2 = ServerPath("test2").restApiWebsocket<HasId<*>?, TestThing, UUID>(
-        database,
         info = wsModelInfo,
         key = TestThing__id
     )

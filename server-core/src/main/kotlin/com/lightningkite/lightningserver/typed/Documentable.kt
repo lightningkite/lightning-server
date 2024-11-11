@@ -36,7 +36,7 @@ interface Documentable {
         val interfaces get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *, *>>()
             .mapNotNull { it.belongsToInterface }
             .distinct()
-        val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *, *, *>>()
+        val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *, *, *, *>>()
         val all get() = endpoints + websockets
         val usedTypes: Collection<KSerializer<*>>
             get() {

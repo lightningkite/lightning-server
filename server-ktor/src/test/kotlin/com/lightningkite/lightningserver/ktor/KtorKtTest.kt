@@ -13,7 +13,6 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.GeneralServerSettings
 import com.lightningkite.lightningserver.websocket.MultiplexMessage
 import com.lightningkite.lightningserver.websocket.MultiplexWebSocketHandler
-import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
 import com.lightningkite.lightningserver.websocket.websocket
 import com.lightningkite.serialization.ClientModule
 import com.lightningkite.uuid
@@ -30,26 +29,31 @@ import kotlinx.serialization.json.Json
 import org.junit.Test
 import java.util.*
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.websocket.WebSocketTopic
+import com.lightningkite.lightningserver.websocket.send
+import kotlinx.serialization.builtins.serializer
 import com.lightningkite.lightningserver.websocket.WebSockets as MyWebSockets
 
 class KtorKtTest {
 
+    val topic = WebSocketTopic("general", String.serializer())
+    val socket = ServerPath("socket-test").websocket(
+        willConnect = { Unit },
+        didConnect = {
+            println("didConnect $it")
+            GlobalScope.launch {
+                delay(200L)
+                send("Test")
+            }
+        },
+        message = { println("message $it") },
+        disconnect = { println("disconnect $it") },
+    ).get.handler { HttpResponse.plainText("no")}
+    val multiplexSocket = ServerPath("multiplex").websocket(MultiplexWebSocketHandler { LocalCache })
+
     @Test
     fun socketTest() {
         TestSettings
-        var socketId: WebSocketIdentifier? = null
-        val socket = ServerPath("socket-test").websocket(
-            connect = {
-                println("connect $it")
-                socketId = it.id
-                GlobalScope.launch {
-                    delay(200L)
-                    socketId!!.send("Test")
-                }
-            },
-            message = { println("message $it") },
-            disconnect = { println("disconnect $it") },
-        ).get.handler { HttpResponse.plainText("no")}
         testApplication {
             environment { watchPaths = listOf() }
             application {
@@ -77,19 +81,6 @@ class KtorKtTest {
     @Test
     fun socketPathTest() {
         TestSettings
-        var socketId: WebSocketIdentifier? = null
-        val socket = ServerPath("socket-test").websocket(
-            connect = {
-                println("connect $it")
-                socketId = it.id
-                GlobalScope.launch {
-                    delay(200L)
-                    socketId!!.send("Test")
-                }
-            },
-            message = { println("message $it") },
-            disconnect = { println("disconnect $it") },
-        )
         testApplication {
             environment { watchPaths = listOf() }
             application {
@@ -117,20 +108,6 @@ class KtorKtTest {
     @Test
     fun multiplexSocketTest() {
         TestSettings
-        var socketId: WebSocketIdentifier? = null
-        val multiplexSocket = ServerPath("multiplex").websocket(MultiplexWebSocketHandler { LocalCache })
-        val socket = ServerPath("socket-test").websocket(
-            connect = {
-                println("connect $it")
-                socketId = it.id
-                GlobalScope.launch {
-                    delay(200L)
-                    socketId!!.send("Test")
-                }
-            },
-            message = { println("message $it") },
-            disconnect = { println("disconnect $it") },
-        )
         testApplication {
             environment { watchPaths = listOf() }
             application {

@@ -147,9 +147,11 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
             val endpoints =
                 listOf("total") + Http.endpoints.keys.map { it.toString() } + WebSockets.handlers.keys.flatMap {
                     listOf(
-                        WebSockets.HandlerSection(it, WebSockets.WsHandlerType.CONNECT),
-                        WebSockets.HandlerSection(it, WebSockets.WsHandlerType.MESSAGE),
-                        WebSockets.HandlerSection(it, WebSockets.WsHandlerType.DISCONNECT),
+                        WebSockets.HandlerSection(it, WebSockets.WsHandlerType.CONNECTING).toString(),
+                        WebSockets.HandlerSection(it, WebSockets.WsHandlerType.CONNECTED).toString(),
+                        WebSockets.HandlerSection(it, WebSockets.WsHandlerType.MESSAGE).toString(),
+                        WebSockets.HandlerSection(it, WebSockets.WsHandlerType.WSSUB).toString(),
+                        WebSockets.HandlerSection(it, WebSockets.WsHandlerType.DISCONNECT).toString()
                     ).map { it.toString() }
                 } + Scheduler.schedules.map { "SCHEDULE " + it.key } + Tasks.tasks.keys.map { "TASK $it" }
             for (endpoint in endpoints) {

@@ -18,8 +18,10 @@ fun allServerEntryPoints(): List<String> {
         Http.endpoints.keys.map { it.toString() },
         WebSockets.handlers.keys.flatMap {
             listOf(
-                WebSockets.HandlerSection(it, WebSockets.WsHandlerType.CONNECT).toString(),
+                WebSockets.HandlerSection(it, WebSockets.WsHandlerType.CONNECTING).toString(),
+                WebSockets.HandlerSection(it, WebSockets.WsHandlerType.CONNECTED).toString(),
                 WebSockets.HandlerSection(it, WebSockets.WsHandlerType.MESSAGE).toString(),
+                WebSockets.HandlerSection(it, WebSockets.WsHandlerType.WSSUB).toString(),
                 WebSockets.HandlerSection(it, WebSockets.WsHandlerType.DISCONNECT).toString()
             )
         },

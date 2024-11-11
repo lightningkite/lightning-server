@@ -34,6 +34,7 @@ import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.StructureKind
 import java.util.*
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.websocket.WebSocketFrame
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlin.collections.HashMap
 
@@ -144,11 +145,23 @@ abstract class Serialization {
     interface HttpContentParser {
         val contentType: ContentType
         suspend operator fun <T> invoke(content: HttpContent, serializer: KSerializer<T>): T
+        suspend operator fun <T> invoke(content: WebSocketFrame, serializer: KSerializer<T>): T =
+            invoke(when(content) {
+                is WebSocketFrame.Binary -> HttpContent.Binary(content.content, contentType)
+                is WebSocketFrame.Text -> HttpContent.Text(content.content, contentType)
+            }, serializer)
     }
 
     interface HttpContentEmitter {
         val contentType: ContentType
         suspend operator fun <T> invoke(contentType: ContentType, serializer: KSerializer<T>, value: T): HttpContent
+        suspend fun <T> ws(contentType: ContentType, serializer: KSerializer<T>, value: T): WebSocketFrame =
+            invoke(contentType, serializer, value).let {
+                when(it) {
+                    is HttpContent.Text -> WebSocketFrame.Text(it.string)
+                    else -> WebSocketFrame.Binary(it.bytes())
+                }
+            }
         suspend fun <T> streaming(contentType: ContentType, serializer: KSerializer<T>, value: T): HttpContent =
             invoke(contentType, serializer, value)
     }

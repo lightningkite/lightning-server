@@ -299,7 +299,7 @@ private fun Appendable.functionHeader(
             append(">")
         }
 
-        is ApiWebsocket<*, *, *, *> -> {
+        is ApiWebsocket<*, *, *, *, *> -> {
             append("Observable<WebSocketIsh<")
             documentable.inputType.write().let { append(it) }
             append(", ")
@@ -361,7 +361,7 @@ private fun arguments(
         }?.let(::listOf)
     ).flatten()
 
-    is ApiWebsocket<*, *, *, *> -> listOfNotNull(
+    is ApiWebsocket<*, *, *, *, *> -> listOfNotNull(
         documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
             TArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),

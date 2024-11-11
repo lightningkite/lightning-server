@@ -20,6 +20,7 @@ import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.typed
+import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websocket.WebSockets
 import com.lightningkite.now
 import io.ktor.http.*
@@ -90,7 +91,7 @@ open class BaseAuthEndpoints<USER : HasId<ID>, ID : Comparable<ID>>(
                 try {
                     var token =
                         request.headers[HttpHeader.Authorization] ?: request.headers.cookies[HttpHeader.Authorization]
-                        ?: request.queryParameters.find { it.first == "jwt" }?.second?.takeIf { request is WebSockets.ConnectEvent }
+                        ?: request.queryParameters.find { it.first == "jwt" }?.second?.takeIf { request is WebSocketConnectRequest }
                         ?: return null
                     token = token.removePrefix("Bearer ")
                     val claims = jwtSigner().hasher.verifyJwt(token) ?: return null

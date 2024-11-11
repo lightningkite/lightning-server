@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.engine.LocalEngine
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.files.FilesSettings
+import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
 
@@ -20,6 +21,6 @@ object TestSettings {
 
     init {
         Settings.populateDefaults()
-        engine = LocalEngine(LocalCache)
+        engine = LocalEngine(LocalPubSub)
     }
 }
