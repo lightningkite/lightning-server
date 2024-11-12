@@ -85,10 +85,10 @@ class MetaEndpoints(
                 """.trimIndent() + original.substringAfterLast("</body>"))
             }
             .let { original ->
-                (original.substringBeforeLast("</head>") + """
+                (original.substringBeforeLast("<head>") + """
+                    <head>
                     <base href="${path("admin2/").fullUrl()}">
-                    </head>
-                """.trimIndent() + original.substringAfterLast("</head>"))
+                """.trimIndent() + original.substringAfterLast("<head>"))
             }
         return HttpResponse.html(content = page, headers = {
             set(
