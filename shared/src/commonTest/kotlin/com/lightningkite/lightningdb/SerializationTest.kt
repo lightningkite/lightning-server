@@ -17,6 +17,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.properties.Properties
 import kotlinx.serialization.properties.decodeFromStringMap
 import kotlinx.serialization.properties.encodeToStringMap
+import kotlinx.serialization.protobuf.ProtoBuf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -28,6 +29,7 @@ class SerializationTest {
         encodeDefaults = true
     }
     val myProperties = Properties(ClientModule)
+    val myProtobuf = ProtoBuf { this.encodeDefaults = true }
 
     init {
         prepareModelsShared()
@@ -275,64 +277,38 @@ class SerializationTest {
         path<LargeTestModel>().embedded.value1.cycle()
     }
 
+    private inline fun <reified T> T.cycleItem() {
+        println("----$this----")
+        run {
+            val asString = myJson.encodeToString(this)
+            println("JSON: $asString")
+            val recreated = myJson.decodeFromString<T>(asString)
+            assertEquals<T>(this, recreated)
+        }
+        run {
+            val asString = myProperties.encodeToStringMap(this)
+            println("Properties: $asString")
+            val recreated = myProperties.decodeFromStringMap<T>(asString)
+            assertEquals<T>(this, recreated)
+        }
+//        run {
+//            val asString = myProtobuf.encodeToHexString(this)
+//            println("Protobuf: $asString")
+//            val recreated = myProtobuf.decodeFromHexString<T>(asString)
+//            assertEquals<T>(this, recreated)
+//        }
+    }
+
     private inline fun <reified T> Condition<T>.cycle() {
-        println("----$this----")
-        val asString = myJson.encodeToString(this)
-        println(asString)
-        val recreated = myJson.decodeFromString<Condition<T>>(asString)
-        println(recreated)
-        assertEquals(this, recreated)
-
-        val asString2 = myProperties.encodeToStringMap(this)
-        println(asString2)
-        val recreated2 = myProperties.decodeFromStringMap<Condition<T>>(asString2)
-        println(recreated2)
-        assertEquals(this, recreated2)
-
-        val inQuery = Query(condition = this)
-        val asString3 = myJson.encodeToString(inQuery)
-        println("Query: ${asString3}")
-        val recreated3 = myJson.decodeFromString<Query<T>>(asString3)
-        println("Query: ${recreated3}")
-        assertEquals(inQuery, recreated3)
+        cycleItem()
+        Query(condition = this).cycleItem()
     }
-    private inline fun <reified T> Modification<T>.cycle() {
-        println("----$this----")
-        val asString = myJson.encodeToString(this)
-        println(asString)
-        val recreated = myJson.decodeFromString<Modification<T>>(asString)
-        println(recreated)
-        assertEquals(this, recreated)
+    private inline fun <reified T> Modification<T>.cycle() = cycleItem()
+    private inline fun <reified T> List<SortPart<T>>.cycle() = cycleItem()
+    private inline fun <reified T> DataClassPathPartial<T>.cycle() = Box(this).cycleItem()
 
-        val asString2 = myProperties.encodeToStringMap(this)
-        println(asString2)
-        val recreated2 = myProperties.decodeFromStringMap<Modification<T>>(asString2)
-        println(recreated2)
-        assertEquals(this, recreated2)
-    }
-    private inline fun <reified T> List<SortPart<T>>.cycle() {
-        println("----$this----")
-        val asString = myJson.encodeToString(this)
-        println(asString)
-        val recreated = myJson.decodeFromString<List<SortPart<T>>>(asString)
-        println(recreated)
-        assertEquals(this, recreated)
-
-        val asString2 = myProperties.encodeToStringMap(this)
-        println(asString2)
-        val recreated2 = myProperties.decodeFromStringMap<List<SortPart<T>>>(asString2)
-        println(recreated2)
-        assertEquals(this, recreated2)
-    }
-    private inline fun <reified T> DataClassPathPartial<T>.cycle() {
-        println("----$this----")
-        val asString = myJson.encodeToString(this)
-        println(asString)
-        val recreated = myJson.decodeFromString<DataClassPathPartial<T>>(asString)
-        println(recreated)
-        assertEquals(this, recreated)
-    }
-
+    @Serializable
+    data class Box<T>(val value: T)
 
     @OptIn(InternalSerializationApi::class)
     @Test fun studyCheating() {

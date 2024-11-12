@@ -54,6 +54,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
+                implementation(serverlibs.serializationProtobuf)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonTest/kotlin"))

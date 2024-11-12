@@ -68,5 +68,6 @@ val lightningServerKSchema: LightningServerKSchema by lazy {
         }.toList(),
         enums = @Suppress("UNCHECKED_CAST") registry.virtualTypes.filterValues { it is VirtualEnum } as Map<String, VirtualEnum>,
         structures = @Suppress("UNCHECKED_CAST") registry.virtualTypes.filterValues { it is VirtualStruct } as Map<String, VirtualStruct>,
+        aliases = @Suppress("UNCHECKED_CAST") registry.virtualTypes.filterValues { it is VirtualAlias } as Map<String, VirtualAlias>,
     )
 }

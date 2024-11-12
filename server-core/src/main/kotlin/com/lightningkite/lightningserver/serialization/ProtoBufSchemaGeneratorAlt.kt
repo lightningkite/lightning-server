@@ -2,6 +2,7 @@
 
 package com.lightningkite.lightningserver.serialization
 
+import com.lightningkite.lightningdb.Description
 import com.lightningkite.lightningserver.typed.subAndChildSerializers
 import com.lightningkite.lightningserver.typed.subSerializers
 import kotlinx.serialization.*
@@ -143,10 +144,7 @@ public class ProtoBufSchemaGeneratorAlt(val protoBuf: ProtoBuf) {
             when {
                 descriptor.isProtobufMessage -> queue.addAll(generateMessage(type))
                 descriptor.isProtobufEnum -> generateEnum(type)
-                else -> throw IllegalStateException(
-                    "Unrecognized custom type with serial name "
-                            + "'${descriptor.serialName}' and kind '${descriptor.kind}'"
-                )
+                else -> {}
             }
         }
     }
@@ -174,6 +172,11 @@ public class ProtoBufSchemaGeneratorAlt(val protoBuf: ProtoBuf) {
             }
         }
 
+        messageType.descriptor.annotations.filterIsInstance<Description>().firstOrNull()?.text?.let {
+            appendLine("/**")
+            appendLine(" * ${it.split('\n').filter { it.isNotBlank() }.joinToString("\n * ") { it.trim() }.trim()}")
+            appendLine(" */")
+        }
         append("message ").append(messageName).appendLine(" {")
 
         val usedNumbers: MutableSet<Int> = mutableSetOf()
@@ -211,6 +214,14 @@ public class ProtoBufSchemaGeneratorAlt(val protoBuf: ProtoBuf) {
 
             val fieldType = getChildType(index)
             val fieldDescriptor = fieldType.descriptor
+            listOfNotNull(
+                messageDescriptor.getElementAnnotations(index).filterIsInstance<Description>().firstOrNull()?.text,
+                fieldDescriptor.annotations.filterIsInstance<Description>().firstOrNull()?.text
+            ).joinToString("\n").takeUnless { it.isBlank() }?.let {
+                appendLine("  /**")
+                appendLine("   * ${it.split('\n').filter { it.isNotBlank() }.joinToString("\n   * ") { it.trim() }.trim()}")
+                appendLine("   */")
+            }
 
             val number = getChildNumber(index)
             if (messageDescriptor.isChildOneOfMessage(index)) {
@@ -477,7 +488,11 @@ public class ProtoBufSchemaGeneratorAlt(val protoBuf: ProtoBuf) {
 
 
     private val SerialDescriptor.messageOrEnumName: String
-        get() = (serialName.substringAfterLast('.', serialName)).removeSuffix("?") + reverser[this]?.subSerializers()?.joinToString("") { it.descriptor.messageOrEnumName }
+        get() {
+            if(isNullable) return nonNullOriginal.messageOrEnumName
+            return (serialName.substringAfterLast('.', serialName)).removeSuffix("?") + reverser[this]?.subSerializers()
+                ?.joinToString("") { it.descriptor.messageOrEnumName }
+        }
 
     private val SerialDescriptor.decontextualize: SerialDescriptor get() {
         return if(kind == SerialKind.CONTEXTUAL) {
