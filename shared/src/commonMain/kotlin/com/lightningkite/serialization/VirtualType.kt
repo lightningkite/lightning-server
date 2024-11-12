@@ -17,6 +17,17 @@ sealed interface VirtualType {
 }
 
 @Serializable
+data class VirtualAlias(
+    override val serialName: String,
+    val wraps: VirtualTypeReference,
+    override val annotations: List<SerializableAnnotation>
+): VirtualType {
+    override fun serializer(registry: SerializationRegistry, arguments: Array<KSerializer<*>>): KSerializer<*> {
+        return wraps.serializer(registry, mapOf())  // TODO: Support generics
+    }
+}
+
+@Serializable
 data class VirtualTypeParameter(
     val name: String,
 )

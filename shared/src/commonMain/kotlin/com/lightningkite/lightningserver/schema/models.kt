@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.schema
 
+import com.lightningkite.serialization.VirtualAlias
 import com.lightningkite.serialization.VirtualEnum
 import com.lightningkite.serialization.VirtualStruct
 import com.lightningkite.serialization.VirtualTypeReference
@@ -12,6 +13,7 @@ data class LightningServerKSchema(
     val baseWsUrl: String,
     val structures: Map<String, VirtualStruct>,
     val enums: Map<String, VirtualEnum>,
+    val aliases: Map<String, VirtualAlias> = mapOf(),
     val endpoints: List<LightningServerKSchemaEndpoint>,
     val interfaces: List<LightningServerKSchemaInterface>,
 )

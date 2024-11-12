@@ -10,6 +10,7 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 
 
 private class SerializablePropertyParser<T>(val serializer: KSerializer<T>) {
@@ -34,19 +35,7 @@ class DataClassPathSerializer<T>(val inner: KSerializer<T>): KSerializerWithDefa
     override val default: DataClassPathPartial<T>
         get() = DataClassPathSelf(inner)
     @OptIn(ExperimentalSerializationApi::class)
-    override val descriptor: SerialDescriptor = object: SerialDescriptor {
-        override val kind: SerialKind = PrimitiveKind.STRING
-        override val serialName: String = "com.lightningkite.lightningdb.DataClassPathPartial"
-        override val elementsCount: Int get() = 0
-        override fun getElementName(index: Int): String = error()
-        override fun getElementIndex(name: String): Int = error()
-        override fun isElementOptional(index: Int): Boolean = error()
-        override fun getElementDescriptor(index: Int): SerialDescriptor = error()
-        override fun getElementAnnotations(index: Int): List<Annotation> = error()
-        override fun toString(): String = "PrimitiveDescriptor($serialName)"
-        private fun error(): Nothing = throw IllegalStateException("Primitive descriptor does not have elements")
-        override val annotations: List<Annotation> = listOf()
-    }
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningdb.DataClassPathPartial", PrimitiveKind.STRING)
 
     override fun deserialize(decoder: Decoder): DataClassPathPartial<T> {
         val value = decoder.decodeString()

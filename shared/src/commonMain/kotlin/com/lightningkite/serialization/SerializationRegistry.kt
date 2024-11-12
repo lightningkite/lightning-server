@@ -4,6 +4,8 @@ import com.lightningkite.*
 import com.lightningkite.lightningserver.files.ServerFileSerializer
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
+import kotlinx.serialization.descriptors.PolymorphicKind
+import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
@@ -229,7 +231,7 @@ class SerializationRegistry(val module: SerializersModule) {
     private fun registerVirtualWithoutTypeParameters(
         value: KSerializer<*>
     ): VirtualType? {
-        return when (value.descriptor.kind) {
+        return when (val kind = value.descriptor.kind) {
             StructureKind.CLASS -> register(VirtualStruct(
                 serialName = value.descriptor.serialName,
                 annotations = value.descriptor.annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) },
@@ -293,6 +295,22 @@ class SerializationRegistry(val module: SerializersModule) {
                 }
             ) as VirtualType)
 
+            is PrimitiveKind -> register(VirtualAlias(
+                serialName = value.descriptor.serialName,
+                annotations = value.descriptor.annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) },
+                wraps = VirtualTypeReference(when(kind) {
+                    PrimitiveKind.BOOLEAN -> "kotlin.Boolean"
+                    PrimitiveKind.BYTE -> "kotlin.Byte"
+                    PrimitiveKind.CHAR -> "kotlin.Char"
+                    PrimitiveKind.DOUBLE -> "kotlin.Double"
+                    PrimitiveKind.FLOAT -> "kotlin.Float"
+                    PrimitiveKind.INT -> "kotlin.Int"
+                    PrimitiveKind.LONG -> "kotlin.Long"
+                    PrimitiveKind.SHORT -> "kotlin.Short"
+                    PrimitiveKind.STRING -> "kotlin.String"
+                }, arguments = listOf(), isNullable = value.descriptor.isNullable)
+            ))
+
             else -> null
         }
     }
@@ -304,7 +322,7 @@ class SerializationRegistry(val module: SerializersModule) {
     ): VirtualType? {
         val generics = Array(10) { GenericPlaceholderSerializer(key, it) }
         val value = generator(generics.map { it }.toTypedArray())
-        return when (value.descriptor.kind) {
+        return when (val kind = value.descriptor.kind) {
             StructureKind.CLASS -> register(VirtualStruct(
                 serialName = value.descriptor.serialName,
                 annotations = value.descriptor.annotations.mapNotNull {
@@ -377,6 +395,21 @@ class SerializationRegistry(val module: SerializersModule) {
                     )
                 }
             ) as VirtualType)
+            is PrimitiveKind -> register(VirtualAlias(
+                serialName = value.descriptor.serialName,
+                annotations = value.descriptor.annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) },
+                wraps = VirtualTypeReference(when(kind) {
+                    PrimitiveKind.BOOLEAN -> "kotlin.Boolean"
+                    PrimitiveKind.BYTE -> "kotlin.Byte"
+                    PrimitiveKind.CHAR -> "kotlin.Char"
+                    PrimitiveKind.DOUBLE -> "kotlin.Double"
+                    PrimitiveKind.FLOAT -> "kotlin.Float"
+                    PrimitiveKind.INT -> "kotlin.Int"
+                    PrimitiveKind.LONG -> "kotlin.Long"
+                    PrimitiveKind.SHORT -> "kotlin.Short"
+                    PrimitiveKind.STRING -> "kotlin.String"
+                }, arguments = listOf(), isNullable = value.descriptor.isNullable)
+            ))
             else -> null
         }
     }
