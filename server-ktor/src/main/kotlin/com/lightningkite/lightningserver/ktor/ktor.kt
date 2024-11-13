@@ -91,7 +91,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                 }
             }
         }
-        WebSockets.handlers.put(ServerPath.root, QueryParamWebSocketHandler { cache })
+        WebSockets.handlers.put(ServerPath.root, QueryParamWebSocketHandler())
         WebSockets.handlers.forEach { (path, rawHandler) ->
             @Suppress("UNCHECKED_CAST")
             rawHandler as WebSocketHandler<Any?>

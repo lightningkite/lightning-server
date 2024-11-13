@@ -1,0 +1,222 @@
+package com.lightningkite.lightningserver.aws
+
+import com.lightningkite.lightningserver.db.requireTable
+import com.lightningkite.now
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.future.await
+import kotlinx.coroutines.reactive.asFlow
+import kotlinx.coroutines.reactive.collect
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue
+import software.amazon.awssdk.services.dynamodb.model.BillingMode
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException
+import software.amazon.awssdk.services.dynamodb.model.KeyType
+import software.amazon.awssdk.services.dynamodb.model.KeysAndAttributes
+import software.amazon.awssdk.services.dynamodb.model.ProjectionType
+import software.amazon.awssdk.services.dynamodb.model.ScalarAttributeType
+import kotlin.collections.component1
+import kotlin.collections.component2
+import kotlin.collections.set
+import kotlin.time.Duration.Companion.hours
+
+class AwsWebSocketDynamoDb(val client: DynamoDbAsyncClient, val baseTableName: String) {
+    val socketExpiration = 8.hours
+    val tableSubs = "$baseTableName-subs"
+    val tableSubsReverse = "$baseTableName-subs-reverse"
+    val tableStates = "$baseTableName-state"
+    val ready = GlobalScope.async(start = CoroutineStart.LAZY) {
+        client.requireTable(
+            createTableRequest = {
+                it.tableName(tableSubs)
+                it.billingMode(BillingMode.PAY_PER_REQUEST)
+                it.keySchema(
+                    { it.attributeName("topic").keyType(KeyType.HASH) },
+                    { it.attributeName("socketId").keyType(KeyType.RANGE) })
+                it.attributeDefinitions(
+                    { it.attributeName("topic").attributeType(ScalarAttributeType.S) },
+                    { it.attributeName("socketId").attributeType(ScalarAttributeType.S) },
+//                    { it.attributeName("path").attributeType(ScalarAttributeType.S) },
+//                    { it.attributeName("expire").attributeType(ScalarAttributeType.N) },
+                )
+                it.globalSecondaryIndexes(
+                    {
+                        it.keySchema(
+                            { it.attributeName("socketId").keyType(KeyType.HASH) },
+                            { it.attributeName("topic").keyType(KeyType.RANGE) })
+                        it.projection { it.projectionType(ProjectionType.INCLUDE).nonKeyAttributes("path", "expire") }
+                        it.indexName(tableSubsReverse)
+                    }
+                )
+            },
+            timeToLive = {
+                it.tableName(tableSubs)
+                it.timeToLiveSpecification {
+                    it.attributeName("expire")
+                    it.enabled(true)
+                }
+            }
+        )
+        client.requireTable(
+            createTableRequest = {
+                it.tableName(tableStates)
+                it.billingMode(BillingMode.PAY_PER_REQUEST)
+                it.keySchema({ it.attributeName("socketId").keyType(KeyType.HASH) })
+                it.attributeDefinitions(
+                    { it.attributeName("socketId").attributeType(ScalarAttributeType.S) },
+                )
+            },
+            timeToLive = {
+                it.tableName(tableStates)
+                it.timeToLiveSpecification {
+                    it.attributeName("expire")
+                    it.enabled(true)
+                }
+            }
+        )
+        Unit
+    }
+
+    suspend fun subscribers(topic: String): Map<String, Set<String>> {
+        val out = HashMap<String, HashSet<String>>()
+        forSubscribers(topic) { path, ids -> out.getOrPut(path) { HashSet() }.addAll(ids) }
+        return out
+    }
+    suspend fun forSubscribers(topic: String, perSubscriber: suspend (path: String, ids: Iterable<String>) -> Unit) {
+        ready.await()
+        client.queryPaginator {
+            it.tableName(tableSubs)
+            it.expressionAttributeValues(mapOf(":topic" to AttributeValue.fromS(topic)))
+            it.keyConditionExpression("topic = :topic")
+            it.expressionAttributeNames(mapOf("#path" to "path"))
+            it.projectionExpression("socketId, #path")
+            it.limit(1000)
+        }.asFlow().collect { response ->
+            for((key, value) in response.items().groupBy(
+                keySelector = { it["path"]!!.s() },
+                valueTransform = { it["socketId"]!!.s() }
+            ).entries) {
+                perSubscriber(key, value)
+            }
+        }
+    }
+
+    suspend fun subscribe(path: String, topic: String, socketId: String) {
+        ready.await()
+        client.putItem {
+            it.tableName(tableSubs)
+            it.item(mapOf(
+                "topic" to AttributeValue.fromS(topic),
+                "socketId" to AttributeValue.fromS(socketId),
+                "path" to AttributeValue.fromS(path),
+                "expires" to AttributeValue.fromN(now().plus(socketExpiration).epochSeconds.toString())
+            ))
+        }.await()
+    }
+    suspend fun unsubscribe(topic: String, socketId: String) {
+        ready.await()
+        client.deleteItem {
+            it.tableName(tableSubs)
+            it.key(mapOf(
+                "topic" to AttributeValue.fromS(topic),
+                "socketId" to AttributeValue.fromS(socketId),
+            ))
+        }.await()
+    }
+    suspend fun clean(socketId: String) {
+        ready.await()
+        client.queryPaginator {
+            it.tableName(tableSubs)
+            it.indexName(tableSubsReverse)
+            it.expressionAttributeValues(mapOf(":socketId" to AttributeValue.fromS(socketId)))
+            it.keyConditionExpression("socketId = :socketId")
+            it.projectionExpression("topic, socketId")
+            it.limit(100)
+        }.collect {
+            for(item in it.items()) {
+                client.deleteItem {
+                    it.tableName(tableSubs)
+                    it.key(item)
+                }.await()
+            }
+        }
+        client.deleteItem {
+            it.tableName(tableStates)
+            it.key(mapOf("socketId" to AttributeValue.fromS(socketId)))
+        }.await()
+    }
+
+    suspend fun debugStates(): Map<String, String> {
+        ready.await()
+        val out = HashMap<String, String>()
+        client.scanPaginator {
+            it.tableName(tableStates)
+            it.attributesToGet("socketId", "state")
+        }.asFlow().collect {
+            it.items()?.forEach {
+                out[it["socketId"]!!.s()] = it["state"]!!.s()
+            }
+        }
+        return out
+    }
+
+    suspend fun state(id: String): String? {
+        ready.await()
+        return client.getItem {
+            it.tableName(tableStates)
+            it.key(mapOf("socketId" to AttributeValue.fromS(id)))
+        }.await().item()?.get("state")?.s()
+
+    }
+
+    suspend fun states(ids: Iterable<String>): Map<String, String> {
+        ready.await()
+        val out = HashMap<String, String>()
+        val getState = KeysAndAttributes.builder().attributesToGet("socketId", "state").keys(ids.map { mapOf("socketId" to AttributeValue.fromS(it)) }).build()
+        client.batchGetItemPaginator {
+            it.requestItems(mapOf(tableStates to getState))
+        }.asFlow().collect {
+            it.responses()?.get(tableStates)?.forEach {
+                out[it["socketId"]!!.s()] = it["state"]!!.s()
+            }
+        }
+        return out
+    }
+
+    suspend fun setState(socketId: String, toState: String) {
+        ready.await()
+        client.putItem {
+            it.tableName(tableStates)
+            it.item(
+                mapOf(
+                    "socketId" to AttributeValue.fromS(socketId),
+                    "state" to AttributeValue.fromS(toState),
+                    "expires" to AttributeValue.fromN(now().plus(socketExpiration).epochSeconds.toString())
+                )
+            )
+        }.await()
+    }
+
+    suspend fun updateState(socketId: String, fromState: String, toState: String): Boolean {
+        ready.await()
+        return try {
+            client.putItem {
+                it.tableName(tableStates)
+                it.expressionAttributeNames(mapOf("#state" to "state"))
+                it.expressionAttributeValues(mapOf(":fromState" to AttributeValue.fromS(fromState)))
+                it.conditionExpression("#state = :fromState")
+                it.item(
+                    mapOf(
+                        "socketId" to AttributeValue.fromS(socketId),
+                        "state" to AttributeValue.fromS(toState),
+                        "expires" to AttributeValue.fromN(now().plus(socketExpiration).epochSeconds.toString())
+                    )
+                )
+            }.await()
+            true
+        } catch(e: ConditionalCheckFailedException) {
+            false
+        }
+    }
+}

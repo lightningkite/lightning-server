@@ -12,7 +12,7 @@ import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.websocket.TypeRetriever
+import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.lightningserver.websocket.WebSocketClose
 import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websocket.WebSocketTopic
@@ -34,12 +34,10 @@ class ApiWebsocketTest {
     )
 
     val route = ServerPath("test-api-websocket").typed
-    val s = object: ApiWebsocket<HasId<*>?, TypedServerPath0, TestType, TestType, TestType>() {
-        override val path: TypedServerPath0 = route
+    val s = object: ApiWebsocket<HasId<*>?, TypedServerPath0, TestType, TestType, TestType>(route, TestType.serializer()) {
         override val authOptions: AuthOptions<HasId<*>?> = noAuth
         override val inputType: KSerializer<TestType> = TestType.serializer()
         override val outputType: KSerializer<TestType> = TestType.serializer()
-        override val storageSerializer: KSerializer<TestType> = TestType.serializer()
         override val summary: String = "Test"
 
         val general = WebSocketTopic("sample", TestType.serializer())
@@ -82,10 +80,6 @@ class ApiWebsocketTest {
             reason: WebSocketClose
         ) {
             println("${connection.currentState} disconnect")
-        }
-
-        init {
-            WebSockets.handlers[path.path] = this.raw
         }
     }
 

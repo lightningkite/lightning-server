@@ -3,9 +3,7 @@ package com.lightningkite.lightningserver.websocket
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.pubsub.PubSub
-import io.ktor.websocket.CloseReason
-import io.ktor.websocket.Frame
-import io.ktor.websocket.close
+import com.lightningkite.lightningserver.serialization.TypeRetriever
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -20,9 +18,8 @@ abstract class LocalMidWebsocket<STORAGE>(
 ): MidWebsocket<STORAGE> {
     override var currentState: STORAGE = startingState
     override suspend fun repullState(): STORAGE = currentState
-    override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE): STORAGE {
+    override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
         currentState = modification(currentState)
-        return currentState
     }
     override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE {
         currentState = modification(currentState)

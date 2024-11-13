@@ -4,15 +4,17 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.lightningserver.typed.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
 import com.lightningkite.serialization.SerializableProperty
-import com.lightningkite.lightningserver.websocket.TypeRetriever
 import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websocket.WebSocketTopic
+import com.lightningkite.lightningserver.websocket.WebSockets
 import com.lightningkite.now
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -33,15 +35,16 @@ data class ModelRestUpdatesWebsocketData<T : HasId<ID>, ID : Comparable<ID>>(
 }
 
 class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
-    override val path: TypedServerPath0,
+    path: TypedServerPath0,
     val info: ModelInfo<USER, T, ID>,
     val key: SerializableProperty<T, *>? = null,
-) : ApiWebsocket<USER, TypedServerPath0, Condition<T>, CollectionUpdates<T, ID>, ModelRestUpdatesWebsocketData<T, ID>>() {
+) : ApiWebsocket<USER, TypedServerPath0, Condition<T>, CollectionUpdates<T, ID>, ModelRestUpdatesWebsocketData<T, ID>>(
+    path,
+    ModelRestUpdatesWebsocketData.serializer(info.serialization.serializer, info.serialization.idSerializer)
+) {
     override val authOptions: AuthOptions<USER> get() = info.authOptions
     override val inputType: KSerializer<Condition<T>> = Condition.serializer(info.serialization.serializer)
     override val outputType: KSerializer<CollectionUpdates<T, ID>> = CollectionUpdates.serializer(info.serialization.serializer, info.serialization.idSerializer)
-    override val storageSerializer: KSerializer<ModelRestUpdatesWebsocketData<T, ID>> =
-        ModelRestUpdatesWebsocketData.serializer(info.serialization.serializer, info.serialization.idSerializer)
     override val summary: String = "Watch"
 
     override suspend fun AuthAndPathParts<USER, TypedServerPath0>.willConnect(
@@ -79,6 +82,7 @@ class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         topic: String,
         retrieve: TypeRetriever
     ) = with(connection) {
+        serverLogger.info("messageFromSubscription $topic activating! Got ${retrieve(generalTopic.type)} and state $currentState")
         val toSend = retrieve(generalTopic.type).changes.map { entry ->
             ListChange(
                 old = entry.old?.takeIf { currentState.condition(it) }?.let { currentState.mask(it) },

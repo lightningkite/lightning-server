@@ -26,6 +26,7 @@ dependencies {
     api(serverlibs.lambdaJavaCore)
     api(serverlibs.lambdaJavaEvents)
     api(serverlibs.lambdaJavaLog4j2)
+    implementation(serverlibs.coroutinesReactive)
     testImplementation(serverlibs.kotlinTest)
     testImplementation(project(":server-testing"))
     ksp(project(":processor"))

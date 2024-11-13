@@ -18,7 +18,7 @@ class QueryParamWebSocketHandlerTest {
             message = { println("Message second"); send("Reply second") },
             disconnect = { println("Disconnect second") }
         )
-        val target = ServerPath.root.path("qp").websocket(QueryParamWebSocketHandler { LocalCache })
+        val target = ServerPath.root.path("qp").websocket(QueryParamWebSocketHandler())
         runBlocking {
             target.test(queryParameters = listOf("path" to first.toString())) {
                 this.send("Sending first")
@@ -38,7 +38,7 @@ class QueryParamWebSocketHandlerTest {
             message = { println("Message first"); send("Reply first") },
             disconnect = { println("Disconnect first") }
         )
-        val target = ServerPath.root.path("qp").websocket(QueryParamWebSocketHandler { LocalCache })
+        val target = ServerPath.root.path("qp").websocket(QueryParamWebSocketHandler())
         runBlocking {
             target.test(queryParameters = listOf("path" to "$first?first=first", "second" to "second")) {
                 this.send("Sending first")

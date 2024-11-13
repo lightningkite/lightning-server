@@ -1,26 +1,20 @@
 package com.lightningkite.lightningserver.websocket
 
 import com.lightningkite.lightningserver.cache.Cache
-import com.lightningkite.lightningserver.cache.CacheHandle
 import com.lightningkite.lightningserver.cache.LocalCache
-import com.lightningkite.lightningserver.cache.PrefixCache
-import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathMatcher
 import com.lightningkite.lightningserver.exceptions.NotFoundException
-import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.metrics.Metrics
+import com.lightningkite.lightningserver.serialization.AnonType
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.settings.generalSettings
+import com.lightningkite.lightningserver.serialization.TypeRetriever
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.serializer
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.hours
 
 @Serializable
 data class MultiplexWebSocketHandlerState(
@@ -52,7 +46,7 @@ data class MultiplexWebSocketHandlerState(
 @Serializable
 data class MultiplexWebSocketHandlerConnectionInfo(
     val handlerPath: ServerPath,
-    val storage: AnonType,
+    @Contextual val storage: AnonType,
     val topics: Set<String> = setOf(),
 ) {
     val handler
@@ -99,7 +93,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
             if (topic !in newstate) this@wrapped.unsubscribe(topic)
         }
 
-        override suspend fun queueStateUpdate(modification: (T) -> T): T {
+        override suspend fun queueStateUpdate(modification: (T) -> T) {
             var toReturn: T? = null
             this@wrapped.queueStateUpdate { data ->
                 val underlying = data.map[channel]!!.storage.value(handler.storageSerializer)
@@ -109,7 +103,6 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                     }, handler.storageSerializer)))
                 )
             }
-            return toReturn as T
         }
 
         override suspend fun updateStateImmediately(modification: (T) -> T): T {

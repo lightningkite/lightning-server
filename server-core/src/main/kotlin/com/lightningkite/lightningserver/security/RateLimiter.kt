@@ -9,8 +9,8 @@ import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.lightningserver.websocket.MidWebsocket
-import com.lightningkite.lightningserver.websocket.TypeRetriever
 import com.lightningkite.lightningserver.websocket.WebSocketClose
 import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websocket.WebSocketFrame

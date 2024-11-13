@@ -1,8 +1,12 @@
 package com.lightningkite.lightningserver.websocket
 
+import com.github.jershell.kbson.ByteArraySerializer
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.engine.engine
+import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.lightningserver.typed.AuthAndPathParts
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -12,57 +16,6 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-@Serializable(AnonTypeSerializer::class)
-class AnonType {
-    var serialized: String? = null
-    var serializer: KSerializer<*>? = null
-    var direct: Any? = null
-    var hasDirect: Boolean = false
-
-    constructor(direct: Any?, serializer: KSerializer<*>) {
-        this.direct = direct
-        hasDirect = true
-        this.serializer = serializer
-    }
-    constructor(serialized: String) {
-        this.serialized = serialized
-    }
-
-    fun serialized(): String {
-        return serialized ?: run {
-            val newSer = Serialization.Internal.json.encodeToString(serializer as KSerializer<Any?>, direct)
-            serialized = newSer
-            newSer
-        }
-    }
-    fun <T> value(serializer: KSerializer<T>): T {
-        if(hasDirect) return direct as T
-        hasDirect = true
-        val d = Serialization.Internal.json.decodeFromString(serializer, serialized!!)
-        direct = d
-        return d
-    }
-}
-
-@JvmInline
-value class TypeRetriever(val retriever: (KSerializer<*>) -> Any?) {
-    @Suppress("UNCHECKED_CAST")
-    operator fun <T> invoke(serializer: KSerializer<T>): T = retriever(serializer) as T
-    companion object {
-        fun of(retriever: (KSerializer<Nothing>) -> Nothing): TypeRetriever {
-            @Suppress("UNCHECKED_CAST")
-            return TypeRetriever(retriever as (KSerializer<*>) -> Any?)
-        }
-        fun literal(value: Any?) = TypeRetriever { value }
-    }
-}
-
-object AnonTypeSerializer: KSerializer<AnonType> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("AnonType", PrimitiveKind.STRING)
-    override fun deserialize(decoder: Decoder): AnonType = AnonType(decoder.decodeString())
-    override fun serialize(encoder: Encoder, value: AnonType) = encoder.encodeString(value.serialized())
-}
-
 suspend fun <STORAGE> WebSocketHandler<STORAGE>.messageFromSubscriptionTracked(path: ServerPath, mid: MidWebsocket<STORAGE>, topic: String, retriever: TypeRetriever) {
     Metrics.handlerPerformance<Unit>(
         WebSockets.HandlerSection(
@@ -70,7 +23,12 @@ suspend fun <STORAGE> WebSocketHandler<STORAGE>.messageFromSubscriptionTracked(p
             WebSockets.WsHandlerType.WSSUB
         )
     ) {
-        messageFromSubscription(mid, topic, retriever)
+        try {
+            messageFromSubscription(mid, topic, retriever)
+        } catch(e: Exception) {
+            e.report()
+            throw e
+        }
     }
 }
 
@@ -81,7 +39,12 @@ suspend fun <STORAGE> WebSocketHandler<STORAGE>.messageFromClientTracked(path: S
             WebSockets.WsHandlerType.MESSAGE
         )
     ) {
-        messageFromClient(mid, message)
+        try {
+            messageFromClient(mid, message)
+        } catch(e: Exception) {
+            e.report()
+            throw e
+        }
     }
 }
 
@@ -92,7 +55,12 @@ suspend fun <STORAGE> WebSocketHandler<STORAGE>.didConnectTracked(path: ServerPa
             WebSockets.WsHandlerType.CONNECTED
         )
     ) {
-        didConnect(mid, request)
+        try {
+            didConnect(mid, request)
+        } catch(e: Exception) {
+            e.report()
+            throw e
+        }
     }
 }
 
@@ -103,7 +71,12 @@ suspend fun <STORAGE> WebSocketHandler<STORAGE>.willConnectTracked(path: ServerP
             WebSockets.WsHandlerType.CONNECTING
         )
     ) {
-        willConnect(request)
+        try {
+            willConnect(request)
+        } catch(e: Exception) {
+            e.report()
+            throw e
+        }
     }
 }
 
@@ -114,6 +87,11 @@ suspend fun <STORAGE> WebSocketHandler<STORAGE>.disconnectTracked(path: ServerPa
             WebSockets.WsHandlerType.DISCONNECT
         )
     ) {
-        disconnect(mid, reason)
+        try {
+            disconnect(mid, reason)
+        } catch(e: Exception) {
+            e.report()
+            throw e
+        }
     }
 }

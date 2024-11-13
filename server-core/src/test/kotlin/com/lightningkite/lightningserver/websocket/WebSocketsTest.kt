@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.websocket
 
 import com.lightningkite.UUID
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.serialization.TypeRetriever
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer

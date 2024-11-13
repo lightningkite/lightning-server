@@ -30,6 +30,7 @@ import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.files.fileObject
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.meta.metaEndpoints
+import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
@@ -93,7 +94,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         prepareModelsServerCore()
         prepareModelsServerTesting()
         Settings.populateDefaults()
-        engine = LocalEngine(LocalCache)
+        engine = LocalEngine(LocalPubSub)
     }
 
     val sampleUser = GlobalScope.async(start = CoroutineStart.LAZY) {

@@ -39,6 +39,7 @@ val BsonOverrides = SerializersModule {
 //    contextual(BsonTimestamp::class, BsonTimestampSerializer)
     contextual(Locale::class, MongoLocaleSerializer)
 //    contextual(Binary::class, BinarySerializer)
+    contextual(AnonType::class, ByteArrayAnonTypeSerializer)
 }
 
 /**

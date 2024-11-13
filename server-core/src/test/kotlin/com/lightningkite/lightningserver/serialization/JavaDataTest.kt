@@ -3,6 +3,7 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.UUID
+import com.lightningkite.lightningdb.condition
 import com.lightningkite.lightningserver.Access
 import com.lightningkite.lightningserver.CompletePermissions
 import com.lightningkite.lightningserver.FinalPermissions
@@ -16,6 +17,7 @@ import com.lightningkite.lightningserver.encryption.Encryptor
 import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.encryptor
 import com.lightningkite.lightningserver.testmodels.TestUser
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.uuid
 import kotlinx.serialization.*
 import org.junit.Test

@@ -44,29 +44,38 @@ import kotlin.collections.HashMap
 abstract class Serialization {
     companion object : Serialization() {
         override fun defaultModule(): SerializersModule =
-            ClientModule.overwriteWith(serializersModuleOf(ExternalServerFileSerializer))
+            ClientModule
+                .overwriteWith(serializersModuleOf(ExternalServerFileSerializer))
+                .overwriteWith(serializersModuleOf(StringAnonTypeSerializer))
                 .overwriteWith(additionalModule)
     }
 
     object Internal : Serialization() {
-        override fun defaultModule(): SerializersModule = ClientModule.overwriteWith(additionalModule)
+        override fun defaultModule(): SerializersModule = ClientModule
+            .overwriteWith(serializersModuleOf(StringAnonTypeSerializer))
+            .overwriteWith(additionalModule)
     }
 
     init {
-        Validators.suspendProcessor<MimeType, ServerFile> { t, v ->
-            val h = v.fileObject.head()
-            when {
-                h == null -> ValidationIssuePart(1, "File does not exist")
-                h.size > t.maxSize -> ValidationIssuePart(
-                    1,
-                    "File is too big; max size is ${t.maxSize} bytes but file is ${h.size} bytes"
-                )
+        Validators.suspendProcessor<MimeType, Any> { t, v ->
+            when(v) {
+                is ServerFile -> {
+                    val h = v.fileObject.head()
+                    when {
+                        h == null -> ValidationIssuePart(1, "File does not exist")
+                        h.size > t.maxSize -> ValidationIssuePart(
+                            1,
+                            "File is too big; max size is ${t.maxSize} bytes but file is ${h.size} bytes"
+                        )
 
-                t.types.none { h.type.matches(ContentType(it)) } -> ValidationIssuePart(
-                    1,
-                    "File type ${h.type} does not match ${t.types.joinToString("; ")}"
-                )
+                        t.types.none { h.type.matches(ContentType(it)) } -> ValidationIssuePart(
+                            1,
+                            "File type ${h.type} does not match ${t.types.joinToString("; ")}"
+                        )
 
+                        else -> null
+                    }
+                }
                 else -> null
             }
         }
@@ -119,7 +128,7 @@ abstract class Serialization {
     var cbor: Cbor by SetOnce {
         Cbor {
             ignoreUnknownKeys = true
-            serializersModule = module
+            serializersModule = module.overwriteWith(serializersModuleOf(ByteArrayAnonTypeSerializer))
             encodeDefaults = true
         }
     }
@@ -127,6 +136,7 @@ abstract class Serialization {
         JavaData(module.overwriteWith(SerializersModule {
             contextual(UUID::class, UUIDPartsSerializer)
             contextual(Instant::class, InstantLongSerializer)
+            contextual(AnonType::class, ByteArrayAnonTypeSerializer)
         }))
     }
     var stringArray: StringArrayFormat by SetOnce {

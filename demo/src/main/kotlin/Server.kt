@@ -54,6 +54,8 @@ import kotlin.time.Duration.Companion.minutes
 import com.lightningkite.UUID
 import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningserver.files.S3File
+import com.lightningkite.lightningserver.websocket.send
+import com.lightningkite.lightningserver.websocket.text
 import com.lightningkite.prepareModelsShared
 import com.lightningkite.uuid
 import kotlinx.html.*
@@ -134,15 +136,15 @@ object Server : ServerPathGroup(ServerPath.root) {
     }
 
     val socket = path("socket").websocket(
-        connect = { println("Connected $it - you are ${it.user<User?>()}") },
+        willConnect = { UUID.random().toString() },
+        didConnect = { send("Connected $currentState") },
         message = {
-            println("Message $it")
-            it.id.send(it.content)
+            send(it.text)
             if (it.content == "die") {
                 throw Exception("You asked me to die!")
             }
         },
-        disconnect = { println("Disconnect $it") }
+        disconnect = { println("Disconnect $currentState") }
     )
 
     val task = task("Sample Task") { it: Int ->

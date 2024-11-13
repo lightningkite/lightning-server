@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.websocket
 
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.serialization.serializerOrContextual
 import kotlinx.serialization.KSerializer
 

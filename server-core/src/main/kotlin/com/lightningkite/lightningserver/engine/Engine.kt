@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.pubsub.PubSub
+import com.lightningkite.lightningserver.serialization.InternalCommunicationEncoding
 import com.lightningkite.lightningserver.tasks.Task
 import kotlinx.coroutines.*
 import kotlinx.serialization.KSerializer
@@ -18,6 +19,7 @@ import kotlin.time.Duration.Companion.minutes
  * Each implementation will use the underlying environment for launching an async task.
  */
 interface Engine {
+    val internalCommunicationEncoding: InternalCommunicationEncoding
     suspend fun launchTask(task: Task<Any?>, input: Any?)
     suspend fun <T> publish(topic: String, serializer: KSerializer<T>, output: T)
     @OptIn(DelicateCoroutinesApi::class)
@@ -46,7 +48,7 @@ interface Engine {
  * This will run asynchronously with no regard for whether the task finishes or fails. This is useful
  * during local development, as well deployment in non-serverless environments when you can.
  */
-class LocalEngine(val pubSub: PubSub) : Engine {
+class LocalEngine(val pubSub: PubSub, override val internalCommunicationEncoding: InternalCommunicationEncoding = InternalCommunicationEncoding.JavaData) : Engine {
     val logger = LoggerFactory.getLogger(this::class.java)
     override suspend fun <T> publish(topic: String, serializer: KSerializer<T>, output: T) {
         pubSub.get(topic, serializer).emit(output)
@@ -68,6 +70,8 @@ class LocalEngine(val pubSub: PubSub) : Engine {
  * hence the name UnitTestEngine.
  */
 object UnitTestEngine : Engine {
+    override val internalCommunicationEncoding: InternalCommunicationEncoding
+        get() = InternalCommunicationEncoding.Json
     val logger = LoggerFactory.getLogger(this::class.java)
     override suspend fun <T> publish(topic: String, serializer: KSerializer<T>, output: T) {
         println("TOPIC $topic PUBLISHES $output")

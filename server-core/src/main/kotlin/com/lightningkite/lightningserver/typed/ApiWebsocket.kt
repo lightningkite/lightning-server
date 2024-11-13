@@ -1,47 +1,34 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.HasId
-import com.lightningkite.serialization.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthOptions
-import com.lightningkite.lightningserver.auth.authAny
-import com.lightningkite.lightningserver.auth.authChecked
-import com.lightningkite.lightningserver.auth.authOptions
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ContentType
-import com.lightningkite.lightningserver.core.LightningServerDsl
-import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.engine.UnitTestEngine
 import com.lightningkite.lightningserver.engine.engine
-import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.settings.generalSettings
+import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.lightningserver.utils.cancellingScope
 import com.lightningkite.lightningserver.websocket.MidWebsocket
-import com.lightningkite.lightningserver.websocket.TypeRetriever
-import com.lightningkite.lightningserver.websocket.VirtualSocket
 import com.lightningkite.lightningserver.websocket.WebSocketClose
 import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websocket.WebSocketFrame
 import com.lightningkite.lightningserver.websocket.WebSocketHandler
 import com.lightningkite.lightningserver.websocket.WebSocketTopic
 import com.lightningkite.lightningserver.websocket.WebSockets
-import com.lightningkite.lightningserver.websocket.test
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import java.net.URLDecoder
 import java.util.UUID
 
 @Serializable
@@ -59,12 +46,10 @@ data class ApiWebsocketStorage<STORAGE>(
     val parser = Serialization.parsers[contentType] ?: throw IllegalStateException("No parser found for $contentType")
 }
 
-abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> : Documentable {
-    abstract override val path: PATH
+abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> constructor(override val path: PATH, val storageSerializer: KSerializer<STORAGE>) : Documentable {
     abstract override val authOptions: AuthOptions<USER>
     abstract val inputType: KSerializer<INPUT>
     abstract val outputType: KSerializer<OUTPUT>
-    abstract val storageSerializer: KSerializer<STORAGE>
     abstract override val summary: String
     open override val description: String get() = summary
     open val errorCases: List<LSError> get() = emptyList()
@@ -84,7 +69,7 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
     interface Mid<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> {
         val currentState: STORAGE
         suspend fun repullState(): STORAGE
-        suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE): STORAGE
+        suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE)
         suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE
         suspend fun <T> subscribe(topic: WebSocketTopic<T>)
         suspend fun unsubscribe(topic: String)
@@ -96,8 +81,8 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
         Mid<USER, PATH, INPUT, OUTPUT, STORAGE> {
         override val currentState: STORAGE = wraps.currentState.storage
         override suspend fun repullState(): STORAGE = wraps.repullState().storage
-        override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE): STORAGE {
-            return wraps.queueStateUpdate { it.copy(storage = modification(it.storage)) }.storage
+        override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
+            return wraps.queueStateUpdate { it.copy(storage = modification(it.storage)) }
         }
 
         override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE {
@@ -113,42 +98,43 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
         override suspend fun close(reason: WebSocketClose) = wraps.close(reason)
     }
 
-    val raw by lazy {
-        object : WebSocketHandler<ApiWebsocketStorage<STORAGE>> {
-            override val storageSerializer: KSerializer<ApiWebsocketStorage<STORAGE>> =
-                ApiWebsocketStorage.serializer(this@ApiWebsocket.storageSerializer)
+    val raw = object : WebSocketHandler<ApiWebsocketStorage<STORAGE>> {
+        override val storageSerializer: KSerializer<ApiWebsocketStorage<STORAGE>> =
+            ApiWebsocketStorage.serializer(this@ApiWebsocket.storageSerializer)
 
-            override suspend fun willConnect(request: WebSocketConnectRequest): ApiWebsocketStorage<STORAGE> =
-                ApiWebsocketStorage(
-                    request.queryParameter(HttpHeader.Accept)
-                        ?: request.queryParameter(HttpHeader.ContentType)
-                        ?: request.headers.contentType?.toString()
-                        ?: request.headers.accept.firstOrNull()?.toString()
-                        ?: ContentType.Application.Json.toString(),
-                    with(path.authAndPathParts(request, authOptions)) { willConnect(request) }
-                )
+        override suspend fun willConnect(request: WebSocketConnectRequest): ApiWebsocketStorage<STORAGE> =
+            ApiWebsocketStorage(
+                request.queryParameter(HttpHeader.Accept)
+                    ?: request.queryParameter(HttpHeader.ContentType)
+                    ?: request.headers.contentType?.toString()
+                    ?: request.headers.accept.firstOrNull()?.takeUnless { it == ContentType.Any }?.toString()
+                    ?: ContentType.Application.Json.toString(),
+                with(path.authAndPathParts(request, authOptions)) { willConnect(request) }
+            )
 
-            override suspend fun didConnect(
-                connection: MidWebsocket<ApiWebsocketStorage<STORAGE>>,
-                request: WebSocketConnectRequest
-            ) = didConnect(MidImpl(connection), request)
+        override suspend fun didConnect(
+            connection: MidWebsocket<ApiWebsocketStorage<STORAGE>>,
+            request: WebSocketConnectRequest
+        ) = didConnect(MidImpl(connection), request)
 
-            override suspend fun messageFromClient(
-                connection: MidWebsocket<ApiWebsocketStorage<STORAGE>>,
-                frame: WebSocketFrame
-            ) = messageFromClient(MidImpl(connection), connection.currentState.parser(frame, inputType))
+        override suspend fun messageFromClient(
+            connection: MidWebsocket<ApiWebsocketStorage<STORAGE>>,
+            frame: WebSocketFrame
+        ) = messageFromClient(MidImpl(connection), connection.currentState.parser(frame, inputType))
 
-            override suspend fun messageFromSubscription(
-                connection: MidWebsocket<ApiWebsocketStorage<STORAGE>>,
-                topic: String,
-                retrieve: TypeRetriever
-            ) = messageFromSubscription(MidImpl(connection), topic, retrieve)
+        override suspend fun messageFromSubscription(
+            connection: MidWebsocket<ApiWebsocketStorage<STORAGE>>,
+            topic: String,
+            retrieve: TypeRetriever
+        ) = messageFromSubscription(MidImpl(connection), topic, retrieve)
 
-            override suspend fun disconnect(
-                connection: MidWebsocket<ApiWebsocketStorage<STORAGE>>,
-                reason: WebSocketClose
-            ) = this@ApiWebsocket.disconnect(MidImpl(connection), reason)
-        }
+        override suspend fun disconnect(
+            connection: MidWebsocket<ApiWebsocketStorage<STORAGE>>,
+            reason: WebSocketClose
+        ) = this@ApiWebsocket.disconnect(MidImpl(connection), reason)
+    }
+    init {
+        WebSockets.handlers[path.path] = this.raw
     }
 }
 
@@ -187,9 +173,8 @@ suspend fun <USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> A
         val mid = object : ApiWebsocket.Mid<USER, PATH, INPUT, OUTPUT, STORAGE> {
             override var currentState: STORAGE = startingState
             override suspend fun repullState(): STORAGE = currentState
-            override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE): STORAGE {
+            override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
                 currentState = modification(currentState)
-                return currentState
             }
 
             override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE {

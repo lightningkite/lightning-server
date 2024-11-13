@@ -12,6 +12,7 @@ import com.lightningkite.lightningserver.db.*
 import com.lightningkite.lightningserver.typed.AuthAccessor
 import java.util.*
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.typed.typed
 import kotlin.random.Random
 
 class TestModelEndpoints(path: ServerPath): ServerPathGroup(path) {
@@ -23,6 +24,7 @@ class TestModelEndpoints(path: ServerPath): ServerPathGroup(path) {
     )
 
     val rest = ModelRestEndpoints(path("rest"), info)
-    val restWebsocket = path("rest").restApiWebsocket(Server.database, info)
+    val restWebsocket = path("rest").restApiWebsocket(info)
+    val rest2Websocket = ModelRestUpdatesWebsocket(path("rest2").typed, info, TestModel__id)
     val dump = ModelDumpEndpoints(path("rest"), info, Authentication.isSuperUser, Server.files, Server.email)
 }

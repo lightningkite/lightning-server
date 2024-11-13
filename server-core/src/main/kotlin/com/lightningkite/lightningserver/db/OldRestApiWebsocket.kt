@@ -6,11 +6,11 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.lightningserver.typed.ApiWebsocket
 import com.lightningkite.lightningserver.typed.AuthAccessor
 import com.lightningkite.lightningserver.typed.AuthAndPathParts
 import com.lightningkite.lightningserver.typed.TypedServerPath0
-import com.lightningkite.lightningserver.websocket.TypeRetriever
 import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websocket.WebSocketTopic
 import com.lightningkite.now
@@ -41,15 +41,16 @@ fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWeb
     OldRestApiWebsocket(TypedServerPath0(this), info, key)
 
 class OldRestApiWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
-    override val path: TypedServerPath0,
+    path: TypedServerPath0,
     val info: ModelInfo<USER, T, ID>,
     val key: SerializableProperty<T, *>? = null,
-) : ApiWebsocket<USER, TypedServerPath0, Query<T>, ListChange<T>, OldRestApiWebsocketData<T, ID>>() {
+) : ApiWebsocket<USER, TypedServerPath0, Query<T>, ListChange<T>, OldRestApiWebsocketData<T, ID>>(
+    path,
+    OldRestApiWebsocketData.serializer(info.serialization.serializer, info.serialization.idSerializer)
+) {
     override val authOptions: AuthOptions<USER> get() = info.authOptions
     override val inputType: KSerializer<Query<T>> = Query.serializer(info.serialization.serializer)
     override val outputType: KSerializer<ListChange<T>> = ListChange.serializer(info.serialization.serializer)
-    override val storageSerializer: KSerializer<OldRestApiWebsocketData<T, ID>> =
-        OldRestApiWebsocketData.serializer(info.serialization.serializer, info.serialization.idSerializer)
     override val summary: String = "Watch"
 
     override suspend fun AuthAndPathParts<USER, TypedServerPath0>.willConnect(

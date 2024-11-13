@@ -1,24 +1,21 @@
 package com.lightningkite.lightningserver.websocket
 
 import com.lightningkite.lightningserver.cache.Cache
-import com.lightningkite.lightningserver.cache.get
-import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
-import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
-import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.serialization.AnonType
+import com.lightningkite.lightningserver.serialization.TypeRetriever
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 
 @Serializable
-data class QueryParamWebSocketHandlerData(val handlerPath: ServerPath, val underlyingData: AnonType) {
+data class QueryParamWebSocketHandlerData(val handlerPath: ServerPath, @Contextual val underlyingData: AnonType) {
     val handler get() = WebSockets.handlers[handlerPath] ?: throw NotFoundException("No web socket handler found for '$handlerPath'")
 }
 
-class QueryParamWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<QueryParamWebSocketHandlerData> {
+class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandlerData> {
     override val storageSerializer: KSerializer<QueryParamWebSocketHandlerData> =
         QueryParamWebSocketHandlerData.serializer()
 
@@ -51,7 +48,7 @@ class QueryParamWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Quer
         override suspend fun close(reason: WebSocketClose) = this@wrapped.close(reason)
         override suspend fun send(frame: WebSocketFrame) = this@wrapped.send(frame)
         override suspend fun repullState(): T = this@wrapped.repullState().underlyingData.value(handler.storageSerializer)
-        override suspend fun queueStateUpdate(modification: (T) -> T): T {
+        override suspend fun queueStateUpdate(modification: (T) -> T) {
             var toReturn: T? = null
             this@wrapped.queueStateUpdate { data ->
                 val underlying = data.underlyingData.value(handler.storageSerializer)
@@ -59,7 +56,6 @@ class QueryParamWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Quer
                     underlyingData = AnonType(modification(underlying).also { toReturn = it }, handler.storageSerializer)
                 )
             }
-            return toReturn as T
         }
 
         override suspend fun updateStateImmediately(modification: (T) -> T): T {
