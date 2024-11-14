@@ -10,6 +10,10 @@ import io.ktor.util.*
 import kotlinx.datetime.Instant
 
 
+abstract class RawHttpStatusException(message: String, cause: Throwable? = null): Exception(message, cause) {
+    abstract suspend fun toResponse(request: HttpRequest): HttpResponse
+}
+
 /**
  * A Lightning Server exception that is handled differently in requests and tasks.
  * These are caught and result in a well formed response with a proper status code.
@@ -23,7 +27,7 @@ open class HttpStatusException(
     val data: String = "",
     val headers: HttpHeaders = HttpHeaders.EMPTY,
     cause: Throwable? = null
-) : Exception(message, cause) {
+) : RawHttpStatusException(message, cause) {
     constructor(lsError: LSError): this(
         status = HttpStatus(lsError.http),
         detail = lsError.detail,
@@ -39,7 +43,7 @@ open class HttpStatusException(
         data = data,
     )
 
-    suspend fun toResponse(request: HttpRequest): HttpResponse {
+    override suspend fun toResponse(request: HttpRequest): HttpResponse {
         if (request.headers.accept.firstOrNull() == ContentType.Text.Html) {
             return HttpResponse(body = HttpContent.Text(string = HtmlDefaults.basePage("""
                 <h1>${status.toString().escapeHTML()}</h1>

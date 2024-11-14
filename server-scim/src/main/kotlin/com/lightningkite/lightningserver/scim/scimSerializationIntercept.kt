@@ -8,8 +8,13 @@ import com.lightningkite.TrimmedCaselessStringSerializer
 import com.lightningkite.lightningdb.MultipleReferences
 import com.lightningkite.lightningdb.References
 import com.lightningkite.lightningdb.Unique
+import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.exceptions.RawHttpStatusException
 import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
 import com.lightningkite.lightningserver.files.ServerFileSerializer
+import com.lightningkite.lightningserver.http.HttpContent
+import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.serialization.InstantIso8601Serializer
 import com.lightningkite.serialization.descriptionOrDisplayName
@@ -20,6 +25,7 @@ import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationStrategy
+import kotlinx.serialization.StringFormat
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
@@ -214,4 +220,37 @@ class ScimHackerySerializer<T>(val scimRoot: String, val inner: KSerializer<T>):
         return InterceptableJsonDecoder(scimRoot, decoder as JsonDecoder).decodeSerializableValue(inner)
     }
 
+}
+
+lateinit var scimRoot: String
+private val Serialization_jsonScim by lazy {
+    object: StringFormat {
+        override fun <T> encodeToString(
+            serializer: SerializationStrategy<T>,
+            value: T
+        ): String {
+            return Serialization.json.encodeToString(ScimHackerySerializer(scimRoot, serializer as KSerializer<T>), value)
+        }
+
+        override fun <T> decodeFromString(
+            deserializer: DeserializationStrategy<T>,
+            string: String
+        ): T {
+            return Serialization.json.decodeFromString(ScimHackerySerializer(scimRoot, deserializer as KSerializer<T>), string)
+        }
+
+        override val serializersModule: SerializersModule get() = Serialization.json.serializersModule
+    }
+}
+val Serialization.Companion.jsonScim get() = Serialization_jsonScim
+private val JsonScimContentType = ContentType("application", "scim+json")
+val ContentType.Application.JsonScim get() = JsonScimContentType
+
+class ScimErrorException(val error: ScimError): RawHttpStatusException(error.detail, null) {
+    override suspend fun toResponse(request: HttpRequest): HttpResponse = HttpResponse(
+        HttpContent.Text(
+            Serialization.jsonScim.encodeToString(ScimError.serializer(), error),
+            ContentType.Application.JsonScim
+        )
+    )
 }

@@ -14,6 +14,8 @@ import com.lightningkite.lightningdb.InMemoryFieldCollection
 import com.lightningkite.lightningdb.Modification
 import com.lightningkite.lightningdb.SortPart
 import com.lightningkite.lightningdb.Unique
+import com.lightningkite.lightningdb.get
+import com.lightningkite.lightningdb.insertOne
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.authRequired
 import com.lightningkite.lightningserver.auth.noAuth
@@ -22,6 +24,10 @@ import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.ModelInfo
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.email.Email
+import com.lightningkite.lightningserver.exceptions.BadRequestException
+import com.lightningkite.lightningserver.exceptions.ForbiddenException
+import com.lightningkite.lightningserver.exceptions.HttpStatusException
+import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.routes.docName
@@ -32,6 +38,8 @@ import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.arg
 import com.lightningkite.lightningserver.typed.delete
 import com.lightningkite.lightningserver.typed.get
+import com.lightningkite.lightningserver.typed.patch
+import com.lightningkite.lightningserver.typed.path1
 import com.lightningkite.lightningserver.typed.put
 import com.lightningkite.serialization.description
 import com.lightningkite.serialization.descriptionOrDisplayName
@@ -152,7 +160,9 @@ class ScimResourceEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>
         authOptions = info.authOptions,
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
-        implementation = { TODO() }
+        implementation = {
+            info.collection(this).insertOne(it) ?: throw ForbiddenException("Insert was not permitted.")
+        }
     )
     val detail = path.arg("id", info.serialization.idSerializer)
     val retrieveKnown = detail.get.api(
@@ -160,7 +170,9 @@ class ScimResourceEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>
         authOptions = info.authOptions,
         inputType = Unit.serializer(),
         outputType = info.serialization.serializer,
-        implementation = { TODO() }
+        implementation = {
+            info.collection(this).get(path1)!!
+        }
     )
     val query = get.api(
         summary = "Scim Query",
@@ -183,8 +195,15 @@ class ScimResourceEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>
         outputType = ScimListResponse.serializer(info.serialization.serializer),
         implementation = { TODO() }
     )
+    val modify = detail.patch.api(
+        summary = "Scim Modify",
+        authOptions = info.authOptions,
+        inputType = ScimPatchOp.serializer(info.serialization.serializer),
+        outputType = ScimListResponse.serializer(info.serialization.serializer),
+        implementation = { TODO() }
+    )
     val remove = detail.delete.api(
-        summary = "Scim Retrieve Known",
+        summary = "Scim Delete",
         authOptions = info.authOptions,
         inputType = Unit.serializer(),
         outputType = Unit.serializer(),

@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
+import com.lightningkite.lightningserver.exceptions.RawHttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.settings.generalSettings
@@ -36,8 +37,8 @@ object Http {
 
     var exception: suspend (HttpRequest, Exception) -> HttpResponse =
         { request, exception ->
-            if (exception is HttpStatusException) {
-                if (generalSettings().debug) {
+            if (exception is RawHttpStatusException) {
+                if (generalSettings().debug && exception is HttpStatusException) {
                     println(exception.toLSError())
                     logger.warn(exception.toLSError().toString())
                 }
@@ -80,7 +81,7 @@ object Http {
         return endpoints[request.endpoint]?.let { handler ->
             val authOrNull = try {
                 request.authAny()
-            } catch (http: HttpStatusException){
+            } catch (http: RawHttpStatusException){
                 return http.toResponse(request)
             } catch (e: Exception) {
                 return HttpResponse(null, HttpStatus.Unauthorized)
@@ -126,7 +127,7 @@ suspend fun HttpEndpoint.test(
     )
     return try {
         Http.execute(req)
-    } catch (e: HttpStatusException) {
+    } catch (e: RawHttpStatusException) {
         e.toResponse(req)
     }
 }

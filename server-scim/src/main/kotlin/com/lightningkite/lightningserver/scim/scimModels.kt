@@ -3,11 +3,21 @@ package com.lightningkite.lightningserver.scim
 import com.lightningkite.EmailAddress
 import com.lightningkite.lightningdb.Condition
 import com.lightningkite.lightningdb.Description
+import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.Modification
 import com.lightningkite.lightningdb.SortPart
+import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.email.Email
+import com.lightningkite.lightningserver.exceptions.RawHttpStatusException
+import com.lightningkite.lightningserver.http.HttpContent
+import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
+import com.lightningkite.serialization.SerializableProperty
+import com.lightningkite.serialization.innerElement
+import com.lightningkite.serialization.nullElement
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.serialization.KSerializer
@@ -20,6 +30,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlin.reflect.KClass
 
 
@@ -80,65 +91,53 @@ data class ScimQuery<T>(
     val excludedAttributes: Set<ScimAttribute> = setOf(),
 )
 
-@ScimSchemaUri("urn:ietf:params:scim:api:messages:2.0:PatchOp")
-class ScimModificationSerializer<T>(val subtype: KSerializer<T>) : KSerializer<Modification<T>> {
-    override val descriptor: SerialDescriptor
-        get() = TODO("Not yet implemented")
-
-    override fun serialize(
-        encoder: Encoder,
-        value: Modification<T>
-    ) {
-        TODO("Not yet implemented")
-    }
-
-    override fun deserialize(decoder: Decoder): Modification<T> {
-        TODO("Not yet implemented")
-    }
-
-}
 
 @Serializable
-enum class ScimPatchOpSingleType { add, remove, replace }
+@ScimSchemaUri("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+data class ScimPatchOp<T>(
+    val Operations: List<ScimPatchOpSingle<T>>
+)
 
+@Serializable
+data class ScimPatchOpSingle<T>(
+    val type: PatchOpType,
+    val path: ScimPathPartial<T>? = null,
+    val value: JsonElement = JsonNull,
+)
 
-/**
- * See https://datatracker.ietf.org/doc/html/rfc7644#autoid-17
- */
-class ScimConditionSerializer<T> : KSerializer<Condition<T>> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("com.lightningkite.lightningdb.Condition/scim", PrimitiveKind.STRING)
-
-    override fun serialize(
-        encoder: Encoder,
-        value: Condition<T>
-    ) {
-        TODO("Not yet implemented")
+@Serializable(ScimPathPartialSerializer::class)
+sealed interface ScimPathPartial<T>
+sealed interface ScimPath<T, B>: ScimPathPartial<T> {
+    val serializer: KSerializer<B>
+    fun toStringOrNull(): String?
+    class Base<T>(override val serializer: KSerializer<T>): ScimPath<T, T> {
+        override fun equals(other: Any?): Boolean = other is Base<*>
+        override fun hashCode(): Int = 0
+        override fun toString() = ""
+        override fun toStringOrNull(): String? = null
     }
-
-    override fun deserialize(decoder: Decoder): Condition<T> {
-        TODO("Not yet implemented")
+    data class Field<T, A, B>(val base: ScimPath<T, A>, val field: SerializableProperty<A, B>): ScimPath<T, B> {
+        override val serializer: KSerializer<B> = field.serializer
+        override fun toString() = toStringOrNull()
+        override fun toStringOrNull(): String = listOfNotNull(base.toStringOrNull(), field.name /*TODO: Scim name*/).joinToString(".")
+    }
+    data class FieldNullable<T, A, B>(val base: ScimPath<T, A>, val field: SerializableProperty<A, B?>): ScimPath<T, B> {
+        @Suppress("UNCHECKED_CAST")
+        override val serializer: KSerializer<B> = field.serializer.nullElement() as KSerializer<B>
+        override fun toString() = toStringOrNull()
+        override fun toStringOrNull(): String = listOfNotNull(base.toStringOrNull(), field.name /*TODO: Scim name*/).joinToString(".")
+    }
+    data class Filter<T, C: Collection<A>, A>(val base: ScimPath<T, C>, val condition: Condition<A>): ScimPath<T, A> {
+        @Suppress("UNCHECKED_CAST")
+        override val serializer: KSerializer<A> = base.serializer.innerElement()!! as KSerializer<A>
+        override fun toString() = toStringOrNull()
+        override fun toStringOrNull(): String = "${base}[$condition]"
     }
 }
 
-/**
- * See https://datatracker.ietf.org/doc/html/rfc7644#autoid-17
- */
-class ScimSortPartSerializer<T> : KSerializer<SortPart<T>> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("com.lightningkite.lightningdb.SortPart/scim", PrimitiveKind.STRING)
+@Serializable enum class PatchOpType { add, remove, replace }
 
-    override fun serialize(
-        encoder: Encoder,
-        value: SortPart<T>
-    ) {
-        TODO("Not yet implemented")
-    }
 
-    override fun deserialize(decoder: Decoder): SortPart<T> {
-        TODO("Not yet implemented")
-    }
-}
 
 
 @Serializable
@@ -237,6 +236,7 @@ interface ScimResource<ID: Comparable<ID>>: HasId<ID> {
 //)
 
 @Serializable
+@GenerateDataClassPaths
 @ScimSchemaUri("urn:ietf:params:scim:schemas:core:2.0:Schema")
 data class ScimSchema(
     override val _id: String,
@@ -252,6 +252,7 @@ data class ScimSchema(
 
 @ScimSchemaUri("urn:ietf:params:scim:schemas:core:2.0:ResourceType")
 @Serializable
+@GenerateDataClassPaths
 data class ScimResourceType(
     override val _id: String,
     override val externalId: String? = null,
@@ -269,6 +270,7 @@ data class ScimResourceType(
 @Serializable data class ScimSchemaExtension(val schema: String, val required: Boolean)
 
 @Serializable
+@GenerateDataClassPaths
 data class ScimAttributeDefinition(
     val name: String,
     val type: ScimType,
@@ -297,6 +299,7 @@ enum class ScimMutability { readOnly, readWrite, immutable, writeOnly }
 enum class ScimType { string, boolean, decimal, integer, dateTime, reference, complex }
 
 @Serializable
+@GenerateDataClassPaths
 @ScimSchemaUri("urn:ietf:params:scim:schemas:core:2.0:User")
 data class ScimUser(
     override val _id: String,
@@ -328,6 +331,7 @@ data class ScimUser(
 ): ScimResource<String>
 
 @Serializable
+@GenerateDataClassPaths
 data class ScimEmailAddress(
     val value: EmailAddress,
     val type: String,
@@ -335,6 +339,7 @@ data class ScimEmailAddress(
 )
 
 @Serializable
+@GenerateDataClassPaths
 data class ScimPhoneNumber(
     val value: String,
     val type: String,
@@ -342,23 +347,27 @@ data class ScimPhoneNumber(
 )
 
 @Serializable
+@GenerateDataClassPaths
 data class ScimIms(
     val type: String,
     val value: String,
 )
 
 @Serializable
+@GenerateDataClassPaths
 data class ScimCertificate(
     val value: String
 )
 
 @Serializable
+@GenerateDataClassPaths
 data class ScimPhoto(
     val value: String,
     val type: String
 )
 
 @Serializable
+@GenerateDataClassPaths
 @ScimExtension("urn:ietf:params:scim:schemas:extension:enterprise:2.0:User")
 data class ScimUserEnterprise(
     val employeeNumber: String? = null,
@@ -370,6 +379,7 @@ data class ScimUserEnterprise(
 )
 
 @Serializable
+@GenerateDataClassPaths
 @ScimSchemaUri("urn:ietf:params:scim:schemas:core:2.0:Group")
 data class ScimGroup(
     override val _id: String,
@@ -381,6 +391,7 @@ data class ScimGroup(
 ): ScimResource<String>
 
 @Serializable
+@GenerateDataClassPaths
 data class ScimRole(
     val value: String,
     val display: String,
@@ -392,6 +403,7 @@ data class ScimRole(
 enum class ScimDirect { direct, indirect }
 
 @Serializable
+@GenerateDataClassPaths
 data class ScimUserOrGroupReference(
     val value: String,
     val display: String,
@@ -400,6 +412,7 @@ data class ScimUserOrGroupReference(
 )
 
 @Serializable
+@GenerateDataClassPaths
 data class ScimAddress(
     val formatted: String,
     val streetAddress: String,
@@ -412,6 +425,7 @@ data class ScimAddress(
 )
 
 @Serializable
+@GenerateDataClassPaths
 data class ScimUserName(
     val formatted: String? = null,
     val familyName: String? = null,

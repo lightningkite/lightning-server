@@ -13,6 +13,7 @@ import java.io.ByteArrayInputStream
 import java.nio.charset.Charset
 import java.util.*
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.exceptions.RawHttpStatusException
 import com.lightningkite.lightningserver.http.HttpStatus as HttpStatus1
 
 abstract class AzureAdapter {
@@ -86,7 +87,7 @@ abstract class AzureAdapter {
                     )
                     val result = try {
                         Http.endpoints[match.endpoint]!!.invoke(request2)
-                    } catch (e: HttpStatusException) {
+                    } catch (e: RawHttpStatusException) {
                         e.toResponse(request2)
                     }
                     logger.debug("<-- ${request.uri} ${request.httpMethod} ${result.status}")
