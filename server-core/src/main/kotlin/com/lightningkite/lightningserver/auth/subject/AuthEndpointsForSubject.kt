@@ -128,8 +128,9 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         // TODO: Read JWT from query params, remove and redirect
         val token =
             request.headers[HttpHeader.Authorization]?.removePrefix("bearer ")?.removePrefix("Bearer ")
+                ?: request.queryParameters.find { it.first.equals(HttpHeader.Authorization, true) }?.second
+                ?: request.queryParameters.find { it.first == "jwt" }?.second
                 ?: request.headers.cookies[HttpHeader.Authorization]
-                ?: request.queryParameters.find { it.first == "authorization" }?.second
                 ?: return null
         return tokenToAuth(token, request)
     }

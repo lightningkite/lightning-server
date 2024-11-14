@@ -65,6 +65,7 @@ class WebSocketConnectRequest(
     val cache: Cache = LocalCache(),
 ) : Request {
     fun queryParameter(key: String): String? = queryParameters.find { it.first == key }?.second
+    fun queryParameterCaseInsensitive(key: String): String? = queryParameters.find { it.first.equals(key, true) }?.second
     private val cacheCalc = HashMap<Request.CacheKey<*>, Any?>()
     override suspend fun <T> cache(key: Request.CacheKey<T>): T {
         @Suppress("UNCHECKED_CAST")

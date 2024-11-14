@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.typed
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthOptions
+import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.engine.UnitTestEngine
@@ -98,8 +99,8 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
 
         override suspend fun willConnect(request: WebSocketConnectRequest): ApiWebsocketStorage<STORAGE> =
             ApiWebsocketStorage(
-                (request.queryParameter(HttpHeader.Accept)
-                    ?: request.queryParameter(HttpHeader.ContentType)
+                (request.queryParameterCaseInsensitive(HttpHeader.Accept)
+                    ?: request.queryParameterCaseInsensitive(HttpHeader.ContentType)
                     ?: request.headers.contentType?.toString()
                     ?: request.headers.accept.firstOrNull()?.takeUnless { it == ContentType.Any }?.toString()
                     ?: ContentType.Application.Json.toString()),
