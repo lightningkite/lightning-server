@@ -8,17 +8,9 @@ filter
 	: attrPath SP PR                             #presentExp
 	| attrPath SP COMPAREOPERATOR SP VALUE       #operatorExp
 	| NOT? SP* '(' filter ')'                    #braceExp
-	| attrPath '[' valPathFilter ']'             #valPathExp
+	| attrPath '[' filter ']'             #valPathExp
 	| filter SP AND SP filter                    #andExp
 	| filter SP OR SP filter                     #orExp
-	;
-
-valPathFilter
-	: attrPath SP PR                             #valPathPresentExp
-	| attrPath SP COMPAREOPERATOR SP VALUE       #valPathOperatorExp
-	| NOT? SP* '(' valPathFilter ')'             #valPathBraceExp
-	| valPathFilter SP AND SP valPathFilter      #valPathAndExp
-	| valPathFilter SP OR SP valPathFilter       #valPathOrExp
 	;
 
 attrPath

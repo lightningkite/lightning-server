@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.scim
 
+import com.lightningkite.IsRawString
 import com.lightningkite.lightningdb.Condition
 import com.lightningkite.lightningdb.SortPart
 import com.lightningkite.lightningserver.core.ContentType
@@ -13,14 +14,20 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.serialization.SerializableProperty
 import com.lightningkite.serialization.description
 import com.lightningkite.serialization.innerElement
+import com.lightningkite.serialization.nullElement
 import com.lightningkite.serialization.serializableProperties
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.StringFormat
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.SetSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.SerializersModule
@@ -115,23 +122,193 @@ class ScimConditionSerializer<T>(val subtype: KSerializer<T>) : KSerializer<Cond
 
     override fun deserialize(decoder: Decoder): Condition<T> {
         val string = decoder.decodeString()
-
-        val str = StringCharStream("meta.lastModified gt \"2011-05-13T04:42:34Z\"")
-        val lex = ScimFilterLexer(str)
-        val stream = CommonTokenStream(lex)
-        val parse = ScimFilterParser(stream)
-
-        return parse.filter().toCondition()
+        return fromString(string)
     }
 
-    private fun ScimFilterParser.AndExpContext.toCondition(): Condition<T> = TODO()
-    private fun ScimFilterParser.ValPathExpContext.toCondition(): Condition<T> = TODO()
-    private fun ScimFilterParser.PresentExpContext.toCondition(): Condition<T> = TODO()
-    private fun ScimFilterParser.OperatorExpContext.toCondition(): Condition<T> = TODO()
-    private fun ScimFilterParser.BraceExpContext.toCondition(): Condition<T> = TODO()
-    private fun ScimFilterParser.OrExpContext.toCondition(): Condition<T> = TODO()
+    private fun ScimFilterParser.AttrPathContext.handleNn(makeCondition: (KSerializer<Any?>) -> Condition<Any?>): Condition<T> {
+        return handle { ser ->
+            if (ser.descriptor.isNullable) {
+                Condition.IfNotNull(makeCondition(ser.nullElement()!! as KSerializer<Any?>))
+            } else {
+                makeCondition(ser)
+            }
+        }
+    }
+
+    private fun ScimFilterParser.AttrPathContext.handle(autoVal: Boolean = true, makeCondition: (KSerializer<Any?>) -> Condition<Any?>): Condition<T> {
+
+        val mainName = ATTRNAME(0)!!.text?.lowercase()
+//        if(mainName == "value") return makeCondition(subtype as KSerializer<Any?>) as Condition<T>
+        val props = subtype.serializableProperties
+            ?: throw IllegalStateException("serializableProperties not available on ${subtype.descriptor.serialName}")
+        val schema = SCHEMA()?.text?.lowercase()
+        val mainNameProperty = props.find { it.name.lowercase() == mainName }
+        val subName = ATTRNAME(1)?.text?.lowercase() ?: if(autoVal && (mainNameProperty?.serializer?.descriptor?.kind == StructureKind.CLASS || (mainNameProperty?.serializer?.descriptor?.kind == StructureKind.LIST &&
+                    mainNameProperty?.serializer?.innerElement()?.descriptor?.kind == StructureKind.CLASS))) "value" else null
+
+        return when {
+            mainName == "meta" && subName == "created" -> {
+                val p =
+                    props.find { it.name == "createdAt" } ?: throw SerializationException("No property createdAt found")
+                Condition.OnField(p, makeCondition(p.serializer as KSerializer<Any?>))
+            }
+
+            mainName == "meta" && subName == "lastmodified" -> {
+                val p = props.find { it.name == "modifiedAt" }
+                    ?: throw SerializationException("No property modifiedAt found")
+                Condition.OnField(p, makeCondition(p.serializer as KSerializer<Any?>))
+            }
+
+            subName == null -> {
+                val p = mainNameProperty
+                    ?: throw SerializationException("No property ${mainName} found")
+                Condition.OnField(p, makeCondition(p.serializer as KSerializer<Any?>))
+            }
+
+            else -> {
+                val p1 = mainNameProperty
+                    ?: throw SerializationException("No property ${mainName} found")
+                val listWrap = p1.serializer.descriptor.kind == StructureKind.LIST
+                val subProps = (if(listWrap) p1.serializer.innerElement().serializableProperties else p1.serializer.serializableProperties)
+                    ?: throw IllegalStateException("serializableProperties not available on ${p1.serializer.descriptor.serialName}")
+                val p2 = subProps.find { it.name.lowercase() == subName }
+                    ?: throw SerializationException("No property ${subName} found on ${mainName}")
+                val innermost = makeCondition(p2.serializer as KSerializer<Any?>)
+                val p2nn = Condition.OnField(p2, innermost) as Condition<Any?>
+                val p2nnc = when(mainNameProperty.serializer.descriptor.serialName) {
+                    ListSerializer(Int.serializer()).descriptor.serialName -> Condition.ListAnyElements<List<Any?>>(p2nn)
+                    SetSerializer(Int.serializer()).descriptor.serialName -> Condition.SetAnyElements<Set<Any?>>(p2nn)
+                    else -> p2nn
+                } as Condition<Any?>
+                val inner = if (p1.serializer.descriptor.isNullable)
+                    Condition.IfNotNull(p2nnc) as Condition<Any?>
+                else
+                    p2nnc
+                Condition.OnField(p1, inner)
+            }
+        }
+    }
+
+    private fun ScimFilterParser.AndExpContext.toCondition(): Condition<T> = Condition.And(
+        filter()
+            .map { it.toCondition() }
+    )
+
+    private fun ScimFilterParser.ValPathExpContext.toCondition(): Condition<T> = attrPath().handle(autoVal = false) { serializer ->
+        val inner =
+            with(ScimConditionSerializer(serializer.innerElement())) { filter().toCondition() } as Condition<Any?>
+        when (serializer.descriptor.serialName) {
+            ListSerializer(Int.serializer()).descriptor.serialName -> Condition.ListAnyElements<List<Any?>>(inner)
+            SetSerializer(Int.serializer()).descriptor.serialName -> Condition.SetAnyElements<Set<Any?>>(inner)
+            else -> throw IllegalArgumentException()
+        } as Condition<Any?>
+    }
+
+    private fun ScimFilterParser.PresentExpContext.toCondition(): Condition<T> =
+        attrPath().handle { serializer -> Condition.NotEqual(null) }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun ScimFilterParser.OperatorExpContext.toCondition(): Condition<T> =
+        when (val tokenType = this.COMPAREOPERATOR()!!.text.uppercase()) {
+            "EQ" -> attrPath().handle { serializer ->
+                Condition.Equal(
+                    Serialization.json.decodeFromString(
+                        serializer,
+                        VALUE().text
+                    )
+                )
+            }
+
+            "NE" -> attrPath().handle { serializer ->
+                Condition.NotEqual(
+                    Serialization.json.decodeFromString(
+                        serializer,
+                        VALUE().text
+                    )
+                )
+            }
+
+            "CO" -> attrPath().handleNn { serializer ->
+                when (serializer.descriptor.serialName.substringBefore('/')) {
+                    ListSerializer(Int.serializer()).descriptor.serialName -> Condition.ListAnyElements<List<Any?>>(
+                        Condition.Equal(Serialization.json.decodeFromString(serializer.innerElement(), VALUE().text))
+                    )
+
+                    SetSerializer(Int.serializer()).descriptor.serialName -> Condition.SetAnyElements<Set<Any?>>(
+                        Condition.Equal(Serialization.json.decodeFromString(serializer.innerElement(), VALUE().text))
+                    )
+
+                    "kotlin.String" -> Condition.StringContains(
+                        Serialization.json.decodeFromString(
+                            String.serializer(),
+                            VALUE().text
+                        )
+                    )
+
+                    else -> Condition.RawStringContains<IsRawString>(
+                        Serialization.json.decodeFromString(
+                            String.serializer(),
+                            VALUE().text
+                        ), true
+                    ) as Condition<Any?>
+                } as Condition<Any?>
+            }
+
+            "SW" -> attrPath().handleNn { serializer ->
+                val v = Serialization.json.decodeFromString(String.serializer(), VALUE().text)
+                // TODO: There are edges here - case sensitivity should be controlled by the field in question, start/ends incorrect
+                if (serializer.descriptor.serialName.substringBefore('/') == "kotlin.String") {
+                    Condition.RegexMatches("^" + Regex.escape(v)) as Condition<Any?>
+                } else {
+                    Condition.RawStringContains<IsRawString>(v, true) as Condition<Any?>
+                }
+            }
+
+            "EW" -> attrPath().handleNn { serializer ->
+                val v = Serialization.json.decodeFromString(String.serializer(), VALUE().text)
+                // TODO: There are edges here - case sensitivity should be controlled by the field in question, start/ends incorrect
+                if (serializer.descriptor.serialName.substringBefore('/') == "kotlin.String") {
+                    Condition.RegexMatches(Regex.escape(v) + "$") as Condition<Any?>
+                } else {
+                    Condition.RawStringContains<IsRawString>(v, true) as Condition<Any?>
+                }
+            }
+
+            "GT" -> attrPath().handleNn { serializer ->
+                val v = Serialization.json.decodeFromString(serializer, VALUE().text) as Comparable<Comparable<*>>
+                Condition.GreaterThan(v) as Condition<Any?>
+            }
+
+            "GE" -> attrPath().handleNn { serializer ->
+                val v = Serialization.json.decodeFromString(serializer, VALUE().text) as Comparable<Comparable<*>>
+                Condition.GreaterThan(v) as Condition<Any?>
+            }
+
+            "LT" -> attrPath().handleNn { serializer ->
+                val v = Serialization.json.decodeFromString(serializer, VALUE().text) as Comparable<Comparable<*>>
+                Condition.GreaterThan(v) as Condition<Any?>
+            }
+
+            "LE" -> attrPath().handleNn { serializer ->
+                val v = Serialization.json.decodeFromString(serializer, VALUE().text) as Comparable<Comparable<*>>
+                Condition.GreaterThan(v) as Condition<Any?>
+            }
+
+            else -> throw IllegalArgumentException("Token type ${tokenType} not known")
+        }
+
+    private fun ScimFilterParser.BraceExpContext.toCondition(): Condition<T> = if (this.NOT() != null)
+        Condition.Not(filter().toCondition())
+    else
+        filter().toCondition()
+
+    private fun ScimFilterParser.OrExpContext.toCondition(): Condition<T> = Condition.Or(
+        filter()
+            .map { it.toCondition() }
+    )
+
     private fun ScimFilterParser.FilterContext.toCondition(): Condition<T> {
-        return when(val element = this) {
+        return when (val element = this) {
             is ScimFilterParser.AndExpContext -> element.toCondition()
             is ScimFilterParser.ValPathExpContext -> element.toCondition()
             is ScimFilterParser.PresentExpContext -> element.toCondition()
@@ -142,8 +319,23 @@ class ScimConditionSerializer<T>(val subtype: KSerializer<T>) : KSerializer<Cond
         }
     }
 
-    fun fromString(string: String): Condition<T> = TODO()
-    fun fromStringUntilTermination(string: String, start: Int = 0): Pair<Condition<T>, Int> = TODO()
+    fun fromString(string: String): Condition<T> {
+        val str = StringCharStream(string)
+        val lex = ScimFilterLexer(str)
+        val stream = CommonTokenStream(lex)
+        val parse = ScimFilterParser(stream)
+
+        return parse.filter().toCondition()
+    }
+
+    fun fromStringUntilTermination(string: String, start: Int = 0): Pair<Condition<T>, Int> {
+        val str = StringCharStream(string.substring(start))
+        val lex = ScimFilterLexer(str)
+        val stream = CommonTokenStream(lex)
+        val parse = ScimFilterParser(stream)
+        val f = parse.filter()
+        return f.toCondition() to f.position!!.end.offset(string)
+    }
 }
 
 /**
