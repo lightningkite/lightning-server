@@ -13,13 +13,7 @@ import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.lightningserver.utils.cancellingScope
-import com.lightningkite.lightningserver.websocket.MidWebsocket
-import com.lightningkite.lightningserver.websocket.WebSocketClose
-import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websocket.WebSocketFrame
-import com.lightningkite.lightningserver.websocket.WebSocketHandler
-import com.lightningkite.lightningserver.websocket.WebSocketTopic
-import com.lightningkite.lightningserver.websocket.WebSockets
+import com.lightningkite.lightningserver.websocket.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
@@ -104,11 +98,11 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
 
         override suspend fun willConnect(request: WebSocketConnectRequest): ApiWebsocketStorage<STORAGE> =
             ApiWebsocketStorage(
-                request.queryParameter(HttpHeader.Accept)
+                (request.queryParameter(HttpHeader.Accept)
                     ?: request.queryParameter(HttpHeader.ContentType)
                     ?: request.headers.contentType?.toString()
                     ?: request.headers.accept.firstOrNull()?.takeUnless { it == ContentType.Any }?.toString()
-                    ?: ContentType.Application.Json.toString(),
+                    ?: ContentType.Application.Json.toString()),
                 with(path.authAndPathParts(request, authOptions)) { willConnect(request) }
             )
 
@@ -120,7 +114,12 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
         override suspend fun messageFromClient(
             connection: MidWebsocket<ApiWebsocketStorage<STORAGE>>,
             frame: WebSocketFrame
-        ) = messageFromClient(MidImpl(connection), connection.currentState.parser(frame, inputType))
+        ) {
+            if ((frame as? WebSocketFrame.Text)?.content?.isBlank() == true) {
+                connection.send(" ")
+                return
+            } else messageFromClient(MidImpl(connection), connection.currentState.parser(frame, inputType))
+        }
 
         override suspend fun messageFromSubscription(
             connection: MidWebsocket<ApiWebsocketStorage<STORAGE>>,

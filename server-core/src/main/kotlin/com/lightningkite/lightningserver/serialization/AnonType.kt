@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.lightningserver.engine.engine
+import io.ktor.util.*
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -61,6 +62,8 @@ class AnonType {
     )
 
     override fun hashCode(): Int = if(hasDirect) direct.hashCode() else serializedBytes?.contentHashCode() ?: serializedString?.hashCode() ?: 0
+
+    override fun toString(): String = "AnonType(${direct ?: serializedString ?: serializedBytes?.encodeBase64()})"
 }
 
 object ByteArrayAnonTypeSerializer: KSerializer<AnonType> {

@@ -61,7 +61,9 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
         channel: String,
         handler: WebSocketHandler<T>
     ): MidWebsocket<T> = object : MidWebsocket<T> {
-        override val currentState: T = this@wrapped.currentState.map[channel]!!.storage.value(handler.storageSerializer)
+
+        override var currentState: T = this@wrapped.currentState.map.getValue(channel).storage.value(handler.storageSerializer)
+            private set
         override suspend fun close(reason: WebSocketClose) = this@wrapped.close(reason)
         override suspend fun send(frame: WebSocketFrame) = this@wrapped.send(
             Serialization.json.encodeToString(
@@ -78,7 +80,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
         override suspend fun <T> subscribe(topic: WebSocketTopic<T>) {
             if (topic.topic !in this@wrapped.currentState) this@wrapped.subscribe(topic)
             this@wrapped.updateStateImmediately { data ->
-                data.copy(map = data.map + (channel to data.map[channel]!!.let {
+                data.copy(map = data.map + (channel to data.map.getValue(channel).let {
                     it.copy(topics = it.topics + topic.topic)
                 }))
             }
@@ -86,7 +88,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
 
         override suspend fun unsubscribe(topic: String) {
             val newstate = this@wrapped.updateStateImmediately { data ->
-                data.copy(map = data.map + (channel to data.map[channel]!!.let {
+                data.copy(map = data.map + (channel to data.map.getValue(channel).let {
                     it.copy(topics = it.topics + topic)
                 }))
             }
@@ -94,28 +96,24 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
         }
 
         override suspend fun queueStateUpdate(modification: (T) -> T) {
-            var toReturn: T? = null
             this@wrapped.queueStateUpdate { data ->
-                val underlying = data.map[channel]!!.storage.value(handler.storageSerializer)
+                val underlying = data.map.getValue(channel).storage.value(handler.storageSerializer)
                 data.copy(
-                    map = data.map + (channel to data.map[channel]!!.copy(storage = AnonType(modification(underlying).also {
-                        toReturn = it
-                    }, handler.storageSerializer)))
+                    map = data.map + (channel to data.map.getValue(channel).copy(storage = AnonType(modification(underlying), handler.storageSerializer)))
                 )
             }
         }
 
         override suspend fun updateStateImmediately(modification: (T) -> T): T {
-            var toReturn: T? = null
             this@wrapped.updateStateImmediately { data ->
-                val underlying = data.map[channel]!!.storage.value(handler.storageSerializer)
+                val underlying = data.map.getValue(channel).storage.value(handler.storageSerializer)
                 data.copy(
-                    map = data.map + (channel to data.map[channel]!!.copy(storage = AnonType(modification(underlying).also {
-                        toReturn = it
+                    map = data.map + (channel to data.map.getValue(channel).copy(storage = AnonType(modification(underlying).also {
+                        currentState = it
                     }, handler.storageSerializer)))
                 )
             }
-            return toReturn as T
+            return currentState
         }
     }
 
@@ -137,6 +135,10 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
         connection: MidWebsocket<MultiplexWebSocketHandlerState>,
         frame: WebSocketFrame
     ) {
+        if ((frame as? WebSocketFrame.Text)?.content?.isBlank() == true) {
+            connection.send(" ")
+            return
+        }
         val message = Serialization.json.decodeFromString<MultiplexMessage>((frame as WebSocketFrame.Text).content)
         val channel = message.channel
         try {

@@ -44,29 +44,31 @@ class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandler
     }
 
     fun <T> MidWebsocket<QueryParamWebSocketHandlerData>.wrapped(handler: WebSocketHandler<T>): MidWebsocket<T> = object: MidWebsocket<T> {
-        override val currentState: T = this@wrapped.currentState.underlyingData.value(handler.storageSerializer)
+        override var currentState: T = this@wrapped.currentState.underlyingData.value(handler.storageSerializer)
+            private set
         override suspend fun close(reason: WebSocketClose) = this@wrapped.close(reason)
         override suspend fun send(frame: WebSocketFrame) = this@wrapped.send(frame)
         override suspend fun repullState(): T = this@wrapped.repullState().underlyingData.value(handler.storageSerializer)
         override suspend fun queueStateUpdate(modification: (T) -> T) {
-            var toReturn: T? = null
             this@wrapped.queueStateUpdate { data ->
                 val underlying = data.underlyingData.value(handler.storageSerializer)
                 data.copy(
-                    underlyingData = AnonType(modification(underlying).also { toReturn = it }, handler.storageSerializer)
+                    underlyingData = AnonType(modification(underlying), handler.storageSerializer)
                 )
             }
         }
 
         override suspend fun updateStateImmediately(modification: (T) -> T): T {
-            var toReturn: T? = null
             this@wrapped.updateStateImmediately { data ->
                 val underlying = data.underlyingData.value(handler.storageSerializer)
                 data.copy(
-                    underlyingData = AnonType(modification(underlying).also { toReturn = it }, handler.storageSerializer)
+                    underlyingData = AnonType(
+                        modification(underlying).also { currentState = it },
+                        handler.storageSerializer
+                    )
                 )
             }
-            return toReturn as T
+            return currentState
         }
         override suspend fun <T> subscribe(topic: WebSocketTopic<T>) = this@wrapped.subscribe(topic)
         override suspend fun unsubscribe(topic: String) = this@wrapped.unsubscribe(topic)
