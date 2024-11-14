@@ -85,9 +85,9 @@ class AwsAdapterWs(val root: AwsAdapter) {
         override var currentState: T =
             root.communicationEncoding.decodeString(handler.storageSerializer, stateString)
 
-        override suspend fun repullState(): T = webSocketDynamo.states(listOf(socketId))[socketId]!!.let {
-            root.communicationEncoding.decodeString(handler.storageSerializer, it)
-        }.also { currentState = it }
+        override suspend fun repullState(): T = webSocketDynamo.states(listOf(socketId))[socketId]!!
+            .let { root.communicationEncoding.decodeString(handler.storageSerializer, it) }
+            .also { currentState = it }
 
         val queue = ArrayList<(T) -> T>()
         override suspend fun queueStateUpdate(modification: (T) -> T) {
@@ -98,10 +98,11 @@ class AwsAdapterWs(val root: AwsAdapter) {
             if (queue.isEmpty()) return currentState
             var newState = currentState
             while (true) {
+                val stateString = root.communicationEncoding.encodeString(handler.storageSerializer, currentState)
                 newState = queue.fold(currentState) { item, apply -> apply(item) }
                 val newStateString = root.communicationEncoding.encodeString(handler.storageSerializer, newState)
                 if (webSocketDynamo.updateState(socketId, stateString, newStateString)) break
-                repullState()
+                currentState = repullState()
             }
             queue.clear()
             currentState = newState
