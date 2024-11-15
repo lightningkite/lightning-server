@@ -30,6 +30,13 @@ class ScimSerializationTest {
             Serialization.json.parseToJsonElement("[$fullSampleUserjson]"),
             Serialization.json.encodeToJsonElement(ScimHackerySerializer("SCIMROOT", ListSerializer(ScimUser.serializer())), listOf(fullSampleUser))
         )
+        Serialization.json.encodeToJsonElement(ScimHackerySerializer("SCIMROOT", ScimListResponse.serializer(ScimUser.serializer())),
+            ScimListResponse(20, listOf(fullSampleUser, fullSampleUser), 1, 20)).let(::println)
+    }
+    @Test
+    fun isolate() {
+        Serialization.json.encodeToJsonElement(ScimHackerySerializer("SCIMROOT", ScimListResponse.serializer(ScimUser.serializer())),
+            ScimListResponse(20, listOf(fullSampleUser, fullSampleUser), 1, 20)).let(::println)
     }
 
     val fullSampleUser = ScimUser(

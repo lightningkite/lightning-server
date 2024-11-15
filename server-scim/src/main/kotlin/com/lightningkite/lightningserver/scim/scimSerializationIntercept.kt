@@ -1,3 +1,5 @@
+@file:OptIn(InternalSerializationApi::class)
+
 package com.lightningkite.lightningserver.scim
 
 import com.lightningkite.CaselessStringSerializer
@@ -22,8 +24,8 @@ import com.lightningkite.serialization.listElement
 import com.lightningkite.serialization.nullElement
 import com.lightningkite.serialization.serializableProperties
 import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.StringFormat
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -135,8 +137,8 @@ private fun KSerializer<*>.uncontextualize(module: SerializersModule = Serializa
     } else this
 }
 
-fun SerializationStrategy<*>.isScimResource() = descriptor.annotations.any { it is ScimSchemaUri }
-fun DeserializationStrategy<*>.isScimResource() = descriptor.annotations.any { it is ScimSchemaUri }
+fun SerializationStrategy<*>.isScimTagged() = descriptor.annotations.any { it is ScimSchemaUri }
+fun DeserializationStrategy<*>.isScimTagged() = descriptor.annotations.any { it is ScimSchemaUri }
 
 private fun SerialDescriptor.fmap(): Map<String, String> = (0..<elementsCount).mapNotNull { i ->
     val uri = getElementDescriptor(i).annotations.filterIsInstance<ScimExtension>().firstOrNull()?.uri ?: return@mapNotNull null
@@ -145,38 +147,52 @@ private fun SerialDescriptor.fmap(): Map<String, String> = (0..<elementsCount).m
 
 private fun JsonEncoder.scimIntercept(scimRoot: String): InterceptableJsonEncoder =
     this as? InterceptableJsonEncoder ?: InterceptableJsonEncoder(scimRoot, this)
-private class InterceptableJsonEncoder(val scimRoot: String, val wraps: JsonEncoder): JsonEncoder by wraps {
-    override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
-        if(serializer.isScimResource()) {
-            val uri = serializer.descriptor.annotations.filterIsInstance<ScimSchemaUri>().first().uri
-            val fmap = serializer.descriptor.fmap()
-            val asJson = Serialization.json.encodeToJsonElement(serializer, value) as JsonObject
-            // WAH HA HA HA
-            val modified = buildJsonObject {
-                putJsonArray("schemas") {
-                    add(uri)
-                    // Extensions
-                    serializer.descriptor.elementDescriptors
-                        .mapNotNull { it.annotations.filterIsInstance<ScimExtension>().firstOrNull()?.uri }
-                        .forEach { add(it) }
-                }
-                putJsonObject("meta") {
-                    put("resourceType", uri.substringAfterLast(':'))
-                    put("created", asJson["createdAt"]!!)
-                    put("lastModified", asJson["modifiedAt"]!!)
-                    put("location", scimRoot + "/" + uri.substringAfterLast(':') + "/" + asJson["_id"]!!.jsonPrimitive.content)
+private class InterceptableJsonEncoder(val scimRoot: String, val wraps: JsonEncoder, var skipTop: Boolean = false): JsonEncoder by wraps {
+    fun <T> interceptResource(serializer: SerializationStrategy<T>, value: T): JsonObject = buildJsonObject {
+        val uri = serializer.descriptor.annotations.filterIsInstance<ScimSchemaUri>().first().uri
+        val fmap = serializer.descriptor.fmap()
+        val asJson = Serialization.json.encodeToJsonElement(serializer, value) as JsonObject
+        putJsonArray("schemas") {
+            add(uri)
+            // Extensions
+            serializer.descriptor.elementDescriptors
+                .mapNotNull { it.annotations.filterIsInstance<ScimExtension>().firstOrNull()?.uri }
+                .forEach { add(it) }
+        }
+        asJson["createdAt"]?.let {
+            putJsonObject("meta") {
+                put("resourceType", uri.substringAfterLast(':'))
+                put("created", asJson["createdAt"]!!)
+                put("lastModified", asJson["modifiedAt"]!!)
+                put(
+                    "location",
+                    scimRoot + "/" + uri.substringAfterLast(':') + "/" + asJson["_id"]!!.jsonPrimitive.content
+                )
 //                        put("version")
-                }
-                for((key, value) in asJson.entries) {
-                    when(key) {
-                        "createdAt", "modifiedAt" -> {}
-                        "_id" -> put("id", value)
-                        else -> put(fmap[key] ?: key, value)
-                    }
-                }
             }
-            wraps.encodeSerializableValue(JsonObject.serializer(), modified)
-        } else wraps.encodeSerializableValue(serializer, value)
+        }
+        for((key, value) in asJson.entries) {
+            when(key) {
+                "createdAt", "modifiedAt" -> {}
+                "_id" -> put("id", value)
+                else -> put(fmap[key] ?: key, value)
+            }
+        }
+    }
+    override fun <T> encodeSerializableElement(
+        descriptor: SerialDescriptor,
+        index: Int,
+        serializer: SerializationStrategy<T>,
+        value: T
+    ) {
+        if(serializer.isScimTagged()) {
+            wraps.encodeSerializableElement(descriptor, index, JsonObject.serializer(), interceptResource(serializer, value))
+        } else wraps.encodeSerializableElement(descriptor, index, serializer, value)
+    }
+    override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
+        if(serializer.isScimTagged()) {
+            JsonObject.serializer().serialize(this, interceptResource(serializer, value))
+        } else serializer.serialize(this, value)
     }
 
     override fun beginStructure(descriptor: SerialDescriptor) = (wraps.beginStructure(descriptor) as JsonEncoder).scimIntercept(scimRoot)
@@ -189,7 +205,7 @@ private fun JsonDecoder.scimIntercept(scimRoot: String): InterceptableJsonDecode
     this as? InterceptableJsonDecoder ?: InterceptableJsonDecoder(scimRoot, this)
 private class InterceptableJsonDecoder(val scimRoot: String, val wraps: JsonDecoder): JsonDecoder by wraps {
     override fun <T> decodeSerializableValue(deserializer: DeserializationStrategy<T>): T {
-        if(deserializer.isScimResource()) {
+        if(deserializer.isScimTagged()) {
             val frmap = deserializer.descriptor.fmap().entries.associate { it.value to it.key }
             val value = wraps.decodeSerializableValue(JsonObject.serializer())
             // WAH HA HA HA
