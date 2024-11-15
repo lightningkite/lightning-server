@@ -14,8 +14,12 @@ import com.lightningkite.lightningdb.InMemoryFieldCollection
 import com.lightningkite.lightningdb.Modification
 import com.lightningkite.lightningdb.SortPart
 import com.lightningkite.lightningdb.Unique
+import com.lightningkite.lightningdb.deleteOneById
 import com.lightningkite.lightningdb.get
 import com.lightningkite.lightningdb.insertOne
+import com.lightningkite.lightningdb.query
+import com.lightningkite.lightningdb.replaceOneById
+import com.lightningkite.lightningdb.updateOneById
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.authRequired
 import com.lightningkite.lightningserver.auth.noAuth
@@ -28,6 +32,7 @@ import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
+import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.routes.docName
@@ -46,6 +51,7 @@ import com.lightningkite.serialization.descriptionOrDisplayName
 import com.lightningkite.serialization.displayName
 import com.lightningkite.serialization.listElement
 import com.lightningkite.serialization.serializableProperties
+import kotlinx.coroutines.flow.toList
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.serialization.KSerializer
@@ -121,14 +127,15 @@ class ScimEndpoints<Auth : HasId<*>>(
             override fun collection(): FieldCollection<ScimSchema> = collection
             override suspend fun collection(auth: AuthAccessor<Auth>): FieldCollection<ScimSchema> = collection
         })
-    val bulk = path("Bulk").post.api(
-        authOptions = userInfo.authOptions,
-        summary = "SCIM Bulk",
-        implementation = { bulk: ScimBulkRequest ->
-
-            ScimBulkResponse(TODO(), status = TODO())
-        }
-    )
+    // TODO: bulk
+//    val bulk = path("Bulk").post.api(
+//        authOptions = userInfo.authOptions,
+//        summary = "SCIM Bulk",
+//        implementation = { bulk: ScimBulkRequest ->
+//            bulk.Operations.
+//            ScimBulkResponse()
+//        }
+//    )
 }
 
 
@@ -161,7 +168,7 @@ class ScimResourceEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>
         inputType = info.serialization.serializer,
         outputType = info.serialization.serializer,
         implementation = {
-            info.collection(this).insertOne(it) ?: throw ForbiddenException("Insert was not permitted.")
+            info.collection(this).insertOne(it) ?: throw ScimErrorException(ScimError(ScimErrorType.sensitive, "Not allowed", HttpStatus.Forbidden.code.toString()))
         }
     )
     val detail = path.arg("id", info.serialization.idSerializer)
@@ -171,7 +178,7 @@ class ScimResourceEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>
         inputType = Unit.serializer(),
         outputType = info.serialization.serializer,
         implementation = {
-            info.collection(this).get(path1)!!
+            info.collection(this).get(path1) ?: throw ScimErrorException(ScimError(ScimErrorType.invalidPath, "Not Found", HttpStatus.NotFound.code.toString()))
         }
     )
     val query = get.api(
@@ -179,34 +186,57 @@ class ScimResourceEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>
         authOptions = info.authOptions,
         inputType = ScimQuery.serializer(info.serialization.serializer),
         outputType = ScimListResponse.serializer(info.serialization.serializer),
-        implementation = { TODO() }
+        implementation = { input ->
+            val r = info.collection(this).query(input.query()).toList()
+            ScimListResponse(
+                totalResults = r.size,
+                Resources = r,
+                startIndex = input.startIndex,
+                itemsPerPage = input.count
+            )
+        }
     )
     val queryPost = post(".query").api(
         summary = "Scim Query Post",
         authOptions = info.authOptions,
         inputType = ScimQuery.serializer(info.serialization.serializer),
         outputType = ScimListResponse.serializer(info.serialization.serializer),
-        implementation = { TODO() }
+        implementation = { input ->
+            val r = info.collection(this).query(input.query()).toList()
+            ScimListResponse(
+                totalResults = r.size,
+                Resources = r,
+                startIndex = input.startIndex,
+                itemsPerPage = input.count
+            )
+        }
     )
     val replace = detail.put.api(
         summary = "Scim Replace",
         authOptions = info.authOptions,
-        inputType = ScimQuery.serializer(info.serialization.serializer),
-        outputType = ScimListResponse.serializer(info.serialization.serializer),
-        implementation = { TODO() }
+        inputType = info.serialization.serializer,
+        outputType = info.serialization.serializer,
+        implementation = { input ->
+            info.collection(this).replaceOneById(path1, input).new ?: throw ScimErrorException(ScimError(ScimErrorType.sensitive, "Not allowed", HttpStatus.Forbidden.code.toString()))
+        }
     )
     val modify = detail.patch.api(
         summary = "Scim Modify",
         authOptions = info.authOptions,
         inputType = ScimPatchOp.serializer(info.serialization.serializer),
-        outputType = ScimListResponse.serializer(info.serialization.serializer),
-        implementation = { TODO() }
+        outputType = info.serialization.serializer,
+        implementation = { input ->
+            info.collection(this).updateOneById(path1, Modification.Chain(input.Operations.map { it.modification(info.serialization.serializer) }))
+                ?.new?: throw ScimErrorException(ScimError(ScimErrorType.invalidPath, "Not Found", HttpStatus.NotFound.code.toString()))
+        }
     )
     val remove = detail.delete.api(
         summary = "Scim Delete",
         authOptions = info.authOptions,
         inputType = Unit.serializer(),
         outputType = Unit.serializer(),
-        implementation = { TODO() }
+        implementation = {
+            info.collection(this).deleteOneById(path1)
+        }
     )
 }

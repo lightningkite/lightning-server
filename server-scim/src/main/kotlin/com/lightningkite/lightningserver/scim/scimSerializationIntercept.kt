@@ -36,6 +36,7 @@ import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.encoding.CompositeEncoder
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonEncoder
@@ -137,7 +138,7 @@ private fun KSerializer<*>.uncontextualize(module: SerializersModule = Serializa
 fun SerializationStrategy<*>.isScimResource() = descriptor.annotations.any { it is ScimSchemaUri }
 fun DeserializationStrategy<*>.isScimResource() = descriptor.annotations.any { it is ScimSchemaUri }
 
-private fun SerialDescriptor.fmap() = (0..<elementsCount).mapNotNull { i ->
+private fun SerialDescriptor.fmap(): Map<String, String> = (0..<elementsCount).mapNotNull { i ->
     val uri = getElementDescriptor(i).annotations.filterIsInstance<ScimExtension>().firstOrNull()?.uri ?: return@mapNotNull null
     getElementName(i) to uri
 }.associate { it }
@@ -189,12 +190,17 @@ private fun JsonDecoder.scimIntercept(scimRoot: String): InterceptableJsonDecode
 private class InterceptableJsonDecoder(val scimRoot: String, val wraps: JsonDecoder): JsonDecoder by wraps {
     override fun <T> decodeSerializableValue(deserializer: DeserializationStrategy<T>): T {
         if(deserializer.isScimResource()) {
-            val fmap = deserializer.descriptor.fmap()
+            val frmap = deserializer.descriptor.fmap().entries.associate { it.value to it.key }
             val value = wraps.decodeSerializableValue(JsonObject.serializer())
             // WAH HA HA HA
             val modified = buildJsonObject {
                 for((key, value) in value.entries) {
-                    put(key, value)
+                    when (key) {
+                        "meta" -> continue
+                        "schemas" -> continue
+                        "id" -> put("_id", value)
+                        else -> put(frmap[key] ?: key, value)
+                    }
                 }
             }
             return Serialization.json.decodeFromJsonElement(deserializer, modified)
@@ -223,25 +229,36 @@ class ScimHackerySerializer<T>(val scimRoot: String, val inner: KSerializer<T>):
 }
 
 lateinit var scimRoot: String
-private val Serialization_jsonScim by lazy {
-    object: StringFormat {
-        override fun <T> encodeToString(
-            serializer: SerializationStrategy<T>,
-            value: T
-        ): String {
-            return Serialization.json.encodeToString(ScimHackerySerializer(scimRoot, serializer as KSerializer<T>), value)
-        }
-
-        override fun <T> decodeFromString(
-            deserializer: DeserializationStrategy<T>,
-            string: String
-        ): T {
-            return Serialization.json.decodeFromString(ScimHackerySerializer(scimRoot, deserializer as KSerializer<T>), string)
-        }
-
-        override val serializersModule: SerializersModule get() = Serialization.json.serializersModule
+class JsonScim(json: Json): StringFormat {
+    val json = Json(json) { decodeEnumsCaseInsensitive = true; ignoreUnknownKeys = true }
+    override val serializersModule: SerializersModule get() = json.serializersModule
+    override fun <T> encodeToString(
+        serializer: SerializationStrategy<T>,
+        value: T
+    ): String {
+        return json.encodeToString(ScimHackerySerializer(scimRoot, serializer as KSerializer<T>), value)
     }
+    override fun <T> decodeFromString(
+        deserializer: DeserializationStrategy<T>,
+        string: String
+    ): T {
+        return json.decodeFromString(ScimHackerySerializer(scimRoot, deserializer as KSerializer<T>), string)
+    }
+    fun <T> encodeToJsonElement(
+        serializer: SerializationStrategy<T>,
+        value: T
+    ): JsonElement {
+        return json.encodeToJsonElement(ScimHackerySerializer(scimRoot, serializer as KSerializer<T>), value)
+    }
+    fun <T> decodeFromJsonElement(
+        deserializer: DeserializationStrategy<T>,
+        string: JsonElement
+    ): T {
+        return json.decodeFromJsonElement(ScimHackerySerializer(scimRoot, deserializer as KSerializer<T>), string)
+    }
+
 }
+private val Serialization_jsonScim by lazy { JsonScim(Serialization.json) }
 val Serialization.Companion.jsonScim get() = Serialization_jsonScim
 private val JsonScimContentType = ContentType("application", "scim+json")
 val ContentType.Application.JsonScim get() = JsonScimContentType

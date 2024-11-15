@@ -337,22 +337,3 @@ class ScimConditionSerializer<T>(val subtype: KSerializer<T>) : KSerializer<Cond
         return f.toCondition() to f.position!!.end.offset(string)
     }
 }
-
-/**
- * See https://datatracker.ietf.org/doc/html/rfc7644#autoid-17
- */
-class ScimSortPartSerializer<T>(val subtype: KSerializer<T>) : KSerializer<SortPart<T>> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("com.lightningkite.lightningdb.SortPart/scim", PrimitiveKind.STRING)
-
-    override fun serialize(
-        encoder: Encoder,
-        value: SortPart<T>
-    ) {
-        TODO("Not yet implemented")
-    }
-
-    override fun deserialize(decoder: Decoder): SortPart<T> {
-        TODO("Not yet implemented")
-    }
-}
