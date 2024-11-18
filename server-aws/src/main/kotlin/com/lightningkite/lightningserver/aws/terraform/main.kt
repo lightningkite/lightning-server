@@ -200,11 +200,11 @@ private fun terraformEnvironmentAws(handlerFqn: String, folder: File, projectNam
         } ?: run {
             it.appendLine("""    key    = "${info.projectNameSafe}/${folder.name}"""")
         }
-        it.appendLine("""    region = "us-west-2"""")
+        it.appendLine("""    region = "${info.region}"""")
         it.appendLine("""  }""")
         it.appendLine("""}""")
         it.appendLine("""provider "aws" {""")
-        it.appendLine("""  region = "us-west-2"""")
+        it.appendLine("""  region = "${info.region}"""")
         it.appendLine("""}""")
         it.appendLine("""provider "aws" {""")
         it.appendLine("""  alias = "acm"""")

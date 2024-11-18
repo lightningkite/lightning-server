@@ -26,7 +26,7 @@ internal fun defaultAwsHandler(project: TerraformProjectInfo) = with(project) {
         inputs = listOf(
             TerraformInput.string(
                 "deployment_location",
-                "us-west-2",
+                project.region,
                 description = "The AWS region key to deploy all resources in."
             ),
             TerraformInput.boolean(
