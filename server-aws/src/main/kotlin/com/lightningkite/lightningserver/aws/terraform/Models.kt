@@ -8,6 +8,7 @@ data class TerraformProjectInfo(
     val projectName: String,
     val bucket: String,
     val bucketPathOverride: String? = null,
+    val region: String = "us-west-2",
     val core: TerraformCoreType = TerraformCoreType.Lambda,
     val vpc: Boolean = true,
     val existingVpc: Boolean = false,
