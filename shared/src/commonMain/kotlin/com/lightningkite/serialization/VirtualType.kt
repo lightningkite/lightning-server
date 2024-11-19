@@ -76,7 +76,12 @@ data class VirtualStruct(
             }
         }
         val defaults by lazy {
-            serializers.map { it.default() }
+            fields.zip(serializers) { field, serializer ->
+                field.defaultJson?.let {
+                    return@zip DefaultDecoder.json.decodeFromString(serializer, it)
+                }
+                serializer.default()
+            }
         }
         val defaultInstance by lazy { VirtualInstance(this, defaults) }
         val serializableProperties: Array<SerializableProperty<VirtualInstance, Any?>> by lazy {
@@ -102,7 +107,9 @@ data class VirtualStruct(
         }
 
         override fun deserialize(decoder: Decoder): VirtualInstance {
-            val values = Array<Any?>(fields.size) { specifiedDefaults[it] }
+            val values = Array<Any?>(fields.size) {
+                specifiedDefaults[it].takeUnless { it == DefaultNotPresent }
+            }
             val s = decoder.beginStructure(descriptor)
             while (true) {
                 val index = s.decodeElementIndex(descriptor)
