@@ -10,7 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class WebSocketsTest {
-    open class TestMirrorSocket() : WebSocketHandler<String> {
+    open class TestMirrorSocket(val assertOnConnection: suspend WebSocketConnection<String>.()->Unit = {}) : WebSocketHandler<String> {
         var connects = 0
         var messages = 0
         var disconnects = 0
@@ -32,27 +32,31 @@ class WebSocketsTest {
 
         override suspend fun willConnect(request: WebSocketConnectRequest): String = UUID.random().toString()
 
-        override suspend fun didConnect(connection: MidWebsocket<String>, request: WebSocketConnectRequest) {
+        override suspend fun didConnect(connection: WebSocketConnection<String>) {
+            assertOnConnection(connection)
             println("${connection.currentState} - connects: ${++connects}")
         }
 
         override suspend fun messageFromClient(
-            connection: MidWebsocket<String>,
+            connection: WebSocketConnection<String>,
             frame: WebSocketFrame
         ) {
+            assertOnConnection(connection)
             println("${connection.currentState} - messages: ${++messages}")
             connection.send(frame)
         }
 
         override suspend fun messageFromSubscription(
-            connection: MidWebsocket<String>,
+            connection: WebSocketConnection<String>,
             topic: String,
             retrieve: TypeRetriever
         ) {
+            assertOnConnection(connection)
             println("${connection.currentState} - wssub: ${++wssubs}")
         }
 
-        override suspend fun disconnect(connection: MidWebsocket<String>, reason: WebSocketClose) {
+        override suspend fun disconnect(connection: WebSocketConnection<String>, reason: WebSocketClose) {
+            assertOnConnection(connection)
             println("${connection.currentState} - disconnects: ${++disconnects}")
         }
     }
@@ -74,7 +78,7 @@ class WebSocketsTest {
     @Test
     fun testerExceptionCausesDisconnect() {
         val mirror = object : TestMirrorSocket() {
-            override suspend fun messageFromClient(connection: MidWebsocket<String>, frame: WebSocketFrame) {
+            override suspend fun messageFromClient(connection: WebSocketConnection<String>, frame: WebSocketFrame) {
                 super.messageFromClient(connection, frame)
                 throw Exception()
             }

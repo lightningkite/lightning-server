@@ -10,14 +10,15 @@ import com.lightningkite.lightningserver.serialization.TypeRetriever
 import io.ktor.util.encodeBase64
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 interface WebSocketHandler<STORAGE> {
     val storageSerializer: KSerializer<STORAGE>
     suspend fun willConnect(request: WebSocketConnectRequest): STORAGE
-    suspend fun didConnect(connection: MidWebsocket<STORAGE>, request: WebSocketConnectRequest)
-    suspend fun messageFromClient(connection: MidWebsocket<STORAGE>, frame: WebSocketFrame)
-    suspend fun messageFromSubscription(connection: MidWebsocket<STORAGE>, topic: String, retrieve: TypeRetriever)
-    suspend fun disconnect(connection: MidWebsocket<STORAGE>, reason: WebSocketClose)
+    suspend fun didConnect(connection: WebSocketConnection<STORAGE>)
+    suspend fun messageFromClient(connection: WebSocketConnection<STORAGE>, frame: WebSocketFrame)
+    suspend fun messageFromSubscription(connection: WebSocketConnection<STORAGE>, topic: String, retrieve: TypeRetriever)
+    suspend fun disconnect(connection: WebSocketConnection<STORAGE>, reason: WebSocketClose)
 }
 
 data class WebSocketTopic<T>(
@@ -53,20 +54,21 @@ val WebSocketFrame.text: String
         is WebSocketFrame.Text -> content
     }
 
-class WebSocketConnectRequest(
+@Serializable
+data class WebSocketConnectRequest(
     override val path: ServerPath,
-    override val parts: Map<String, String>,
+    override val parts: Map<String, String> = mapOf(),
     override val wildcard: String? = null,
-    override val queryParameters: List<Pair<String, String>>,
-    override val headers: HttpHeaders,
-    override val domain: String,
-    override val protocol: String,
-    override val sourceIp: String,
-    val cache: Cache = LocalCache(),
+    override val queryParameters: List<Pair<String, String>> = listOf(),
+    override val headers: HttpHeaders = HttpHeaders.EMPTY,
+    override val domain: String = "",
+    override val protocol: String = "",
+    override val sourceIp: String = "",
+    @Transient val cache: Cache = LocalCache(),
 ) : Request {
     fun queryParameter(key: String): String? = queryParameters.find { it.first == key }?.second
     fun queryParameterCaseInsensitive(key: String): String? = queryParameters.find { it.first.equals(key, true) }?.second
-    private val cacheCalc = HashMap<Request.CacheKey<*>, Any?>()
+    @Transient private val cacheCalc = HashMap<Request.CacheKey<*>, Any?>()
     override suspend fun <T> cache(key: Request.CacheKey<T>): T {
         @Suppress("UNCHECKED_CAST")
         if (cacheCalc.containsKey(key)) return cacheCalc[key] as T
@@ -74,45 +76,10 @@ class WebSocketConnectRequest(
         cacheCalc[key] = calculated
         return calculated
     }
-
-    val serializable
-        get() = WebSocketConnectRequestSerializable(
-            path = path,
-            parts = parts,
-            wildcard = wildcard,
-            queryParameters = queryParameters,
-            headers = headers.entries,
-            domain = domain,
-            protocol = protocol,
-            sourceIp = sourceIp,
-        )
 }
 
-@Serializable
-class WebSocketConnectRequestSerializable(
-    val path: ServerPath,
-    val parts: Map<String, String>,
-    val wildcard: String? = null,
-    val queryParameters: List<Pair<String, String>>,
-    val headers: List<Pair<String, String>>,
-    val domain: String,
-    val protocol: String,
-    val sourceIp: String,
-) {
-    val normal: WebSocketConnectRequest
-        get() = WebSocketConnectRequest(
-            path = path,
-            parts = parts,
-            wildcard = wildcard,
-            queryParameters = queryParameters,
-            headers = HttpHeaders(*headers.toTypedArray()),
-            domain = domain,
-            protocol = protocol,
-            sourceIp = sourceIp,
-        )
-}
-
-interface MidWebsocket<STORAGE> {
+interface WebSocketConnection<STORAGE> {
+    val request: WebSocketConnectRequest
     val currentState: STORAGE
     suspend fun repullState(): STORAGE
     suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE)
@@ -123,8 +90,8 @@ interface MidWebsocket<STORAGE> {
     suspend fun close(reason: WebSocketClose)
 }
 
-suspend fun MidWebsocket<*>.send(content: String) = send(WebSocketFrame(content))
-suspend fun MidWebsocket<*>.send(content: ByteArray) = send(WebSocketFrame(content))
+suspend fun WebSocketConnection<*>.send(content: String) = send(WebSocketFrame(content))
+suspend fun WebSocketConnection<*>.send(content: ByteArray) = send(WebSocketFrame(content))
 
 /*
 TODO:

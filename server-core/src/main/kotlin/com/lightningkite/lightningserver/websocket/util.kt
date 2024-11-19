@@ -1,26 +1,16 @@
 package com.lightningkite.lightningserver.websocket
 
-import com.github.jershell.kbson.ByteArraySerializer
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
-import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.TypeRetriever
-import com.lightningkite.lightningserver.typed.AuthAndPathParts
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 
-suspend fun <STORAGE> WebSocketHandler<STORAGE>.messageFromSubscriptionTracked(path: ServerPath, mid: MidWebsocket<STORAGE>, topic: String, retriever: TypeRetriever) {
+suspend fun <STORAGE> WebSocketHandler<STORAGE>.messageFromSubscriptionTracked(path: ServerPath, mid: WebSocketConnection<STORAGE>, topic: String, retriever: TypeRetriever) {
     Metrics.handlerPerformance<Unit>(
-        WebSockets.HandlerSection(
+        WebSockets.HandlerContext(
             path,
-            WebSockets.WsHandlerType.WSSUB
+            WebSockets.WsHandlerType.WSSUB,
+            mid.request
         )
     ) {
         try {
@@ -32,11 +22,12 @@ suspend fun <STORAGE> WebSocketHandler<STORAGE>.messageFromSubscriptionTracked(p
     }
 }
 
-suspend fun <STORAGE> WebSocketHandler<STORAGE>.messageFromClientTracked(path: ServerPath, mid: MidWebsocket<STORAGE>, message: WebSocketFrame) {
+suspend fun <STORAGE> WebSocketHandler<STORAGE>.messageFromClientTracked(path: ServerPath, mid: WebSocketConnection<STORAGE>, message: WebSocketFrame) {
     Metrics.handlerPerformance<Unit>(
-        WebSockets.HandlerSection(
+        WebSockets.HandlerContext(
             path,
-            WebSockets.WsHandlerType.MESSAGE
+            WebSockets.WsHandlerType.MESSAGE,
+            mid.request
         )
     ) {
         try {
@@ -48,15 +39,16 @@ suspend fun <STORAGE> WebSocketHandler<STORAGE>.messageFromClientTracked(path: S
     }
 }
 
-suspend fun <STORAGE> WebSocketHandler<STORAGE>.didConnectTracked(path: ServerPath, mid: MidWebsocket<STORAGE>, request: WebSocketConnectRequest) {
+suspend fun <STORAGE> WebSocketHandler<STORAGE>.didConnectTracked(path: ServerPath, mid: WebSocketConnection<STORAGE>) {
     Metrics.handlerPerformance<Unit>(
-        WebSockets.HandlerSection(
+        WebSockets.HandlerContext(
             path,
-            WebSockets.WsHandlerType.CONNECTED
+            WebSockets.WsHandlerType.CONNECTED,
+            mid.request,
         )
     ) {
         try {
-            didConnect(mid, request)
+            didConnect(mid)
         } catch(e: Exception) {
             e.report()
             throw e
@@ -66,9 +58,10 @@ suspend fun <STORAGE> WebSocketHandler<STORAGE>.didConnectTracked(path: ServerPa
 
 suspend fun <STORAGE> WebSocketHandler<STORAGE>.willConnectTracked(path: ServerPath, request: WebSocketConnectRequest): STORAGE {
     return Metrics.handlerPerformance<STORAGE>(
-        WebSockets.HandlerSection(
+        WebSockets.HandlerContext(
             path,
-            WebSockets.WsHandlerType.CONNECTING
+            WebSockets.WsHandlerType.CONNECTING,
+            request,
         )
     ) {
         try {
@@ -80,11 +73,16 @@ suspend fun <STORAGE> WebSocketHandler<STORAGE>.willConnectTracked(path: ServerP
     }
 }
 
-suspend fun <STORAGE> WebSocketHandler<STORAGE>.disconnectTracked(path: ServerPath, mid: MidWebsocket<STORAGE>, reason: WebSocketClose) {
+suspend fun <STORAGE> WebSocketHandler<STORAGE>.disconnectTracked(
+    path: ServerPath,
+    mid: WebSocketConnection<STORAGE>,
+    reason: WebSocketClose
+) {
     return Metrics.handlerPerformance<Unit>(
-        WebSockets.HandlerSection(
+        WebSockets.HandlerContext(
             path,
-            WebSockets.WsHandlerType.DISCONNECT
+            WebSockets.WsHandlerType.DISCONNECT,
+            mid.request
         )
     ) {
         try {

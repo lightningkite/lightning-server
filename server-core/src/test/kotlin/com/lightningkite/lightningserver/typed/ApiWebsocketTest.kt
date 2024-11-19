@@ -6,25 +6,18 @@ import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.engine.UnitTestEngine
-import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.lightningserver.websocket.WebSocketClose
 import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websocket.WebSocketTopic
-import com.lightningkite.lightningserver.websocket.WebSockets
 import com.lightningkite.lightningserver.websocket.test
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.yield
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToByteArray
-import kotlinx.serialization.serializer
 import kotlin.test.Test
 
 class ApiWebsocketTest {
@@ -51,15 +44,14 @@ class ApiWebsocketTest {
         }
 
         override suspend fun didConnect(
-            connection: Mid<HasId<*>?, TypedServerPath0, TestType, TestType, TestType>,
-            request: WebSocketConnectRequest
+            connection: ApiWebsocketConnection<HasId<*>?, TypedServerPath0, TestType, TestType, TestType>
         ) {
             println("${connection.currentState} didConnect")
             connection.subscribe(general)
         }
 
         override suspend fun messageFromClient(
-            connection: Mid<HasId<*>?, TypedServerPath0, TestType, TestType, TestType>,
+            connection: ApiWebsocketConnection<HasId<*>?, TypedServerPath0, TestType, TestType, TestType>,
             input: TestType
         ) {
             println("${connection.currentState} messageFromClient $input")
@@ -67,7 +59,7 @@ class ApiWebsocketTest {
         }
 
         override suspend fun messageFromSubscription(
-            connection: Mid<HasId<*>?, TypedServerPath0, TestType, TestType, TestType>,
+            connection: ApiWebsocketConnection<HasId<*>?, TypedServerPath0, TestType, TestType, TestType>,
             topic: String,
             retriever: TypeRetriever
         ) {
@@ -76,7 +68,7 @@ class ApiWebsocketTest {
         }
 
         override suspend fun disconnect(
-            connection: Mid<HasId<*>?, TypedServerPath0, TestType, TestType, TestType>,
+            connection: ApiWebsocketConnection<HasId<*>?, TypedServerPath0, TestType, TestType, TestType>,
             reason: WebSocketClose
         ) {
             println("${connection.currentState} disconnect")

@@ -8,19 +8,13 @@ import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.serialization.AnonType
-import com.lightningkite.lightningserver.serialization.InternalCommunicationEncoding
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.serialization.TypeRetriever
-import com.lightningkite.lightningserver.serialization.decodeFromBase64
-import com.lightningkite.lightningserver.serialization.encodeToBase64
 import com.lightningkite.lightningserver.settings.generalSettings
-import com.lightningkite.lightningserver.websocket.MidWebsocket
+import com.lightningkite.lightningserver.websocket.WebSocketConnection
 import com.lightningkite.lightningserver.websocket.QueryParamWebSocketHandler
 import com.lightningkite.lightningserver.websocket.WebSocketClose
 import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
-import com.lightningkite.lightningserver.websocket.WebSocketConnectRequestSerializable
 import com.lightningkite.lightningserver.websocket.WebSocketFrame
-import com.lightningkite.lightningserver.websocket.WebSocketFrame.Companion.invoke
 import com.lightningkite.lightningserver.websocket.WebSocketHandler
 import com.lightningkite.lightningserver.websocket.WebSocketTopic
 import com.lightningkite.lightningserver.websocket.WebSockets
@@ -54,8 +48,8 @@ class AwsAdapterWs(val root: AwsAdapter) {
     @Serializable
     data class WebSocketDidConnect(
         val socketId: String,
-        val connection: WebSocketConnectRequestSerializable,
-        val storage: String
+        val connection: WebSocketConnectRequest,
+        @Contextual val storage: AnonType
     )
     @Serializable
     data class WebSocketPublish(
@@ -65,28 +59,29 @@ class AwsAdapterWs(val root: AwsAdapter) {
 
     suspend inline fun <T, R> withMid(
         path: ServerPath,
+        request: WebSocketConnectRequest,
         handler: WebSocketHandler<T>,
         socketId: String,
-        stateString: String,
+        stateString: AnonType,
         action: (WsMid<T>) -> R
     ): R {
-        val mid = WsMid<T>(path = path, handler = handler, socketId = socketId, stateString = stateString)
+        val mid = WsMid<T>(request = request, path = path, handler = handler, socketId = socketId, stateString = stateString)
         val r = action(mid)
         mid.commit()
         return r
     }
 
     inner class WsMid<T> constructor(
+        override val request: WebSocketConnectRequest,
         val path: ServerPath,
         val handler: WebSocketHandler<T>,
         val socketId: String,
-        val stateString: String
-    ) : MidWebsocket<T> {
-        override var currentState: T =
-            root.communicationEncoding.decodeString(handler.storageSerializer, stateString)
+        val stateString: AnonType
+    ) : WebSocketConnection<T> {
+        override var currentState: T = stateString.value(handler.storageSerializer)
 
-        override suspend fun repullState(): T = webSocketDynamo.states(listOf(socketId))[socketId]!!
-            .let { root.communicationEncoding.decodeString(handler.storageSerializer, it) }
+        override suspend fun repullState(): T = webSocketDynamo.statesAlone(listOf(socketId))[socketId]!!
+            .let { root.communicationEncoding.decodeBytes(handler.storageSerializer, it) }
             .also { currentState = it }
 
         val queue = ArrayList<(T) -> T>()
@@ -98,9 +93,9 @@ class AwsAdapterWs(val root: AwsAdapter) {
             if (queue.isEmpty()) return currentState
             var newState = currentState
             while (true) {
-                val stateString = root.communicationEncoding.encodeString(handler.storageSerializer, currentState)
+                val stateString = root.communicationEncoding.encodeBytes(handler.storageSerializer, currentState)
                 newState = queue.fold(currentState) { item, apply -> apply(item) }
-                val newStateString = root.communicationEncoding.encodeString(handler.storageSerializer, newState)
+                val newStateString = root.communicationEncoding.encodeBytes(handler.storageSerializer, newState)
                 if (webSocketDynamo.updateState(socketId, stateString, newStateString)) break
                 currentState = repullState()
             }
@@ -187,7 +182,8 @@ class AwsAdapterWs(val root: AwsAdapter) {
                 // TODO: could retrieve more states at once?
                 val states = webSocketDynamo.states(ids)
                 for (socketId in ids) {
-                    withMid(p, h, socketId, states[socketId] ?: continue) { mid ->
+                    val s = states[socketId] ?: continue
+                    withMid(p, s.connectRequest, h, socketId, AnonType(s.state)) { mid ->
                         try {
                             h.messageFromSubscriptionTracked(p, mid, event.topic, tr)
                         } catch (e: Exception) {
@@ -231,12 +227,11 @@ class AwsAdapterWs(val root: AwsAdapter) {
     }
     suspend fun handleWebsocketDidConnect(event: WebSocketDidConnect): APIGatewayV2HTTPResponse {
         val path = ServerPath.root
-        withMid(path, rootWs, event.socketId, event.storage) { mid ->
+        withMid(path, event.connection, rootWs, event.socketId, event.storage) { mid ->
             try {
                 rootWs.didConnectTracked(
                     path,
-                    mid,
-                    event.connection.normal
+                    mid
                 )
                 return APIGatewayV2HTTPResponse(200)
             } catch (e: Exception) {
@@ -277,8 +272,9 @@ class AwsAdapterWs(val root: AwsAdapter) {
                 )
                 try {
                     val storage = rootWs.willConnectTracked(ServerPath.root, lkEvent)
+                    val storageBytes = root.communicationEncoding.encodeBytes(rootWs.storageSerializer, storage)
                     val storageString = root.communicationEncoding.encodeString(rootWs.storageSerializer, storage)
-                    webSocketDynamo.setState(event.requestContext.connectionId, storageString)
+                    webSocketDynamo.setState(event.requestContext.connectionId, lkEvent, storageBytes)
                     try {
                         root.lambdaClient.invoke {
                             it.functionName(System.getenv("AWS_LAMBDA_FUNCTION_NAME"))
@@ -291,8 +287,8 @@ class AwsAdapterWs(val root: AwsAdapter) {
                                         WebSocketDidConnect.serializer(),
                                         WebSocketDidConnect(
                                             event.requestContext.connectionId,
-                                            lkEvent.serializable,
-                                            storageString
+                                            lkEvent,
+                                            AnonType(storageString)
                                         )
                                     )
                                 )
@@ -310,11 +306,13 @@ class AwsAdapterWs(val root: AwsAdapter) {
 
             "\$disconnect" -> {
                 try {
+                    val state = webSocketDynamo.state(event.requestContext.connectionId) ?: return APIGatewayV2HTTPResponse(204)
                     withMid(
                         ServerPath.root,
+                        state.connectRequest,
                         rootWs,
                         event.requestContext.connectionId,
-                        webSocketDynamo.state(event.requestContext.connectionId) ?: return APIGatewayV2HTTPResponse(204)
+                        AnonType(state.state)
                     ) { mid ->
                         rootWs.disconnectTracked(
                             ServerPath.root,
@@ -333,13 +331,13 @@ class AwsAdapterWs(val root: AwsAdapter) {
             else -> if (body == null || body.length == 0L)
                 APIGatewayV2HTTPResponse(200)
             else {
+                val state = webSocketDynamo.state(event.requestContext.connectionId) ?: return APIGatewayV2HTTPResponse(204)
                 withMid(
                     ServerPath.root,
+                    state.connectRequest,
                     rootWs,
                     event.requestContext.connectionId,
-                    webSocketDynamo.state(event.requestContext.connectionId) ?: return APIGatewayV2HTTPResponse(
-                        204
-                    )
+                    AnonType(state.state),
                 ) { mid ->
                     try {
                         rootWs.messageFromClientTracked(

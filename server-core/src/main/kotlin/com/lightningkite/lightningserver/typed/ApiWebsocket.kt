@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.typed
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthOptions
-import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.engine.UnitTestEngine
@@ -51,29 +50,35 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
     open override val belongsToInterface: Documentable.InterfaceInfo? get() = null
 
     abstract suspend fun AuthAndPathParts<USER, PATH>.willConnect(request: WebSocketConnectRequest): STORAGE
-    open suspend fun didConnect(connection: Mid<USER, PATH, INPUT, OUTPUT, STORAGE>, request: WebSocketConnectRequest) {}
-    open suspend fun messageFromClient(connection: Mid<USER, PATH, INPUT, OUTPUT, STORAGE>, input: INPUT) {}
-    open suspend fun messageFromSubscription(connection: Mid<USER, PATH, INPUT, OUTPUT, STORAGE>,
-        topic: String,
-        retriever: TypeRetriever
+    open suspend fun didConnect(connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>) {}
+    open suspend fun messageFromClient(connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>, input: INPUT) {}
+    open suspend fun messageFromSubscription(connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>,
+                                             topic: String,
+                                             retriever: TypeRetriever
     ) {
     }
 
-    open suspend fun disconnect(connection: Mid<USER, PATH, INPUT, OUTPUT, STORAGE>, reason: WebSocketClose) {}
+    open suspend fun disconnect(connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>, reason: WebSocketClose) {}
 
-    interface Mid<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> {
-        val currentState: STORAGE
-        suspend fun repullState(): STORAGE
-        suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE)
-        suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE
-        suspend fun <T> subscribe(topic: WebSocketTopic<T>)
-        suspend fun unsubscribe(topic: String)
-        suspend fun send(output: OUTPUT)
-        suspend fun close(reason: WebSocketClose)
+    abstract class ApiWebsocketConnection<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE>(
+//        authOrNull: RequestAuth<USER & Any>?,
+//        rawRequest: Request?,
+//        parts: Array<Any?>
+    )
+//        : AuthAndPathParts<USER, PATH>(authOrNull, rawRequest, parts)  // TODO
+    {
+        abstract val currentState: STORAGE
+        abstract suspend fun repullState(): STORAGE
+        abstract suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE)
+        abstract suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE
+        abstract suspend fun <T> subscribe(topic: WebSocketTopic<T>)
+        abstract suspend fun unsubscribe(topic: String)
+        abstract suspend fun send(output: OUTPUT)
+        abstract suspend fun close(reason: WebSocketClose)
     }
 
-    inner class MidImpl(val wraps: MidWebsocket<ApiWebsocketStorage<STORAGE>>) :
-        Mid<USER, PATH, INPUT, OUTPUT, STORAGE> {
+    inner class ApiWebsocketConnectionImpl(val wraps: WebSocketConnection<ApiWebsocketStorage<STORAGE>>) :
+        ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>() {
         override val currentState: STORAGE = wraps.currentState.storage
         override suspend fun repullState(): STORAGE = wraps.repullState().storage
         override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
@@ -108,30 +113,29 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
             )
 
         override suspend fun didConnect(
-            connection: MidWebsocket<ApiWebsocketStorage<STORAGE>>,
-            request: WebSocketConnectRequest
-        ) = didConnect(MidImpl(connection), request)
+            connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>
+        ) = didConnect(ApiWebsocketConnectionImpl(connection))
 
         override suspend fun messageFromClient(
-            connection: MidWebsocket<ApiWebsocketStorage<STORAGE>>,
+            connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>,
             frame: WebSocketFrame
         ) {
             if ((frame as? WebSocketFrame.Text)?.content?.isBlank() == true) {
                 connection.send(" ")
                 return
-            } else messageFromClient(MidImpl(connection), connection.currentState.parser(frame, inputType))
+            } else messageFromClient(ApiWebsocketConnectionImpl(connection), connection.currentState.parser(frame, inputType))
         }
 
         override suspend fun messageFromSubscription(
-            connection: MidWebsocket<ApiWebsocketStorage<STORAGE>>,
+            connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>,
             topic: String,
             retrieve: TypeRetriever
-        ) = messageFromSubscription(MidImpl(connection), topic, retrieve)
+        ) = messageFromSubscription(ApiWebsocketConnectionImpl(connection), topic, retrieve)
 
         override suspend fun disconnect(
-            connection: MidWebsocket<ApiWebsocketStorage<STORAGE>>,
+            connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>,
             reason: WebSocketClose
-        ) = this@ApiWebsocket.disconnect(MidImpl(connection), reason)
+        ) = this@ApiWebsocket.disconnect(ApiWebsocketConnectionImpl(connection), reason)
     }
     init {
         WebSockets.handlers[path.path] = this.raw
@@ -170,7 +174,7 @@ suspend fun <USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> A
         val id = UUID.randomUUID().toString()
         println("$id Connecting...")
         val startingState = with(auth) { willConnect(req) }
-        val mid = object : ApiWebsocket.Mid<USER, PATH, INPUT, OUTPUT, STORAGE> {
+        val mid = object : ApiWebsocket.ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>() {
             override var currentState: STORAGE = startingState
             override suspend fun repullState(): STORAGE = currentState
             override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
@@ -215,7 +219,7 @@ suspend fun <USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> A
         }
 
         println("$id Connected.")
-        didConnect(mid, req)
+        didConnect(mid)
 
         var error: Exception? = null
         try {

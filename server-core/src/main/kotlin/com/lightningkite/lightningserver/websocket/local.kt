@@ -9,13 +9,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 
-abstract class LocalMidWebsocket<STORAGE>(
+abstract class LocalWebSocketConnection<STORAGE>(
     startingState: STORAGE,
+    override val request: WebSocketConnectRequest,
     val handler: WebSocketHandler<STORAGE>,
     val path: ServerPath,
     val pubSub: PubSub,
     val scope: CoroutineScope
-): MidWebsocket<STORAGE> {
+): WebSocketConnection<STORAGE> {
     override var currentState: STORAGE = startingState
     override suspend fun repullState(): STORAGE = currentState
     override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
@@ -31,12 +32,13 @@ abstract class LocalMidWebsocket<STORAGE>(
         subscriptions[topic.topic] = scope.launch {
             pubSub.get(topic.topic, topic.type).collect { value ->
                 Metrics.handlerPerformance(
-                    WebSockets.HandlerSection(
+                    WebSockets.HandlerContext(
                         path,
-                        WebSockets.WsHandlerType.WSSUB
+                        WebSockets.WsHandlerType.WSSUB,
+                        null // TODO
                     )
                 ) {
-                    handler.messageFromSubscription(this@LocalMidWebsocket, topic.topic, TypeRetriever{ value })
+                    handler.messageFromSubscription(this@LocalWebSocketConnection, topic.topic, TypeRetriever{ value })
                 }
             }
         }

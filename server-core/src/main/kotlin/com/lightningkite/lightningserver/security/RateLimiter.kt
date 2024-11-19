@@ -10,13 +10,12 @@ import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.TypeRetriever
-import com.lightningkite.lightningserver.websocket.MidWebsocket
+import com.lightningkite.lightningserver.websocket.WebSocketConnection
 import com.lightningkite.lightningserver.websocket.WebSocketClose
 import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websocket.WebSocketFrame
 import com.lightningkite.lightningserver.websocket.WebSocketHandler
 import com.lightningkite.lightningserver.websocket.WebSocketHandlerInterceptor
-import com.lightningkite.lightningserver.websocket.WebSockets
 import com.lightningkite.now
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Contextual
@@ -64,16 +63,20 @@ class RateLimiter(
                     }
                     return result
                 }
-                override suspend fun didConnect(connection: MidWebsocket<T>, request: WebSocketConnectRequest) {
-                    handler.didConnect(connection, request)
+                override suspend fun didConnect(connection: WebSocketConnection<T>) {
+                    handler.didConnect(connection)
                 }
-                override suspend fun messageFromClient(connection: MidWebsocket<T>, frame: WebSocketFrame) {
+                override suspend fun messageFromClient(connection: WebSocketConnection<T>, frame: WebSocketFrame) {
                     handler.messageFromClient(connection, frame)
                 }
-                override suspend fun messageFromSubscription(connection: MidWebsocket<T>, topic: String, retrieve: TypeRetriever) {
+                override suspend fun messageFromSubscription(
+                    connection: WebSocketConnection<T>,
+                    topic: String,
+                    retrieve: TypeRetriever
+                ) {
                     handler.messageFromSubscription(connection, topic, retrieve)
                 }
-                override suspend fun disconnect(connection: MidWebsocket<T>, reason: WebSocketClose) {
+                override suspend fun disconnect(connection: WebSocketConnection<T>, reason: WebSocketClose) {
                     handler.disconnect(connection, reason)
                 }
             }

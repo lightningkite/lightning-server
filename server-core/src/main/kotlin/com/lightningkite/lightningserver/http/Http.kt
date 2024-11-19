@@ -83,9 +83,8 @@ object Http {
             } catch (e: Exception) {
                 return HttpResponse(null, HttpStatus.Unauthorized)
             }
-            serverLogger.info("${request.endpoint} (${request.parts}) accessed by ${authOrNull} (${request.sourceIp})")
             try {
-                Metrics.handlerPerformance(request.endpoint) {
+                Metrics.handlerPerformance(request) {
                     fullAction(request, handler)
                 }
             } catch (e: Exception) {

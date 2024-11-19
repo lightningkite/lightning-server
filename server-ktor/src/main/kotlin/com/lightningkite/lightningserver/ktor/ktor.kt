@@ -4,12 +4,10 @@ import com.lightningkite.lightningserver.cache.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.engine.LocalEngine
 import com.lightningkite.lightningserver.engine.engine
-import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.metrics.Metrics
-import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.pubsub.PubSub
 import com.lightningkite.lightningserver.schedule.Schedule
 import com.lightningkite.lightningserver.schedule.ScheduledTask
@@ -17,15 +15,14 @@ import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.schedule.plus
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
-import com.lightningkite.lightningserver.websocket.LocalMidWebsocket
-import com.lightningkite.lightningserver.websocket.MidWebsocket
+import com.lightningkite.lightningserver.websocket.LocalWebSocketConnection
+import com.lightningkite.lightningserver.websocket.WebSocketConnection
 import com.lightningkite.lightningserver.websocket.QueryParamWebSocketHandler
 import com.lightningkite.lightningserver.websocket.WebSocketClose
 import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websocket.WebSocketFrame
 import com.lightningkite.lightningserver.websocket.WebSocketFrame.*
 import com.lightningkite.lightningserver.websocket.WebSocketHandler
-import com.lightningkite.lightningserver.websocket.WebSocketTopic
 import com.lightningkite.lightningserver.websocket.WebSockets
 import com.lightningkite.lightningserver.websocket.didConnectTracked
 import com.lightningkite.lightningserver.websocket.disconnectTracked
@@ -50,16 +47,12 @@ import io.ktor.util.*
 import io.ktor.utils.io.jvm.javaio.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.*
-import kotlinx.serialization.KSerializer
-import org.slf4j.LoggerFactory
-import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import com.lightningkite.lightningserver.core.ContentType as HttpContentType
 
@@ -112,15 +105,19 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                             headers = call.request.headers.adapt(),
                             domain = call.request.origin.serverHost,
                             protocol = call.request.origin.scheme,
-                            sourceIp = call.request.origin.remoteHost,
+                            sourceIp = generalSettings().realIpHeader?.let {
+                                call.request.header(it)
+                                    ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
+                            } ?: call.request.origin.remoteAddress,
                             cache = cache
                         )
                         val startingState = handler.willConnectTracked(path, request)
-                        var closingMid: MidWebsocket<Any?>? = null
+                        var closingMid: WebSocketConnection<Any?>? = null
                         try {
 
-                            val mid = object : LocalMidWebsocket<Any?>(
+                            val mid = object : LocalWebSocketConnection<Any?>(
                                 startingState = startingState,
+                                request = request,
                                 handler = handler,
                                 path = path,
                                 pubSub = pubSub,
@@ -141,7 +138,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                             }
                             closingMid = mid
 
-                            handler.didConnectTracked(path, mid, request)
+                            handler.didConnectTracked(path, mid)
 
                             for (incoming in this.incoming) {
                                 val m = when (incoming) {

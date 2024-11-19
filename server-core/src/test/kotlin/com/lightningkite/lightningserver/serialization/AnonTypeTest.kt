@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelRestUpdatesWebsocketData
 import com.lightningkite.lightningserver.engine.LocalEngine
 import com.lightningkite.lightningserver.engine.engine
+import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.prepareModelsServerCoreTest
 import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.pubsub.PubSub
@@ -86,16 +87,16 @@ class AnonTypeTest {
                 ModelRestUpdatesWebsocketData.serializer(ComplexWithId.serializer(), ContextualSerializer(UUID::class))
             )
             val base = QueryParamWebSocketHandlerData(
-                ServerPath("test/test"), AnonType(
+                "test/test", AnonType(
                     MultiplexWebSocketHandlerState(
                         mapOf(
                             "first" to MultiplexWebSocketHandlerConnectionInfo(
-                                ServerPath("test/first/rest"),
+                                "test/first/rest",
                                 storage = a,
                                 topics = setOf("topic/A")
                             ),
                             "first" to MultiplexWebSocketHandlerConnectionInfo(
-                                ServerPath("test/second/rest"),
+                                "test/second/rest",
                                 storage = a,
                                 topics = setOf("topic/A")
                             ),
@@ -103,7 +104,7 @@ class AnonTypeTest {
                         domain = "domain.com",
                         protocol = "https",
                         sourceIp = "0.0.0.0",
-                        headers = mapOf("Authorization" to "something or other")
+                        headers = HttpHeaders("Authorization" to "something or other")
                     ),
                     MultiplexWebSocketHandlerState.serializer()
                 )

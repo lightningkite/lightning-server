@@ -19,21 +19,35 @@ import kotlinx.serialization.serializer
 @Serializable
 data class MultiplexWebSocketHandlerState(
     val map: Map<String, MultiplexWebSocketHandlerConnectionInfo>,
+    val queryParams: List<Pair<String, String>> = listOf(),
     val domain: String,
     val protocol: String,
     val sourceIp: String,
-    val headers: Map<String, String>,
+    val headers: HttpHeaders,
 ) {
 
+    fun toConnectionRequest(existingChannel: String): WebSocketConnectRequest {
+        val channelInfo = map.getValue(existingChannel)
+        val match = channelInfo.handlerMatch
+        return WebSocketConnectRequest(
+            path = match.path,
+            parts = match.parts,
+            wildcard = match.wildcard,
+            queryParameters = queryParams + (channelInfo.queryParams ?: listOf()),
+            headers = headers,
+            domain = domain,
+            protocol = protocol,
+            sourceIp = sourceIp,
+        )
+    }
     fun toConnectionRequest(match: ServerPathMatcher.Match, message: MultiplexMessage): WebSocketConnectRequest {
         return WebSocketConnectRequest(
             path = match.path,
             parts = match.parts,
             wildcard = match.wildcard,
-            queryParameters = message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } }
-                ?: listOf(),
+            queryParameters = queryParams + (message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf()),
             cache = LocalCache(),
-            headers = HttpHeaders(headers),
+            headers = headers,
             domain = domain,
             protocol = protocol,
             sourceIp = sourceIp
@@ -45,25 +59,28 @@ data class MultiplexWebSocketHandlerState(
 
 @Serializable
 data class MultiplexWebSocketHandlerConnectionInfo(
-    val handlerPath: ServerPath,
+    val path: String,
     @Contextual val storage: AnonType,
     val topics: Set<String> = setOf(),
+    val queryParams: List<Pair<String, String>> = listOf(),
 ) {
-    val handler
-        get() = WebSockets.handlers[handlerPath]
-            ?: throw NotFoundException("No web socket handler found for '$handlerPath'")
+    val handlerMatch get() = WebSockets.matcher.match(path) ?: throw NotFoundException("No web socket handler found for '$path'")
+    val handlerPath get() = handlerMatch.path
+    val handler get() = WebSockets.handlers[handlerMatch.path]
 }
 
 class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<MultiplexWebSocketHandlerState> {
     override val storageSerializer: KSerializer<MultiplexWebSocketHandlerState> get() = serializer()
 
-    fun <T> MidWebsocket<MultiplexWebSocketHandlerState>.wrapped(
+    fun <T> WebSocketConnection<MultiplexWebSocketHandlerState>.wrapped(
         channel: String,
+        path: ServerPath,
         handler: WebSocketHandler<T>
-    ): MidWebsocket<T> = object : MidWebsocket<T> {
-
+    ): WebSocketConnection<T> = object : WebSocketConnection<T> {
         override var currentState: T = this@wrapped.currentState.map.getValue(channel).storage.value(handler.storageSerializer)
             private set
+        override val request: WebSocketConnectRequest
+            get() = this@wrapped.currentState.toConnectionRequest(channel)
         override suspend fun close(reason: WebSocketClose) = this@wrapped.close(reason)
         override suspend fun send(frame: WebSocketFrame) = this@wrapped.send(
             Serialization.json.encodeToString(
@@ -123,16 +140,16 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
             domain = request.domain,
             protocol = request.protocol,
             sourceIp = request.sourceIp,
-            headers = request.headers.entries.associate { it },
+            headers = request.headers,
+            queryParams = request.queryParameters,
         )
 
     override suspend fun didConnect(
-        connection: MidWebsocket<MultiplexWebSocketHandlerState>,
-        request: WebSocketConnectRequest
+        connection: WebSocketConnection<MultiplexWebSocketHandlerState>
     ) = Unit
 
     override suspend fun messageFromClient(
-        connection: MidWebsocket<MultiplexWebSocketHandlerState>,
+        connection: WebSocketConnection<MultiplexWebSocketHandlerState>,
         frame: WebSocketFrame
     ) {
         if ((frame as? WebSocketFrame.Text)?.content?.isBlank() == true) {
@@ -152,12 +169,13 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                     connection.updateStateImmediately {
                         it.copy(
                             map = it.map + (channel to MultiplexWebSocketHandlerConnectionInfo(
-                                handlerPath = match.path,
-                                storage = AnonType(storage, otherHandler.storageSerializer)
+                                path = message.path!!,
+                                storage = AnonType(storage, otherHandler.storageSerializer),
+                                queryParams = message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf()
                             ))
                         )
                     }
-                    otherHandler.didConnectTracked(match.path, connection.wrapped(channel, otherHandler), r)
+                    otherHandler.didConnectTracked(match.path, connection.wrapped(channel, match.path, otherHandler))
                     connection.send(
                         WebSocketFrame(
                             Serialization.json.encodeToString(
@@ -175,7 +193,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                     val otherHandler = info.handler as WebSocketHandler<Any?>
                     otherHandler.disconnectTracked(
                         info.handlerPath,
-                        connection.wrapped(channel, otherHandler),
+                        connection.wrapped(channel, info.handlerPath, otherHandler),
                         WebSocketClose.NORMAL
                     )
                     connection.updateStateImmediately { it.copy(map = it.map - channel) }
@@ -197,7 +215,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                     val frame = WebSocketFrame.Text(message.data!!)
                     otherHandler.messageFromClientTracked(
                         info.handlerPath,
-                        connection.wrapped(channel, otherHandler),
+                        connection.wrapped(channel, info.handlerPath, otherHandler),
                         frame
                     )
                 }
@@ -216,7 +234,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                 val otherHandler = it.handler as WebSocketHandler<Any?>
                 otherHandler.disconnectTracked(
                     it.handlerPath,
-                    connection.wrapped(channel, otherHandler),
+                    connection.wrapped(channel, it.handlerPath, otherHandler),
                     WebSocketClose.CLOSED_ABNORMALLY
                 )
             }
@@ -225,7 +243,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
     }
 
     override suspend fun messageFromSubscription(
-        connection: MidWebsocket<MultiplexWebSocketHandlerState>,
+        connection: WebSocketConnection<MultiplexWebSocketHandlerState>,
         topic: String,
         retriever: TypeRetriever
     ) = with(connection) {
@@ -233,22 +251,23 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
             if (info.topics.contains(topic)) {
                 val otherHandler = info.handler as WebSocketHandler<Any?>
                 Metrics.handlerPerformance(
-                    WebSockets.HandlerSection(
+                    WebSockets.HandlerContext(
                         info.handlerPath,
-                        WebSockets.WsHandlerType.WSSUB
+                        WebSockets.WsHandlerType.WSSUB,
+                        null  // TODO
                     )
                 ) {
-                    otherHandler.messageFromSubscription(wrapped(channel, otherHandler), topic, retriever)
+                    otherHandler.messageFromSubscription(wrapped(channel, info.handlerPath, otherHandler), topic, retriever)
                 }
             }
         }
     }
 
-    override suspend fun disconnect(connection: MidWebsocket<MultiplexWebSocketHandlerState>, reason: WebSocketClose) =
+    override suspend fun disconnect(connection: WebSocketConnection<MultiplexWebSocketHandlerState>, reason: WebSocketClose) =
         with(connection) {
             currentState.map.entries.forEach { (channel, it) ->
                 val otherHandler = it.handler as WebSocketHandler<Any?>
-                otherHandler.disconnectTracked(it.handlerPath, wrapped(channel, otherHandler), reason)
+                otherHandler.disconnectTracked(it.handlerPath, wrapped(channel, it.handlerPath, otherHandler), reason)
             }
         }
 }

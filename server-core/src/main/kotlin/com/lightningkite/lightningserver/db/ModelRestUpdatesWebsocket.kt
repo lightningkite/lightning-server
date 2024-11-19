@@ -4,17 +4,16 @@ package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.lightningserver.typed.*
-import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
 import com.lightningkite.serialization.SerializableProperty
 import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websocket.WebSocketTopic
-import com.lightningkite.lightningserver.websocket.WebSockets
 import com.lightningkite.now
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -42,6 +41,19 @@ class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
     path,
     ModelRestUpdatesWebsocketData.serializer(info.serialization.serializer, info.serialization.idSerializer)
 ) {
+    constructor(
+        path: ServerPath,
+        info: ModelInfo<USER, T, ID>,
+        key: SerializableProperty<T, *>? = null,
+    ):this(TypedServerPath0(path), info, key)
+    @Deprecated("database parameter no longer required")
+    constructor(
+        path: ServerPath,
+        database: () -> Database,
+        info: ModelInfo<USER, T, ID>,
+        key: SerializableProperty<T, *>? = null,
+    ):this(path, info, key)
+
     override val authOptions: AuthOptions<USER> get() = info.authOptions
     override val inputType: KSerializer<Condition<T>> = Condition.serializer(info.serialization.serializer)
     override val outputType: KSerializer<CollectionUpdates<T, ID>> = CollectionUpdates.serializer(info.serialization.serializer, info.serialization.idSerializer)
@@ -60,7 +72,7 @@ class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
     fun hashTopic(hash: Int) = WebSocketTopic("$path/$hash", CollectionChanges.serializer(info.serialization.serializer))
 
     override suspend fun messageFromClient(
-        connection: Mid<USER, TypedServerPath0, Condition<T>, CollectionUpdates<T, ID>, ModelRestUpdatesWebsocketData<T, ID>>,
+        connection: ApiWebsocketConnection<USER, TypedServerPath0, Condition<T>, CollectionUpdates<T, ID>, ModelRestUpdatesWebsocketData<T, ID>>,
         input: Condition<T>
     ) = with(connection) {
         val p = info.collection(AuthAccessor(currentState.auth(), null))
@@ -78,7 +90,7 @@ class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
     }
 
     override suspend fun messageFromSubscription(
-        connection: Mid<USER, TypedServerPath0, Condition<T>, CollectionUpdates<T, ID>, ModelRestUpdatesWebsocketData<T, ID>>,
+        connection: ApiWebsocketConnection<USER, TypedServerPath0, Condition<T>, CollectionUpdates<T, ID>, ModelRestUpdatesWebsocketData<T, ID>>,
         topic: String,
         retrieve: TypeRetriever
     ) = with(connection) {

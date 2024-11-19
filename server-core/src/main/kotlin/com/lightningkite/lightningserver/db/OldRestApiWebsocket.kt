@@ -40,6 +40,15 @@ fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWeb
 ): ApiWebsocket<USER, TypedServerPath0, Query<T>, ListChange<T>, OldRestApiWebsocketData<T, ID>> =
     OldRestApiWebsocket(TypedServerPath0(this), info, key)
 
+@LightningServerDsl
+@Deprecated("database parameter no longer needed")
+fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ServerPath.restApiWebsocket(
+    database: () -> Database,
+    info: ModelInfo<USER, T, ID>,
+    key: SerializableProperty<T, *>? = null,
+): ApiWebsocket<USER, TypedServerPath0, Query<T>, ListChange<T>, OldRestApiWebsocketData<T, ID>> =
+    OldRestApiWebsocket(TypedServerPath0(this), info, key)
+
 class OldRestApiWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     path: TypedServerPath0,
     val info: ModelInfo<USER, T, ID>,
@@ -66,7 +75,7 @@ class OldRestApiWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     fun hashTopic(hash: Int) = WebSocketTopic("$path/$hash", CollectionChanges.serializer(info.serialization.serializer))
 
     override suspend fun messageFromClient(
-        connection: Mid<USER, TypedServerPath0, Query<T>, ListChange<T>, OldRestApiWebsocketData<T, ID>>,
+        connection: ApiWebsocketConnection<USER, TypedServerPath0, Query<T>, ListChange<T>, OldRestApiWebsocketData<T, ID>>,
         input: Query<T>
     ) = with(connection) {
         val p = info.collection(AuthAccessor(currentState.auth(), null))
@@ -84,7 +93,7 @@ class OldRestApiWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     }
 
     override suspend fun messageFromSubscription(
-        connection: Mid<USER, TypedServerPath0, Query<T>, ListChange<T>, OldRestApiWebsocketData<T, ID>>,
+        connection: ApiWebsocketConnection<USER, TypedServerPath0, Query<T>, ListChange<T>, OldRestApiWebsocketData<T, ID>>,
         topic: String,
         retrieve: TypeRetriever
     ) = with(connection) {

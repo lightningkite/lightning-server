@@ -1,30 +1,21 @@
 package com.lightningkite.lightningserver.websocket
 
-import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathMatcher
 import com.lightningkite.lightningserver.engine.UnitTestEngine
 import com.lightningkite.lightningserver.engine.engine
-import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.http.HttpHeaders
-import com.lightningkite.lightningserver.http.HttpInterceptor
 import com.lightningkite.lightningserver.http.Request
-import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.pubsub.LocalPubSub
-import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.utils.MutableMapWithChangeHandler
 import com.lightningkite.lightningserver.utils.cancellingScope
-import com.lightningkite.uuid
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.serialization.KSerializer
-import java.util.*
-import kotlin.collections.set
+import com.lightningkite.UUID
+import com.lightningkite.lightningserver.auth.authAny
+import com.lightningkite.lightningserver.core.ServerContext
+import com.lightningkite.lightningserver.core.ServerEntryPoint
 
 object WebSockets {
     val handlers: MutableMap<ServerPath, WebSocketHandler<*>> =
@@ -57,11 +48,15 @@ object WebSockets {
         private set
 
     enum class WsHandlerType {
-        CONNECTING, CONNECTED, MESSAGE, NOTIFY, WSSUB, DISCONNECT
+        CONNECTING, CONNECTED, MESSAGE, WSSUB, DISCONNECT
     }
 
-    data class HandlerSection(val path: ServerPath, val type: WsHandlerType) {
+    data class HandlerSection(val path: ServerPath, val type: WsHandlerType): ServerEntryPoint {
         override fun toString(): String = "$type $path"
+    }
+    data class HandlerContext(val path: ServerPath, val type: WsHandlerType, override val request: Request?): ServerContext {
+        override val entryPoint = HandlerSection(path, WsHandlerType.CONNECTING)
+        override suspend fun logString(): String = "$type ${path.toString(request?.parts ?: mapOf())} accessed by ${request?.authAny()} (${request?.sourceIp})"
     }
 }
 
@@ -106,10 +101,10 @@ suspend fun ServerPath.test(
         val channel = Channel<WebSocketFrame>(20)
         val h = WebSockets.handlers[path]!! as WebSocketHandler<Any?>
 
-        val id = UUID.randomUUID().toString()
+        val id = UUID.random().toString()
         println("$id Connecting...")
         val startingState = h.willConnect(req)
-        val mid = object : LocalMidWebsocket<Any?>(startingState, h, this@test, LocalPubSub, this) {
+        val mid = object : LocalWebSocketConnection<Any?>(startingState, req, h, this@test, LocalPubSub, this) {
             override suspend fun <T> subscribe(topic: WebSocketTopic<T>) {
                 println("$id SUBSCRIBES TO ${topic.topic}")
                 super.subscribe(topic)
@@ -131,7 +126,7 @@ suspend fun ServerPath.test(
         }
 
         println("$id Connected.")
-        h.didConnect(mid, req)
+        h.didConnect(mid)
 
         var error: Exception? = null
         try {

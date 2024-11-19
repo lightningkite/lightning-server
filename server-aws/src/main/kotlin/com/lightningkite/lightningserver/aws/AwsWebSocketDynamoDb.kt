@@ -1,6 +1,9 @@
 package com.lightningkite.lightningserver.aws
 
 import com.lightningkite.lightningserver.db.requireTable
+import com.lightningkite.lightningserver.engine.engine
+import com.lightningkite.lightningserver.serialization.InternalCommunicationEncoding
+import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.now
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.GlobalScope
@@ -8,8 +11,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.reactive.collect
+import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
+import software.amazon.awssdk.services.dynamodb.model.AttributeAction
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
+import software.amazon.awssdk.services.dynamodb.model.AttributeValueUpdate
 import software.amazon.awssdk.services.dynamodb.model.BillingMode
 import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException
 import software.amazon.awssdk.services.dynamodb.model.KeyType
@@ -21,7 +27,9 @@ import kotlin.collections.component2
 import kotlin.collections.set
 import kotlin.time.Duration.Companion.hours
 
-class AwsWebSocketDynamoDb(val client: DynamoDbAsyncClient, val baseTableName: String) {
+class AwsWebSocketDynamoDb(val client: DynamoDbAsyncClient, val baseTableName: String, val encoding: InternalCommunicationEncoding = engine.internalCommunicationEncoding) {
+    class StateAndConnectRequest(val state: ByteArray, val connectRequest: WebSocketConnectRequest)
+
     val socketExpiration = 8.hours
     val tableSubs = "$baseTableName-subs"
     val tableSubsReverse = "$baseTableName-subs-reverse"
@@ -147,72 +155,97 @@ class AwsWebSocketDynamoDb(val client: DynamoDbAsyncClient, val baseTableName: S
         }.await()
     }
 
-    suspend fun debugStates(): Map<String, String> {
+    suspend fun debugStates(): Map<String, StateAndConnectRequest> {
         ready.await()
-        val out = HashMap<String, String>()
+        val out = HashMap<String, StateAndConnectRequest>()
         client.scanPaginator {
             it.tableName(tableStates)
-            it.attributesToGet("socketId", "state")
+            it.attributesToGet("socketId", "state", "request")
         }.asFlow().collect {
             it.items()?.forEach {
-                out[it["socketId"]!!.s()] = it["state"]!!.s()
+                out[it["socketId"]!!.s()] = StateAndConnectRequest(
+                    it["state"]!!.b().asByteArray(),
+                    encoding.decodeBytes(WebSocketConnectRequest.serializer(), it["request"]!!.b().asByteArray())
+                )
             }
         }
         return out
     }
 
-    suspend fun state(id: String): String? {
+    suspend fun state(id: String): StateAndConnectRequest? {
         ready.await()
         return client.getItem {
             it.tableName(tableStates)
             it.key(mapOf("socketId" to AttributeValue.fromS(id)))
-        }.await().item()?.get("state")?.s()
-
+            it.attributesToGet("state", "request")
+        }.await().item()?.let {
+            println(it.keys)
+            StateAndConnectRequest(
+                it.get("state")!!.b().asByteArray(),
+                encoding.decodeBytes(WebSocketConnectRequest.serializer(), it.get("request")!!.b().asByteArray()),
+            )
+        }
     }
 
-    suspend fun states(ids: Iterable<String>): Map<String, String> {
+    suspend fun statesAlone(ids: Iterable<String>): Map<String, ByteArray> {
         ready.await()
-        val out = HashMap<String, String>()
+        val out = HashMap<String, ByteArray>()
         val getState = KeysAndAttributes.builder().attributesToGet("socketId", "state").keys(ids.map { mapOf("socketId" to AttributeValue.fromS(it)) }).build()
         client.batchGetItemPaginator {
             it.requestItems(mapOf(tableStates to getState))
         }.asFlow().collect {
             it.responses()?.get(tableStates)?.forEach {
-                out[it["socketId"]!!.s()] = it["state"]!!.s()
+                out[it["socketId"]!!.s()] = it["state"]!!.b().asByteArray()
+            }
+        }
+        return out
+    }
+    suspend fun states(ids: Iterable<String>): Map<String, StateAndConnectRequest> {
+        ready.await()
+        val out = HashMap<String, StateAndConnectRequest>()
+        val getState = KeysAndAttributes.builder().attributesToGet("socketId", "state", "request").keys(ids.map { mapOf("socketId" to AttributeValue.fromS(it)) }).build()
+        client.batchGetItemPaginator {
+            it.requestItems(mapOf(tableStates to getState))
+        }.asFlow().collect {
+            it.responses()?.get(tableStates)?.forEach {
+                out[it["socketId"]!!.s()] = StateAndConnectRequest(
+                    it["state"]!!.b().asByteArray(),
+                    encoding.decodeBytes(WebSocketConnectRequest.serializer(), it["request"]!!.b().asByteArray())
+                )
             }
         }
         return out
     }
 
-    suspend fun setState(socketId: String, toState: String) {
+    suspend fun setState(socketId: String, request: WebSocketConnectRequest, toState: ByteArray) {
         ready.await()
         client.putItem {
             it.tableName(tableStates)
             it.item(
                 mapOf(
                     "socketId" to AttributeValue.fromS(socketId),
-                    "state" to AttributeValue.fromS(toState),
+                    "state" to AttributeValue.fromB(SdkBytes.fromByteArray(toState)),
+                    "request" to AttributeValue.fromB(SdkBytes.fromByteArray(encoding.encodeBytes(WebSocketConnectRequest.serializer(), request))),
                     "expires" to AttributeValue.fromN(now().plus(socketExpiration).epochSeconds.toString())
                 )
             )
         }.await()
     }
 
-    suspend fun updateState(socketId: String, fromState: String, toState: String): Boolean {
+    suspend fun updateState(socketId: String, fromState: ByteArray, toState: ByteArray): Boolean {
         ready.await()
         return try {
-            client.putItem {
+            client.updateItem {
                 it.tableName(tableStates)
-                it.expressionAttributeNames(mapOf("#state" to "state"))
-                it.expressionAttributeValues(mapOf(":fromState" to AttributeValue.fromS(fromState)))
+                it.key(mapOf("socketId" to AttributeValue.fromS(socketId)))
+                it.expressionAttributeNames(mapOf("#state" to "state", "#expires" to "expires"))
+                it.expressionAttributeValues(mapOf(
+                    ":fromState" to AttributeValue.fromB(SdkBytes.fromByteArray(fromState)),
+                    ":state" to AttributeValue.fromB(SdkBytes.fromByteArray(toState)),
+                    ":expires" to AttributeValue.fromN(now().plus(socketExpiration).epochSeconds.toString()),
+                ))
                 it.conditionExpression("#state = :fromState")
-                it.item(
-                    mapOf(
-                        "socketId" to AttributeValue.fromS(socketId),
-                        "state" to AttributeValue.fromS(toState),
-                        "expires" to AttributeValue.fromN(now().plus(socketExpiration).epochSeconds.toString())
-                    )
-                )
+                it.updateExpression("SET #state = :state, #expires = :expires")
             }.await()
             true
         } catch(e: ConditionalCheckFailedException) {

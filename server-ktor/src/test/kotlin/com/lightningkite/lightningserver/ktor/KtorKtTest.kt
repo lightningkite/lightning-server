@@ -40,7 +40,7 @@ class KtorKtTest {
     val socket = ServerPath("socket-test").websocket(
         willConnect = { Unit },
         didConnect = {
-            println("didConnect $it")
+            println("didConnect")
             GlobalScope.launch {
                 delay(200L)
                 send("Test")

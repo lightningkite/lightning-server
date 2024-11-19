@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.core
 
 import com.lightningkite.lightningserver.http.Http
+import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.metrics.MetricType
 import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.tasks.Tasks
@@ -13,31 +14,43 @@ import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 
-fun allServerEntryPoints(): List<String> {
-    return listOf(
-        Http.endpoints.keys.map { it.toString() },
+fun allServerEntryPoints(): List<ServerEntryPoint> {
+    return listOf<Collection<ServerEntryPoint>>(
+        Http.endpoints.keys,
         WebSockets.handlers.keys.flatMap {
             listOf(
-                WebSockets.HandlerSection(it, WebSockets.WsHandlerType.CONNECTING).toString(),
-                WebSockets.HandlerSection(it, WebSockets.WsHandlerType.CONNECTED).toString(),
-                WebSockets.HandlerSection(it, WebSockets.WsHandlerType.MESSAGE).toString(),
-                WebSockets.HandlerSection(it, WebSockets.WsHandlerType.WSSUB).toString(),
-                WebSockets.HandlerSection(it, WebSockets.WsHandlerType.DISCONNECT).toString()
+                WebSockets.HandlerSection(it, WebSockets.WsHandlerType.CONNECTING),
+                WebSockets.HandlerSection(it, WebSockets.WsHandlerType.CONNECTED),
+                WebSockets.HandlerSection(it, WebSockets.WsHandlerType.MESSAGE),
+                WebSockets.HandlerSection(it, WebSockets.WsHandlerType.WSSUB),
+                WebSockets.HandlerSection(it, WebSockets.WsHandlerType.DISCONNECT)
             )
         },
-        Scheduler.schedules.map { it.toString() },
-        Tasks.tasks.map { it.toString() }
+        Scheduler.schedules.values,
+        Tasks.tasks.values
     ).flatten()
 }
 
-class ServerEntryPointElement(val entryPoint: Any, val metricSums: ConcurrentHashMap<MetricType, Double> = ConcurrentHashMap()) : AbstractCoroutineContextElement(ServerEntryPointElement) {
-    companion object Key : CoroutineContext.Key<ServerEntryPointElement>
+interface ServerEntryPoint {
+
 }
 
 val serverLogger = LoggerFactory.getLogger("LightningServer")
-suspend fun <T> serverEntryPoint(entryPoint: Any, action: suspend CoroutineScope.() -> T): T {
-    serverLogger.info("Handling $entryPoint")
-    return withContext(ServerEntryPointElement(entryPoint), action)
+
+interface ServerContext {
+    val entryPoint: ServerEntryPoint
+    val request: Request?
+    suspend fun logString(): String
 }
 
-suspend fun serverEntryPoint(): Any? = coroutineContext[ServerEntryPointElement.Key]?.entryPoint
+
+class ServerContextElement(val context: ServerContext, val metricSums: ConcurrentHashMap<MetricType, Double> = ConcurrentHashMap()) : AbstractCoroutineContextElement(ServerContextElement) {
+    companion object Key : CoroutineContext.Key<ServerContextElement>
+}
+
+suspend fun <T> serverContext(context: ServerContext, action: suspend CoroutineScope.() -> T): T {
+    serverLogger.info("Handling ${context.logString()}")
+    return withContext(ServerContextElement(context), action)
+}
+
+suspend fun serverContext(): ServerContext? = coroutineContext[ServerContextElement.Key]?.context
