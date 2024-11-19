@@ -72,10 +72,12 @@ class SerializationRegistry(val module: SerializersModule) {
     }
 
     fun register(serializer: KSerializer<*>) {
+//        println("$this Registered ${serializer.descriptor.serialName}")
         direct[serializer.descriptor.serialName] = serializer
     }
 
     fun register(name: String, make: (Array<KSerializer<Nothing>>) -> KSerializer<*>) {
+//        println("$this Registered $name")
         @Suppress("UNCHECKED_CAST")
         factory[name] = make as (Array<KSerializer<*>>) -> KSerializer<*>
     }
@@ -142,6 +144,13 @@ class SerializationRegistry(val module: SerializersModule) {
                 it[1]
             )
         }
+        register(serializer<HashSet<Int>>().descriptor.serialName) { SetSerializer(it[0]) }
+        register(serializer<HashMap<String, Int>>().descriptor.serialName) {
+            MapSerializer(
+                it[0],
+                it[1]
+            )
+        }
         register(
             MapEntrySerializer(
                 NothingSerializer(),
@@ -188,11 +197,15 @@ class SerializationRegistry(val module: SerializersModule) {
     }
 
     fun registerVirtualDeep(type: KSerializer<*>) {
-        type.nullElement()?.let { return registerVirtualDeep(it) }
-        if(registerVirtual(type) != null) {
-            type.tryChildSerializers()?.forEach { registerVirtualDeep(it) }
+        try {
+            type.nullElement()?.let { return registerVirtualDeep(it) }
+            if (registerVirtual(type) != null) {
+                type.tryChildSerializers()?.forEach { registerVirtualDeep(it) }
+            }
+            type.tryTypeParameterSerializers3()?.forEach { registerVirtualDeep(it) }
+        } catch(e: Exception) {
+            throw Exception("Failed to register serializer for ${type.descriptor.serialName}", e)
         }
-        type.tryTypeParameterSerializers3()?.forEach { registerVirtualDeep(it) }
     }
     fun registerVirtual(type: KSerializer<*>): VirtualType? {
         type.nullElement()?.let { return registerVirtual(it) }

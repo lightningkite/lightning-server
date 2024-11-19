@@ -69,11 +69,19 @@ data class VirtualStruct(
         }
         val specifiedDefaults by lazy {
             fields.zip(serializers) { field, serializer ->
-                field.defaultJson?.let { DefaultDecoder.json.decodeFromString(serializer, it) } ?: DefaultNotPresent
+                field.defaultJson?.let {
+                    return@zip DefaultDecoder.json.decodeFromString(serializer, it)
+                }
+                DefaultNotPresent
             }
         }
         val defaults by lazy {
-            serializers.map { it.default() }
+            fields.zip(serializers) { field, serializer ->
+                field.defaultJson?.let {
+                    return@zip DefaultDecoder.json.decodeFromString(serializer, it)
+                }
+                serializer.default()
+            }
         }
         val defaultInstance by lazy { VirtualInstance(this, defaults) }
         val serializableProperties: Array<SerializableProperty<VirtualInstance, Any?>> by lazy {
@@ -81,6 +89,9 @@ data class VirtualStruct(
                 SerializableProperty.FromVirtualField(it, registry, context)
             }.toTypedArray()
         }
+        val ensureNotNull = fields.withIndex().filter {
+            !it.value.optional && !it.value.type.isNullable
+        }.map { it.index  }.toIntArray()
 
         @Transient
         override val descriptor: SerialDescriptor by lazy {
@@ -96,7 +107,9 @@ data class VirtualStruct(
         }
 
         override fun deserialize(decoder: Decoder): VirtualInstance {
-            val values = Array<Any?>(fields.size) { null }
+            val values = Array<Any?>(fields.size) {
+                specifiedDefaults[it].takeUnless { it == DefaultNotPresent }
+            }
             val s = decoder.beginStructure(descriptor)
             while (true) {
                 val index = s.decodeElementIndex(descriptor)
@@ -120,6 +133,12 @@ data class VirtualStruct(
                 }
             }
             s.endStructure(descriptor)
+            // Ensure we got everything
+            ensureNotNull.forEach { index ->
+                if(values[index] == null) {
+                    throw SerializationException("${fields[index].name} required but was not present")
+                }
+            }
             return VirtualInstance(this, values.asList())
         }
 

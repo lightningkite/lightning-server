@@ -21,10 +21,27 @@ val lightningServerKSchema: LightningServerKSchema by lazy {
     val registry = SerializationRegistry(Serialization.module).also {
         it.registerShared()
     }
-    Documentable.endpoints.flatMap {
-        sequenceOf(it.inputType, it.outputType) + it.route.path.serializers.asSequence()
-    }.forEach {
-        registry.registerVirtualDeep(it)
+    Documentable.endpoints.forEach {
+        try {
+            registry.registerVirtualDeep(it.inputType)
+            registry.registerVirtualDeep(it.outputType)
+            it.route.path.serializers.forEach { serializer ->
+                registry.registerVirtualDeep(serializer)
+            }
+        } catch(e: Exception) {
+            throw IllegalStateException("Failed to generate schema for endpoint ${it.route.endpoint}", e)
+        }
+    }
+    Documentable.websockets.forEach {
+        try {
+            registry.registerVirtualDeep(it.inputType)
+            registry.registerVirtualDeep(it.outputType)
+            it.path.serializers.forEach { serializer ->
+                registry.registerVirtualDeep(serializer)
+            }
+        } catch(e: Exception) {
+            throw IllegalStateException("Failed to generate schema for websocket ${it.path}", e)
+        }
     }
     LightningServerKSchema(
         baseUrl = generalSettings().publicUrl,
