@@ -82,7 +82,12 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
             .use { transport ->
                 emails.forEach { email ->
                     transport.sendMessage(
-                        email.toJavaX(session).also { it.saveChanges() },
+                        email.copy(
+                            fromEmail = email.fromEmail ?: smtpConfig.fromEmail,
+                            fromLabel = email.fromLabel ?: generalSettings().projectName
+                        )
+                            .toJavaX(session)
+                            .also { it.saveChanges() },
                         email.to
                             .plus(email.cc)
                             .plus(email.bcc)
