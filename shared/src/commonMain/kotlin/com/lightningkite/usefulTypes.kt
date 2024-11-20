@@ -422,7 +422,7 @@ value class Temperature(val celsius: Double) {
         val Long.kelvin: Temperature get() = Temperature(celsius = this - 273.15)
         val Double.kelvin: Temperature get() = Temperature(celsius = this - 273.15)
     }
-    override fun toString(): String = "$celsius °C"
+    override fun toString(): String = "$celsius°C"
 }
 
 operator fun Acceleration.times(other: Duration): Speed = Speed(metersPerSecond = this.metersPerSecondPerSecond * other.toDouble(DurationUnit.SECONDS))

@@ -34,4 +34,8 @@ class UnitsTest {
         val speed = 32.miles / 5.minutes
         speed.metersPerSecond
     }
+
+    @Test fun serIntrospect() {
+        println(Temperature.serializer().descriptor.isInline)
+    }
 }

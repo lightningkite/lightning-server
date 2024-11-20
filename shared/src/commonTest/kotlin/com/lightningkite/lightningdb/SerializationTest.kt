@@ -237,6 +237,14 @@ class SerializationTest {
         (path<LargeTestModel>().map.containsKey("asdf")).cycle()
     }
 
+    @Test fun samples() {
+        condition<LargeTestModel> { it.list.any { it.gt(8) or it.lt(2) } }.let {
+            println(it)
+            println(myJson.encodeToString(it))
+        }
+
+    }
+
     @Test fun modifications() {
 //        ((path<LargeTestModel>().int assign 2) then (path<LargeTestModel>().boolean assign true)).cycle()
         modification<LargeTestModel> {
