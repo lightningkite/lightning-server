@@ -34,13 +34,19 @@ data class ApiWebsocketStorage<STORAGE>(
     val contentType = ContentType(mimeType)
 
     @Transient
-    val emitter = Serialization.emitters[contentType] ?: throw IllegalStateException("No emitter found for $contentType")
+    val emitter =
+        Serialization.emitters[contentType] ?: throw IllegalStateException("No emitter found for $contentType")
 
     @Transient
     val parser = Serialization.parsers[contentType] ?: throw IllegalStateException("No parser found for $contentType")
 }
 
-abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> constructor(override val path: PATH, val storageSerializer: KSerializer<STORAGE>) : Documentable {
+abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> constructor(
+    override val path: PATH,
+    val innerStorageSerializer: KSerializer<STORAGE>
+) : WebSocketHandler<ApiWebsocketStorage<STORAGE>>, Documentable {
+    final override val storageSerializer: KSerializer<ApiWebsocketStorage<STORAGE>> =
+        ApiWebsocketStorage.serializer(this@ApiWebsocket.innerStorageSerializer)
     abstract override val authOptions: AuthOptions<USER>
     abstract val inputType: KSerializer<INPUT>
     abstract val outputType: KSerializer<OUTPUT>
@@ -51,14 +57,24 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
 
     abstract suspend fun AuthAndPathParts<USER, PATH>.willConnect(request: WebSocketConnectRequest): STORAGE
     open suspend fun didConnect(connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>) {}
-    open suspend fun messageFromClient(connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>, input: INPUT) {}
-    open suspend fun messageFromSubscription(connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>,
-                                             topic: String,
-                                             retriever: TypeRetriever
+    open suspend fun messageFromClient(
+        connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>,
+        input: INPUT
     ) {
     }
 
-    open suspend fun disconnect(connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>, reason: WebSocketClose) {}
+    open suspend fun messageFromSubscription(
+        connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>,
+        topic: String,
+        retriever: TypeRetriever
+    ) {
+    }
+
+    open suspend fun disconnect(
+        connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>,
+        reason: WebSocketClose
+    ) {
+    }
 
     abstract class ApiWebsocketConnection<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE>(
 //        authOrNull: RequestAuth<USER & Any>?,
@@ -98,47 +114,46 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
         override suspend fun close(reason: WebSocketClose) = wraps.close(reason)
     }
 
-    val raw = object : WebSocketHandler<ApiWebsocketStorage<STORAGE>> {
-        override val storageSerializer: KSerializer<ApiWebsocketStorage<STORAGE>> =
-            ApiWebsocketStorage.serializer(this@ApiWebsocket.storageSerializer)
+    final override suspend fun willConnect(request: WebSocketConnectRequest): ApiWebsocketStorage<STORAGE> =
+        ApiWebsocketStorage(
+            (request.queryParameterCaseInsensitive(HttpHeader.Accept)
+                ?: request.queryParameterCaseInsensitive(HttpHeader.ContentType)
+                ?: request.headers.contentType?.toString()
+                ?: request.headers.accept.firstOrNull()?.takeUnless { it == ContentType.Any }?.toString()
+                ?: ContentType.Application.Json.toString()),
+            with(path.authAndPathParts(request, authOptions)) { willConnect(request) }
+        )
 
-        override suspend fun willConnect(request: WebSocketConnectRequest): ApiWebsocketStorage<STORAGE> =
-            ApiWebsocketStorage(
-                (request.queryParameterCaseInsensitive(HttpHeader.Accept)
-                    ?: request.queryParameterCaseInsensitive(HttpHeader.ContentType)
-                    ?: request.headers.contentType?.toString()
-                    ?: request.headers.accept.firstOrNull()?.takeUnless { it == ContentType.Any }?.toString()
-                    ?: ContentType.Application.Json.toString()),
-                with(path.authAndPathParts(request, authOptions)) { willConnect(request) }
-            )
+    final override suspend fun didConnect(
+        connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>
+    ) = didConnect(ApiWebsocketConnectionImpl(connection))
 
-        override suspend fun didConnect(
-            connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>
-        ) = didConnect(ApiWebsocketConnectionImpl(connection))
-
-        override suspend fun messageFromClient(
-            connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>,
-            frame: WebSocketFrame
-        ) {
-            if ((frame as? WebSocketFrame.Text)?.content?.isBlank() == true) {
-                connection.send(" ")
-                return
-            } else messageFromClient(ApiWebsocketConnectionImpl(connection), connection.currentState.parser(frame, inputType))
-        }
-
-        override suspend fun messageFromSubscription(
-            connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>,
-            topic: String,
-            retrieve: TypeRetriever
-        ) = messageFromSubscription(ApiWebsocketConnectionImpl(connection), topic, retrieve)
-
-        override suspend fun disconnect(
-            connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>,
-            reason: WebSocketClose
-        ) = this@ApiWebsocket.disconnect(ApiWebsocketConnectionImpl(connection), reason)
+    final override suspend fun messageFromClient(
+        connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>,
+        frame: WebSocketFrame
+    ) {
+        if ((frame as? WebSocketFrame.Text)?.content?.isBlank() == true) {
+            connection.send(" ")
+            return
+        } else messageFromClient(
+            ApiWebsocketConnectionImpl(connection),
+            connection.currentState.parser(frame, inputType)
+        )
     }
+
+    final override suspend fun messageFromSubscription(
+        connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>,
+        topic: String,
+        retrieve: TypeRetriever
+    ) = messageFromSubscription(ApiWebsocketConnectionImpl(connection), topic, retrieve)
+
+    final override suspend fun disconnect(
+        connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>,
+        reason: WebSocketClose
+    ) = this@ApiWebsocket.disconnect(ApiWebsocketConnectionImpl(connection), reason)
+
     init {
-        WebSockets.handlers[path.path] = this.raw
+        WebSockets.handlers[path.path] = this
     }
 }
 
