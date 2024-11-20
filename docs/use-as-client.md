@@ -61,7 +61,7 @@ Options:
     - Only let items through that fulfill every condition in the array.
 - `{ "Or": [<subconditions>] }`
     - Only let items through that fulfill at least one condition in the array.
-- `{ "<field name>": <subcondition> }`
+- `{ "<field name>": <condition on field's type> }`
     - Run a condition on a particular field.
 - `{ "Equal": <value> }`
     - Only let through items that match the given value exactly.
@@ -76,23 +76,23 @@ Options:
 - `{ "GreaterThanOrEqual": <value> }`
 - `{ "LessThanOrEqual": <value> }`
     - Comparison filters.  Only operate on comparable values, like numbers and strings.
-- `{ "StringContains": <value> }`
+- `{ "StringContains": { "value": <value>, "ignoreCase": true } }`
     - Only let through values that contain the given string.  Only operates on strings.
-- `{ "RegexMatches": true }`
+- `{ "RegexMatches": { "value": <regular expression>, "ignoreCase": true } }`
     - Only let through values that match the regular expression. Only operates on strings.
-- `{ "ListAllElements": <subcondition> }`
+- `{ "ListAllElements": <condition for element type> }`
     - Only match lists where every element matches the given condition.
-- `{ "ListAnyElements": <subcondition> }`
+- `{ "ListAnyElements": <condition for element type> }`
     - Only match lists where some element matches the given condition.
 - `{ "ListSizesEquals": <count> }`
     - Only matches lists that contain exactly `count` elements.
-- `{ "SetAllElements": <condition> }`
+- `{ "SetAllElements": <condition for element type> }`
     - Only match sets where every element matches the given condition.
-- `{ "SetAnyElements": <condition> }`
+- `{ "SetAnyElements": <condition for element type> }`
     - Only match sets where some element matches the given condition.
 - `{ "SetSizesEquals": <count> }`
     - Only matches sets that contain exactly `count` elements.
-- `{ "IfNotNull": <condition> }`
+- `{ "IfNotNull": <condition on non-null type> }`
     - Allows you to run conditions on a nullable field
 
 Sample reads as "name is equal to Test and number is either 1, 2, or 3.":
@@ -109,7 +109,15 @@ Sample reads as "name is equal to Test and number is either 1, 2, or 3.":
       "number": {
         "Inside": [1, 2, 3]
       }
-    }
+    },
+    {
+      "listOfInts": {
+        "ListAnyElements": {
+          "Or": [{ "GreaterThan": 8 }, { "LessThan": 2 }]
+        }
+      }
+    },
+    { "email": {  "StringContains": { "value": "@domain.com", "ignoreCase": true } } }
   ]
 }
 ```
