@@ -18,6 +18,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         endpoints.filter { it.inputType == Unit.serializer() || it.route.method != HttpMethod.GET }.toList()
     appendLine("import { ${fromLightningServerPackage.joinToString()}, apiCall, Path, DeepPartial } from '@lightningkite/lightning-server-simplified'")
     appendLine()
+    val stringSerialNames: Set<String> = setOf()
     usedTypes
         .filter { it.descriptor.simpleSerialName !in skipFromLsPackage }
         .sortedBy { it.descriptor.simpleSerialName }
@@ -60,9 +61,11 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
                 }
 
                 is PrimitiveKind.STRING -> {
-                    if (it.descriptor.simpleSerialName != "String") {
+                    val simpleSerialName = it.descriptor.simpleSerialName
+                    if (simpleSerialName != "String" && !stringSerialNames.contains(simpleSerialName)) {
+                        stringSerialNames.plus(simpleSerialName)
                         emitTypeComment(it)
-                        appendLine("type ${it.descriptor.simpleSerialName} = string  // ${it.descriptor.serialName}")
+                        appendLine("type $simpleSerialName = string  // ${it.descriptor.serialName}")
                     }
                 }
 
@@ -439,7 +442,7 @@ private fun KSerializer<*>.write(): String = nullElement()?.let { it.write() + "
 }
 
 private val SerialDescriptor.simpleSerialName: String
-    get() = serialName.substringBefore('<').substringAfterLast('.').removeSuffix("?")
+    get() = serialName.substringBefore('<').substringBefore('/').substringAfterLast('.').removeSuffix("?")
 
 private fun String.userTypeTokenName(): String =
     this.substringAfterLast('.').replaceFirstChar { it.lowercase() }.plus("Token")
