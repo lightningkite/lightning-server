@@ -36,7 +36,7 @@ class VirtualTypesTest {
         println("Schema: ${json.encodeToString(vtype)}")
         val original = instance
         // forward
-        json.decodeFromString(vtypeSerializer, json.encodeToString(serializer, original))
+        json.decodeFromString(vtypeSerializer, json.encodeToString(serializer, original).also { println(it) })
 
         val string = json.encodeToString(serializer, original)
         println(string)
@@ -76,7 +76,10 @@ class VirtualTypesTest {
         )
     }
     @Test fun testStructure() {
+        LargeTestModel_list
         testVirtualVersion(LargeTestModel.serializer(), LargeTestModel())
+    }
+    @Test fun testStructureWithoutDefaults() {
         testVirtualVersion(LargeTestModel.serializer(), LargeTestModel()) { encodeDefaults = false }
     }
     @Test fun testGeneric() {
