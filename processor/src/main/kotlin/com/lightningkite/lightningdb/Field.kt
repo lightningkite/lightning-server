@@ -12,15 +12,18 @@ data class Field(
 }
 
 private fun toField(owner: KSClassDeclaration, param: KSValueParameter, property: KSPropertyDeclaration): Field {
+    val regexes = owner.primaryConstructor?.parameters?.map { other ->
+        Regex("([^a-zA-Z0-9]|^)${other.name?.asString() ?: "xxx"}([^a-zA-Z0-9]|$)")
+    } ?: listOf()
     return Field(
         name = property.simpleName.getShortName(),
         kotlinType = property.type,
         annotations = property.annotations.map { it.resolve() }.toList(),
         default = param.defaultText?.takeUnless {
-            owner.primaryConstructor?.parameters?.any { other ->
-                it.contains(other.name?.asString() ?: "???")
+            regexes.any { r ->
+                r.find(it) != null
             } == true
-        },
+        }?.plus(" // ${regexes.joinToString { it.pattern }}"),
     )
 }
 
