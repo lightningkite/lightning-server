@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.serialization.AnonType
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.TypeRetriever
+import com.lightningkite.lightningserver.utils.logDuration
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -46,7 +47,6 @@ data class MultiplexWebSocketHandlerState(
             parts = match.parts,
             wildcard = match.wildcard,
             queryParameters = queryParams + (message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf()),
-            cache = LocalCache(),
             headers = headers,
             domain = domain,
             protocol = protocol,
@@ -64,7 +64,9 @@ data class MultiplexWebSocketHandlerConnectionInfo(
     val topics: Set<String> = setOf(),
     val queryParams: List<Pair<String, String>> = listOf(),
 ) {
-    val handlerMatch get() = WebSockets.matcher.match(path) ?: throw NotFoundException("No web socket handler found for '$path'")
+    val handlerMatch by lazy {
+        WebSockets.matcher.match(path) ?: throw NotFoundException("No web socket handler found for '$path'")
+    }
     val handlerPath get() = handlerMatch.path
     val handler get() = WebSockets.handlers[handlerMatch.path]
 }
@@ -76,61 +78,74 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
         channel: String,
         path: ServerPath,
         handler: WebSocketHandler<T>
-    ): WebSocketConnection<T> = object : WebSocketConnection<T> {
-        override var currentState: T = this@wrapped.currentState.map.getValue(channel).storage.value(handler.storageSerializer)
-            private set
-        override val request: WebSocketConnectRequest
-            get() = this@wrapped.currentState.toConnectionRequest(channel)
-        override suspend fun close(reason: WebSocketClose) = this@wrapped.close(reason)
-        override suspend fun send(frame: WebSocketFrame) = this@wrapped.send(
-            Serialization.json.encodeToString(
-                MultiplexMessage(
-                    channel = channel,
-                    data = frame.text
+    ): WebSocketConnection<T> = logDuration("Multiplex wrap") {
+        object : WebSocketConnection<T> {
+            override var currentState: T =
+                logDuration("multiplex state pull") {
+                    this@wrapped.currentState.map.getValue(channel).storage.value(
+                        handler.storageSerializer
+                    )
+                }
+                private set
+            override val request: WebSocketConnectRequest by lazy {
+                this@wrapped.currentState.toConnectionRequest(
+                    channel
+                )
+            }
+
+            override suspend fun close(reason: WebSocketClose) = this@wrapped.close(reason)
+            override suspend fun send(frame: WebSocketFrame) = this@wrapped.send(
+                Serialization.json.encodeToString(
+                    MultiplexMessage(
+                        channel = channel,
+                        data = frame.text
+                    )
                 )
             )
-        )
 
-        override suspend fun repullState(): T =
-            this@wrapped.repullState().map[channel]!!.storage.value(handler.storageSerializer)
+            override suspend fun repullState(): T =
+                logDuration("Multiplex repull") { this@wrapped.repullState().map[channel]!!.storage.value(handler.storageSerializer) }
 
-        override suspend fun <T> subscribe(topic: WebSocketTopic<T>) {
-            if (topic.topic !in this@wrapped.currentState) this@wrapped.subscribe(topic)
-            this@wrapped.updateStateImmediately { data ->
-                data.copy(map = data.map + (channel to data.map.getValue(channel).let {
-                    it.copy(topics = it.topics + topic.topic)
-                }))
+            override suspend fun <T> subscribe(topic: WebSocketTopic<T>) {
+                if (topic.topic !in this@wrapped.currentState) this@wrapped.subscribe(topic)
+                this@wrapped.updateStateImmediately { data ->
+                    data.copy(map = data.map + (channel to data.map.getValue(channel).let {
+                        it.copy(topics = it.topics + topic.topic)
+                    }))
+                }
             }
-        }
 
-        override suspend fun unsubscribe(topic: String) {
-            val newstate = this@wrapped.updateStateImmediately { data ->
-                data.copy(map = data.map + (channel to data.map.getValue(channel).let {
-                    it.copy(topics = it.topics + topic)
-                }))
+            override suspend fun unsubscribe(topic: String) {
+                val newstate = this@wrapped.updateStateImmediately { data ->
+                    data.copy(map = data.map + (channel to data.map.getValue(channel).let {
+                        it.copy(topics = it.topics + topic)
+                    }))
+                }
+                if (topic !in newstate) this@wrapped.unsubscribe(topic)
             }
-            if (topic !in newstate) this@wrapped.unsubscribe(topic)
-        }
 
-        override suspend fun queueStateUpdate(modification: (T) -> T) {
-            this@wrapped.queueStateUpdate { data ->
-                val underlying = data.map.getValue(channel).storage.value(handler.storageSerializer)
-                data.copy(
-                    map = data.map + (channel to data.map.getValue(channel).copy(storage = AnonType(modification(underlying), handler.storageSerializer)))
-                )
+            override suspend fun queueStateUpdate(modification: (T) -> T) {
+                this@wrapped.queueStateUpdate { data ->
+                    val underlying = data.map.getValue(channel).storage.value(handler.storageSerializer)
+                    data.copy(
+                        map = data.map + (channel to data.map.getValue(channel)
+                            .copy(storage = AnonType(modification(underlying), handler.storageSerializer)))
+                    )
+                }
             }
-        }
 
-        override suspend fun updateStateImmediately(modification: (T) -> T): T {
-            this@wrapped.updateStateImmediately { data ->
-                val underlying = data.map.getValue(channel).storage.value(handler.storageSerializer)
-                data.copy(
-                    map = data.map + (channel to data.map.getValue(channel).copy(storage = AnonType(modification(underlying).also {
-                        currentState = it
-                    }, handler.storageSerializer)))
-                )
+            override suspend fun updateStateImmediately(modification: (T) -> T): T {
+                this@wrapped.updateStateImmediately { data ->
+                    val underlying = data.map.getValue(channel).storage.value(handler.storageSerializer)
+                    data.copy(
+                        map = data.map + (channel to data.map.getValue(channel)
+                            .copy(storage = AnonType(modification(underlying).also {
+                                currentState = it
+                            }, handler.storageSerializer)))
+                    )
+                }
+                return currentState
             }
-            return currentState
         }
     }
 

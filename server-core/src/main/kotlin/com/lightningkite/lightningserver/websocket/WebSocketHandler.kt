@@ -1,5 +1,9 @@
 package com.lightningkite.lightningserver.websocket
 
+import com.lightningkite.lightningserver.auth.RequestAuth
+import com.lightningkite.lightningserver.auth.RequestAuthSerializable
+import com.lightningkite.lightningserver.auth.real
+import com.lightningkite.lightningserver.auth.serializable
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
@@ -7,10 +11,12 @@ import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.serialization.TypeRetriever
+import com.lightningkite.now
 import io.ktor.util.encodeBase64
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlin.time.Duration.Companion.days
 
 interface WebSocketHandler<STORAGE> {
     val storageSerializer: KSerializer<STORAGE>
@@ -64,16 +70,18 @@ data class WebSocketConnectRequest(
     override val domain: String = "",
     override val protocol: String = "",
     override val sourceIp: String = "",
-    @Transient val cache: Cache = LocalCache(),
+    var precalculatedAuth: RequestAuthSerializable? = null,
 ) : Request {
     fun queryParameter(key: String): String? = queryParameters.find { it.first == key }?.second
     fun queryParameterCaseInsensitive(key: String): String? = queryParameters.find { it.first.equals(key, true) }?.second
     @Transient private val cacheCalc = HashMap<Request.CacheKey<*>, Any?>()
+    init { cacheCalc[RequestAuth.Key] = precalculatedAuth?.real() }
     override suspend fun <T> cache(key: Request.CacheKey<T>): T {
         @Suppress("UNCHECKED_CAST")
         if (cacheCalc.containsKey(key)) return cacheCalc[key] as T
         val calculated = key.calculate(this)
         cacheCalc[key] = calculated
+        if(key == RequestAuth.Key) precalculatedAuth = (calculated as RequestAuth<*>).serializable(now() + 1.days)
         return calculated
     }
 }

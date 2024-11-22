@@ -182,7 +182,6 @@ suspend fun <USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> A
             domain = "test",
             protocol = "ws",
             sourceIp = "127.0.0.1",
-            cache = cache,
         )
         val channel = Channel<OUTPUT>(20)
 

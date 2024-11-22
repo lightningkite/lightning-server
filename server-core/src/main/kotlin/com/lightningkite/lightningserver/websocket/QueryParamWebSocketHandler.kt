@@ -4,13 +4,18 @@ import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.serialization.AnonType
 import com.lightningkite.lightningserver.serialization.TypeRetriever
+import com.lightningkite.lightningserver.utils.logDuration
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class QueryParamWebSocketHandlerData(val path: String, @Contextual val underlyingData: AnonType) {
-    val handlerMatch get() = WebSockets.matcher.match(path) ?: throw NotFoundException("No web socket handler found for '$path'")
+    val handlerMatch by lazy {
+        logDuration("handlerMatch") {
+            WebSockets.matcher.match(path) ?: throw NotFoundException("No web socket handler found for '$path'")
+        }
+    }
     val handlerPath get() = handlerMatch.path
     val handler get() = WebSockets.handlers[handlerMatch.path]
 }
@@ -19,7 +24,8 @@ class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandler
     override val storageSerializer: KSerializer<QueryParamWebSocketHandlerData> =
         QueryParamWebSocketHandlerData.serializer()
 
-    fun translateRequest(path: String, request: WebSocketConnectRequest): WebSocketConnectRequest {
+    fun translateRequest(path: String, request: WebSocketConnectRequest): WebSocketConnectRequest = logDuration("Multiplex translate request"){
+
         val match = WebSockets.matcher.match(path) ?: throw NotFoundException("No web socket handler found for '$path'")
         val fixedQueryParameters = request.queryParameters.mapNotNull {
             if (it.first == "path") {
@@ -30,23 +36,26 @@ class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandler
                     null
             } else it
         }
-        return WebSocketConnectRequest(
+        WebSocketConnectRequest(
             path = match.path,
             parts = match.parts,
             wildcard = match.wildcard,
             queryParameters = fixedQueryParameters,
-            cache = request.cache,
             headers = request.headers,
             domain = request.domain,
             protocol = request.protocol,
-            sourceIp = request.sourceIp
+            sourceIp = request.sourceIp,
         )
     }
 
-    fun <T> WebSocketConnection<QueryParamWebSocketHandlerData>.wrapped(handler: WebSocketHandler<T>): WebSocketConnection<T> =
+    fun <T> WebSocketConnection<QueryParamWebSocketHandlerData>.wrapped(handler: WebSocketHandler<T>): WebSocketConnection<T> = logDuration("Multiplex wrap") {
         object : WebSocketConnection<T> {
-            override val request: WebSocketConnectRequest
-                get() = translateRequest(path = this@wrapped.currentState.path, this@wrapped.request)
+            override val request: WebSocketConnectRequest by lazy {
+                translateRequest(
+                    path = this@wrapped.currentState.path,
+                    this@wrapped.request
+                )
+            }
             override var currentState: T = this@wrapped.currentState.underlyingData.value(handler.storageSerializer)
                 private set
 
@@ -80,7 +89,7 @@ class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandler
             override suspend fun <T> subscribe(topic: WebSocketTopic<T>) = this@wrapped.subscribe(topic)
             override suspend fun unsubscribe(topic: String) = this@wrapped.unsubscribe(topic)
         }
-
+    }
     override suspend fun willConnect(request: WebSocketConnectRequest): QueryParamWebSocketHandlerData {
         val rawPath = request.headers["x-path"] ?: request.queryParameter("path")?.substringBefore('?') ?: "/"
         val request = translateRequest(rawPath, request)

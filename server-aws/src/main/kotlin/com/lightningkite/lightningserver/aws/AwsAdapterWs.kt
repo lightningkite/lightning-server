@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.aws
 
+import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
@@ -51,6 +52,7 @@ class AwsAdapterWs(val root: AwsAdapter) {
         val connection: WebSocketConnectRequest,
         @Contextual val storage: AnonType
     )
+
     @Serializable
     data class WebSocketPublish(
         val topic: String,
@@ -65,7 +67,8 @@ class AwsAdapterWs(val root: AwsAdapter) {
         stateString: AnonType,
         action: (WsMid<T>) -> R
     ): R {
-        val mid = WsMid<T>(request = request, path = path, handler = handler, socketId = socketId, stateString = stateString)
+        val mid =
+            WsMid<T>(request = request, path = path, handler = handler, socketId = socketId, stateString = stateString)
         val r = action(mid)
         mid.commit()
         return r
@@ -144,30 +147,33 @@ class AwsAdapterWs(val root: AwsAdapter) {
             }
         }
 
-        override suspend fun close(reason: WebSocketClose) {
-            try {
-                val result = root.apiGatewayManagement.deleteConnection {
-                    it.connectionId(socketId)
-                }.await()
-                val r = result.sdkHttpResponse()
-                if (!r.isSuccessful) {
-                    throw Exception(
-                        "Failed to close $socketId: ${r.statusCode()} - ${
-                            try {
-                                r.statusText().get()
-                            } catch (e: Exception) {
-                                "?"
-                            }
-                        } - ${(r as? SdkHttpFullResponse)?.content()?.get()?.use { it.reader().readText() }}"
-                    )
-                }
-                true
-            } catch (e: GoneException) {
-                false
-            }
-        }
+        override suspend fun close(reason: WebSocketClose) = webSocketClose(socketId, reason)
 
     }
+
+    suspend fun webSocketClose(socketId: String, reason: WebSocketClose) {
+        try {
+            val result = root.apiGatewayManagement.deleteConnection {
+                it.connectionId(socketId)
+            }.await()
+            val r = result.sdkHttpResponse()
+            if (!r.isSuccessful) {
+                throw Exception(
+                    "Failed to close $socketId: ${r.statusCode()} - ${
+                        try {
+                            r.statusText().get()
+                        } catch (e: Exception) {
+                            "?"
+                        }
+                    } - ${(r as? SdkHttpFullResponse)?.content()?.get()?.use { it.reader().readText() }}"
+                )
+            }
+            true
+        } catch (e: GoneException) {
+            false
+        }
+    }
+
 
     suspend fun publishHandler(event: WebSocketPublish): APIGatewayV2HTTPResponse {
         val tr = event.data.retriever
@@ -183,14 +189,13 @@ class AwsAdapterWs(val root: AwsAdapter) {
                 val states = webSocketDynamo.states(ids)
                 for (socketId in ids) {
                     val s = states[socketId] ?: continue
-                    withMid(p, s.connectRequest, h, socketId, AnonType(s.state)) { mid ->
-                        try {
+                    try {
+                        withMid(p, s.connectRequest, h, socketId, AnonType(s.state)) { mid ->
                             h.messageFromSubscriptionTracked(p, mid, event.topic, tr)
-                        } catch (e: Exception) {
-                            root.logger.warn("WebSocket sub fail $socketId: ${e.message}")
-                            // Suppress, already reported inside *Tracked
-                            mid.close(WebSocketClose.INTERNAL_ERROR)
                         }
+                    } catch (e: Exception) {
+                        // Suppress, already reported inside *Tracked
+                        webSocketClose(socketId, WebSocketClose.INTERNAL_ERROR)
                     }
                 }
             } catch (e: Exception) {
@@ -225,19 +230,20 @@ class AwsAdapterWs(val root: AwsAdapter) {
             e.report()
         }
     }
+
     suspend fun handleWebsocketDidConnect(event: WebSocketDidConnect): APIGatewayV2HTTPResponse {
         val path = ServerPath.root
-        withMid(path, event.connection, rootWs, event.socketId, event.storage) { mid ->
-            try {
+        try {
+            withMid(path, event.connection, rootWs, event.socketId, event.storage) { mid ->
                 rootWs.didConnectTracked(
                     path,
                     mid
                 )
                 return APIGatewayV2HTTPResponse(200)
-            } catch (e: Exception) {
-                mid.close(WebSocketClose.INTERNAL_ERROR)
-                return APIGatewayV2HTTPResponse(500, body = e.message ?: "")
             }
+        } catch (e: Exception) {
+            webSocketClose(event.socketId, WebSocketClose.INTERNAL_ERROR)
+            return APIGatewayV2HTTPResponse(500, body = e.message ?: "")
         }
     }
 
@@ -267,13 +273,13 @@ class AwsAdapterWs(val root: AwsAdapter) {
                     headers = headers,
                     domain = event.requestContext.domainName,
                     protocol = "https",
-                    cache = LocalCache(),
                     sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0"
                 )
                 try {
                     val storage = rootWs.willConnectTracked(ServerPath.root, lkEvent)
                     val storageBytes = root.communicationEncoding.encodeBytes(rootWs.storageSerializer, storage)
                     val storageString = root.communicationEncoding.encodeString(rootWs.storageSerializer, storage)
+                    lkEvent.authAny()  // Forces auth to be cached
                     webSocketDynamo.setState(event.requestContext.connectionId, lkEvent, storageBytes)
                     try {
                         root.lambdaClient.invoke {
@@ -306,7 +312,8 @@ class AwsAdapterWs(val root: AwsAdapter) {
 
             "\$disconnect" -> {
                 try {
-                    val state = webSocketDynamo.state(event.requestContext.connectionId) ?: return APIGatewayV2HTTPResponse(204)
+                    val state =
+                        webSocketDynamo.state(event.requestContext.connectionId) ?: return APIGatewayV2HTTPResponse(204)
                     withMid(
                         ServerPath.root,
                         state.connectRequest,
@@ -331,25 +338,26 @@ class AwsAdapterWs(val root: AwsAdapter) {
             else -> if (body == null || body.length == 0L)
                 APIGatewayV2HTTPResponse(200)
             else {
-                val state = webSocketDynamo.state(event.requestContext.connectionId) ?: return APIGatewayV2HTTPResponse(204)
-                withMid(
-                    ServerPath.root,
-                    state.connectRequest,
-                    rootWs,
-                    event.requestContext.connectionId,
-                    AnonType(state.state),
-                ) { mid ->
-                    try {
+                val state =
+                    webSocketDynamo.state(event.requestContext.connectionId) ?: return APIGatewayV2HTTPResponse(204)
+                try {
+                    withMid(
+                        ServerPath.root,
+                        state.connectRequest,
+                        rootWs,
+                        event.requestContext.connectionId,
+                        AnonType(state.state),
+                    ) { mid ->
                         rootWs.messageFromClientTracked(
                             ServerPath.root,
                             mid,
                             WebSocketFrame(event.body)
                         )
                         APIGatewayV2HTTPResponse(200)
-                    } catch (e: Exception) {
-                        mid.close(WebSocketClose.INTERNAL_ERROR)
-                        APIGatewayV2HTTPResponse(500, body = e.message ?: "")
                     }
+                } catch (e: Exception) {
+                    webSocketClose(event.requestContext.connectionId, WebSocketClose.INTERNAL_ERROR)
+                    APIGatewayV2HTTPResponse(500, body = e.message ?: "")
                 }
             }
         }

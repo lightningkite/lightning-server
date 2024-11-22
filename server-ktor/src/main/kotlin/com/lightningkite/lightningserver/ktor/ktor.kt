@@ -109,7 +109,6 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                                 call.request.header(it)
                                     ?: throw Exception("Real IP address header for proxy '$it' was missing from the request.")
                             } ?: call.request.origin.remoteAddress,
-                            cache = cache
                         )
                         val startingState = handler.willConnectTracked(path, request)
                         var closingMid: WebSocketConnection<Any?>? = null

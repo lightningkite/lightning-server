@@ -55,7 +55,7 @@ object WebSockets {
         override fun toString(): String = "$type $path"
     }
     data class HandlerContext(val path: ServerPath, val type: WsHandlerType, override val request: Request?): ServerContext {
-        override val entryPoint = HandlerSection(path, WsHandlerType.CONNECTING)
+        override val entryPoint = HandlerSection(path, type)
         override suspend fun logString(): String = "$type ${path.toString(request?.parts ?: mapOf())} accessed by ${request?.authAny()} (${request?.sourceIp})"
     }
 }
@@ -96,7 +96,6 @@ suspend fun ServerPath.test(
             domain = domain,
             protocol = protocol,
             sourceIp = sourceIp,
-            cache = cache,
         )
         val channel = Channel<WebSocketFrame>(20)
         val h = WebSockets.handlers[path]!! as WebSocketHandler<Any?>
