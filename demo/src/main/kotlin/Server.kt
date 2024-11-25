@@ -54,6 +54,7 @@ import kotlin.time.Duration.Companion.minutes
 import com.lightningkite.UUID
 import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningserver.files.S3File
+import com.lightningkite.lightningserver.metrics.CloudwatchMetrics
 import com.lightningkite.lightningserver.websocket.send
 import com.lightningkite.lightningserver.websocket.text
 import com.lightningkite.prepareModelsShared
@@ -71,6 +72,7 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     init {
         Metrics
+        CloudwatchMetrics
         DynamoDbCache
         MongoDatabase
         MemcachedCache

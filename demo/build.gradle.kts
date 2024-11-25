@@ -33,7 +33,6 @@ dependencies {
 }
 
 kotlin {
-
     sourceSets.main {
         kotlin.srcDir("build/generated/ksp/main/kotlin")
     }
@@ -41,6 +40,7 @@ kotlin {
 
 application {
     mainClass.set("com.lightningkite.lightningserverdemo.MainKt")
+    this.applicationName = "server"
 }
 
 tasks.create("serve", JavaExec::class.java) {

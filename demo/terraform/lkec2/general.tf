@@ -11,7 +11,7 @@ variable "cors" {
 }
 variable "display_name" {
     type = string
-    default = "demo"
+    default = "demo-example-single-ec2"
     nullable = false
     description = "The GeneralSettings projectName."
 }

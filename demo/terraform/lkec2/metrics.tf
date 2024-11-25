@@ -5,12 +5,12 @@
 
 variable "metrics_tracked" {
     type = list(string)
-    default = ["Health Checks Run", "Execution Time"]
+    default = ["Execution Time", "Health Checks Run"]
     nullable = false
 }
 variable "metrics_namespace" {
     type = string
-    default = "demo"
+    default = "demo-example-single-ec2"
     nullable = false
 }
 
@@ -24,8 +24,8 @@ variable "metrics_namespace" {
 ##########
 
 resource "aws_iam_policy" "metrics" {
-  name        = "demo-metrics"
-  path = "/demo/metrics/"
+  name        = "demo-example-single-ec2-metrics"
+  path = "/demo/example/single/ec2/metrics/"
   description = "Access to publish metrics"
   policy = jsonencode({
     Version = "2012-10-17"

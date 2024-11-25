@@ -12,7 +12,6 @@ import software.amazon.awssdk.services.s3.S3Client
 
 class AwsHandler : AwsAdapter() {
     init {
-        CloudwatchMetrics
         Server
         preventLambdaTimeoutReuse = true
         loadSettings()
