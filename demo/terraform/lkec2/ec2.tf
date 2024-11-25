@@ -201,37 +201,63 @@ resource "aws_instance" "main" {
   tags = {
     Name = "demo-example-single-ec2"
   }
-  user_data = <<EOF
-      #!/bin/bash
-      sudo apt update -y
-      sudo apt upgrade -y
-      sudo apt install -y build-essential vim git net-tools whois openjdk-17-jdk ca-certificates curl supervisor libssl-dev pkg-config unzip nginx certbot
-
-      # Rust and efs utils install
-
-      curl https://sh.rustup.rs -sSf | sh
-      . "$HOME/.cargo/env"
-      if [ ! -d "~/efs-utils/" ]; then
-              mkdir ~/efs-utils
-      fi
-
-      git clone https://github.com/aws/efs-utils ~/efs-utils
-
-      cd ~/efs-utils && ./build-deb.sh
-
-      sudo apt -y install ~/efs-utils/build/amazon-efs-utils*deb
-
-      if [ ! -d "/mnt/efs/" ]; then
-          sudo mkdir /mnt/efs
-      fi
-
-      sudo rm -rf ~/efs-utils
-
-      sudo groupadd -g 4200 server_runner || true
-      sudo useradd -r -u 400 -g server_runner server_runner || true
-
-  EOF
 }
+
+resource "ssh_resource" "main_install_resources" {
+  depends_on = [aws_instance.main]
+  host = aws_eip.main.public_ip
+  triggers = {
+    instanceid = aws_instance.main.id
+    admins = jsonencode(var.admins)
+  }
+  user = "ubuntu"
+  password = ""
+  private_key = tls_private_key.main.private_key_openssh
+  commands = [
+    "sudo apt update -y",
+    "sudo apt upgrade -y",
+    "sudo apt install -y build-essential vim git net-tools whois openjdk-17-jdk ca-certificates curl supervisor libssl-dev pkg-config unzip nginx certbot python3-certbot-nginx rustup",
+  ]
+  timeout = "5m"
+}
+resource "ssh_resource" "main_install_efs" {
+  depends_on = [aws_instance.main, ssh_resource.main_install_resources]
+  host = aws_eip.main.public_ip
+  triggers = {
+    instanceid = aws_instance.main.id
+    admins = jsonencode(var.admins)
+  }
+  user = "ubuntu"
+  password = ""
+  private_key = tls_private_key.main.private_key_openssh
+  file {
+    destination = "install-efs.sh"
+    content = <<EOF
+      #!/bin/bash
+      # EFS utils install
+      if ! dpkg -s amazon-efs-utils &>/dev/null; then
+        if [ ! -d "~/efs-utils/" ]; then
+                mkdir ~/efs-utils
+        fi
+
+        git clone https://github.com/aws/efs-utils ~/efs-utils
+
+        cd ~/efs-utils && ./build-deb.sh
+
+        sudo apt -y install ~/efs-utils/build/amazon-efs-utils*deb
+
+        sudo rm -rf ~/efs-utils
+      fi
+    EOF
+    permissions = "0700"
+  }
+  commands = [
+    "rustup default stable",
+    "/bin/bash install-efs.sh",
+  ]
+  timeout = "10m"
+}
+
 resource "aws_eip" "main" {
   instance = aws_instance.main.id
 }
@@ -254,33 +280,37 @@ resource "ssh_resource" "main_users" {
   depends_on = [aws_instance.main]
   host = aws_eip.main.public_ip
   triggers = {
+    instanceid = aws_instance.main.id
     admins = jsonencode(var.admins)
   }
   user = "ubuntu"
   password = ""
   private_key = tls_private_key.main.private_key_openssh
   commands = flatten([for x in var.admins : [
-    "sudo adduser ${x.username} --disabled-password --gecos \"${x.name},${x.site},${x.phone1},${x.phone2},${x.email}\" sudo",
+    "sudo adduser ${x.username} --gecos \"${x.name},${x.site},${x.phone1},${x.phone2},${x.email}\" || true",
+    "echo \"${x.username}:changeme\" | sudo chpasswd ${x.username}",
     "sudo mkdir -p /home/${x.username}/.ssh",
     "printf \"${join("\n", x.keys)}\n\" | sudo tee /home/${x.username}/.ssh/authorized_keys",
     "sudo chmod 755 /home/${x.username}/.ssh",
     "sudo chmod 664 /home/${x.username}/.ssh/authorized_keys",
     "sudo chown ${x.username}:${x.username} /home/${x.username}/.ssh -R",
+    "sudo adduser ${x.username} sudo",
   ]])
   timeout = "20s"
 }
 
 resource "ssh_resource" "main_mount_efs" {
-  depends_on = [aws_instance.main]
+  depends_on = [ssh_resource.main_install_efs]
   host = aws_eip.main.public_ip
   triggers = {
+    instanceid = aws_instance.main.id
     systemid = aws_efs_file_system.main.id
   }
   user = "ubuntu"
   password = ""
   private_key = tls_private_key.main.private_key_openssh
   commands = [
-    "sudo [ -d /mnt/efs ] || mkdir /mnt/efs",
+    "sudo [ -d /mnt/efs ] || sudo mkdir /mnt/efs",
     "sudo mount -t efs ${aws_efs_file_system.main.id} /mnt/efs/"
   ]
   timeout = "20s"
@@ -320,11 +350,11 @@ resource "aws_efs_file_system" "main" {
 }
 
 resource "ssh_resource" "upload_executable" {
-  depends_on = [ssh_resource.main_mount_efs]
+  depends_on = [ssh_resource.main_install_resources, ssh_resource.main_install_efs, ssh_resource.main_mount_efs]
   host = aws_eip.main.public_ip
   triggers = {
-    index = filesha512("../../build/distributions/server.zip")
     systemid = aws_efs_file_system.main.id
+    index = filesha512("../../build/distributions/server.zip")
   }
   user = "ubuntu"
   password = ""
@@ -334,6 +364,8 @@ resource "ssh_resource" "upload_executable" {
     destination = "${var.domain_name}.zip"
   }
   commands = [
+    "sudo groupadd -g 4200 server_runner || true",
+    "sudo useradd -r -u 400 -g server_runner server_runner || true",
     "sudo unzip -o ${var.domain_name}.zip -d /mnt/efs/${var.domain_name}",
     "sudo chown -R server_runner:server_runner /mnt/efs/${var.domain_name}",
     "sudo chmod -R 500 /mnt/efs/${var.domain_name}",
@@ -342,10 +374,12 @@ resource "ssh_resource" "upload_executable" {
 }
 
 resource "ssh_resource" "upload_settings" {
-  depends_on = [ssh_resource.main_mount_efs]
+  depends_on = [ssh_resource.main_install_resources, ssh_resource.main_mount_efs, ssh_resource.upload_executable]
   host = aws_eip.main.public_ip
   triggers = {
+    instanceid = aws_instance.main.id
     systemid = aws_efs_file_system.main.id
+    settingshash = local_sensitive_file.settings_raw.content_base64sha512
   }
   user = "ubuntu"
   password = ""
@@ -355,6 +389,8 @@ resource "ssh_resource" "upload_settings" {
     destination = "${var.domain_name}.settings.json"
   }
   commands = [
+    "sudo groupadd -g 4200 server_runner || true",
+    "sudo useradd -r -u 400 -g server_runner server_runner || true",
     "sudo mv ${var.domain_name}.settings.json /mnt/efs/${var.domain_name}/server/bin/settings.json",
     "sudo chown -R server_runner:server_runner /mnt/efs/${var.domain_name}",
     "sudo chmod -R 500 /mnt/efs/${var.domain_name}",
@@ -363,8 +399,11 @@ resource "ssh_resource" "upload_settings" {
 }
 
 resource "ssh_resource" "setup_nginx" {
-  depends_on = [ssh_resource.main_mount_efs, aws_route53_record.main]
+  depends_on = [ssh_resource.main_install_resources, ssh_resource.main_mount_efs, ssh_resource.upload_executable, aws_route53_record.main]
   host = aws_eip.main.public_ip
+  triggers = {
+    instanceid = aws_instance.main.id
+  }
   user = "ubuntu"
   password = ""
   private_key = tls_private_key.main.private_key_openssh
@@ -502,14 +541,14 @@ resource "ssh_resource" "setup_nginx" {
     "sudo ln -sf /etc/nginx/sites-available/ws.${var.domain_name}.conf /etc/nginx/sites-enabled/ws.${var.domain_name}.conf",
     "sudo certbot --nginx -d ${var.domain_name} -d ws.${var.domain_name} --non-interactive --agree-tos -m ${var.reporting_email}"
   ]
-  timeout = "30s"
+  timeout = "60s"
 }
 
 resource "ssh_resource" "setup_supervisor" {
   depends_on = [ssh_resource.main_mount_efs]
   host = aws_eip.main.public_ip
   triggers = {
-    systemid = aws_efs_file_system.main.id
+    instanceid = aws_instance.main.id
   }
   user = "ubuntu"
   password = ""
@@ -538,6 +577,7 @@ resource "ssh_resource" "restart_server" {
   depends_on = [ssh_resource.setup_supervisor, ssh_resource.upload_executable, ssh_resource.upload_settings]
   host = aws_eip.main.public_ip
   triggers = {
+    instanceid = aws_instance.main.id
     systemid = aws_efs_file_system.main.id
     index = filesha512("../../build/distributions/server.zip")
     settings = local_sensitive_file.settings_raw.content_base64sha512
