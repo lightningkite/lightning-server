@@ -78,10 +78,10 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
         channel: String,
         path: ServerPath,
         handler: WebSocketHandler<T>
-    ): WebSocketConnection<T> = logDuration("Multiplex wrap") {
+    ): WebSocketConnection<T> = run {
         object : WebSocketConnection<T> {
             override var currentState: T =
-                logDuration("multiplex state pull") {
+                run {
                     this@wrapped.currentState.map.getValue(channel).storage.value(
                         handler.storageSerializer
                     )
@@ -104,7 +104,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
             )
 
             override suspend fun repullState(): T =
-                logDuration("Multiplex repull") { this@wrapped.repullState().map[channel]!!.storage.value(handler.storageSerializer) }
+                run { this@wrapped.repullState().map[channel]!!.storage.value(handler.storageSerializer) }
 
             override suspend fun <T> subscribe(topic: WebSocketTopic<T>) {
                 if (topic.topic !in this@wrapped.currentState) this@wrapped.subscribe(topic)

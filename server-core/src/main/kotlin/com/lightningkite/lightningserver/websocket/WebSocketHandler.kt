@@ -70,12 +70,15 @@ data class WebSocketConnectRequest(
     override val domain: String = "",
     override val protocol: String = "",
     override val sourceIp: String = "",
-    var precalculatedAuth: RequestAuthSerializable? = null,
+    var precalculatedAuth: RequestAuthSerializable? = RequestAuthSerializable.dummy,
 ) : Request {
     fun queryParameter(key: String): String? = queryParameters.find { it.first == key }?.second
     fun queryParameterCaseInsensitive(key: String): String? = queryParameters.find { it.first.equals(key, true) }?.second
     @Transient private val cacheCalc = HashMap<Request.CacheKey<*>, Any?>()
-    init { cacheCalc[RequestAuth.Key] = precalculatedAuth?.real() }
+    init {
+        if(precalculatedAuth != RequestAuthSerializable.dummy)
+            cacheCalc[RequestAuth.Key] = precalculatedAuth?.real()
+    }
     override suspend fun <T> cache(key: Request.CacheKey<T>): T {
         @Suppress("UNCHECKED_CAST")
         if (cacheCalc.containsKey(key)) return cacheCalc[key] as T

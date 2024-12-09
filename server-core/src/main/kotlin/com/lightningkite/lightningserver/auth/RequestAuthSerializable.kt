@@ -35,7 +35,11 @@ data class RequestAuthSerializable(
     val scopes: Set<String>,
     val cache: CacheKeyMap = CacheKeyMap(mapOf()),
     val thirdParty: String? = null,
-)
+) {
+    companion object {
+        val dummy = RequestAuthSerializable("", null, "", Instant.DISTANT_PAST, Instant.DISTANT_PAST, setOf())
+    }
+}
 
 @Suppress("UNCHECKED_CAST")
 fun RequestAuth<*>.serializable(expiresAt: Instant) = RequestAuthSerializable(

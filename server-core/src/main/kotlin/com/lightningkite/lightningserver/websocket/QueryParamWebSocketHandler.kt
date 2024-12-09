@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class QueryParamWebSocketHandlerData(val path: String, @Contextual val underlyingData: AnonType) {
     val handlerMatch by lazy {
-        logDuration("handlerMatch") {
+        run {
             WebSockets.matcher.match(path) ?: throw NotFoundException("No web socket handler found for '$path'")
         }
     }
@@ -24,7 +24,7 @@ class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandler
     override val storageSerializer: KSerializer<QueryParamWebSocketHandlerData> =
         QueryParamWebSocketHandlerData.serializer()
 
-    fun translateRequest(path: String, request: WebSocketConnectRequest): WebSocketConnectRequest = logDuration("Multiplex translate request"){
+    fun translateRequest(path: String, request: WebSocketConnectRequest): WebSocketConnectRequest = run {
 
         val match = WebSockets.matcher.match(path) ?: throw NotFoundException("No web socket handler found for '$path'")
         val fixedQueryParameters = request.queryParameters.mapNotNull {
@@ -48,7 +48,7 @@ class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandler
         )
     }
 
-    fun <T> WebSocketConnection<QueryParamWebSocketHandlerData>.wrapped(handler: WebSocketHandler<T>): WebSocketConnection<T> = logDuration("Multiplex wrap") {
+    fun <T> WebSocketConnection<QueryParamWebSocketHandlerData>.wrapped(handler: WebSocketHandler<T>): WebSocketConnection<T> = run {
         object : WebSocketConnection<T> {
             override val request: WebSocketConnectRequest by lazy {
                 translateRequest(
