@@ -36,6 +36,7 @@ import software.amazon.awssdk.services.apigatewaymanagementapi.model.GoneExcepti
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.lambda.model.InvocationType
 import java.util.Base64
+import kotlin.time.measureTime
 
 class AwsAdapterWs(val root: AwsAdapter) {
     val dynamo: DynamoDbAsyncClient by lazy { DynamoDbAsyncClient.builder().region(root.region).build() }
@@ -67,8 +68,16 @@ class AwsAdapterWs(val root: AwsAdapter) {
         stateString: AnonType,
         action: (WsMid<T>) -> R
     ): R {
-        val mid =
-            WsMid<T>(request = request, path = path, handler = handler, socketId = socketId, stateString = stateString)
+        val mid: WsMid<T>
+        measureTime {
+            mid = WsMid<T>(
+                request = request,
+                path = path,
+                handler = handler,
+                socketId = socketId,
+                stateString = stateString
+            )
+        }.also { println("Mid construction took $it") }
         val r = action(mid)
         mid.commit()
         return r
@@ -176,31 +185,42 @@ class AwsAdapterWs(val root: AwsAdapter) {
 
 
     suspend fun publishHandler(event: WebSocketPublish): APIGatewayV2HTTPResponse {
-        val tr = event.data.retriever
-        webSocketDynamo.forSubscribers(event.topic) { path, ids ->
-            try {
-                val p = ServerPath(path)
-                val h = if (p == ServerPath.root) rootWs else WebSockets.handlers[p] ?: run {
-                    serverLogger.warn("No handler found for $p")
-                    return@forSubscribers
-                }
-                h as WebSocketHandler<Any?>
-                // TODO: could retrieve more states at once?
-                val states = webSocketDynamo.states(ids)
-                for (socketId in ids) {
-                    val s = states[socketId] ?: continue
+        serverLogger.info("publishHandler for ${event.topic} started")
+        measureTime {
+            val tr = event.data.retriever
+            webSocketDynamo.forSubscribers(event.topic) { path, ids ->
+                serverLogger.info("publishHandler for ${event.topic} and $path (${ids.size}) started")
+
+                measureTime {
                     try {
-                        withMid(p, s.connectRequest, h, socketId, AnonType(s.state)) { mid ->
-                            h.messageFromSubscriptionTracked(p, mid, event.topic, tr)
+                        val p = ServerPath(path)
+                        val h = if (p == ServerPath.root) rootWs else WebSockets.handlers[p] ?: run {
+                            serverLogger.warn("No handler found for $p")
+                            return@forSubscribers
+                        }
+                        h as WebSocketHandler<Any?>
+                        // TODO: could retrieve more states at once?
+                        val states = webSocketDynamo.states(ids)
+                        for (socketId in ids) {
+                            val s = states[socketId] ?: continue
+                            try {
+                                withMid(p, s.connectRequest, h, socketId, AnonType(s.state)) { mid ->
+                                    h.messageFromSubscriptionTracked(p, mid, event.topic, tr)
+                                }
+                            } catch (e: Exception) {
+                                // Suppress, already reported inside *Tracked
+                                webSocketClose(socketId, WebSocketClose.INTERNAL_ERROR)
+                            }
                         }
                     } catch (e: Exception) {
-                        // Suppress, already reported inside *Tracked
-                        webSocketClose(socketId, WebSocketClose.INTERNAL_ERROR)
+                        root.logger.warn("WebSocket subs fail $path: ${e.message}")
                     }
+                }.also {
+                    serverLogger.info("publishHandler for ${event.topic} and $path (${ids.size}) took $it")
                 }
-            } catch (e: Exception) {
-                root.logger.warn("WebSocket subs fail $path: ${e.message}")
             }
+        }.also {
+            serverLogger.info("publishHandler for ${event.topic} took $it")
         }
 
         return APIGatewayV2HTTPResponse(200)
@@ -259,12 +279,17 @@ class AwsAdapterWs(val root: AwsAdapter) {
             else
                 HttpContent.Text(raw, headers.contentType ?: ContentType.Text.Plain)
         }
-        val queryParams =
+        var queryParams =
             (event.multiValueQueryStringParameters
                 ?: mapOf()).entries.flatMap { it.value.map { v -> it.key to v.decodeURLPart() } }
 
         return when (event.requestContext.routeKey) {
             "\$connect" -> {
+                // TODO: Remove this fugly hack and deal with websocket auth better
+                queryParams = queryParams.flatMap {
+                    if(it.first == "path") listOf(it) + it.second.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=') }
+                    else listOf(it)
+                }
                 val lkEvent = WebSocketConnectRequest(
                     path = ServerPath.root,
                     parts = mapOf(),

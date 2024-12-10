@@ -101,7 +101,7 @@ class AwsWebSocketDynamoDb(
         return out
     }
 
-    suspend fun forSubscribers(topic: String, perSubscriber: suspend (path: String, ids: Iterable<String>) -> Unit) {
+    suspend fun forSubscribers(topic: String, perSubscriber: suspend (path: String, ids: Collection<String>) -> Unit) {
         ready.await()
         measureTime {
             client.queryPaginator {

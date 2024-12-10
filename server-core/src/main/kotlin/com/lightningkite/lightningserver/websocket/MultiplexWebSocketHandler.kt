@@ -1,5 +1,7 @@
 package com.lightningkite.lightningserver.websocket
 
+import com.lightningkite.lightningserver.auth.RequestAuthSerializable
+import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
@@ -16,59 +18,23 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.serializer
+import kotlin.collections.plus
 
 @Serializable
 data class MultiplexWebSocketHandlerState(
     val map: Map<String, MultiplexWebSocketHandlerConnectionInfo>,
-    val queryParams: List<Pair<String, String>> = listOf(),
-    val domain: String,
-    val protocol: String,
-    val sourceIp: String,
-    val headers: HttpHeaders,
 ) {
-
-    fun toConnectionRequest(existingChannel: String): WebSocketConnectRequest {
-        val channelInfo = map.getValue(existingChannel)
-        val match = channelInfo.handlerMatch
-        return WebSocketConnectRequest(
-            path = match.path,
-            parts = match.parts,
-            wildcard = match.wildcard,
-            queryParameters = queryParams + (channelInfo.queryParams ?: listOf()),
-            headers = headers,
-            domain = domain,
-            protocol = protocol,
-            sourceIp = sourceIp,
-        )
-    }
-    fun toConnectionRequest(match: ServerPathMatcher.Match, message: MultiplexMessage): WebSocketConnectRequest {
-        return WebSocketConnectRequest(
-            path = match.path,
-            parts = match.parts,
-            wildcard = match.wildcard,
-            queryParameters = queryParams + (message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf()),
-            headers = headers,
-            domain = domain,
-            protocol = protocol,
-            sourceIp = sourceIp
-        )
-    }
-
     operator fun contains(topic: String): Boolean = map.values.any { info -> info.topics.contains(topic) }
 }
 
 @Serializable
 data class MultiplexWebSocketHandlerConnectionInfo(
-    val path: String,
     @Contextual val storage: AnonType,
     val topics: Set<String> = setOf(),
-    val queryParams: List<Pair<String, String>> = listOf(),
+    val request: WebSocketConnectRequest,
 ) {
-    val handlerMatch by lazy {
-        WebSockets.matcher.match(path) ?: throw NotFoundException("No web socket handler found for '$path'")
-    }
-    val handlerPath get() = handlerMatch.path
-    val handler get() = WebSockets.handlers[handlerMatch.path]
+    val handler get() = WebSockets.handlers[request.path]
+    val handlerPath get() = request.path
 }
 
 class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<MultiplexWebSocketHandlerState> {
@@ -87,11 +53,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                     )
                 }
                 private set
-            override val request: WebSocketConnectRequest by lazy {
-                this@wrapped.currentState.toConnectionRequest(
-                    channel
-                )
-            }
+            override val request: WebSocketConnectRequest get() = this@wrapped.currentState.map.getValue(channel).request
 
             override suspend fun close(reason: WebSocketClose) = this@wrapped.close(reason)
             override suspend fun send(frame: WebSocketFrame) = this@wrapped.send(
@@ -152,11 +114,6 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
     override suspend fun willConnect(request: WebSocketConnectRequest): MultiplexWebSocketHandlerState =
         MultiplexWebSocketHandlerState(
             map = mapOf(),
-            domain = request.domain,
-            protocol = request.protocol,
-            sourceIp = request.sourceIp,
-            headers = request.headers,
-            queryParams = request.queryParameters,
         )
 
     override suspend fun didConnect(
@@ -179,14 +136,18 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                     val match = WebSockets.matcher.match(message.path!!) ?: throw NotFoundException()
                     val otherHandler =
                         WebSockets.handlers[match.path] as? WebSocketHandler<Any?> ?: throw NotFoundException()
-                    val r = connection.currentState.toConnectionRequest(match, message)
+                    val r = connection.request.copy(
+                        path = match.path,
+                        parts = match.parts,
+                        wildcard = match.wildcard,
+                        queryParameters = connection.request.queryParameters + (message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf()),
+                    )
                     val storage = otherHandler.willConnectTracked(match.path, r)
                     connection.updateStateImmediately {
                         it.copy(
                             map = it.map + (channel to MultiplexWebSocketHandlerConnectionInfo(
-                                path = message.path!!,
+                                request = r,
                                 storage = AnonType(storage, otherHandler.storageSerializer),
-                                queryParams = message.queryParams?.entries?.flatMap { it.value.map { v -> it.key to v } } ?: listOf()
                             ))
                         )
                     }

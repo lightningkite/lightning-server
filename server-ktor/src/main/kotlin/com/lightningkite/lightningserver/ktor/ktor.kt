@@ -97,11 +97,17 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                         call.parameters.forEach { s, strings ->
                             parts[s] = strings.joinToString("/")
                         }
+                        var queryParams = call.request.queryParameters.flattenEntries()
+                        // TODO: Remove this fugly hack and deal with websocket auth better
+                        queryParams = queryParams.flatMap {
+                            if(it.first == "path") listOf(it) + it.second.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=') }
+                            else listOf(it)
+                        }
                         val request = WebSocketConnectRequest(
                             path = path,
                             parts = parts,
                             wildcard = wildcard,
-                            queryParameters = call.request.queryParameters.flattenEntries(),
+                            queryParameters = queryParams,
                             headers = call.request.headers.adapt(),
                             domain = call.request.origin.serverHost,
                             protocol = call.request.origin.scheme,

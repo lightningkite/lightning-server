@@ -17,6 +17,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlin.time.Duration.Companion.days
+import kotlin.time.measureTime
 
 interface WebSocketHandler<STORAGE> {
     val storageSerializer: KSerializer<STORAGE>
@@ -61,7 +62,7 @@ val WebSocketFrame.text: String
     }
 
 @Serializable
-data class WebSocketConnectRequest(
+data class WebSocketConnectRequest constructor(
     override val path: ServerPath,
     override val parts: Map<String, String> = mapOf(),
     override val wildcard: String? = null,
@@ -82,7 +83,10 @@ data class WebSocketConnectRequest(
     override suspend fun <T> cache(key: Request.CacheKey<T>): T {
         @Suppress("UNCHECKED_CAST")
         if (cacheCalc.containsKey(key)) return cacheCalc[key] as T
-        val calculated = key.calculate(this)
+        val calculated: T
+        measureTime {
+            calculated = key.calculate(this)
+        }.also { println("WebSocketConnectRequest cache fetch for $key took $it") }
         cacheCalc[key] = calculated
         if(key == RequestAuth.Key) precalculatedAuth = (calculated as RequestAuth<*>).serializable(now() + 1.days)
         return calculated
