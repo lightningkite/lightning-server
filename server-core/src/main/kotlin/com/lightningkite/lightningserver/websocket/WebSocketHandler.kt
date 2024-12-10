@@ -85,7 +85,7 @@ data class WebSocketConnectRequest constructor(
         if (cacheCalc.containsKey(key)) return cacheCalc[key] as T
         val calculated: T = key.calculate(this)
         cacheCalc[key] = calculated
-        if(key == RequestAuth.Key) precalculatedAuth = (calculated as RequestAuth<*>).serializable(now() + 1.days)
+        if(key == RequestAuth.Key) precalculatedAuth = (calculated as? RequestAuth<*>)?.serializable(now() + 1.days)
         return calculated
     }
 }
