@@ -1,12 +1,9 @@
 package com.lightningkite.lightningserver.websocket
 
-import com.lightningkite.lightningserver.auth.RequestAuthSerializable
-import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.metrics.Metrics
 import com.lightningkite.lightningserver.serialization.AnonType
 import com.lightningkite.lightningserver.serialization.TypeRetriever
-import com.lightningkite.lightningserver.utils.logDuration
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -20,26 +17,6 @@ data class QueryParamWebSocketHandlerData(val request: WebSocketConnectRequest, 
 class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandlerData> {
     override val storageSerializer: KSerializer<QueryParamWebSocketHandlerData> =
         QueryParamWebSocketHandlerData.serializer()
-
-    fun translateRequest(path: String, request: WebSocketConnectRequest): WebSocketConnectRequest = run {
-
-        val match = WebSockets.matcher.match(path) ?: throw NotFoundException("No web socket handler found for '$path'")
-        val fixedQueryParameters = request.queryParameters.mapNotNull {
-            if (it.first == "path") {
-                if (it.second.contains('?'))
-                    it.second.substringAfter('?').substringBefore('=') to it.second.substringAfter('?')
-                        .substringAfter('=')
-                else
-                    null
-            } else it
-        }
-        request.copy(
-            path = match.path,
-            parts = match.parts,
-            wildcard = match.wildcard,
-            queryParameters = fixedQueryParameters,
-        )
-    }
 
     fun <T> WebSocketConnection<QueryParamWebSocketHandlerData>.wrapped(handler: WebSocketHandler<T>): WebSocketConnection<T> = run {
         object : WebSocketConnection<T> {
@@ -80,11 +57,35 @@ class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandler
     }
     override suspend fun willConnect(request: WebSocketConnectRequest): QueryParamWebSocketHandlerData {
         val rawPath = request.headers["x-path"] ?: request.queryParameter("path")?.substringBefore('?') ?: "/"
-        val request = translateRequest(rawPath, request)
+        val request = run {
+            val match = WebSockets.matcher.match(rawPath)
+                ?: throw NotFoundException("No web socket handler found for '$rawPath' - ${request.queryParameter("path")}")
+            val fixedQueryParameters = request.queryParameters.mapNotNull {
+                if (it.first == "path") {
+                    if (it.second.contains('?'))
+                        it.second.substringAfter('?').substringBefore('=') to it.second.substringAfter('?')
+                            .substringAfter('=')
+                    else
+                        null
+                } else it
+            }
+            request.copy(
+                path = match.path,
+                parts = match.parts,
+                wildcard = match.wildcard,
+                queryParameters = fixedQueryParameters,
+            )
+        }
         val otherHandler =
             WebSockets.handlers[request.path] ?: throw NotFoundException("No web socket handler found for '$rawPath'")
         val startData =
-            Metrics.handlerPerformance(WebSockets.HandlerContext(request.path, WebSockets.WsHandlerType.CONNECTING, null /*TODO*/)) {
+            Metrics.handlerPerformance(
+                WebSockets.HandlerContext(
+                    request.path,
+                    WebSockets.WsHandlerType.CONNECTING,
+                    null /*TODO*/
+                )
+            ) {
                 otherHandler.willConnect(request)
             }
         return QueryParamWebSocketHandlerData(
@@ -97,9 +98,8 @@ class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandler
         connection: WebSocketConnection<QueryParamWebSocketHandlerData>,
     ) {
         val innerRequest = connection.currentState.request
-        val other = innerRequest.headers["x-path"] ?: innerRequest.queryParameter("path")?.substringBefore('?') ?: "/"
-        val otherHandler = WebSockets.handlers[connection.request.path] as? WebSocketHandler<Any?>
-            ?: throw NotFoundException("No web socket handler found for '$other'")
+        val otherHandler = WebSockets.handlers[innerRequest.path] as? WebSocketHandler<Any?>
+            ?: throw NotFoundException("No web socket handler found - makes no sense.")
         otherHandler.didConnectTracked(connection.request.path, connection.wrapped<Any?>(otherHandler))
     }
 
