@@ -41,6 +41,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         1.days to 7.days,
         2.hours to 1.days,
         10.minutes to 2.hours,
+        1.minutes to 10.minutes,
     )
 
     val collection by lazy { database().collection<MetricSpanStats>() }
@@ -50,7 +51,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         for (span in keepFor.keys) {
             events.filter { it.entryPoint != null }.groupBy { it.metricType to it.entryPoint }.forEach { (typeAndEntryPoint, typeEvents) ->
                 val (type, entryPoint) = typeAndEntryPoint
-                if (type.name in settings.trackingByEntryPoint) {
+                if (settings.trackedByEntryPoint(type.name)) {
                     typeEvents.groupBy { it.time.roundTo(span) }.forEach { (rounded, spanEvents) ->
                         val stats = spanEvents.stats(entryPoint!!, type.name, rounded, span)
                         jobs.add(launch {
@@ -64,7 +65,7 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
                 }
             }
             events.groupBy { it.metricType }.forEach { (type, typeEvents) ->
-                if (type.name in settings.trackingTotalsOnly || type.name in settings.trackingByEntryPoint) {
+                if (settings.tracked(type.name)) {
                     typeEvents.groupBy { it.time.roundTo(span) }.forEach { (rounded, spanEvents) ->
                         val stats = spanEvents.stats("total", type.name, rounded, span)
                         jobs.add(launch {
@@ -126,12 +127,12 @@ class DatabaseMetrics(override val settings: MetricSettings, val database: () ->
         if (!Authentication.isDeveloper.accepts(it.authAny())) throw ForbiddenException()
         HttpResponse.html(content = HtmlDefaults.basePage(buildString {
             appendLine("<ul>")
-            for (metric in settings.trackingByEntryPoint) {
+            for (metric in MetricType.known.filter { settings.trackedByEntryPoint(it.name) }) {
                 appendLine(
                     "<li><a href=${
                         visualizeIndexB.path.toString(
                             mapOf(
-                                "metric" to metric
+                                "metric" to metric.name
                             )
                         )
                     }>$metric</li>"

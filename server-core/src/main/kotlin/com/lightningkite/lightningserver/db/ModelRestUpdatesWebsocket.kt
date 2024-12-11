@@ -94,7 +94,6 @@ class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
         topic: String,
         retrieve: TypeRetriever
     ) = with(connection) {
-        serverLogger.info("messageFromSubscription $topic activating! Got ${retrieve(generalTopic.type)} and state $currentState")
         val toSend = retrieve(generalTopic.type).changes.map { entry ->
             ListChange(
                 old = entry.old?.takeIf { currentState.condition(it) }?.let { currentState.mask(it) },

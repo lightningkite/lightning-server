@@ -1,5 +1,8 @@
 package com.lightningkite.lightningserver.encryption
 
+import com.lightningkite.lightningserver.metrics.MetricType
+import com.lightningkite.lightningserver.metrics.MetricUnit
+import com.lightningkite.lightningserver.metrics.Metrics
 import io.ktor.util.*
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
@@ -8,17 +11,24 @@ import javax.crypto.spec.PBEKeySpec
 
 private const val prefix = "PBKDF2WithHmacSHA512."
 
+object SecureHash {
+    val metricsKey = MetricType("Secure Hashing", MetricUnit.Milliseconds)
+}
+
 /**
  * Securely hashes a string in a way that could be used for password storage.
  */
 fun String.secureHash(): String {
     if (this.startsWith(prefix)) return this
     if (this.isEmpty()) return ""
+    val start = System.nanoTime()
     val salt = ByteArray(16)
     SecureRandom().nextBytes(salt)
     val skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512")
     val spec = PBEKeySpec(this.toCharArray(), salt, 100000, 512)
     val key = skf.generateSecret(spec)
+    val tookNs = System.nanoTime() - start
+    Metrics.report(SecureHash.metricsKey, tookNs / 1000000.0)
     return prefix + salt.encodeBase64() + "." + key.encoded.encodeBase64()
 }
 
@@ -28,10 +38,13 @@ fun String.secureHash(): String {
 fun String.checkAgainstHash(againstHash: String): Boolean {
     if (againstHash.isEmpty()) return false
     val against = againstHash.removePrefix(prefix)
+    val start = System.nanoTime()
     val salt = against.substringBefore('.').decodeBase64Bytes()
     val rest = against.substringAfter('.')
     val skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512")
     val spec = PBEKeySpec(this.toCharArray(), salt, 100000, 512)
     val key = skf.generateSecret(spec)
+    val tookNs = System.nanoTime() - start
+    Metrics.report(SecureHash.metricsKey, tookNs / 1000000.0)
     return key.encoded.encodeBase64() == rest
 }

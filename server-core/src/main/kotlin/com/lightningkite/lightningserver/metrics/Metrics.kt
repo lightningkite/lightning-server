@@ -70,13 +70,13 @@ interface Metrics: HealthCheckable {
 
         fun report(type: MetricType, value: Double) {
             if (!Settings.sealed) return
-            if (type.name in metricsSettings().settings.tracked)
+            if (metricsSettings().settings.tracked(type.name))
                 toReport.add(MetricEvent(type, null, now(), value))
         }
 
         suspend fun reportPerHandler(type: MetricType, value: Double) {
             if (!Settings.sealed) return
-            if (type.name in metricsSettings().settings.tracked)
+            if (metricsSettings().settings.tracked(type.name))
                 toReport.add(MetricEvent(type, serverContext()?.entryPoint?.toString() ?: "Unknown", now(), value))
         }
 

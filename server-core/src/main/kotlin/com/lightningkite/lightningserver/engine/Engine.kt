@@ -26,7 +26,7 @@ interface Engine {
     fun backgroundReportingAction(action: suspend ()->Unit) {
         GlobalScope.launch {
             while (true) {
-                delay(5.minutes)
+                delay(1.minutes)
                 try {
                     action()
                 } catch(e: Exception) {
