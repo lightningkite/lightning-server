@@ -20,8 +20,8 @@ import com.lightningkite.UUID
 import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import kotlinx.serialization.Contextual
 
-data class RequestAuth<SUBJECT : HasId<*>>(
-    val subject: Authentication.SubjectHandler<SUBJECT, *>,
+data class RequestAuth<out SUBJECT : HasId<*>>(
+    val subject: Authentication.SubjectHandler<@UnsafeVariance SUBJECT, *>,
     val sessionId: UUID?,
     val rawId: Comparable<*>,
     @Contextual val issuedAt: Instant,
@@ -91,9 +91,9 @@ data class RequestAuth<SUBJECT : HasId<*>>(
         )
     }
 
-    abstract class CacheKey<SUBJECT : HasId<ID>, ID : Comparable<ID>, VALUE> {
+    abstract class CacheKey<out SUBJECT : HasId<@UnsafeVariance ID>, out ID : Comparable<@UnsafeVariance ID>, VALUE> {
         abstract val name: String
-        abstract suspend fun calculate(auth: RequestAuth<SUBJECT>): VALUE
+        abstract suspend fun calculate(auth: RequestAuth<@UnsafeVariance SUBJECT>): VALUE
         abstract val serializer: KSerializer<VALUE>
         abstract val validFor: Duration
         var serializationIndex: Int = -1
@@ -123,10 +123,10 @@ data class RequestAuth<SUBJECT : HasId<*>>(
     @Serializable
     data class ExpiringValue<T>(val value: T, @Contextual val expiresAt: Instant)
 
-    val cache = HashMap<CacheKey<SUBJECT, *, *>, ExpiringValue<*>>()
+    val cache: HashMap<CacheKey<@UnsafeVariance SUBJECT, *, *>, ExpiringValue<*>> = HashMap<CacheKey<SUBJECT, *, *>, ExpiringValue<*>>()
 
     @Suppress("UNCHECKED_CAST")
-    suspend fun <T> get(key: CacheKey<SUBJECT, *, T>): T {
+    suspend fun <T> get(key: CacheKey<@UnsafeVariance SUBJECT, *, T>): T {
         cache.get(key)?.let {
             if (now() > it.expiresAt) cache.remove(key)
             else return it.value as T
@@ -136,7 +136,7 @@ data class RequestAuth<SUBJECT : HasId<*>>(
         return c
     }
 
-    suspend fun precache(keys: List<CacheKey<SUBJECT, *, *>>): RequestAuth<SUBJECT> {
+    suspend fun precache(keys: List<CacheKey<@UnsafeVariance SUBJECT, *, *>>): RequestAuth<SUBJECT> {
         keys.forEach { get(it) }
         return this
     }

@@ -27,6 +27,7 @@ import com.lightningkite.lightningserver.websocket.WebSockets
 import com.lightningkite.lightningserver.websocket.didConnectTracked
 import com.lightningkite.lightningserver.websocket.disconnectTracked
 import com.lightningkite.lightningserver.websocket.messageFromClientTracked
+import com.lightningkite.lightningserver.websocket.text
 import com.lightningkite.lightningserver.websocket.willConnectTracked
 import com.lightningkite.now
 import io.ktor.http.*

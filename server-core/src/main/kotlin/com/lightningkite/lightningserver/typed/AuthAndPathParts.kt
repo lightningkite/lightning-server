@@ -9,7 +9,7 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.serialization.KSerializer
 
-open class AuthAccessor<USER: HasId<*>?>(
+open class AuthAccessor<out USER: HasId<*>?>(
     val authOrNull: RequestAuth<USER & Any>?,
     val rawRequest: Request?,
 ) {
@@ -21,7 +21,7 @@ open class AuthAccessor<USER: HasId<*>?>(
     suspend fun user() = authOrNull?.get() as USER
 }
 
-open class AuthAndPathParts<USER: HasId<*>?, PATH: TypedServerPath>(
+open class AuthAndPathParts<out USER: HasId<*>?, PATH: TypedServerPath>(
     authOrNull: RequestAuth<USER & Any>?,
     rawRequest: Request?,
     val parts: Array<Any?>

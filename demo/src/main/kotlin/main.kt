@@ -15,6 +15,8 @@ import kotlinx.datetime.Instant
 import java.util.*
 import com.lightningkite.UUID
 import com.lightningkite.lightningserver.aws.terraform.createTerraform
+import com.lightningkite.lightningserver.ktor.runServerNetty
+import com.lightningkite.lightningserver.pubsub.BadPubSub
 
 fun setup() {
     Server
@@ -22,7 +24,7 @@ fun setup() {
 
 private fun serve() {
     loadSettings(File("settings.json"))
-    runServer(LocalPubSub, LocalCache)
+    runServerNetty(BadPubSub, LocalCache)
 }
 
 fun terraform() {
