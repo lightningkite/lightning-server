@@ -34,9 +34,16 @@ object SettingsHandlers {
             {
                 projectName = var.display_name
                 publicUrl = ${if (domain) "\"https://${'$'}{var.domain_name}\"" else "aws_apigatewayv2_stage.http.invoke_url"}
-                wsUrl = ${if (domain) "\"wss://ws.${'$'}{var.domain_name}?path=\"" else "\"\${aws_apigatewayv2_stage.ws.invoke_url}?path=\""}
+                wsUrl = ${run {
+                    val suffix = if(core == TerraformCoreType.Lambda) "?path=" else ""
+                    when {
+                        domain -> "\"wss://ws.${'$'}{var.domain_name}$suffix\""
+                        else -> "\"\${aws_apigatewayv2_stage.ws.invoke_url}$suffix\""
+                    }
+                }}
                 debug = var.debug
                 cors = var.cors
+                ${if(core == TerraformCoreType.SingleEC2) "host = \"127.0.0.1\"" else ""}
             }
         """.trimIndent()
         }

@@ -180,6 +180,7 @@ resource "local_sensitive_file" "settings_raw" {
         wsUrl = "wss://ws.${var.domain_name}?path="
         debug = var.debug
         cors = var.cors
+        
     }
     database = {
       url = "mongodb+srv://demoexampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_serverless_instance.database.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"

@@ -9,12 +9,6 @@ variable "instance_ubuntu_version" {
     nullable = false
     description = "The ubuntu LTS version to use"
 }
-variable "port" {
-    type = number
-    default = 3000
-    nullable = false
-    description = "The internal port to use"
-}
 variable "instance_size" {
     type = string
     default = "t3.micro"
@@ -55,7 +49,6 @@ resource "local_sensitive_file" "settings_raw" {
         wsUrl = "wss://ws.${var.domain_name}"
         debug = var.debug
         cors = var.cors
-        port = var.port
         host = "127.0.0.1"
     }
     database = {
@@ -485,7 +478,7 @@ resource "ssh_resource" "setup_nginx" {
 
         proxy_next_upstream error timeout;
 
-        proxy_pass http://127.0.0.1:${var.port};
+        proxy_pass http://127.0.0.1:8080;
         proxy_pass_header Server;
         proxy_redirect off;
         proxy_set_header Host $http_host;
@@ -514,7 +507,7 @@ resource "ssh_resource" "setup_nginx" {
 
         proxy_next_upstream error timeout;
 
-        proxy_pass http://127.0.0.1:${var.port};
+        proxy_pass http://127.0.0.1:8080;
         proxy_pass_header Server;
         proxy_http_version 1.1;
         proxy_redirect off;
@@ -590,3 +583,4 @@ resource "ssh_resource" "restart_server" {
   ]
   timeout = "30s"
 }
+
