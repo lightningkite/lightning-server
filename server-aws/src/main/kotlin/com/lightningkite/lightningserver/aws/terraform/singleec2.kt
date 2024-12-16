@@ -21,6 +21,11 @@ internal fun awsEc2Handler(
     ),
     inputs = listOf(
         TerraformInput.string(
+            "serve_command",
+            "serve",
+            description = "The command to use to begin serving."
+        ),
+        TerraformInput.string(
             "instance_ubuntu_version",
             "24.04",
             description = "The ubuntu LTS version to use"
@@ -526,7 +531,7 @@ internal fun awsEc2Handler(
               [program:${'$'}{var.domain_name}]
               directory=/mnt/efs/${'$'}{var.domain_name}/server/bin
               user=server_runner
-              command=/bin/sh server serve
+              command=/bin/sh server ${'$'}{var.serve_command}
               autostart=true
               autorestart=true
               stderr_logfile=/var/log/${'$'}{var.domain_name}.err.log

@@ -3,6 +3,12 @@
 # Inputs
 ##########
 
+variable "serve_command" {
+    type = string
+    default = "serve"
+    nullable = false
+    description = "The command to use to begin serving."
+}
 variable "instance_ubuntu_version" {
     type = string
     default = "24.04"
@@ -551,7 +557,7 @@ resource "ssh_resource" "setup_supervisor" {
       [program:${var.domain_name}]
       directory=/mnt/efs/${var.domain_name}/server/bin
       user=server_runner
-      command=/bin/sh server serve
+      command=/bin/sh server ${var.serve_command}
       autostart=true
       autorestart=true
       stderr_logfile=/var/log/${var.domain_name}.err.log
