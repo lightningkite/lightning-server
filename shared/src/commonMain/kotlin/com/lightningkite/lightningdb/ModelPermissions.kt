@@ -1,12 +1,14 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.serialization.*
-import com.lightningkite.serialization.SerializableProperty
+import com.lightningkite.serialization.Partial
+import kotlinx.serialization.Serializable
 
 /**
  * Defines permissions for accessing a model in a database.
  * Default constructor is 'whitelist' mode.
  */
+@Serializable
+@GenerateDataClassPaths
 data class ModelPermissions<Model>(
     /**
      * The user may only create an item if it matches this condition.

@@ -48,16 +48,14 @@ class KnownDeviceProofEndpoints(
 
     private val active get() = condition<KnownDeviceSecret> { it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())) }
 
-    val modelInfo = modelInfo(
-        serialization = ModelSerializationInfo<KnownDeviceSecret, UUID>(),
-        authOptions = anyAuthRoot + Authentication.isAdmin,
-        getBaseCollection = { database().collection() },
-        getCollection = {
+    val modelInfo = database.modelInfo<HasId<*>?, KnownDeviceSecret, UUID>(
+        authOptions = (anyAuthRoot + Authentication.isAdmin),
+        signals = {
             it.interceptCreate {
                 it.copy(hash = it.hash.secureHash(), expiresAt = now() + expires())
             }
         },
-        forUser = {
+        permissions = {
             val admin = condition<KnownDeviceSecret>(Authentication.isAdmin.accepts(authOrNull))
             val mine = authOrNull?.let { a ->
                 condition<KnownDeviceSecret> {
@@ -65,23 +63,21 @@ class KnownDeviceProofEndpoints(
                 }
             } ?: Condition.Never
             val active = condition<KnownDeviceSecret> { it.disabledAt.eq(null) }
-            it.withPermissions(
-                ModelPermissions(
-                    create = Condition.Never,
-                    read = admin or mine,
-                    readMask = mask {
-                        it.hash.mask("")
-                    },
-                    update = admin or (mine and active),
-                    updateRestrictions = updateRestrictions {
-                        it.subjectType.cannotBeModified()
-                        it.subjectId.cannotBeModified()
-                        it.hash.cannotBeModified()
-                        it.deviceInfo.cannotBeModified()
-                        it.establishedAt.cannotBeModified()
-                    },
-                    delete = Condition.Never,
-                )
+            ModelPermissions(
+                create = Condition.Never,
+                read = admin or mine,
+                readMask = mask {
+                    it.hash.mask("")
+                },
+                update = admin or (mine and active),
+                updateRestrictions = updateRestrictions {
+                    it.subjectType.cannotBeModified()
+                    it.subjectId.cannotBeModified()
+                    it.hash.cannotBeModified()
+                    it.deviceInfo.cannotBeModified()
+                    it.establishedAt.cannotBeModified()
+                },
+                delete = Condition.Never,
             )
         }
     )

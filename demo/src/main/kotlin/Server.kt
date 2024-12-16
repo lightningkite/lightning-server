@@ -102,23 +102,19 @@ object Server : ServerPathGroup(ServerPath.root) {
         }
     }
 
-    val userInfo = modelInfoWithDefault<User, User, UUID>(
+    val userInfo = database.modelInfo<User, User, UUID>(
         authOptions = authOptions(),
         serialization = ModelSerializationInfo(),
-        getBaseCollection = { database().collection() },
-        defaultItem = { User(email = "") },
-        forUser = { it ->
+        permissions = {
             val user = user()
             val everyone: Condition<User> = Condition.Always()
             val self: Condition<User> = condition { it._id eq user._id }
             val admin: Condition<User> = if (user.isSuperUser) Condition.Always() else Condition.Never()
-            it.withPermissions(
-                ModelPermissions(
-                    create = everyone,
-                    read = self or admin,
-                    update = self or admin,
-                    delete = self or admin
-                )
+            ModelPermissions(
+                create = everyone,
+                read = self or admin,
+                update = self or admin,
+                delete = self or admin
             )
         }
     )

@@ -60,11 +60,9 @@ class PasswordProofEndpoints(
 
     private val active get() = condition<PasswordSecret> { it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())) }
 
-    val modelInfo = modelInfo(
-        serialization = ModelSerializationInfo<PasswordSecret, UUID>(),
+    val modelInfo = database.modelInfo<HasId<*>?, PasswordSecret, UUID>(
         authOptions = anyAuthRoot + Authentication.isAdmin,
-        getBaseCollection = { database().collection() },
-        getCollection = {
+        signals = {
             it.interceptCreate {
                 evaluatePassword(it.hash)
                 if (it.hint?.contains(it.hash, true) == true)
@@ -72,28 +70,26 @@ class PasswordProofEndpoints(
                 it.copy(hash = it.hash.secureHash())
             }
         },
-        forUser = {
+        permissions = {
             val admin = condition<PasswordSecret>(Authentication.isAdmin.accepts(authOrNull))
             val mine = authOrNull?.let { a ->
                 condition<PasswordSecret> {
                     it.subjectId.eq(a.idString) and it.subjectType.eq(a.subject.name)
                 }
             } ?: Condition.Never
-            it.withPermissions(
-                ModelPermissions(
-                    create = Condition.Never,
-                    read = admin or mine,
-                    readMask = mask {
-                        it.hash.mask("")
-                    },
-                    update = admin or (mine and active),
-                    updateRestrictions = updateRestrictions {
-                        it.subjectType.cannotBeModified()
-                        it.subjectId.cannotBeModified()
-                        it.hash.cannotBeModified()
-                    },
-                    delete = Condition.Never,
-                )
+            ModelPermissions(
+                create = Condition.Never,
+                read = admin or mine,
+                readMask = mask {
+                    it.hash.mask("")
+                },
+                update = admin or (mine and active),
+                updateRestrictions = updateRestrictions {
+                    it.subjectType.cannotBeModified()
+                    it.subjectId.cannotBeModified()
+                    it.hash.cannotBeModified()
+                },
+                delete = Condition.Never,
             )
         }
     )

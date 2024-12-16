@@ -73,11 +73,9 @@ class OneTimePasswordProofEndpoints(
 
     private val active get() = condition<OtpSecret> { it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())) }
 
-    val modelInfo = modelInfo(
-        serialization = ModelSerializationInfo<OtpSecret, UUID>(),
+    val modelInfo = database.modelInfo<HasId<*>?, OtpSecret, UUID>(
         authOptions = anyAuthRoot + Authentication.isAdmin,
-        getBaseCollection = { database().collection() },
-        forUser = {
+        permissions = {
             val admin = condition<OtpSecret>(Authentication.isAdmin.accepts(authOrNull))
             val mine = authOrNull?.let { a ->
                 condition<OtpSecret> {
@@ -85,26 +83,24 @@ class OneTimePasswordProofEndpoints(
                 }
             } ?: Condition.Never
             val active = condition<OtpSecret> { it.disabledAt.eq(null) }
-            it.withPermissions(
-                ModelPermissions(
-                    create = Condition.Never,
-                    read = admin or mine,
-                    readMask = mask {
-                        it.secretBase32.mask("")
-                    },
-                    update = admin or (mine and active),
-                    updateRestrictions = updateRestrictions {
-                        it.subjectType.cannotBeModified()
-                        it.subjectId.cannotBeModified()
-                        it.secretBase32.cannotBeModified()
-                        it.issuer.cannotBeModified()
-                        it.period.cannotBeModified()
-                        it.digits.cannotBeModified()
-                        it.algorithm.cannotBeModified()
-                        it.establishedAt.cannotBeModified()
-                    },
-                    delete = Condition.Never,
-                )
+            ModelPermissions(
+                create = Condition.Never,
+                read = admin or mine,
+                readMask = mask {
+                    it.secretBase32.mask("")
+                },
+                update = admin or (mine and active),
+                updateRestrictions = updateRestrictions {
+                    it.subjectType.cannotBeModified()
+                    it.subjectId.cannotBeModified()
+                    it.secretBase32.cannotBeModified()
+                    it.issuer.cannotBeModified()
+                    it.period.cannotBeModified()
+                    it.digits.cannotBeModified()
+                    it.algorithm.cannotBeModified()
+                    it.establishedAt.cannotBeModified()
+                },
+                delete = Condition.Never,
             )
         }
     )

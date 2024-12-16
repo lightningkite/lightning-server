@@ -1,94 +1,64 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.auth.AuthOption
 import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.AuthOptions
+import com.lightningkite.lightningserver.auth.RequestAuth
+import com.lightningkite.lightningserver.auth.authOptions
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.AuthAccessor
 import com.lightningkite.serialization.contextualSerializerIfHandled
+import kotlinx.serialization.serializer
 
-@Suppress("DEPRECATION")
-@Deprecated("User newer version with auth accessor instead, as it enables more potential optimizations.")
-inline fun <reified USER : HasId<*>, reified T : HasId<ID>, reified ID : Comparable<ID>> ModelInfo(
-    noinline getCollection: () -> FieldCollection<T>,
-    noinline getBaseCollection: () -> FieldCollection<T> = { getCollection() },
-    noinline forUser: suspend FieldCollection<T>.(principal: USER) -> FieldCollection<T>,
-    modelName: String = Serialization.module.contextualSerializerIfHandled<T>().descriptor.serialName.substringBefore('<')
-        .substringAfterLast('.'),
-) = ModelInfo(
-    serialization = ModelSerializationInfo<T, ID>(),
-    authOptions = com.lightningkite.lightningserver.auth.authOptions<USER>(),
-    getCollection = getCollection,
-    getBaseCollection = getBaseCollection,
-    forUser = forUser,
-    modelName = modelName,
-)
-
-@Deprecated("User newer version with auth accessor instead, as it enables more potential optimizations.")
-fun <USER : HasId<*>, T : HasId<ID>, ID : Comparable<ID>> ModelInfo(
-    serialization: ModelSerializationInfo<T, ID>,
-    authOptions: AuthOptions<USER>,
-    getCollection: () -> FieldCollection<T>,
-    getBaseCollection: () -> FieldCollection<T> = { getCollection() },
-    forUser: suspend FieldCollection<T>.(principal: USER) -> FieldCollection<T>,
-    modelName: String = serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
-) = object : ModelInfo<USER, T, ID> {
-    override val authOptions: AuthOptions<USER> = authOptions
-    override val serialization: ModelSerializationInfo<T, ID> = serialization
-    override fun baseCollection(): FieldCollection<T> = getBaseCollection()
-    override fun registerChangeListener(action: suspend (CollectionChanges<T>) -> Unit) {
-        changeListeners.add(action)
-    }
-    val changeListeners = ArrayList<suspend (CollectionChanges<T>)->Unit>()
-    override fun collection(): FieldCollection<T> = getCollection().withChangeListeners(changeListeners)
-    override suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<T> = forUser(collection(), auth.user())
-    override val collectionName: String = modelName
-}
-
-fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> modelInfo(
-    serialization: ModelSerializationInfo<T, ID>,
-    authOptions: AuthOptions<USER>,
-    getBaseCollection: () -> FieldCollection<T>,
-    getCollection: (collection: FieldCollection<T>) -> FieldCollection<T> = { it },
-    forUser: suspend AuthAccessor<USER>.(collection: FieldCollection<T>) -> FieldCollection<T> = { it },
-    modelName: String = serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
-) = object : ModelInfo<USER, T, ID> {
-    override val authOptions: AuthOptions<USER> = authOptions
-    override val serialization: ModelSerializationInfo<T, ID> = serialization
-    override fun baseCollection(): FieldCollection<T> = getBaseCollection()
-    override fun registerChangeListener(action: suspend (CollectionChanges<T>) -> Unit) {
-        changeListeners.add(action)
-    }
-    val changeListeners = ArrayList<suspend (CollectionChanges<T>)->Unit>()
-    override fun collection(): FieldCollection<T> = getCollection(this.baseCollection().withChangeListeners(changeListeners))
-    override suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<T> =
-        auth.forUser(this.collection())
-
-    override val collectionName: String = modelName
-}
-
-/*
-T.serializer().modelInfo(database(), "collectionName") {
-    forAuth<User> {
-        it.withPermissions(ModelPermission(
-
-        ))
-    }
-    forAuth<Admin> { it }
-}
- */
-
-interface ModelInfo<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> {
+interface ModelInfo<out USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> {
     val serialization: ModelSerializationInfo<T, ID>
     val authOptions: AuthOptions<USER>
     val collectionName: String
         get() = serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
 
-    fun baseCollection(): FieldCollection<T> = collection()
-    fun collection(): FieldCollection<T> = baseCollection()
-    fun registerChangeListener(action: suspend (CollectionChanges<T>)->Unit): Unit
-    suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<T>
-    suspend fun collection(user: USER): FieldCollection<T> = collection(AuthAccessor.test(user))
+    fun baseCollection(): FieldCollection<T>
+    fun registerChangeListener(action: suspend (CollectionChanges<T>) -> Unit): Unit
+    suspend fun permissions(auth: AuthAccessor<@UnsafeVariance USER>): ModelPermissions<T>
+    suspend fun collection(auth: AuthAccessor<@UnsafeVariance USER>): FieldCollection<T>
+    fun collection(): FieldCollection<T>
+
+    suspend fun defaultItem(auth: RequestAuth<USER & Any>?): T = serialization.serializer.default()
+    fun exampleItem(): T? = null
 }
 
+suspend fun <USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>> ModelInfo<USER, T, ID>.collection(user: USER): FieldCollection<T> =
+    collection(AuthAccessor.test(user))
 
+
+inline fun <reified USER : HasId<*>?, reified T : HasId<ID>, reified ID : Comparable<ID>> (() -> Database).modelInfo(
+    authOptions: AuthOptions<USER> = authOptions<USER>(),
+    serialization: ModelSerializationInfo<T, ID> = ModelSerializationInfo(),
+    collectionName: String = serialization.serializer.descriptor.serialName.substringBefore('<')
+        .substringAfterLast('.'),
+    crossinline signals: (FieldCollection<T>) -> FieldCollection<T> = { it },
+    crossinline log: AuthAccessor<USER>?.(FieldCollection<T>) -> FieldCollection<T> = { it },
+    crossinline systemAccess: (FieldCollection<T>) -> FieldCollection<T> = { it },
+    noinline postPermissionsForUser: suspend AuthAccessor<USER>.(FieldCollection<T>) -> FieldCollection<T> = { it },
+    crossinline permissions: suspend AuthAccessor<USER>.() -> ModelPermissions<T>,
+    noinline prePermissionsForUser: suspend AuthAccessor<USER>.(FieldCollection<T>) -> FieldCollection<T> = { it },
+) = object : ModelInfo<USER, T, ID> {
+    override val serialization: ModelSerializationInfo<T, ID> = serialization
+    override val authOptions: AuthOptions<USER> = authOptions
+    override fun baseCollection(): FieldCollection<T> = this@modelInfo().collection(
+        serialization.serializer,
+        collectionName
+    )
+    val changeListeners = ArrayList<suspend (CollectionChanges<T>) -> Unit>()
+    override fun registerChangeListener(action: suspend (CollectionChanges<T>) -> Unit) {
+        changeListeners += action
+    }
+    override suspend fun permissions(auth: AuthAccessor<USER>): ModelPermissions<T> = permissions(auth)
+    fun collectionWithSignals() = baseCollection().withChangeListeners(changeListeners).let { signals(it) }
+    override suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<T> = collectionWithSignals()
+        .let { log(auth, it) }
+        .let { postPermissionsForUser(auth, it) }
+        .let { it.withPermissions(permissions(auth)) }
+        .let { prePermissionsForUser(auth, it) }
+    override fun collection(): FieldCollection<T> = systemAccess(log(null, collectionWithSignals()))
+}

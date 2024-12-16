@@ -26,6 +26,8 @@ class SerializationRegistry(val module: SerializersModule) {
     private val internalVirtualTypes = HashMap<String, VirtualType>()
     val virtualTypes: Map<String, VirtualType> get() = internalVirtualTypes
 
+    val registeredTypes get() = direct.keys + factory.keys
+
     fun copy(): SerializationRegistry = SerializationRegistry(module).also {
         it.direct += direct
         it.factory += factory
