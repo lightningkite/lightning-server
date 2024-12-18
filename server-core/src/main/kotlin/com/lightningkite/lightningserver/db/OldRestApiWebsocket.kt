@@ -10,6 +10,7 @@ import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.lightningserver.typed.ApiWebsocket
 import com.lightningkite.lightningserver.typed.AuthAccessor
 import com.lightningkite.lightningserver.typed.AuthAndPathParts
+import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.TypedServerPath0
 import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websocket.WebSocketTopic
@@ -61,6 +62,10 @@ class OldRestApiWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
     override val inputType: KSerializer<Query<T>> = Query.serializer(info.serialization.serializer)
     override val outputType: KSerializer<ListChange<T>> = ListChange.serializer(info.serialization.serializer)
     override val summary: String = "Watch"
+    override val belongsToInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path.path, "ClientModelRestEndpointsPlusWs", listOf(
+        info.serialization.serializer,
+        info.serialization.idSerializer
+    ))
 
     override suspend fun AuthAndPathParts<USER, TypedServerPath0>.willConnect(
         request: WebSocketConnectRequest

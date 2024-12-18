@@ -57,7 +57,12 @@ class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
     override val authOptions: AuthOptions<USER> get() = info.authOptions
     override val inputType: KSerializer<Condition<T>> = Condition.serializer(info.serialization.serializer)
     override val outputType: KSerializer<CollectionUpdates<T, ID>> = CollectionUpdates.serializer(info.serialization.serializer, info.serialization.idSerializer)
-    override val summary: String = "Watch"
+    override val summary: String = "Updates"
+    override val belongsToInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path.path, "ClientModelRestEndpointsPlusUpdatesWebsocket", listOf(
+        info.serialization.serializer,
+        info.serialization.idSerializer
+    ))
+    override val description: String = "Streams updates about items that fulfill your condition."
 
     override suspend fun AuthAndPathParts<USER, TypedServerPath0>.willConnect(
         request: WebSocketConnectRequest
