@@ -3,12 +3,17 @@ package com.lightningkite.lightningserver.typed
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthOptions
+import com.lightningkite.lightningserver.auth.RequestAuth
+import com.lightningkite.lightningserver.auth.auth
+import com.lightningkite.lightningserver.auth.authChecked
+import com.lightningkite.lightningserver.auth.real
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.engine.UnitTestEngine
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.TypeRetriever
@@ -77,11 +82,10 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
     }
 
     abstract class ApiWebsocketConnection<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE>(
-//        authOrNull: RequestAuth<USER & Any>?,
-//        rawRequest: Request?,
-//        parts: Array<Any?>
-    )
-//        : AuthAndPathParts<USER, PATH>(authOrNull, rawRequest, parts)  // TODO
+        authOrNull: RequestAuth<USER & Any>?,
+        rawRequest: Request?,
+        parts: Array<Any?>
+    ) : AuthAndPathParts<USER, PATH>(authOrNull, rawRequest, parts)  // TODO
     {
         abstract val currentState: STORAGE
         abstract suspend fun repullState(): STORAGE
@@ -94,7 +98,11 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
     }
 
     inner class ApiWebsocketConnectionImpl(val wraps: WebSocketConnection<ApiWebsocketStorage<STORAGE>>) :
-        ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>() {
+        ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>(
+            wraps.request.precalculatedAuth?.real() as RequestAuth<USER & Any>?,
+            wraps.request,
+            path.parameters.map { wraps.request.parts[it.name] }.toTypedArray()
+        ) {
         override val currentState: STORAGE = wraps.currentState.storage
         override suspend fun repullState(): STORAGE = wraps.repullState().storage
         override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
@@ -188,7 +196,12 @@ suspend fun <USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> A
         val id = UUID.randomUUID().toString()
         println("$id Connecting...")
         val startingState = with(auth) { willConnect(req) }
-        val mid = object : ApiWebsocket.ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>() {
+        val auth = req.authChecked(authOptions)
+        val mid = object : ApiWebsocket.ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>(
+            auth,
+            req,
+            path.parameters.map { req.parts[it.name] }.toTypedArray()
+        ) {
             override var currentState: STORAGE = startingState
             override suspend fun repullState(): STORAGE = currentState
             override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {

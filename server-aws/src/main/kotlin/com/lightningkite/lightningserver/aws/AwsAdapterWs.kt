@@ -288,6 +288,7 @@ class AwsAdapterWs(val root: AwsAdapter) {
                     sourceIp = event.requestContext.identity.sourceIp ?: "0.0.0.0"
                 )
                 try {
+                    lkEvent.authAny()  // force cache
                     val storage = rootWs.willConnectTracked(ServerPath.root, lkEvent)
                     val storageBytes = root.communicationEncoding.encodeBytes(rootWs.storageSerializer, storage)
                     val storageString = root.communicationEncoding.encodeString(rootWs.storageSerializer, storage)

@@ -70,9 +70,7 @@ class SerializationTest {
     @Test fun partial2() {
         val serializer = PartialSerializer(LargeTestModel.serializer())
         val part = partialOf<LargeTestModel> {
-            it.embeddedNullable.notNull {
-                it.value2 assign 4
-            }
+            it.embeddedNullable.notNull.value2 assign 4
             it.int assign 5
             it.intNullable assign null
         }
