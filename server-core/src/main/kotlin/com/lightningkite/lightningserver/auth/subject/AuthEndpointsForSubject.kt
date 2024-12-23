@@ -128,8 +128,8 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         // TODO: Read JWT from query params, remove and redirect
         val token =
             request.headers[HttpHeader.Authorization]?.removePrefix("bearer ")?.removePrefix("Bearer ")
-                ?: request.queryParameters.find { it.first.equals(HttpHeader.Authorization, true) }?.second
-                ?: request.queryParameters.find { it.first == "jwt" }?.second
+                ?: request.queryParameters.find { it.first.equals(HttpHeader.Authorization, true) }?.second?.replace(' ', '+')
+                ?: request.queryParameters.find { it.first == "jwt" }?.second?.replace(' ', '+')
                 ?: request.headers.cookies[HttpHeader.Authorization]
                 ?: return null
         return tokenToAuth(token, request)
@@ -506,24 +506,28 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     private suspend fun RefreshToken.session(request: Request?): Session<SUBJECT, ID>? {
         if (!valid) {
-//            if(generalSettings().debug) println("Auth failed because !valid")
+            if(generalSettings().debug) println("Auth failed because !valid")
             return null
         }
         if (type != handler.name) {
-//            if(generalSettings().debug) println("Auth failed because type != handler.name")
+            if(generalSettings().debug) println("Auth failed because type != handler.name")
             return null
         }
         val session = sessionInfo.collection().get(_id) ?: run {
-//            if(generalSettings().debug) println("Auth failed because session does not exist")
-            return null
+            if(generalSettings().debug) println("No such session")
+            throw UnauthorizedException("No such session")
         }
         if (!plainTextSecret.checkAgainstHash(session.secretHash)) {
-//            if(generalSettings().debug) println("Auth failed because !plainTextSecret.checkAgainstHash(session.secretHash)")
-            return null
+            if(generalSettings().debug) println("Auth failed because !plainTextSecret.checkAgainstHash(session.secretHash) ($plainTextSecret vs ${session.secretHash})")
+            throw UnauthorizedException("Incorrect hash for session")
+        }
+        if ((session.expires ?: Instant.DISTANT_FUTURE) < now()) {
+            if(generalSettings().debug) println("Auth failed because session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()")
+            throw UnauthorizedException("Session has expired.")
         }
         if (session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()) {
-//            if(generalSettings().debug) println("Auth failed because session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()")
-            return null
+            if(generalSettings().debug) println("Auth failed because session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()")
+            throw UnauthorizedException("Session has been terminated.")
         }
         sessionInfo.collection().updateOneById(_id, modification(dataClassPath) {
             it.lastUsed assign now()

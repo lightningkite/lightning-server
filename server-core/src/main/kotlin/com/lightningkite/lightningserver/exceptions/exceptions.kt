@@ -39,7 +39,7 @@ open class HttpStatusException(
         data = data,
     )
 
-    suspend fun toResponse(request: HttpRequest): HttpResponse {
+    suspend fun toResponse(request: Request): HttpResponse {
         if (request.headers.accept.firstOrNull() == ContentType.Text.Html) {
             return HttpResponse(body = HttpContent.Text(string = HtmlDefaults.basePage("""
                 <h1>${status.toString().escapeHTML()}</h1>

@@ -11,6 +11,7 @@ import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.settings.CorsSettings
 import com.lightningkite.lightningserver.settings.generalSettings
@@ -83,54 +84,59 @@ class AwsAdapterHttp(val root: AwsAdapter) {
             sourceIp = event.requestContext.identity.sourceIp
         )
         val result = Http.execute(request).extensionForEngineAddCors(request).extensionForEngineCompression(request)
-        val outHeaders = HashMap<String, String>()
-        result.headers.entries.forEach { outHeaders.put(it.first, it.second) }
-        val b = result.body
-        b?.type?.let { outHeaders.put(HttpHeader.ContentType, it.toString()) }
-        b?.length?.let { outHeaders.put(HttpHeader.ContentLength, it.toString()) }
-        when {
-            b == null -> {
-                val response = APIGatewayV2HTTPResponse(
-                    statusCode = result.status.code,
-                    headers = outHeaders
+        return result.toAws()
+    }
+}
+
+internal suspend fun HttpResponse.toAws(
+): APIGatewayV2HTTPResponse {
+    val outHeaders = HashMap<String, String>()
+    headers.entries.forEach { outHeaders.put(it.first, it.second) }
+    val b = body
+    b?.type?.let { outHeaders.put(HttpHeader.ContentType, it.toString()) }
+    b?.length?.let { outHeaders.put(HttpHeader.ContentLength, it.toString()) }
+    when {
+        b == null -> {
+            val response = APIGatewayV2HTTPResponse(
+                statusCode = status.code,
+                headers = outHeaders
+            )
+            return response
+        }
+
+        b is HttpContent.Text -> {
+            val response = withContext(Dispatchers.IO) {
+                APIGatewayV2HTTPResponse(
+                    statusCode = this@toAws.status.code,
+                    headers = outHeaders,
+                    body = b.text()
                 )
-                return response
             }
+            return response
+        }
 
-            b is HttpContent.Text -> {
-                val response = withContext(Dispatchers.IO) {
-                    APIGatewayV2HTTPResponse(
-                        statusCode = result.status.code,
-                        headers = outHeaders,
-                        body = b.text()
-                    )
-                }
-                return response
+        b is HttpContent.Binary -> {
+            val response = withContext(Dispatchers.IO) {
+                APIGatewayV2HTTPResponse(
+                    statusCode = this@toAws.status.code,
+                    headers = outHeaders,
+                    body = Base64.getEncoder().encodeToString(b.bytes),
+                    isBase64Encoded = true
+                )
             }
+            return response
+        }
 
-            b is HttpContent.Binary -> {
-                val response = withContext(Dispatchers.IO) {
-                    APIGatewayV2HTTPResponse(
-                        statusCode = result.status.code,
-                        headers = outHeaders,
-                        body = Base64.getEncoder().encodeToString(b.bytes),
-                        isBase64Encoded = true
-                    )
-                }
-                return response
+        else -> {
+            val response = withContext(Dispatchers.IO) {
+                APIGatewayV2HTTPResponse(
+                    statusCode = this@toAws.status.code,
+                    headers = outHeaders,
+                    body = Base64.getEncoder().encodeToString(b.stream().use { it.readAllBytes() }),
+                    isBase64Encoded = true
+                )
             }
-
-            else -> {
-                val response = withContext(Dispatchers.IO) {
-                    APIGatewayV2HTTPResponse(
-                        statusCode = result.status.code,
-                        headers = outHeaders,
-                        body = Base64.getEncoder().encodeToString(b.stream().use { it.readAllBytes() }),
-                        isBase64Encoded = true
-                    )
-                }
-                return response
-            }
+            return response
         }
     }
 }

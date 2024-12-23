@@ -5,6 +5,7 @@ import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.serverLogger
+import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -292,7 +293,6 @@ class AwsAdapterWs(val root: AwsAdapter) {
                     val storage = rootWs.willConnectTracked(ServerPath.root, lkEvent)
                     val storageBytes = root.communicationEncoding.encodeBytes(rootWs.storageSerializer, storage)
                     val storageString = root.communicationEncoding.encodeString(rootWs.storageSerializer, storage)
-                    lkEvent.authAny()  // Forces auth to be cached
                     webSocketDynamo.setState(event.requestContext.connectionId, lkEvent, storageBytes)
                     try {
                         root.lambdaClient.invoke {
@@ -318,6 +318,8 @@ class AwsAdapterWs(val root: AwsAdapter) {
                     }
                     root.logger.info("WebSocket ${event.requestContext.connectionId} connected successfully.")
                     APIGatewayV2HTTPResponse(200)
+                } catch (http: HttpStatusException){
+                    http.toResponse(lkEvent).toAws()
                 } catch (e: Exception) {
                     APIGatewayV2HTTPResponse(500, body = e.message ?: "")
                 }
