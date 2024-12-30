@@ -28,6 +28,12 @@ import kotlinx.serialization.UseContextualSerialization
 import org.junit.Test
 import java.util.*
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.auth.toRequestRequirements
+import com.lightningkite.lightningserver.http.Http
+import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.http.HttpStatus
+import com.lightningkite.lightningserver.http.test
+import io.ktor.http.decodeURLQueryComponent
 import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -346,6 +352,62 @@ class AuthEndpointsForSubjectTest {
             client_secret = oauthSecret,
         ))
         println(self1)
+    }
+
+    @Test fun testPresignOk(): Unit = runBlocking {
+        val url = TestSettings.testUserSubject.presign(
+            TestSettings.authenticatedGet.toRequestRequirements(),
+            TestSettings.testAdmin.await()._id
+        )
+        println(url)
+        val m = Http.matcher.match(url.substringBefore('?'), HttpMethod.GET)!!
+        assertEquals(HttpStatus.OK, m.endpoint.test(
+            parts = m.parts,
+            wildcard = m.wildcard,
+            queryParameters = url.substringAfter('?', "").split('&').map { it.substringBefore('=') to it.substringAfter('=').decodeURLQueryComponent() }
+        ).status)
+    }
+
+    @Test fun testPresignWrongPath(): Unit = runBlocking {
+        val url = TestSettings.testUserSubject.presign(
+            TestSettings.authenticatedGet.toRequestRequirements(),
+            TestSettings.testAdmin.await()._id
+        )
+        println(url)
+        val m = Http.matcher.match(TestSettings.authenticatedGet2.path.toString(), HttpMethod.GET)!!
+        assertEquals(HttpStatus.Unauthorized, m.endpoint.test(
+            parts = m.parts,
+            wildcard = m.wildcard,
+            queryParameters = url.substringAfter('?', "").split('&').map { it.substringBefore('=') to it.substringAfter('=').decodeURLQueryComponent() }
+        ).status)
+    }
+
+    @Test fun testPresignOkPart(): Unit = runBlocking {
+        val url = TestSettings.testUserSubject.presign(
+            TestSettings.authenticatedGet2.toRequestRequirements(parts = mapOf("id" to "asdf")),
+            TestSettings.testAdmin.await()._id
+        )
+        println(url)
+        val m = Http.matcher.match(url.substringBefore('?'), HttpMethod.GET)!!
+        assertEquals(HttpStatus.OK, m.endpoint.test(
+            parts = m.parts,
+            wildcard = m.wildcard,
+            queryParameters = url.substringAfter('?', "").split('&').map { it.substringBefore('=') to it.substringAfter('=').decodeURLQueryComponent() }
+        ).status)
+    }
+
+    @Test fun testPresignWrongPart(): Unit = runBlocking {
+        val url = TestSettings.testUserSubject.presign(
+            TestSettings.authenticatedGet2.toRequestRequirements(parts = mapOf("id" to "asdf")),
+            TestSettings.testAdmin.await()._id
+        )
+        println(url)
+        val m = Http.matcher.match(url.substringBefore('?').replace("asdf", "fdsa"), HttpMethod.GET)!!
+        assertEquals(HttpStatus.Unauthorized, m.endpoint.test(
+            parts = m.parts,
+            wildcard = m.wildcard,
+            queryParameters = url.substringAfter('?', "").split('&').map { it.substringBefore('=') to it.substringAfter('=').decodeURLQueryComponent() }
+        ).status)
     }
 
 }

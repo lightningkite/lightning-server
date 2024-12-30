@@ -32,7 +32,7 @@ data class HttpRequest(
         get() = endpoint
     override val path: ServerPath
         get() = endpoint.path
-    val method: HttpMethod
+    override val method: HttpMethod
         get() = endpoint.method
 
     fun queryParameter(key: String): String? = queryParameters.find { it.first == key }?.second

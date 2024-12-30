@@ -9,6 +9,7 @@ import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.now
@@ -71,13 +72,16 @@ data class WebSocketConnectRequest constructor(
     override val domain: String = "",
     override val protocol: String = "",
     override val sourceIp: String = "",
-    var precalculatedAuth: RequestAuthSerializable? = RequestAuthSerializable.dummy,
+    var precalculatedAuth: RequestAuthSerializable? = null,
+    var hasPrecalculatedAuth: Boolean = false,
 ) : Request {
+    override val method: HttpMethod
+        get() = HttpMethod.WEBSOCKET
     fun queryParameter(key: String): String? = queryParameters.find { it.first == key }?.second
     fun queryParameterCaseInsensitive(key: String): String? = queryParameters.find { it.first.equals(key, true) }?.second
     @Transient private val cacheCalc = HashMap<Request.CacheKey<*>, Any?>()
     init {
-        if(precalculatedAuth != RequestAuthSerializable.dummy)
+        if(hasPrecalculatedAuth)
             cacheCalc[RequestAuth.Key] = precalculatedAuth?.real()
     }
     override suspend fun <T> cache(key: Request.CacheKey<T>): T {
@@ -85,7 +89,10 @@ data class WebSocketConnectRequest constructor(
         if (cacheCalc.containsKey(key)) return cacheCalc[key] as T
         val calculated: T = key.calculate(this)
         cacheCalc[key] = calculated
-        if(key == RequestAuth.Key) precalculatedAuth = (calculated as? RequestAuth<*>)?.serializable(now() + 1.days)
+        if(key == RequestAuth.Key) {
+            precalculatedAuth = (calculated as? RequestAuth<*>)?.serializable(now() + 1.days)
+            hasPrecalculatedAuth = true
+        }
         return calculated
     }
 }

@@ -147,9 +147,9 @@ data class MongoFields(
                     appendLine("""override fun get(receiver: $typeReference): ${field.kotlinType.toKotlin()} = receiver.${field.name}""")
                     appendLine("""override fun setCopy(receiver: $typeReference, value: ${field.kotlinType.toKotlin()}) = receiver.copy(${field.name} = value)""")
                     appendLine(
-                        """override val serializer: KSerializer<${field.kotlinType.toKotlin()}> by lazy { ($classReference.serializer($nothings) as GeneratedSerializer<*>).childSerializers()[$index] as KSerializer<${field.kotlinType.toKotlin()}> }"""
+                        """override val serializer: KSerializer<${field.kotlinType.toKotlin()}> by lazy { ($classReference.serializer(${declaration.typeParameters.joinToString(", "){ it.name.asString().decapitalizeAsciiOnly() }}) as GeneratedSerializer<*>).childSerializers()[$index] as KSerializer<${field.kotlinType.toKotlin()}> }"""
                     )
-                    appendLine("""override val annotations: List<Annotation> by lazy { $classReference.serializer($nothings).descriptor.getElementAnnotations($index) }""")
+                    appendLine("""override val annotations: List<Annotation> by lazy { $classReference.serializer(${declaration.typeParameters.joinToString(", "){ it.name.asString().decapitalizeAsciiOnly() }}).descriptor.getElementAnnotations($index) }""")
                     field.default?.let {
                         appendLine("""override val default: ${field.kotlinType.toKotlin()} = $it""")
                     }

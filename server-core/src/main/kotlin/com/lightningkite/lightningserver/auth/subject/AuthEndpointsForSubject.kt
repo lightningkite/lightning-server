@@ -7,6 +7,7 @@ import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.auth.RequestAuth.RequestRequirements
 import com.lightningkite.lightningserver.auth.oauth.*
 import com.lightningkite.lightningserver.auth.proof.*
 import com.lightningkite.lightningserver.auth.token.PrivateTinyTokenFormat
@@ -21,6 +22,8 @@ import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.exceptions.*
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -44,6 +47,7 @@ import org.jetbrains.annotations.TestOnly
 import java.security.SecureRandom
 import java.util.*
 import kotlin.math.min
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
@@ -133,6 +137,33 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 ?: request.headers.cookies[HttpHeader.Authorization]
                 ?: return null
         return tokenToAuth(token, request)
+    }
+
+    fun presignToken(forSession: Session<SUBJECT, ID>, requirements: RequestRequirements): String {
+        return tokenFormat().create(handler, RequestAuth(
+            subject = handler,
+            sessionId = forSession._id,
+            rawId = forSession.subjectId,
+            issuedAt = now(),
+            scopes = forSession.scopes,
+            fromMasquerade = null,
+            requirements = requirements
+        ))
+    }
+    fun presignToken(forId: ID, requirements: RequestRequirements): String {
+        return tokenFormat().create(handler, RequestAuth(
+            subject = handler,
+            sessionId = null,
+            rawId = forId,
+            issuedAt = now(),
+            requirements = requirements
+        ))
+    }
+    fun presign(request: RequestRequirements, forSession: Session<SUBJECT, ID>): String {
+        return "${request.pathPlusQueryParametersAnd}${HttpHeader.Authorization}=${presignToken(forSession, request)}"
+    }
+    fun presign(request: RequestRequirements, forId: ID): String {
+        return "${request.pathPlusQueryParametersAnd}${HttpHeader.Authorization}=${presignToken(forId, request)}"
     }
 
     suspend fun tokenToAuth(token: String, request: Request?): RequestAuth<SUBJECT>? {
@@ -755,5 +786,3 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     val html = DebuggingHtmlEndpoints()
 }
-
-

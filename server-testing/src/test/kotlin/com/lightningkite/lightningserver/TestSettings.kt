@@ -5,6 +5,8 @@ import com.lightningkite.lightningserver.files.ServerFile
 import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningdb.insertOne
 import com.lightningkite.lightningdb.test.*
+import com.lightningkite.lightningserver.auth.AuthType
+import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.auth.authOptions
 import com.lightningkite.lightningserver.auth.authRequired
@@ -15,6 +17,7 @@ import com.lightningkite.lightningserver.auth.old.BaseAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.EmailAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.UserEmailAccess
 import com.lightningkite.lightningserver.auth.old.userEmailAccess
+import com.lightningkite.lightningserver.auth.subject.AuthEndpointsForSubject
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
@@ -42,6 +45,7 @@ import com.lightningkite.prepareModelsShared
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
+import kotlinx.serialization.KSerializer
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes

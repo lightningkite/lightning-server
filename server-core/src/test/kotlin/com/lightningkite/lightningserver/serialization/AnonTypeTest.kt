@@ -5,6 +5,7 @@ import com.lightningkite.lightningdb.Condition
 import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.Mask
+import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.auth.RequestAuthSerializable
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelRestUpdatesWebsocketData
@@ -17,6 +18,7 @@ import com.lightningkite.lightningserver.pubsub.PubSub
 import com.lightningkite.lightningserver.websocket.MultiplexWebSocketHandlerConnectionInfo
 import com.lightningkite.lightningserver.websocket.MultiplexWebSocketHandlerState
 import com.lightningkite.lightningserver.websocket.QueryParamWebSocketHandlerData
+import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.now
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.ContextualSerializer
@@ -69,11 +71,12 @@ class AnonTypeTest {
     @Serializable @GenerateDataClassPaths data class ComplexWithId(override val _id: UUID, val x: Int = 0, val y: String = "", val z: Complex? = null): HasId<UUID>
     @Test fun wsWrapSizing() {
         prepareModelsServerCoreTest()
+        TestSettings
         fun value(): AnonType {
             val a = AnonType(
                 ModelRestUpdatesWebsocketData(
                     user = RequestAuthSerializable(
-                        "User",
+                        TestSettings.testUserSubject.handler.name,
                         UUID.random(),
                         UUID.random().toString(),
                         now(),
@@ -86,25 +89,29 @@ class AnonTypeTest {
                 ),
                 ModelRestUpdatesWebsocketData.serializer(ComplexWithId.serializer(), ContextualSerializer(UUID::class))
             )
+            val req = WebSocketConnectRequest(
+                path = ServerPath("test/test"),
+                domain = "domain.com",
+                protocol = "https",
+                sourceIp = "0.0.0.0",
+                headers = HttpHeaders("Authorization" to "something or other")
+
+            )
             val base = QueryParamWebSocketHandlerData(
-                "test/test", AnonType(
+                req, AnonType(
                     MultiplexWebSocketHandlerState(
                         mapOf(
                             "first" to MultiplexWebSocketHandlerConnectionInfo(
-                                "test/first/rest",
                                 storage = a,
-                                topics = setOf("topic/A")
+                                topics = setOf("topic/A"),
+                                request = req
                             ),
                             "first" to MultiplexWebSocketHandlerConnectionInfo(
-                                "test/second/rest",
                                 storage = a,
-                                topics = setOf("topic/A")
+                                topics = setOf("topic/A"),
+                                request = req
                             ),
                         ),
-                        domain = "domain.com",
-                        protocol = "https",
-                        sourceIp = "0.0.0.0",
-                        headers = HttpHeaders("Authorization" to "something or other")
                     ),
                     MultiplexWebSocketHandlerState.serializer()
                 )

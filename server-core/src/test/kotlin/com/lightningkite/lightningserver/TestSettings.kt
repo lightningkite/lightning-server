@@ -45,6 +45,12 @@ import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration
 import java.util.*
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.get
+import com.lightningkite.lightningserver.http.handler
+import com.lightningkite.lightningserver.typed.arg
+import com.lightningkite.lightningserver.typed.get
 import kotlin.time.Duration.Companion.minutes
 
 object TestSettings: ServerPathGroup(ServerPath.root) {
@@ -179,6 +185,15 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         handler = subjectHandler,
         database = database,
     )
+
+    val authenticatedGet = path("authenticated-get").get.handler { req ->
+        req.authChecked(authOptions<TestUser>())
+        HttpResponse.plainText("OK")
+    }
+    val authenticatedGet2 = path("authenticated-get").arg<String>("id").get.endpoint.handler { req ->
+        req.authChecked(authOptions<TestUser>())
+        HttpResponse.plainText("OK")
+    }
 
     object EmailCacheKey : RequestAuth.CacheKey<TestUser, UUID, String>() {
         override val name: String
