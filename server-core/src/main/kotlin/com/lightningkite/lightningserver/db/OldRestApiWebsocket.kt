@@ -67,12 +67,13 @@ class OldRestApiWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
         info.serialization.idSerializer
     ))
 
-    override suspend fun AuthAndPathParts<USER, TypedServerPath0>.willConnect(
+    override suspend fun willConnect(
+        auth: AuthAndPathParts<USER, TypedServerPath0>,
         request: WebSocketConnectRequest
     ): OldRestApiWebsocketData<T, ID> {
         return OldRestApiWebsocketData(
-            user = authOrNull?.serializable(now().plus(1.days)),
-            mask = info.collection(this).mask()
+            user = auth.authOrNull?.serializable(now().plus(1.days)),
+            mask = info.collection(auth).mask()
         )
     }
     

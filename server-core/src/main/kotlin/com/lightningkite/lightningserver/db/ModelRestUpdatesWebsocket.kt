@@ -64,12 +64,13 @@ class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
     ))
     override val description: String = "Streams updates about items that fulfill your condition."
 
-    override suspend fun AuthAndPathParts<USER, TypedServerPath0>.willConnect(
+    override suspend fun willConnect(
+        auth: AuthAndPathParts<USER, TypedServerPath0>,
         request: WebSocketConnectRequest
     ): ModelRestUpdatesWebsocketData<T, ID> {
         return ModelRestUpdatesWebsocketData(
-            user = authOrNull?.serializable(now().plus(1.days)),
-            mask = info.collection(this).mask()
+            user = auth.authOrNull?.serializable(now().plus(1.days)),
+            mask = info.collection(auth).mask()
         )
     }
 

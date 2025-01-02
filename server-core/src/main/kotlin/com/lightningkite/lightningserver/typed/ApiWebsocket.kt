@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.auth.auth
 import com.lightningkite.lightningserver.auth.authChecked
 import com.lightningkite.lightningserver.auth.real
+import com.lightningkite.lightningserver.auth.serializable
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.engine.UnitTestEngine
@@ -19,6 +20,7 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.lightningserver.utils.cancellingScope
 import com.lightningkite.lightningserver.websocket.*
+import com.lightningkite.now
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
@@ -29,6 +31,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import java.util.UUID
+import kotlin.time.Duration.Companion.minutes
 
 @Serializable
 data class ApiWebsocketStorage<STORAGE>(
@@ -60,7 +63,7 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
     open val errorCases: List<LSError> get() = emptyList()
     open override val belongsToInterface: Documentable.InterfaceInfo? get() = null
 
-    abstract suspend fun AuthAndPathParts<USER, PATH>.willConnect(request: WebSocketConnectRequest): STORAGE
+    abstract suspend fun willConnect(auth: AuthAndPathParts<USER, PATH>, request: WebSocketConnectRequest): STORAGE
     open suspend fun didConnect(connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>) {}
     open suspend fun messageFromClient(
         connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>,
@@ -129,7 +132,7 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
                 ?: request.headers.contentType?.toString()
                 ?: request.headers.accept.firstOrNull()?.takeUnless { it == ContentType.Any }?.toString()
                 ?: ContentType.Application.Json.toString()),
-            with(path.authAndPathParts(request, authOptions)) { willConnect(request) }
+            willConnect(path.authAndPathParts(request, authOptions), request)
         )
 
     final override suspend fun didConnect(
@@ -190,12 +193,14 @@ suspend fun <USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> A
             domain = "test",
             protocol = "ws",
             sourceIp = "127.0.0.1",
+            precalculatedAuth = auth.authOrNull?.serializable(now() + 10.minutes),
+            hasPrecalculatedAuth = true,
         )
         val channel = Channel<OUTPUT>(20)
 
         val id = UUID.randomUUID().toString()
         println("$id Connecting...")
-        val startingState = with(auth) { willConnect(req) }
+        val startingState = willConnect(auth, req)
         val auth = req.authChecked(authOptions)
         val mid = object : ApiWebsocket.ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>(
             auth,

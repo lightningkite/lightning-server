@@ -35,7 +35,8 @@ class ApiWebsocketTest {
 
         val general = WebSocketTopic("sample", TestType.serializer())
 
-        override suspend fun AuthAndPathParts<HasId<*>?, TypedServerPath0>.willConnect(
+        override suspend fun willConnect(
+            auth: AuthAndPathParts<HasId<*>?, TypedServerPath0>,
             request: WebSocketConnectRequest
         ): TestType  {
             val id = UUID.random().toString()
