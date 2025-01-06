@@ -14,224 +14,225 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
 fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
-    val safeDocumentables =
-        endpoints.filter { it.inputType == Unit.serializer() || it.route.method != HttpMethod.GET }.toList()
-    appendLine("import { ${fromLightningServerPackage.joinToString()}, apiCall, Path, DeepPartial } from '@lightningkite/lightning-server-simplified'")
-    appendLine()
-    usedTypes
-        .filter { it.descriptor.simpleSerialName !in skipFromLsPackage }
-        .sortedBy { it.descriptor.simpleSerialName }
-        .forEach {
-            when (it.descriptor.kind) {
-                is StructureKind.CLASS -> {
-                    if (it is MySealedClassSerializer) return@forEach
-//                    emitTypeComment(it)
-                    append("export interface ")
-                    it.write().let { out.append(it) }
-                    appendLine(" {")
-                    (it.serializableProperties?.map { it.serializer } ?: it.tryChildSerializers()?.toList()
-                    ?: listOf()).forEachIndexed { index, sub ->
-                        append("    ")
-                        append(it.descriptor.getElementName(index))
-                        append(": ")
-                        out.append(sub.write())
-                        appendLine()
-                    }
-                    appendLine("}")
-                }
-
-                is SerialKind.ENUM -> {
-//                    emitTypeComment(it)
-                    append("export enum ")
-                    it.write().let { out.append(it) }
-                    appendLine(" {")
-                    for (index in 0 until it.descriptor.elementsCount) {
-                        append("    ")
-                        it.descriptor.getElementName(index).first()
-                            .let { if (it.isJavaIdentifierStart()) it else '_' }.let { append(it) }
-                        it.descriptor.getElementName(index).drop(1)
-                            .map { if (it.isJavaIdentifierPart()) it else '_' }.forEach { append(it) }
-                        append(" = \"")
-                        append(it.descriptor.getElementName(index))
-                        append("\",")
-                        appendLine()
-                    }
-                    appendLine("}")
-                }
-
-                is PrimitiveKind.STRING -> {
-                    if (it.descriptor.simpleSerialName != "String") {
-//                        emitTypeComment(it)
-                        appendLine("type ${it.descriptor.simpleSerialName} = string  // ${it.descriptor.serialName}")
-                    }
-                }
-
-                else -> {}
-            }
-        }
-
-    appendLine()
-    appendLine()
-    appendLine()
-
-    val byGroup = safeDocumentables.groupBy { it.docGroupIdentifier }
-    val groups = byGroup.keys.filterNotNull().sortedBy { it.groupToPartName() }
-    appendLine("export interface Api {")
-    for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
-        appendLine("    ")
-        appendLine("     /**")
-        entry.description.split('\n').map { it.trim() }.forEach {
-            appendLine("     * $it")
-        }
-        appendLine("     **/")
-        append("    ")
-        append(entry.functionName)
-        this.functionHeader(entry)
-        appendLine()
-    }
-    for (group in groups) {
-        appendLine("    readonly ${group.groupToPartName()}: {")
-        for (entry in byGroup[group]!!) {
-            appendLine("        ")
-            appendLine("        /**")
-            entry.description.split('\n').map { it.trim() }.forEach {
-                appendLine("        * $it")
-            }
-            appendLine("        **/")
-            append("        ")
-            append(entry.functionName)
-            this.functionHeader(entry)
-            appendLine()
-        }
-        appendLine("    }")
-    }
-    appendLine("}")
-
-    appendLine()
-    appendLine()
-    appendLine()
-
-    val byUserType = safeDocumentables.groupBy { it.primaryAuthName }
-    val userTypes = byUserType.keys.filterNotNull()
-    userTypes.forEach { userType ->
-        @Suppress("NAME_SHADOWING") val byGroup =
-            ((byUserType[userType] ?: listOf()) + (byUserType[null] ?: listOf())).groupBy { it.docGroupIdentifier }
-        @Suppress("NAME_SHADOWING") val groups = byGroup.keys.filterNotNull().sortedBy { it.groupToPartName() }
-        val sessionClassName = "${userType.substringAfterLast('.')}Session"
-        appendLine("export class $sessionClassName {")
-        appendLine("    constructor(public api: Api, public ${userType.userTypeTokenName()}: ()=>string) {}")
-        for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
-            appendLine("    ")
-            appendLine("    /**")
-            entry.description.split('\n').map { it.trim() }.forEach {
-                appendLine("    * $it")
-            }
-            appendLine("    **/")
-            append("    ")
-            append(entry.functionName)
-            this.functionHeader(entry, skipAuth = true)
-            append(" { return this.api.")
-            functionCall(entry, skipAuth = false, authUsesThis = true, overrideUserType = userType)
-            appendLine(" } ")
-        }
-        for (group in groups) {
-            appendLine("    readonly ${group.groupToPartName()} = {")
-            for (entry in byGroup[group]!!) {
-                appendLine("        ")
-                appendLine("        /**")
-                entry.description.split('\n').map { it.trim() }.forEach {
-                    appendLine("        * $it")
-                }
-                appendLine("        **/")
-                append("        ")
-                append(entry.functionName)
-                append(": ")
-                this.functionHeader(entry, skipAuth = true)
-                append(" => { return this.api.")
-                append(group.groupToPartName())
-                append(".")
-                functionCall(entry, skipAuth = false, authUsesThis = true, overrideUserType = userType)
-                appendLine(" }, ")
-            }
-            appendLine("    }")
-        }
-        appendLine("}")
-        appendLine()
-    }
-
-    appendLine()
-    appendLine()
-    appendLine()
-
-    appendLine("export class LiveApi implements Api {")
-    appendLine("    public constructor(public httpUrl: string, public socketUrl: string = httpUrl, public extraHeaders: Record<string, string> = {}, public responseInterceptors?: (x: Response)=>Response) {}")
-    for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
-        appendLine("    ")
-        appendLine("    /**")
-        entry.description.split('\n').map { it.trim() }.forEach {
-            appendLine("    * $it")
-        }
-        appendLine("    **/")
-        append("    ")
-        append(entry.functionName)
-        this.functionHeader(entry, skipAuth = false)
-        appendLine(" {")
-        val hasInput = entry.inputType != Unit.serializer()
-        appendLine("        return apiCall<${entry.inputType.write()}>(")
-        appendLine("            `\${this.httpUrl}${entry.path.path.escaped}`,")
-        appendLine("            ${if (hasInput) "input" else "undefined"},")
-        appendLine("            {")
-        appendLine("                method: \"${entry.route.method}\",")
-        entry.primaryAuthName?.let {
-            appendLine("                headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
-        }
-        appendLine("            }, ")
-        appendLine("            undefined,")
-        appendLine("            this.responseInterceptors, ")
-        entry.outputType.takeUnless { it == Unit.serializer() }?.let {
-            appendLine("        ).then(x => x.json())")
-        } ?: run {
-            appendLine("        ).then(x => undefined)")
-        }
-        appendLine("    }")
-    }
-    for (group in groups.sortedBy { it.groupToPartName() }) {
-        appendLine("    readonly ${group.groupToPartName()} = {")
-        for (entry in byGroup[group]!!) {
-            appendLine("        ")
-            appendLine("        /**")
-            entry.description.split('\n').map { it.trim() }.forEach {
-                appendLine("        * $it")
-            }
-            appendLine("        **/")
-            append("        ")
-            append(entry.functionName)
-            append(": ")
-            this.functionHeader(entry, skipAuth = false)
-            appendLine(" => {")
-            val hasInput = entry.inputType != Unit.serializer()
-            appendLine("            return apiCall<${entry.inputType.write()}>(")
-            appendLine("                `\${this.httpUrl}${entry.path.path.escaped}`,")
-            appendLine("                ${if (hasInput) "input" else "undefined"},")
-            appendLine("                {")
-            appendLine("                    method: \"${entry.route.method}\",")
-            entry.primaryAuthName?.let {
-                appendLine("                    headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
-            }
-            appendLine("                }, ")
-            appendLine("                undefined,")
-            appendLine("                this.responseInterceptors, ")
-            entry.outputType.takeUnless { it == Unit.serializer() }?.let {
-                appendLine("            ).then(x => x.json())")
-            } ?: run {
-                appendLine("            ).then(x => undefined)")
-            }
-            appendLine("        },")
-        }
-        appendLine("    }")
-    }
-    appendLine("}")
-    appendLine()
+    "nope"
+//    val safeDocumentables =
+//        endpoints.filter { it.inputType == Unit.serializer() || it.route.method != HttpMethod.GET }.toList()
+//    appendLine("import { ${fromLightningServerPackage.joinToString()}, apiCall, Path, DeepPartial } from '@lightningkite/lightning-server-simplified'")
+//    appendLine()
+//    usedTypes
+//        .filter { it.descriptor.simpleSerialName !in skipFromLsPackage }
+//        .sortedBy { it.descriptor.simpleSerialName }
+//        .forEach {
+//            when (it.descriptor.kind) {
+//                is StructureKind.CLASS -> {
+//                    if (it is MySealedClassSerializer) return@forEach
+////                    emitTypeComment(it)
+//                    append("export interface ")
+//                    it.write().let { out.append(it) }
+//                    appendLine(" {")
+//                    (it.serializableProperties?.map { it.serializer } ?: it.tryChildSerializers()?.toList()
+//                    ?: listOf()).forEachIndexed { index, sub ->
+//                        append("    ")
+//                        append(it.descriptor.getElementName(index))
+//                        append(": ")
+//                        out.append(sub.write())
+//                        appendLine()
+//                    }
+//                    appendLine("}")
+//                }
+//
+//                is SerialKind.ENUM -> {
+////                    emitTypeComment(it)
+//                    append("export enum ")
+//                    it.write().let { out.append(it) }
+//                    appendLine(" {")
+//                    for (index in 0 until it.descriptor.elementsCount) {
+//                        append("    ")
+//                        it.descriptor.getElementName(index).first()
+//                            .let { if (it.isJavaIdentifierStart()) it else '_' }.let { append(it) }
+//                        it.descriptor.getElementName(index).drop(1)
+//                            .map { if (it.isJavaIdentifierPart()) it else '_' }.forEach { append(it) }
+//                        append(" = \"")
+//                        append(it.descriptor.getElementName(index))
+//                        append("\",")
+//                        appendLine()
+//                    }
+//                    appendLine("}")
+//                }
+//
+//                is PrimitiveKind.STRING -> {
+//                    if (it.descriptor.simpleSerialName != "String") {
+////                        emitTypeComment(it)
+//                        appendLine("type ${it.descriptor.simpleSerialName} = string  // ${it.descriptor.serialName}")
+//                    }
+//                }
+//
+//                else -> {}
+//            }
+//        }
+//
+//    appendLine()
+//    appendLine()
+//    appendLine()
+//
+//    val byGroup = safeDocumentables.groupBy { it.docGroupIdentifier }
+//    val groups = byGroup.keys.filterNotNull().sortedBy { it.groupToPartName() }
+//    appendLine("export interface Api {")
+//    for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
+//        appendLine("    ")
+//        appendLine("     /**")
+//        entry.description.split('\n').map { it.trim() }.forEach {
+//            appendLine("     * $it")
+//        }
+//        appendLine("     **/")
+//        append("    ")
+//        append(entry.functionName)
+//        this.functionHeader(entry)
+//        appendLine()
+//    }
+//    for (group in groups) {
+//        appendLine("    readonly ${group.groupToPartName()}: {")
+//        for (entry in byGroup[group]!!) {
+//            appendLine("        ")
+//            appendLine("        /**")
+//            entry.description.split('\n').map { it.trim() }.forEach {
+//                appendLine("        * $it")
+//            }
+//            appendLine("        **/")
+//            append("        ")
+//            append(entry.functionName)
+//            this.functionHeader(entry)
+//            appendLine()
+//        }
+//        appendLine("    }")
+//    }
+//    appendLine("}")
+//
+//    appendLine()
+//    appendLine()
+//    appendLine()
+//
+//    val byUserType = safeDocumentables.groupBy { it.primaryAuthName }
+//    val userTypes = byUserType.keys.filterNotNull()
+//    userTypes.forEach { userType ->
+//        @Suppress("NAME_SHADOWING") val byGroup =
+//            ((byUserType[userType] ?: listOf()) + (byUserType[null] ?: listOf())).groupBy { it.docGroupIdentifier }
+//        @Suppress("NAME_SHADOWING") val groups = byGroup.keys.filterNotNull().sortedBy { it.groupToPartName() }
+//        val sessionClassName = "${userType.substringAfterLast('.')}Session"
+//        appendLine("export class $sessionClassName {")
+//        appendLine("    constructor(public api: Api, public ${userType.userTypeTokenName()}: ()=>string) {}")
+//        for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
+//            appendLine("    ")
+//            appendLine("    /**")
+//            entry.description.split('\n').map { it.trim() }.forEach {
+//                appendLine("    * $it")
+//            }
+//            appendLine("    **/")
+//            append("    ")
+//            append(entry.functionName)
+//            this.functionHeader(entry, skipAuth = true)
+//            append(" { return this.api.")
+//            functionCall(entry, skipAuth = false, authUsesThis = true, overrideUserType = userType)
+//            appendLine(" } ")
+//        }
+//        for (group in groups) {
+//            appendLine("    readonly ${group.groupToPartName()} = {")
+//            for (entry in byGroup[group]!!) {
+//                appendLine("        ")
+//                appendLine("        /**")
+//                entry.description.split('\n').map { it.trim() }.forEach {
+//                    appendLine("        * $it")
+//                }
+//                appendLine("        **/")
+//                append("        ")
+//                append(entry.functionName)
+//                append(": ")
+//                this.functionHeader(entry, skipAuth = true)
+//                append(" => { return this.api.")
+//                append(group.groupToPartName())
+//                append(".")
+//                functionCall(entry, skipAuth = false, authUsesThis = true, overrideUserType = userType)
+//                appendLine(" }, ")
+//            }
+//            appendLine("    }")
+//        }
+//        appendLine("}")
+//        appendLine()
+//    }
+//
+//    appendLine()
+//    appendLine()
+//    appendLine()
+//
+//    appendLine("export class LiveApi implements Api {")
+//    appendLine("    public constructor(public httpUrl: string, public socketUrl: string = httpUrl, public extraHeaders: Record<string, string> = {}, public responseInterceptors?: (x: Response)=>Response) {}")
+//    for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
+//        appendLine("    ")
+//        appendLine("    /**")
+//        entry.description.split('\n').map { it.trim() }.forEach {
+//            appendLine("    * $it")
+//        }
+//        appendLine("    **/")
+//        append("    ")
+//        append(entry.functionName)
+//        this.functionHeader(entry, skipAuth = false)
+//        appendLine(" {")
+//        val hasInput = entry.inputType != Unit.serializer()
+//        appendLine("        return apiCall<${entry.inputType.write()}>(")
+//        appendLine("            `\${this.httpUrl}${entry.path.path.escaped}`,")
+//        appendLine("            ${if (hasInput) "input" else "undefined"},")
+//        appendLine("            {")
+//        appendLine("                method: \"${entry.route.method}\",")
+//        entry.primaryAuthName?.let {
+//            appendLine("                headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
+//        }
+//        appendLine("            }, ")
+//        appendLine("            undefined,")
+//        appendLine("            this.responseInterceptors, ")
+//        entry.outputType.takeUnless { it == Unit.serializer() }?.let {
+//            appendLine("        ).then(x => x.json())")
+//        } ?: run {
+//            appendLine("        ).then(x => undefined)")
+//        }
+//        appendLine("    }")
+//    }
+//    for (group in groups.sortedBy { it.groupToPartName() }) {
+//        appendLine("    readonly ${group.groupToPartName()} = {")
+//        for (entry in byGroup[group]!!) {
+//            appendLine("        ")
+//            appendLine("        /**")
+//            entry.description.split('\n').map { it.trim() }.forEach {
+//                appendLine("        * $it")
+//            }
+//            appendLine("        **/")
+//            append("        ")
+//            append(entry.functionName)
+//            append(": ")
+//            this.functionHeader(entry, skipAuth = false)
+//            appendLine(" => {")
+//            val hasInput = entry.inputType != Unit.serializer()
+//            appendLine("            return apiCall<${entry.inputType.write()}>(")
+//            appendLine("                `\${this.httpUrl}${entry.path.path.escaped}`,")
+//            appendLine("                ${if (hasInput) "input" else "undefined"},")
+//            appendLine("                {")
+//            appendLine("                    method: \"${entry.route.method}\",")
+//            entry.primaryAuthName?.let {
+//                appendLine("                    headers: ${it.userTypeTokenName()} ? { ...this.extraHeaders, \"Authorization\": `Bearer \${${it.userTypeTokenName()}}` } : this.extraHeaders,")
+//            }
+//            appendLine("                }, ")
+//            appendLine("                undefined,")
+//            appendLine("                this.responseInterceptors, ")
+//            entry.outputType.takeUnless { it == Unit.serializer() }?.let {
+//                appendLine("            ).then(x => x.json())")
+//            } ?: run {
+//                appendLine("            ).then(x => undefined)")
+//            }
+//            appendLine("        },")
+//        }
+//        appendLine("    }")
+//    }
+//    appendLine("}")
+//    appendLine()
 }
 
 
@@ -264,6 +265,27 @@ fun Documentable.Companion.simpleTypescriptSdk(out: Appendable) = with(out) {
             groupCount(input: GroupCountQuery<T>, userToken: string): Promise<Record<string, number>>
             aggregate(input: AggregateQuery<T>, userToken: string): Promise<number | null | undefined>
             groupAggregate(input: GroupAggregateQuery<T>, userToken: string): Promise<Record<string, number | null | undefined>>
+        }
+        interface SessionAutoEndpoints<T> {
+            default(): Promise<T>
+            query(input: Query<T>): Promise<Array<T>>
+            queryPartial(input: QueryPartial<T>): Promise<Array<DeepPartial<T>>>
+            detail(id: UUID): Promise<T>
+            insertBulk(input: Array<T>): Promise<Array<T>>
+            insert(input: T): Promise<T>
+            upsert(id: UUID, input: T): Promise<T>
+            bulkReplace(input: Array<T>): Promise<Array<T>>
+            replace(id: UUID, input: T): Promise<T>
+            bulkModify(input: MassModification<T>): Promise<number>
+            modifyWithDiff(id: UUID, input: Modification<T>): Promise<EntryChange<T>>
+            modify(id: UUID, input: Modification<T>): Promise<T>
+            simplifiedModify(id: UUID, input: DeepPartial<T>): Promise<T>
+            bulkDelete(input: Condition<T>): Promise<number>
+            delete(id: UUID): Promise<void>
+            count(input: Condition<T>): Promise<number>
+            groupCount(input: GroupCountQuery<T>): Promise<Record<string, number>>
+            aggregate(input: AggregateQuery<T>): Promise<number | null | undefined>
+            groupAggregate(input: GroupAggregateQuery<T>): Promise<Record<string, number | null | undefined>>
         }
     """.trimIndent()
     )
@@ -402,7 +424,7 @@ fun Documentable.Companion.simpleTypescriptSdk(out: Appendable) = with(out) {
         }
 
         appendLine("""
-        generateAutoEndpoints = <M, K extends AutoEndpoints<M>>(endpoint: K): AutoEndpoints<M> => ({
+        generateAutoEndpoints = <M, K extends AutoEndpoints<M> = any>(endpoint: K): SessionAutoEndpoints<M> => ({
             default: () => endpoint.default(this.${userType.userTypeTokenName()}()),
             query: (input) => endpoint.query(input, this.${userType.userTypeTokenName()}()),
             queryPartial: (input) => endpoint.queryPartial(input, this.${userType.userTypeTokenName()}()),
@@ -427,12 +449,13 @@ fun Documentable.Companion.simpleTypescriptSdk(out: Appendable) = with(out) {
         appendLine()
 
         for (group in groups) {
-
             if (byGroup[group].hasAutoEndpoints()) {
+                val autoGeneratedInterface =
+                    byGroup[group]!!.firstOrNull { it.functionName == "detail" }?.outputType?.write()
                 val nonAutogeneratedEndpoints = byGroup[group]!!.filterNot { autoGeneratedNames.contains(it.functionName) }
-                appendLine("    readonly ${group.groupToPartName()}: Api[\"${group.groupToPartName()}\"] = {")
+                appendLine("    readonly ${group.groupToPartName()} = {")
                 append("        ")
-                appendLine("...this.generateAutoEndpoints(this.api.${group.groupToPartName()}),")
+                appendLine("...this.generateAutoEndpoints<${autoGeneratedInterface}>(this.api.${group.groupToPartName()}),")
                 for (entry in nonAutogeneratedEndpoints) {
                     append("        ")
                     append(entry.functionName)
@@ -470,6 +493,7 @@ fun Documentable.Companion.simpleTypescriptSdk(out: Appendable) = with(out) {
     appendLine()
     appendLine()
     appendLine()
+    println("Generating")
 
     appendLine("export class LiveApi implements Api {")
     appendLine("    public constructor(public httpUrl: string, public socketUrl: string = httpUrl, public extraHeaders: Record<string, string> = {}, public responseInterceptors?: (x: Response)=>Response) {}")
@@ -497,9 +521,66 @@ fun Documentable.Companion.simpleTypescriptSdk(out: Appendable) = with(out) {
         }
         appendLine("    }")
     }
+
+
+    appendLine("""
+            private apiCallHelper = <T, R>(
+                path: string,
+                method: string,
+                input: T | undefined,
+                userToken: string
+            ): Promise<R> => {
+                return apiCall<T>(
+                    `$\{this.httpUrl}$\{path}`,
+                    input as T,
+                    {
+                        method,
+                        headers: userToken
+                            ? { ...this.extraHeaders, Authorization: `Bearer $\{userToken}` }
+                            : this.extraHeaders,
+                    },
+                    undefined,
+                    this.responseInterceptors
+                ).then((x) => x.json());
+            };
+            private generateEndpoint = <T>(path: string): AutoEndpoints<T>  => ({
+                default: (userToken) => this.apiCallHelper(`${"$"}{path}/_default_`, "GET", undefined, userToken),
+                query: (input, userToken) => this.apiCallHelper(`${"$"}{path}/rest/query`, "POST", input, userToken),
+                queryPartial: (input, userToken) => this.apiCallHelper(`${"$"}{path}/rest/query-partial`, "POST", input, userToken),
+                detail: (id, userToken) => this.apiCallHelper(`${"$"}{path}/rest/${"$"}{id}`, "GET", undefined, userToken),
+                insertBulk: (input, userToken) => this.apiCallHelper(`${"$"}{path}/rest/bulk`, "POST", input, userToken),
+                insert: (input, userToken) => this.apiCallHelper(`${"$"}{path}/rest`, "POST", input, userToken),
+                upsert: (id, input, userToken) => this.apiCallHelper(`${"$"}{path}/rest/${"$"}{id}`, "POST", input, userToken),
+                bulkReplace: (input, userToken) => this.apiCallHelper(`${"$"}{path}/rest`, "PUT", input, userToken),
+                replace: (id, input, userToken) => this.apiCallHelper(`${"$"}{path}/rest/${"$"}{id}`, "PUT", input, userToken),
+                bulkModify: (input, userToken) => this.apiCallHelper(`${"$"}{path}/rest/bulk`, "PATCH", input, userToken),
+                modifyWithDiff: (id, input, userToken) => this.apiCallHelper(`${"$"}{path}/rest/${"$"}{id}/delta`, "PATCH", input, userToken),
+                modify: (id, input, userToken) => this.apiCallHelper(`${"$"}{path}/rest/${"$"}{id}`, "PATCH", input, userToken),
+                simplifiedModify: (id, input, userToken) => this.apiCallHelper(`${"$"}{path}/rest/${"$"}{id}/simplified`, "PATCH", input, userToken),
+                bulkDelete: (input, userToken) => this.apiCallHelper(`${"$"}{path}/rest/bulk-delete`, "POST", input, userToken),
+                delete: (id, userToken) => this.apiCallHelper(`${"$"}{path}/rest/${"$"}{id}`, "DELETE", undefined, userToken),
+                count: (input, userToken) => this.apiCallHelper(`${"$"}{path}/rest/count`, "POST", input, userToken),
+                groupCount: (input, userToken) => this.apiCallHelper(`${"$"}{path}/rest/group-count`, "POST", input, userToken),
+                aggregate: (input, userToken) => this.apiCallHelper(`${"$"}{path}/rest/aggregate`, "POST", input, userToken),
+                groupAggregate: (input, userToken) => this.apiCallHelper(`${"$"}{path}/rest/group-aggregate`, "POST", input, userToken),
+            });
+    """.trimIndent())
+    appendLine()
+    appendLine()
+
     for (group in groups.sortedBy { it.groupToPartName() }) {
         appendLine("    readonly ${group.groupToPartName()} = {")
-        for (entry in byGroup[group]!!) {
+
+        val explicitEndpoints = if (byGroup[group]!!.hasAutoEndpoints()) byGroup[group]!!.filterNot { autoGeneratedNames.contains(it.functionName) } else byGroup[group]!!
+
+        if (byGroup[group]!!.hasAutoEndpoints()) {
+            val autoGeneratedInterface =
+                byGroup[group]!!.firstOrNull { it.functionName == "detail" }?.outputType?.write()
+            append("        ")
+            appendLine("...this.generateEndpoint<${autoGeneratedInterface}>(\"/${group.groupToPartName()}\"),")
+        }
+
+        for (entry in explicitEndpoints) {
             appendLine("        ")
             append("        ")
             append(entry.functionName)
@@ -552,7 +633,6 @@ private val skipFromLsPackage = setOf(
     "Partial",
 ) + fromLightningServerPackage
 
-private fun String.groupToInterfaceName(): String = replaceFirstChar { it.uppercase() } + "Api"
 private fun String.groupToPartName(): String = replaceFirstChar { it.lowercase() }
 
 @Suppress("UNCHECKED_CAST")
