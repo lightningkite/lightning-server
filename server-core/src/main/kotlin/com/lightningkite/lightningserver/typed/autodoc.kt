@@ -42,6 +42,14 @@ fun ServerPath.apiDocs(packageName: String = "com.mypackage"): HttpEndpoint {
             )
         )
     }
+    get("simple.sdk.ts").handler {
+        HttpResponse(
+            HttpContent.Text(
+                string = buildString { Documentable.simpleTypescriptSdk(this) },
+                type = ContentType.Text.Plain
+            )
+        )
+    }
     get("sdk.dart").handler {
         HttpResponse(
             HttpContent.Text(
