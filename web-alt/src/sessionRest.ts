@@ -99,7 +99,7 @@ export interface SessionRestEndpoint<T extends HasId> {
 /**
  * Session rest endpoints with an auth token as the last parameter
  */
-export type ApiEndpoint<T extends HasId> = {
+export type ApiRestEndpoint<T extends HasId> = {
   [K in keyof SessionRestEndpoint<T>]: SessionRestEndpoint<T>[K] extends (
     ...args: infer A
   ) => infer R
