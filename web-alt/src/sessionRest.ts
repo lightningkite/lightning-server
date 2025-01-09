@@ -28,7 +28,7 @@ export interface SessionRestEndpoint<T extends HasId> {
   /**
   * Gets parts of items that match the given query.
   **/
-  queryPartial(input: QueryPartial<T>): Promise<Array<DeepPartial<T>>>;
+  queryPartial<Q extends QueryPartial<T>>(input: Q): Promise<Array<{[K in keyof T as K extends ListItem<Q["fields"]> ? K : never]: T[K]}>>;
   /**
   * Gets a single item by ID.
   **/
@@ -69,7 +69,6 @@ export interface SessionRestEndpoint<T extends HasId> {
   * Modifies a item by ID, returning the new value.
   **/
   simplifiedModify(id: UUID, input: DeepPartial<T>): Promise<T>;
-
   /**
   * Deletes all matching items, returning the number of deleted items.
   **/
@@ -100,9 +99,25 @@ export interface SessionRestEndpoint<T extends HasId> {
  * Session rest endpoints with an auth token as the last parameter
  */
 export type ApiRestEndpoint<T extends HasId> = {
-  [K in keyof SessionRestEndpoint<T>]: SessionRestEndpoint<T>[K] extends (
-    ...args: infer A
-  ) => infer R
-    ? (...args: [...A, string]) => R
-    : never;
+  default: (token: string) => Promise<T>;
+  query(input: Query<T>, token: string): Promise<Array<T>>;
+  queryPartial<Q extends QueryPartial<T>>(input: Q, token: string): Promise<Array<{[K in keyof T as K extends ListItem<Q["fields"]> ? K : never]: T[K]}>>;
+  detail(id: UUID, token: string): Promise<T>;
+  insertBulk(input: Array<T>, token: string): Promise<Array<T>>;
+  insert(input: T, token: string): Promise<T>;
+  upsert(id: UUID, input: T, token: string): Promise<T>;
+  bulkReplace(input: Array<T>, token: string): Promise<Array<T>>;
+  replace(id: UUID, input: T, token: string): Promise<T>;
+  bulkModify(input: MassModification<T>, token: string): Promise<number>;
+  modifyWithDiff(id: UUID, input: Modification<T>, token: string): Promise<EntryChange<T>>;
+  modify(id: UUID, input: Modification<T>, token: string): Promise<T>;
+  simplifiedModify(id: UUID, input: DeepPartial<T>, token: string): Promise<T>;
+  bulkDelete(input: Condition<T>, token: string): Promise<number>;
+  delete(id: UUID, token: string): Promise<void>;
+  count(input: Condition<T>, token: string): Promise<number>;
+  groupCount(input: GroupCountQuery<T>, token: string): Promise<Record<string, number>>;
+  aggregate(input: AggregateQuery<T>, token: string): Promise<number | null | undefined>;
+  groupAggregate(input: GroupAggregateQuery<T>, token: string): Promise<Record<string, number | null | undefined>>;
 };
+
+type ListItem<T> = T extends (infer U)[] ? U : never

@@ -251,7 +251,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     private generateCommonEndpoints = <T extends {_id: string}>(path: string): ApiRestEndpoint<T>  => ({
         default: (userToken) => this.makeApiCall(`${"$"}{path}/_default_`, "GET", undefined, userToken),
         query: (input, userToken) => this.makeApiCall(`${"$"}{path}/rest/query`, "POST", input, userToken),
-        queryPartial: (input, userToken) => this.makeApiCall(`${"$"}{path}/rest/query-partial`, "POST", input, userToken),
+        queryPartial: (input, userToken) => this.makeApiCall(`${"$"}{path}/rest/query-partial`, "POST", input, userToken) as any,
         detail: (id, userToken) => this.makeApiCall(`${"$"}{path}/rest/${"$"}{id}`, "GET", undefined, userToken),
         insertBulk: (input, userToken) => this.makeApiCall(`${"$"}{path}/rest/bulk`, "POST", input, userToken),
         insert: (input, userToken) => this.makeApiCall(`${"$"}{path}/rest`, "POST", input, userToken),
