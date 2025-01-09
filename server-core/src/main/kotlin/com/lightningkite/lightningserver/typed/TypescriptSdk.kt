@@ -151,10 +151,10 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
 
         appendLine(
             """
-    private generateAutoEndpoints = <M extends {_id: string}, E extends ApiRestEndpoint<M> = any>(endpoint: E): SessionRestEndpoint<M> => ({
+    private generateAutoEndpoints = <T extends {_id: string}, E extends ApiRestEndpoint<T> = any>(endpoint: E): SessionRestEndpoint<T> => ({
         default: () => endpoint.default(this.${userType.userTypeTokenName()}()),
         query: (input) => endpoint.query(input, this.${userType.userTypeTokenName()}()),
-        queryPartial: (input) => endpoint.queryPartial(input, this.${userType.userTypeTokenName()}()),
+        queryPartial: (input) => endpoint.queryPartial(input, this.${userType.userTypeTokenName()}()) as any,
         detail: (id) => endpoint.detail(id, this.${userType.userTypeTokenName()}()),
         insertBulk: (input) => endpoint.insertBulk(input, this.${userType.userTypeTokenName()}()),
         insert: (input) => endpoint.insert(input, this.${userType.userTypeTokenName()}()),
