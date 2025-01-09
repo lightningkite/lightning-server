@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.ktor
 import com.lightningkite.lightningserver.cache.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.engine.LocalEngine
-import com.lightningkite.lightningserver.engine.engine
+import com.lightningkite.lightningserver.engine.engine as lsEngine
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpHeaders
@@ -45,6 +45,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.util.*
+import io.ktor.utils.io.*
 import io.ktor.utils.io.jvm.javaio.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.GlobalScope
@@ -59,7 +60,7 @@ import com.lightningkite.lightningserver.core.ContentType as HttpContentType
 
 fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
     val myEngine = LocalEngine(pubSub)
-    engine = myEngine
+    lsEngine = myEngine
     try {
         runBlocking { Tasks.onSettingsReady() }
         install(io.ktor.server.websocket.WebSockets)
@@ -203,7 +204,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                             }
 
                             is HttpContent.Stream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
-                                b.getStream().copyTo(this)
+                                b.getStream().toByteReadChannel().copyTo(this)
                             }
 
                             is HttpContent.Multipart -> TODO()
@@ -254,7 +255,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                         }
 
                         is HttpContent.Stream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
-                            b.getStream().copyTo(this)
+                            b.getStream().toByteReadChannel().copyTo(this)
                         }
 
                         is HttpContent.Multipart -> TODO()

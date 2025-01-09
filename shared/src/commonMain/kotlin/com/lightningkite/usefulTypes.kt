@@ -419,8 +419,9 @@ value class Temperature(val celsius: Double): Comparable<Temperature> {
     override fun compareTo(other: Temperature): Int = this.celsius.compareTo(other.celsius)
     val fahrenheit: Double get() = celsius * 9 / 5 + 32
     val kelvin: Double get() = celsius + 273.15
-    operator fun plus(other: Temperature): Temperature = Temperature(celsius + other.celsius)
-    operator fun minus(other: Temperature): Temperature = Temperature(celsius - other.celsius)
+    operator fun plus(other: RelativeTemperature): Temperature = Temperature(celsius + other.celsius)
+    operator fun minus(other: RelativeTemperature): Temperature = Temperature(celsius - other.celsius)
+    operator fun minus(other: Temperature): RelativeTemperature = RelativeTemperature(celsius - other.celsius)
 
     companion object {
         val Int.celsius: Temperature get() = Temperature(celsius = this * 1.0)
@@ -432,6 +433,31 @@ value class Temperature(val celsius: Double): Comparable<Temperature> {
         val Int.kelvin: Temperature get() = Temperature(celsius = this - 273.15)
         val Long.kelvin: Temperature get() = Temperature(celsius = this - 273.15)
         val Double.kelvin: Temperature get() = Temperature(celsius = this - 273.15)
+    }
+    override fun toString(): String = "$celsius°C"
+}
+
+@JvmInline
+@Serializable
+value class RelativeTemperature(val celsius: Double): Comparable<Temperature> {
+    override fun compareTo(other: Temperature): Int = this.celsius.compareTo(other.celsius)
+    val fahrenheit: Double get() = celsius * 9 / 5
+    val kelvin: Double get() = celsius
+    operator fun plus(other: RelativeTemperature): RelativeTemperature = RelativeTemperature(celsius + other.celsius)
+    operator fun minus(other: RelativeTemperature): RelativeTemperature = RelativeTemperature(celsius - other.celsius)
+    operator fun times(other: Double): RelativeTemperature = RelativeTemperature(celsius * other)
+    operator fun div(other: Double): RelativeTemperature = RelativeTemperature(celsius / other)
+
+    companion object {
+        val Int.relativeCelsius: RelativeTemperature get() = RelativeTemperature(celsius = this.toDouble())
+        val Long.relativeCelsius: RelativeTemperature get() = RelativeTemperature(celsius = this.toDouble())
+        val Double.relativeCelsius: RelativeTemperature get() = RelativeTemperature(celsius = this)
+        val Int.relativeFahrenheit: RelativeTemperature get() = RelativeTemperature(celsius = this * 5.0 / 9)
+        val Long.relativeFahrenheit: RelativeTemperature get() = RelativeTemperature(celsius = this * 5.0 / 9)
+        val Double.relativeFahrenheit: RelativeTemperature get() = RelativeTemperature(celsius = (this) * 5 / 9)
+        val Int.relativeKelvin: RelativeTemperature get() = RelativeTemperature(celsius = this.toDouble())
+        val Long.relativeKelvin: RelativeTemperature get() = RelativeTemperature(celsius = this.toDouble())
+        val Double.relativeKelvin: RelativeTemperature get() = RelativeTemperature(celsius = this)
     }
     override fun toString(): String = "$celsius°C"
 }

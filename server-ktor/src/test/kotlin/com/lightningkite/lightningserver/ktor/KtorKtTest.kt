@@ -55,7 +55,6 @@ class KtorKtTest {
     fun socketTest() {
         TestSettings
         testApplication {
-            environment { watchPaths = listOf() }
             application {
                 TestSettings
                 lightningServer(LocalPubSub, LocalCache)
@@ -82,7 +81,6 @@ class KtorKtTest {
     fun socketPathTest() {
         TestSettings
         testApplication {
-            environment { watchPaths = listOf() }
             application {
                 TestSettings
                 lightningServer(LocalPubSub, LocalCache)
@@ -109,7 +107,6 @@ class KtorKtTest {
     fun multiplexSocketTest() {
         TestSettings
         testApplication {
-            environment { watchPaths = listOf() }
             application {
                 TestSettings
                 lightningServer(LocalPubSub, LocalCache)
