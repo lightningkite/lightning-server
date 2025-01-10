@@ -28,7 +28,7 @@ export interface SessionRestEndpoint<T extends HasId> {
   /**
   * Gets parts of items that match the given query.
   **/
-  queryPartial<Q extends QueryPartial<T>>(input: Q): Promise<Array<{[K in keyof T as K extends ListItem<Q["fields"]> ? K : never]: T[K]}>>;
+  queryPartial<Q extends QueryPartial<T>>(input: Q): Promise<Array<{[K in keyof T as K extends Q["fields"][number] ? K : never]: T[K]}>>;
   /**
   * Gets a single item by ID.
   **/
@@ -101,7 +101,7 @@ export interface SessionRestEndpoint<T extends HasId> {
 export type ApiRestEndpoint<T extends HasId> = {
   default: (token: string) => Promise<T>;
   query(input: Query<T>, token: string): Promise<Array<T>>;
-  queryPartial<Q extends QueryPartial<T>>(input: Q, token: string): Promise<Array<{[K in keyof T as K extends ListItem<Q["fields"]> ? K : never]: T[K]}>>;
+  queryPartial<Q extends QueryPartial<T>>(input: Q, token: string): Promise<Array<{[K in keyof T as K extends Q["fields"][number] ? K : never]: T[K]}>>;
   detail(id: UUID, token: string): Promise<T>;
   insertBulk(input: Array<T>, token: string): Promise<Array<T>>;
   insert(input: T, token: string): Promise<T>;
@@ -119,5 +119,3 @@ export type ApiRestEndpoint<T extends HasId> = {
   aggregate(input: AggregateQuery<T>, token: string): Promise<number | null | undefined>;
   groupAggregate(input: GroupAggregateQuery<T>, token: string): Promise<Record<string, number | null | undefined>>;
 };
-
-type ListItem<T> = T extends (infer U)[] ? U : never
