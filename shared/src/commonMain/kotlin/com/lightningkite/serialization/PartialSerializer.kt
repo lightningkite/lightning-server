@@ -23,7 +23,7 @@ class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> 
                     PartialSerializer(it.serializer)
                 } else it.serializer
             }
-        } ?: listOf()
+        } ?: if(source.descriptor.serialName == "kotlin.Nothing") listOf() else throw IllegalArgumentException("Failed to make partial serializer: ${source.descriptor.serialName} has no serializableProperties")
     }
     override val descriptor: SerialDescriptor by lazy {
             try {

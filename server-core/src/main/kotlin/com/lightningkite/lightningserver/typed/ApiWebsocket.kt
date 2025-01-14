@@ -18,6 +18,7 @@ import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.TypeRetriever
+import com.lightningkite.lightningserver.typed.ApiWebsocket.AuthAndPathPartsAndApiOptions
 import com.lightningkite.lightningserver.utils.cancellingScope
 import com.lightningkite.lightningserver.websocket.*
 import com.lightningkite.now
@@ -36,7 +37,8 @@ import kotlin.time.Duration.Companion.minutes
 @Serializable
 data class ApiWebsocketStorage<STORAGE>(
     val mimeType: String,
-    val storage: STORAGE
+    val storage: STORAGE,
+    val respondToPings: Boolean = true
 ) {
     @Transient
     val contentType = ContentType(mimeType)
@@ -63,7 +65,18 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
     open val errorCases: List<LSError> get() = emptyList()
     open override val belongsToInterface: Documentable.InterfaceInfo? get() = null
 
-    abstract suspend fun willConnect(auth: AuthAndPathParts<USER, PATH>, request: WebSocketConnectRequest): STORAGE
+    class AuthAndPathPartsAndApiOptions<USER : HasId<*>?, PATH : TypedServerPath>(
+        authOrNull: RequestAuth<USER & Any>?,
+        rawRequest: Request?,
+        parts: Array<Any?>
+    ): AuthAndPathParts<USER, PATH>(authOrNull, rawRequest, parts) {
+        var respondToPings: Boolean = true
+    }
+
+    open suspend fun willConnect(auth: AuthAndPathParts<USER, PATH>, request: WebSocketConnectRequest): STORAGE
+        = willConnect(AuthAndPathPartsAndApiOptions(auth.authOrNull, auth.rawRequest, auth.parts), request)
+    open suspend fun willConnect(auth: AuthAndPathPartsAndApiOptions<USER, PATH>, request: WebSocketConnectRequest): STORAGE
+        = willConnect(AuthAndPathParts(auth.authOrNull, auth.rawRequest, auth.parts), request)
     open suspend fun didConnect(connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>) {}
     open suspend fun messageFromClient(
         connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>,
@@ -125,15 +138,19 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
         override suspend fun close(reason: WebSocketClose) = wraps.close(reason)
     }
 
-    final override suspend fun willConnect(request: WebSocketConnectRequest): ApiWebsocketStorage<STORAGE> =
-        ApiWebsocketStorage(
+    final override suspend fun willConnect(request: WebSocketConnectRequest): ApiWebsocketStorage<STORAGE> {
+        val cb = path.authAndPathParts(request, authOptions)
+        val c = AuthAndPathPartsAndApiOptions<USER, PATH>(cb.authOrNull, cb.rawRequest, cb.parts)
+        return ApiWebsocketStorage(
             (request.queryParameterCaseInsensitive(HttpHeader.Accept)
                 ?: request.queryParameterCaseInsensitive(HttpHeader.ContentType)
                 ?: request.headers.contentType?.toString()
                 ?: request.headers.accept.firstOrNull()?.takeUnless { it == ContentType.Any }?.toString()
                 ?: ContentType.Application.Json.toString()),
-            willConnect(path.authAndPathParts(request, authOptions), request)
+            willConnect(c, request),
+            respondToPings = c.respondToPings
         )
+    }
 
     final override suspend fun didConnect(
         connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>
@@ -143,7 +160,7 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
         connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>,
         frame: WebSocketFrame
     ) {
-        if ((frame as? WebSocketFrame.Text)?.content?.isBlank() == true) {
+        if ((frame as? WebSocketFrame.Text)?.content?.isBlank() == true && connection.currentState.respondToPings) {
             connection.send(" ")
             return
         } else messageFromClient(
@@ -200,7 +217,8 @@ suspend fun <USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> A
 
         val id = UUID.randomUUID().toString()
         println("$id Connecting...")
-        val startingState = willConnect(auth, req)
+        val auth2 = AuthAndPathPartsAndApiOptions<USER, PATH>(auth.authOrNull, auth.rawRequest, auth.parts)
+        val startingState = willConnect(auth2, req)
         val auth = req.authChecked(authOptions)
         val mid = object : ApiWebsocket.ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>(
             auth,
