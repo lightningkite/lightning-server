@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.auth.proof
 
+import com.lightningkite.UUID
 import com.lightningkite.lightningserver.encryption.checkAgainstHash
 import com.lightningkite.lightningserver.encryption.secureHash
 import com.lightningkite.lightningserver.cache.Cache
@@ -32,7 +33,7 @@ open class PinHandler(
 
     suspend fun establish(identifier: String): PinAndKey {
         val pin = generate()
-        val key = uuid().toString()
+        val key = UUID.random().toString()
         val fixedPin = if (mixedCaseMode) pin else pin.lowercase()
         cache().set(cacheKey(key), fixedPin.secureHash(), expiration)
         cache().set(attemptCacheKey(key), 0, expiration)

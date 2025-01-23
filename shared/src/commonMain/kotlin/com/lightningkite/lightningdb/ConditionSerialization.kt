@@ -94,7 +94,7 @@ class ConditionSerializer<T>(val inner: KSerializer<T>): MySealedClassSerializer
         r as List<MySealedClassSerializer.Option<Condition<T>, out Condition<T>>>
     })
 } as MySealedClassSerializerInterface<Condition<T>>), KSerializerWithDefault<Condition<T>> {
-    override val default: Condition<T> = Condition.Never()
+    override val default: Condition<T> = Condition.Never
 }
 
 class ConditionOnFieldSerializer<K : Any, V>(

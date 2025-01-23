@@ -224,6 +224,7 @@ data class VirtualInstance(
     val type: VirtualStruct.Concrete,
     val values: List<Any?>
 ): HasId<Comparable<Comparable<*>>>, Comparable<VirtualInstance> {
+    @Suppress("UNCHECKED_CAST")
     override val _id: Comparable<Comparable<*>>
         get() = type.struct.idField?.let { values[it.index] as Comparable<Comparable<*>> } ?: values.hashCode() as Comparable<Comparable<*>>
     override fun toString(): String =
@@ -233,6 +234,7 @@ data class VirtualInstance(
         for(i in values.indices) {
             val t = this.values[i]
             val o = other.values[i]
+            @Suppress("UNCHECKED_CAST")
             if(t is Comparable<*>) {
                 val r = (t as Comparable<Any?>).compareTo(o)
                 if(r != 0) return r

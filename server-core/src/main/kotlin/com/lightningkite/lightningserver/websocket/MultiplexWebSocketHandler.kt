@@ -134,6 +134,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
             when {
                 message.start -> {
                     val match = WebSockets.matcher.match(message.path!!) ?: throw NotFoundException()
+                    @Suppress("UNCHECKED_CAST")
                     val otherHandler =
                         WebSockets.handlers[match.path] as? WebSocketHandler<Any?> ?: throw NotFoundException()
                     val r = connection.request.copy(
@@ -166,6 +167,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
 
                 message.end -> {
                     val info = connection.currentState.map[message.channel]!!
+                    @Suppress("UNCHECKED_CAST")
                     val otherHandler = info.handler as WebSocketHandler<Any?>
                     otherHandler.disconnectTracked(
                         info.handlerPath,
@@ -187,12 +189,13 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
 
                 message.data != null -> {
                     val info = connection.currentState.map[message.channel]!!
+                    @Suppress("UNCHECKED_CAST")
                     val otherHandler = info.handler as WebSocketHandler<Any?>
-                    val frame = WebSocketFrame.Text(message.data!!)
+                    val textFrame = WebSocketFrame.Text(message.data!!)
                     otherHandler.messageFromClientTracked(
                         info.handlerPath,
                         connection.wrapped(channel, info.handlerPath, otherHandler),
-                        frame
+                        textFrame
                     )
                 }
             }
@@ -207,6 +210,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                 )
             )
             connection.currentState.map[channel]?.let {
+                @Suppress("UNCHECKED_CAST")
                 val otherHandler = it.handler as WebSocketHandler<Any?>
                 otherHandler.disconnectTracked(
                     it.handlerPath,
@@ -221,10 +225,11 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
     override suspend fun messageFromSubscription(
         connection: WebSocketConnection<MultiplexWebSocketHandlerState>,
         topic: String,
-        retriever: TypeRetriever
+        retrieve: TypeRetriever
     ) = with(connection) {
         for ((channel, info) in currentState.map) {
             if (info.topics.contains(topic)) {
+                @Suppress("UNCHECKED_CAST")
                 val otherHandler = info.handler as WebSocketHandler<Any?>
                 Metrics.handlerPerformance(
                     WebSockets.HandlerContext(
@@ -233,7 +238,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                         null  // TODO
                     )
                 ) {
-                    otherHandler.messageFromSubscription(wrapped(channel, info.handlerPath, otherHandler), topic, retriever)
+                    otherHandler.messageFromSubscription(wrapped(channel, info.handlerPath, otherHandler), topic, retrieve)
                 }
             }
         }
@@ -242,6 +247,7 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
     override suspend fun disconnect(connection: WebSocketConnection<MultiplexWebSocketHandlerState>, reason: WebSocketClose) =
         with(connection) {
             currentState.map.entries.forEach { (channel, it) ->
+                @Suppress("UNCHECKED_CAST")
                 val otherHandler = it.handler as WebSocketHandler<Any?>
                 otherHandler.disconnectTracked(it.handlerPath, wrapped(channel, it.handlerPath, otherHandler), reason)
             }

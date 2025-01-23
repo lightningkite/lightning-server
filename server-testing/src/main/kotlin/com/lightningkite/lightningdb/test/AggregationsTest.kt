@@ -67,13 +67,13 @@ abstract class AggregationsTest() {
             }
             for(type in Aggregate.values()) {
                 val control = c.all().toList().asSequence().map { it.int.toDouble() }.filter { false }.aggregate(type)
-                val test: Double? = c.aggregate(type, property = property, condition = Condition.Never())
+                val test: Double? = c.aggregate(type, property = property, condition = Condition.Never)
                 if(control == null) assertNull(test)
                 else assertEquals(control, test!!, 0.0000001)
             }
             for(type in Aggregate.values()) {
                 val control = c.all().toList().asSequence().map { it.byte to it.int.toDouble() }.filter { false }.aggregate(type)
-                val test: Map<Byte, Double?> = c.groupAggregate(type, property = property, groupBy = path<LargeTestModel>().byte, condition = Condition.Never())
+                val test: Map<Byte, Double?> = c.groupAggregate(type, property = property, groupBy = path<LargeTestModel>().byte, condition = Condition.Never)
                 assertEquals(control.keys, test.keys)
                 for(key in control.keys) {
                     assertEquals(control[key]!!, test[key]!!, 0.0000001)

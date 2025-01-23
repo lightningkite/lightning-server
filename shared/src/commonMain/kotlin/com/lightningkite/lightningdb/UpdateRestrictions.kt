@@ -31,12 +31,12 @@ data class UpdateRestrictions<T>(
             if(on.affects(field.path)) {
                 totalConditions.add(field.limitedIf)
                 if(field.limitedTo !is Condition.Always) {
-                    if(!field.limitedTo.guaranteedAfter(on)) return Condition.Never()
+                    if(!field.limitedTo.guaranteedAfter(on)) return Condition.Never
                 }
             }
         }
         return when(totalConditions.size) {
-            0 -> Condition.Always()
+            0 -> Condition.Always
             1 -> totalConditions[0]
             else -> Condition.And(totalConditions)
         }
@@ -51,13 +51,13 @@ data class UpdateRestrictions<T>(
          * Makes a field unmodifiable.
          */
         fun DataClassPath<T, *>.cannotBeModified() {
-            fields.add(UpdateRestrictionsPart(this, Condition.Never(), Condition.Always()))
+            fields.add(UpdateRestrictionsPart(this, Condition.Never, Condition.Always))
         }
         /**
          * Makes a field only modifiable if the item matches the [condition].
          */
         infix fun DataClassPath<T, *>.requires(condition: Condition<T>) {
-            fields.add(UpdateRestrictionsPart(this, condition, Condition.Always()))
+            fields.add(UpdateRestrictionsPart(this, condition, Condition.Always))
         }
         /**
          * Makes a field only modifiable if the item matches the [condition].
@@ -70,7 +70,7 @@ data class UpdateRestrictions<T>(
          * The value is only allowed to change to a value that matches [valueMust].
          */
         inline fun <reified V> DataClassPath<T, V>.mustBe(valueMust: (DataClassPath<V, V>)->Condition<V>) {
-            fields.add(UpdateRestrictionsPart(this, Condition.Always(), this.condition(valueMust)))
+            fields.add(UpdateRestrictionsPart(this, Condition.Always, this.condition(valueMust)))
         }
         fun build() = UpdateRestrictions(fields)
         fun include(mask: UpdateRestrictions<T>) { fields.addAll(mask.fields) }

@@ -22,7 +22,7 @@ object DefaultDecoder : Decoder {
     val defaults = HashMap<String, Any?>()
 
     init {
-        defaults[UUIDSerializer.descriptor.serialName] = uuid("00000000-0000-0000-0000-000000000000")
+        defaults[UUIDSerializer.descriptor.serialName] = UUID.parse("00000000-0000-0000-0000-000000000000")
         defaults[DurationSerializer.descriptor.serialName] = 0.seconds
         defaults[InstantIso8601Serializer.descriptor.serialName] = Instant.fromEpochMilliseconds(0)
         defaults[LocalTimeIso8601Serializer.descriptor.serialName] = LocalTime(0, 0, 0)
@@ -98,6 +98,8 @@ object DefaultDecoder : Decoder {
 
     override fun <T : Any> decodeNullableSerializableValue(deserializer: DeserializationStrategy<T?>): T? = null
     override fun <T> decodeSerializableValue(deserializer: DeserializationStrategy<T>): T {
+
+        @Suppress("UNCHECKED_CAST")
         return (defaults[deserializer.descriptor.serialName] as? T) ?: deserializer.deserialize(this)
     }
 

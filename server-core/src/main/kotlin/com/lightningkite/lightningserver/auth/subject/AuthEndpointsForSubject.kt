@@ -93,9 +93,9 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         forUser = { collection: FieldCollection<Session<SUBJECT, ID>> ->
             val requestAuth = this.authOrNull
             val canUse: Condition<Session<SUBJECT, ID>> = when {
-                Authentication.isSuperUser.accepts(requestAuth) -> Condition.Always()
-                Authentication.isAdmin.accepts(requestAuth) -> Condition.Always()
-                requestAuth == null -> Condition.Never()
+                Authentication.isSuperUser.accepts(requestAuth) -> Condition.Always
+                Authentication.isAdmin.accepts(requestAuth) -> Condition.Always
+                requestAuth == null -> Condition.Never
                 else -> Condition.OnField(
                     Session_subjectId(handler.subjectSerializer, handler.idSerializer),
                     @Suppress("UNCHECKED_CAST")
@@ -103,14 +103,14 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
             val isRoot: Condition<Session<SUBJECT, ID>> =
-                if (Authentication.isSuperUser.accepts(requestAuth)) Condition.Always() else Condition.Never()
+                if (Authentication.isSuperUser.accepts(requestAuth)) Condition.Always else Condition.Never
             collection.withPermissions(
                 permissions = ModelPermissions(
                     create = isRoot,
                     read = canUse,
                     readMask = Mask(
                         listOf(
-                            Condition.Never<Session<SUBJECT, ID>>() to Modification.OnField(
+                            Condition.Never to Modification.OnField(
                                 Session_secretHash(handler.subjectSerializer, handler.idSerializer),
                                 Modification.Assign("")
                             )

@@ -98,6 +98,8 @@ suspend fun ServerPath.test(
             sourceIp = sourceIp,
         )
         val channel = Channel<WebSocketFrame>(20)
+
+        @Suppress("UNCHECKED_CAST")
         val h = WebSockets.handlers[path]!! as WebSocketHandler<Any?>
 
         val id = UUID.random().toString()

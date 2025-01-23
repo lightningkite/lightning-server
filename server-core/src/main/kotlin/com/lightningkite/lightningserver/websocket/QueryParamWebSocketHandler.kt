@@ -88,6 +88,8 @@ class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandler
             ) {
                 otherHandler.willConnect(request)
             }
+
+        @Suppress("UNCHECKED_CAST")
         return QueryParamWebSocketHandlerData(
             request,
             AnonType(startData, otherHandler.storageSerializer as KSerializer<Any?>)
@@ -98,6 +100,7 @@ class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandler
         connection: WebSocketConnection<QueryParamWebSocketHandlerData>,
     ) {
         val innerRequest = connection.currentState.request
+        @Suppress("UNCHECKED_CAST")
         val otherHandler = WebSockets.handlers[innerRequest.path] as? WebSocketHandler<Any?>
             ?: throw NotFoundException("No web socket handler found - makes no sense.")
         otherHandler.didConnectTracked(connection.request.path, connection.wrapped<Any?>(otherHandler))
@@ -107,6 +110,7 @@ class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandler
         connection: WebSocketConnection<QueryParamWebSocketHandlerData>,
         frame: WebSocketFrame,
     ) {
+        @Suppress("UNCHECKED_CAST")
         val otherHandler = connection.currentState.handler as WebSocketHandler<Any?>
         otherHandler.messageFromClientTracked(
             connection.currentState.handlerPath,
@@ -120,6 +124,7 @@ class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandler
         topic: String,
         retrieve: TypeRetriever,
     ) {
+        @Suppress("UNCHECKED_CAST")
         val otherHandler = connection.currentState.handler as WebSocketHandler<Any?>
         otherHandler.messageFromSubscriptionTracked(
             connection.currentState.handlerPath,
@@ -133,6 +138,7 @@ class QueryParamWebSocketHandler() : WebSocketHandler<QueryParamWebSocketHandler
         connection: WebSocketConnection<QueryParamWebSocketHandlerData>,
         reason: WebSocketClose,
     ) {
+        @Suppress("UNCHECKED_CAST")
         val otherHandler = connection.currentState.handler as WebSocketHandler<Any?>
         otherHandler.disconnectTracked(
             connection.currentState.handlerPath,

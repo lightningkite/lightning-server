@@ -6,6 +6,7 @@ import com.lightningkite.lightningserver.serialization.InternalCommunicationEnco
 import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.now
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.future.await
@@ -39,6 +40,8 @@ class AwsWebSocketDynamoDb(
     val tableSubs = "$baseTableName-subs"
     val tableSubsReverse = "$baseTableName-subs-reverse"
     val tableStates = "$baseTableName-state"
+
+    @OptIn(DelicateCoroutinesApi::class)
     val ready = GlobalScope.async(start = CoroutineStart.LAZY) {
         measureTime {
             client.requireTable(

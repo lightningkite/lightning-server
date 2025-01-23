@@ -12,7 +12,7 @@ import java.util.*
 import com.lightningkite.UUID
 
 fun FileObject.resolveRandom(prefix: String = "", extension: String) =
-    resolve(prefix + uuid().toString() + ".$extension")
+    resolve(prefix + UUID.random().toString() + ".$extension")
 
 suspend fun FileObject.exists() = head() != null
 

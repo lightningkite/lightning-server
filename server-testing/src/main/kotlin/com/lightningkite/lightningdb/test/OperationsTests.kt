@@ -30,7 +30,7 @@ abstract class OperationsTests() {
         collection.insertOne(m)
         val result = collection.findPartial(
             fields = setOf(path<LargeTestModel>().int),
-            condition = Condition.Always()
+            condition = Condition.Always
         ).toList()
         assertEquals(partialOf { it.int assign m.int }, result.first())
     }

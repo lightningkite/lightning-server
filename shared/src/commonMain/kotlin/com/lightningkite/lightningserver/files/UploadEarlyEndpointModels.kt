@@ -19,7 +19,7 @@ import kotlin.time.Duration.Companion.minutes
 @GenerateDataClassPaths
 @Serializable
 data class UploadForNextRequest(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     val file: ServerFile,
     val expires: Instant = now().plus(15.minutes)
 ) : HasId<UUID>

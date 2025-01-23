@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.serialization.*
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.NothingSerializer
@@ -35,7 +36,7 @@ data class Mask<T>(
             if(on.any { pair.second.affects(it.field) }) totalConditions.add(pair.first)
         }
         return when(totalConditions.size) {
-            0 -> Condition.Always()
+            0 -> Condition.Always
             1 -> totalConditions[0]
             else -> Condition.And(totalConditions)
         }
@@ -46,7 +47,7 @@ data class Mask<T>(
             if(pair.second.affects(on)) totalConditions.add(pair.first)
         }
         return when(totalConditions.size) {
-            0 -> Condition.Always()
+            0 -> Condition.Always
             1 -> totalConditions[0]
             else -> Condition.And(totalConditions)
         }
@@ -57,7 +58,7 @@ data class Mask<T>(
             if(condition.readsResultOf(pair.second, tableTextPaths)) totalConditions.add(pair.first)
         }
         return when(totalConditions.size) {
-            0 -> Condition.Always()
+            0 -> Condition.Always
             1 -> totalConditions[0]
             else -> Condition.And(totalConditions)
         }
@@ -67,7 +68,7 @@ data class Mask<T>(
         val pairs: ArrayList<Pair<Condition<T>, Modification<T>>> = ArrayList()
     ) {
         val it = DataClassPathSelf(serializer)
-        fun <V> DataClassPath<T, V>.mask(value: V, unless: Condition<T> = Condition.Never()) {
+        fun <V> DataClassPath<T, V>.mask(value: V, unless: Condition<T> = Condition.Never) {
             pairs.add(unless to mapModification(Modification.Assign(value)))
         }
         infix fun <V> DataClassPath<T, V>.maskedTo(value: V) = mapModification(Modification.Assign(value))
@@ -75,7 +76,7 @@ data class Mask<T>(
             pairs.add(condition to this)
         }
         fun always(modification: Modification<T>) {
-            pairs.add(Condition.Never<T>() to modification)
+            pairs.add(Condition.Never to modification)
         }
         fun build() = Mask(pairs)
         fun include(mask: Mask<T>) { pairs.addAll(mask.pairs) }
@@ -202,6 +203,7 @@ fun <T> Condition<T>.readPaths(): Set<DataClassPathPartial<T>> {
     return out
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 @Suppress("UNCHECKED_CAST")
 fun <T> Condition<T>.emitReadPaths(out: (DataClassPathPartial<T>) -> Unit) = emitReadPaths(DataClassPathSelf<T>(
     NothingSerializer() as KSerializer<T>
@@ -269,6 +271,7 @@ fun <T> Condition<T>.readsResultOf(modification: Modification<T>, tableTextPaths
 
         is Condition.FullTextSearch -> {
             tableTextPaths.any {
+                @Suppress("UNCHECKED_CAST")
                 it.reversed().fold(Condition.Equal<Any?>(null)) { acc: Condition<Any?>, it: SerializableProperty<*, *> -> Condition.OnField(it as SerializableProperty<Any?, Any?>, acc) }
                     .readsResultOf(modification, listOf())
             }

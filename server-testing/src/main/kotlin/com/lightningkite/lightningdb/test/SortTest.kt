@@ -37,9 +37,9 @@ abstract class SortTest {
         val sortedPosts = items.sortedBy { it.int }
         val reversePosts = items.sortedByDescending { it.int }
         collection.insertMany(items)
-        val results1 = collection.find(Condition.Always()).toList()
-        val results2 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().int, true))).toList()
-        val results3 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().int, false))).toList()
+        val results1 = collection.find(Condition.Always).toList()
+        val results2 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().int, true))).toList()
+        val results3 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().int, false))).toList()
         assertEquals(items.map { it._id }, results1.map { it._id })
         assertEquals(sortedPosts.map { it._id }, results2.map { it._id })
         assertEquals(reversePosts.map { it._id }, results3.map { it._id })
@@ -59,9 +59,9 @@ abstract class SortTest {
         val sortedPosts = items.sortedBy { it.embedded.value2 }
         val reversePosts = items.sortedByDescending { it.embedded.value2 }
         collection.insertMany(items)
-        val results1 = collection.find(Condition.Always()).toList()
-        val results2 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().embedded.value2, true))).toList()
-        val results3 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().embedded.value2, false))).toList()
+        val results1 = collection.find(Condition.Always).toList()
+        val results2 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().embedded.value2, true))).toList()
+        val results3 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().embedded.value2, false))).toList()
         assertEquals(items.map { it._id }, results1.map { it._id })
         assertEquals(sortedPosts.map { it._id }, results2.map { it._id })
         assertEquals(reversePosts.map { it._id }, results3.map { it._id })
@@ -81,9 +81,9 @@ abstract class SortTest {
         val sortedPosts = items.sortedBy { it.embeddedNullable?.value2 }
         val reversePosts = items.sortedByDescending { it.embeddedNullable?.value2 }
         collection.insertMany(items)
-        val results1 = collection.find(Condition.Always()).toList()
-        val results2 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().embeddedNullable.notNull.value2, true))).toList()
-        val results3 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().embeddedNullable.notNull.value2, false))).toList()
+        val results1 = collection.find(Condition.Always).toList()
+        val results2 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().embeddedNullable.notNull.value2, true))).toList()
+        val results3 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().embeddedNullable.notNull.value2, false))).toList()
         assertEquals(items.map { it._id }, results1.map { it._id })
         assertEquals(sortedPosts.map { it._id }, results2.map { it._id })
         assertEquals(reversePosts.map { it._id }, results3.map { it._id })
@@ -103,9 +103,9 @@ abstract class SortTest {
         val sortedPosts = items.sortedBy { it.instant }
         val reversePosts = items.sortedByDescending { it.instant }
         collection.insertMany(items)
-        val results1 = collection.find(Condition.Always()).toList()
-        val results2 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().instant, true))).toList()
-        val results3 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().instant, false))).toList()
+        val results1 = collection.find(Condition.Always).toList()
+        val results2 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().instant, true))).toList()
+        val results3 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().instant, false))).toList()
         assertEquals(items.map { it._id }, results1.map { it._id })
         assertEquals(sortedPosts.map { it._id }, results2.map { it._id })
         assertEquals(reversePosts.map { it._id }, results3.map { it._id })
@@ -125,9 +125,9 @@ abstract class SortTest {
         val sortedPosts = items.sortedBy { it.string }
         val reversePosts = items.sortedByDescending { it.string }
         collection.insertMany(items)
-        val results1 = collection.find(Condition.Always()).toList()
-        val results2 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().string, true))).toList()
-        val results3 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().string, false))).toList()
+        val results1 = collection.find(Condition.Always).toList()
+        val results2 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().string, true))).toList()
+        val results3 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().string, false))).toList()
         assertEquals(items.map { it._id }, results1.map { it._id })
         assertEquals(sortedPosts.map { it._id }, results2.map { it._id })
         assertEquals(reversePosts.map { it._id }, results3.map { it._id })
@@ -147,9 +147,9 @@ abstract class SortTest {
         val sortedPosts = items.sortedBy { it.string.lowercase() }
         val reversePosts = items.sortedByDescending { it.string.lowercase() }
         collection.insertMany(items)
-        val results1 = collection.find(Condition.Always()).toList()
-        val results2 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().string, true, true))).toList()
-        val results3 = collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().string, false, true))).toList()
+        val results1 = collection.find(Condition.Always).toList()
+        val results2 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().string, true, true))).toList()
+        val results3 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().string, false, true))).toList()
         assertEquals(items.map { it._id }, results1.map { it._id })
         assertEquals(sortedPosts.map { it._id }, results2.map { it._id })
         assertEquals(reversePosts.map { it._id }, results3.map { it._id })
@@ -167,7 +167,7 @@ abstract class SortTest {
             LargeTestModel(string = "ae"),
             LargeTestModel(string = "Af"),
         )
-        collection.find(Condition.Always(), orderBy = listOf(SortPart(path<LargeTestModel>().long, true, true))).toList()
+        collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().long, true, true))).toList()
     }
 
 }

@@ -18,7 +18,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 object UUIDSerializer : KSerializer<UUID> {
     override fun deserialize(decoder: Decoder): UUID = try {
-        uuid(decoder.decodeString())
+        UUID.parse(decoder.decodeString())
     } catch (e: IllegalArgumentException) {
         throw SerializationException(e.message)
     }

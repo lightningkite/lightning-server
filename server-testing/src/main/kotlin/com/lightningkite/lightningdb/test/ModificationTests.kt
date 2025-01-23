@@ -25,14 +25,14 @@ abstract class ModificationTests() {
         assertEquals(collection.count(), max)
         try {
             val updated = collection.updateOne(
-                condition = Condition.Always(),
+                condition = Condition.Always,
                 modification = modification { it.boolean assign true },
                 orderBy = sort { it.int.descending() }
 //                orderBy = listOf(SortPart(LargeTestModel_int, ascending = false))
             )
             assertEquals(max, updated.new!!.int)
             val deleted = collection.deleteOne(
-                condition = Condition.Always(),
+                condition = Condition.Always,
                 orderBy = sort { it.int.descending() }
 //                orderBy = listOf(SortPart(LargeTestModel_int, ascending = false))
             )

@@ -35,7 +35,7 @@ data class MongoFields(
         appendLine("""// Automatically generated based off ${declaration.containingFile?.fileName}""")
         appendLine("""@file:OptIn(ExperimentalSerializationApi::class, InternalSerializationApi::class)""")
         if (declaration.typeParameters.isEmpty())
-            appendLine("""@file:Suppress("UnusedImport")""")
+            appendLine("""@file:Suppress("UnusedImport", "UNCHECKED_CAST")""")
         else
             appendLine("""@file:Suppress("UNCHECKED_CAST", "UNUSED_PARAMETER", "UnusedImport")""")
         appendLine()

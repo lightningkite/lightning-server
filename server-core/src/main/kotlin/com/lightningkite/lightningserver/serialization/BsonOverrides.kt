@@ -135,7 +135,7 @@ object MongoLocaleSerializer : KSerializer<Locale> {
     }
 }
 
-@Serializer(forClass = UUID::class)
+//@Serializer(forClass = UUID::class)
 object UUIDSerializer : KSerializer<UUID> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.UUID/bson", PrimitiveKind.STRING)
 

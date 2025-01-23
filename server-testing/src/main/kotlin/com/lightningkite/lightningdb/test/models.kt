@@ -17,7 +17,7 @@ import com.lightningkite.uuid
 @GenerateDataClassPaths()
 @Serializable
 data class User(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     @Unique override var email: String,
     @Unique override val phoneNumber: String,
     var age: Long = 0,
@@ -54,7 +54,7 @@ data class CompoundTestKey(
 @GenerateDataClassPaths()
 @Serializable
 data class Post(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     var author: UUID,
     var content: String,
     var at: Long? = null
@@ -65,7 +65,7 @@ data class Post(
 @GenerateDataClassPaths()
 @Serializable
 data class Employee(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     var dictionary: Map<String, Int> = mapOf(),
 ) : HasId<UUID> {
     companion object
@@ -74,7 +74,7 @@ data class Employee(
 @GenerateDataClassPaths
 @Serializable
 data class EmbeddedObjectTest(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     var name: String = "",
     var embed1: ClassUsedForEmbedding = ClassUsedForEmbedding("value1", 1),
     var embed2: ClassUsedForEmbedding = ClassUsedForEmbedding("value2", 2),
@@ -105,7 +105,7 @@ data class HasServerFiles(
 @GenerateDataClassPaths
 @Serializable
 data class EmbeddedNullable(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     var name: String = "",
     var embed1: ClassUsedForEmbedding? = null,
 ) : HasId<UUID> {
@@ -116,7 +116,7 @@ data class EmbeddedNullable(
 @Serializable
 @TextIndex(["string", "embedded.value1"])
 data class LargeTestModel(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     var boolean: Boolean = false,
     var byte: Byte = 0,
     var short: Short = 0,
@@ -155,7 +155,7 @@ data class LargeTestModel(
 @GenerateDataClassPaths
 @Serializable
 data class SimpleLargeTestModel(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     var boolean: Boolean = false,
     var byte: Byte = 0,
     var short: Short = 0,
@@ -175,7 +175,7 @@ data class SimpleLargeTestModel(
 @GenerateDataClassPaths
 @Serializable
 data class NestedEnumTestModel(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     val thing: NestedEnumHolder = NestedEnumHolder()
 ) : HasId<UUID> {
     companion object
@@ -193,7 +193,7 @@ enum class TestEnum { One, Two }
 @GenerateDataClassPaths
 @Serializable
 data class GeoTest(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     @Index val geo: GeoCoordinate = GeoCoordinate(41.727019, -111.8443002)
 ) : HasId<UUID> {
     companion object
@@ -202,14 +202,14 @@ data class GeoTest(
 @GenerateDataClassPaths
 @Serializable
 data class EmbeddedMap(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     var map: Map<String, RecursiveEmbed>,
 ) : HasId<UUID>
 
 @GenerateDataClassPaths
 @Serializable
 data class MetaTestModel(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     val condition: Condition<LargeTestModel>,
     val modification: Modification<LargeTestModel>
 ) : HasId<UUID> {

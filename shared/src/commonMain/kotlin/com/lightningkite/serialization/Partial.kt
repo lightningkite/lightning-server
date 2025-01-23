@@ -29,10 +29,16 @@ data class Partial<T>(
     } else null
     fun <S> perPath(soFar: DataClassPath<S, T>, action: (DataClassPathWithValue<S, *>) -> Unit) {
         for(part in parts) {
+
+            @Suppress("UNCHECKED_CAST")
             val p = DataClassPathAccess(soFar, part.key as SerializableProperty<T, Any?>)
             if(part.value is Partial<*> && part.key.serializer.let { it.nullElement() ?: it } !is PartialSerializer<*>) {
+
+                @Suppress("UNCHECKED_CAST")
                 val partial = (part.value as Partial<Any?>)
                 val ser = part.key.serializer.let { it.nullElement() ?: it }
+
+                @Suppress("UNCHECKED_CAST")
                 partial.total(ser as KSerializer<Any?>)?.let {
                     action(DataClassPathWithValue(p, it))
                 } ?: partial.perPath(p, action)
@@ -49,7 +55,6 @@ data class DataClassPathWithValue<A, V>(val path: DataClassPath<A, V>, val value
 
 @Suppress("UNCHECKED_CAST")
 class PartialBuilder<T>(val partial: Partial<T> = Partial()) {
-    @Suppress("NOTHING_TO_INLINE")
     inline infix fun <A> DataClassPath<T, A>.assign(value: A) {
         var target: Partial<Any> = partial as Partial<Any>
         val props = properties
@@ -58,7 +63,6 @@ class PartialBuilder<T>(val partial: Partial<T> = Partial()) {
         }
         target.parts[props.last() as SerializableProperty<Any, A>] = value
     }
-    @Suppress("NOTHING_TO_INLINE")
     inline infix fun <A> DataClassPath<T, A>.assign(value: Partial<A>) {
         var target: Partial<Any> = partial as Partial<Any>
         val props = properties
