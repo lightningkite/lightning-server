@@ -307,7 +307,7 @@ auctionDay,auction,venue,company,auctionDate,city,state,country,wasMigrated,lotN
     }
 
     @Test fun testContextuals() {
-        Serialization.csv.roundTripTest(ContextualSerializer(UUID::class), uuid())
+        Serialization.csv.roundTripTest(ContextualSerializer(UUID::class), UUID.random())
         Serialization.csv.roundTripTest(ContextualSerializer(ServerFile::class), TestSettings.files().root.resolve("example").serverFile)
     }
 
@@ -389,7 +389,7 @@ auctionDay,auction,venue,company,auctionDate,city,state,country,wasMigrated,lotN
     @AdminSearchFields(["make", "model"])
     @AdminTitleFields(["make", "model", "year", "auctionDate"])
     data class Lot(
-        override val _id: UUID = uuid(),
+        override val _id: UUID = UUID.random(),
         val auctionDay: UUID,
         val auction: UUID,
         val venue: UUID,

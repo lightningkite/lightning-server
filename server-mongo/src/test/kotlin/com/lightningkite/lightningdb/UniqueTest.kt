@@ -49,7 +49,7 @@ class UniqueTest : MongoTest() {
 @Serializable
 @UniqueSet(["email", "account"])
 data class IndexingTestModel(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     val email: String? = null,
     val account: String? = null,
 ) : HasId<UUID>

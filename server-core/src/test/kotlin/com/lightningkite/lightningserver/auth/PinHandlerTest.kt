@@ -10,6 +10,8 @@ import org.junit.Assert.fail
 import org.junit.Test
 import kotlin.test.assertIs
 
+
+@Suppress("Deprecation")
 class PinHandlerTest {
 
     private inline fun <reified T : Exception> assertException(action: () -> Unit, verify: (T) -> Boolean = { true }) {

@@ -31,9 +31,11 @@ import java.util.*
 import com.lightningkite.UUID
 import com.lightningkite.lightningserver.websocket.WebSocketTopic
 import com.lightningkite.lightningserver.websocket.send
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.serialization.builtins.serializer
 import com.lightningkite.lightningserver.websocket.WebSockets as MyWebSockets
 
+@OptIn(DelicateCoroutinesApi::class)
 class KtorKtTest {
 
     val topic = WebSocketTopic("general", String.serializer())
@@ -119,7 +121,7 @@ class KtorKtTest {
                     })
                 }
             }
-            val channel = uuid().toString()
+            val channel = UUID.random().toString()
             client.webSocket(multiplexSocket.toString()) {
                 send(
                     Serialization.json.encodeToString(

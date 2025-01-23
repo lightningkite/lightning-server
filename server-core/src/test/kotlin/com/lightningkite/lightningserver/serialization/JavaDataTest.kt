@@ -76,9 +76,9 @@ class JavaDataTest {
         val sample = CompletePermissions(
             organizations = setOf(
                 FinalPermissions(
-                    directOwner = uuid("55555555-5555-5555-5555-555555555555"),
-                    owners = setOf(uuid("55555555-5555-5555-5555-555555555555")),
-                    member = uuid("55555555-5555-5555-5555-555555555555"),
+                    directOwner = UUID.parse("55555555-5555-5555-5555-555555555555"),
+                    owners = setOf(UUID.parse("55555555-5555-5555-5555-555555555555")),
+                    member = UUID.parse("55555555-5555-5555-5555-555555555555"),
                     manageBalance = true,
                     minimalMemberRead = true,
                     notifications = true,

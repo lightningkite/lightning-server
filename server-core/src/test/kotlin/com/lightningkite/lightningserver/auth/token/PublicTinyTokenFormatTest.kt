@@ -24,7 +24,7 @@ class PublicTinyTokenFormatTest: TokenFormatTest() {
     init { TestSettings }
 
     @Test fun encodeData() {
-        val data = CacheKeyMap(mapOf(TestSettings.TestCacheKey to RequestAuth.ExpiringValue(uuid(), now().plus(60.seconds))))
+        val data = CacheKeyMap(mapOf(TestSettings.TestCacheKey to RequestAuth.ExpiringValue(UUID.random(), now().plus(60.seconds))))
         println(data)
         val hex = Serialization.javaData.encodeToHexString(CacheKeyMapSerializer, data)
         println(hex)

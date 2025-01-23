@@ -3,11 +3,8 @@ package com.lightningkite.lightningdb.testing
 import com.lightningkite.*
 import com.lightningkite.serialization.*
 import kotlinx.datetime.Instant
-import kotlinx.serialization.ContextualSerializer
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonBuilder
 import kotlin.test.Test
@@ -15,6 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.time.Duration
 import kotlin.time.measureTime
 
+@OptIn(ExperimentalSerializationApi::class)
 class VirtualTypesTest {
 
     init {
@@ -115,7 +113,7 @@ class VirtualTypesTest {
 
     @Serializable
     data class TestModel(
-        val _id: UUID = uuid(),
+        val _id: UUID = UUID.random(),
         val x: Int = 0,
         val y: String,
         val z: Duration?,

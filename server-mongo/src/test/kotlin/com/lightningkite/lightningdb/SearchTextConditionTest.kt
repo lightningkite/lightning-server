@@ -34,7 +34,7 @@ class SearchTextConditionTest {
     @GenerateDataClassPaths
     @TextIndex(["string", "otherField", "anotherField"])
     data class ModelWithTextIndex2(
-        override val _id: UUID = uuid(),
+        override val _id: UUID = UUID.random(),
         val string: String = "nothere",
         val otherField: String? = null,
         val anotherField: Int = 201,

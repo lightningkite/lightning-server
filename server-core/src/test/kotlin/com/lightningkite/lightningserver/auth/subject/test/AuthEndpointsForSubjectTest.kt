@@ -309,7 +309,7 @@ class AuthEndpointsForSubjectTest {
 
     @Test fun testOauth(): Unit = runBlocking {
         val oauthClient = TestSettings.oauthClients.rest.insert.test(TestSettings.testAdmin.await(), OauthClient(
-            _id = uuid().toString(),
+            _id = UUID.random().toString(),
             niceName = "Test",
             scopes = TestSettings.testUserSubject.self.authOptions.options.first()!!.scopes ?: setOf(),
             redirectUris = setOf("https://test.com")

@@ -36,12 +36,12 @@ class BasicTest() {
             // Quick test
             val t = LargeTestModel()
             collection.insertOne(t)
-            assertEquals(t, collection.find(Condition.Always()).firstOrNull())
+            assertEquals(t, collection.find(Condition.Always).firstOrNull())
             assertEquals(t, collection.find(condition { it.byte eq 0 }).firstOrNull())
-            assertEquals(t.byte, collection.updateOne(Condition.Always(), modification { it.byte += 1 }).old?.byte)
-            assertEquals(t.byte.plus(1).toByte(), collection.updateOne(Condition.Always(), modification { it.byte += 1 }).old?.byte)
-            assertEquals(t.byte.plus(2).toByte(), collection.updateOne(Condition.Always(), modification { it.byte += 1 }).old?.byte)
-            assertEquals(t.byte.plus(3).toByte(), collection.updateOne(Condition.Always(), modification { it.byte += 1 }).old?.byte)
+            assertEquals(t.byte, collection.updateOne(Condition.Always, modification { it.byte += 1 }).old?.byte)
+            assertEquals(t.byte.plus(1).toByte(), collection.updateOne(Condition.Always, modification { it.byte += 1 }).old?.byte)
+            assertEquals(t.byte.plus(2).toByte(), collection.updateOne(Condition.Always, modification { it.byte += 1 }).old?.byte)
+            assertEquals(t.byte.plus(3).toByte(), collection.updateOne(Condition.Always, modification { it.byte += 1 }).old?.byte)
         }
     }
 
@@ -117,7 +117,7 @@ class BasicTest() {
 class CodingTest() {
     @Serializable
     data class TestModel(
-        @Contextual val uuid: UUID = uuid(),
+        @Contextual val uuid: UUID = UUID.random(),
         @Contextual val time: Instant,
         val x: String?,
         val y: Int,
