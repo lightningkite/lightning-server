@@ -1,5 +1,6 @@
 package com.lightningkite
 
+import com.lightningkite.serialization.KSerializerWithDefault
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -100,7 +101,8 @@ inline fun String.trimmedCaseless(): TrimmedCaselessString = TrimmedCaselessStri
 
 
 
-object EmailAddressSerializer : KSerializer<EmailAddress> {
+object EmailAddressSerializer : KSerializerWithDefault<EmailAddress> {
+    override val default: EmailAddress get() = "example@example.com".toEmailAddress()
     override fun deserialize(decoder: Decoder): EmailAddress = decoder.decodeString().toEmailAddress()
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.EmailAddress", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: EmailAddress) = encoder.encodeString(value.raw)
@@ -138,7 +140,8 @@ fun String.toEmailAddress(): EmailAddress {
 }
 
 
-object PhoneNumberSerializer : KSerializer<PhoneNumber> {
+object PhoneNumberSerializer : KSerializer<PhoneNumber>, KSerializerWithDefault<PhoneNumber> {
+    override val default: PhoneNumber get() = PhoneNumber("")
     override fun deserialize(decoder: Decoder): PhoneNumber = decoder.decodeString().toPhoneNumber()
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.PhoneNumber", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: PhoneNumber) = encoder.encodeString(value.raw)

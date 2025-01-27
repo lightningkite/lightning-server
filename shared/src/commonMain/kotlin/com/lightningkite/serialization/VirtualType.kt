@@ -163,6 +163,8 @@ data class VirtualEnum(
     val options: List<VirtualEnumOption>,
 ) : VirtualType, KSerializer<VirtualEnumValue> {
     @Transient
+    val entries = options.map { VirtualEnumValue(this, it.index) }
+    @Transient
     private val map = options.associateBy { it.name }
     override fun serializer(registry: SerializationRegistry, arguments: Array<KSerializer<*>>): KSerializer<*> = this
     override fun toString(): String = "Virtual $serialName { ${options.joinToString()} }"
@@ -194,7 +196,7 @@ data class VirtualEnum(
     }
 
     override fun deserialize(decoder: Decoder): VirtualEnumValue {
-        return VirtualEnumValue(this, decoder.decodeEnum(descriptor))
+        return entries[decoder.decodeEnum(descriptor)]
     }
 
     override fun serialize(encoder: Encoder, value: VirtualEnumValue) {
