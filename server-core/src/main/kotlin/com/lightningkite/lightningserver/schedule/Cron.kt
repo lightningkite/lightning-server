@@ -162,6 +162,7 @@ data class CronDayOfWeek(
     @Deprecated("This does not work yet")
     val recurrence: Int? = null,
 ) {
+    @Suppress("Deprecation")
     override fun toString(): String = buildString {
         append(day.value)
         if (last) append('L')

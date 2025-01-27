@@ -147,7 +147,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
                 HttpResponse.redirectToGet("${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$token")
             }
             val loginRedirect = path("oauth/${it.first}/login").get.handler {
-                HttpResponse.redirectToGet(callback.loginUrl(uuid()))
+                HttpResponse.redirectToGet(callback.loginUrl(UUID.random()))
             }
             val loginApi = path("oauth/${it.first}/login").get.typed(
                 summary = "Log In via ${it.first.niceName}",
@@ -160,7 +160,7 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
                     )
                 ),
                 implementation = { _: Unit, _: Unit ->
-                    callback.loginUrl(uuid())
+                    callback.loginUrl(UUID.random())
                 }
             )
             OauthEndpointSet(

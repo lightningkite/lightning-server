@@ -43,6 +43,7 @@ import com.lightningkite.lightningserver.typed.bulkRequestEndpoint
 import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.prepareModelsShared
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.serialization.KSerializer
@@ -101,6 +102,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         engine = LocalEngine(LocalPubSub)
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     val sampleUser = GlobalScope.async(start = CoroutineStart.LAZY) {
         info.collection().insertOne(User(
             email = "test@test.com",

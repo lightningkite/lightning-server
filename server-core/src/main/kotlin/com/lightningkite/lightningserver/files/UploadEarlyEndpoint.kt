@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.UUID
 import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
 import com.lightningkite.serialization.*
@@ -71,7 +72,7 @@ class UploadEarlyEndpoint(
         description = "Upload a file to make a request later.  Times out in around 10 minutes.",
         errorCases = listOf(),
         implementation = { _: Unit ->
-            val id = uuid()
+            val id = UUID.random()
             val newFile = files().root.resolve(jailFilePath).resolve("$id.file")
             val newItem = UploadForNextRequest(
                 expires = now().plus(expiration),

@@ -107,9 +107,9 @@ object Server : ServerPathGroup(ServerPath.root) {
         serialization = ModelSerializationInfo(),
         permissions = {
             val user = user()
-            val everyone: Condition<User> = Condition.Always()
+            val everyone: Condition<User> = Condition.Always
             val self: Condition<User> = condition { it._id eq user._id }
-            val admin: Condition<User> = if (user.isSuperUser) Condition.Always() else Condition.Never()
+            val admin: Condition<User> = if (user.isSuperUser) Condition.Always else Condition.Never
             ModelPermissions(
                 create = everyone,
                 read = self or admin,
@@ -146,7 +146,7 @@ object Server : ServerPathGroup(ServerPath.root) {
     )
 
     val task = task("Sample Task") { it: Int ->
-        val id = uuid()
+        val id = UUID.random()
         println("Got input $it in the sample task $id")
         var value = cache().get<Int>("key")
         println("From cache is $value for task $id")
@@ -251,7 +251,7 @@ object Server : ServerPathGroup(ServerPath.root) {
             override suspend fun fetch(id: UUID): User = userInfo.collection().get(id) ?: throw NotFoundException()
             override suspend fun findUser(property: String, value: String): User? = when (property) {
                 "email" -> userInfo.collection().findOne(condition { it.email eq value })
-                "_id" -> userInfo.collection().get(uuid(value))
+                "_id" -> userInfo.collection().get(UUID.parse(value))
                 else -> null
             }
 

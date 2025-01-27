@@ -36,7 +36,7 @@ class SimpleSignals {
         prepareModelsShared()
         prepareModelsServerCore()
         collection = TestSettings.database().collection<TempThing>()
-        runBlocking { collection.deleteManyIgnoringOld(Condition.Always()) }
+        runBlocking { collection.deleteManyIgnoringOld(Condition.Always) }
     }
 
     @Test
@@ -48,10 +48,10 @@ class SimpleSignals {
         }
 
         collection.insert(listOf(thing1, thing2))
-        signaledCollection.updateOne(Condition.Always(), mod1)
-        signaledCollection.replaceOne(Condition.Always(), thing3)
-        signaledCollection.deleteOne(Condition.Always())
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.updateOne(Condition.Always, mod1)
+        signaledCollection.replaceOne(Condition.Always, thing3)
+        signaledCollection.deleteOne(Condition.Always)
+        signaledCollection.deleteMany(Condition.Always)
 
         signaledCollection = collection.postCreate {
             calledIds.add(it._id)
@@ -66,14 +66,14 @@ class SimpleSignals {
         runCount = 0
         calledIds.clear()
 
-        signaledCollection.deleteMany(Condition.Always())
-        signaledCollection.upsertOne(Condition.Always(), mod1, thing1)
+        signaledCollection.deleteMany(Condition.Always)
+        signaledCollection.upsertOne(Condition.Always, mod1, thing1)
         assertEquals(1, runCount)
         assertEquals(listOf(thing1._id), calledIds)
         calledIds.clear()
         runCount = 0
 
-        signaledCollection.upsertOne(Condition.Always(), mod1, thing1)
+        signaledCollection.upsertOne(Condition.Always, mod1, thing1)
         assertEquals(0, runCount)
         assertTrue(calledIds.isEmpty())
 
@@ -88,9 +88,9 @@ class SimpleSignals {
         }
 
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.updateOne(Condition.Always(), mod1)
-        signaledCollection.upsertOne(Condition.Always(), mod1, thing1)
-        signaledCollection.replaceOne(Condition.Always(), thing3)
+        signaledCollection.updateOne(Condition.Always, mod1)
+        signaledCollection.upsertOne(Condition.Always, mod1, thing1)
+        signaledCollection.replaceOne(Condition.Always, thing3)
 
         signaledCollection = collection.postDelete {
             calledIds.add(it._id)
@@ -98,9 +98,9 @@ class SimpleSignals {
             runCount++
         }
 
-        collection.deleteMany(Condition.Always())
+        collection.deleteMany(Condition.Always)
         collection.insert(listOf(thing1, thing2))
-        signaledCollection.deleteOne(Condition.Always())
+        signaledCollection.deleteOne(Condition.Always)
         assertEquals(1, runCount)
         assertEquals(listOf(thing1._id), calledIds)
 
@@ -108,25 +108,25 @@ class SimpleSignals {
         signaledCollection.insertOne(thing1)
         calledIds.clear()
         runCount = 0
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         assertEquals(2, runCount)
         assertEquals(listOf(thing2._id, thing1._id), calledIds)
 
 
-        collection.deleteMany(Condition.Always())
+        collection.deleteMany(Condition.Always)
         collection.insert(listOf(thing1, thing2))
         calledIds.clear()
         runCount = 0
-        signaledCollection.deleteOneIgnoringOld(Condition.Always())
+        signaledCollection.deleteOneIgnoringOld(Condition.Always)
         assertEquals(1, runCount)
         assertEquals(listOf(thing1._id), calledIds)
 
 
-        collection.deleteMany(Condition.Always())
+        collection.deleteMany(Condition.Always)
         collection.insert(listOf(thing1, thing2))
         calledIds.clear()
         runCount = 0
-        signaledCollection.deleteManyIgnoringOld(Condition.Always())
+        signaledCollection.deleteManyIgnoringOld(Condition.Always)
         assertEquals(2, runCount)
         assertEquals(listOf(thing1._id, thing2._id), calledIds)
 
@@ -140,9 +140,9 @@ class SimpleSignals {
         }
 
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.deleteOne(Condition.Always())
+        signaledCollection.deleteOne(Condition.Always)
         signaledCollection.insertOne(thing1)
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
 
 
         signaledCollection = collection.postChange { old, new ->
@@ -151,48 +151,48 @@ class SimpleSignals {
             runCount++
         }
 
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.replaceOne(Condition.Always(), TempThing(4))
+        signaledCollection.replaceOne(Condition.Always, TempThing(4))
         assertEquals(1, runCount)
         runCount = 0
 
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.replaceOneIgnoringResult(Condition.Always(), TempThing(4))
+        signaledCollection.replaceOneIgnoringResult(Condition.Always, TempThing(4))
         assertEquals(1, runCount)
         runCount = 0
 
 
 
-        signaledCollection.deleteMany(Condition.Always())
-        signaledCollection.upsertOne(Condition.Always(), mod1, TempThing(4))
+        signaledCollection.deleteMany(Condition.Always)
+        signaledCollection.upsertOne(Condition.Always, mod1, TempThing(4))
         assertEquals(0, runCount)
         assertTrue(calledIds.isEmpty())
 
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.upsertOne(Condition.Always(), mod1, TempThing(4))
+        signaledCollection.upsertOne(Condition.Always, mod1, TempThing(4))
         assertEquals(1, runCount)
         runCount = 0
 
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.upsertOneIgnoringResult(Condition.Always(), mod1, TempThing(4))
+        signaledCollection.upsertOneIgnoringResult(Condition.Always, mod1, TempThing(4))
         assertEquals(1, runCount)
         runCount = 0
 
 
 
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.updateOne(Condition.Always(), mod1)
+        signaledCollection.updateOne(Condition.Always, mod1)
         assertEquals(1, runCount)
         runCount = 0
 
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.updateOneIgnoringResult(Condition.Always(), mod1)
+        signaledCollection.updateOneIgnoringResult(Condition.Always, mod1)
         assertEquals(1, runCount)
         runCount = 0
 
@@ -204,17 +204,17 @@ class SimpleSignals {
             runCount++
         }
 
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.updateMany(Condition.Always(), mod1)
+        signaledCollection.updateMany(Condition.Always, mod1)
         assertEquals(2, runCount)
         assertEquals(listOf(1, 2), calledIds)
         calledIds.clear()
         runCount = 0
 
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.updateManyIgnoringResult(Condition.Always(), mod1)
+        signaledCollection.updateManyIgnoringResult(Condition.Always, mod1)
         assertEquals(2, runCount)
         assertEquals(listOf(1, 2), calledIds)
 
@@ -235,68 +235,68 @@ class SimpleSignals {
         runCount = 0
 
 
-        signaledCollection.replaceOne(Condition.Always(), thing3)
+        signaledCollection.replaceOne(Condition.Always, thing3)
         assertEquals(listOf(thing3._id), calledIds)
         assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 
-        signaledCollection.replaceOneIgnoringResult(Condition.Always(), thing1)
+        signaledCollection.replaceOneIgnoringResult(Condition.Always, thing1)
         assertEquals(listOf(thing1._id), calledIds)
         assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 
 
-        collection.deleteMany(Condition.Always())
-        signaledCollection.upsertOne(Condition.Always(), mod1, thing1)
+        collection.deleteMany(Condition.Always)
+        signaledCollection.upsertOne(Condition.Always, mod1, thing1)
         assertEquals(listOf(thing1._id), calledIds)
         assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 
-        signaledCollection.upsertOne(Condition.Always(), mod1, thing1)
+        signaledCollection.upsertOne(Condition.Always, mod1, thing1)
         assertEquals(listOf(4), calledIds)
         assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 
-        collection.deleteMany(Condition.Always())
-        signaledCollection.upsertOneIgnoringResult(Condition.Always(), mod1, thing1)
+        collection.deleteMany(Condition.Always)
+        signaledCollection.upsertOneIgnoringResult(Condition.Always, mod1, thing1)
         assertEquals(listOf(thing1._id), calledIds)
         assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 
-        signaledCollection.upsertOneIgnoringResult(Condition.Always(), mod1, thing1)
+        signaledCollection.upsertOneIgnoringResult(Condition.Always, mod1, thing1)
         assertEquals(listOf(4), calledIds)
         assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 
 
-        collection.deleteMany(Condition.Always())
+        collection.deleteMany(Condition.Always)
         collection.insert(listOf(thing1, thing2))
-        signaledCollection.updateOne(Condition.Always(), mod1)
+        signaledCollection.updateOne(Condition.Always, mod1)
         assertEquals(listOf(4), calledIds)
         assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 
-        signaledCollection.updateOneIgnoringResult(Condition.Always(), mod2)
+        signaledCollection.updateOneIgnoringResult(Condition.Always, mod2)
         assertEquals(listOf(5), calledIds)
         assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 
 
-        signaledCollection.updateMany(Condition.Always(), mod1)
+        signaledCollection.updateMany(Condition.Always, mod1)
         assertEquals(listOf(4, 4), calledIds)
         assertEquals(2, runCount)
         calledIds.clear()
         runCount = 0
 
-        signaledCollection.updateManyIgnoringResult(Condition.Always(), mod2)
+        signaledCollection.updateManyIgnoringResult(Condition.Always, mod2)
         assertEquals(listOf(5, 5), calledIds)
         assertEquals(2, runCount)
         calledIds.clear()
@@ -340,30 +340,30 @@ class SimpleSignals {
         runCount = 0
 
 
-        signaledCollection.updateMany(Condition.Always(), modification { it._id assign 4 })
+        signaledCollection.updateMany(Condition.Always, modification { it._id assign 4 })
         assertEquals(listOf(thing1._id, 4, thing3._id), calledIds)
         assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 
-        collection.deleteMany(Condition.Always())
+        collection.deleteMany(Condition.Always)
         collection.insertMany(listOf(thing1, thing2, thing3))
 
 
-        signaledCollection.deleteOne(Condition.Always())
+        signaledCollection.deleteOne(Condition.Always)
         assertEquals(listOf(thing1._id), calledIds)
         assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 
 
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         assertEquals(listOf(thing2._id, thing3._id), calledIds)
         assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 
-        collection.deleteMany(Condition.Always())
+        collection.deleteMany(Condition.Always)
         collection.insertMany(listOf(thing1, thing2, thing3))
 
         signaledCollection.replaceOneIgnoringResult(condition { it._id eq thing2._id }, thing3)
@@ -387,25 +387,25 @@ class SimpleSignals {
         runCount = 0
 
 
-        signaledCollection.updateManyIgnoringResult(Condition.Always(), modification { it._id assign 4 })
+        signaledCollection.updateManyIgnoringResult(Condition.Always, modification { it._id assign 4 })
         assertEquals(listOf(thing1._id, 4, thing3._id), calledIds)
         assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 
 
-        collection.deleteMany(Condition.Always())
+        collection.deleteMany(Condition.Always)
         collection.insertMany(listOf(thing1, thing2, thing3))
 
 
-        signaledCollection.deleteOneIgnoringOld(Condition.Always())
+        signaledCollection.deleteOneIgnoringOld(Condition.Always)
         assertEquals(listOf(thing1._id), calledIds)
         assertEquals(1, runCount)
         calledIds.clear()
         runCount = 0
 
 
-        signaledCollection.deleteManyIgnoringOld(Condition.Always())
+        signaledCollection.deleteManyIgnoringOld(Condition.Always)
         assertEquals(listOf(thing2._id, thing3._id), calledIds)
         assertEquals(1, runCount)
         calledIds.clear()
@@ -422,10 +422,10 @@ class SimpleSignals {
         }
 
         collection.insert(listOf(thing1, thing2))
-        signaledCollection.updateOne(Condition.Always(), mod1)
-        signaledCollection.replaceOne(Condition.Always(), thing3)
-        signaledCollection.deleteOne(Condition.Always())
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.updateOne(Condition.Always, mod1)
+        signaledCollection.replaceOne(Condition.Always, thing3)
+        signaledCollection.deleteOne(Condition.Always)
+        signaledCollection.deleteMany(Condition.Always)
 
 
         signaledCollection = collection.interceptCreate {
@@ -442,13 +442,13 @@ class SimpleSignals {
         calledIds.clear()
         runCount = 0
 
-        signaledCollection.upsertOne(Condition.Always(), mod1, thing1)
+        signaledCollection.upsertOne(Condition.Always, mod1, thing1)
         assertEquals(1, runCount)
         assertEquals(listOf(thing1._id), calledIds)
         calledIds.clear()
         runCount = 0
 
-        signaledCollection.upsertOne(Condition.Always(), mod1, thing1)
+        signaledCollection.upsertOne(Condition.Always, mod1, thing1)
         assertEquals(1, runCount)
         assertEquals(listOf(thing1._id), calledIds)
 
@@ -463,10 +463,10 @@ class SimpleSignals {
         }
 
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.updateOne(Condition.Always(), mod1)
-        signaledCollection.updateMany(Condition.Always(), mod1)
-        signaledCollection.replaceOne(Condition.Always(), thing3)
-        signaledCollection.upsertOne(Condition.Always(), mod1, thing3)
+        signaledCollection.updateOne(Condition.Always, mod1)
+        signaledCollection.updateMany(Condition.Always, mod1)
+        signaledCollection.replaceOne(Condition.Always, thing3)
+        signaledCollection.upsertOne(Condition.Always, mod1, thing3)
 
 
         signaledCollection = collection.interceptDelete {
@@ -475,9 +475,9 @@ class SimpleSignals {
             runCount++
         }
 
-        collection.deleteMany(Condition.Always())
+        collection.deleteMany(Condition.Always)
         collection.insert(listOf(thing1, thing2))
-        signaledCollection.deleteOne(Condition.Always())
+        signaledCollection.deleteOne(Condition.Always)
         assertEquals(1, runCount)
         assertEquals(listOf(thing1._id), calledIds)
 
@@ -485,25 +485,25 @@ class SimpleSignals {
         signaledCollection.insertOne(thing1)
         calledIds.clear()
         runCount = 0
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         assertEquals(2, runCount)
         assertEquals(listOf(thing2._id, thing1._id), calledIds)
 
 
-        collection.deleteMany(Condition.Always())
+        collection.deleteMany(Condition.Always)
         collection.insert(listOf(thing1, thing2))
         calledIds.clear()
         runCount = 0
-        signaledCollection.deleteOneIgnoringOld(Condition.Always())
+        signaledCollection.deleteOneIgnoringOld(Condition.Always)
         assertEquals(1, runCount)
         assertEquals(listOf(thing1._id), calledIds)
 
 
-        collection.deleteMany(Condition.Always())
+        collection.deleteMany(Condition.Always)
         collection.insert(listOf(thing1, thing2))
         calledIds.clear()
         runCount = 0
-        signaledCollection.deleteManyIgnoringOld(Condition.Always())
+        signaledCollection.deleteManyIgnoringOld(Condition.Always)
         assertEquals(2, runCount)
         assertEquals(listOf(thing1._id, thing2._id), calledIds)
 
@@ -518,12 +518,12 @@ class SimpleSignals {
         }
 
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.updateOne(Condition.Always(), mod1)
-        signaledCollection.updateMany(Condition.Always(), mod1)
-        signaledCollection.deleteOne(Condition.Always())
-        signaledCollection.deleteMany(Condition.Always())
-        signaledCollection.upsertOne(Condition.Always(), mod1, thing1)
-        signaledCollection.upsertOneIgnoringResult(Condition.Always(), mod1, thing1)
+        signaledCollection.updateOne(Condition.Always, mod1)
+        signaledCollection.updateMany(Condition.Always, mod1)
+        signaledCollection.deleteOne(Condition.Always)
+        signaledCollection.deleteMany(Condition.Always)
+        signaledCollection.upsertOne(Condition.Always, mod1, thing1)
+        signaledCollection.upsertOneIgnoringResult(Condition.Always, mod1, thing1)
 
 
         signaledCollection = collection.interceptReplace { value ->
@@ -532,33 +532,33 @@ class SimpleSignals {
             value
         }
 
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.replaceOne(Condition.Always(), TempThing(4))
+        signaledCollection.replaceOne(Condition.Always, TempThing(4))
         assertEquals(1, runCount)
         assertEquals(listOf(4), calledIds)
         runCount = 0
         calledIds.clear()
 
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.replaceOneIgnoringResult(Condition.Always(), TempThing(5))
+        signaledCollection.replaceOneIgnoringResult(Condition.Always, TempThing(5))
         assertEquals(1, runCount)
         assertEquals(listOf(5), calledIds)
         runCount = 0
         calledIds.clear()
 
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.upsertOne(Condition.Always(), Modification.Assign(TempThing(4)), TempThing(4))
+        signaledCollection.upsertOne(Condition.Always, Modification.Assign(TempThing(4)), TempThing(4))
         assertEquals(1, runCount)
         assertEquals(listOf(4), calledIds)
         runCount = 0
         calledIds.clear()
 
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteMany(Condition.Always)
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.upsertOneIgnoringResult(Condition.Always(), Modification.Assign(TempThing(4)), TempThing(4))
+        signaledCollection.upsertOneIgnoringResult(Condition.Always, Modification.Assign(TempThing(4)), TempThing(4))
         assertEquals(1, runCount)
         assertEquals(listOf(4), calledIds)
         runCount = 0
@@ -575,10 +575,10 @@ class SimpleSignals {
         }
 
         signaledCollection.insert(listOf(thing1, thing2))
-        signaledCollection.replaceOne(Condition.Always(), TempThing(4))
-        signaledCollection.replaceOneIgnoringResult(Condition.Always(), TempThing(5))
-        signaledCollection.deleteOne(Condition.Always())
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.replaceOne(Condition.Always, TempThing(4))
+        signaledCollection.replaceOneIgnoringResult(Condition.Always, TempThing(5))
+        signaledCollection.deleteOne(Condition.Always)
+        signaledCollection.deleteMany(Condition.Always)
 
 
         signaledCollection = collection.interceptModification { value ->
@@ -586,19 +586,19 @@ class SimpleSignals {
             value
         }
 
-        signaledCollection.updateOne(Condition.Always(), mod1)
+        signaledCollection.updateOne(Condition.Always, mod1)
         assertEquals(1, runCount)
         runCount = 0
 
-        signaledCollection.updateMany(Condition.Always(), mod1)
+        signaledCollection.updateMany(Condition.Always, mod1)
         assertEquals(1, runCount)
         runCount = 0
 
-        signaledCollection.upsertOne(Condition.Always(), mod1, thing1)
+        signaledCollection.upsertOne(Condition.Always, mod1, thing1)
         assertEquals(1, runCount)
         runCount = 0
 
-        signaledCollection.upsertOne(Condition.Always(), mod1, thing1)
+        signaledCollection.upsertOne(Condition.Always, mod1, thing1)
         assertEquals(1, runCount)
         runCount = 0
 
@@ -613,8 +613,8 @@ class SimpleSignals {
         }
 
         collection.insert(listOf(thing1, thing2))
-        signaledCollection.deleteOne(Condition.Always())
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteOne(Condition.Always)
+        signaledCollection.deleteMany(Condition.Always)
 
         signaledCollection = collection.interceptChange { value ->
             if (value is Modification.Assign) {
@@ -633,88 +633,88 @@ class SimpleSignals {
         calledIds.clear()
 
 
-        signaledCollection.replaceOne(Condition.Always(), thing3)
+        signaledCollection.replaceOne(Condition.Always, thing3)
         assertEquals(1, runCount)
         assertEquals(listOf(thing3._id), calledIds)
         runCount = 0
         calledIds.clear()
 
-        signaledCollection.replaceOneIgnoringResult(Condition.Always(), thing1)
+        signaledCollection.replaceOneIgnoringResult(Condition.Always, thing1)
         assertEquals(1, runCount)
         assertEquals(listOf(thing1._id), calledIds)
         runCount = 0
         calledIds.clear()
 
 
-        collection.deleteMany(Condition.Always())
-        signaledCollection.upsertOne(Condition.Always(), mod1, thing1)
+        collection.deleteMany(Condition.Always)
+        signaledCollection.upsertOne(Condition.Always, mod1, thing1)
         assertEquals(2, runCount)
         assertEquals(listOf(thing1._id), calledIds)
         runCount = 0
         calledIds.clear()
 
-        signaledCollection.upsertOne(Condition.Always(), mod1, thing1)
+        signaledCollection.upsertOne(Condition.Always, mod1, thing1)
         assertEquals(2, runCount)
         assertEquals(listOf(thing1._id), calledIds)
         runCount = 0
         calledIds.clear()
 
 
-        collection.deleteMany(Condition.Always())
-        signaledCollection.upsertOne(Condition.Always(), Modification.Assign(thing2), thing1)
+        collection.deleteMany(Condition.Always)
+        signaledCollection.upsertOne(Condition.Always, Modification.Assign(thing2), thing1)
         assertEquals(2, runCount)
         assertEquals(listOf(thing2._id, thing1._id), calledIds)
         runCount = 0
         calledIds.clear()
 
-        signaledCollection.upsertOne(Condition.Always(), Modification.Assign(thing2), thing1)
+        signaledCollection.upsertOne(Condition.Always, Modification.Assign(thing2), thing1)
         assertEquals(2, runCount)
         assertEquals(listOf(thing2._id, thing1._id), calledIds)
         runCount = 0
         calledIds.clear()
 
-        collection.deleteMany(Condition.Always())
-        signaledCollection.upsertOneIgnoringResult(Condition.Always(), mod1, thing1)
+        collection.deleteMany(Condition.Always)
+        signaledCollection.upsertOneIgnoringResult(Condition.Always, mod1, thing1)
         assertEquals(2, runCount)
         assertEquals(listOf(thing1._id), calledIds)
         runCount = 0
         calledIds.clear()
 
-        signaledCollection.upsertOneIgnoringResult(Condition.Always(), mod1, thing1)
+        signaledCollection.upsertOneIgnoringResult(Condition.Always, mod1, thing1)
         assertEquals(2, runCount)
         assertEquals(listOf(thing1._id), calledIds)
         runCount = 0
         calledIds.clear()
 
-        collection.deleteMany(Condition.Always())
-        signaledCollection.upsertOneIgnoringResult(Condition.Always(), Modification.Assign(thing2), thing1)
+        collection.deleteMany(Condition.Always)
+        signaledCollection.upsertOneIgnoringResult(Condition.Always, Modification.Assign(thing2), thing1)
         assertEquals(2, runCount)
         assertEquals(listOf(thing2._id, thing1._id), calledIds)
         runCount = 0
         calledIds.clear()
 
-        signaledCollection.upsertOneIgnoringResult(Condition.Always(), Modification.Assign(thing2), thing1)
+        signaledCollection.upsertOneIgnoringResult(Condition.Always, Modification.Assign(thing2), thing1)
         assertEquals(2, runCount)
         assertEquals(listOf(thing2._id, thing1._id), calledIds)
         runCount = 0
         calledIds.clear()
 
 
-        collection.deleteMany(Condition.Always())
+        collection.deleteMany(Condition.Always)
         collection.insert(listOf(thing1, thing2))
-        signaledCollection.updateOne(Condition.Always(), mod1)
+        signaledCollection.updateOne(Condition.Always, mod1)
         assertEquals(1, runCount)
         runCount = 0
 
-        signaledCollection.updateOneIgnoringResult(Condition.Always(), mod1)
+        signaledCollection.updateOneIgnoringResult(Condition.Always, mod1)
         assertEquals(1, runCount)
         runCount = 0
 
-        signaledCollection.updateMany(Condition.Always(), mod1)
+        signaledCollection.updateMany(Condition.Always, mod1)
         assertEquals(1, runCount)
         runCount = 0
 
-        signaledCollection.updateManyIgnoringResult(Condition.Always(), mod1)
+        signaledCollection.updateManyIgnoringResult(Condition.Always, mod1)
         assertEquals(1, runCount)
         runCount = 0
 
@@ -728,8 +728,8 @@ class SimpleSignals {
         }
 
         collection.insert(listOf(thing1, thing2))
-        signaledCollection.deleteOne(Condition.Always())
-        signaledCollection.deleteMany(Condition.Always())
+        signaledCollection.deleteOne(Condition.Always)
+        signaledCollection.deleteMany(Condition.Always)
 
         signaledCollection = collection.interceptChangePerInstance { value, mod ->
             calledIds.add(value._id)
@@ -753,7 +753,7 @@ class SimpleSignals {
 //            mod
 //        }
 //
-//        signaledCollection.replaceOne(Condition.Always(), thing3)
+//        signaledCollection.replaceOne(Condition.Always, thing3)
 //        assertEquals(listOf(thing3._id, thing1._id), calledIds)
 //        assertEquals(1, runCount)
 //        calledIds.clear()

@@ -77,6 +77,7 @@ sealed class Modification<T>  {
 
     @Serializable(ModificationAppendRawStringSerializer::class)
     data class AppendRawString<T: IsRawString>(val value: String): Modification<T>() {
+        @Suppress("UNCHECKED_CAST")
         override fun invoke(on: T): T = on.mapRaw { it + value } as T
         override fun toString(): String = " += $value"
     }

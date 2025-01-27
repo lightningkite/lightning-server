@@ -375,7 +375,7 @@ internal fun MultiPartData.adapt(myType: ContentType): HttpContent.Multipart {
                                 filename = it.originalFileName ?: "",
                                 headers = h,
                                 content = HttpContent.Stream(
-                                    it.streamProvider,
+                                    { it.provider().toInputStream() },
                                     h.contentLength,
                                     it.contentType?.adapt() ?: ContentType.Application.OctetStream
                                 )

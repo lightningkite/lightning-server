@@ -13,6 +13,6 @@ class SerializablePropertiesTest {
     @Test
     fun test() {
         assertNotEquals(listOf(), User_email.annotations.also { println(it) })
-        path<UUID>().eq(uuid())
+        path<UUID>().eq(UUID.random())
     }
 }

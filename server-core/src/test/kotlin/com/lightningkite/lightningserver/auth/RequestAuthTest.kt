@@ -19,9 +19,9 @@ import kotlin.test.assertTrue
 
 class RequestAuthTest {
     @Serializable
-    data class Sample2(override val _id: UUID = uuid()): HasId<UUID>
+    data class Sample2(override val _id: UUID = UUID.random()): HasId<UUID>
     @Test fun test(): Unit = runBlocking {
-        val sample = RequestAuth(TestSettings.subjectHandler, uuid(), rawId = uuid(), issuedAt = now())
+        val sample = RequestAuth(TestSettings.subjectHandler, UUID.random(), rawId = UUID.random(), issuedAt = now())
         val myAuth = AuthOption(AuthType<TestUser>())
         val otherAuth = AuthOption(AuthType<Sample2>())
         AuthOption(AuthType.any).accepts(sample)

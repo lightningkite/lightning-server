@@ -6,6 +6,7 @@ import com.lightningkite.serialization.serializableProperties
 import com.lightningkite.serialization.tryChildSerializers
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Contextual
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.Serializable
@@ -17,6 +18,7 @@ import kotlinx.serialization.encoding.Encoder
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+@OptIn(ExperimentalSerializationApi::class)
 class KspTest {
     @Test fun testSerializable() {
         prepareModelsSharedTest()

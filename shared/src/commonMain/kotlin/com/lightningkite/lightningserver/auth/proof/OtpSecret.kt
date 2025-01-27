@@ -17,7 +17,7 @@ import kotlin.time.Duration
 @Serializable
 @GenerateDataClassPaths
 data class OtpSecret(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     val subjectType: String,
     val subjectId: String,
 
@@ -37,7 +37,7 @@ data class OtpSecret(
 @Serializable
 @GenerateDataClassPaths
 data class PasswordSecret(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     val subjectType: String,
     val subjectId: String,
 
@@ -53,7 +53,7 @@ data class PasswordSecret(
 @Serializable
 @GenerateDataClassPaths
 data class KnownDeviceSecret(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     val subjectType: String,
     val subjectId: String,
 

@@ -27,7 +27,7 @@ class ChangeSocketTest {
         runBlocking {
             prepareModelsShared()
             prepareModelsServerCore()
-            TestSettings.wsModelInfo.collection().deleteMany(Condition.Always())
+            TestSettings.wsModelInfo.collection().deleteMany(Condition.Always)
             TestSettings.ws.test(AuthAndPathParts.test(null)) {
 
                 suspend fun assertSent(
@@ -80,7 +80,7 @@ class ChangeSocketTest {
     fun test2() {
         val database = TestSettings.database
         runBlocking {
-            TestSettings.wsModelInfo.collection().deleteMany(Condition.Always())
+            TestSettings.wsModelInfo.collection().deleteMany(Condition.Always)
             TestSettings.ws2.test(AuthAndPathParts.test(null)) {
 
                 suspend fun assertSent(

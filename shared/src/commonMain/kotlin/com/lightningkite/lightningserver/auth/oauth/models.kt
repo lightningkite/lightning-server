@@ -1,6 +1,7 @@
 @file:UseContextualSerialization(ServerFile::class, Instant::class)
 package com.lightningkite.lightningserver.auth.oauth
 
+import com.lightningkite.UUID
 import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.files.ServerFile
@@ -64,7 +65,7 @@ data class OauthCodeRequest(
     val scope: String,
     val redirect_uri: String,
     val client_id: String,
-    val state: String = uuid().toString(),
+    val state: String = UUID.random().toString(),
     val response_mode: OauthResponseMode = OauthResponseMode.form_post,
     val access_type: OauthAccessType? = null,
     val include_granted_scopes: Boolean? = null,

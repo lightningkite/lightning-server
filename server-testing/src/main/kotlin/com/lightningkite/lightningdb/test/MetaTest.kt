@@ -30,7 +30,7 @@ abstract class MetaTest {
             modification = modification { it.int += 2 }
         )
         c.insertOne(toInsert)
-        val results = c.find(Condition.Always()).toList()
+        val results = c.find(Condition.Always).toList()
         results.forEach { println(it) }
         assertContains(results, toInsert)
     }

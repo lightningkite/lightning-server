@@ -104,7 +104,7 @@ class ExternalAsyncTaskIntegration<REQUEST, RESPONSE : HasId<String>, RESULT>(
     }
 
     // Callback storage and handling
-    data class ResultAction<OURDATA, RESULT> internal constructor(
+    class ResultAction<OURDATA, RESULT> internal constructor(
         val key: String,
         val ourDataSerialization: KSerializer<OURDATA>,
         val expiration: Duration = 1.days,

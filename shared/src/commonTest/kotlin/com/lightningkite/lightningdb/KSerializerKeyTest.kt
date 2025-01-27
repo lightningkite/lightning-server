@@ -9,6 +9,7 @@ import com.lightningkite.serialization.KSerializerKey
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ContextualSerializer
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.nullable
@@ -18,6 +19,7 @@ import kotlinx.serialization.properties.Properties
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+@OptIn(ExperimentalSerializationApi::class)
 class KSerializerKeyTest {
     val myJson = Json {
         serializersModule = ClientModule

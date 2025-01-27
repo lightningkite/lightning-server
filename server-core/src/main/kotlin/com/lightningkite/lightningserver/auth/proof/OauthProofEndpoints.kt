@@ -60,7 +60,7 @@ class OauthProofEndpoints(
         )).encodeURLQueryComponent()}&backend=${generalSettings().publicUrl.encodeURLQueryComponent()}")
     }
     override val indirectLink: ServerPath = path("open").get.handler {
-        HttpResponse.redirectToGet(callback.loginUrl(uuid()))
+        HttpResponse.redirectToGet(callback.loginUrl(UUID.random()))
     }.path
     val loginApi = path("login").get.api(
         summary = "Log In via ${provider.niceName}",
@@ -74,7 +74,7 @@ class OauthProofEndpoints(
             )
         ),
         implementation = { _: Unit ->
-            callback.loginUrl(uuid())
+            callback.loginUrl(UUID.random())
         }
     )
     override val start = path("start").get.api(
@@ -89,7 +89,7 @@ class OauthProofEndpoints(
             )
         ),
         implementation = { ensureEmail: String ->
-            callback.loginUrl(uuid(), loginHint = ensureEmail)
+            callback.loginUrl(UUID.random(), loginHint = ensureEmail)
         }
     )
 }

@@ -20,6 +20,7 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.time.Duration
 
+@OptIn(ExperimentalSerializationApi::class)
 class SerializationRegistry(val module: SerializersModule) {
     private val direct = HashMap<String, KSerializer<*>>()
     private val factory = HashMap<String, (Array<KSerializer<*>>) -> KSerializer<*>>()
@@ -177,10 +178,8 @@ class SerializationRegistry(val module: SerializersModule) {
     private class GenericPlaceholderSerializer(val infoSource: String, val index: Int = 0) : KSerializer<Nothing> {
         var used: Boolean = false
 
-        @OptIn(ExperimentalSerializationApi::class)
         val wraps = NothingSerializer()
 
-        @OptIn(ExperimentalSerializationApi::class)
         override val descriptor: SerialDescriptor by lazy {
             used = true
             SerialDescriptor(
@@ -218,7 +217,6 @@ class SerializationRegistry(val module: SerializersModule) {
         } else null
     }
 
-    @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
     fun virtualize(matching: (String) -> Boolean): SerializationRegistry {
         val new = SerializationRegistry(module)
         for ((key, value) in direct) {
@@ -242,7 +240,7 @@ class SerializationRegistry(val module: SerializersModule) {
         return new
     }
 
-    @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
+    @OptIn(InternalSerializationApi::class)
     private fun registerVirtualWithoutTypeParameters(
         value: KSerializer<*>
     ): VirtualType? {
@@ -330,7 +328,7 @@ class SerializationRegistry(val module: SerializersModule) {
         }
     }
 
-    @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
+    @OptIn(InternalSerializationApi::class)
     private fun registerVirtualWithTypeParameters(
         key: String,
         generator: (Array<KSerializer<*>>) -> KSerializer<*>

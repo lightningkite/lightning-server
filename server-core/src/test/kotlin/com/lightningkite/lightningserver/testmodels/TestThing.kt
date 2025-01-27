@@ -13,7 +13,7 @@ import com.lightningkite.uuid
 
 @GenerateDataClassPaths
 @Serializable
-data class TestThing(override val _id: UUID = uuid(), val value: Int = 0) : HasId<UUID>
+data class TestThing(override val _id: UUID = UUID.random(), val value: Int = 0) : HasId<UUID>
 
 @GenerateDataClassPaths
 @Serializable

@@ -89,8 +89,8 @@ class KnownDeviceProofEndpoints(
         id: ID,
         deviceInfo: String
     ): KnownDeviceSecretAndExpiration {
-        val secretValue = uuid().toString()
-        val secretId = uuid()
+        val secretValue = UUID.random().toString()
+        val secretId = UUID.random()
         val exp = now() + expires()
         @Suppress("UNCHECKED_CAST")
         val secret = KnownDeviceSecret(
@@ -175,7 +175,7 @@ class KnownDeviceProofEndpoints(
         errorCases = listOf(),
         examples = listOf(
             ApiExample(
-                input = "${uuid()}/${uuid()}",
+                input = "${UUID.random()}/${UUID.random()}",
                 output = Proof(
                     via = info.via,
                     property = "User/_id",
@@ -189,7 +189,7 @@ class KnownDeviceProofEndpoints(
         successCode = HttpStatus.OK,
         implementation = { input: String ->
             val now = now()
-            val id = input.substringBefore('/').let { uuid(it) }
+            val id = input.substringBefore('/').let { UUID.parse(it) }
             val secret = input.substringAfter('/')
             cache().constrainAttemptRate(
                 cacheKey = "known-devices-count-${id}"

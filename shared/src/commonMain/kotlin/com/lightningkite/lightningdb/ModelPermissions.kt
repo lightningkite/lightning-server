@@ -13,11 +13,11 @@ data class ModelPermissions<Model>(
     /**
      * The user may only create an item if it matches this condition.
      */
-    val create: Condition<Model> = Condition.Never(),
+    val create: Condition<Model> = Condition.Never,
     /**
      * The user may only read models that match this condition.
      */
-    val read: Condition<Model> = Condition.Never(),
+    val read: Condition<Model> = Condition.Never,
     /**
      * The user may only read models masked as defined here.
      */
@@ -25,7 +25,7 @@ data class ModelPermissions<Model>(
     /**
      * The user may only update models that match this condition.
      */
-    val update: Condition<Model> = Condition.Never(),
+    val update: Condition<Model> = Condition.Never,
     /**
      * Restrictions on what the user is allowed to update.
      */
@@ -33,7 +33,7 @@ data class ModelPermissions<Model>(
     /**
      * The user may only delete models that match this condition.
      */
-    val delete: Condition<Model> = Condition.Never(),
+    val delete: Condition<Model> = Condition.Never,
     val maxQueryTimeMs: Long = 1_000L
 ) {
     companion object {
@@ -41,10 +41,10 @@ data class ModelPermissions<Model>(
          * A full whitelist permission set.
          */
         fun <Model> allowAll(): ModelPermissions<Model> = ModelPermissions(
-            create = Condition.Always(),
-            read = Condition.Always(),
-            update = Condition.Always(),
-            delete = Condition.Always(),
+            create = Condition.Always,
+            read = Condition.Always,
+            update = Condition.Always,
+            delete = Condition.Always,
         )
     }
 

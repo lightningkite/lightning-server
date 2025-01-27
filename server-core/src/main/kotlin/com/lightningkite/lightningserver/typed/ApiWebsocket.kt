@@ -113,6 +113,7 @@ abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUT
         abstract suspend fun close(reason: WebSocketClose)
     }
 
+    @Suppress("UNCHECKED_CAST")
     inner class ApiWebsocketConnectionImpl(val wraps: WebSocketConnection<ApiWebsocketStorage<STORAGE>>) :
         ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>(
             wraps.request.precalculatedAuth?.real() as RequestAuth<USER & Any>?,
@@ -195,7 +196,7 @@ suspend fun <USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> A
 //    val oldEngine = engine
     engine = UnitTestEngine
     try {
-        val cache = LocalCache()
+        @Suppress("UNCHECKED_CAST")
         val req = WebSocketConnectRequest(
             path = path.path,
             parts = path.parameters.withIndex().associate { (index, it) ->
@@ -219,9 +220,9 @@ suspend fun <USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> A
         println("$id Connecting...")
         val auth2 = AuthAndPathPartsAndApiOptions<USER, PATH>(auth.authOrNull, auth.rawRequest, auth.parts)
         val startingState = willConnect(auth2, req)
-        val auth = req.authChecked(authOptions)
+        val checkedAuth = req.authChecked(authOptions)
         val mid = object : ApiWebsocket.ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>(
-            auth,
+            checkedAuth,
             req,
             path.parameters.map { req.parts[it.name] }.toTypedArray()
         ) {
@@ -258,9 +259,9 @@ suspend fun <USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> A
                 subscriptions[topic]?.cancel()
             }
 
-            override suspend fun send(frame: OUTPUT) {
-                println("$id <-- $frame")
-                channel.send(frame)
+            override suspend fun send(output: OUTPUT) {
+                println("$id <-- $output")
+                channel.send(output)
             }
 
             override suspend fun close(reason: WebSocketClose) {

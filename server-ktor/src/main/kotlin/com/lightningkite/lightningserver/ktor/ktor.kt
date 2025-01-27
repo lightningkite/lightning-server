@@ -406,7 +406,7 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
                                 filename = it.originalFileName ?: "",
                                 headers = h,
                                 content = HttpContent.Stream(
-                                    it.streamProvider,
+                                    { it.provider().toInputStream() },
                                     h.contentLength,
                                     it.contentType?.adapt()
                                         ?: com.lightningkite.lightningserver.core.ContentType.Application.OctetStream

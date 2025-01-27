@@ -18,7 +18,7 @@ import com.lightningkite.uuid
 @GenerateDataClassPaths
 @TextIndex(["string"])
 data class ModelWithTextIndex(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     val string: String
 ): HasId<UUID>
 

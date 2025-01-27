@@ -27,7 +27,7 @@ fun <T> Condition<T>.simplify(): Condition<T> {
                 }
                 .let {
 //                    println("AND total simplification list: $it")
-                    if (it.isEmpty()) Condition.Always<T>()
+                    if (it.isEmpty()) Condition.Always
                     else if (it.size == 1) it.first()
                     else Condition.And<T>(it)
                 }
@@ -55,7 +55,7 @@ fun <T> Condition<T>.simplify(): Condition<T> {
                 }
                 .let {
 //                    println("OR total simplification list: $it")
-                    if (it.isEmpty()) Condition.Never<T>()
+                    if (it.isEmpty()) Condition.Never
                     else if (it.size == 1) it.first()
                     else Condition.Or<T>(it)
                 }
@@ -68,8 +68,8 @@ fun <T> Condition<T>.simplify(): Condition<T> {
 private fun <T> Condition<T>.finalSimplify(): Condition<T> = when(this) {
     is Condition.And -> if(conditions.any { it == Condition.Never }) Condition.Never else this
     is Condition.Or -> if(conditions.any { it == Condition.Always }) Condition.Always else this
-    is Condition.Inside -> if(values.isEmpty()) Condition.Never() else this
-    is Condition.NotInside -> if(values.isEmpty()) Condition.Always() else this
+    is Condition.Inside -> if(values.isEmpty()) Condition.Never else this
+    is Condition.NotInside -> if(values.isEmpty()) Condition.Always else this
     else -> this
 }
 
@@ -123,14 +123,14 @@ private fun <T> reduceAnd(a: Condition<T>, b: Condition<T>): Condition<T> {
         }
 
         is Condition.Equal -> when (b) {
-            is Condition.Equal -> if (a.value == b.value) a else Condition.Never()
-            is Condition.GreaterThan -> if (a.value.let { it as Comparable<Any?> } > b.value.let { it as Comparable<Any?> }) a else Condition.Never()
-            is Condition.LessThan -> if (a.value.let { it as Comparable<Any?> } < b.value.let { it as Comparable<Any?> }) a else Condition.Never()
-            is Condition.GreaterThanOrEqual -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) a else Condition.Never()
-            is Condition.LessThanOrEqual -> if (a.value.let { it as Comparable<Any?> } <= b.value.let { it as Comparable<Any?> }) a else Condition.Never()
-            is Condition.NotEqual -> if (a.value != b.value) a else Condition.Never()
-            is Condition.Inside -> if (a.value in b.values) a else Condition.Never()
-            is Condition.NotInside -> if (a.value !in b.values) a else Condition.Never()
+            is Condition.Equal -> if (a.value == b.value) a else Condition.Never
+            is Condition.GreaterThan -> if (a.value.let { it as Comparable<Any?> } > b.value.let { it as Comparable<Any?> }) a else Condition.Never
+            is Condition.LessThan -> if (a.value.let { it as Comparable<Any?> } < b.value.let { it as Comparable<Any?> }) a else Condition.Never
+            is Condition.GreaterThanOrEqual -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) a else Condition.Never
+            is Condition.LessThanOrEqual -> if (a.value.let { it as Comparable<Any?> } <= b.value.let { it as Comparable<Any?> }) a else Condition.Never
+            is Condition.NotEqual -> if (a.value != b.value) a else Condition.Never
+            is Condition.Inside -> if (a.value in b.values) a else Condition.Never
+            is Condition.NotInside -> if (a.value !in b.values) a else Condition.Never
             is Condition.And -> Condition.And(b.conditions + a)
             else -> Condition.And(listOf(a, b))
         }
@@ -138,8 +138,8 @@ private fun <T> reduceAnd(a: Condition<T>, b: Condition<T>): Condition<T> {
         is Condition.GreaterThan -> when (b) {
             is Condition.GreaterThan -> if (a.value.let { it as Comparable<Any?> } > b.value.let { it as Comparable<Any?> }) a else b
             is Condition.GreaterThanOrEqual -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) a else b
-            is Condition.LessThan -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) Condition.Never() else Condition.And(listOf(a, b))
-            is Condition.LessThanOrEqual -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) Condition.Never() else Condition.And(listOf(a, b))
+            is Condition.LessThan -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) Condition.Never else Condition.And(listOf(a, b))
+            is Condition.LessThanOrEqual -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) Condition.Never else Condition.And(listOf(a, b))
             is Condition.Always,
             is Condition.Never,
             is Condition.And,
@@ -163,8 +163,8 @@ private fun <T> reduceAnd(a: Condition<T>, b: Condition<T>): Condition<T> {
 
         is Condition.GreaterThanOrEqual -> when (b) {
             is Condition.GreaterThanOrEqual -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) a else b
-            is Condition.LessThan -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) Condition.Never() else Condition.And(listOf(a, b))
-            is Condition.LessThanOrEqual -> if (a.value.let { it as Comparable<Any?> } > b.value.let { it as Comparable<Any?> }) Condition.Never() else Condition.And(listOf(a, b))
+            is Condition.LessThan -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) Condition.Never else Condition.And(listOf(a, b))
+            is Condition.LessThanOrEqual -> if (a.value.let { it as Comparable<Any?> } > b.value.let { it as Comparable<Any?> }) Condition.Never else Condition.And(listOf(a, b))
             is Condition.GreaterThan,
             is Condition.Always,
             is Condition.Never,
@@ -230,7 +230,7 @@ private fun <T> reduceOr(a: Condition<T>, b: Condition<T>): Condition<T> {
             is Condition.LessThan -> if (a.value.let { it as Comparable<Any?> } < b.value.let { it as Comparable<Any?> }) b else Condition.Or(listOf(a, b))
             is Condition.GreaterThanOrEqual -> if (a.value.let { it as Comparable<Any?> } >= b.value.let { it as Comparable<Any?> }) b else Condition.Or(listOf(a, b))
             is Condition.LessThanOrEqual -> if (a.value.let { it as Comparable<Any?> } <= b.value.let { it as Comparable<Any?> }) b else Condition.Or(listOf(a, b))
-            is Condition.NotEqual -> if (a.value != b.value) b else Condition.Always()
+            is Condition.NotEqual -> if (a.value != b.value) b else Condition.Always
             is Condition.Inside -> if (a.value in b.values) b else Condition.Inside(b.values + a.value)
             is Condition.NotInside -> if (a.value !in b.values) b else Condition.NotInside(b.values - a.value)
             is Condition.Or -> Condition.Or(b.conditions + a)
