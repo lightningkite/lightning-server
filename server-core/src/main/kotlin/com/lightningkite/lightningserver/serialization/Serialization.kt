@@ -34,6 +34,8 @@ import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.StructureKind
 import java.util.*
 import com.lightningkite.UUID
+import com.lightningkite.kotlinx.serialization.csv.CsvFormat
+import com.lightningkite.kotlinx.serialization.csv.StringDeferringConfig
 import com.lightningkite.lightningserver.websocket.WebSocketFrame
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlin.collections.HashMap
@@ -146,7 +148,7 @@ abstract class Serialization {
         Properties(module)
     }
     var formData: FormDataFormat by SetOnce {
-        FormDataFormat(StringDeferringConfig(module, deferredFormat = json))
+        FormDataFormat(module)
     }
     var protobuf: ProtoBuf by SetOnce {
         ProtoBuf { this.serializersModule = module.overwriteWith(ProtoBufOverrides) }

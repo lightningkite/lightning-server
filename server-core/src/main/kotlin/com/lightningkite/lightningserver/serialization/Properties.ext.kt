@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.serialization
 
+import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.properties.Properties
 import kotlinx.serialization.serializer
 import java.net.URLDecoder
@@ -9,7 +11,7 @@ import java.net.URLEncoder
 inline fun <reified T> Properties.decodeFromFormData(value: String): T =
     decodeFromFormData(serializersModule.serializer<T>(), value)
 
-fun <T> Properties.decodeFromFormData(serializer: KSerializer<T>, value: String): T {
+fun <T> Properties.decodeFromFormData(serializer: DeserializationStrategy<T>, value: String): T {
     return decodeFromStringMap<T>(
         serializer,
         value.split('&').associate {
@@ -24,7 +26,7 @@ fun <T> Properties.decodeFromFormData(serializer: KSerializer<T>, value: String)
 inline fun <reified T> Properties.encodeToFormData(value: T): String =
     encodeToFormData(serializersModule.serializer<T>(), value)
 
-fun <T> Properties.encodeToFormData(serializer: KSerializer<T>, value: T): String {
+fun <T> Properties.encodeToFormData(serializer: SerializationStrategy<T>, value: T): String {
     return encodeToStringMap<T>(
         serializer,
         value
