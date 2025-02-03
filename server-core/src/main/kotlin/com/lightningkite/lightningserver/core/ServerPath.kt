@@ -22,7 +22,7 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
 
         companion object {
             fun fromString(string: String): Afterwards {
-                if (string.endsWith("/{...}"))
+                if (string.endsWith("/{...}") || string == "{...}")
                     return ChainedWildcard
                 else if (string.endsWith("/"))
                     return TrailingSlash

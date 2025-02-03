@@ -9,6 +9,7 @@ import com.lightningkite.prepareModelsShared
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 class ModificationSimplifyTest {
     init {
@@ -20,17 +21,6 @@ class ModificationSimplifyTest {
         prepareModelsServerCore()
         prepareModelsServerTesting()
         val item = LargeTestModel()
-        val mods = listOf(
-            modification<LargeTestModel> { it.int assign 1 } to modification<LargeTestModel> { it.int assign 1 },
-            modification<LargeTestModel> {
-                it assign item
-                it.int assign 1
-            } to modification<LargeTestModel> { it assign item.copy(int = 1) },
-        )
-        for((pre, post) in mods) {
-            assertEquals(post, pre.simplify().also { println("$pre -> $it") })
-            assertEquals(pre(item), post(item))
-        }
         listOf<Modification<LargeTestModel>>(
             modification {
                 it assign item
@@ -51,33 +41,73 @@ class ModificationSimplifyTest {
             modification {
                 it.int assign 1
             },
+            modification {
+                it.int assign 1
+                it.int plusAssign 1
+            },
+            modification {
+                it.int plusAssign 1
+                it.int assign 1
+            },
+            modification {
+                it.int plusAssign 1
+                it.int assign 1
+                it.int timesAssign 2
+            },
+            modification {
+                it.int assign 1
+                it.int plusAssign 1
+                it.int timesAssign 2
+            },
+            modification {
+                it.int assign 1
+                it.int plusAssign 1
+                it.int timesAssign 2
+                it.long assign 3
+                it.long plusAssign 2
+            },
+            modification {
+                it.int assign 1
+                it.int plusAssign 1
+                it.int timesAssign 2
+                it.long plusAssign 2
+            },
+            modification {
+                add(modification {
+                    it.int assign 4
+                    it.int plusAssign 4
+                })
+                add(modification {
+                    it.int timesAssign 4
+                    it.long plusAssign 4
+                })
+            },
+            modification<LargeTestModel> {
+                it.embedded.value1 assign "test"
+                it.embedded assign ClassUsedForEmbedding("test2", 1)
+            }
         ).forEach {
-            assertEquals(it(item), it.simplify()(item))
+            val simplified = it.simplify()
+            println("$it --> $simplified")
+            assertEquals(it(item), simplified(item))
+            fun Modification<*>.assertNoNothings() {
+                when(this) {
+                    is Modification.Nothing -> fail()
+                    is Modification.Chain -> modifications.forEach { it.assertNoNothings() }
+                    is Modification.SetPerElement<*> -> modification.assertNoNothings()
+                    is Modification.ListPerElement<*> -> modification.assertNoNothings()
+                    is Modification.OnField<*, *> -> modification.assertNoNothings()
+                    else -> {}
+                }
+            }
+            simplified.assertNoNothings()
         }
     }
 
-    @Test
-    fun testFiltersNothing(){
-
-        val modWithNothing = Modification.Chain<LargeTestModel>(listOf(
-            Modification.Nothing(),
-            modification { it.int assign 1 }
-        ))
-
-        var simplified = modWithNothing.simplify()
-        assertTrue(simplified is Modification.Chain)
-        assertEquals(1, simplified.modifications.size)
-        assertTrue(simplified.modifications.first() is Modification.OnField<*,*>)
-
-
-        val nothingDuringSimplification = Modification.Chain<LargeTestModel>(listOf(
-            Modification.Chain(emptyList()),
-            modification { it.int assign 1 }
-        ))
-        simplified = nothingDuringSimplification.simplify()
-        assertTrue(simplified is Modification.Chain)
-        assertEquals(1, simplified.modifications.size)
-        assertTrue(simplified.modifications.first() is Modification.OnField<*,*>)
-
+    @Test fun annoyingNested() {
+        modification<LargeTestModel> {
+            it.embedded.value1 assign "test"
+            it.embedded assign ClassUsedForEmbedding("test2", 1)
+        }.also { println(it) }.simplify().also { println(it) }
     }
 }

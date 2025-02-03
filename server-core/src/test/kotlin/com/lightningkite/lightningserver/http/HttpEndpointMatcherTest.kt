@@ -16,6 +16,7 @@ class HttpEndpointMatcherTest {
         val testXC = ServerPath("test/{otherName}/c").get
         val testAX = ServerPath("test/a/{second}").get
         val testXXX = ServerPath("test/{...}").get
+        val finalFallback = ServerPath("{...}").get
         val paths = setOf(
             root,
             test,
@@ -26,12 +27,13 @@ class HttpEndpointMatcherTest {
             testXC,
             testAX,
             testXXX,
+            finalFallback,
         )
         val matcher = HttpEndpointMatcher(paths.asSequence())
         assertEquals(HttpEndpointMatcher.Match(root, mapOf(), null), matcher.match("", HttpMethod.GET))
         assertEquals(HttpEndpointMatcher.Match(root, mapOf(), null), matcher.match("/", HttpMethod.GET))
         assertEquals(HttpEndpointMatcher.Match(test, mapOf(), null), matcher.match("test", HttpMethod.GET))
-        assertEquals(null, matcher.match("asdf", HttpMethod.GET))
+        assertEquals(HttpEndpointMatcher.Match(finalFallback, mapOf(), "asdf"), matcher.match("asdf", HttpMethod.GET))
         assertEquals(HttpEndpointMatcher.Match(testSlash, mapOf(), null), matcher.match("test/", HttpMethod.GET))
         assertEquals(HttpEndpointMatcher.Match(testA, mapOf(), null), matcher.match("test/a", HttpMethod.GET))
         assertEquals(HttpEndpointMatcher.Match(testAB, mapOf(), null), matcher.match("test/a/b", HttpMethod.GET))

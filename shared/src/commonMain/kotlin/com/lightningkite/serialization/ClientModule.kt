@@ -7,6 +7,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.time.Duration
 
@@ -22,4 +23,8 @@ val ClientModule = SerializersModule {
     contextual(Duration::class, DurationSerializer)
     contextual(ServerFile::class, ServerFileSerializer)
     contextual(GeoCoordinate::class, GeoCoordinateArraySerializer)
+    contextual(ClosedRange::class, {
+        @Suppress("UNCHECKED_CAST")
+        ClosedRangeSerializer(it[0] as KSerializer<Comparable<Comparable<*>>>)
+    })
 }

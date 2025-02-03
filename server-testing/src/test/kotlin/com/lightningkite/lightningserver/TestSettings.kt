@@ -20,6 +20,7 @@ import com.lightningkite.lightningserver.auth.old.userEmailAccess
 import com.lightningkite.lightningserver.auth.subject.AuthEndpointsForSubject
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.LocalCache
+import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.DatabaseSettings
@@ -31,6 +32,7 @@ import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.files.fileObject
+import com.lightningkite.lightningserver.filescanner.FileScanner
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.meta.metaEndpoints
 import com.lightningkite.lightningserver.pubsub.LocalPubSub
@@ -47,6 +49,7 @@ import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.serialization.KSerializer
+import java.io.InputStream
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -79,7 +82,12 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     val baseAuth = BaseAuthEndpoints(authPath, emailAccess, jwtSigner, 1.hours, 5.minutes)
     val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
 
-    val earlyUpload = UploadEarlyEndpoint(path("upload-early"), files, database)
+    val earlyUpload = UploadEarlyEndpoint(path("upload-early"), files, database, fileScanner = { listOf(object: FileScanner {
+        override fun requires(claimedType: ContentType): FileScanner.Requires = FileScanner.Requires.Whole
+        override fun scan(claimedType: ContentType, data: InputStream) {
+            println("Fake scanned ${data.readBytes().size} bytes")
+        }
+    }) })
     val consumeFile = path("consume-file").post.api(authOptions = noAuth, summary = "consume file") { input: ServerFile ->
         input.fileObject.signedUrl
     }

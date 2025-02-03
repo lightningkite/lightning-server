@@ -21,6 +21,7 @@ val client = HttpClient(CIO) {
     }
     engine {
         this.requestTimeout = 60000
+        this.https { this.certificates }
     }
 }
 

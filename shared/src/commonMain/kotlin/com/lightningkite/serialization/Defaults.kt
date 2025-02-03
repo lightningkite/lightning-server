@@ -2,6 +2,7 @@ package com.lightningkite.serialization
 
 import com.lightningkite.*
 import kotlinx.datetime.*
+import kotlinx.datetime.serializers.TimeZoneSerializer
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -34,6 +35,9 @@ object DefaultDecoder : Decoder {
         defaults[kotlinx.datetime.serializers.LocalDateTimeIso8601Serializer.descriptor.serialName] = LocalDateTime(LocalDate(1970, 1, 1), LocalTime(0, 0, 0))
         defaults[ZonedDateTimeIso8601Serializer.descriptor.serialName] = ZonedDateTime(LocalDateTime(LocalDate(1970, 1, 1), LocalTime(0, 0, 0)), TimeZone.UTC)
         defaults[OffsetDateTimeIso8601Serializer.descriptor.serialName] = OffsetDateTime(LocalDateTime(LocalDate(1970, 1, 1), LocalTime(0, 0, 0)), UtcOffset.ZERO)
+        defaults[TimeZoneSerializer.descriptor.serialName] = TimeZone.currentSystemDefault()
+        defaults[GeoCoordinateGeoJsonSerializer.descriptor.serialName] = GeoCoordinate(0.0, 0.0)
+        defaults[GeoCoordinateArraySerializer.descriptor.serialName] = GeoCoordinate(0.0, 0.0)
     }
 
     override var serializersModule: SerializersModule = ClientModule
@@ -98,7 +102,6 @@ object DefaultDecoder : Decoder {
 
     override fun <T : Any> decodeNullableSerializableValue(deserializer: DeserializationStrategy<T?>): T? = null
     override fun <T> decodeSerializableValue(deserializer: DeserializationStrategy<T>): T {
-
         @Suppress("UNCHECKED_CAST")
         return (defaults[deserializer.descriptor.serialName] as? T) ?: deserializer.deserialize(this)
     }

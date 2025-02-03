@@ -118,6 +118,8 @@ class SerializationRegistry(val module: SerializersModule) {
         register(Char.serializer())
         register(String.serializer())
         register(Duration.serializer())
+        register(kotlinx.datetime.serializers.MonthSerializer)
+        register(kotlinx.datetime.serializers.TimeZoneSerializer)
         register(InstantIso8601Serializer)
         register(LocalDateIso8601Serializer)
         register(LocalTimeIso8601Serializer)
@@ -173,6 +175,7 @@ class SerializationRegistry(val module: SerializersModule) {
                 NothingSerializer()
             ).descriptor.serialName
         ) { TripleSerializer(it[0], it[1], it[2]) }
+        register(ClosedRangeSerializer(NothingSerializer()).descriptor.serialName) { ClosedRangeSerializer(it[0] )}
     }
 
     private class GenericPlaceholderSerializer(val infoSource: String, val index: Int = 0) : KSerializer<Nothing> {

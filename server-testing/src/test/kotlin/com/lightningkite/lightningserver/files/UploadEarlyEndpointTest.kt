@@ -15,27 +15,56 @@ class UploadEarlyEndpointTest {
     @Test
     fun test(): Unit = runBlocking {
         TestSettings
-        val a = TestSettings.earlyUpload.endpoint.test(null, Unit)
+        val unverified = TestSettings.earlyUpload.endpoint.test(null, Unit)
+        println("unverified: ${unverified.futureCallToken}")
         runBlocking {
-            val match = Http.matcher.match(a.uploadUrl.removePrefix(generalSettings().publicUrl).substringBefore('?'), HttpMethod.PUT)!!
+            val match = Http.matcher.match(unverified.uploadUrl.removePrefix(generalSettings().publicUrl).substringBefore('?'), HttpMethod.PUT)!!
             Http.endpoints[match.endpoint]!!.invoke(HttpRequest(
                 match.endpoint,
                 match.parts,
                 match.wildcard,
-                queryParameters = a.uploadUrl.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=') },
+                queryParameters = unverified.uploadUrl.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=') },
                 body = HttpContent.Text("Test", ContentType.Text.Plain)
             )).let { assert(it.status.success) }
         }
-        TestSettings.consumeFile.test(null, ServerFile(a.futureCallToken))
-        val result = TestSettings.consumeFile.test(null, ServerFile(a.futureCallToken))
-        println("Resulting file: $result")
+        val result = TestSettings.consumeFile.test(null, ServerFile(unverified.futureCallToken))
+        println("result: $result")
         runBlocking {
             val match = Http.matcher.match(result.removePrefix(generalSettings().publicUrl).substringBefore('?'), HttpMethod.GET)!!
             Http.endpoints[match.endpoint]!!.invoke(HttpRequest(
                 match.endpoint,
                 match.parts,
                 match.wildcard,
-                queryParameters = a.uploadUrl.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=') },
+                queryParameters = unverified.uploadUrl.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=') },
+            )).let { assert(it.status.success) }
+        }
+    }
+    @Test
+    fun testWithVerify(): Unit = runBlocking {
+        TestSettings
+        val unverified = TestSettings.earlyUpload.endpoint.test(null, Unit)
+        println("unverified: ${unverified.futureCallToken}")
+        runBlocking {
+            val match = Http.matcher.match(unverified.uploadUrl.removePrefix(generalSettings().publicUrl).substringBefore('?'), HttpMethod.PUT)!!
+            Http.endpoints[match.endpoint]!!.invoke(HttpRequest(
+                match.endpoint,
+                match.parts,
+                match.wildcard,
+                queryParameters = unverified.uploadUrl.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=') },
+                body = HttpContent.Text("Test", ContentType.Text.Plain)
+            )).let { assert(it.status.success) }
+        }
+        val verified = TestSettings.earlyUpload.verify.test(null, unverified.futureCallToken)
+        println("verified: $verified")
+        val result = TestSettings.consumeFile.test(null, ServerFile(verified))
+        println("result: $result")
+        runBlocking {
+            val match = Http.matcher.match(result.removePrefix(generalSettings().publicUrl).substringBefore('?'), HttpMethod.GET)!!
+            Http.endpoints[match.endpoint]!!.invoke(HttpRequest(
+                match.endpoint,
+                match.parts,
+                match.wildcard,
+                queryParameters = unverified.uploadUrl.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=') },
             )).let { assert(it.status.success) }
         }
     }

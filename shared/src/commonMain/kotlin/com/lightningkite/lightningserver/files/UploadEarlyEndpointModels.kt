@@ -7,7 +7,6 @@ import com.lightningkite.UUID
 
 import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
-import com.lightningkite.uuid
 import com.lightningkite.now
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
