@@ -1,5 +1,5 @@
 plugins {
-    alias(serverlibs.plugins.dokka) apply false
+    // alias(serverlibs.plugins.dokka) apply false
     alias(serverlibs.plugins.kotlinJvm) apply false
     alias(serverlibs.plugins.kotlinMultiplatform) apply false
     alias(serverlibs.plugins.androidApp) apply false
@@ -9,8 +9,12 @@ plugins {
 }
 
 buildscript {
+    repositories {
+        mavenLocal()
+        maven("https://lightningkite-maven.s3.us-west-2.amazonaws.com")
+    }
     dependencies {
-        classpath(serverlibs.deployHelpers)
+        classpath("com.lightningkite:lk-gradle-helpers:main-SNAPSHOT")
         classpath(serverlibs.proguard)
     }
 }

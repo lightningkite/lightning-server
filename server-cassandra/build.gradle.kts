@@ -1,15 +1,16 @@
-import com.lightningkite.deployhelpers.developer
+
 import com.lightningkite.deployhelpers.github
 import com.lightningkite.deployhelpers.mit
-import com.lightningkite.deployhelpers.standardPublishing
+import com.lightningkite.deployhelpers.*
+import com.vanniktech.maven.publish.SonatypeHost
 
 plugins {
     kotlin("jvm")
     id("com.google.devtools.ksp")
     kotlin("plugin.serialization")
-    id("org.jetbrains.dokka")
+    // alias(serverlibs.plugins.dokka)
     id("signing")
-    `maven-publish`
+    alias(serverlibs.plugins.vanniktechMavenPublish)
 }
 
 val kotlinVersion: String by project
@@ -73,4 +74,3 @@ standardPublishing {
         )
     }
 }
-tasks.getByName("sourceJar").dependsOn("kspKotlin")
