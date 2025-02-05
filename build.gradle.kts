@@ -14,7 +14,7 @@ buildscript {
         maven("https://lightningkite-maven.s3.us-west-2.amazonaws.com")
     }
     dependencies {
-        classpath("com.lightningkite:lk-gradle-helpers:1.0.2")
+        classpath("com.lightningkite:lk-gradle-helpers:1.0.3")
         classpath(libs.proguard)
     }
 }
