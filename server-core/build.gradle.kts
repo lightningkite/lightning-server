@@ -5,12 +5,12 @@ import com.lightningkite.deployhelpers.*
 import com.vanniktech.maven.publish.SonatypeHost
 
 plugins {
-    alias(serverlibs.plugins.kotlinJvm)
-    alias(serverlibs.plugins.ksp)
-    alias(serverlibs.plugins.serialization)
-    // alias(serverlibs.plugins.dokka)
+    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.serialization)
+    // alias(libs.plugins.dokka)
     id("signing")
-    alias(serverlibs.plugins.vanniktechMavenPublish)
+    alias(libs.plugins.vanniktechMavenPublish)
 }
 
 val lk = project.lk {
@@ -19,10 +19,10 @@ val lk = project.lk {
 
 dependencies {
     api(project(":shared"))
-    api(serverlibs.ktorJson)
-    api(serverlibs.ktorCioJvm)
-    api(serverlibs.ktorClientCio)
-    api(serverlibs.ktorContentNegotiation)
+    api(libs.ktorJson)
+    api(libs.ktorCioJvm)
+    api(libs.ktorClientCio)
+    api(libs.ktorContentNegotiation)
     api(lk.mavenOrLocal(
         gitUrl = "git@github.com:lightningkite/kotlinx-serialization-csv-durable.git",
         group = "com.lightningkite",
@@ -30,25 +30,25 @@ dependencies {
         major = 0,
         minor = 2
     ))
-    implementation(serverlibs.coroutinesCore)
-    implementation(serverlibs.logBackClassic)
-    implementation(serverlibs.kotlinStdLib)
-    implementation(serverlibs.coroutinesCore)
-    api(serverlibs.kotlinHtmlJvm)
-    api(serverlibs.oneTimePass)
-    api(serverlibs.serializationCbor)
-    api(serverlibs.xmlUtilJvm)
-    api(serverlibs.mongoBson)
-    api(serverlibs.kBson)
-    api(serverlibs.kaml)
-    api(serverlibs.serializationProtobuf)
-    api(serverlibs.kotlinReflect)
-    implementation(serverlibs.bouncyCastleBcprov)
-    implementation(serverlibs.bouncyCastleBcpkix)
+    implementation(libs.coroutinesCore)
+    implementation(libs.logBackClassic)
+    implementation(libs.kotlinStdLib)
+    implementation(libs.coroutinesCore)
+    api(libs.kotlinHtmlJvm)
+    api(libs.oneTimePass)
+    api(libs.serializationCbor)
+    api(libs.xmlUtilJvm)
+    api(libs.mongoBson)
+    api(libs.kBson)
+    api(libs.kaml)
+    api(libs.serializationProtobuf)
+    api(libs.kotlinReflect)
+    implementation(libs.bouncyCastleBcprov)
+    implementation(libs.bouncyCastleBcpkix)
 
-    api(serverlibs.angusMail)
-    testImplementation(serverlibs.javaJwt)
-    testImplementation(serverlibs.kotlinTest)
+    api(libs.angusMail)
+    testImplementation(libs.javaJwt)
+    testImplementation(libs.kotlinTest)
 
     ksp(project(":processor"))
     kspTest(project(":processor"))

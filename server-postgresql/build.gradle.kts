@@ -5,23 +5,23 @@ import com.lightningkite.deployhelpers.*
 import com.vanniktech.maven.publish.SonatypeHost
 
 plugins {
-    alias(serverlibs.plugins.kotlinJvm)
-    alias(serverlibs.plugins.ksp)
-    alias(serverlibs.plugins.serialization)
-    // alias(serverlibs.plugins.dokka)
+    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.serialization)
+    // alias(libs.plugins.dokka)
     id("signing")
-    alias(serverlibs.plugins.vanniktechMavenPublish)
+    alias(libs.plugins.vanniktechMavenPublish)
 }
 
 dependencies {
     api(project(":server-core"))
-    api(serverlibs.exposedCore)
-    api(serverlibs.exposedJavaTime)
-    api(serverlibs.exposedJdbc)
-    api(serverlibs.postgresql)
-    api(serverlibs.embeddedPostgres)
-    implementation(serverlibs.coroutinesJdk)
-    testImplementation(serverlibs.kotlinTest)
+    api(libs.exposedCore)
+    api(libs.exposedJavaTime)
+    api(libs.exposedJdbc)
+    api(libs.postgresql)
+    api(libs.embeddedPostgres)
+    implementation(libs.coroutinesJdk)
+    testImplementation(libs.kotlinTest)
     testImplementation(project(":server-testing"))
     ksp(project(":processor"))
     kspTest(project(":processor"))

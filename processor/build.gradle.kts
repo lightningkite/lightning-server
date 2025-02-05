@@ -2,10 +2,10 @@ import com.lightningkite.deployhelpers.*
 import com.vanniktech.maven.publish.*
 
 plugins {
-    alias(serverlibs.plugins.kotlinJvm)
-    // alias(serverlibs.plugins.dokka)
+    alias(libs.plugins.kotlinJvm)
+    // alias(libs.plugins.dokka)
     id("signing")
-    alias(serverlibs.plugins.vanniktechMavenPublish)
+    alias(libs.plugins.vanniktechMavenPublish)
 }
 
 
@@ -13,9 +13,9 @@ val kotlinVersion: String by project
 val kspVersion: String by project
 
 dependencies {
-    implementation(serverlibs.ksp)
-    implementation(serverlibs.kotlinCompiler)
-    testImplementation(serverlibs.kotlinTest)
+    implementation(libs.ksp)
+    implementation(libs.kotlinCompiler)
+    testImplementation(libs.kotlinTest)
 }
 
 val lk = project.lk {

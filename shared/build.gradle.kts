@@ -2,13 +2,13 @@ import com.lightningkite.deployhelpers.*
 import com.vanniktech.maven.publish.SonatypeHost
 
 plugins {
-    alias(serverlibs.plugins.kotlinMultiplatform)
-    alias(serverlibs.plugins.ksp)
-    alias(serverlibs.plugins.serialization)
-    alias(serverlibs.plugins.androidLibrary)
-    // alias(serverlibs.plugins.dokka)
+    alias(libs.plugins.kotlinMultiplatform)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.serialization)
+    alias(libs.plugins.androidLibrary)
+    // alias(libs.plugins.dokka)
     id("signing")
-    alias(serverlibs.plugins.vanniktechMavenPublish)
+    alias(libs.plugins.vanniktechMavenPublish)
 }
 
 ksp {
@@ -42,12 +42,12 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(serverlibs.kotlinXJson)
-                api(serverlibs.serializationProperties)
-                api(serverlibs.kotlinXDatetime)
+                api(libs.kotlinXJson)
+                api(libs.serializationProperties)
+                api(libs.kotlinXDatetime)
 
-                implementation(serverlibs.kotlinReflect)
-                implementation(serverlibs.kotlinStdLib)
+                implementation(libs.kotlinReflect)
+                implementation(libs.kotlinStdLib)
 
             }
             kotlin {
@@ -57,7 +57,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation(serverlibs.serializationProtobuf)
+                implementation(libs.serializationProtobuf)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonTest/kotlin"))

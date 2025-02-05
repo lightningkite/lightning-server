@@ -8,9 +8,9 @@ plugins {
     kotlin("jvm")
     id("com.google.devtools.ksp")
     kotlin("plugin.serialization")
-    // alias(serverlibs.plugins.dokka)
+    // alias(libs.plugins.dokka)
     id("signing")
-    alias(serverlibs.plugins.vanniktechMavenPublish)
+    alias(libs.plugins.vanniktechMavenPublish)
 }
 
 val kotlinVersion: String by project
