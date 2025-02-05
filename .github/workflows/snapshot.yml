@@ -54,7 +54,7 @@ jobs:
           ORG_GRADLE_PROJECT_lightningKiteMavenAwsAccessKey: AKIARR4DEGXXROVKYNNP
           ORG_GRADLE_PROJECT_lightningKiteMavenAwsSecretAccessKey: ${{ secrets.MAVENS3SECRETKEY }}
         run: |
-          ./gradlew publishMainPublicationToSonatypeRepository
+          ./gradlew publishAllPublicationsToLightningKiteRepository
 
   releaseShared:
     name: Shared Test and Upload Release
@@ -97,4 +97,4 @@ jobs:
           ORG_GRADLE_PROJECT_lightningKiteMavenAwsAccessKey: AKIARR4DEGXXROVKYNNP
           ORG_GRADLE_PROJECT_lightningKiteMavenAwsSecretAccessKey: ${{ secrets.MAVENS3SECRETKEY }}
         run: |
-          ./gradlew shared:publishAllPublicationsToSonatypeRepository
+          ./gradlew shared:publishAllPublicationsToLightningKiteRepository
