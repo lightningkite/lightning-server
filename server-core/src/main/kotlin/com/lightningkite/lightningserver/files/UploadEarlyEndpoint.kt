@@ -1,19 +1,20 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.UUID
 import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
-import com.lightningkite.serialization.*
+import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.encryption.*
+import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.filescanner.FileScanner
 import com.lightningkite.lightningserver.filescanner.copyAndScan
 import com.lightningkite.lightningserver.filescanner.scan
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.now
-import com.lightningkite.uuid
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration
@@ -28,33 +29,55 @@ class UploadEarlyEndpoint(
     val fileScanner: () -> List<FileScanner> = { listOf() },
     val jailFilePath: String = "upload-jail",
     val filePath: String = "uploaded",
-    val expiration: Duration = 1.days
-) : ServerPathGroup(path), FileSystem.SpecialResolver {
+    val expiration: Duration = 1.days,
+    val authOptions: AuthOptions<*> = noAuth,
+) : ServerPathGroup(path) {
 
     companion object {
         var default: UploadEarlyEndpoint? = null
     }
-    override val prefix: String = "future://$path/"
-    override fun resolve(url: String): FileObject {
-        val post = url.substringAfter(prefix)
-        val id = post.substringBefore('?')
-        val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
-        val safeFo = files().root.resolve(filePath).resolve("$id.file")
-        runBlocking { fileScanner().copyAndScan(originalFo, safeFo) }
-        return safeFo
+    val unsafeResolver = object: FileSystem.SpecialResolver {
+        override val prefix: String = "future://$path/"
+        override fun resolve(url: String): FileObject {
+            val post = url.substringAfter(prefix)
+            val id = post.substringBefore('?')
+            val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
+            val safeFo = files().root.resolve(filePath).resolve("$id.file")
+            runBlocking { fileScanner().copyAndScan(originalFo, safeFo) }
+            return safeFo
+        }
+
+        override fun resolveWithSignature(url: String): FileObject {
+            val post = url.substringAfter(prefix)
+            verifyUrl(post)
+            val id = post.substringBefore('?')
+            val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
+            val safeFo = files().root.resolve(filePath).resolve("$id.file")
+            runBlocking { fileScanner().copyAndScan(originalFo, safeFo) }
+            return safeFo
+        }
     }
-    override fun resolveWithSignature(url: String): FileObject {
-        val post = url.substringAfter(prefix)
-        verifyUrl(post)
-        val id = post.substringBefore('?')
-        val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
-        val safeFo = files().root.resolve(filePath).resolve("$id.file")
-        runBlocking { fileScanner().copyAndScan(originalFo, safeFo) }
-        return safeFo
+    val safeResolver = object: FileSystem.SpecialResolver {
+        override val prefix: String = "future-safe://$path/"
+        override fun resolve(url: String): FileObject {
+            val post = url.substringAfter(prefix)
+            val id = post.substringBefore('?')
+            val safeFo = files().root.resolve(filePath).resolve("$id.file")
+            return safeFo
+        }
+
+        override fun resolveWithSignature(url: String): FileObject {
+            val post = url.substringAfter(prefix)
+            verifyUrl(post)
+            val id = post.substringBefore('?')
+            val safeFo = files().root.resolve(filePath).resolve("$id.file")
+            return safeFo
+        }
     }
     init {
         prepareModelsServerCore()
-        FileSystem.register(this)
+        FileSystem.register(unsafeResolver)
+        FileSystem.register(safeResolver)
         FileSystem.default = files
         ExternalServerFileSerializer.uploadFile = {
             fileScanner().scan(it)
@@ -66,22 +89,53 @@ class UploadEarlyEndpoint(
     }
 
     val endpoint = get.api(
-        authOptions = noAuth,
+        authOptions = authOptions,
         summary = "Upload File for Request",
         description = "Upload a file to make a request later.  Times out in around 10 minutes.",
         errorCases = listOf(),
         implementation = { _: Unit ->
-            val id = uuid()
-            val newFile = files().root.resolve(jailFilePath).resolve("$id.file")
-            val newItem = UploadForNextRequest(
-                expires = now().plus(expiration),
-                file = ServerFile(newFile.url)
-            )
-            database().collection<UploadForNextRequest>().insertOne(newItem)
-            UploadInformation(
-                uploadUrl = newFile.uploadUrl(expiration),
-                futureCallToken = signUrl(prefix + id.toString())
-            )
+            val id = UUID.random()
+            if(fileScanner().isEmpty()) {
+                val newFile = files().root.resolve(filePath).resolve("$id.file")
+                val newItem = UploadForNextRequest(
+                    expires = now().plus(expiration),
+                    file = ServerFile(newFile.url)
+                )
+                database().collection<UploadForNextRequest>().insertOne(newItem)
+                UploadInformation(
+                    uploadUrl = newFile.uploadUrl(expiration),
+                    futureCallToken = signUrl(safeResolver.prefix + id.toString())
+                )
+            } else {
+                val newFile = files().root.resolve(jailFilePath).resolve("$id.file")
+                val newItem = UploadForNextRequest(
+                    expires = now().plus(expiration),
+                    file = ServerFile(newFile.url)
+                )
+                database().collection<UploadForNextRequest>().insertOne(newItem)
+                UploadInformation(
+                    uploadUrl = newFile.uploadUrl(expiration),
+                    futureCallToken = signUrl(unsafeResolver.prefix + id.toString())
+                )
+            }
+        }
+    )
+
+    val verify = post("verify").api(
+        authOptions = authOptions,
+        summary = "Verify uploaded file",
+        description = "Checks out a file and moves it out of jail if it's safe.  Makes for significantly faster subsequent requests.",
+        errorCases = listOf(),
+        implementation = { url: String ->
+            if(url.startsWith(safeResolver.prefix)) return@api url
+            if(!url.startsWith(unsafeResolver.prefix)) throw BadRequestException("URL expected to start with ${unsafeResolver.prefix}")
+            val post = url.substringAfter(unsafeResolver.prefix)
+            verifyUrl(post)
+            val id = post.substringBefore('?')
+            val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
+            val safeFo = files().root.resolve(filePath).resolve("$id.file")
+            runBlocking { fileScanner().copyAndScan(originalFo, safeFo) }
+            signUrl(safeResolver.prefix + id.toString())
         }
     )
 
