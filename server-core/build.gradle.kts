@@ -23,13 +23,6 @@ dependencies {
     api(libs.ktorCioJvm)
     api(libs.ktorClientCio)
     api(libs.ktorContentNegotiation)
-    api(lk.mavenOrLocal(
-        gitUrl = "git@github.com:lightningkite/kotlinx-serialization-csv-durable.git",
-        group = "com.lightningkite",
-        artifact = "kotlinx-serialization-csv-durable",
-        major = 0,
-        minor = 2
-    ))
     implementation(libs.coroutinesCore)
     implementation(libs.logBackClassic)
     implementation(libs.kotlinStdLib)
