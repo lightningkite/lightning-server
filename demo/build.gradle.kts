@@ -3,12 +3,12 @@ import proguard.gradle.ProGuardTask
 import java.util.*
 
 plugins {
-    alias(serverlibs.plugins.kotlinJvm)
-    alias(serverlibs.plugins.serialization)
-    alias(serverlibs.plugins.ksp)
+    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.serialization)
+    alias(libs.plugins.ksp)
     application
-    alias(serverlibs.plugins.graalVmNative)
-    alias(serverlibs.plugins.shadow)
+    alias(libs.plugins.graalVmNative)
+    alias(libs.plugins.shadow)
 }
 
 group = "com.lightningkite.lightningserver"
@@ -27,8 +27,8 @@ dependencies {
     api(project(":server-sentry"))
     api(project(":server-sftp"))
     ksp(project(":processor"))
-    implementation(serverlibs.kotlinerCli)
-    implementation(serverlibs.ktorCallLogging)
+    implementation(libs.kotlinerCli)
+    implementation(libs.ktorCallLogging)
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 }
 

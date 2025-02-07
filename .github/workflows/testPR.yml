@@ -2,7 +2,7 @@ name: TestPullRequest
 
 on:
   pull_request:
-    branches: version-2
+    branches: version-*
   workflow_dispatch:
 
 jobs:

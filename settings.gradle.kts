@@ -26,9 +26,6 @@ pluginManagement {
             maven("https://jitpack.io")
         }
 
-        versionCatalogs {
-            create("serverlibs") { from(files("gradle/serverlibs.versions.toml"))}
-        }
     }
 }
 

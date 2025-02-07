@@ -1,32 +1,34 @@
-import com.lightningkite.deployhelpers.developer
+
 import com.lightningkite.deployhelpers.github
 import com.lightningkite.deployhelpers.mit
-import com.lightningkite.deployhelpers.standardPublishing
+import com.lightningkite.deployhelpers.*
+import com.vanniktech.maven.publish.SonatypeHost
 
 plugins {
-    alias(serverlibs.plugins.kotlinJvm)
-    alias(serverlibs.plugins.ksp)
-    alias(serverlibs.plugins.dokka)
-    alias(serverlibs.plugins.serialization)
+    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.ksp)
+    // alias(libs.plugins.dokka)
+    alias(libs.plugins.serialization)
     id("signing")
-    `maven-publish`
+    alias(libs.plugins.vanniktechMavenPublish)
 }
 
 dependencies {
     api(project(":server-dynamodb"))
     api(project(":server-core"))
-    api(serverlibs.orgCrac)
-    api(serverlibs.awsS3)
-    api(serverlibs.awsLambda)
-    api(serverlibs.awsSes)
-    api(serverlibs.awsRds)
-    api(serverlibs.awsApiGateway)
-    api(serverlibs.awsCloudWatch)
-    api(serverlibs.orgCrac)
-    api(serverlibs.lambdaJavaCore)
-    api(serverlibs.lambdaJavaEvents)
-    api(serverlibs.lambdaJavaLog4j2)
-    testImplementation(serverlibs.kotlinTest)
+    api(libs.orgCrac)
+    api(libs.awsS3)
+    api(libs.awsLambda)
+    api(libs.awsSes)
+    api(libs.awsRds)
+    api(libs.awsApiGateway)
+    api(libs.awsCloudWatch)
+    api(libs.orgCrac)
+    api(libs.lambdaJavaCore)
+    api(libs.lambdaJavaEvents)
+    api(libs.lambdaJavaLog4j2)
+    implementation(libs.coroutinesReactive)
+    testImplementation(libs.kotlinTest)
     testImplementation(project(":server-testing"))
     ksp(project(":processor"))
     kspTest(project(":processor"))
@@ -54,26 +56,26 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 }
 
 
-standardPublishing {
-    name.set("Lightning-server-Server")
-    description.set("An implementation of LightningServer Engine using AWS Lambda, FileSystem using AWS S3, Email using AWS SES, and Metrics using AWS CloudWatch.")
-    github("lightningkite", "lightning-server")
+val lk = project.lk {
+    version = gitBasedVersion().also { println("Determined version to be $it") }
+}
+mavenPublishing {
+    // publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    signAllPublications()
+    coordinates(group.toString(), name, version.toString())
+    pom {
+        name.set("Lightning-server-Server")
+        description.set("An implementation of LightningServer Engine using AWS Lambda, FileSystem using AWS S3, Email using AWS SES, and Metrics using AWS CloudWatch.")
+        github("lightningkite", "lightning-server")
 
-    licenses {
-        mit()
-    }
+        licenses {
+            mit()
+        }
 
-    developers {
-        developer(
-            id = "LightningKiteJoseph",
-            name = "Joseph Ivie",
-            email = "joseph@lightningkite.com",
-        )
-        developer(
-            id = "bjsvedin",
-            name = "Brady Svedin",
-            email = "brady@lightningkite.com",
-        )
+        developers {
+            joseph()
+            brady()
+        }
     }
 }
-tasks.getByName("sourceJar").dependsOn("kspKotlin")
+
