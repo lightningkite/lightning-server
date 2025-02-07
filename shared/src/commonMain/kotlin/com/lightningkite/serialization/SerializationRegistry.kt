@@ -256,12 +256,13 @@ class SerializationRegistry(val module: SerializersModule) {
                         index = index,
                         name = it.name,
                         type = it.serializer.virtualTypeReference(this),
-                        optional = false,
+                        optional = it.defaultCode != null,
                         annotations = it.annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) },
                         defaultJson = it.default?.let { default ->
                             @Suppress("UNCHECKED_CAST")
                             DefaultDecoder.json.encodeToString(it.serializer as KSerializer<Any?>, default)
-                        }
+                        },
+                        defaultCode = it.defaultCode,
                     )
                 } ?: (value as? GeneratedSerializer<*>)?.let {
                     it.typeParametersSerializers()
@@ -351,12 +352,13 @@ class SerializationRegistry(val module: SerializersModule) {
                         index = index,
                         name = it.name,
                         type = it.serializer.virtualTypeReference(this),
-                        optional = false,
+                        optional = it.defaultCode != null,
                         annotations = it.annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) },
                         defaultJson = it.default?.let { default ->
                             @Suppress("UNCHECKED_CAST")
                             DefaultDecoder.json.encodeToString(it.serializer as KSerializer<Any?>, default)
-                        }
+                        },
+                        defaultCode = it.defaultCode,
                     )
                 } ?: (value as? GeneratedSerializer<*>)?.let {
                     it.typeParametersSerializers()

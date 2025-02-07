@@ -9,6 +9,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonBuilder
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.time.Duration
 import kotlin.time.measureTime
 
@@ -76,6 +77,19 @@ class VirtualTypesTest {
     @Test fun testStructure() {
         LargeTestModel_list
         testVirtualVersion(LargeTestModel.serializer(), LargeTestModel())
+    }
+    @Test fun testStructureDefaultsRegen() {
+        val serializer = LargeTestModel.serializer()
+        val virtualRegistry = SerializationRegistry.master.virtualize { it.contains("testing") }
+        val vtype = virtualRegistry.virtualTypes[serializer.descriptor.serialName] as VirtualStruct
+        val vtypeSerializer = virtualRegistry[serializer.descriptor.serialName, serializer.tryTypeParameterSerializers3() ?: arrayOf()] as VirtualStruct.Concrete
+        (0..<vtypeSerializer.descriptor.elementsCount)
+            .forEach {
+                println(vtypeSerializer.descriptor.getElementName(it) + ": " + vtypeSerializer.descriptor.isElementOptional(it))
+            }
+        // Seems odd, right?
+        // We're checking that the IDs are regenerated randomly as intended
+        assertNotEquals(vtypeSerializer.default._id, vtypeSerializer.default._id)
     }
     @Test fun testStructureWithoutDefaults() {
         testVirtualVersion(LargeTestModel.serializer(), LargeTestModel()) { encodeDefaults = false }

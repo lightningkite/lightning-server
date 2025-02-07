@@ -5,7 +5,6 @@ package com.lightningkite.lightningserver.db
 import com.lightningkite.lightningdb.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.lightningserver.typed.*

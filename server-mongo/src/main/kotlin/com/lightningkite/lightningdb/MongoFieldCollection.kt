@@ -6,9 +6,6 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.serialization.*
 import com.mongodb.MongoCommandException
 import com.mongodb.client.model.*
-import com.mongodb.client.model.search.SearchOperator
-import com.mongodb.client.model.search.SearchOptions
-import com.mongodb.client.model.search.SearchPath
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -16,10 +13,8 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.*
-import kotlinx.serialization.serializer
 import org.bson.BsonBoolean
 import org.bson.BsonDocument
-import org.bson.BsonValue
 import org.bson.conversions.Bson
 import java.util.concurrent.TimeUnit
 import kotlin.reflect.KClass

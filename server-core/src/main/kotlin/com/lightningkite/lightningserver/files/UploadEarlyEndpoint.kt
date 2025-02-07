@@ -95,16 +95,29 @@ class UploadEarlyEndpoint(
         errorCases = listOf(),
         implementation = { _: Unit ->
             val id = UUID.random()
-            val newFile = files().root.resolve(jailFilePath).resolve("$id.file")
-            val newItem = UploadForNextRequest(
-                expires = now().plus(expiration),
-                file = ServerFile(newFile.url)
-            )
-            database().collection<UploadForNextRequest>().insertOne(newItem)
-            UploadInformation(
-                uploadUrl = newFile.uploadUrl(expiration),
-                futureCallToken = signUrl(unsafeResolver.prefix + id.toString())
-            )
+            if(fileScanner().isEmpty()) {
+                val newFile = files().root.resolve(filePath).resolve("$id.file")
+                val newItem = UploadForNextRequest(
+                    expires = now().plus(expiration),
+                    file = ServerFile(newFile.url)
+                )
+                database().collection<UploadForNextRequest>().insertOne(newItem)
+                UploadInformation(
+                    uploadUrl = newFile.uploadUrl(expiration),
+                    futureCallToken = signUrl(safeResolver.prefix + id.toString())
+                )
+            } else {
+                val newFile = files().root.resolve(jailFilePath).resolve("$id.file")
+                val newItem = UploadForNextRequest(
+                    expires = now().plus(expiration),
+                    file = ServerFile(newFile.url)
+                )
+                database().collection<UploadForNextRequest>().insertOne(newItem)
+                UploadInformation(
+                    uploadUrl = newFile.uploadUrl(expiration),
+                    futureCallToken = signUrl(unsafeResolver.prefix + id.toString())
+                )
+            }
         }
     )
 
@@ -114,6 +127,7 @@ class UploadEarlyEndpoint(
         description = "Checks out a file and moves it out of jail if it's safe.  Makes for significantly faster subsequent requests.",
         errorCases = listOf(),
         implementation = { url: String ->
+            if(url.startsWith(safeResolver.prefix)) return@api url
             if(!url.startsWith(unsafeResolver.prefix)) throw BadRequestException("URL expected to start with ${unsafeResolver.prefix}")
             val post = url.substringAfter(unsafeResolver.prefix)
             verifyUrl(post)

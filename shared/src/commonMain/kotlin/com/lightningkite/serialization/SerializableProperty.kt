@@ -10,6 +10,7 @@ interface SerializableProperty<A, B> {
     val serializer: KSerializer<B>
     val annotations: List<Annotation> get() = listOf()
     val default: B? get() = null
+    val defaultCode: String? get() = null
     val serializableAnnotations: List<SerializableAnnotation> get() = annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) }
 
     companion object {

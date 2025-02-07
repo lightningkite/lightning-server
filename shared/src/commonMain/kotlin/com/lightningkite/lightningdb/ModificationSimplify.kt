@@ -1,6 +1,5 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.serialization.*
 import com.lightningkite.serialization.SerializableProperty
 
 private fun <T> List<Modification<T>>.toMod(): Modification<T> {

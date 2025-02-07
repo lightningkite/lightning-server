@@ -1,6 +1,5 @@
 package com.lightningkite.lightningdb
 
-import com.lightningkite.serialization.*
 import com.lightningkite.serialization.SerializableProperty
 
 // Sink properties, reduce within properties, reduce all

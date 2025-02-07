@@ -2,7 +2,9 @@
 
 package com.lightningkite.serialization
 
+import com.lightningkite.UUID
 import com.lightningkite.lightningdb.HasId
+import com.lightningkite.now
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.CompositeDecoder
@@ -21,7 +23,7 @@ data class VirtualAlias(
     override val serialName: String,
     val wraps: VirtualTypeReference,
     override val annotations: List<SerializableAnnotation>
-): VirtualType {
+) : VirtualType {
     override fun serializer(registry: SerializationRegistry, arguments: Array<KSerializer<*>>): KSerializer<*> {
         return wraps.serializer(registry, mapOf())  // TODO: Support generics
     }
@@ -47,51 +49,89 @@ data class VirtualStruct(
     override fun serializer(registry: SerializationRegistry, arguments: Array<KSerializer<*>>): KSerializer<*> =
         Concrete(registry, arguments)
 
-    override fun toString(): String = "virtual data class $serialName${parameters.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.name } ?: ""}(${fields.joinToString()})"
+    override fun toString(): String = "virtual data class $serialName${
+        parameters.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") { it.name } ?: ""
+    }(${fields.joinToString()})"
 
     object DefaultNotPresent
     inner class Concrete(val registry: SerializationRegistry, val arguments: Array<out KSerializer<*>>) :
-        KSerializer<VirtualInstance>, VirtualType by this@VirtualStruct {
+        KSerializer<VirtualInstance>, VirtualType by this@VirtualStruct, KSerializerWithDefault<VirtualInstance> {
         val struct = this@VirtualStruct
-        init { if(arguments.size < parameters.size) throw IllegalArgumentException("VirtualStructure ${serialName} needs ${parameters.size} parameters, but we only got ${arguments.size}") }
-        val context = parameters.indices.associate { parameters[it].name to arguments[it] }
-        operator fun invoke(): VirtualInstance = defaultInstance
+
+        init {
+            if (arguments.size < parameters.size) throw IllegalArgumentException("VirtualStructure ${serialName} needs ${parameters.size} parameters, but we only got ${arguments.size}")
+        }
+
+        val typeArguments = parameters.indices.associate { parameters[it].name to arguments[it] }
+
+        override val default: VirtualInstance
+            get() = VirtualInstance(
+                this,
+                fields.indices.map { index ->
+                    val gen = defaultGenerators[index]
+                    val serializer = serializers[index]
+                    if(gen != null) gen() else serializer.default()
+                }
+            )
+        operator fun invoke(): VirtualInstance = default
         operator fun invoke(map: Map<VirtualField, Any?> = mapOf()): VirtualInstance {
-            val fields = defaults.toMutableList()
+            val fields = fields.indices.mapTo(ArrayList()) { index ->
+                val gen = defaultGenerators[index]
+                val serializer = serializers[index]
+                if(gen != null) gen() else serializer.default()
+            }
             for ((key, value) in map) fields[key.index] = value
             return VirtualInstance(this, fields)
         }
 
         val serializers by lazy {
             fields.map {
-                it.type.serializer(registry, context)
+                it.type.serializer(registry, typeArguments)
             }
         }
-        val specifiedDefaults by lazy {
+        val defaultGenerators: List<(() -> Any?)?> by lazy {
             fields.zip(serializers) { field, serializer ->
-                field.defaultJson?.let {
-                    return@zip DefaultDecoder.json.decodeFromString(serializer, it)
+                field.defaultCode?.trim()?.let {
+                    // handling some common cases for sanity's sake
+                    when (it) {
+                        "uuid()", "UUID.random()" -> {
+                            { UUID.random() }
+                        }
+                        "now()" -> {
+                            { now() }
+                        }
+                        // TODO: Check for field cloning?
+                        else -> null
+                    }
+                } ?: field.defaultJson?.let {
+                    val v = DefaultDecoder.json.decodeFromString(serializer, it)
+                    ;{ v }
                 }
-                DefaultNotPresent
             }
         }
-        val defaults by lazy {
-            fields.zip(serializers) { field, serializer ->
-                field.defaultJson?.let {
-                    return@zip DefaultDecoder.json.decodeFromString(serializer, it)
-                }
-                serializer.default()
+        val skipSerializationIfEqual by lazy {
+            defaultGenerators.map {
+                if (it != null) it()
+                else DefaultNotPresent
             }
         }
-        val defaultInstance by lazy { VirtualInstance(this, defaults) }
+//        val defaults by lazy {
+//            fields.zip(serializers) { field, serializer ->
+//                field.defaultJson?.let {
+//                    return@zip DefaultDecoder.json.decodeFromString(serializer, it)
+//                }
+//                serializer.default()
+//            }
+//        }
+//        val defaultInstance by lazy { VirtualInstance(this, defaults) }
         val serializableProperties: Array<SerializableProperty<VirtualInstance, Any?>> by lazy {
             fields.map {
-                SerializableProperty.FromVirtualField(it, registry, context)
+                SerializableProperty.FromVirtualField(it, registry, typeArguments)
             }.toTypedArray()
         }
         val ensureNotNull = fields.withIndex().filter {
             !it.value.optional && !it.value.type.isNullable
-        }.map { it.index  }.toIntArray()
+        }.map { it.index }.toIntArray()
 
         @Transient
         override val descriptor: SerialDescriptor by lazy {
@@ -108,7 +148,7 @@ data class VirtualStruct(
 
         override fun deserialize(decoder: Decoder): VirtualInstance {
             val values = Array<Any?>(fields.size) {
-                specifiedDefaults[it].takeUnless { it == DefaultNotPresent }
+                defaultGenerators[it]?.invoke()
             }
             val s = decoder.beginStructure(descriptor)
             while (true) {
@@ -135,7 +175,7 @@ data class VirtualStruct(
             s.endStructure(descriptor)
             // Ensure we got everything
             ensureNotNull.forEach { index ->
-                if(values[index] == null) {
+                if (values[index] == null) {
                     throw SerializationException("${fields[index].name} required but was not present")
                 }
             }
@@ -146,7 +186,7 @@ data class VirtualStruct(
             val s = encoder.beginStructure(descriptor)
             for ((index, field) in fields.withIndex()) {
                 val v = value.values[index]
-                if (v != specifiedDefaults[index] || s.shouldEncodeElementDefault(descriptor, index)) {
+                if (v != skipSerializationIfEqual[index] || s.shouldEncodeElementDefault(descriptor, index)) {
                     val ser = serializers[index]
                     s.encodeSerializableElement(descriptor, index, ser, v)
                 }
@@ -164,10 +204,12 @@ data class VirtualEnum(
 ) : VirtualType, KSerializer<VirtualEnumValue> {
     @Transient
     val entries = options.map { VirtualEnumValue(this, it.index) }
+
     @Transient
     private val map = options.associateBy { it.name }
     override fun serializer(registry: SerializationRegistry, arguments: Array<KSerializer<*>>): KSerializer<*> = this
     override fun toString(): String = "Virtual $serialName { ${options.joinToString()} }"
+
     @Transient
     override val descriptor: SerialDescriptor = object : SerialDescriptor {
         @ExperimentalSerializationApi
@@ -225,21 +267,23 @@ class VirtualEnumValue(
 data class VirtualInstance(
     val type: VirtualStruct.Concrete,
     val values: List<Any?>
-): HasId<Comparable<Comparable<*>>>, Comparable<VirtualInstance> {
+) : HasId<Comparable<Comparable<*>>>, Comparable<VirtualInstance> {
     @Suppress("UNCHECKED_CAST")
     override val _id: Comparable<Comparable<*>>
-        get() = type.struct.idField?.let { values[it.index] as Comparable<Comparable<*>> } ?: values.hashCode() as Comparable<Comparable<*>>
+        get() = type.struct.idField?.let { values[it.index] as Comparable<Comparable<*>> }
+            ?: values.hashCode() as Comparable<Comparable<*>>
+
     override fun toString(): String =
         "${type.struct.serialName}(${values.zip(type.struct.fields).joinToString { "${it.second.name}=${it.first}" }})"
 
     override fun compareTo(other: VirtualInstance): Int {
-        for(i in values.indices) {
+        for (i in values.indices) {
             val t = this.values[i]
             val o = other.values[i]
             @Suppress("UNCHECKED_CAST")
-            if(t is Comparable<*>) {
+            if (t is Comparable<*>) {
                 val r = (t as Comparable<Any?>).compareTo(o)
-                if(r != 0) return r
+                if (r != 0) return r
             }
         }
         return 0
@@ -254,6 +298,7 @@ data class VirtualField(
     val optional: Boolean,
     val annotations: List<SerializableAnnotation>,
     val defaultJson: String? = null,
+    val defaultCode: String? = null,
 ) {
     override fun toString(): String = "$name: $type"
 }
