@@ -98,7 +98,7 @@ data class MongoFields(
                     appendLine("""override val annotations: List<Annotation> by lazy { $classReference.serializer().descriptor.getElementAnnotations($index) }""")
                     field.default?.let {
                         appendLine("""override val default: ${field.kotlinType.toKotlin()} = $it""")
-                        appendLine("""override val defaultCode: String? = "${it.replace("$", "\\$").replace("\"", "\\\"")}" """)
+                        appendLine("""override val defaultCode: String? = "${it.substringBefore('\n').replace("$", "\\$").replace("\"", "\\\"")}" """)
                     }
                 }
                 appendLine("}")
@@ -153,7 +153,7 @@ data class MongoFields(
                     appendLine("""override val annotations: List<Annotation> by lazy { $classReference.serializer(${declaration.typeParameters.joinToString(", "){ it.name.asString().decapitalizeAsciiOnly() }}).descriptor.getElementAnnotations($index) }""")
                     field.default?.let {
                         appendLine("""override val default: ${field.kotlinType.toKotlin()} = $it""")
-                        appendLine("""override val defaultCode: String? = "${it.replace("$", "\\$").replace("\"", "\\\"")}" """)
+                        appendLine("""override val defaultCode: String? = "${it.substringBefore('\n').replace("$", "\\$").replace("\"", "\\\"")}" """)
                     }
                     appendLine("""override fun hashCode(): Int = ${field.name.hashCode() * 31 + simpleName.hashCode()}""")
                     appendLine(
