@@ -50,4 +50,5 @@ include(":server-scim")
 include(":server-sentry")
 include(":server-sentry9")
 include(":server-sftp")
+include(":monitoring")
 

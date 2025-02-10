@@ -17,3 +17,4 @@ bssoftware
 .kotlin
 kotlin-js-store/
 local.version.txt
+local.auto.tfvars

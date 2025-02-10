@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.serverhealth
 
 import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.settings.Settings
@@ -16,7 +17,7 @@ import java.net.NetworkInterface
  * Examples of features that can be checked on are Email, Database, and Exception Reporting.
  */
 fun ServerPath.healthCheck() = get.api(
-    authOptions = Authentication.isDeveloper,
+    authOptions = noAuth,
     inputType = Unit.serializer(),
     outputType = ServerHealth.serializer(),
     summary = "Get Server Health",

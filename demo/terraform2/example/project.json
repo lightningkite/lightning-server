@@ -1,7 +1,7 @@
 {
-    "projectName": "demo-example",
-    "bucket": "ivieleague-deployment-states",
-    "bucketPathOverride": "demo/example",
+    "projectName": "demo",
+    "bucket": "your-deployment-bucket",
+    "bucketPathOverride": null,
     "region": "us-west-2",
     "core": "Lambda",
     "vpc": false,
@@ -11,7 +11,7 @@
     "createBeforeDestroy": false,
     "handlers": {
         "general": "Standard",
-        "database": "MongoDB Serverless",
+        "database": "AuroraDB Serverless V2",
         "cache": "DynamoDB",
         "secretBasis": "Standard",
         "slack": "Direct",
@@ -20,11 +20,6 @@
         "files": "S3",
         "metrics": "Cloudwatch",
         "exceptions": "Direct",
-        "email": "SMTP through SES",
-        "jwt": "Standard",
-        "oauth_github": "Direct",
-        "oauth_apple": "Direct",
-        "oauth_google": "Direct",
-        "oauth_microsoft": "Direct"
+        "email": "SMTP through SES"
     }
 }

@@ -1,14 +1,14 @@
 {
-    "projectName": "demo-example-single-ec2",
+    "projectName": "monitoring",
     "bucket": "lightningkite-terraform",
     "bucketPathOverride": null,
     "region": "us-west-2",
-    "core": "SingleEC2",
-    "vpc": true,
-    "existingVpc": true,
+    "core": "Lambda",
+    "vpc": false,
+    "existingVpc": false,
     "domain": true,
     "profile": "lk",
-    "createBeforeDestroy": false,
+    "createBeforeDestroy": true,
     "handlers": {
         "general": "Standard",
         "database": "MongoDB Serverless",
@@ -18,13 +18,16 @@
         "sms": "Direct",
         "logging": "Direct",
         "files": "S3",
-        "metrics": "Cloudwatch",
+        "metrics": "Direct",
         "exceptions": "Direct",
         "email": "SMTP through SES",
-        "jwt": "Standard",
-        "oauth_github": "Direct",
-        "oauth_apple": "Direct",
-        "oauth_google": "Direct",
-        "oauth_microsoft": "Direct"
+        "serveApp": "Direct",
+        "issueContact": "Direct",
+        "rateLimit": "Direct",
+        "allowUnauthenticatedTesting": "Direct",
+        "fileScanner": "Direct",
+        "notifications": "Direct",
+        "pubsub": "Direct",
+        "frontend": "Direct"
     }
 }

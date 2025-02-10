@@ -32,12 +32,12 @@ variable "lambda_snapstart" {
 ##########
 
 resource "aws_s3_bucket" "lambda_bucket" {
-  bucket_prefix = "demo-example-lambda-bucket"
+  bucket_prefix = "monitoring-lambda-bucket"
   force_destroy = true
 }
 
 resource "aws_iam_role" "main_exec" {
-  name = "demo-example-main-exec"
+  name = "monitoring-main-exec"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -54,9 +54,9 @@ resource "aws_iam_role" "main_exec" {
 }
 
 resource "aws_iam_policy" "bucketDynamoAndInvoke" {
-  name        = "demo-example-bucketDynamoAndInvoke"
-  path = "/demo/example/bucketDynamoAndInvoke/"
-  description = "Access to the demo-example bucket, dynamo, and invoke"
+  name        = "monitoring-bucketDynamoAndInvoke"
+  path = "/monitoring/bucketDynamoAndInvoke/"
+  description = "Access to the monitoring bucket, dynamo, and invoke"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -111,12 +111,6 @@ resource "aws_iam_role_policy_attachment" "files" {
 }
 
 
-resource "aws_iam_role_policy_attachment" "metrics" {
-  role       = aws_iam_role.main_exec.id
-  policy_arn = aws_iam_policy.metrics.arn
-}
-
-
 resource "aws_s3_object" "app_storage" {
   bucket = aws_s3_bucket.lambda_bucket.id
 
@@ -128,7 +122,7 @@ resource "aws_s3_object" "app_storage" {
 }
 
 resource "aws_lambda_function" "main" {
-  function_name = "demo-example-main"
+  function_name = "monitoring-main"
   publish = var.lambda_snapstart
 
   s3_bucket = aws_s3_bucket.lambda_bucket.id
@@ -168,7 +162,7 @@ resource "aws_lambda_alias" "main" {
 }
 
 resource "aws_cloudwatch_log_group" "main" {
-  name = "demo-example-main-log"
+  name = "monitoring-main-log"
   retention_in_days = 30
 }
 
@@ -183,10 +177,10 @@ resource "local_sensitive_file" "settings_raw" {
         
     }
     database = {
-      url = "mongodb+srv://demoexampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_serverless_instance.database.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
+      url = "mongodb+srv://monitoringdatabase-main:${random_password.database.result}@${replace(mongodbatlas_serverless_instance.database.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
     }
     cache = {
-        url = "dynamodb://${var.deployment_location}/demo_example"
+        url = "dynamodb://${var.deployment_location}/monitoring"
     }
     secretBasis = random_password.secretBasis.result
     slack = var.slack
@@ -196,10 +190,7 @@ resource "local_sensitive_file" "settings_raw" {
         storageUrl = "s3://${aws_s3_bucket.files.id}.s3-${aws_s3_bucket.files.region}.amazonaws.com"
         signedUrlExpiration = var.files_expiry
     }
-    metrics = {
-        url = "cloudwatch://${var.deployment_location}/${var.metrics_namespace}"
-        trackingByEntryPoint = var.metrics_tracked
-    }
+    metrics = var.metrics
     exceptions = var.exceptions
     email = {
         url = "smtp://${aws_iam_access_key.email.id}:${aws_iam_access_key.email.ses_smtp_password_v4}@email-smtp.${var.deployment_location}.amazonaws.com:587" 
@@ -258,9 +249,9 @@ resource "aws_lambda_permission" "scheduled_tasks" {
   action        = "lambda:InvokeFunction"
   function_name = "${aws_lambda_alias.main.function_name}:${aws_lambda_alias.main.name}"
   principal     = "events.amazonaws.com"
-  source_arn    = "arn:aws:events:${var.deployment_location}:${data.aws_caller_identity.current.account_id}:rule/demo-example_*"
+  source_arn    = "arn:aws:events:${var.deployment_location}:${data.aws_caller_identity.current.account_id}:rule/monitoring_*"
   lifecycle {
-    create_before_destroy = false
+    create_before_destroy = true
   }
 }
 

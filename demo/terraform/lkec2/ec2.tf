@@ -64,11 +64,7 @@ resource "local_sensitive_file" "settings_raw" {
         url = "dynamodb://${var.deployment_location}/demo_example_single_ec2"
     }
     secretBasis = random_password.secretBasis.result
-    jwt = {
-        expiration = var.jwt_expiration 
-        emailExpiration = var.jwt_emailExpiration 
-        secret = random_password.jwt.result
-    }
+    slack = var.slack
     sms = var.sms
     logging = var.logging
     files = {
