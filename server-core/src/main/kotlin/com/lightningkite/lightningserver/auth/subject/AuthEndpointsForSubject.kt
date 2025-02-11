@@ -178,7 +178,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     val errorNoSingleUser = LSError(
         404,
         detail = "no-single-user",
-        message = "No single user could be found that matches the given credentials."
+        message = "No user '' was found."
     )
     val errorInvalidProof = LSError(
         400,
@@ -294,7 +294,10 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
             val used = proofs.map { it.via }.toSet()
             val users = proofs.mapNotNull { handler.findUser(it.property, it.value) }.distinctBy { it._id }
-            val subject = users.singleOrNull() ?: throw HttpStatusException(errorNoSingleUser)
+            val identity = proofs.filter { it.property == "email" || it.property == "phone" }.firstOrNull()
+            val subject = users.singleOrNull() ?: throw HttpStatusException(errorNoSingleUser.copy(
+                message = "No user was found with the ${identity?.property ?: "given ID"} ${identity?.value ?: ""}."
+            ))
             proofs.forEach {
                 if(handler.get(subject, it.property) != it.value) {
                     throw HttpStatusException(errorIrrelevantProof.copy(data = it.via))

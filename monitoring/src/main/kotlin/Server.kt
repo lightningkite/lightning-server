@@ -44,7 +44,6 @@ object Server : ServerPathGroup(ServerPath.root) {
         S3FileSystem
         prepareModelsShared()
         prepareModelsServerCore()
-        prepareModelsMonitoring()
         startupOnce("adminUser", database) {
             database().collection<User>().insertOne(
                 User(
