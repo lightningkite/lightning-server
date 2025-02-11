@@ -102,7 +102,7 @@ object Http {
         endpoints[HttpEndpoint(ServerPath("robots.txt"), HttpMethod.GET)] = {
             HttpResponse.plainText("""
             User-agent: *
-            Disallow: 
+            Disallow: /
         """.trimIndent())
         }
     }
