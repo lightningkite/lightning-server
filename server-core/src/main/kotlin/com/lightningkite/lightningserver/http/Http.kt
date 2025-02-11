@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.auth.authAny
+import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
@@ -94,6 +95,15 @@ object Http {
             if (generalSettings().debug) {
                 logger.warn("${request.endpoint} not found!")
             }
+        }
+    }
+
+    init {
+        endpoints[HttpEndpoint(ServerPath("robots.txt"), HttpMethod.GET)] = {
+            HttpResponse.plainText("""
+            User-agent: *
+            Disallow: 
+        """.trimIndent())
         }
     }
 }
