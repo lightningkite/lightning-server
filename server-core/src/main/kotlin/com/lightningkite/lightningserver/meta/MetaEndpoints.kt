@@ -1,6 +1,8 @@
 package com.lightningkite.lightningserver.meta
 
 import com.lightningkite.lightningserver.HtmlDefaults
+import com.lightningkite.lightningserver.cache.Cache
+import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
@@ -15,6 +17,7 @@ import com.lightningkite.lightningserver.schedule.Scheduler
 import com.lightningkite.lightningserver.schema.lightningServerKSchema
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serverhealth.healthCheck
+import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.apiDocs
@@ -30,6 +33,7 @@ import kotlinx.serialization.json.put
 class MetaEndpoints(
     path: ServerPath,
     packageName: String = "com.mypackage",
+    cache: () -> Cache = Settings.requirements["cache"]?.let { { it.invoke() as? Cache ?: LocalCache } } ?: { LocalCache },
 ) : ServerPathGroup(path) {
 
     val root = get.handler {
@@ -45,7 +49,7 @@ class MetaEndpoints(
         })
     }
     val docs = path("docs").apiDocs(packageName)
-    val health = path("health").healthCheck()
+    val health = path("health").healthCheck(cache)
     val isOnline = path("online").get.handler { HttpResponse.plainText("Server is running.") }
 
     private suspend fun openAdmin(request: HttpRequest): HttpResponse {

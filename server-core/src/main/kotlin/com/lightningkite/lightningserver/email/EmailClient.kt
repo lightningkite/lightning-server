@@ -2,6 +2,9 @@ package com.lightningkite.lightningserver.email
 
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
+import com.lightningkite.lightningserver.settings.generalSettings
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 
 /**
  * An interface for sending emails. This is used directly by the EmailSettings to abstract the implementation of
@@ -72,14 +75,15 @@ interface EmailClient : HealthCheckable {
         )
     )
 
-
+    override val healthCheckFrequency: Duration
+        get() = 6.hours
     override suspend fun healthCheck(): HealthStatus {
         try {
             send(
                 Email(
-                    subject = "Test Email",
-                    to = listOf(EmailLabeledValue("test@test.com")),
-                    plainText = "This is a test message"
+                    subject = "SLeABLegmURKYOVeRth - Health Check for ${generalSettings().publicUrl}",
+                    to = listOf(EmailLabeledValue("info@lightningkite.com")),
+                    plainText = "This is a test message from the Lightning Server at ${generalSettings().publicUrl}."
                 )
             )
             return HealthStatus(HealthStatus.Level.OK)
