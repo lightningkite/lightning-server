@@ -803,7 +803,7 @@ object SettingsHandlers {
         name = "Cloudwatch",
         inputs = { key ->
             listOf(
-                TerraformInput.stringList("${key}_tracked", MetricType.known.map { it.name }),
+                TerraformInput.stringList("${key}_tracked", MetricType.known.map { it.name }.sorted()),
                 TerraformInput.string("${key}_namespace", this.projectName),
             )
         },
