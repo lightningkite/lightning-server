@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.now
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Instant
 import kotlin.time.Duration
 import org.jetbrains.annotations.TestOnly
 import kotlin.time.Duration.Companion.days
@@ -36,11 +37,11 @@ class UploadEarlyEndpoint(
     companion object {
         var default: UploadEarlyEndpoint? = null
     }
-    val unsafeResolver = object: FileSystem.SpecialResolver {
+
+    val unsafeResolver = object : FileSystem.SpecialResolver {
         override val prefix: String = "future://$path/"
         override fun resolve(url: String): FileObject {
-            val post = url.substringAfter(prefix)
-            val id = post.substringBefore('?')
+            val id = url.substringAfter(prefix).substringBefore('?')
             val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
             val safeFo = files().root.resolve(filePath).resolve("$id.file")
             runBlocking { fileScanner().copyAndScan(originalFo, safeFo) }
@@ -48,32 +49,38 @@ class UploadEarlyEndpoint(
         }
 
         override fun resolveWithSignature(url: String): FileObject {
-            val post = url.substringAfter(prefix)
-            verifyUrl(post)
-            val id = post.substringBefore('?')
+            if(!verifyUrl(url)) throw BadRequestException("Failed to verify: $url")
+            val id = url.substringAfter(prefix).substringBefore('?')
             val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
             val safeFo = files().root.resolve(filePath).resolve("$id.file")
             runBlocking { fileScanner().copyAndScan(originalFo, safeFo) }
             return safeFo
         }
     }
-    val safeResolver = object: FileSystem.SpecialResolver {
+    val safeResolver = object : FileSystem.SpecialResolver {
         override val prefix: String = "future-safe://$path/"
         override fun resolve(url: String): FileObject {
-            val post = url.substringAfter(prefix)
-            val id = post.substringBefore('?')
+            val id = url.substringAfter(prefix).substringBefore('?')
             val safeFo = files().root.resolve(filePath).resolve("$id.file")
+            runBlocking {
+                database().collection<UploadForNextRequest>()
+                    .deleteManyIgnoringOld(condition { it.file eq ServerFile(safeFo.url) })
+            }
             return safeFo
         }
 
         override fun resolveWithSignature(url: String): FileObject {
-            val post = url.substringAfter(prefix)
-            verifyUrl(post)
-            val id = post.substringBefore('?')
+            if(!verifyUrl(url)) throw BadRequestException("Failed to verify: $url")
+            val id = url.substringAfter(prefix).substringBefore('?')
             val safeFo = files().root.resolve(filePath).resolve("$id.file")
+            runBlocking {
+                database().collection<UploadForNextRequest>()
+                    .deleteManyIgnoringOld(condition { it.file eq ServerFile(safeFo.url) })
+            }
             return safeFo
         }
     }
+
     init {
         prepareModelsServerCore()
         FileSystem.register(unsafeResolver)
@@ -95,7 +102,7 @@ class UploadEarlyEndpoint(
         errorCases = listOf(),
         implementation = { _: Unit ->
             val id = UUID.random()
-            if(fileScanner().isEmpty()) {
+            if (fileScanner().isEmpty()) {
                 val newFile = files().root.resolve(filePath).resolve("$id.file")
                 val newItem = UploadForNextRequest(
                     expires = now().plus(expiration),
@@ -127,15 +134,21 @@ class UploadEarlyEndpoint(
         description = "Checks out a file and moves it out of jail if it's safe.  Makes for significantly faster subsequent requests.",
         errorCases = listOf(),
         implementation = { url: String ->
-            if(url.startsWith(safeResolver.prefix)) return@api url
-            if(!url.startsWith(unsafeResolver.prefix)) throw BadRequestException("URL expected to start with ${unsafeResolver.prefix}")
-            val post = url.substringAfter(unsafeResolver.prefix)
-            verifyUrl(post)
-            val id = post.substringBefore('?')
+            if (url.startsWith(safeResolver.prefix)) return@api url
+            if (!url.startsWith(unsafeResolver.prefix)) throw BadRequestException("URL expected to start with ${unsafeResolver.prefix}")
+            if(!verifyUrl(url)) throw BadRequestException("Failed to verify: $url")
+            val id = url.substringAfter(unsafeResolver.prefix).substringBefore('?')
             val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
             val safeFo = files().root.resolve(filePath).resolve("$id.file")
-            runBlocking { fileScanner().copyAndScan(originalFo, safeFo) }
-            signUrl(safeResolver.prefix + id.toString())
+            runBlocking {
+                fileScanner().copyAndScan(originalFo, safeFo)
+                val newItem = UploadForNextRequest(
+                    expires = now().plus(expiration),
+                    file = ServerFile(safeFo.url)
+                )
+                database().collection<UploadForNextRequest>().insertOne(newItem)
+            }
+            signUrl(safeResolver.prefix + id)
         }
     )
 
@@ -155,14 +168,22 @@ class UploadEarlyEndpoint(
             it + "&token=" + signer().signUrl(it)
         }
     }
+
     @TestOnly
     internal fun verifyUrl(url: String): Boolean {
-        val params = url.substringAfter('?').split('&').associate { it.substringBefore('=') to it.substringAfter('=').decodeURLQueryComponent() }
-        return verifyUrl(url.substringBefore('?'), params["useUntil"]?.toLong() ?: throw IllegalArgumentException("Parameter 'useUntil' is missing in '$url'"), params["token"] ?: throw IllegalArgumentException("Parameter 'token' is missing in '$url'"))
+        val params = url.substringAfter('?')
+            .split('&')
+            .associate { it.substringBefore('=') to it.substringAfter('=').decodeURLQueryComponent() }
+        return verifyUrl(
+            url.substringBefore('?'),
+            params["useUntil"]?.toLong() ?: throw IllegalArgumentException("Parameter 'useUntil' is missing in '$url'"),
+            params["token"] ?: throw IllegalArgumentException("Parameter 'token' is missing in '$url'")
+        )
     }
+
     @TestOnly
     internal fun verifyUrl(url: String, exp: Long, token: String): Boolean {
-        return signer().verifyUrl(url.substringBefore('?') + "?useUntil=$exp", token)
+        return (now() < Instant.fromEpochMilliseconds(exp)) && signer().verifyUrl(url.substringBefore('?') + "?useUntil=$exp", token)
     }
 
 }
