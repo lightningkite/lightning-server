@@ -109,18 +109,31 @@ interface SecureHasher {
 fun SecureHasher.sign(string: String): String = Base64.getEncoder().encodeToString(sign(string.toByteArray()))
 fun SecureHasher.verify(string: String, base64Signature: String): Boolean =
     verify(string.toByteArray(), Base64.getDecoder().decode(base64Signature))
+
 fun SecureHasher.signUrl(string: String): String = Base64.getUrlEncoder().encodeToString(sign(string.toByteArray()))
-fun SecureHasher.verifyUrl(string: String, base64Signature: String): Boolean =
-    verify(string.toByteArray(), Base64.getUrlDecoder().decode(base64Signature))
+fun SecureHasher.verifyUrl(string: String, base64Signature: String): Boolean {
+    val signature = try {
+        Base64.getUrlDecoder().decode(base64Signature)
+    } catch (_: Exception) {
+        return false
+    }
+    return verify(string.toByteArray(), signature)
+}
 
 fun SecureHasher.signJwt(claims: JwtClaims): String = buildString {
     val withDefaults = Json(Serialization.json) { encodeDefaults = true; explicitNulls = false }
     append(
-        Base64.getUrlEncoder().withoutPadding().encodeToString(withDefaults.encodeToString(JwtHeader(alg = when(this@signJwt) {
-            is SecureHasher.HS256 -> "HS256"
-            is SecureHasher.HS512 -> "HS512"
-            else -> this@signJwt.toString()
-        })).toByteArray())
+        Base64.getUrlEncoder().withoutPadding().encodeToString(
+            withDefaults.encodeToString(
+                JwtHeader(
+                    alg = when (this@signJwt) {
+                        is SecureHasher.HS256 -> "HS256"
+                        is SecureHasher.HS512 -> "HS512"
+                        else -> this@signJwt.toString()
+                    }
+                )
+            ).toByteArray()
+        )
     )
     append('.')
     append(
@@ -133,12 +146,15 @@ fun SecureHasher.signJwt(claims: JwtClaims): String = buildString {
     val signature = Base64.getUrlEncoder().withoutPadding().encodeToString(sign(soFar.toByteArray()))
     append(signature)
 }
+
 fun SecureHasher.verifyJwt(token: String, requiredAudience: String? = null): JwtClaims? {
     val parts = token.split('.')
     if (parts.size != 3) return null  // It's not a JWT, so we'll ignore it.
     val signature = Base64.getUrlDecoder().decode(parts[2])
-    @Suppress("UNUSED_VARIABLE") val header: JwtHeader = Serialization.json.decodeFromString(Base64.getUrlDecoder().decode(parts[0]).toString(Charsets.UTF_8))
-    val claims: JwtClaims = Serialization.json.decodeFromString(Base64.getUrlDecoder().decode(parts[1]).toString(Charsets.UTF_8))
+    @Suppress("UNUSED_VARIABLE") val header: JwtHeader =
+        Serialization.json.decodeFromString(Base64.getUrlDecoder().decode(parts[0]).toString(Charsets.UTF_8))
+    val claims: JwtClaims =
+        Serialization.json.decodeFromString(Base64.getUrlDecoder().decode(parts[1]).toString(Charsets.UTF_8))
     requiredAudience?.let { if (claims.aud != it) return null }  // It's for someone else.  Ignore it.
     if (System.currentTimeMillis() / 1000L > claims.exp) throw JwtExpiredException("JWT has expired.")
     if (!verify(
