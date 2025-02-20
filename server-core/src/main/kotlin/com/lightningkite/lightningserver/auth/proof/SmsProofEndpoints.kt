@@ -31,19 +31,16 @@ class SmsProofEndpoints(
     proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val verifyPhone: suspend (String) -> Boolean = { true },
 ) : PinBasedProofEndpoints(
-    path,
-    "sms",
-    "phone",
-    proofHasher,
-    pin,
+    path = path,
+    name = "sms",
+    property = "phone",
+    proofHasher = proofHasher,
+    pin =pin,
     interfaceInfo = Documentable.InterfaceInfo(path, "SmsProofClientEndpoints", listOf()),
     exampleTarget = "800-1000-100"
 ) {
     init {
         path.docName = "SmsProof"
-    }
-
-    init {
         Authentication.register(this)
     }
 
