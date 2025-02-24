@@ -23,17 +23,15 @@ object Http {
 
     val endpoints: MutableMap<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> =
         MutableMapWithChangeHandler<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> {
-            _matcher = null
-        }
-    private var _matcher: HttpEndpointMatcher? = null
-    val matcher: HttpEndpointMatcher
-        get() {
-            return _matcher ?: run {
-                val created = HttpEndpointMatcher(endpoints.keys.asSequence())
-                _matcher = created
-                created
+            _matcher = lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+                HttpEndpointMatcher(endpoints.keys.asSequence())
             }
         }
+    private var _matcher: Lazy<HttpEndpointMatcher> = lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        HttpEndpointMatcher(endpoints.keys.asSequence())
+    }
+    val matcher: HttpEndpointMatcher
+        get() = _matcher.value
 
     var exception: suspend (HttpRequest, Exception) -> HttpResponse =
         { request, exception ->

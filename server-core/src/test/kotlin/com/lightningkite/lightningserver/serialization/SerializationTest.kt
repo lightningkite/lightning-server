@@ -117,5 +117,6 @@ class SerializationTest {
         assertIsNot<ContextualSerializer<*>>(ClientModule.contextualSerializerIfHandled<Int>())
         assertIs<ContextualSerializer<*>>(ClientModule.contextualSerializerIfHandled<Instant>())
         assertIs<DeferToContextualUuidSerializer>(EmptySerializersModule().contextualSerializerIfHandled<UUID>())
+        assertIs<InstantIso8601Serializer>(ClientModule.getContextual(ContextualSerializer(Instant::class)))
     }
 }
