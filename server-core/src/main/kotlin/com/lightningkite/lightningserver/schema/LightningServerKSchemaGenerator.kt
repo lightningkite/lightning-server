@@ -81,6 +81,7 @@ val lightningServerKSchema: LightningServerKSchema by lazy {
         interfaces = Documentable.interfaces.map {
             LightningServerKSchemaInterface(
                 path = it.path.toString(),
+                docGroup = it.path.docGroup,
                 matches = VirtualTypeReference(it.name, it.subtypes.map { it.virtualTypeReference(registry) }, false)
             )
         }.toList(),
