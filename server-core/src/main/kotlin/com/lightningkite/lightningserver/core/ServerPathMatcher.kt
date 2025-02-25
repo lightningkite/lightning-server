@@ -1,49 +1,40 @@
 package com.lightningkite.lightningserver.core
 
-class ServerPathMatcher(paths: Sequence<ServerPath>) {
-    data class Node(
-        val path: ServerPath?,
-        val trailingSlash: ServerPath?,
-        val chainedWildcard: ServerPath?,
-        val thenConstant: Map<String, Node>,
-        val thenWildcard: Node?,
-    ) {
-        override fun toString(): String {
-            return """Node(
-                path = $path, 
-                trailingSlash = $trailingSlash, 
-                chainedWildcard = $chainedWildcard, 
-                thenConstant = ${thenConstant.keys.joinToString()}, 
-                thenWildcard = ${thenWildcard != null}, 
-            )""".trimIndent().replace("\n", "")
+import com.lightningkite.lightningserver.http.HttpEndpoint
+import kotlin.sequences.forEach
+
+class ServerPathMatcher() {
+    constructor(paths: Sequence<ServerPath>):this() {
+        paths.forEach { add(it) }
+    }
+    class Node {
+        var path: ServerPath? = null
+        var trailingSlash: ServerPath? = null
+        var chainedWildcard: ServerPath? = null
+        val thenConstant = HashMap<String, Node>()
+        var thenWildcard: Node? = null
+        fun thenWildcard(): Node {
+            return thenWildcard ?: run {
+                val n = Node()
+                this.thenWildcard = n
+                n
+            }
         }
     }
-
-    val root = run {
-        fun ServerPath.Segment.s(): String? = when (this) {
-            is ServerPath.Segment.Constant -> value
-            is ServerPath.Segment.Wildcard -> null
-        }
-
-        fun toNode(soFar: List<String?>): Node {
-            val future = paths.filter {
-                it.segments.asSequence().zip(soFar.asSequence())
-                    .all { it.first.s() == it.second } && it.segments.size > soFar.size
+    val root = Node()
+    fun add(path: ServerPath) {
+        var current = root
+        for(segment in path.segments) {
+            current = when(segment) {
+                is ServerPath.Segment.Constant -> current.thenConstant.getOrPut(segment.value) { Node() }
+                is ServerPath.Segment.Wildcard -> current.thenWildcard()
             }
-            return Node(
-                path = paths.find { it.segments.map { it.s() } == soFar && it.after == ServerPath.Afterwards.None },
-                trailingSlash = paths.find { it.segments.map { it.s() } == soFar && it.after == ServerPath.Afterwards.TrailingSlash },
-                chainedWildcard = paths.find { it.segments.map { it.s() } == soFar && it.after == ServerPath.Afterwards.ChainedWildcard },
-                thenConstant = future
-                    .mapNotNull { (it.segments[soFar.size] as? ServerPath.Segment.Constant)?.value }
-                    .distinct()
-                    .associateWith { toNode(soFar + it) },
-                thenWildcard = if (future.any { it.segments[soFar.size] is ServerPath.Segment.Wildcard })
-                    toNode(soFar + null)
-                else null
-            )
         }
-        toNode(listOf())
+        when(path.after) {
+            ServerPath.Afterwards.None -> current.path = path
+            ServerPath.Afterwards.TrailingSlash -> current.trailingSlash = path
+            ServerPath.Afterwards.ChainedWildcard -> current.chainedWildcard = path
+        }
     }
 
     data class Match(
