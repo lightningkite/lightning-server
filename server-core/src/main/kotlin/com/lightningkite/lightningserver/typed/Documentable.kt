@@ -60,6 +60,7 @@ interface Documentable {
     }
 }
 
+val ServerPath.docGroup: String? get() = generateSequence(this) { it.parent }.mapNotNull { it.docName }.firstOrNull()
 val Documentable.docGroup: String? get() = generateSequence(path.path) { it.parent }.mapNotNull { it.docName }.firstOrNull()
 val Documentable.docGroupIdentifier: String? get() = docGroup
     ?.replace(Regex("""[^0-9a-zA-Z]+(?<following>.)?""")) { match ->

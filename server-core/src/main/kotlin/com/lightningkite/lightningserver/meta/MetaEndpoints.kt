@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.meta
 
+import com.lightningkite.lightningdb.Database
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.LocalCache
@@ -7,6 +8,7 @@ import com.lightningkite.lightningserver.client
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
+import com.lightningkite.lightningserver.funnels.FunnelEndpoints
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
@@ -33,7 +35,10 @@ import kotlinx.serialization.json.put
 class MetaEndpoints(
     path: ServerPath,
     packageName: String = "com.mypackage",
-    cache: () -> Cache = Settings.requirements["cache"]?.let { { it.invoke() as? Cache ?: LocalCache } } ?: { LocalCache },
+    cache: () -> Cache = Settings.requirements["cache"]?.let { { it.invoke() as? Cache ?: LocalCache } }
+        ?: { LocalCache },
+    database: () -> Database = Settings.requirements["database"]?.let { { it.invoke() as Database } }
+        ?: Settings.requirements["db"]?.let { { it.invoke() as Database } }!!,
 ) : ServerPathGroup(path) {
 
     val root = get.handler {
@@ -51,6 +56,7 @@ class MetaEndpoints(
     val docs = path("docs").apiDocs(packageName)
     val health = path("health").healthCheck(cache)
     val isOnline = path("online").get.handler { HttpResponse.plainText("Server is running.") }
+    val funnels = FunnelEndpoints(database, path = path("funnels"))
 
     private suspend fun openAdmin(request: HttpRequest): HttpResponse {
         val inject = buildJsonObject {

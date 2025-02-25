@@ -21,6 +21,7 @@ data class LightningServerKSchema(
 @Serializable
 data class LightningServerKSchemaInterface(
     val matches: VirtualTypeReference,
+    val docGroup: String? = null,
     val path: String,
 )
 

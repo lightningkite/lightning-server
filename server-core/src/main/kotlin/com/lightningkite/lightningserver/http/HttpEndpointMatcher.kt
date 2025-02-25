@@ -3,53 +3,39 @@ package com.lightningkite.lightningserver.http
 import com.lightningkite.lightningserver.core.ServerPath
 import io.ktor.http.*
 
-class HttpEndpointMatcher(paths: Sequence<HttpEndpoint>) {
-    data class Node(
-        val path: Map<HttpMethod, HttpEndpoint>,
-        val trailingSlash: Map<HttpMethod, HttpEndpoint>,
-        val chainedWildcard: Map<HttpMethod, HttpEndpoint>,
-        val thenConstant: Map<String, Node>,
-        val thenWildcard: Node?,
-    ) {
-        override fun toString(): String {
-            return """Node(
-                path = $path, 
-                trailingSlash = $trailingSlash, 
-                chainedWildcard = $chainedWildcard, 
-                thenConstant = ${thenConstant.keys.joinToString()}, 
-                thenWildcard = ${thenWildcard != null}, 
-            )""".trimIndent().replace("\n", "")
-        }
+class HttpEndpointMatcher() {
+    constructor(paths: Sequence<HttpEndpoint>):this() {
+        paths.forEach { add(it) }
     }
 
-    val root = run {
-        fun ServerPath.Segment.s(): String? = when (this) {
-            is ServerPath.Segment.Constant -> value
-            is ServerPath.Segment.Wildcard -> null
-        }
-
-        fun toNode(soFar: List<String?>): Node {
-            val future = paths.map { it.path }.filter {
-                it.segments.asSequence().zip(soFar.asSequence())
-                    .all { it.first.s() == it.second } && it.segments.size > soFar.size
+    class Node {
+        val path = HashMap<HttpMethod, HttpEndpoint>()
+        val trailingSlash = HashMap<HttpMethod, HttpEndpoint>()
+        val chainedWildcard = HashMap<HttpMethod, HttpEndpoint>()
+        val thenConstant = HashMap<String, Node>()
+        var thenWildcard: Node? = null
+        fun thenWildcard(): Node {
+            return thenWildcard ?: run {
+                val n = Node()
+                this.thenWildcard = n
+                n
             }
-            return Node(
-                path = paths.filter { it.path.segments.map { it.s() } == soFar && it.path.after == ServerPath.Afterwards.None }
-                    .associateBy { it.method },
-                trailingSlash = paths.filter { it.path.segments.map { it.s() } == soFar && it.path.after == ServerPath.Afterwards.TrailingSlash }
-                    .associateBy { it.method },
-                chainedWildcard = paths.filter { it.path.segments.map { it.s() } == soFar && it.path.after == ServerPath.Afterwards.ChainedWildcard }
-                    .associateBy { it.method },
-                thenConstant = future
-                    .mapNotNull { (it.segments[soFar.size] as? ServerPath.Segment.Constant)?.value }
-                    .distinct()
-                    .associateWith { toNode(soFar + it) },
-                thenWildcard = if (future.any { it.segments[soFar.size] is ServerPath.Segment.Wildcard })
-                    toNode(soFar + null)
-                else null
-            )
         }
-        toNode(listOf())
+    }
+    val root = Node()
+    fun add(endpoint: HttpEndpoint) {
+        var current = root
+        for(segment in endpoint.path.segments) {
+            current = when(segment) {
+                is ServerPath.Segment.Constant -> current.thenConstant.getOrPut(segment.value) { Node() }
+                is ServerPath.Segment.Wildcard -> current.thenWildcard()
+            }
+        }
+        when(endpoint.path.after) {
+            ServerPath.Afterwards.None -> current.path[endpoint.method] = endpoint
+            ServerPath.Afterwards.TrailingSlash -> current.trailingSlash[endpoint.method] = endpoint
+            ServerPath.Afterwards.ChainedWildcard -> current.chainedWildcard[endpoint.method] = endpoint
+        }
     }
 
     data class Match(

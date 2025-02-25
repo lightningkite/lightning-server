@@ -36,6 +36,7 @@ class SerializationRegistry(val module: SerializersModule) {
     }
 
     companion object {
+        var permitCustomContextual: Boolean = false
         val master = SerializationRegistry(ClientModule)
     }
 
@@ -207,6 +208,9 @@ class SerializationRegistry(val module: SerializersModule) {
                 type.tryChildSerializers()?.forEach { registerVirtualDeep(it) }
             }
             type.tryTypeParameterSerializers3()?.forEach { registerVirtualDeep(it) }
+            if(type.descriptor.kind == SerialKind.CONTEXTUAL && permitCustomContextual) {
+                registerVirtualDeep(module.getContextual(type))
+            }
         } catch(e: Exception) {
             throw Exception("Failed to register serializer for ${type.descriptor.serialName}", e)
         }
