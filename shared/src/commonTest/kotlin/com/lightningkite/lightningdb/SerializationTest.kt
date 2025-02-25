@@ -4,6 +4,7 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.*
 import com.lightningkite.lightningdb.testing.*
+import com.lightningkite.lightningserver.monitoring.FunnelSummary
 import com.lightningkite.serialization.ClientModule
 import com.lightningkite.serialization.*
 import com.lightningkite.serialization.partialOf
@@ -65,6 +66,11 @@ class SerializationTest {
         assertEquals(part, restored)
         println(restored)
         println(myJson.decodeFromString(serializer, """{"age": 23}"""))
+    }
+
+    @Test fun partialFunnelSummary() {
+        val serializer = PartialSerializer(FunnelSummary.serializer())
+        serializer.descriptor
     }
 
     @Test fun partial2() {

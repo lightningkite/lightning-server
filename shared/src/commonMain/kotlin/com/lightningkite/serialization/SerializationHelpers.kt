@@ -13,6 +13,7 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
+import kotlinx.serialization.descriptors.capturedKClass
 import kotlinx.serialization.encoding.AbstractDecoder
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.encoding.Decoder
@@ -125,8 +126,7 @@ private object FakerDecoder : AbstractDecoder() {
     override fun decodeNotNullMark(): Boolean = true
 }
 
-private class CheatingBastardDecoder(var count: Int = 0) : AbstractDecoder() {
-    override val serializersModule: SerializersModule = com.lightningkite.serialization.ClientModule
+private class CheatingBastardDecoder(var count: Int = 0, override val serializersModule: SerializersModule = com.lightningkite.serialization.ClientModule) : AbstractDecoder() {
     var counter = 0
     override fun decodeElementIndex(descriptor: SerialDescriptor): Int {
         return counter++.let {
@@ -255,6 +255,16 @@ fun serializerOrContextual(type: KType): KSerializer<*> {
             if(type.isMarkedNullable) (it as KSerializer<Any>).nullable
             else it
         }
+    }
+}
+
+@Suppress("UNCHECKED_CAST")
+fun <T> SerializersModule.getContextual(serializer: KSerializer<T>): KSerializer<T> {
+    return try {
+        serializer.deserialize(CheatingBastardDecoder(0, this))
+        serializer
+    } catch (e: FoundSerializerSignal) {
+        e.serializer as KSerializer<T>
     }
 }
 
