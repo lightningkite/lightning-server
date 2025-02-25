@@ -17,7 +17,9 @@ import com.lightningkite.lightningdb.lt
 import com.lightningkite.lightningdb.modification
 import com.lightningkite.lightningdb.sort
 import com.lightningkite.lightningdb.updateOneById
+import com.lightningkite.lightningserver.auth.AuthOption
 import com.lightningkite.lightningserver.auth.AuthOptions
+import com.lightningkite.lightningserver.auth.AuthType
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.anyAuth
 import com.lightningkite.lightningserver.auth.authOptions
@@ -154,7 +156,7 @@ class FunnelEndpoints(
     }
 
     val start = path("start").post.api(
-        authOptions = anyAuth,
+        authOptions = AuthOptions(setOf(null, AuthOption(AuthType.any, scopes = setOf()))),
         summary = "Start Funnel Instance"
     ) { input: FunnelStart ->
         info.collection().insertOne(FunnelInstance(
