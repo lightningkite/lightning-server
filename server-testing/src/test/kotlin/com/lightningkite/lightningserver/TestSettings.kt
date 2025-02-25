@@ -69,6 +69,9 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     init {
         Serialization.enablePublicJavaData()
         Serialization.enablePublicProtobuf()
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerTesting()
     }
 
     val info = modelInfo<User, User, UUID>(
@@ -103,9 +106,6 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     val meta = path("meta").metaEndpoints("com.lightningkite.lightningserver")
 
     init {
-        prepareModelsShared()
-        prepareModelsServerCore()
-        prepareModelsServerTesting()
         Settings.populateDefaults()
         engine = LocalEngine(LocalPubSub)
     }
