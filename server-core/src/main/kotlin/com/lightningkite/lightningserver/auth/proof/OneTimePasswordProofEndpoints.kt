@@ -193,7 +193,7 @@ class OneTimePasswordProofEndpoints(
         }
     )
 
-    val confirm = path("existing").get.api(
+    val confirm = path("existing").post.api(
         belongsToInterface = loggedInInterfaceInfo,
         summary = "Confirm One Time Password",
         inputType = String.serializer(),
@@ -206,14 +206,14 @@ class OneTimePasswordProofEndpoints(
             val active = modelInfo.collection().find(condition {
                 it.subjectId.eq(auth.idString) and it.subjectType.eq(auth.subject.name) and it.disabledAt.eq(null)
             }).toList()
-            if(active.isEmpty()) throw NotFoundException()
+            if (active.isEmpty()) throw NotFoundException()
             prove.implementation(
                 AuthAndPathParts(null, null, arrayOf()),
                 IdentificationAndPassword(
-                    auth.subject.name,
-                    "${auth.subject.name}/_id",
-                    auth.idString.also { println("Confirming info got $it for idstring") },
-                    code
+                    type = auth.subject.name,
+                    property = "${auth.subject.name}/_id",
+                    value = auth.idString,
+                    password = code
                 )
             )
             Unit
