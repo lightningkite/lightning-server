@@ -173,6 +173,7 @@ class SerializationTest {
 
     @Test fun demoConditions() {
         Condition.Equal(2).cycle()
+        condition { it.email.contains("@lightningkite.com") and it.name.eq("Dan") }
         (path<User>().email eq "Dan".trimmedCaseless()).cycle()
         (path<User>().email eq "Dan".trimmedCaseless()).cycle()
         (path<Post>().content eq "Lightning Kite").cycle()
