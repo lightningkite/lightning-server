@@ -43,6 +43,7 @@ class MailgunEmailClient(
                 basicAuth("api", key)
             }
         )
+        email.attachments.forEach { it.content.close() }
         if (!result.status.isSuccess())
             throw Exception("Got status ${result.status}: ${result.bodyAsText()}")
     }

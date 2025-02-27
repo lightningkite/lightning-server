@@ -40,7 +40,9 @@ import java.util.Base64
 import kotlin.time.measureTime
 
 class AwsAdapterWs(val root: AwsAdapter) {
-    val dynamo: DynamoDbAsyncClient by lazy { DynamoDbAsyncClient.builder().region(root.region).build() }
+    val dynamo: DynamoDbAsyncClient by lazy { DynamoDbAsyncClient.builder().region(root.region)
+        .overrideConfiguration(AwsConnections.clientOverrideConfiguration)
+        .httpClient(AwsConnections.asyncClient).build() }
     val webSocketDynamo by lazy {
         AwsWebSocketDynamoDb(
             dynamo, generalSettings().wsUrl.substringAfter("://")

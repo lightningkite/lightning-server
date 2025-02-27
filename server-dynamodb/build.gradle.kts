@@ -14,15 +14,7 @@ plugins {
 }
 
 dependencies {
-    api(project(":server-core"))
-    implementation(libs.coroutinesJdk)
-    implementation(libs.coroutinesReactive)
-    api(libs.dynamodb)
-    testImplementation(libs.kotlinTest)
-    testImplementation(project(":server-testing"))
-    ksp(project(":processor"))
-    kspTest(project(":processor"))
-    testImplementation(project(":server-testing"))
+    api(project(":server-aws"))
 }
 
 ksp {

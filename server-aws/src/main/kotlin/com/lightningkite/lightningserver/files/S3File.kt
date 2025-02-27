@@ -117,7 +117,7 @@ data class S3File(val system: S3FileSystem, val path: File) : FileObject {
             }.build()
         )
         return HttpContent.Stream(
-            getStream = { s },
+            stream = s,
             length = s.response().contentLength(),
             type = s.response().contentType()?.let(::ContentType) ?: ContentType.Application.OctetStream
         )

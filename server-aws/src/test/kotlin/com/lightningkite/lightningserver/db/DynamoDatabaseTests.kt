@@ -28,7 +28,7 @@ class DynamoDBTests() {
     fun test() {
         prepareModelsShared()
         prepareModelsServerCore()
-        prepareModelsServerDynamodbTest()
+        prepareModelsServerAwsTest()
         runBlocking {
             val database = DynamoDatabase(embeddedDynamo())
             println("Defining table")

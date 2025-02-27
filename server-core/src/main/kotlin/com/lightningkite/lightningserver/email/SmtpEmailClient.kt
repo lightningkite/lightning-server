@@ -45,6 +45,7 @@ class SmtpEmailClient(val smtpConfig: SmtpConfig) : EmailClient {
                 fromLabel = email.fromLabel ?: generalSettings().projectName
             ).toJavaX(session)
         )
+        email.attachments.forEach { it.content.close() }
     }
 
     override suspend fun sendBulk(template: Email, personalizations: List<EmailPersonalization>) {

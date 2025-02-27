@@ -18,6 +18,7 @@ object TestEmailClient : EmailClient {
         lastEmailSent = email
         onEmailSent?.invoke(email)
         if (printToConsole) ConsoleEmailClient.send(email)
+        email.attachments.forEach { it.content.close() }
     }
 
 }

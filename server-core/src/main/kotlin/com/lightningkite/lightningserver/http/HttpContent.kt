@@ -21,7 +21,7 @@ import java.io.*
 import java.nio.charset.Charset
 import java.util.Enumeration
 
-sealed class HttpContent {
+sealed class HttpContent: Closeable {
     abstract suspend fun stream(): InputStream
     suspend fun text(): String = stream().use { it.reader().readText() }
     suspend fun bytes(): ByteArray = stream().use { it.readBytes() }
@@ -32,6 +32,7 @@ sealed class HttpContent {
         val bytes = string.toByteArray(Charset.defaultCharset())
         override suspend fun stream(): InputStream = ByteArrayInputStream(bytes)
         override val length: Long get() = bytes.size.toLong()
+        override fun close() {}
     }
 
     class Binary(val bytes: ByteArray, override val type: ContentType) : HttpContent() {
@@ -40,14 +41,26 @@ sealed class HttpContent {
         override fun toString(): String = "Binary(${bytes.size} bytes)"
         override fun hashCode(): Int = bytes.contentHashCode()
         override fun equals(other: Any?): Boolean = other is Binary && other.bytes.contentEquals(this.bytes)
+        override fun close() {}
     }
 
     data class Stream(
-        val getStream: suspend () -> InputStream,
+        val stream: InputStream,
         override val length: Long? = null,
         override val type: ContentType,
     ) : HttpContent() {
-        override suspend fun stream(): InputStream = getStream()
+        override suspend fun stream(): InputStream = stream
+        override fun close() = stream.close()
+    }
+
+    data class LazyStream(
+        val getStream: () -> InputStream,
+        override val length: Long? = null,
+        override val type: ContentType,
+    ) : HttpContent() {
+        private val open = ArrayList<InputStream>()
+        override suspend fun stream(): InputStream = getStream().also { open.add(it) }
+        override fun close() { open.forEach { it.close() } }
     }
 
     data class OutStream(
@@ -60,6 +73,7 @@ sealed class HttpContent {
             write(bytes)
             return ByteArrayInputStream(bytes.toByteArray())
         }
+        override fun close() {}
     }
 
     data class Multipart(override val type: ContentType, val parts: Flow<HttpContentAndHeaders>) : HttpContent() {
@@ -67,6 +81,7 @@ sealed class HttpContent {
             get() = null
 
         override suspend fun stream(): InputStream = throw UnsupportedOperationException()
+        override fun close() {}
 
         companion object Part {
             @Deprecated("Use lowercase function instead", ReplaceWith("formItem(key, value)"))
@@ -148,8 +163,8 @@ sealed class HttpContent {
             type = ContentType.Application.Json
         )
 
-        fun file(file: File, type: ContentType = ContentType.fromExtension(file.extension)): Stream {
-            return Stream(
+        fun file(file: File, type: ContentType = ContentType.fromExtension(file.extension)): LazyStream {
+            return LazyStream(
                 getStream = { file.inputStream() },
                 length = file.length(),
                 type = type
