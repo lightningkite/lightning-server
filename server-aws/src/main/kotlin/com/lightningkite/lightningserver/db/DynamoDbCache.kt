@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.db
 
+import com.lightningkite.lightningserver.aws.AwsConnections
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.CacheSettings
 import kotlinx.coroutines.*
@@ -36,6 +37,7 @@ class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: St
                                         })
                                     } else DefaultCredentialsProvider.create()
                                 )
+                                .httpClient(AwsConnections.asyncClient)
                                 .region(Region.of(match.groups["region"]!!.value))
                                 .build()
                         },

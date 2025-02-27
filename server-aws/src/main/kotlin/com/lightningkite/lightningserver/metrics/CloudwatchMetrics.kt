@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.metrics
 
 import com.lightningkite.lightningdb.condition
 import com.lightningkite.lightningdb.eq
+import com.lightningkite.lightningserver.aws.AwsConnections
 import com.lightningkite.lightningserver.files.S3FileSystem
 import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.coroutines.future.await
@@ -56,6 +57,7 @@ class CloudwatchMetrics(
     val cw = CloudWatchAsyncClient.builder()
         .region(region)
         .credentialsProvider(credentialProvider)
+        .httpClient(AwsConnections.asyncClient)
         .build()
 
     override suspend fun report(events: List<MetricEvent>) {

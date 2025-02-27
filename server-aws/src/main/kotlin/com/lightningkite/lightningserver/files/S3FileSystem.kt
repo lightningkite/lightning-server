@@ -1,10 +1,13 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.atZone
+import com.lightningkite.lightningserver.aws.AwsConnections
+import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import com.lightningkite.now
 import io.ktor.http.*
 import kotlinx.datetime.TimeZone
 import software.amazon.awssdk.auth.credentials.*
+import software.amazon.awssdk.http.SdkHttpClient
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3AsyncClient
 import software.amazon.awssdk.services.s3.S3Client
@@ -36,6 +39,7 @@ class S3FileSystem(
     ) {
         val tokenPreEncoded = token?.encodeURLParameter()
     }
+
     fun creds(): DirectAwsCredentials {
         val onHand = credsDirect
         return if(onHand == null || System.currentTimeMillis() > credsOnHandMs) {
@@ -72,12 +76,15 @@ class S3FileSystem(
     val s3: S3Client by lazy {
         S3Client.builder()
             .region(region)
+            .httpClient(AwsConnections.client)
+            .overrideConfiguration(AwsConnections.clientOverrideConfiguration)
             .credentialsProvider(credentialProvider)
             .build()
     }
     val s3Async: S3AsyncClient by lazy {
         S3AsyncClient.builder()
             .region(region)
+            .httpClient(AwsConnections.asyncClient)
             .credentialsProvider(credentialProvider)
             .build()
     }

@@ -15,9 +15,15 @@ plugins {
 
 dependencies {
     api(project(":server-core"))
+    api(project(":server-dynamodb"))
     implementation(libs.coroutinesJdk)
     implementation(libs.coroutinesReactive)
-    api(libs.dynamodb)
+    fun ModuleDependency.excludeNetty() {
+        exclude("software.amazon.awssdk:netty-nio-client")
+        exclude("software.amazon.awssdk:apache-client")
+    }
+    api(libs.dynamodb) { excludeNetty() }
+    api(libs.awsCrtClient) { excludeNetty() }
     testImplementation(libs.kotlinTest)
     testImplementation(project(":server-testing"))
     ksp(project(":processor"))
