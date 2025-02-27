@@ -57,7 +57,7 @@ private fun serverHealth(
     version = System.getenv("AWS_LAMBDA_FUNCTION_VERSION")?.takeUnless { it.isEmpty() } ?: "Unknown",
     memory = memory(),
     features = features,
-    loadAverageCpu = ManagementFactory.getOperatingSystemMXBean().systemLoadAverage,
+    loadAverageCpu = ManagementFactory.getOperatingSystemMXBean().systemLoadAverage / ManagementFactory.getOperatingSystemMXBean().availableProcessors,
 )
 
 private fun Long.roundMemoryForSecurity() = this.div(100_000).times(100_000)  // Round to the nearest megabyte

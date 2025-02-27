@@ -40,6 +40,10 @@ class S3FileSystem(
         val tokenPreEncoded = token?.encodeURLParameter()
     }
 
+    override suspend fun healthCheck(): HealthStatus {
+        return listOf(super.healthCheck(), AwsConnections.health).maxBy { it.level }
+    }
+
     fun creds(): DirectAwsCredentials {
         val onHand = credsDirect
         return if(onHand == null || System.currentTimeMillis() > credsOnHandMs) {
@@ -85,6 +89,7 @@ class S3FileSystem(
         S3AsyncClient.builder()
             .region(region)
             .httpClient(AwsConnections.asyncClient)
+            .overrideConfiguration(AwsConnections.clientOverrideConfiguration)
             .credentialsProvider(credentialProvider)
             .build()
     }

@@ -94,11 +94,13 @@ abstract class AwsAdapter(val communicationEncoding: InternalCommunicationEncodi
     val lambdaClient = LambdaAsyncClient.builder()
         .region(region)
         .httpClient(AwsConnections.asyncClient)
+        .overrideConfiguration(AwsConnections.clientOverrideConfiguration)
         .build()
     val apiGatewayManagement by lazy {
         ApiGatewayManagementApiAsyncClient.builder()
             .region(region)
             .httpClient(AwsConnections.asyncClient)
+            .overrideConfiguration(AwsConnections.clientOverrideConfiguration)
             .endpointOverride(URI.create("https://" + generalSettings().wsUrl.removePrefix("wss://")))
             .build()
     }

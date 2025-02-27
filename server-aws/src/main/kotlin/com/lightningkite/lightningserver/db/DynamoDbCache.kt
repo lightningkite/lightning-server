@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.db
 import com.lightningkite.lightningserver.aws.AwsConnections
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.CacheSettings
+import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import kotlinx.coroutines.*
 import kotlinx.coroutines.future.await
 import kotlinx.datetime.Clock
@@ -38,6 +39,7 @@ class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: St
                                     } else DefaultCredentialsProvider.create()
                                 )
                                 .httpClient(AwsConnections.asyncClient)
+                                .overrideConfiguration(AwsConnections.clientOverrideConfiguration)
                                 .region(Region.of(match.groups["region"]!!.value))
                                 .build()
                         },
@@ -47,6 +49,9 @@ class DynamoDbCache(val makeClient: () -> DynamoDbAsyncClient, val tableName: St
                     ?: throw IllegalStateException("Invalid dynamodb URL. The URL should match the pattern: dynamodb://[access]:[secret]@[region]/[tableName]")
             }
         }
+    }
+    override suspend fun healthCheck(): HealthStatus {
+        return listOf(super.healthCheck(), AwsConnections.health).maxBy { it.level }
     }
 
     @OptIn(DelicateCoroutinesApi::class)

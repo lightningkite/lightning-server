@@ -2,6 +2,7 @@ package com.lightningkite.lightningdb
 
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
+import com.mongodb.event.ConnectionPoolListener
 import com.mongodb.kotlin.client.coroutine.MongoClient
 import de.flapdoodle.embed.mongo.commands.MongodArguments
 import de.flapdoodle.embed.mongo.distribution.Version
@@ -23,7 +24,7 @@ import java.nio.file.Files
 fun testMongo(
     databaseFolder: File = Files.createTempDirectory("embeddedMongo").toFile(),
     version: String? = null
-): MongoClient = embeddedMongo(
+): MongoClientSettings = embeddedMongo(
     deleteAfter = true,
     databaseFolder = databaseFolder,
     port = Net.freeServerPort(Net.getLocalHost()),
@@ -34,7 +35,7 @@ fun embeddedMongo(
     databaseFolder: File = File("./build/embeddedMongo"),
     port: Int? = null,
     version: String? = null
-): MongoClient =
+): MongoClientSettings =
     embeddedMongo(
         deleteAfter = false,
         databaseFolder = databaseFolder,
@@ -47,7 +48,7 @@ private fun embeddedMongo(
     databaseFolder: File,
     port: Int,
     version: Version.Main = Version.Main.V7_0
-): MongoClient {
+): MongoClientSettings {
 
     databaseFolder.mkdirs()
     val runner:TransitionWalker.ReachedState<RunningMongodProcess> = Mongod.instance()
@@ -72,24 +73,15 @@ private fun embeddedMongo(
         .start(version)
     val connectionString = "mongodb://${runner.current().serverAddress}"
 
-    val client = MongoClient.create(
-        MongoClientSettings.builder()
-            .apply {
-                applyConnectionString(ConnectionString(connectionString))
-                uuidRepresentation(UuidRepresentation.STANDARD)
-            }
-            .build()
-    )
-
     Runtime.getRuntime().addShutdownHook(Thread {
-        try {
-            client.close()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
         runner.current().stop()
         if (deleteAfter) databaseFolder.deleteRecursively()
     })
-    return client
+    return MongoClientSettings.builder()
+        .apply {
+            applyConnectionString(ConnectionString(connectionString))
+            uuidRepresentation(UuidRepresentation.STANDARD)
+        }
+        .build()
 
 }

@@ -73,7 +73,7 @@ data class AzureFile(val system: AzureFileSystem, val path: File) : FileObject {
 
     override suspend fun get(): HttpContent? {
         val properties = client.properties
-        return HttpContent.Stream(
+        return HttpContent.LazyStream(
             getStream = { client.openInputStream() },
             length = properties.blobSize,
             type = ContentType(properties.contentType)

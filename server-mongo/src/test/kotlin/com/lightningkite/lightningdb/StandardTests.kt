@@ -11,61 +11,23 @@ import org.junit.BeforeClass
 import org.junit.Test
 import kotlin.test.assertEquals
 
+object TestDatabase {
+    val settings = testMongo()
+    val mongoClient = MongoDatabase("default", clientSettings = TestDatabase.settings)
+}
+
 class MongoAggregationsTest : AggregationsTest() {
-
-    companion object {
-        var mongoClient: MongoClient? = null
-        lateinit var defaultMongo: MongoDatabase
-
-        @BeforeClass
-        @JvmStatic
-        fun start() {
-            mongoClient = testMongo()
-            defaultMongo = MongoDatabase("default") { mongoClient!! }
-            prepareModelsShared()
-            prepareModelsServerCore()
-            prepareModelsServerTesting()
-            prepareModelsServerMongoTest()
-        }
-
-        @AfterClass
-        @JvmStatic
-        fun after() {
-            mongoClient?.close()
-        }
-    }
-
-    override val database: Database = Companion.defaultMongo
+    override val database: Database = TestDatabase.mongoClient
 }
 
 class MongoConditionTests : ConditionTests() {
-
-    companion object {
-        var mongoClient: MongoClient? = null
-        lateinit var defaultMongo: MongoDatabase
-
-        init {
-            prepareModelsShared()
-            prepareModelsServerCore()
-            prepareModelsServerMongoTest()
-            prepareModelsServerTesting()
-        }
-
-        @BeforeClass
-        @JvmStatic
-        fun start() {
-            mongoClient = testMongo()
-            defaultMongo = MongoDatabase("default") { mongoClient!! }
-        }
-
-        @AfterClass
-        @JvmStatic
-        fun after() {
-            mongoClient?.close()
-        }
+    init {
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerMongoTest()
+        prepareModelsServerTesting()
     }
-
-    override val database: Database = Companion.defaultMongo
+    override val database: Database = TestDatabase.mongoClient
 
     @Test
     fun testNot() = runBlocking {
@@ -97,109 +59,45 @@ class MongoConditionTests : ConditionTests() {
 }
 
 class MongoModificationTests : ModificationTests() {
+    init {
 
-    companion object {
-        var mongoClient: MongoClient? = null
-        lateinit var defaultMongo: MongoDatabase
-
-        @BeforeClass
-        @JvmStatic
-        fun start() {
-            mongoClient = testMongo()
-            defaultMongo = MongoDatabase("default") { mongoClient!! }
-            prepareModelsShared()
-            prepareModelsServerCore()
-            prepareModelsServerMongoTest()
-            prepareModelsServerTesting()
-        }
-
-        @AfterClass
-        @JvmStatic
-        fun after() {
-            mongoClient?.close()
-        }
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerMongoTest()
+        prepareModelsServerTesting()
     }
-
-    override val database: Database = Companion.defaultMongo
+    override val database: Database = TestDatabase.mongoClient
 }
 
 class MongoOperationsTests : OperationsTests() {
+    init {
 
-    companion object {
-        var mongoClient: MongoClient? = null
-        lateinit var defaultMongo: MongoDatabase
-
-        @BeforeClass
-        @JvmStatic
-        fun start() {
-            mongoClient = testMongo()
-            defaultMongo = MongoDatabase("default") { mongoClient!! }
-            prepareModelsShared()
-            prepareModelsServerCore()
-            prepareModelsServerMongoTest()
-            prepareModelsServerTesting()
-        }
-
-        @AfterClass
-        @JvmStatic
-        fun after() {
-            mongoClient?.close()
-        }
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerMongoTest()
+        prepareModelsServerTesting()
     }
-
-    override val database: Database = Companion.defaultMongo
+    override val database: Database = TestDatabase.mongoClient
 }
 
 class MongoSortTest : SortTest() {
+    init {
 
-    companion object {
-        var mongoClient: MongoClient? = null
-        lateinit var defaultMongo: MongoDatabase
-
-        @BeforeClass
-        @JvmStatic
-        fun start() {
-            mongoClient = testMongo()
-            defaultMongo = MongoDatabase("default") { mongoClient!! }
-            prepareModelsShared()
-            prepareModelsServerCore()
-            prepareModelsServerMongoTest()
-            prepareModelsServerTesting()
-        }
-
-        @AfterClass
-        @JvmStatic
-        fun after() {
-            mongoClient?.close()
-        }
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerMongoTest()
+        prepareModelsServerTesting()
     }
-
-    override val database: Database = Companion.defaultMongo
+    override val database: Database = TestDatabase.mongoClient
 }
 
 class MongoMetaTest : MetaTest() {
+    init {
 
-    companion object {
-        var mongoClient: MongoClient? = null
-        lateinit var defaultMongo: MongoDatabase
-
-        @BeforeClass
-        @JvmStatic
-        fun start() {
-            mongoClient = testMongo()
-            defaultMongo = MongoDatabase("default") { mongoClient!! }
-            prepareModelsShared()
-            prepareModelsServerCore()
-            prepareModelsServerMongoTest()
-            prepareModelsServerTesting()
-        }
-
-        @AfterClass
-        @JvmStatic
-        fun after() {
-            mongoClient?.close()
-        }
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerMongoTest()
+        prepareModelsServerTesting()
     }
-
-    override val database: Database = Companion.defaultMongo
+    override val database: Database = TestDatabase.mongoClient
 }

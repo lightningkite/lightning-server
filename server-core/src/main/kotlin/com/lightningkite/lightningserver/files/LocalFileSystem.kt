@@ -76,7 +76,7 @@ class LocalFileSystem(
                 val start = part.substringBefore('-').takeIf { it.isNotEmpty() }?.toLong() ?: 0
                 val end = part.substringAfter('-').takeIf { it.isNotEmpty() }?.toLong()
                 if (start == 0L && end == null) {
-                    HttpContent.Stream(
+                    HttpContent.LazyStream(
                         getStream = { file.inputStream() },
                         length = file.length(),
                         type = contentType
@@ -102,7 +102,7 @@ class LocalFileSystem(
             )
         } else {
             HttpResponse(
-                body = HttpContent.Stream(
+                body = HttpContent.LazyStream(
                     getStream = { file.inputStream() },
                     length = file.length(),
                     type = contentType

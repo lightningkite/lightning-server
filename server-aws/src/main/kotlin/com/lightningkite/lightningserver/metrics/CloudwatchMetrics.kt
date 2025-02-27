@@ -4,6 +4,7 @@ import com.lightningkite.lightningdb.condition
 import com.lightningkite.lightningdb.eq
 import com.lightningkite.lightningserver.aws.AwsConnections
 import com.lightningkite.lightningserver.files.S3FileSystem
+import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
@@ -54,10 +55,14 @@ class CloudwatchMetrics(
         }
     }
 
+    override suspend fun healthCheck(): HealthStatus {
+        return listOf(super.healthCheck(), AwsConnections.health).maxBy { it.level }
+    }
     val cw = CloudWatchAsyncClient.builder()
         .region(region)
         .credentialsProvider(credentialProvider)
         .httpClient(AwsConnections.asyncClient)
+        .overrideConfiguration(AwsConnections.clientOverrideConfiguration)
         .build()
 
     override suspend fun report(events: List<MetricEvent>) {
