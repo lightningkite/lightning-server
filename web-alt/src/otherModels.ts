@@ -1,19 +1,29 @@
 import { Condition } from './Condition'
 import { Modification } from './Modification'
 
+/**
+ * condition: Defaults to Condition.Always<T>()
+ * skip: Defaults to 0
+ * limit: Defaults to 100
+ */
 export interface Query<T> {
-    condition?: Condition<T>// = Condition.Always<T>(),
+    condition?: Condition<T>
     orderBy?: Array<SortPart<T>>
-    skip?: number // = 0,
-    limit?: number // = 100,
+    skip?: number
+    limit?: number
 }
 
+/**
+ * condition: Defaults to Condition.Always<T>()
+ * skip: Defaults to 0
+ * limit: Defaults to 100
+ */
 export interface QueryPartial<T> {
     fields: Array<DataClassPathPartial<T>>
-    condition?: Condition<T> // = Condition.Always<T>(),
+    condition?: Condition<T>
     orderBy?: Array<SortPart<T>>
-    skip?: number // = 0,
-    limit?: number // = 100,
+    skip?: number
+    limit?: number
 }
 
 export type SortPart<T> = (keyof T & string) | `-${keyof T& string}` | `~${keyof T & string}` | `-~${keyof T & string}`

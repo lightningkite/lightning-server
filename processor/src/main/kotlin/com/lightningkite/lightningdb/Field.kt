@@ -23,7 +23,7 @@ private fun toField(owner: KSClassDeclaration, param: KSValueParameter, property
             regexes.any { r ->
                 r.find(it) != null
             } == true
-        },
+        }?.plus(" // ${regexes.joinToString { it.pattern }}"),
     )
 }
 
