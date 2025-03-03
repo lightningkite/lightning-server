@@ -36,7 +36,11 @@ private suspend fun HttpContentAndHeaders.into(part: MimePart) {
             DataHandler(ByteArrayDataSource(stream, content.type.toString()))
         }
 
-        is HttpContent.Stream -> part.dataHandler = content.getStream().use { stream ->
+        is HttpContent.LazyStream -> part.dataHandler = content.getStream().use { stream ->
+            DataHandler(ByteArrayDataSource(stream, content.type.toString()))
+        }
+
+        is HttpContent.Stream -> part.dataHandler = content.stream.use { stream ->
             DataHandler(ByteArrayDataSource(stream, content.type.toString()))
         }
 

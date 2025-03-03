@@ -203,8 +203,11 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                                 )
                             }
 
-                            is HttpContent.Stream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
+                            is HttpContent.LazyStream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
                                 b.getStream().toByteReadChannel().copyTo(this)
+                            }
+                            is HttpContent.Stream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
+                                b.stream.toByteReadChannel().copyTo(this)
                             }
 
                             is HttpContent.Multipart -> TODO()
@@ -254,12 +257,16 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                             )
                         }
 
-                        is HttpContent.Stream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
+                        is HttpContent.LazyStream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
                             b.getStream().toByteReadChannel().copyTo(this)
+                        }
+                        is HttpContent.Stream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
+                            b.stream.toByteReadChannel().copyTo(this)
                         }
 
                         is HttpContent.Multipart -> TODO()
                     }
+                    result.body?.close()
                 }
             }
         }
@@ -370,9 +377,8 @@ internal suspend fun ApplicationCall.adapt(route: HttpEndpoint): HttpRequest {
             if (ktorType.contentType == "multipart")
                 receiveMultipart().adapt(myType)
             else {
-                val stream = receiveStream()
                 HttpContent.Stream(
-                    { stream },
+                    receiveStream(),
                     request.contentLength(),
                     request.contentType().adapt()
                 )
@@ -405,7 +411,7 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
                                 key = it.name ?: "",
                                 filename = it.originalFileName ?: "",
                                 headers = h,
-                                content = HttpContent.Stream(
+                                content = HttpContent.LazyStream(
                                     { it.provider().toInputStream() },
                                     h.contentLength,
                                     it.contentType?.adapt()
@@ -420,7 +426,7 @@ internal fun MultiPartData.adapt(myType: com.lightningkite.lightningserver.core.
                                 key = it.name ?: "",
                                 filename = "",
                                 headers = h,
-                                content = HttpContent.Stream(
+                                content = HttpContent.LazyStream(
                                     { it.provider().asStream() },
                                     h.contentLength,
                                     it.contentType?.adapt()

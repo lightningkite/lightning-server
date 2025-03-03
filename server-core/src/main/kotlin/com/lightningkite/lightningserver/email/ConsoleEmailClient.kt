@@ -27,5 +27,6 @@ object ConsoleEmailClient : EmailClient {
                 }
             }
         })
+        email.attachments.forEach { it.content.close() }
     }
 }

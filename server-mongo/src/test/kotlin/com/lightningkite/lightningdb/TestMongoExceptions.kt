@@ -21,7 +21,7 @@ class TestMongoExceptions : MongoTest() {
         prepareModelsServerMongoTest()
 
         val collection =
-            (db.collection<IndexingTestModel>("MongoExceptions_unique") as MongoFieldCollection<IndexingTestModel>)
+            (defaultMongo.collection<IndexingTestModel>("MongoExceptions_unique") as MongoFieldCollection<IndexingTestModel>)
 
         collection.insertOne(IndexingTestModel(email = "test@test.com", account = "asdf"))
 
