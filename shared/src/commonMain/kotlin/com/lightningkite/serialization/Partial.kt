@@ -29,9 +29,19 @@ data class Partial<T>(
     } else null
     fun <S> perPath(soFar: DataClassPath<S, T>, action: (DataClassPathWithValue<S, *>) -> Unit) {
         for(part in parts) {
+
+            @Suppress("UNCHECKED_CAST")
             val p = DataClassPathAccess(soFar, part.key as SerializableProperty<T, Any?>)
             if(part.value is Partial<*> && part.key.serializer.let { it.nullElement() ?: it } !is PartialSerializer<*>) {
-                (part.value as Partial<Any?>).perPath(p, action)
+
+                @Suppress("UNCHECKED_CAST")
+                val partial = (part.value as Partial<Any?>)
+                val ser = part.key.serializer.let { it.nullElement() ?: it }
+
+                @Suppress("UNCHECKED_CAST")
+                partial.total(ser as KSerializer<Any?>)?.let {
+                    action(DataClassPathWithValue(p, it))
+                } ?: partial.perPath(p, action)
             } else {
                 action(DataClassPathWithValue(p, part.value))
             }
@@ -44,30 +54,22 @@ data class DataClassPathWithValue<A, V>(val path: DataClassPath<A, V>, val value
 }
 
 @Suppress("UNCHECKED_CAST")
-class PartialBuilder<T>(val parts: MutableMap<SerializableProperty<T, *>, Any?> = mutableMapOf()) {
-    inline operator fun <A> DataClassPath<T, A>.invoke(setup: PartialBuilder<A>.(DataClassPathSelf<A>) -> Unit) {
-        if(this !is DataClassPathAccess<*, *, *>) throw IllegalArgumentException()
-        parts[this.second as SerializableProperty<T, *>] = PartialBuilder<A>().apply { setup(DataClassPathSelf(second.serializer as KSerializer<A>)) }.let { Partial<A>(it.parts) }
-    }
-    inline fun <A: Any> DataClassPath<T, A?>.notNull(setup: PartialBuilder<A>.(DataClassPathSelf<A>) -> Unit) {
-        if(this !is DataClassPathAccess<*, *, *>) throw IllegalArgumentException()
-        parts[this.second as SerializableProperty<T, *>] = PartialBuilder<A>().apply { setup(DataClassPathSelf(second.serializer as KSerializer<A>)) }.let { Partial<A>(it.parts) }
-    }
-
-    @Suppress("NOTHING_TO_INLINE")
-    inline infix fun <A> DataClassPath<T, A>.assign(value: Partial<A>) {
-        if(this !is DataClassPathAccess<*, *, *>) throw IllegalArgumentException()
-        parts[this.second as SerializableProperty<T, *>] = value
-    }
-
-    @Suppress("NOTHING_TO_INLINE")
+class PartialBuilder<T>(val partial: Partial<T> = Partial()) {
     inline infix fun <A> DataClassPath<T, A>.assign(value: A) {
-        if(this !is DataClassPathAccess<*, *, *>) throw IllegalArgumentException()
-        this.second.serializer.serializableProperties?.let {
-            parts[this.second as SerializableProperty<T, *>] = partialOf(value, it as Array<SerializableProperty<Any?, *>>)
-        } ?: run {
-            parts[this.second as SerializableProperty<T, *>] = value
+        var target: Partial<Any> = partial as Partial<Any>
+        val props = properties
+        for (prop in props.dropLast(1)) {
+            target = target.parts.getOrPut(prop as SerializableProperty<Any, Any>) { Partial<Any>() } as Partial<Any>
         }
+        target.parts[props.last() as SerializableProperty<Any, A>] = value
+    }
+    inline infix fun <A> DataClassPath<T, A>.assign(value: Partial<A>) {
+        var target: Partial<Any> = partial as Partial<Any>
+        val props = properties
+        for (prop in props.dropLast(1)) {
+            target = target.parts.getOrPut(prop as SerializableProperty<Any, Any>) { Partial<Any>() } as Partial<Any>
+        }
+        target.parts[props.last() as SerializableProperty<Any, A>] = value
     }
 }
 
@@ -78,7 +80,7 @@ inline fun <reified T> partialOf(builder: PartialBuilder<T>.(DataClassPathSelf<T
                 serializer()
             )
         )
-    }.parts.let { Partial(it) }
+    }.partial
 
 
 fun <T> partialOf(item: T, properties: Array<SerializableProperty<T, *>>) = Partial<T>().apply {

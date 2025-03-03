@@ -73,11 +73,9 @@ class OneTimePasswordProofEndpoints(
 
     private val active get() = condition<OtpSecret> { it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())) }
 
-    val modelInfo = modelInfo(
-        serialization = ModelSerializationInfo<OtpSecret, UUID>(),
+    val modelInfo = database.modelInfo<HasId<*>?, OtpSecret, UUID>(
         authOptions = anyAuthRoot + Authentication.isAdmin,
-        getBaseCollection = { database().collection() },
-        forUser = {
+        permissions = {
             val admin = condition<OtpSecret>(Authentication.isAdmin.accepts(authOrNull))
             val mine = authOrNull?.let { a ->
                 condition<OtpSecret> {
@@ -85,26 +83,24 @@ class OneTimePasswordProofEndpoints(
                 }
             } ?: Condition.Never
             val active = condition<OtpSecret> { it.disabledAt.eq(null) }
-            it.withPermissions(
-                ModelPermissions(
-                    create = Condition.Never,
-                    read = admin or mine,
-                    readMask = mask {
-                        it.secretBase32.mask("")
-                    },
-                    update = admin or (mine and active),
-                    updateRestrictions = updateRestrictions {
-                        it.subjectType.cannotBeModified()
-                        it.subjectId.cannotBeModified()
-                        it.secretBase32.cannotBeModified()
-                        it.issuer.cannotBeModified()
-                        it.period.cannotBeModified()
-                        it.digits.cannotBeModified()
-                        it.algorithm.cannotBeModified()
-                        it.establishedAt.cannotBeModified()
-                    },
-                    delete = Condition.Never,
-                )
+            ModelPermissions(
+                create = Condition.Never,
+                read = admin or mine,
+                readMask = mask {
+                    it.secretBase32.mask("")
+                },
+                update = admin or (mine and active),
+                updateRestrictions = updateRestrictions {
+                    it.subjectType.cannotBeModified()
+                    it.subjectId.cannotBeModified()
+                    it.secretBase32.cannotBeModified()
+                    it.issuer.cannotBeModified()
+                    it.period.cannotBeModified()
+                    it.digits.cannotBeModified()
+                    it.algorithm.cannotBeModified()
+                    it.establishedAt.cannotBeModified()
+                },
+                delete = Condition.Never,
             )
         }
     )
@@ -197,7 +193,7 @@ class OneTimePasswordProofEndpoints(
         }
     )
 
-    val confirm = path("existing").get.api(
+    val confirm = path("existing").post.api(
         belongsToInterface = loggedInInterfaceInfo,
         summary = "Confirm One Time Password",
         inputType = String.serializer(),
@@ -210,14 +206,14 @@ class OneTimePasswordProofEndpoints(
             val active = modelInfo.collection().find(condition {
                 it.subjectId.eq(auth.idString) and it.subjectType.eq(auth.subject.name) and it.disabledAt.eq(null)
             }).toList()
-            if(active.isEmpty()) throw NotFoundException()
+            if (active.isEmpty()) throw NotFoundException()
             prove.implementation(
                 AuthAndPathParts(null, null, arrayOf()),
                 IdentificationAndPassword(
-                    auth.subject.name,
-                    "${auth.subject.name}/_id",
-                    auth.idString.also { println("Confirming info got $it for idstring") },
-                    code
+                    type = auth.subject.name,
+                    property = "${auth.subject.name}/_id",
+                    value = auth.idString,
+                    password = code
                 )
             )
             Unit

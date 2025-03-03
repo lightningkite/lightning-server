@@ -13,7 +13,8 @@ import kotlin.time.DurationUnit
 
 @JvmInline
 @Serializable
-value class Length(val meters: Double) {
+value class Length(val meters: Double): Comparable<Length> {
+    override fun compareTo(other: Length): Int = this.meters.compareTo(other.meters)
     val astronomicalUnits: Double get() = meters / 1.495978707E11
     val centimeters: Double get() = meters / 0.01
     val feet: Double get() = meters / 0.3048
@@ -91,7 +92,8 @@ value class Length(val meters: Double) {
 
 @JvmInline
 @Serializable
-value class Area(val squareMeters: Double) {
+value class Area(val squareMeters: Double): Comparable<Area> {
+    override fun compareTo(other: Area): Int = this.squareMeters.compareTo(other.squareMeters)
     val acres: Double get() = squareMeters / 4046.8564224
     val hectare: Double get() = squareMeters / 10000.0
     val squareKilometers: Double get() = squareMeters / 1000000.0
@@ -129,7 +131,8 @@ value class Area(val squareMeters: Double) {
 
 @JvmInline
 @Serializable
-value class Volume(val cubicMeters: Double) {
+value class Volume(val cubicMeters: Double): Comparable<Volume> {
+    override fun compareTo(other: Volume): Int = this.cubicMeters.compareTo(other.cubicMeters)
     val cubicFeet: Double get() = cubicMeters / 0.028316846592000004
     val cubicKilometers: Double get() = cubicMeters / 1.0E9
     val cubicYards: Double get() = cubicMeters / 0.764554857984
@@ -195,7 +198,8 @@ value class Volume(val cubicMeters: Double) {
 
 @JvmInline
 @Serializable
-value class Mass(val kilograms: Double) {
+value class Mass(val kilograms: Double): Comparable<Mass> {
+    override fun compareTo(other: Mass): Int = this.kilograms.compareTo(other.kilograms)
     val grains: Double get() = kilograms / 6.479891000000001E-5
     val grams: Double get() = kilograms / 0.001
     val milligrams: Double get() = kilograms / 1.0E-6
@@ -241,7 +245,8 @@ value class Mass(val kilograms: Double) {
 
 @JvmInline
 @Serializable
-value class Speed(val metersPerSecond: Double) {
+value class Speed(val metersPerSecond: Double): Comparable<Speed> {
+    override fun compareTo(other: Speed): Int = this.metersPerSecond.compareTo(other.metersPerSecond)
     val feetPerSecond: Double get() = metersPerSecond / 0.3048
     val kilometersPerHour: Double get() = metersPerSecond / 0.2777777777777778
     val milesPerHour: Double get() = metersPerSecond / 0.44704
@@ -271,7 +276,8 @@ value class Speed(val metersPerSecond: Double) {
 
 @JvmInline
 @Serializable
-value class Acceleration(val metersPerSecondPerSecond: Double) {
+value class Acceleration(val metersPerSecondPerSecond: Double): Comparable<Acceleration> {
+    override fun compareTo(other: Acceleration): Int = this.metersPerSecondPerSecond.compareTo(other.metersPerSecondPerSecond)
     val feetPerSecondPerSecond: Double get() = metersPerSecondPerSecond / 0.3048
     val kilometersPerHourPerSecond: Double get() = metersPerSecondPerSecond / 0.2777777777777778
     val milesPerHourPerSecond: Double get() = metersPerSecondPerSecond / 0.44704
@@ -301,7 +307,8 @@ value class Acceleration(val metersPerSecondPerSecond: Double) {
 
 @JvmInline
 @Serializable
-value class Force(val newtons: Double) {
+value class Force(val newtons: Double): Comparable<Force> {
+    override fun compareTo(other: Force): Int = this.newtons.compareTo(other.newtons)
     val poundForce: Double get() = newtons / 4.448222
     operator fun plus(other: Force): Force = Force(newtons + other.newtons)
     operator fun minus(other: Force): Force = Force(newtons - other.newtons)
@@ -323,7 +330,8 @@ value class Force(val newtons: Double) {
 
 @JvmInline
 @Serializable
-value class Pressure(val pascals: Double) {
+value class Pressure(val pascals: Double): Comparable<Pressure> {
+    override fun compareTo(other: Pressure): Int = this.pascals.compareTo(other.pascals)
     val atmospheres: Double get() = pascals / 101325.0
     val bars: Double get() = pascals / 100000.0
     val millibars: Double get() = pascals / 100.0
@@ -357,7 +365,8 @@ value class Pressure(val pascals: Double) {
 
 @JvmInline
 @Serializable
-value class Energy(val joules: Double) {
+value class Energy(val joules: Double): Comparable<Energy> {
+    override fun compareTo(other: Energy): Int = this.joules.compareTo(other.joules)
     val btus: Double get() = joules / 9.484516526770049E-4
     val kcal: Double get() = joules / 4.184
     operator fun plus(other: Energy): Energy = Energy(joules + other.joules)
@@ -383,7 +392,8 @@ value class Energy(val joules: Double) {
 
 @JvmInline
 @Serializable
-value class Power(val watts: Double) {
+value class Power(val watts: Double): Comparable<Power> {
+    override fun compareTo(other: Power): Int = this.watts.compareTo(other.watts)
     val kilowatts: Double get() = watts / 1000.0
     operator fun plus(other: Power): Power = Power(watts + other.watts)
     operator fun minus(other: Power): Power = Power(watts - other.watts)
@@ -405,11 +415,13 @@ value class Power(val watts: Double) {
 
 @JvmInline
 @Serializable
-value class Temperature(val celsius: Double) {
+value class Temperature(val celsius: Double): Comparable<Temperature> {
+    override fun compareTo(other: Temperature): Int = this.celsius.compareTo(other.celsius)
     val fahrenheit: Double get() = celsius * 9 / 5 + 32
     val kelvin: Double get() = celsius + 273.15
-    operator fun plus(other: Temperature): Temperature = Temperature(celsius + other.celsius)
-    operator fun minus(other: Temperature): Temperature = Temperature(celsius - other.celsius)
+    operator fun plus(other: RelativeTemperature): Temperature = Temperature(celsius + other.celsius)
+    operator fun minus(other: RelativeTemperature): Temperature = Temperature(celsius - other.celsius)
+    operator fun minus(other: Temperature): RelativeTemperature = RelativeTemperature(celsius - other.celsius)
 
     companion object {
         val Int.celsius: Temperature get() = Temperature(celsius = this * 1.0)
@@ -421,6 +433,31 @@ value class Temperature(val celsius: Double) {
         val Int.kelvin: Temperature get() = Temperature(celsius = this - 273.15)
         val Long.kelvin: Temperature get() = Temperature(celsius = this - 273.15)
         val Double.kelvin: Temperature get() = Temperature(celsius = this - 273.15)
+    }
+    override fun toString(): String = "$celsius°C"
+}
+
+@JvmInline
+@Serializable
+value class RelativeTemperature(val celsius: Double): Comparable<Temperature> {
+    override fun compareTo(other: Temperature): Int = this.celsius.compareTo(other.celsius)
+    val fahrenheit: Double get() = celsius * 9 / 5
+    val kelvin: Double get() = celsius
+    operator fun plus(other: RelativeTemperature): RelativeTemperature = RelativeTemperature(celsius + other.celsius)
+    operator fun minus(other: RelativeTemperature): RelativeTemperature = RelativeTemperature(celsius - other.celsius)
+    operator fun times(other: Double): RelativeTemperature = RelativeTemperature(celsius * other)
+    operator fun div(other: Double): RelativeTemperature = RelativeTemperature(celsius / other)
+
+    companion object {
+        val Int.relativeCelsius: RelativeTemperature get() = RelativeTemperature(celsius = this.toDouble())
+        val Long.relativeCelsius: RelativeTemperature get() = RelativeTemperature(celsius = this.toDouble())
+        val Double.relativeCelsius: RelativeTemperature get() = RelativeTemperature(celsius = this)
+        val Int.relativeFahrenheit: RelativeTemperature get() = RelativeTemperature(celsius = this * 5.0 / 9)
+        val Long.relativeFahrenheit: RelativeTemperature get() = RelativeTemperature(celsius = this * 5.0 / 9)
+        val Double.relativeFahrenheit: RelativeTemperature get() = RelativeTemperature(celsius = (this) * 5 / 9)
+        val Int.relativeKelvin: RelativeTemperature get() = RelativeTemperature(celsius = this.toDouble())
+        val Long.relativeKelvin: RelativeTemperature get() = RelativeTemperature(celsius = this.toDouble())
+        val Double.relativeKelvin: RelativeTemperature get() = RelativeTemperature(celsius = this)
     }
     override fun toString(): String = "$celsius°C"
 }

@@ -80,11 +80,11 @@ class MySealedClassSerializer<T : Any>(
     override fun serialize(encoder: Encoder, value: T) {
         encoder.encodeStructure(descriptor) {
             val index = getIndex(value)
+            @Suppress("UNCHECKED_CAST")
             val serializer = options[index].serializer as KSerializer<Any?>
             if(serializer.descriptor.kind == StructureKind.OBJECT) {
                 encodeBooleanElement(descriptor, index, true)
             } else {
-                @Suppress("UNCHECKED_CAST")
                 this.encodeSerializableElement<Any?>(
                     descriptor,
                     index,

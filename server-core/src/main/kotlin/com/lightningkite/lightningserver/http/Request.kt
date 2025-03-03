@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.core.ServerPath
 
 interface Request {
     val path: ServerPath
+    val method: HttpMethod
     val parts: Map<String, String>
     val wildcard: String?
     val queryParameters: List<Pair<String, String>>

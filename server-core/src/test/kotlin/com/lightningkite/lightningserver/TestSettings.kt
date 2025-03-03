@@ -32,11 +32,7 @@ import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.testmodels.*
 import com.lightningkite.prepareModelsShared
 import com.lightningkite.uuid
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -45,8 +41,16 @@ import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration
 import java.util.*
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.http.HttpRequest
+import com.lightningkite.lightningserver.http.HttpResponse
+import com.lightningkite.lightningserver.http.get
+import com.lightningkite.lightningserver.http.handler
+import com.lightningkite.lightningserver.typed.arg
+import com.lightningkite.lightningserver.typed.get
+import kotlinx.coroutines.*
 import kotlin.time.Duration.Companion.minutes
 
+@OptIn(DelicateCoroutinesApi::class)
 object TestSettings: ServerPathGroup(ServerPath.root) {
     val database = setting("database", DatabaseSettings("ram"))
     val email = setting("email", EmailSettings("test"))
@@ -72,11 +76,9 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         forUser = { it },
     )
     val ws = ServerPath("test").restApiWebsocket<HasId<*>?, TestThing, UUID>(
-        database,
         info = wsModelInfo
     )
     val ws2 = ServerPath("test2").restApiWebsocket<HasId<*>?, TestThing, UUID>(
-        database,
         info = wsModelInfo,
         key = TestThing__id
     )
@@ -99,7 +101,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     )
 
     val proofEmail = EmailProofEndpoints(
-        ServerPath(uuid().toString()),
+        ServerPath(UUID.random().toString()),
         PinHandler(cache, "pin"),
         email,
         { to, pin ->
@@ -112,22 +114,22 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     )
 
     val proofKnown = KnownDeviceProofEndpoints(
-        ServerPath(uuid().toString()),
+        ServerPath(UUID.random().toString()),
         database,
         cache
     )
     val proofPassword = PasswordProofEndpoints(
-        ServerPath(uuid().toString()),
+        ServerPath(UUID.random().toString()),
         database,
         cache
     )
     val proofOtp = OneTimePasswordProofEndpoints(
-        ServerPath(uuid().toString()),
+        ServerPath(UUID.random().toString()),
         database,
         cache
     )
     val proofSms = SmsProofEndpoints(
-        ServerPath(uuid().toString()),
+        ServerPath(UUID.random().toString()),
         PinHandler(cache, "pin2"),
         sms,
     )
@@ -177,10 +179,19 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         override fun toString(): String = name
     }
     val testUserSubject = AuthEndpointsForSubject(
-        path = ServerPath(uuid().toString()),
+        path = ServerPath(UUID.random().toString()),
         handler = subjectHandler,
         database = database,
     )
+
+    val authenticatedGet = path("authenticated-get").get.handler { req ->
+        req.authChecked(authOptions<TestUser>())
+        HttpResponse.plainText("OK")
+    }
+    val authenticatedGet2 = path("authenticated-get").arg<String>("id").get.endpoint.handler { req ->
+        req.authChecked(authOptions<TestUser>())
+        HttpResponse.plainText("OK")
+    }
 
     object EmailCacheKey : RequestAuth.CacheKey<TestUser, UUID, String>() {
         override val name: String

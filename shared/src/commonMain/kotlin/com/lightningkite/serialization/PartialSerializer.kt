@@ -23,7 +23,7 @@ class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> 
                     PartialSerializer(it.serializer)
                 } else it.serializer
             }
-        } ?: listOf()
+        } ?: if(source.descriptor.serialName == "kotlin.Nothing") listOf() else throw IllegalArgumentException("Failed to make partial serializer: ${source.descriptor.serialName} has no serializableProperties")
     }
     override val descriptor: SerialDescriptor by lazy {
             try {
@@ -97,11 +97,14 @@ fun <K> DataClassPathPartial<K>.setMap(key: K, out: Partial<K>) {
         val prop = properties.last() as SerializableProperty<Any?, *>
         val unwrapped = prop.serializer.nullElement() ?: prop.serializer
         unwrapped.serializableProperties?.let { props ->
+
+            @Suppress("UNCHECKED_CAST")
             current.parts[properties.last() as SerializableProperty<Any?, *>] = getAny(key)?.let {
                 @Suppress("UNCHECKED_CAST")
                 partialOf<Any>(it, props.map { DataClassPathAccess<Any, Any, Any?>(DataClassPathSelf(prop.serializer as KSerializer<Any>), it as SerializableProperty<Any, Any?>) })
             }
         } ?: run {
+            @Suppress("UNCHECKED_CAST")
             current.parts[properties.last() as SerializableProperty<Any?, *>] = getAny(key)
         }
     }

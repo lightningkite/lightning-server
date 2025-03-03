@@ -35,7 +35,7 @@ data class MongoFields(
         appendLine("""// Automatically generated based off ${declaration.containingFile?.fileName}""")
         appendLine("""@file:OptIn(ExperimentalSerializationApi::class, InternalSerializationApi::class)""")
         if (declaration.typeParameters.isEmpty())
-            appendLine("""@file:Suppress("UnusedImport")""")
+            appendLine("""@file:Suppress("UnusedImport", "UNCHECKED_CAST")""")
         else
             appendLine("""@file:Suppress("UNCHECKED_CAST", "UNUSED_PARAMETER", "UnusedImport")""")
         appendLine()
@@ -86,20 +86,19 @@ data class MongoFields(
             appendLine("inline val $typeReference.Companion.path: DataClassPath<$typeReference, $typeReference> get() = path<$typeReference>()")
             appendLine()
             appendLine()
-            for (field in fields) {
+            for ((index, field) in fields.withIndex()) {
                 appendLine("object ${simpleName}_${field.name}: SerializableProperty<$typeReference, ${field.kotlinType.toKotlin()}> {")
                 tab {
-                    appendLine("""override val name: String = "${field.name}"""")
+                    appendLine("""override val name: String by lazy { $classReference.serializer().descriptor.getElementName($index) }""")
                     appendLine("""override fun get(receiver: $typeReference): ${field.kotlinType.toKotlin()} = receiver.${field.name}""")
                     appendLine("""override fun setCopy(receiver: $typeReference, value: ${field.kotlinType.toKotlin()}) = receiver.copy(${field.name} = value)""")
                     appendLine(
-                        """override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${
-                            field.kotlinType.resolve().toKotlinSerializer(contextualTypes)
-                        }"""
+                        """override val serializer: KSerializer<${field.kotlinType.toKotlin()}> by lazy { ($classReference.serializer() as GeneratedSerializer<*>).childSerializers()[$index] as KSerializer<${field.kotlinType.toKotlin()}> }"""
                     )
-                    appendLine("""override val annotations: List<Annotation> = $classReference.serializer().tryFindAnnotations("${field.name}")""")
+                    appendLine("""override val annotations: List<Annotation> by lazy { $classReference.serializer().descriptor.getElementAnnotations($index) }""")
                     field.default?.let {
                         appendLine("""override val default: ${field.kotlinType.toKotlin()} = $it""")
+                        appendLine("""override val defaultCode: String? = "${it.substringBefore('\n').replace("$", "\\$").replace("\"", "\\\"")}" """)
                     }
                 }
                 appendLine("}")
@@ -132,7 +131,7 @@ data class MongoFields(
             }
             appendLine()
             appendLine()
-            for (field in fields) {
+            for ((index, field) in fields.withIndex()) {
                 appendLine(
                     "class ${simpleName}_${field.name}<${
                         declaration.typeParameters.joinToString(", ") {
@@ -145,17 +144,16 @@ data class MongoFields(
                     }): SerializableProperty<$typeReference, ${field.kotlinType.toKotlin()}> {"
                 )
                 tab {
-                    appendLine("""override val name: String = "${field.name}"""")
+                    appendLine("""override val name: String by lazy { $classReference.serializer($nothings).descriptor.getElementName($index) }""")
                     appendLine("""override fun get(receiver: $typeReference): ${field.kotlinType.toKotlin()} = receiver.${field.name}""")
                     appendLine("""override fun setCopy(receiver: $typeReference, value: ${field.kotlinType.toKotlin()}) = receiver.copy(${field.name} = value)""")
                     appendLine(
-                        """override val serializer: KSerializer<${field.kotlinType.toKotlin()}> = ${
-                            field.kotlinType.resolve().toKotlinSerializer(contextualTypes)
-                        }"""
+                        """override val serializer: KSerializer<${field.kotlinType.toKotlin()}> by lazy { ($classReference.serializer(${declaration.typeParameters.joinToString(", "){ it.name.asString().decapitalizeAsciiOnly() }}) as GeneratedSerializer<*>).childSerializers()[$index] as KSerializer<${field.kotlinType.toKotlin()}> }"""
                     )
-                    appendLine("""override val annotations: List<Annotation> = $classReference.serializer($nothings).tryFindAnnotations("${field.name}")""")
+                    appendLine("""override val annotations: List<Annotation> by lazy { $classReference.serializer(${declaration.typeParameters.joinToString(", "){ it.name.asString().decapitalizeAsciiOnly() }}).descriptor.getElementAnnotations($index) }""")
                     field.default?.let {
                         appendLine("""override val default: ${field.kotlinType.toKotlin()} = $it""")
+                        appendLine("""override val defaultCode: String? = "${it.substringBefore('\n').replace("$", "\\$").replace("\"", "\\\"")}" """)
                     }
                     appendLine("""override fun hashCode(): Int = ${field.name.hashCode() * 31 + simpleName.hashCode()}""")
                     appendLine(

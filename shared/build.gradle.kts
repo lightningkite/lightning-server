@@ -1,13 +1,14 @@
 import com.lightningkite.deployhelpers.*
+import com.vanniktech.maven.publish.SonatypeHost
 
 plugins {
-    alias(serverlibs.plugins.kotlinMultiplatform)
-    alias(serverlibs.plugins.ksp)
-    alias(serverlibs.plugins.serialization)
-    alias(serverlibs.plugins.androidLibrary)
-    alias(serverlibs.plugins.dokka)
+    alias(libs.plugins.kotlinMultiplatform)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.serialization)
+    alias(libs.plugins.androidLibrary)
+    // alias(libs.plugins.dokka)
     id("signing")
-    `maven-publish`
+    alias(libs.plugins.vanniktechMavenPublish)
 }
 
 ksp {
@@ -18,9 +19,7 @@ kotlin {
     applyDefaultHierarchyTemplate()
     androidTarget {
         compilations.all {
-            kotlinOptions {
-                jvmTarget = "17"
-            }
+            kotlinOptions.jvmTarget = "1.8"
         }
     }
 
@@ -35,16 +34,18 @@ kotlin {
     iosX64()
     iosArm64()
     iosSimulatorArm64()
+    macosX64()
+    macosArm64()
 
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(serverlibs.kotlinXJson)
-                api(serverlibs.serializationProperties)
-                api(serverlibs.kotlinXDatetime)
+                api(libs.kotlinXJson)
+                api(libs.serializationProperties)
+                api(libs.kotlinXDatetime)
 
-                implementation(serverlibs.kotlinReflect)
-                implementation(serverlibs.kotlinStdLib)
+                implementation(libs.kotlinReflect)
+                implementation(libs.kotlinStdLib)
 
             }
             kotlin {
@@ -54,7 +55,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation(serverlibs.serializationProtobuf)
+                implementation(libs.serializationProtobuf)
             }
             kotlin {
                 srcDir(file("build/generated/ksp/common/commonTest/kotlin"))
@@ -76,26 +77,26 @@ dependencies {
     }
 }
 
-standardPublishing {
-    name.set("Lightning-server-Shared")
-    description.set("A tool for communication between a server using LightningServer and a client.")
-    github("lightningkite", "lightning-server")
+val lk = project.lk {
+    version = gitBasedVersion().also { println("Determined version to be $it") }
+}
+mavenPublishing {
+    // publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    signAllPublications()
+    coordinates(group.toString(), name, version.toString())
+    pom {
+        name.set("Lightning-server-Shared")
+        description.set("A tool for communication between a server using LightningServer and a client.")
+        github("lightningkite", "lightning-server")
 
-    licenses {
-        mit()
-    }
+        licenses {
+            mit()
+        }
 
-    developers {
-        developer(
-            id = "LightningKiteJoseph",
-            name = "Joseph Ivie",
-            email = "joseph@lightningkite.com",
-        )
-        developer(
-            id = "bjsvedin",
-            name = "Brady Svedin",
-            email = "brady@lightningkite.com",
-        )
+        developers {
+            joseph()
+            brady()
+        }
     }
 }
 
@@ -104,12 +105,12 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        minSdk = 26
+        minSdk = 21
     }
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
     dependencies {
         coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")

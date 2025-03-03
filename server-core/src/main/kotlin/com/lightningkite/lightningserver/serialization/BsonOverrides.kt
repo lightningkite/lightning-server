@@ -39,6 +39,7 @@ val BsonOverrides = SerializersModule {
 //    contextual(BsonTimestamp::class, BsonTimestampSerializer)
     contextual(Locale::class, MongoLocaleSerializer)
 //    contextual(Binary::class, BinarySerializer)
+    contextual(AnonType::class, ByteArrayAnonTypeSerializer)
 }
 
 /**
@@ -134,7 +135,7 @@ object MongoLocaleSerializer : KSerializer<Locale> {
     }
 }
 
-@Serializer(forClass = UUID::class)
+//@Serializer(forClass = UUID::class)
 object UUIDSerializer : KSerializer<UUID> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.UUID/bson", PrimitiveKind.STRING)
 

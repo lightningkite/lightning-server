@@ -13,7 +13,8 @@ import kotlin.math.max
 import kotlin.time.Duration
 
 @Serializable(ZonedDateTimeIso8601Serializer::class)
-data class ZonedDateTime(val dateTime: LocalDateTime, val zone: TimeZone) {
+data class ZonedDateTime(val dateTime: LocalDateTime, val zone: TimeZone): Comparable<ZonedDateTime> {
+    override fun compareTo(other: ZonedDateTime): Int = toInstant().compareTo(other.toInstant())
     override fun toString(): String = "$dateTime${zone.offsetAt(dateTime.toInstant(zone))}[${zone.id}]"
     companion object {
         fun parse(string: String): ZonedDateTime {
@@ -56,7 +57,8 @@ inline fun Instant.atZone(zone: TimeZone) = ZonedDateTime(this.toLocalDateTime(z
 fun nowLocal() = ZonedDateTime(now().toLocalDateTime(TimeZone.currentSystemDefault()), TimeZone.currentSystemDefault())
 
 @Serializable(OffsetDateTimeIso8601Serializer::class)
-data class OffsetDateTime(val dateTime: LocalDateTime, val offset: UtcOffset) {
+data class OffsetDateTime(val dateTime: LocalDateTime, val offset: UtcOffset): Comparable<OffsetDateTime> {
+    override fun compareTo(other: OffsetDateTime): Int = toInstant().compareTo(other.toInstant())
     override fun toString(): String = "$dateTime$offset"
     companion object {
         fun parse(string: String): OffsetDateTime {

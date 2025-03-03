@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.files
 
+import com.lightningkite.UUID
 import com.lightningkite.lightningserver.bytes.hexToByteArray
 import com.lightningkite.lightningserver.bytes.toHexString
 import com.lightningkite.lightningserver.client
@@ -45,14 +46,14 @@ class S3FileSystemTest : FileSystemTests() {
 
         var endAt = System.currentTimeMillis() + 1000
         while (System.currentTimeMillis() < endAt)
-            system.root.resolve("${uuid()}.txt").signedUrl
+            system.root.resolve("${UUID.random()}.txt").signedUrl
 
         var count = 0
         endAt = System.currentTimeMillis() + 1000
         var last = ""
         while (System.currentTimeMillis() < endAt) {
             count++
-            last = system.root.resolve("${uuid()}.txt").signedUrl
+            last = system.root.resolve("${UUID.random()}.txt").signedUrl
         }
 
         println("Count: $count")

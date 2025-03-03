@@ -26,9 +26,6 @@ pluginManagement {
             maven("https://jitpack.io")
         }
 
-        versionCatalogs {
-            create("serverlibs") { from(files("gradle/serverlibs.versions.toml"))}
-        }
     }
 }
 
@@ -49,6 +46,7 @@ include(":server-memcached")
 include(":server-mongo")
 include(":server-postgresql")
 include(":server-redis")
+include(":server-scim")
 include(":server-sentry")
 include(":server-sentry9")
 include(":server-sftp")

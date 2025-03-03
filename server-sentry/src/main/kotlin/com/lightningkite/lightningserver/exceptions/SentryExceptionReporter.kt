@@ -7,6 +7,7 @@ import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.schedule.ScheduledTask
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.tasks.Task
+import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websocket.WebSockets
 import io.ktor.http.*
 import io.sentry.Sentry
@@ -68,7 +69,7 @@ class SentryExceptionReporter(val dsn: String) : ExceptionReporter {
                 Sentry.captureEvent(event)
             }
 
-            is WebSockets.ConnectEvent -> {
+            is WebSocketConnectRequest -> {
                 val p = context.authAny()?.get()
                 val event = SentryEvent(t).apply {
                     request = Request().apply {

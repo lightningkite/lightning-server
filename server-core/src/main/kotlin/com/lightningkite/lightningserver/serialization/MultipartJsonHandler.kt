@@ -7,12 +7,12 @@ import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.files.ExternalServerFileSerializer
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.http.HttpHeader
-import com.lightningkite.lightningserver.http.toMultipartContent
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.json.*
+import com.lightningkite.lightningserver.http.toMultipartContent
 
 class MultipartJsonHandler(val json: () -> Json) : Serialization.HttpContentParser {
     override val contentType: ContentType = ContentType.MultiPart.FormData
@@ -22,7 +22,7 @@ class MultipartJsonHandler(val json: () -> Json) : Serialization.HttpContentPars
     }
 
     override suspend fun <T> invoke(content: HttpContent, serializer: KSerializer<T>): T {
-        val multipart = content as? HttpContent.Multipart ?: content.stream().toMultipartContent(content.type)
+        val multipart = content as? HttpContent.Multipart ?: content.stream().toMultipartContent(content.type, content.length)
         val mainData = HashMap<String, Any?>()
         val overrideData = HashMap<String, Any?>()
         var baselineJson: JsonElement = JsonNull

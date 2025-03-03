@@ -16,11 +16,12 @@ import kotlin.time.Duration
 @Serializable
 data class MetricSettings(
     val url: String = "none",
-    val trackingByEntryPoint: Set<String> = setOf(Metrics.executionTime.name),
-    val trackingTotalsOnly: Set<String> = setOf()
+    val trackingByEntryPoint: Set<String>? = null,
+    val trackingTotalsOnly: Set<String>? = null,
 ) : () -> Metrics {
-    @Transient
-    val tracked = trackingTotalsOnly + trackingByEntryPoint
+    fun trackedByEntryPoint(string: String): Boolean = (trackingByEntryPoint == null || string in trackingByEntryPoint)
+    fun tracked(string: String): Boolean = (trackingByEntryPoint == null || string in trackingByEntryPoint) ||
+            (trackingTotalsOnly == null || string in trackingTotalsOnly)
 
     companion object : Pluggable<MetricSettings, Metrics>() {
         init {

@@ -5,6 +5,8 @@ import com.lightningkite.lightningserver.files.ServerFile
 import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningdb.insertOne
 import com.lightningkite.lightningdb.test.*
+import com.lightningkite.lightningserver.auth.AuthType
+import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.JwtSigner
 import com.lightningkite.lightningserver.auth.authOptions
 import com.lightningkite.lightningserver.auth.authRequired
@@ -15,8 +17,10 @@ import com.lightningkite.lightningserver.auth.old.BaseAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.EmailAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.UserEmailAccess
 import com.lightningkite.lightningserver.auth.old.userEmailAccess
+import com.lightningkite.lightningserver.auth.subject.AuthEndpointsForSubject
 import com.lightningkite.lightningserver.cache.CacheSettings
 import com.lightningkite.lightningserver.cache.LocalCache
+import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.DatabaseSettings
@@ -28,8 +32,10 @@ import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.files.fileObject
+import com.lightningkite.lightningserver.filescanner.FileScanner
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.meta.metaEndpoints
+import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
@@ -39,8 +45,11 @@ import com.lightningkite.lightningserver.typed.bulkRequestEndpoint
 import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.prepareModelsShared
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
+import kotlinx.serialization.KSerializer
+import java.io.InputStream
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -60,6 +69,9 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     init {
         Serialization.enablePublicJavaData()
         Serialization.enablePublicProtobuf()
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerTesting()
     }
 
     val info = modelInfo<User, User, UUID>(
@@ -73,7 +85,12 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     val baseAuth = BaseAuthEndpoints(authPath, emailAccess, jwtSigner, 1.hours, 5.minutes)
     val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
 
-    val earlyUpload = UploadEarlyEndpoint(path("upload-early"), files, database)
+    val earlyUpload = UploadEarlyEndpoint(path("upload-early"), files, database, fileScanner = { listOf(object: FileScanner {
+        override fun requires(claimedType: ContentType): FileScanner.Requires = FileScanner.Requires.Whole
+        override fun scan(claimedType: ContentType, data: InputStream) {
+            println("Fake scanned ${data.readBytes().size} bytes")
+        }
+    }) })
     val consumeFile = path("consume-file").post.api(authOptions = noAuth, summary = "consume file") { input: ServerFile ->
         input.fileObject.signedUrl
     }
@@ -89,13 +106,11 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     val meta = path("meta").metaEndpoints("com.lightningkite.lightningserver")
 
     init {
-        prepareModelsShared()
-        prepareModelsServerCore()
-        prepareModelsServerTesting()
         Settings.populateDefaults()
-        engine = LocalEngine(LocalCache)
+        engine = LocalEngine(LocalPubSub)
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     val sampleUser = GlobalScope.async(start = CoroutineStart.LAZY) {
         info.collection().insertOne(User(
             email = "test@test.com",

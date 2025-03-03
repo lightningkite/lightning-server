@@ -17,7 +17,7 @@ import kotlinx.datetime.TimeZone
 @GenerateDataClassPaths()
 @Serializable
 data class User(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     @MaxLength(10) var email: TrimmedCaselessString,
     val name: String = email.raw,
     var age: Long = 0,
@@ -29,7 +29,7 @@ data class User(
 @GenerateDataClassPaths()
 @Serializable
 data class Post(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     var author: UUID,
     var content: String,
     var at: Long? = null
@@ -40,7 +40,7 @@ data class Post(
 @GenerateDataClassPaths()
 @Serializable
 data class Employee(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     var dictionary: Map<String, Int> = mapOf(),
 ) : HasId<UUID> {
     companion object
@@ -60,7 +60,7 @@ data class GenericBox<T>(
 @GenerateDataClassPaths
 @Serializable
 data class EmbeddedObjectTest(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     var name: String = "",
     var embed1: ClassUsedForEmbedding = ClassUsedForEmbedding("value1", 1),
     var embed2: ClassUsedForEmbedding = ClassUsedForEmbedding("value2", 2),
@@ -90,7 +90,7 @@ data class RecursiveEmbed(
 @GenerateDataClassPaths
 @Serializable
 data class EmbeddedNullable(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     var name: String = "",
     var embed1: ClassUsedForEmbedding? = null,
 ) : HasId<UUID> {
@@ -101,7 +101,7 @@ data class EmbeddedNullable(
 @GenerateDataClassPaths
 @Serializable
 data class LargeTestModel(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     val enumEntry: SampleA = SampleA.A,
     var boolean: Boolean = false,
     var byte: Byte = 0,
@@ -144,14 +144,14 @@ data class LargeTestModel(
 @GenerateDataClassPaths
 @Serializable
 data class EmbeddedMap(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     var map: Map<String, RecursiveEmbed>,
 ) : HasId<UUID>
 
 @GenerateDataClassPaths
 @Serializable
 data class Cursed(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     val insideClass: Inside<UUID>
 ): HasId<UUID> {
     @Serializable
@@ -162,8 +162,8 @@ data class Cursed(
 //@GenerateDataClassPaths
 //@Serializable
 //data class MetaModel(
-//    override val _id: UUID = uuid(),
+//    override val _id: UUID = UUID.random(),
 //    val number: Int = 22,
-//    val condition: Condition<MetaModel> = Condition.Always(),
+//    val condition: Condition<MetaModel> = Condition.Always,
 //    val modification: Modification<MetaModel> = Modification.Chain(listOf())
 //): HasId<UUID>

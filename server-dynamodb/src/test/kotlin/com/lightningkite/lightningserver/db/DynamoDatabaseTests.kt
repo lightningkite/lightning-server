@@ -48,14 +48,14 @@ class DynamoDBTests() {
             println(collection.find(condition { it._id eq special._id }).toList())
             collection.updateMany(condition { it._id eq special._id }, modification { it.value += 1 })
             println(collection.find(condition { it._id eq special._id }).toList())
-            println(collection.find(Condition.Always()).toList())
-            println(collection.find(Condition.Always(), orderBy = listOf(SortPart(path<TestData>().value))).toList())
+            println(collection.find(Condition.Always).toList())
+            println(collection.find(Condition.Always, orderBy = listOf(SortPart(path<TestData>().value))).toList())
         }
     }
 }
 
 @GenerateDataClassPaths
 @Serializable data class TestData(
-    val _id: UUID = uuid(),
+    val _id: UUID = UUID.random(),
     @Index val value: Int = 42
 )

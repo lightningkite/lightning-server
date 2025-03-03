@@ -75,7 +75,7 @@ If you wish to implement your own authentication mechanisms, you need only provi
 ```kotlin
 Authentication.handler = object: Authentication.Handler<User> {
     suspend fun http(request: HttpRequest): USER? = TODO()
-    suspend fun ws(request: WebSockets.ConnectEvent): USER? = TODO()
+    suspend fun ws(request: WebSocketConnectRequest): USER? = TODO()
     fun userToIdString(user: USER): String = TODO()
     suspend fun idStringToUser(id: String): USER = TODO()
 }

@@ -3,10 +3,13 @@ package com.lightningkite.lightningserver.http
 import com.lightningkite.lightningserver.core.ContentType
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toJavaInstant
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import java.time.format.DateTimeFormatter
 
+@Serializable
 data class HttpHeaders(val entries: List<Pair<String, String>>) {
-    val normalizedEntries: Map<String, List<String>> = entries
+    @Transient val normalizedEntries: Map<String, List<String>> = entries
         .groupBy { it.first.lowercase() }
         .mapValues { it.value.map { it.second } }
 
@@ -105,6 +108,8 @@ data class HttpHeaders(val entries: List<Pair<String, String>>) {
     }
 }
 
+@JvmName("HttpHeadersMultiMap")
+fun HttpHeaders(entries: Map<String, List<String>>) = HttpHeaders(entries.entries.flatMap { it.value.map { v -> it.key to v  } })
 fun HttpHeaders(entries: Map<String, String>) = HttpHeaders(entries.entries.map { it.toPair() })
 fun HttpHeaders(vararg entry: Pair<String, String>) = HttpHeaders(mapOf(*entry))
 inline fun HttpHeaders(setup: HttpHeaders.Builder.()->Unit) = HttpHeaders.Builder().apply(setup).build()

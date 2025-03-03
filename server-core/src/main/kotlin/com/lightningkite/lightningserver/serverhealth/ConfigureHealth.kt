@@ -1,7 +1,11 @@
 package com.lightningkite.lightningserver.serverhealth
 
 import com.lightningkite.lightningserver.auth.Authentication
+import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.cache.Cache
+import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.typed.api
@@ -15,8 +19,10 @@ import java.net.NetworkInterface
  * A route for accessing status of features, external service connections, and general server information.
  * Examples of features that can be checked on are Email, Database, and Exception Reporting.
  */
-fun ServerPath.healthCheck() = get.api(
-    authOptions = Authentication.isDeveloper,
+fun ServerPath.healthCheck(
+    cache: () -> Cache = Settings.requirements["cache"]?.let { { it.invoke() as? Cache ?: LocalCache } } ?: { LocalCache },
+) = get.api(
+    authOptions = noAuth,
     inputType = Unit.serializer(),
     outputType = ServerHealth.serializer(),
     summary = "Get Server Health",
@@ -29,16 +35,15 @@ fun ServerPath.healthCheck() = get.api(
                 val checkable =
                     it.value as? HealthCheckable ?: return@mapNotNull null
                 it.key to checkable
+            }.associate { it }.mapValues { (key, checkable) ->
+                cache().get(key, HealthStatus.serializer())
+                    ?.takeIf { now() - it.checkedAt < checkable.healthCheckFrequency }
+                    ?: withTimeoutOrNull(10_000L) { checkable.healthCheck() }?.also {
+                        cache().set(key, it, HealthStatus.serializer(), timeToLive = checkable.healthCheckFrequency)
+                    }
+                    ?: HealthStatus(HealthStatus.Level.ERROR, additionalMessage = "Timed out after 10 seconds.")
+
             }
-                .associate {
-                    healthCache[it.second]?.takeIf {
-                        now.toEpochMilliseconds() - it.checkedAt.toEpochMilliseconds() < 60_000 && it.level <= HealthStatus.Level.WARNING
-                    }?.let { s -> return@associate it.first to s }
-                    val result = withTimeoutOrNull(10_000L) { it.second.healthCheck() }
-                        ?: HealthStatus(HealthStatus.Level.ERROR, additionalMessage = "Timed out after 10 seconds.")
-                    healthCache[it.second] = result
-                    it.first to result
-                }
         )
     }
 )
@@ -55,13 +60,16 @@ private fun serverHealth(
     loadAverageCpu = ManagementFactory.getOperatingSystemMXBean().systemLoadAverage,
 )
 
-private val healthCache = HashMap<HealthCheckable, HealthStatus>()
-
-private fun memory(): ServerHealth.Memory = ServerHealth.Memory(
-    max = Runtime.getRuntime().maxMemory(),
-    total = Runtime.getRuntime().totalMemory(),
-    free = Runtime.getRuntime().freeMemory(),
-    systemAllocated = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory(),
-    usage = ((((Runtime.getRuntime().totalMemory() - Runtime.getRuntime()
-        .freeMemory()).toFloat() / Runtime.getRuntime().maxMemory().toFloat() * 100f) * 100).toInt()) / 100f,
-)
+private fun Long.roundMemoryForSecurity() = this.div(100_000).times(100_000)  // Round to the nearest megabyte
+private fun memory(): ServerHealth.Memory {
+    val max = Runtime.getRuntime().maxMemory().roundMemoryForSecurity()
+    val total = Runtime.getRuntime().totalMemory().roundMemoryForSecurity()
+    val free = Runtime.getRuntime().freeMemory().roundMemoryForSecurity()
+    return ServerHealth.Memory(
+        max = max,
+        total = total,
+        free = free,
+        systemAllocated = total - free,
+        usage = ((total - free).toDouble() / max.toDouble()).toFloat()
+    )
+}

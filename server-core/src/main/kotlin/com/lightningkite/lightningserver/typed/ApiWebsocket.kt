@@ -1,220 +1,299 @@
 package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.lightningdb.HasId
-import com.lightningkite.serialization.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.AuthOptions
+import com.lightningkite.lightningserver.auth.RequestAuth
+import com.lightningkite.lightningserver.auth.auth
 import com.lightningkite.lightningserver.auth.authChecked
-import com.lightningkite.lightningserver.auth.authOptions
-import com.lightningkite.lightningserver.core.LightningServerDsl
-import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.exceptions.BadRequestException
+import com.lightningkite.lightningserver.auth.real
+import com.lightningkite.lightningserver.auth.serializable
+import com.lightningkite.lightningserver.cache.LocalCache
+import com.lightningkite.lightningserver.core.ContentType
+import com.lightningkite.lightningserver.engine.UnitTestEngine
+import com.lightningkite.lightningserver.engine.engine
+import com.lightningkite.lightningserver.http.HttpHeader
 import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.Request
+import com.lightningkite.lightningserver.pubsub.LocalPubSub
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.settings.generalSettings
-import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
-import com.lightningkite.lightningserver.websocket.WebSockets
-import com.lightningkite.lightningserver.websocket.test
-import kotlinx.coroutines.cancelAndJoin
+import com.lightningkite.lightningserver.serialization.TypeRetriever
+import com.lightningkite.lightningserver.typed.ApiWebsocket.AuthAndPathPartsAndApiOptions
+import com.lightningkite.lightningserver.utils.cancellingScope
+import com.lightningkite.lightningserver.websocket.*
+import com.lightningkite.now
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.serialization.KSerializer
-import java.net.URLDecoder
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+import java.util.UUID
+import kotlin.time.Duration.Companion.minutes
 
-data class ApiWebsocket<USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT>(
-    override val path: PATH,
-    override val authOptions: AuthOptions<USER>,
-    val inputType: KSerializer<INPUT>,
-    val outputType: KSerializer<OUTPUT>,
-    override val summary: String,
-    override val description: String = summary,
-    val errorCases: List<LSError>,
-    override val belongsToInterface: Documentable.InterfaceInfo? = null,
-    val connect: suspend AuthPathPartsAndConnect<USER, PATH, OUTPUT>.() -> Unit,
-    val message: suspend TypedWebSocketSender<OUTPUT>.(INPUT) -> Unit,
-    val disconnect: suspend TypedWebSocketSender<OUTPUT>.() -> Unit,
-) : Documentable, WebSockets.Handler {
-
-    private val wildcards = path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
-    override suspend fun connect(event: WebSockets.ConnectEvent) {
-        val auth = event.authChecked<USER>(authOptions)
-        val receiver = AuthPathPartsAndConnect<USER, PATH, OUTPUT>(
-            authOrNull = auth,
-            parts = path.serializers.mapIndexed { idx, ser ->
-                val name = wildcards.get(idx).name
-                val str = event.parts[name] ?: throw BadRequestException("Route segment $name not found")
-                str.parseUrlPartOrBadRequest(ser)
-            }.toTypedArray(),
-            event = event,
-            outputSerializer = outputType,
-            rawRequest = event
-        )
-        this.connect.invoke(receiver)
-    }
-
-    override suspend fun message(event: WebSockets.MessageEvent) {
-        val parsed = event.content.let { Serialization.json.decodeFromString(inputType, it) }
-        this.message.invoke(TypedWebSocketSender(event.id, outputType, event.cache), parsed)
-    }
-
-    override suspend fun disconnect(event: WebSockets.DisconnectEvent) {
-        this.disconnect.invoke(TypedWebSocketSender(event.id, outputType, event.cache))
-    }
-
-    suspend fun send(id: WebSocketIdentifier, content: OUTPUT) =
-        id.send(Serialization.json.encodeToString(outputType, content))
-
-}
-
-private fun <T> String.parseUrlPartOrBadRequest(serializer: KSerializer<T>): T = try {
-    Serialization.fromString(URLDecoder.decode(this, Charsets.UTF_8), serializer)
-} catch (e: Exception) {
-    throw BadRequestException("Path part ${this} could not be parsed as a ${serializer.descriptor.serialName}.")
-}
-
-@LightningServerDsl
-inline fun <reified USER: HasId<*>?, PATH: TypedServerPath, reified INPUT, reified OUTPUT> PATH.apiWebsocket(
-    summary: String,
-    description: String = summary,
-    errorCases: List<LSError>,
-    belongsToInterface: Documentable.InterfaceInfo? = null,
-    noinline connect: suspend AuthPathPartsAndConnect<USER, PATH, OUTPUT>.() -> Unit,
-    noinline message: suspend TypedWebSocketSender<OUTPUT>.(INPUT) -> Unit,
-    noinline disconnect: suspend TypedWebSocketSender<OUTPUT>.() -> Unit,
-): ApiWebsocket<USER, PATH, INPUT, OUTPUT> = apiWebsocket(
-    authOptions = authOptions<USER>(),
-    inputType = Serialization.module.contextualSerializerIfHandled(),
-    outputType = Serialization.module.contextualSerializerIfHandled(),
-    summary = summary,
-    description = description,
-    errorCases = errorCases,
-    belongsToInterface = belongsToInterface,
-    connect = connect,
-    message = message,
-    disconnect = disconnect,
-)
-
-@LightningServerDsl
-fun <USER: HasId<*>?, PATH: TypedServerPath, INPUT, OUTPUT> PATH.apiWebsocket(
-    authOptions: AuthOptions<USER>,
-    inputType: KSerializer<INPUT>,
-    outputType: KSerializer<OUTPUT>,
-    summary: String,
-    description: String = summary,
-    errorCases: List<LSError>,
-    belongsToInterface: Documentable.InterfaceInfo? = null,
-    connect: suspend AuthPathPartsAndConnect<USER, PATH, OUTPUT>.() -> Unit,
-    message: suspend TypedWebSocketSender<OUTPUT>.(INPUT) -> Unit,
-    disconnect: suspend TypedWebSocketSender<OUTPUT>.() -> Unit,
-): ApiWebsocket<USER, PATH, INPUT, OUTPUT> {
-    val ws = ApiWebsocket(
-        path = this,
-        authOptions = authOptions,
-        inputType = inputType,
-        outputType = outputType,
-        summary = summary,
-        description = description,
-        errorCases = errorCases,
-        belongsToInterface = belongsToInterface,
-        connect = connect,
-        message = message,
-        disconnect = disconnect,
-    )
-    WebSockets.handlers[path] = ws
-    return ws
-}
-
-@LightningServerDsl
-inline fun <reified USER: HasId<*>?, reified INPUT, reified OUTPUT> ServerPath.apiWebsocket(
-    summary: String,
-    description: String = summary,
-    errorCases: List<LSError>,
-    belongsToInterface: Documentable.InterfaceInfo? = null,
-    noinline connect: suspend AuthPathPartsAndConnect<USER, TypedServerPath0, OUTPUT>.() -> Unit,
-    noinline message: suspend TypedWebSocketSender<OUTPUT>.(INPUT) -> Unit,
-    noinline disconnect: suspend TypedWebSocketSender<OUTPUT>.() -> Unit,
-): ApiWebsocket<USER, TypedServerPath0, INPUT, OUTPUT> = apiWebsocket(
-    authOptions = authOptions<USER>(),
-    inputType = Serialization.module.contextualSerializerIfHandled(),
-    outputType = Serialization.module.contextualSerializerIfHandled(),
-    summary = summary,
-    description = description,
-    errorCases = errorCases,
-    belongsToInterface = belongsToInterface,
-    connect = connect,
-    message = message,
-    disconnect = disconnect,
-)
-
-@LightningServerDsl
-fun <USER: HasId<*>?, INPUT, OUTPUT> ServerPath.apiWebsocket(
-    authOptions: AuthOptions<USER>,
-    inputType: KSerializer<INPUT>,
-    outputType: KSerializer<OUTPUT>,
-    summary: String,
-    description: String = summary,
-    errorCases: List<LSError>,
-    belongsToInterface: Documentable.InterfaceInfo? = null,
-    connect: suspend AuthPathPartsAndConnect<USER, TypedServerPath0, OUTPUT>.() -> Unit,
-    message: suspend TypedWebSocketSender<OUTPUT>.(INPUT) -> Unit,
-    disconnect: suspend TypedWebSocketSender<OUTPUT>.() -> Unit,
-): ApiWebsocket<USER, TypedServerPath0, INPUT, OUTPUT> {
-    val ws = ApiWebsocket(
-        path = TypedServerPath0(this),
-        authOptions = authOptions,
-        inputType = inputType,
-        outputType = outputType,
-        summary = summary,
-        description = description,
-        errorCases = errorCases,
-        belongsToInterface = belongsToInterface,
-        connect = connect,
-        message = message,
-        disconnect = disconnect,
-    )
-    WebSockets.handlers[this] = ws
-    return ws
-}
-
-data class TypedVirtualSocket<INPUT, OUTPUT>(val incoming: ReceiveChannel<OUTPUT>, val send: suspend (INPUT) -> Unit)
-
-suspend fun <USER: HasId<*>?, INPUT, OUTPUT> ApiWebsocket<USER, TypedServerPath0, INPUT, OUTPUT>.test(
-    parts: Map<String, String> = mapOf(),
-    wildcard: String? = null,
-    queryParameters: List<Pair<String, String>> = listOf(),
-    headers: HttpHeaders = HttpHeaders.EMPTY,
-    domain: String = generalSettings().publicUrl.substringAfter("://").substringBefore("/"),
-    protocol: String = generalSettings().publicUrl.substringBefore("://"),
-    sourceIp: String = "0.0.0.0",
-    test: suspend TypedVirtualSocket<INPUT, OUTPUT>.() -> Unit
+@Serializable
+data class ApiWebsocketStorage<STORAGE>(
+    val mimeType: String,
+    val storage: STORAGE,
+    val respondToPings: Boolean = true
 ) {
-    this.path.path.test(
-        parts = parts,
-        wildcard = wildcard,
-        queryParameters = queryParameters,
-        headers = headers,
-        domain = domain,
-        protocol = protocol,
-        sourceIp = sourceIp,
-        test = {
-            val channel = Channel<OUTPUT>(20)
-            coroutineScope {
-                val job = launch {
-                    for (it in incoming) {
-                        channel.send(Serialization.json.decodeFromString(outputType, it))
+    @Transient
+    val contentType = ContentType(mimeType)
+
+    @Transient
+    val emitter =
+        Serialization.emitters[contentType] ?: throw IllegalStateException("No emitter found for $contentType")
+
+    @Transient
+    val parser = Serialization.parsers[contentType] ?: throw IllegalStateException("No parser found for $contentType")
+}
+
+abstract class ApiWebsocket<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> constructor(
+    override val path: PATH,
+    val innerStorageSerializer: KSerializer<STORAGE>
+) : WebSocketHandler<ApiWebsocketStorage<STORAGE>>, Documentable {
+    final override val storageSerializer: KSerializer<ApiWebsocketStorage<STORAGE>> =
+        ApiWebsocketStorage.serializer(this@ApiWebsocket.innerStorageSerializer)
+    abstract override val authOptions: AuthOptions<USER>
+    abstract val inputType: KSerializer<INPUT>
+    abstract val outputType: KSerializer<OUTPUT>
+    abstract override val summary: String
+    open override val description: String get() = summary
+    open val errorCases: List<LSError> get() = emptyList()
+    open override val belongsToInterface: Documentable.InterfaceInfo? get() = null
+
+    class AuthAndPathPartsAndApiOptions<USER : HasId<*>?, PATH : TypedServerPath>(
+        authOrNull: RequestAuth<USER & Any>?,
+        rawRequest: Request?,
+        parts: Array<Any?>
+    ): AuthAndPathParts<USER, PATH>(authOrNull, rawRequest, parts) {
+        var respondToPings: Boolean = true
+    }
+
+    open suspend fun willConnect(auth: AuthAndPathParts<USER, PATH>, request: WebSocketConnectRequest): STORAGE
+        = willConnect(AuthAndPathPartsAndApiOptions(auth.authOrNull, auth.rawRequest, auth.parts), request)
+    open suspend fun willConnect(auth: AuthAndPathPartsAndApiOptions<USER, PATH>, request: WebSocketConnectRequest): STORAGE
+        = willConnect(AuthAndPathParts(auth.authOrNull, auth.rawRequest, auth.parts), request)
+    open suspend fun didConnect(connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>) {}
+    open suspend fun messageFromClient(
+        connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>,
+        input: INPUT
+    ) {
+    }
+
+    open suspend fun messageFromSubscription(
+        connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>,
+        topic: String,
+        retriever: TypeRetriever
+    ) {
+    }
+
+    open suspend fun disconnect(
+        connection: ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>,
+        reason: WebSocketClose
+    ) {
+    }
+
+    abstract class ApiWebsocketConnection<USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE>(
+        authOrNull: RequestAuth<USER & Any>?,
+        rawRequest: Request?,
+        parts: Array<Any?>
+    ) : AuthAndPathParts<USER, PATH>(authOrNull, rawRequest, parts)  // TODO
+    {
+        abstract val currentState: STORAGE
+        abstract suspend fun repullState(): STORAGE
+        abstract suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE)
+        abstract suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE
+        abstract suspend fun <T> subscribe(topic: WebSocketTopic<T>)
+        abstract suspend fun unsubscribe(topic: String)
+        abstract suspend fun send(output: OUTPUT)
+        abstract suspend fun close(reason: WebSocketClose)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    inner class ApiWebsocketConnectionImpl(val wraps: WebSocketConnection<ApiWebsocketStorage<STORAGE>>) :
+        ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>(
+            wraps.request.precalculatedAuth?.real() as RequestAuth<USER & Any>?,
+            wraps.request,
+            path.parameters.map { wraps.request.parts[it.name] }.toTypedArray()
+        ) {
+        override val currentState: STORAGE = wraps.currentState.storage
+        override suspend fun repullState(): STORAGE = wraps.repullState().storage
+        override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
+            return wraps.queueStateUpdate { it.copy(storage = modification(it.storage)) }
+        }
+
+        override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE {
+            return wraps.updateStateImmediately { it.copy(storage = modification(it.storage)) }.storage
+        }
+
+        override suspend fun <T> subscribe(topic: WebSocketTopic<T>) = wraps.subscribe(topic)
+        override suspend fun unsubscribe(topic: String) = wraps.unsubscribe(topic)
+        override suspend fun send(output: OUTPUT) {
+            wraps.send(wraps.currentState.emitter.ws(wraps.currentState.contentType, outputType, output))
+        }
+
+        override suspend fun close(reason: WebSocketClose) = wraps.close(reason)
+    }
+
+    final override suspend fun willConnect(request: WebSocketConnectRequest): ApiWebsocketStorage<STORAGE> {
+        val cb = path.authAndPathParts(request, authOptions)
+        val c = AuthAndPathPartsAndApiOptions<USER, PATH>(cb.authOrNull, cb.rawRequest, cb.parts)
+        return ApiWebsocketStorage(
+            (request.queryParameterCaseInsensitive(HttpHeader.Accept)
+                ?: request.queryParameterCaseInsensitive(HttpHeader.ContentType)
+                ?: request.headers.contentType?.toString()
+                ?: request.headers.accept.firstOrNull()?.takeUnless { it == ContentType.Any }?.toString()
+                ?: ContentType.Application.Json.toString()),
+            willConnect(c, request),
+            respondToPings = c.respondToPings
+        )
+    }
+
+    final override suspend fun didConnect(
+        connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>
+    ) = didConnect(ApiWebsocketConnectionImpl(connection))
+
+    final override suspend fun messageFromClient(
+        connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>,
+        frame: WebSocketFrame
+    ) {
+        if ((frame as? WebSocketFrame.Text)?.content?.isBlank() == true && connection.currentState.respondToPings) {
+            connection.send(" ")
+            return
+        } else messageFromClient(
+            ApiWebsocketConnectionImpl(connection),
+            connection.currentState.parser(frame, inputType)
+        )
+    }
+
+    final override suspend fun messageFromSubscription(
+        connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>,
+        topic: String,
+        retrieve: TypeRetriever
+    ) = messageFromSubscription(ApiWebsocketConnectionImpl(connection), topic, retrieve)
+
+    final override suspend fun disconnect(
+        connection: WebSocketConnection<ApiWebsocketStorage<STORAGE>>,
+        reason: WebSocketClose
+    ) = this@ApiWebsocket.disconnect(ApiWebsocketConnectionImpl(connection), reason)
+
+    init {
+        WebSockets.handlers[path.path] = this
+    }
+}
+
+
+data class ApiVirtualSocket<IN, OUT>(val incoming: ReceiveChannel<OUT>, val send: suspend (IN) -> Unit)
+
+suspend fun <USER : HasId<*>?, PATH : TypedServerPath, INPUT, OUTPUT, STORAGE> ApiWebsocket<USER, PATH, INPUT, OUTPUT, STORAGE>.test(
+    auth: AuthAndPathParts<USER, PATH>,
+    test: suspend ApiVirtualSocket<INPUT, OUTPUT>.() -> Unit,
+): Unit = cancellingScope {
+//    val oldEngine = engine
+    engine = UnitTestEngine
+    try {
+        @Suppress("UNCHECKED_CAST")
+        val req = WebSocketConnectRequest(
+            path = path.path,
+            parts = path.parameters.withIndex().associate { (index, it) ->
+                it.name to Serialization.toString(
+                    auth.parts[index],
+                    it.serializer as KSerializer<Any?>
+                )
+            },
+            wildcard = null,
+            queryParameters = listOf(),
+            headers = HttpHeaders.EMPTY,
+            domain = "test",
+            protocol = "ws",
+            sourceIp = "127.0.0.1",
+            precalculatedAuth = auth.authOrNull?.serializable(now() + 10.minutes),
+            hasPrecalculatedAuth = true,
+        )
+        val channel = Channel<OUTPUT>(20)
+
+        val id = UUID.randomUUID().toString()
+        println("$id Connecting...")
+        val auth2 = AuthAndPathPartsAndApiOptions<USER, PATH>(auth.authOrNull, auth.rawRequest, auth.parts)
+        val startingState = willConnect(auth2, req)
+        val checkedAuth = req.authChecked(authOptions)
+        val mid = object : ApiWebsocket.ApiWebsocketConnection<USER, PATH, INPUT, OUTPUT, STORAGE>(
+            checkedAuth,
+            req,
+            path.parameters.map { req.parts[it.name] }.toTypedArray()
+        ) {
+            override var currentState: STORAGE = startingState
+            override suspend fun repullState(): STORAGE = currentState
+            override suspend fun queueStateUpdate(modification: (STORAGE) -> STORAGE) {
+                currentState = modification(currentState)
+            }
+
+            override suspend fun updateStateImmediately(modification: (STORAGE) -> STORAGE): STORAGE {
+                currentState = modification(currentState)
+                return currentState
+            }
+
+            val subscriptions = HashMap<String, Job>()
+            override suspend fun <T> subscribe(topic: WebSocketTopic<T>) {
+                println("$id SUBSCRIBES TO ${topic.topic}")
+                subscriptions[topic.topic]?.cancel()
+                val t = this
+                subscriptions[topic.topic] = this@cancellingScope.launch {
+                    LocalPubSub.get(topic.topic, topic.type).collect { value ->
+                        messageFromSubscription(
+                            connection = t,
+                            topic = topic.topic,
+                            retriever = TypeRetriever.literal(value)
+                        )
                     }
                 }
-                val job2 = launch {
-                    test(TypedVirtualSocket<INPUT, OUTPUT>(
-                        incoming = channel,
-                        send = { send(Serialization.json.encodeToString(inputType, it)) }
-                    ))
-                }
-                job2.join()
-                job.cancelAndJoin()
+                yield()
             }
-        },
-    )
+
+            override suspend fun unsubscribe(topic: String) {
+                println("$id NO LONGER SUBSCRIBES TO ${topic}")
+                subscriptions[topic]?.cancel()
+            }
+
+            override suspend fun send(output: OUTPUT) {
+                println("$id <-- $output")
+                channel.send(output)
+            }
+
+            override suspend fun close(reason: WebSocketClose) {
+                channel.close()
+            }
+        }
+
+        println("$id Connected.")
+        didConnect(mid)
+
+        var error: Exception? = null
+        try {
+            test(
+                ApiVirtualSocket<INPUT, OUTPUT>(
+                    incoming = channel,
+                    send = { it: INPUT ->
+                        println("$id --> $it")
+                        messageFromClient(mid, it)
+                    }
+                )
+            )
+        } catch (e: Exception) {
+            error = e
+        }
+        println("$id Disconnecting...")
+        disconnect(mid, WebSocketClose.NORMAL)
+        println("$id Disconnected.")
+
+        error?.let { throw it }
+    } finally {
+        cancel()
+//        engine = oldEngine
+    }
+    Unit
 }

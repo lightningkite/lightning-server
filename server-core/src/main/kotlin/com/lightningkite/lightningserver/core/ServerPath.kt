@@ -2,7 +2,14 @@ package com.lightningkite.lightningserver.core
 
 import io.ktor.http.*
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
+@Serializable(ServerPathSerializer::class)
 data class ServerPath(val segments: List<Segment>, val after: Afterwards = Afterwards.None) {
     companion object {
         val root = ServerPath(listOf())
@@ -15,7 +22,7 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
 
         companion object {
             fun fromString(string: String): Afterwards {
-                if (string.endsWith("/{...}"))
+                if (string.endsWith("/{...}") || string == "{...}")
                     return ChainedWildcard
                 else if (string.endsWith("/"))
                     return TrailingSlash
@@ -86,4 +93,10 @@ data class ServerPath(val segments: List<Segment>, val after: Afterwards = After
             Afterwards.TrailingSlash -> "/"
             Afterwards.ChainedWildcard -> "/$wildcard"
         }
+}
+
+object ServerPathSerializer: KSerializer<ServerPath> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ServerPath", PrimitiveKind.STRING)
+    override fun deserialize(decoder: Decoder): ServerPath = ServerPath(decoder.decodeString())
+    override fun serialize(encoder: Encoder, value: ServerPath) = encoder.encodeString(value.toString())
 }

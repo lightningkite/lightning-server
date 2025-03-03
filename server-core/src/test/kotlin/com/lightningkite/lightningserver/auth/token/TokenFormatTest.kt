@@ -30,7 +30,7 @@ abstract class TokenFormatTest {
     val sampleAuth = GlobalScope.async(start = CoroutineStart.LAZY) {
         RequestAuth<TestUser>(
             TestSettings.subjectHandler,
-            uuid(),
+            UUID.random(),
             TestSettings.testUser.await()._id,
             now().roundTo(1.seconds),
             setOf("test", "test2"),

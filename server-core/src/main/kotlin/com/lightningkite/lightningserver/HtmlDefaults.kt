@@ -26,6 +26,7 @@ object HtmlDefaults {
             <!DOCTYPE html>
             <html>
               <head>
+                <meta name="robots" content="noindex">
                 <meta charset="utf-8">
                 <title>${generalSettings().projectName}</title>
               </head>

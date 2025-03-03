@@ -25,7 +25,7 @@ class TestFieldCollectionExtensions {
 
     @Test
     fun testAll():Unit = runBlocking {
-        collection.deleteMany(Condition.Always())
+        collection.deleteMany(Condition.Always)
 
         collection.insertMany((0 until 100).toList().map { TempThing(it) })
 

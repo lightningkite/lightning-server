@@ -3,6 +3,7 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.UUID
+import com.lightningkite.lightningdb.condition
 import com.lightningkite.lightningserver.Access
 import com.lightningkite.lightningserver.CompletePermissions
 import com.lightningkite.lightningserver.FinalPermissions
@@ -16,6 +17,7 @@ import com.lightningkite.lightningserver.encryption.Encryptor
 import com.lightningkite.lightningserver.encryption.SecretBasis
 import com.lightningkite.lightningserver.encryption.encryptor
 import com.lightningkite.lightningserver.testmodels.TestUser
+import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.uuid
 import kotlinx.serialization.*
 import org.junit.Test
@@ -74,9 +76,9 @@ class JavaDataTest {
         val sample = CompletePermissions(
             organizations = setOf(
                 FinalPermissions(
-                    directOwner = uuid("55555555-5555-5555-5555-555555555555"),
-                    owners = setOf(uuid("55555555-5555-5555-5555-555555555555")),
-                    member = uuid("55555555-5555-5555-5555-555555555555"),
+                    directOwner = UUID.parse("55555555-5555-5555-5555-555555555555"),
+                    owners = setOf(UUID.parse("55555555-5555-5555-5555-555555555555")),
+                    member = UUID.parse("55555555-5555-5555-5555-555555555555"),
                     manageBalance = true,
                     minimalMemberRead = true,
                     notifications = true,

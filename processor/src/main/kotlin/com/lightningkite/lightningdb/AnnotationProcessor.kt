@@ -16,7 +16,7 @@ lateinit var comparable: KSClassDeclaration
 class TableGenerator(
     val codeGenerator: CodeGenerator,
     val logger: KSPLogger,
-) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 16) {
+) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 27) {
     fun KSClassDeclaration.isSerializable(): Boolean = this.annotation("Serializable", "kotlinx.serialization") != null
     fun KSClassDeclaration.isPlainSerializable(): Boolean =
         this.annotation("Serializable", "kotlinx.serialization")?.let {
@@ -121,6 +121,7 @@ class TableGenerator(
                 if (mergedName.isNotEmpty()) appendLine("package $mergedName")
                 appendLine()
                 appendLine("import com.lightningkite.serialization.*")
+                appendLine("import kotlinx.serialization.ExperimentalSerializationApi")
                 appendLine("import kotlinx.serialization.builtins.NothingSerializer")
                 appendLine()
                 appendLine("fun prepareModels$module() { ${module}ModelsObject }")
@@ -142,6 +143,7 @@ class TableGenerator(
                 }
                 appendLine("}")
                 appendLine()
+                appendLine("@OptIn(ExperimentalSerializationApi::class)")
                 appendLine("fun SerializationRegistry.register$module() {")
                 tab {
 //                    appendLine("prepareModels$module()")

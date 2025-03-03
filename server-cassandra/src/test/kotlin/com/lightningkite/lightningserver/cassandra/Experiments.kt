@@ -31,7 +31,7 @@ class Experiments {
                         .withColumn("title", DataTypes.TEXT)
                         .build()
                     )
-                    session.executeSuspending(insertInto("test", "TestTable").value("id", literal(com.lightningkite.uuid())).value("title", literal("Test")).build())
+                    session.executeSuspending(insertInto("test", "TestTable").value("id", literal(com.lightningkite.UUID.random())).value("title", literal("Test")).build())
                     session.executeSuspending(selectFrom("test", "TestTable").columns("id", "title").where().limit(1).build()).currentPage().forEach {
                         println("Got item $it")
                     }

@@ -17,11 +17,22 @@ import kotlinx.serialization.UseContextualSerialization
 import kotlin.time.Duration
 import kotlinx.datetime.Instant
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.http.HttpEndpoint
+import com.lightningkite.lightningserver.http.HttpHeaders
+import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
+import com.lightningkite.lightningserver.typed.TypedHttpEndpoint
+import com.lightningkite.lightningserver.typed.TypedServerPath0
+import com.lightningkite.lightningserver.typed.TypedServerPath1
+import com.lightningkite.lightningserver.typed.TypedServerPath2
+import io.ktor.http.encodeURLPathPart
+import io.ktor.http.encodeURLQueryComponent
 import kotlinx.serialization.Contextual
+import kotlin.time.Duration.Companion.days
 
-data class RequestAuth<SUBJECT : HasId<*>>(
-    val subject: Authentication.SubjectHandler<SUBJECT, *>,
+data class RequestAuth<out SUBJECT : HasId<*>>(
+    val subject: Authentication.SubjectHandler<@UnsafeVariance SUBJECT, *>,
     val sessionId: UUID?,
     val rawId: Comparable<*>,
     @Contextual val issuedAt: Instant,
@@ -29,6 +40,7 @@ data class RequestAuth<SUBJECT : HasId<*>>(
     val scopes: Set<String> = setOf("*"),
     val thirdParty: String? = null,
     val fromMasquerade: RequestAuth<*>? = null,
+    val requirements: RequestRequirements? = null,
 ) {
     override fun toString(): String = buildString {
         fromMasquerade?.let {
@@ -47,7 +59,11 @@ data class RequestAuth<SUBJECT : HasId<*>>(
             append(" via ")
             append(it)
         }
+        requirements?.let {
+            append(" (presigned)")
+        }
     }
+
     object Key : Request.CacheKey<RequestAuth<*>?> {
         override suspend fun calculate(request: Request): RequestAuth<*>? {
             for (reader in Authentication.readers) {
@@ -76,6 +92,8 @@ data class RequestAuth<SUBJECT : HasId<*>>(
                             throw ForbiddenException()
                         }
                     } ?: it
+                }?.also {
+                    it.requirements?.assert(request)
                 } ?: continue
             }
             return null
@@ -91,9 +109,9 @@ data class RequestAuth<SUBJECT : HasId<*>>(
         )
     }
 
-    abstract class CacheKey<SUBJECT : HasId<ID>, ID : Comparable<ID>, VALUE> {
+    abstract class CacheKey<out SUBJECT : HasId<@UnsafeVariance ID>, out ID : Comparable<@UnsafeVariance ID>, VALUE> {
         abstract val name: String
-        abstract suspend fun calculate(auth: RequestAuth<SUBJECT>): VALUE
+        abstract suspend fun calculate(auth: RequestAuth<@UnsafeVariance SUBJECT>): VALUE
         abstract val serializer: KSerializer<VALUE>
         abstract val validFor: Duration
         var serializationIndex: Int = -1
@@ -123,10 +141,11 @@ data class RequestAuth<SUBJECT : HasId<*>>(
     @Serializable
     data class ExpiringValue<T>(val value: T, @Contextual val expiresAt: Instant)
 
-    val cache = HashMap<CacheKey<SUBJECT, *, *>, ExpiringValue<*>>()
+    val cache: HashMap<CacheKey<@UnsafeVariance SUBJECT, *, *>, ExpiringValue<*>> =
+        HashMap<CacheKey<SUBJECT, *, *>, ExpiringValue<*>>()
 
     @Suppress("UNCHECKED_CAST")
-    suspend fun <T> get(key: CacheKey<SUBJECT, *, T>): T {
+    suspend fun <T> get(key: CacheKey<@UnsafeVariance SUBJECT, *, T>): T {
         cache.get(key)?.let {
             if (now() > it.expiresAt) cache.remove(key)
             else return it.value as T
@@ -136,7 +155,7 @@ data class RequestAuth<SUBJECT : HasId<*>>(
         return c
     }
 
-    suspend fun precache(keys: List<CacheKey<SUBJECT, *, *>>): RequestAuth<SUBJECT> {
+    suspend fun precache(keys: List<CacheKey<@UnsafeVariance SUBJECT, *, *>>): RequestAuth<SUBJECT> {
         keys.forEach { get(it) }
         return this
     }
@@ -162,7 +181,113 @@ data class RequestAuth<SUBJECT : HasId<*>>(
     }
 
     companion object
+
+    @Serializable
+    data class RequestRequirements(
+        val method: HttpMethod,
+        val path: ServerPath,
+        val parts: Map<String, String>,
+        val queryParameters: List<Pair<String, String>>?,
+        val forceHeaders: HttpHeaders,
+        val limitToHeaders: Set<String>? = null,
+        val until: Instant = now() + 7.days
+    ) {
+        fun assert(request: Request) {
+            if (request.path != path) throw UnauthorizedException("Auth path must be '${path}', but request is for ${request.path}")
+            if (request.parts != parts) throw UnauthorizedException("Auth parts must be '${parts}', but request is for ${request.parts}")
+            if (request.method != method) throw UnauthorizedException("Auth method must be ${method}, but request is for ${request.method}")
+            if (queryParameters != null && request.queryParameters.filter { !it.first.equals(HttpHeader.Authorization, true) } != queryParameters) throw UnauthorizedException("Auth query parameters must be ${queryParameters}, but request is for ${request.queryParameters}")
+            if (limitToHeaders != null) {
+                val fh = forceHeaders.normalizedEntries.keys
+                request.headers.normalizedEntries.forEach {
+                    if(it.key.equals(HttpHeader.Authorization, true)) return@forEach
+                    if (it.key !in limitToHeaders && it.key !in fh) throw UnauthorizedException("Auth disallows header ${it.key}")
+                    forceHeaders.get(it.key)?.let { v ->
+                        if (it.value.joinToString(";") != v) throw UnauthorizedException(
+                            "Auth requires header ${it.key} to be exactly ${v}, but got ${
+                                it.value.joinToString(
+                                    ";"
+                                )
+                            }"
+                        )
+                    }
+                }
+            }
+            if (now() > until) throw UnauthorizedException("This authorization has expired.")
+        }
+
+        val pathPlusQueryParameters =
+            path.toString(parts) + if (queryParameters.isNullOrEmpty()) "" else "?${queryParameters.joinToString("&") { "${it.first}=${it.second.encodeURLQueryComponent()}" }}"
+        val pathPlusQueryParametersAnd =
+            path.toString(parts) + if (queryParameters.isNullOrEmpty()) "?" else "?${queryParameters.joinToString("&") { "${it.first}=${it.second.encodeURLQueryComponent()}" }}&"
+    }
 }
+
+fun HttpEndpoint.toRequestRequirements(
+    parts: Map<String, String> = mapOf(),
+    queryParameters: List<Pair<String, String>>? = null,
+    forceHeaders: HttpHeaders = HttpHeaders.EMPTY,
+    limitToHeaders: Set<String>? = null,
+    until: Instant = now() + 7.days
+) = RequestAuth.RequestRequirements(
+    path = path,
+    method = method,
+    parts = parts,
+    queryParameters = queryParameters,
+    forceHeaders = forceHeaders,
+    limitToHeaders = limitToHeaders,
+    until = until,
+)
+
+fun TypedHttpEndpoint<TypedServerPath0>.toRequestRequirements(
+    queryParameters: List<Pair<String, String>>? = null,
+    forceHeaders: HttpHeaders,
+    limitToHeaders: Set<String>? = null,
+    until: Instant = now() + 7.days
+) = RequestAuth.RequestRequirements(
+    path = path.path,
+    method = endpoint.method,
+    parts = mapOf(),
+    queryParameters = queryParameters,
+    forceHeaders = forceHeaders,
+    limitToHeaders = limitToHeaders,
+    until = until,
+)
+
+fun <A> TypedHttpEndpoint<TypedServerPath1<A>>.toRequestRequirements(
+    a: A,
+    queryParameters: List<Pair<String, String>>? = null,
+    forceHeaders: HttpHeaders,
+    limitToHeaders: Set<String>? = null,
+    until: Instant = now() + 7.days
+) = RequestAuth.RequestRequirements(
+    path = path.path,
+    method = endpoint.method,
+    parts = mapOf(path.a.name to Serialization.toString(a, path.a.serializer).encodeURLPathPart()),
+    queryParameters = queryParameters,
+    forceHeaders = forceHeaders,
+    limitToHeaders = limitToHeaders,
+    until = until,
+)
+fun <A, B> TypedHttpEndpoint<TypedServerPath2<A, B>>.toRequestRequirements(
+    a: A,
+    b: B,
+    queryParameters: List<Pair<String, String>>? = null,
+    forceHeaders: HttpHeaders,
+    limitToHeaders: Set<String>? = null,
+    until: Instant = now() + 7.days
+) = RequestAuth.RequestRequirements(
+    path = path.path,
+    method = endpoint.method,
+    parts = mapOf(
+        path.a.name to Serialization.toString(a, path.a.serializer).encodeURLPathPart(),
+        path.b.name to Serialization.toString(b, path.b.serializer).encodeURLPathPart()
+    ),
+    queryParameters = queryParameters,
+    forceHeaders = forceHeaders,
+    limitToHeaders = limitToHeaders,
+    until = until,
+)
 
 @Suppress("UNCHECKED_CAST")
 inline val <SUBJECT : HasId<ID>, ID : Comparable<ID>> RequestAuth<SUBJECT>.id get() = rawId as ID

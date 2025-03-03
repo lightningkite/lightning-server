@@ -35,7 +35,7 @@ lambda_timeout = 45
 logging = {
   default = {
     filePattern = null
-    level = "DEBUG"
+    level = "INFO"
     toConsole = true
   }
 }

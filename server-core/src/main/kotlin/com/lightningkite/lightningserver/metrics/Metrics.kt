@@ -1,7 +1,9 @@
 package com.lightningkite.lightningserver.metrics
 
-import com.lightningkite.lightningserver.core.ServerEntryPointElement
-import com.lightningkite.lightningserver.core.serverEntryPoint
+import com.lightningkite.lightningserver.core.ServerContext
+import com.lightningkite.lightningserver.core.ServerContextElement
+import com.lightningkite.lightningserver.core.ServerEntryPoint
+import com.lightningkite.lightningserver.core.serverContext
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serverhealth.HealthCheckable
@@ -30,7 +32,7 @@ interface Metrics: HealthCheckable {
                 listOf(
                     MetricEvent(
                         metricType = healthCheckMetric,
-                        entryPoint = serverEntryPoint().toString(),
+                        entryPoint = serverContext()?.entryPoint?.toString(),
                         time = now(),
                         value = 1.0
                     )
@@ -68,18 +70,18 @@ interface Metrics: HealthCheckable {
 
         fun report(type: MetricType, value: Double) {
             if (!Settings.sealed) return
-            if (type.name in metricsSettings().settings.tracked)
+            if (metricsSettings().settings.tracked(type.name))
                 toReport.add(MetricEvent(type, null, now(), value))
         }
 
         suspend fun reportPerHandler(type: MetricType, value: Double) {
             if (!Settings.sealed) return
-            if (type.name in metricsSettings().settings.tracked)
-                toReport.add(MetricEvent(type, serverEntryPoint()?.toString() ?: "Unknown", now(), value))
+            if (metricsSettings().settings.tracked(type.name))
+                toReport.add(MetricEvent(type, serverContext()?.entryPoint?.toString() ?: "Unknown", now(), value))
         }
 
         suspend fun addToSumPerHandler(type: MetricType, value: Double) {
-            coroutineContext[ServerEntryPointElement.Key]?.metricSums?.compute(type) { _, it -> (it ?: 0.0) + value }
+            coroutineContext[ServerContextElement.Key]?.metricSums?.compute(type) { _, it -> (it ?: 0.0) + value }
         }
 
         suspend fun <T> addPerformanceToSumPerHandler(type: MetricType, countType: MetricType? = null, action: suspend () -> T): T {
@@ -97,11 +99,11 @@ interface Metrics: HealthCheckable {
             return result
         }
 
-        suspend fun <T> handlerPerformance(handler: Any, action: suspend () -> T): T {
-            return serverEntryPoint(handler) {
+        suspend fun <T> handlerPerformance(handler: ServerContext, action: suspend () -> T): T {
+            return serverContext(handler) {
                 val result = performancePerHandler(executionTime, action)
                 try {
-                    kotlin.coroutines.coroutineContext[ServerEntryPointElement.Key]?.metricSums?.forEach {
+                    kotlin.coroutines.coroutineContext[ServerContextElement.Key]?.metricSums?.forEach {
                         reportPerHandler(it.key, it.value)
                     }
                 } catch(e: Exception) {

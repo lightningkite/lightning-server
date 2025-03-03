@@ -66,7 +66,7 @@ class ApiEndpointValidateTest {
                         endpoint = TestSettings.sample5.route.endpoint,
                         parts = mapOf(),
                         headers = HttpHeaders { set(HttpHeader.Accept, formatType.toString()) },
-                        body = emitter(formatType, Serialization.module.contextualSerializerIfHandled<UUID>(), uuid())
+                        body = emitter(formatType, Serialization.module.contextualSerializerIfHandled<UUID>(), UUID.random())
                     )
                 ).also {
                     println(it)
@@ -99,7 +99,7 @@ class ApiEndpointValidateTest {
                             double = 0.75,
                             char = 'A',
                             string = "Test",
-                            uuid = uuid(),
+                            uuid = UUID.random(),
                             instant = now(),
                             listEmbedded = listOf(
                                 ClassUsedForEmbedding("first", 1),

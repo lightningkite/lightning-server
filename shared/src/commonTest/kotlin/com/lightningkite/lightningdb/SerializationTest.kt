@@ -4,6 +4,7 @@ package com.lightningkite.lightningdb
 
 import com.lightningkite.*
 import com.lightningkite.lightningdb.testing.*
+import com.lightningkite.lightningserver.monitoring.FunnelSummary
 import com.lightningkite.serialization.ClientModule
 import com.lightningkite.serialization.*
 import com.lightningkite.serialization.partialOf
@@ -56,7 +57,7 @@ class SerializationTest {
     @Test fun partial() {
         val serializer = PartialSerializer(User.serializer())
         val part = partialOf<User>{
-            it._id assign uuid()
+            it._id assign UUID.random()
             it.email assign "test@test.com".trimmedCaseless()
         }
         val asText = myJson.encodeToString(serializer, part)
@@ -67,12 +68,15 @@ class SerializationTest {
         println(myJson.decodeFromString(serializer, """{"age": 23}"""))
     }
 
+    @Test fun partialFunnelSummary() {
+        val serializer = PartialSerializer(FunnelSummary.serializer())
+        serializer.descriptor
+    }
+
     @Test fun partial2() {
         val serializer = PartialSerializer(LargeTestModel.serializer())
         val part = partialOf<LargeTestModel> {
-            it.embeddedNullable.notNull {
-                it.value2 assign 4
-            }
+            it.embeddedNullable.notNull.value2 assign 4
             it.int assign 5
             it.intNullable assign null
         }
@@ -84,6 +88,8 @@ class SerializationTest {
         println(restored)
         println(myJson.decodeFromString(serializer, """{"embedded": { "value1": "Test" }}"""))
     }
+
+    @Suppress("Deprecation")
     @Test fun partial4() {
         val serializer = PartialSerializer(LargeTestModel.serializer())
         val part = Partial(LargeTestModel(), setOf(path<LargeTestModel>().embeddedNullable.notNull.value2))
@@ -93,6 +99,8 @@ class SerializationTest {
         assertEquals(part, restored)
         println(restored)
     }
+
+    @Suppress("Deprecation")
     @Test fun partial6() {
         val serializer = PartialSerializer(LargeTestModel.serializer())
         val part = Partial(LargeTestModel(embeddedNullable = ClassUsedForEmbedding()), setOf(path<LargeTestModel>().embeddedNullable))
@@ -102,6 +110,8 @@ class SerializationTest {
         assertEquals(part, restored)
         println(restored)
     }
+
+    @Suppress("Deprecation")
     @Test fun partial7() {
         val serializer = PartialSerializer(LargeTestModel.serializer())
         val part = Partial(LargeTestModel(), setOf(path<LargeTestModel>().embeddedNullable))
@@ -111,6 +121,8 @@ class SerializationTest {
         assertEquals(part, restored)
         println(restored)
     }
+
+    @Suppress("Deprecation")
     @Test fun partial5() {
         val serializer = PartialSerializer(LargeTestModel.serializer())
         val part = Partial(LargeTestModel(), setOf(path<LargeTestModel>().embedded))
@@ -161,6 +173,7 @@ class SerializationTest {
 
     @Test fun demoConditions() {
         Condition.Equal(2).cycle()
+        condition { it.email.contains("@lightningkite.com") and it.name.eq("Dan") }
         (path<User>().email eq "Dan".trimmedCaseless()).cycle()
         (path<User>().email eq "Dan".trimmedCaseless()).cycle()
         (path<Post>().content eq "Lightning Kite").cycle()
@@ -191,7 +204,7 @@ class SerializationTest {
 
     @Test fun cursedTest() {
         condition<Cursed.Inside<Int>> { it.item eq 2 }.cycle()
-        condition<Cursed> { it.insideClass.item eq uuid() }.cycle()
+        condition<Cursed> { it.insideClass.item eq UUID.random() }.cycle()
     }
 
 //    @Test fun metaTest() {

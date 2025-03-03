@@ -42,7 +42,6 @@ fun HEAD.includeFormScript() {
     }
 }
 
-@OptIn(InternalAPI::class)
 inline fun <reified T> FORM.insideHtmlForm(
     title: String,
     jsEditorName: String,

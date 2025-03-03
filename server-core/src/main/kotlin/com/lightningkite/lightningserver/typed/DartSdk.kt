@@ -333,7 +333,7 @@ private fun arguments(
         }?.let(::listOf)
     ).flatten()
 
-    is ApiWebsocket<*, *, *, *> -> listOfNotNull(
+    is ApiWebsocket<*, *, *, *, *> -> listOfNotNull(
         documentable.primaryAuthName?.takeUnless { skipAuth }?.let {
             DArg(
                 name = (overrideUserType ?: it).userTypeTokenName(),

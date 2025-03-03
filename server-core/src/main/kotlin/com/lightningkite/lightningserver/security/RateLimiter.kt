@@ -9,11 +9,17 @@ import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.http.*
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.websocket.WebSockets
-import com.lightningkite.lightningserver.websocket.WsInterceptor
+import com.lightningkite.lightningserver.serialization.TypeRetriever
+import com.lightningkite.lightningserver.websocket.WebSocketConnection
+import com.lightningkite.lightningserver.websocket.WebSocketClose
+import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
+import com.lightningkite.lightningserver.websocket.WebSocketFrame
+import com.lightningkite.lightningserver.websocket.WebSocketHandler
+import com.lightningkite.lightningserver.websocket.WebSocketHandlerInterceptor
 import com.lightningkite.now
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Contextual
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -46,10 +52,36 @@ class RateLimiter(
             "X-RateLimit-AvailableAfter" to info.availableAfter.toString(),
         )) else result
     }
-    val wsInterceptor: WsInterceptor = { request, cont ->
-        gate(request, request.authAny(), request.sourceIp) {
-            cont(request)
+    val wsInterceptor: WebSocketHandlerInterceptor = object: WebSocketHandlerInterceptor {
+        override fun <T> invoke(handler: WebSocketHandler<T>): WebSocketHandler<T> {
+            return object: WebSocketHandler<T> {
+                override val storageSerializer: KSerializer<T> get() = handler.storageSerializer
+                override suspend fun willConnect(request: WebSocketConnectRequest): T {
+                    val result: T
+                    gate(request, request.authAny(), request.sourceIp) {
+                        result = handler.willConnect(request)
+                    }
+                    return result
+                }
+                override suspend fun didConnect(connection: WebSocketConnection<T>) {
+                    handler.didConnect(connection)
+                }
+                override suspend fun messageFromClient(connection: WebSocketConnection<T>, frame: WebSocketFrame) {
+                    handler.messageFromClient(connection, frame)
+                }
+                override suspend fun messageFromSubscription(
+                    connection: WebSocketConnection<T>,
+                    topic: String,
+                    retrieve: TypeRetriever
+                ) {
+                    handler.messageFromSubscription(connection, topic, retrieve)
+                }
+                override suspend fun disconnect(connection: WebSocketConnection<T>, reason: WebSocketClose) {
+                    handler.disconnect(connection, reason)
+                }
+            }
         }
+
     }
 
     data class RateLimitInfo(

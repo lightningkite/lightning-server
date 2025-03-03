@@ -1,24 +1,5 @@
 package com.lightningkite.lightningserver.aws.terraform
 
-import com.lightningkite.lightningserver.auth.JwtSigner
-import com.lightningkite.lightningserver.cache.CacheSettings
-import com.lightningkite.lightningserver.db.DatabaseSettings
-import com.lightningkite.lightningserver.email.EmailSettings
-import com.lightningkite.lightningserver.encryption.SecretBasis
-import com.lightningkite.lightningserver.files.FilesSettings
-import com.lightningkite.lightningserver.metrics.MetricSettings
-import com.lightningkite.lightningserver.metrics.MetricType
-import com.lightningkite.lightningserver.schedule.Schedule
-import com.lightningkite.lightningserver.schedule.Scheduler
-import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.settings.GeneralServerSettings
-import com.lightningkite.lightningserver.settings.Settings
-import kotlinx.datetime.*
-import kotlinx.datetime.TimeZone
-import kotlinx.serialization.json.Json
-import java.io.File
-import java.util.*
-
 
 internal fun defaultAwsHandler(project: TerraformProjectInfo) = with(project) {
     TerraformSection(
@@ -79,7 +60,7 @@ internal fun defaultAwsHandler(project: TerraformProjectInfo) = with(project) {
                       name = "$namePrefix"
                       cidr = "${'$'}{var.ip_prefix}.0.0/16"
                     
-                      azs             = ["${'$'}{var.deployment_location}a", "${'$'}{var.deployment_location}b", "${'$'}{var.deployment_location}c"]
+                      azs             = ${availabilityZones.joinToString(", ", "[", "]") { "\"$it\"" }}
                       private_subnets = ["${'$'}{var.ip_prefix}.1.0/24", "${'$'}{var.ip_prefix}.2.0/24", "${'$'}{var.ip_prefix}.3.0/24"]
                       public_subnets  = ["${'$'}{var.ip_prefix}.101.0/24", "${'$'}{var.ip_prefix}.102.0/24", "${'$'}{var.ip_prefix}.103.0/24"]
                     

@@ -10,6 +10,7 @@ interface SerializableProperty<A, B> {
     val serializer: KSerializer<B>
     val annotations: List<Annotation> get() = listOf()
     val default: B? get() = null
+    val defaultCode: String? get() = null
     val serializableAnnotations: List<SerializableAnnotation> get() = annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) }
 
     companion object {
@@ -33,9 +34,13 @@ fun <T> KSerializer<T>.tryFindAnnotations(propertyName: String): List<Annotation
     else return descriptor.getElementAnnotations(i)
 }
 private val serClassToList = HashMap<String, (Array<KSerializer<*>>)->Array<SerializableProperty<*, *>>>()
+
+@OptIn(ExperimentalSerializationApi::class)
 @Suppress("UNCHECKED_CAST")
 val <T> KSerializer<T>.serializableProperties: Array<SerializableProperty<T, *>>? get() = (serClassToList[this.descriptor.serialName]?.invoke(tryTypeParameterSerializers() ?: arrayOf())) as? Array<SerializableProperty<T, *>>
     ?: (this as? VirtualStruct.Concrete)?.serializableProperties as? Array<SerializableProperty<T, *>>
+
+@OptIn(ExperimentalSerializationApi::class)
 fun <T, S: KSerializer<T>> S.properties(action: (Array<KSerializer<Nothing>>)->Array<SerializableProperty<T, *>>) {
     @Suppress("UNCHECKED_CAST")
     serClassToList[descriptor.serialName] = action as (Array<KSerializer<*>>)->Array<SerializableProperty<*, *>>

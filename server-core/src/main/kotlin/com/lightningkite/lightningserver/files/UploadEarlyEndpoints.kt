@@ -67,7 +67,7 @@ import com.lightningkite.serialization.*
 //        description = "Start uploading a file to make a request later.  Times out in around 10 minutes.",
 //        errorCases = listOf(),
 //        implementation = { _: Unit ->
-//            val id = uuid()
+//            val id = UUID.random()
 //            val newFile = jailFiles().root.resolve(jailFilePath).resolve("${id}.temp")
 //            val newItem = UploadForNextRequest(
 //                _id = id,

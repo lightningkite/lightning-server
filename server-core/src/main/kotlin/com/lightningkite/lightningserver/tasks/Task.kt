@@ -1,6 +1,9 @@
 package com.lightningkite.lightningserver.tasks
 
+import com.lightningkite.lightningserver.core.ServerContext
+import com.lightningkite.lightningserver.core.ServerEntryPoint
 import com.lightningkite.lightningserver.engine.engine
+import com.lightningkite.lightningserver.http.Request
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.KSerializer
 
@@ -8,7 +11,12 @@ data class Task<INPUT>(
     val name: String,
     val serializer: KSerializer<INPUT>,
     val implementation: suspend RunningTask<INPUT>.(INPUT) -> Unit
-) {
+): ServerEntryPoint, ServerContext {
+    override suspend fun logString(): String = toString()
+    override val entryPoint: ServerEntryPoint
+        get() = this
+    override val request: Request?
+        get() = null
 
     interface RunningTask<T> : CoroutineScope {
         suspend fun restart(input: T)

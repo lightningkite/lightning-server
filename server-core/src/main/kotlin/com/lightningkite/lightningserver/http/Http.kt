@@ -2,6 +2,7 @@ package com.lightningkite.lightningserver.http
 
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.auth.authAny
+import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
@@ -22,17 +23,15 @@ object Http {
 
     val endpoints: MutableMap<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> =
         MutableMapWithChangeHandler<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> {
-            _matcher = null
-        }
-    private var _matcher: HttpEndpointMatcher? = null
-    val matcher: HttpEndpointMatcher
-        get() {
-            return _matcher ?: run {
-                val created = HttpEndpointMatcher(endpoints.keys.asSequence())
-                _matcher = created
-                created
+            _matcher = lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+                HttpEndpointMatcher(endpoints.keys.asSequence())
             }
         }
+    private var _matcher: Lazy<HttpEndpointMatcher> = lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        HttpEndpointMatcher(endpoints.keys.asSequence())
+    }
+    val matcher: HttpEndpointMatcher
+        get() = _matcher.value
 
     var exception: suspend (HttpRequest, Exception) -> HttpResponse =
         { request, exception ->
@@ -69,9 +68,7 @@ object Http {
             // WARNING: This will melt your brain
             fullAction =
                 interceptors.fold<HttpInterceptor, HttpInterceptor>({ request, handler -> handler(request) }) { total, wrapper ->
-                    return@fold { request, handler ->
-                        total(request) { wrapper(it, handler) }
-                    }
+                    return@fold { request, handler -> total(request) { wrapper(it, handler) } }
                 }
         }
     private var fullAction: HttpInterceptor = { req, cont -> cont(req) }
@@ -85,9 +82,8 @@ object Http {
             } catch (e: Exception) {
                 return HttpResponse(null, HttpStatus.Unauthorized)
             }
-            serverLogger.info("${request.endpoint} (${request.parts}) accessed by ${authOrNull} (${request.sourceIp})")
             try {
-                Metrics.handlerPerformance(request.endpoint) {
+                Metrics.handlerPerformance(request) {
                     fullAction(request, handler)
                 }
             } catch (e: Exception) {
@@ -97,6 +93,15 @@ object Http {
             if (generalSettings().debug) {
                 logger.warn("${request.endpoint} not found!")
             }
+        }
+    }
+
+    init {
+        endpoints[HttpEndpoint(ServerPath("robots.txt"), HttpMethod.GET)] = {
+            HttpResponse.plainText("""
+            User-agent: *
+            Disallow: /
+        """.trimIndent())
         }
     }
 }

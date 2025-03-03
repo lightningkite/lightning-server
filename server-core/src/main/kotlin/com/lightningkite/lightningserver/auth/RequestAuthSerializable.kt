@@ -35,7 +35,12 @@ data class RequestAuthSerializable(
     val scopes: Set<String>,
     val cache: CacheKeyMap = CacheKeyMap(mapOf()),
     val thirdParty: String? = null,
-)
+    val requirements: RequestAuth.RequestRequirements? = null,
+) {
+    companion object {
+        val dummy = RequestAuthSerializable("", null, "", Instant.DISTANT_PAST, Instant.DISTANT_PAST, setOf())
+    }
+}
 
 @Suppress("UNCHECKED_CAST")
 fun RequestAuth<*>.serializable(expiresAt: Instant) = RequestAuthSerializable(
@@ -47,6 +52,7 @@ fun RequestAuth<*>.serializable(expiresAt: Instant) = RequestAuthSerializable(
     cache = cacheKeyMap(),
     sessionId = sessionId,
     thirdParty = thirdParty,
+    requirements = requirements,
 )
 
 fun RequestAuthSerializable.real(subjectHandler: Authentication.SubjectHandler<*, *>? = null): RequestAuth<*> {
@@ -63,6 +69,7 @@ fun RequestAuthSerializable.real(subjectHandler: Authentication.SubjectHandler<*
         scopes = scopes,
         sessionId = sessionId,
         thirdParty = thirdParty,
+        requirements = requirements,
     ).cacheKeyMap(cache)
 }
 

@@ -1,22 +1,23 @@
-import com.lightningkite.deployhelpers.developer
+
 import com.lightningkite.deployhelpers.github
 import com.lightningkite.deployhelpers.mit
-import com.lightningkite.deployhelpers.standardPublishing
+import com.lightningkite.deployhelpers.*
+import com.vanniktech.maven.publish.SonatypeHost
 
 plugins {
-    alias(serverlibs.plugins.kotlinJvm)
-    alias(serverlibs.plugins.ksp)
-    alias(serverlibs.plugins.serialization)
-    alias(serverlibs.plugins.dokka)
+    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.serialization)
+    // alias(libs.plugins.dokka)
     id("signing")
-    `maven-publish`
+    alias(libs.plugins.vanniktechMavenPublish)
 }
 
 dependencies {
     api(project(":server-core"))
-    api(serverlibs.azureFunctions)
-    api(serverlibs.azureStorage)
-    testImplementation(serverlibs.kotlinTest)
+    api(libs.azureFunctions)
+    api(libs.azureStorage)
+    testImplementation(libs.kotlinTest)
     testImplementation(project(":server-testing"))
     ksp(project(":processor"))
     kspTest(project(":processor"))
@@ -44,26 +45,27 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     kotlinOptions.jvmTarget = JavaVersion.VERSION_11.toString()
 }
 
-standardPublishing {
-    name.set("Lightning-server-Server")
-    description.set("An implementation of LightningServer Engine using Azure Functions, and FileSystem using Azure Blob Storage.")
-    github("lightningkite", "lightning-server")
 
-    licenses {
-        mit()
-    }
+val lk = project.lk {
+    version = gitBasedVersion().also { println("Determined version to be $it") }
+}
+mavenPublishing {
+    // publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    signAllPublications()
+    coordinates(group.toString(), name, version.toString())
+    pom {
+        name.set("Lightning-server-Server")
+        description.set("An implementation of LightningServer Engine using Azure Functions, and FileSystem using Azure Blob Storage.")
+        github("lightningkite", "lightning-server")
 
-    developers {
-        developer(
-            id = "LightningKiteJoseph",
-            name = "Joseph Ivie",
-            email = "joseph@lightningkite.com",
-        )
-        developer(
-            id = "bjsvedin",
-            name = "Brady Svedin",
-            email = "brady@lightningkite.com",
-        )
+        licenses {
+            mit()
+        }
+
+        developers {
+            joseph()
+            brady()
+        }
     }
 }
-tasks.getByName("sourceJar").dependsOn("kspKotlin")
+

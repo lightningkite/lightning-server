@@ -7,7 +7,7 @@ import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.core.serverEntryPoint
+import com.lightningkite.lightningserver.core.serverContext
 import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
@@ -35,11 +35,18 @@ fun ServerPath.bulkRequestEndpoint() = post.api(
                             error = LSError(404, detail = "no-match", message = "No matching route found", data = it.method + " " + it.path),
                             durationMs = start.elapsedNow().inWholeMilliseconds
                         )
-                    serverEntryPoint(handler.endpoint) {
+                    serverContext(HttpRequest(
+                        endpoint = handler.endpoint,
+                        queryParameters = rawRequest?.queryParameters ?: listOf(),
+                        headers = rawRequest?.headers ?: HttpHeaders.EMPTY,
+                        domain = rawRequest?.domain ?: "",
+                        protocol = rawRequest?.protocol ?: "",
+                        sourceIp = rawRequest?.sourceIp ?: ""
+                    )) {
                         @Suppress("UNCHECKED_CAST")
                         val api =
                             Http.endpoints[handler.endpoint] as? ApiEndpoint<HasId<*>?, TypedServerPath, Any?, Any?>
-                                ?: return@serverEntryPoint entry.key to BulkResponse(
+                                ?: return@serverContext entry.key to BulkResponse(
                                     error = LSError(
                                         400,
                                         detail = "not-api",
@@ -48,7 +55,6 @@ fun ServerPath.bulkRequestEndpoint() = post.api(
                                     ),
                                     durationMs = start.elapsedNow().inWholeMilliseconds
                                 )
-                        serverLogger.info("${api.route.endpoint} (${handler.parts}) accessed by ${authOrNull} (${rawRequest?.sourceIp}) (via bulk)")
                         try {
                             val result = api.implementation(
                                 api.authAndPathParts(

@@ -59,7 +59,7 @@ class OauthProviderInfo(
     fun loginUrl(
         credentials: () -> OauthProviderCredentials,
         callback: HttpEndpoint,
-        state: String = uuid().toString(),
+        state: String = UUID.random().toString(),
         scope: String = scopeForProfile,
         accessType: OauthAccessType = OauthAccessType.online,
         loginHint: String? = null,

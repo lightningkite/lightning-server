@@ -73,7 +73,7 @@ abstract class AzureAdapter {
                         body = if (inHeaders.contentType == ContentType.MultiPart.FormData) {
                             ByteArrayInputStream(
                                 request.body.get().toByteArray(Charset.defaultCharset())
-                            ).toMultipartContent(inHeaders.contentType!!)
+                            ).toMultipartContent(inHeaders.contentType!!, inHeaders.contentLength)
                         } else if (request.body.isPresent)
                             HttpContent.Text(
                                 request.body.get(),

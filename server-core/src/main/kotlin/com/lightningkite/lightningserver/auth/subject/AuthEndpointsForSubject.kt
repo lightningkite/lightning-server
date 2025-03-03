@@ -7,6 +7,7 @@ import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.*
+import com.lightningkite.lightningserver.auth.RequestAuth.RequestRequirements
 import com.lightningkite.lightningserver.auth.oauth.*
 import com.lightningkite.lightningserver.auth.proof.*
 import com.lightningkite.lightningserver.auth.token.PrivateTinyTokenFormat
@@ -21,6 +22,8 @@ import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.encryption.*
 import com.lightningkite.lightningserver.exceptions.*
 import com.lightningkite.lightningserver.http.*
+import com.lightningkite.lightningserver.http.HttpMethod
+import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.routes.docName
 import com.lightningkite.lightningserver.routes.fullUrl
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -44,6 +47,7 @@ import org.jetbrains.annotations.TestOnly
 import java.security.SecureRandom
 import java.util.*
 import kotlin.math.min
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
@@ -89,9 +93,9 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         forUser = { collection: FieldCollection<Session<SUBJECT, ID>> ->
             val requestAuth = this.authOrNull
             val canUse: Condition<Session<SUBJECT, ID>> = when {
-                Authentication.isSuperUser.accepts(requestAuth) -> Condition.Always()
-                Authentication.isAdmin.accepts(requestAuth) -> Condition.Always()
-                requestAuth == null -> Condition.Never()
+                Authentication.isSuperUser.accepts(requestAuth) -> Condition.Always
+                Authentication.isAdmin.accepts(requestAuth) -> Condition.Always
+                requestAuth == null -> Condition.Never
                 else -> Condition.OnField(
                     Session_subjectId(handler.subjectSerializer, handler.idSerializer),
                     @Suppress("UNCHECKED_CAST")
@@ -99,14 +103,14 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 )
             }
             val isRoot: Condition<Session<SUBJECT, ID>> =
-                if (Authentication.isSuperUser.accepts(requestAuth)) Condition.Always() else Condition.Never()
+                if (Authentication.isSuperUser.accepts(requestAuth)) Condition.Always else Condition.Never
             collection.withPermissions(
                 permissions = ModelPermissions(
                     create = isRoot,
                     read = canUse,
                     readMask = Mask(
                         listOf(
-                            Condition.Never<Session<SUBJECT, ID>>() to Modification.OnField(
+                            Condition.Never to Modification.OnField(
                                 Session_secretHash(handler.subjectSerializer, handler.idSerializer),
                                 Modification.Assign("")
                             )
@@ -128,10 +132,38 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         // TODO: Read JWT from query params, remove and redirect
         val token =
             request.headers[HttpHeader.Authorization]?.removePrefix("bearer ")?.removePrefix("Bearer ")
+                ?: request.queryParameters.find { it.first.equals(HttpHeader.Authorization, true) }?.second?.replace(' ', '+')
+                ?: request.queryParameters.find { it.first == "jwt" }?.second?.replace(' ', '+')
                 ?: request.headers.cookies[HttpHeader.Authorization]
-                ?: request.queryParameters.find { it.first == "authorization" }?.second
                 ?: return null
         return tokenToAuth(token, request)
+    }
+
+    fun presignToken(forSession: Session<SUBJECT, ID>, requirements: RequestRequirements): String {
+        return tokenFormat().create(handler, RequestAuth(
+            subject = handler,
+            sessionId = forSession._id,
+            rawId = forSession.subjectId,
+            issuedAt = now(),
+            scopes = forSession.scopes,
+            fromMasquerade = null,
+            requirements = requirements
+        ))
+    }
+    fun presignToken(forId: ID, requirements: RequestRequirements): String {
+        return tokenFormat().create(handler, RequestAuth(
+            subject = handler,
+            sessionId = null,
+            rawId = forId,
+            issuedAt = now(),
+            requirements = requirements
+        ))
+    }
+    fun presign(request: RequestRequirements, forSession: Session<SUBJECT, ID>): String {
+        return "${request.pathPlusQueryParametersAnd}${HttpHeader.Authorization}=${presignToken(forSession, request)}"
+    }
+    fun presign(request: RequestRequirements, forId: ID): String {
+        return "${request.pathPlusQueryParametersAnd}${HttpHeader.Authorization}=${presignToken(forId, request)}"
     }
 
     suspend fun tokenToAuth(token: String, request: Request?): RequestAuth<SUBJECT>? {
@@ -146,7 +178,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     val errorNoSingleUser = LSError(
         404,
         detail = "no-single-user",
-        message = "No single user could be found that matches the given credentials."
+        message = "No user '' was found."
     )
     val errorInvalidProof = LSError(
         400,
@@ -262,7 +294,10 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
             val used = proofs.map { it.via }.toSet()
             val users = proofs.mapNotNull { handler.findUser(it.property, it.value) }.distinctBy { it._id }
-            val subject = users.singleOrNull() ?: throw HttpStatusException(errorNoSingleUser)
+            val identity = proofs.filter { it.property == "email" || it.property == "phone" }.firstOrNull()
+            val subject = users.singleOrNull() ?: throw HttpStatusException(errorNoSingleUser.copy(
+                message = "No user was found with the ${identity?.property ?: "given ID"} ${identity?.value ?: ""}."
+            ))
             proofs.forEach {
                 if(handler.get(subject, it.property) != it.value) {
                     throw HttpStatusException(errorIrrelevantProof.copy(data = it.via))
@@ -505,24 +540,28 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     private suspend fun RefreshToken.session(request: Request?): Session<SUBJECT, ID>? {
         if (!valid) {
-//            if(generalSettings().debug) println("Auth failed because !valid")
+            if(generalSettings().debug) println("Auth failed because !valid")
             return null
         }
         if (type != handler.name) {
-//            if(generalSettings().debug) println("Auth failed because type != handler.name")
+            if(generalSettings().debug) println("Auth failed because type != handler.name")
             return null
         }
         val session = sessionInfo.collection().get(_id) ?: run {
-//            if(generalSettings().debug) println("Auth failed because session does not exist")
-            return null
+            if(generalSettings().debug) println("No such session")
+            throw UnauthorizedException("No such session")
         }
         if (!plainTextSecret.checkAgainstHash(session.secretHash)) {
-//            if(generalSettings().debug) println("Auth failed because !plainTextSecret.checkAgainstHash(session.secretHash)")
-            return null
+            if(generalSettings().debug) println("Auth failed because !plainTextSecret.checkAgainstHash(session.secretHash) ($plainTextSecret vs ${session.secretHash})")
+            throw UnauthorizedException("Incorrect hash for session")
+        }
+        if ((session.expires ?: Instant.DISTANT_FUTURE) < now()) {
+            if(generalSettings().debug) println("Auth failed because session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()")
+            throw UnauthorizedException("Session has expired.")
         }
         if (session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()) {
-//            if(generalSettings().debug) println("Auth failed because session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()")
-            return null
+            if(generalSettings().debug) println("Auth failed because session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()")
+            throw UnauthorizedException("Session has been terminated.")
         }
         sessionInfo.collection().updateOneById(_id, modification(dataClassPath) {
             it.lastUsed assign now()
@@ -586,169 +625,4 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     @Serializable
     private data class HtmlProofFinish(val password: String)
 
-    /**
-     * A quick and dirty set of endpoints for logging in via HTML.
-     */
-    inner class DebuggingHtmlEndpoints {
-
-        // Raw HTML side
-        val html0 = path("start/html/").get.handler { request ->
-            val otherProofs =
-                request.queryParameter("proofs")?.let { Serialization.javaData.decodeFromBase64Url<List<Proof>>(it) }
-                    ?: listOf()
-            request.queryParameter("method")?.decodeURLPart()?.let { methodName ->
-                request.queryParameter("value")?.decodeURLPart()?.let { methodValue ->
-                    return@handler htmlContinue(
-                        HtmlProofStartReq(
-                            methodName,
-                            request.queryParameter("property")?.decodeURLPart() ?: "",
-                            methodValue
-                        ), request, otherProofs
-                    )
-                }
-            }
-            HttpResponse(
-                body = HttpContent.Text(
-                    string = HtmlDefaults.basePage(
-                        """
-                    <form action='.?proofs=${Serialization.javaData.encodeToBase64Url(otherProofs)}' enctype='application/x-www-form-urlencoded' method='post'>
-                        <p>Enter your login key</p>
-                        <select name='method'>
-                        ${handler.proofMethods.joinToString() { "<option value='${it.info.via}' ${if (it is EmailProofEndpoints) "selected" else ""}>${it.info.via}</option>" }}
-                        </select>
-                        <input name='property', value='email'/>
-                        <input name='value'/>
-                        <button type='submit'>Submit</button>
-                    </form>
-                """.trimIndent()
-                    ),
-                    type = ContentType.Text.Html
-                )
-            )
-        }
-
-        val html1 = path("start/html/").post.handler { request ->
-            val otherProofs =
-                request.queryParameter("proofs")?.let { Serialization.javaData.decodeFromBase64Url<List<Proof>>(it) }
-                    ?: listOf()
-            val input = request.body!!.parse<HtmlProofStartReq>()
-            htmlContinue(input, request, otherProofs)
-        }
-
-        private suspend fun htmlContinue(
-            input: HtmlProofStartReq,
-            request: HttpRequest,
-            otherProofs: List<Proof>,
-        ): HttpResponse {
-            val method = handler.proofMethods.find { it.info.via == input.method }
-                ?: throw NotFoundException("No method ${input.method} known")
-            val aapp = AuthAndPathParts<HasId<*>?, TypedServerPath0>(null, request, arrayOf())
-            return when (method) {
-                is Authentication.StartedProofMethod -> {
-                    val key = method.start.implementation(aapp, input.value)
-                    HttpResponse(
-                        body = HttpContent.Text(
-                            string = HtmlDefaults.basePage(
-                                """
-                        <form action='./${input.method}/${key.encodeURLPathPart()}?proofs=${
-                                    Serialization.javaData.encodeToBase64Url(
-                                        otherProofs
-                                    )
-                                }' enctype='application/x-www-form-urlencoded' method='post'>
-                            <p>Enter your password for ${method.info.via}</p>
-                            <input type='password' name='password'/>
-                            <button type='submit'>Submit</button>
-                        </form>
-                    """.trimIndent()
-                            ),
-                            type = ContentType.Text.Html
-                        )
-                    )
-                }
-
-                is Authentication.DirectProofMethod -> {
-                    HttpResponse(
-                        body = HttpContent.Text(
-                            string = HtmlDefaults.basePage(
-                                """
-                        <form action='./${input.method}/${input.property.encodeURLPathPart()}---${input.value.encodeURLPathPart()}?proofs=${
-                                    Serialization.javaData.encodeToBase64Url(
-                                        otherProofs
-                                    )
-                                }' enctype='application/x-www-form-urlencoded' method='post'>
-                            <p>Enter your password for ${method.info.via}</p>
-                            <input type='password' name='password'/>
-                            <button type='submit'>Submit</button>
-                        </form>
-                    """.trimIndent()
-                            ),
-                            type = ContentType.Text.Html
-                        )
-                    )
-                }
-
-                else ->
-                    HttpResponse(
-                        body = HttpContent.Text(
-                            string = HtmlDefaults.basePage(
-                                """
-                                    Sorry, we do not now how to display this method for testing.
-                                """.trimIndent()
-                            ),
-                            type = ContentType.Text.Html
-                        )
-                    )
-            }
-        }
-
-        val html2 = path("start/html/{method}/{key}").post.handler { request ->
-            val otherProofs =
-                request.queryParameter("proofs")?.let { Serialization.javaData.decodeFromBase64Url<List<Proof>>(it) }
-                    ?: listOf()
-            val methodName = request.parts["method"]!!
-            val key = request.parts["key"]!!
-            val input = request.body!!.parse<HtmlProofFinish>()
-            val method = handler.proofMethods.find { it.info.via == methodName }
-                ?: throw NotFoundException("No method ${methodName} known")
-            val aapp = AuthAndPathParts<HasId<*>?, TypedServerPath0>(null, request, arrayOf())
-            val proof = when (method) {
-                is Authentication.StartedProofMethod -> method.prove.implementation(
-                    aapp, FinishProof(
-                        key = key,
-                        password = input.password
-                    )
-                )
-
-                is Authentication.DirectProofMethod -> method.prove.implementation(
-                    aapp, IdentificationAndPassword(
-                        type = handler.name,
-                        property = key.substringBefore("---"),
-                        value = key.substringAfter("---"),
-                        password = input.password
-                    )
-                )
-
-                else -> throw BadRequestException()
-            }
-            val l = login.implementation(aapp, (otherProofs + proof))
-            l.session?.let {
-                HttpResponse.redirectToGet("/") {
-                    setCookie(HttpHeader.Authorization, it)
-                }
-            } ?: run {
-                val nextMethodInfo = l.options.first()
-                HttpResponse.redirectToGet(
-                    html0.path.toString() + "?proofs=${
-                        Serialization.javaData.encodeToBase64Url(
-                            otherProofs + proof
-                        )
-                    }&method=${nextMethodInfo.method.via}&value=${nextMethodInfo.value ?: l.id}&property=${nextMethodInfo.method.property ?: "_id"}"
-                )
-            }
-        }
-    }
-
-    val html = DebuggingHtmlEndpoints()
 }
-
-

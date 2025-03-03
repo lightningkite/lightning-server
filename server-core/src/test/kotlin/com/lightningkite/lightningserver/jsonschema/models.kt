@@ -13,7 +13,7 @@ import com.lightningkite.uuid
 @Serializable
 @GenerateDataClassPaths
 data class Post(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     val author: String,
     val title: String,
     val content: String

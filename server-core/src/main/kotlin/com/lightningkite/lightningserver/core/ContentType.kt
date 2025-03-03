@@ -167,6 +167,7 @@ class ContentType(val type: String, val subtype: String, val parameters: Map<Str
     }
 
     companion object {
+        val Any = ContentType("*", "*")
         val xmlTypes = setOf(
             Application.Xml,
             Text.Html,

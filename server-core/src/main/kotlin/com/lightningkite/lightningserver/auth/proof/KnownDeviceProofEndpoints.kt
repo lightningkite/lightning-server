@@ -48,16 +48,14 @@ class KnownDeviceProofEndpoints(
 
     private val active get() = condition<KnownDeviceSecret> { it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())) }
 
-    val modelInfo = modelInfo(
-        serialization = ModelSerializationInfo<KnownDeviceSecret, UUID>(),
-        authOptions = anyAuthRoot + Authentication.isAdmin,
-        getBaseCollection = { database().collection() },
-        getCollection = {
+    val modelInfo = database.modelInfo<HasId<*>?, KnownDeviceSecret, UUID>(
+        authOptions = (anyAuthRoot + Authentication.isAdmin),
+        signals = {
             it.interceptCreate {
                 it.copy(hash = it.hash.secureHash(), expiresAt = now() + expires())
             }
         },
-        forUser = {
+        permissions = {
             val admin = condition<KnownDeviceSecret>(Authentication.isAdmin.accepts(authOrNull))
             val mine = authOrNull?.let { a ->
                 condition<KnownDeviceSecret> {
@@ -65,23 +63,21 @@ class KnownDeviceProofEndpoints(
                 }
             } ?: Condition.Never
             val active = condition<KnownDeviceSecret> { it.disabledAt.eq(null) }
-            it.withPermissions(
-                ModelPermissions(
-                    create = Condition.Never,
-                    read = admin or mine,
-                    readMask = mask {
-                        it.hash.mask("")
-                    },
-                    update = admin or (mine and active),
-                    updateRestrictions = updateRestrictions {
-                        it.subjectType.cannotBeModified()
-                        it.subjectId.cannotBeModified()
-                        it.hash.cannotBeModified()
-                        it.deviceInfo.cannotBeModified()
-                        it.establishedAt.cannotBeModified()
-                    },
-                    delete = Condition.Never,
-                )
+            ModelPermissions(
+                create = Condition.Never,
+                read = admin or mine,
+                readMask = mask {
+                    it.hash.mask("")
+                },
+                update = admin or (mine and active),
+                updateRestrictions = updateRestrictions {
+                    it.subjectType.cannotBeModified()
+                    it.subjectId.cannotBeModified()
+                    it.hash.cannotBeModified()
+                    it.deviceInfo.cannotBeModified()
+                    it.establishedAt.cannotBeModified()
+                },
+                delete = Condition.Never,
             )
         }
     )
@@ -93,8 +89,8 @@ class KnownDeviceProofEndpoints(
         id: ID,
         deviceInfo: String
     ): KnownDeviceSecretAndExpiration {
-        val secretValue = uuid().toString()
-        val secretId = uuid()
+        val secretValue = UUID.random().toString()
+        val secretId = UUID.random()
         val exp = now() + expires()
         @Suppress("UNCHECKED_CAST")
         val secret = KnownDeviceSecret(
@@ -179,7 +175,7 @@ class KnownDeviceProofEndpoints(
         errorCases = listOf(),
         examples = listOf(
             ApiExample(
-                input = "${uuid()}/${uuid()}",
+                input = "${UUID.random()}/${UUID.random()}",
                 output = Proof(
                     via = info.via,
                     property = "User/_id",
@@ -193,7 +189,7 @@ class KnownDeviceProofEndpoints(
         successCode = HttpStatus.OK,
         implementation = { input: String ->
             val now = now()
-            val id = input.substringBefore('/').let { uuid(it) }
+            val id = input.substringBefore('/').let { UUID.parse(it) }
             val secret = input.substringAfter('/')
             cache().constrainAttemptRate(
                 cacheKey = "known-devices-count-${id}"

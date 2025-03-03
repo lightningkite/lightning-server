@@ -54,12 +54,12 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
     @Suppress("UNCHECKED_CAST")
     private fun sampleConditions(): List<Condition<T>> {
         return try {
-            val sample = exampleItem() ?: return listOf(Condition.Always())
-            listOf(Condition.Always<T>()) + info.serialization.serializer.serializableProperties!!
+            val sample = exampleItem() ?: return listOf(Condition.Always)
+            listOf(Condition.Always) + info.serialization.serializer.serializableProperties!!
                 .take(3)
                 .map { Condition.OnField(it as SerializableProperty<T, Any?>, Condition.Equal(it.get(sample))) }
         } catch (e: Exception) {
-            listOf(Condition.Always())
+            listOf(Condition.Always)
         }
     }
 
@@ -111,6 +111,20 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
             }
         )
     }
+
+    val permissions = get("_permissions_").api<USER, Unit, ModelPermissions<T>>(
+        belongsToInterface = interfaceName,
+        authOptions = info.authOptions,
+        inputType = Unit.serializer(),
+        outputType = ModelPermissions.serializer(info.serialization.serializer),
+        summary = "Permissions",
+        description = "Returns the user's permissions for this collection.",
+        errorCases = listOf(),
+        examples = listOf(ApiExample(Unit, ModelPermissions())),
+        implementation = { _: Unit ->
+            info.permissions(this)
+        }
+    )
 
     val list = wholePath.get.api(
         belongsToInterface = interfaceName,

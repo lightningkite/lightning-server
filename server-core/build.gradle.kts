@@ -1,42 +1,54 @@
-import com.lightningkite.deployhelpers.developer
+
 import com.lightningkite.deployhelpers.github
 import com.lightningkite.deployhelpers.mit
-import com.lightningkite.deployhelpers.standardPublishing
+import com.lightningkite.deployhelpers.*
+import com.vanniktech.maven.publish.SonatypeHost
 
 plugins {
-    alias(serverlibs.plugins.kotlinJvm)
-    alias(serverlibs.plugins.ksp)
-    alias(serverlibs.plugins.serialization)
-    alias(serverlibs.plugins.dokka)
+    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.serialization)
+    // alias(libs.plugins.dokka)
     id("signing")
-    `maven-publish`
+    alias(libs.plugins.vanniktechMavenPublish)
+}
+
+val lk = project.lk {
+    version = gitBasedVersion().also { println("Determined version to be $it") }
 }
 
 dependencies {
     api(project(":shared"))
-    api(serverlibs.ktorJson)
-    api(serverlibs.ktorCioJvm)
-    api(serverlibs.ktorClientCio)
-    api(serverlibs.ktorContentNegotiation)
-    implementation(serverlibs.coroutinesCore)
-    implementation(serverlibs.logBackClassic)
-    implementation(serverlibs.kotlinStdLib)
-    implementation(serverlibs.coroutinesCore)
-    api(serverlibs.kotlinHtmlJvm)
-    api(serverlibs.oneTimePass)
-    api(serverlibs.serializationCbor)
-    api(serverlibs.xmlUtilJvm)
-    api(serverlibs.mongoBson)
-    api(serverlibs.kBson)
-    api(serverlibs.kaml)
-    api(serverlibs.serializationProtobuf)
-    api(serverlibs.kotlinReflect)
-    implementation(serverlibs.bouncyCastleBcprov)
-    implementation(serverlibs.bouncyCastleBcpkix)
+    api(libs.ktorJson)
+    api(libs.ktorCioJvm)
+    api(libs.ktorClientCio)
+    api(libs.ktorContentNegotiation)
+    api(lk.mavenOrLocal(
+        gitUrl = "git@github.com:lightningkite/kotlinx-serialization-csv-durable.git",
+        group = "com.lightningkite",
+        artifact = "kotlinx-serialization-csv-durable",
+        major = 0,
+        minor = 2
+    ))
+    implementation(libs.coroutinesCore)
+    implementation(libs.logBackClassic)
+    implementation(libs.kotlinStdLib)
+    implementation(libs.coroutinesCore)
+    api(libs.kotlinHtmlJvm)
+    api(libs.oneTimePass)
+    api(libs.serializationCbor)
+    api(libs.xmlUtilJvm)
+    api(libs.mongoBson)
+    api(libs.kBson)
+    api(libs.kaml)
+    api(libs.serializationProtobuf)
+    api(libs.kotlinReflect)
+    implementation(libs.bouncyCastleBcprov)
+    implementation(libs.bouncyCastleBcpkix)
 
-    api(serverlibs.angusMail)
-    testImplementation(serverlibs.javaJwt)
-    testImplementation(serverlibs.kotlinTest)
+    api(libs.angusMail)
+    testImplementation(libs.javaJwt)
+    testImplementation(libs.kotlinTest)
 
     ksp(project(":processor"))
     kspTest(project(":processor"))
@@ -63,7 +75,12 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     kotlinOptions.jvmTarget = JavaVersion.VERSION_11.toString()
 }
 
-standardPublishing {
+
+mavenPublishing {
+    // publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    signAllPublications()
+    coordinates(group.toString(), name, version.toString())
+    pom {
     name.set("Lightning-server-Server")
     description.set("A set of tools to fill in/replace what Ktor is lacking in.")
     github("lightningkite", "lightning-server")
@@ -73,17 +90,9 @@ standardPublishing {
     }
 
     developers {
-        developer(
-            id = "LightningKiteJoseph",
-            name = "Joseph Ivie",
-            email = "joseph@lightningkite.com",
-        )
-        developer(
-            id = "bjsvedin",
-            name = "Brady Svedin",
-            email = "brady@lightningkite.com",
-        )
+        joseph()
+        brady()
     }
 }
 
-tasks.getByName("sourceJar").dependsOn("kspKotlin")
+}

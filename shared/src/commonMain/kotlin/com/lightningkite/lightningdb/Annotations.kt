@@ -13,6 +13,14 @@ import kotlin.time.ExperimentalTime
 annotation class CheckReturnValue
 
 /**
+ * The natural sorting order of the items.  Uses field names with prefixed '-' and '~' for ordering.  See [SortPart]'s serialization format.
+ */
+@SerialInfo
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS)
+annotation class NaturalSort(val fields: Array<String>)
+
+/**
  * Which fields are text searched in the admin
  */
 @SerialInfo

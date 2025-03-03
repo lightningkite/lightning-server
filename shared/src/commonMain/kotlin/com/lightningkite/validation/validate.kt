@@ -75,15 +75,18 @@ object Validators {
     }
 
     internal val suspendProcessors = ArrayList<suspend (Annotation, value: Any?) -> ValidationIssuePart?>()
-    inline fun <reified T : Annotation, V : Any> suspendProcessor(crossinline action: suspend (T, V) -> ValidationIssuePart?) {
+    inline fun <reified T : Annotation, reified V : Any> suspendProcessor(crossinline action: suspend (T, V) -> ValidationIssuePart?) {
         directSuspendProcessor(T::class) { a, b ->
             if (a is T) {
                 @Suppress("UNCHECKED_CAST")
                 if(b is Collection<*>)
-                    b.mapNotNull { action(a, it as V) }.firstOrNull()
+                    b.mapNotNull { if(it is V) action(a, it as V) else null }.firstOrNull()
                 else if(b is Map<*, *>)
-                    b.values.mapNotNull { action(a, it as V) }.firstOrNull()
-                else action(a, b as V)
+                    b.values.mapNotNull { if(it is V) action(a, it as V) else null }.firstOrNull()
+                else if(b is V)
+                    action(a, b as V)
+                else
+                    null
             } else
                 null
         }

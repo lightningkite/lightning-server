@@ -15,6 +15,7 @@ import kotlinx.serialization.UseContextualSerialization
 import org.junit.Test
 import java.util.*
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.typed.AuthAndPathParts
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -26,22 +27,28 @@ class ChangeSocketTest {
         runBlocking {
             prepareModelsShared()
             prepareModelsServerCore()
-            TestSettings.wsModelInfo.collection().deleteMany(Condition.Always())
-            TestSettings.ws.test {
+            TestSettings.wsModelInfo.collection().deleteMany(Condition.Always)
+            TestSettings.ws.test(AuthAndPathParts.test(null)) {
 
                 suspend fun assertSent(
                     inserted: TestThing
                 ) {
+                    println("assertSent $inserted")
                     while(incoming.tryReceive().isSuccess) {}
-                    TestSettings.wsModelInfo.collection().insertOne(inserted)
+                    TestSettings.wsModelInfo.collection().insertOne(inserted.also { println("Inserting $it") })
+                    println("Checking if sent...")
                     assertEquals(ListChange(new = inserted), incoming.receive().also { println("Got $it") })
+                    println("OK")
                 }
                 suspend fun assertNotSent(
                     inserted: TestThing
                 ) {
+                    println("assertNotSent $inserted")
                     while(incoming.tryReceive().isSuccess) {}
-                    TestSettings.wsModelInfo.collection().insertOne(inserted)
+                    TestSettings.wsModelInfo.collection().insertOne(inserted.also { println("Inserting $it") })
+                    println("Checking if sent...")
                     assertTrue(incoming.tryReceive().isFailure)
+                    println("OK")
                 }
 
                 val initial = TestThing()
@@ -73,8 +80,8 @@ class ChangeSocketTest {
     fun test2() {
         val database = TestSettings.database
         runBlocking {
-            TestSettings.wsModelInfo.collection().deleteMany(Condition.Always())
-            TestSettings.ws2.test {
+            TestSettings.wsModelInfo.collection().deleteMany(Condition.Always)
+            TestSettings.ws2.test(AuthAndPathParts.test(null)) {
 
                 suspend fun assertSent(
                     inserted: TestThing

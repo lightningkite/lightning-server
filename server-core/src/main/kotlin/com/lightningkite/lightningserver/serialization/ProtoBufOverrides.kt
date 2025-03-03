@@ -22,6 +22,7 @@ val ProtoBufOverrides = SerializersModule {
     contextual(Duration::class, DurationMsSerializer)
     contextual(UUID::class, UUIDByteArraySerializer)
     contextual(Instant::class, InstantLongSerializer)
+    contextual(AnonType::class, ByteArrayAnonTypeSerializer)
 }
 
 object UUIDByteArraySerializer : KSerializer<UUID> {

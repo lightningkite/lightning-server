@@ -1,7 +1,6 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.*
-import com.lightningkite.Distance
 import com.lightningkite.GeoCoordinate
 import com.lightningkite.IsRawString
 import com.lightningkite.Length
@@ -16,13 +15,13 @@ inline fun <reified T> path(): DataClassPath<T, T> = DataClassPathSelf(serialize
 
 inline fun <reified T> condition(setup: (DataClassPath<T, T>) -> Condition<T>): Condition<T> =
     path<T>().let(setup)
-fun <T> condition(boolean: Boolean): Condition<T> = if(boolean) Condition.Always() else Condition.Never
+fun <T> condition(boolean: Boolean): Condition<T> = if(boolean) Condition.Always else Condition.Never
 
-val <K> DataClassPath<K, K>.always: Condition<K> get() = Condition.Always<K>()
-val <K> DataClassPath<K, K>.never: Condition<K> get() = Condition.Never<K>()
+val <K> DataClassPath<K, K>.always: Condition<K> get() = Condition.Always
+val <K> DataClassPath<K, K>.never: Condition<K> get() = Condition.Never
 
 infix fun <K, T> DataClassPath<K, T>.eq(value: T) = mapCondition(Condition.Equal(value))
-infix fun <K, T: Any> DataClassPath<K, T>.eqNn(value: T?) = if(value == null) Condition.Never() else mapCondition(Condition.Equal(value))
+infix fun <K, T: Any> DataClassPath<K, T>.eqNn(value: T?) = if(value == null) Condition.Never else mapCondition(Condition.Equal(value))
 infix fun <K, T> DataClassPath<K, T>.neq(value: T) = mapCondition(Condition.NotEqual(value))
 @JsName("xDataClassPathNotInSet") infix fun <K, T> DataClassPath<K, T>.notInside(values: Set<T>) = mapCondition(Condition.NotInside(values.toList()))
 infix fun <K, T> DataClassPath<K, T>.notInside(values: List<T>) = mapCondition(Condition.NotInside(values))

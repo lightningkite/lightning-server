@@ -43,6 +43,7 @@ val lightningServerKSchema: LightningServerKSchema by lazy {
             throw IllegalStateException("Failed to generate schema for websocket ${it.path}", e)
         }
     }
+    @Suppress("UNCHECKED_CAST")
     LightningServerKSchema(
         baseUrl = generalSettings().publicUrl,
         baseWsUrl = generalSettings().wsUrl,
@@ -80,11 +81,12 @@ val lightningServerKSchema: LightningServerKSchema by lazy {
         interfaces = Documentable.interfaces.map {
             LightningServerKSchemaInterface(
                 path = it.path.toString(),
+                docGroup = it.path.docGroup,
                 matches = VirtualTypeReference(it.name, it.subtypes.map { it.virtualTypeReference(registry) }, false)
             )
         }.toList(),
-        enums = @Suppress("UNCHECKED_CAST") registry.virtualTypes.filterValues { it is VirtualEnum } as Map<String, VirtualEnum>,
-        structures = @Suppress("UNCHECKED_CAST") registry.virtualTypes.filterValues { it is VirtualStruct } as Map<String, VirtualStruct>,
-        aliases = @Suppress("UNCHECKED_CAST") registry.virtualTypes.filterValues { it is VirtualAlias } as Map<String, VirtualAlias>,
+        enums = registry.virtualTypes.filterValues { it is VirtualEnum } as Map<String, VirtualEnum>,
+        structures = registry.virtualTypes.filterValues { it is VirtualStruct } as Map<String, VirtualStruct>,
+        aliases = registry.virtualTypes.filterValues { it is VirtualAlias } as Map<String, VirtualAlias>,
     )
 }

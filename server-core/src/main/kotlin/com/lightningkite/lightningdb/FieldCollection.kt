@@ -63,14 +63,14 @@ interface FieldCollection<Model : Any> {
      * Count the number of matching items in the collection.
      */
     suspend fun count(
-        condition: Condition<Model> = Condition.Always()
+        condition: Condition<Model> = Condition.Always
     ): Int
 
     /**
      * Count the number of matching items in each group.
      */
     suspend fun <Key> groupCount(
-        condition: Condition<Model> = Condition.Always(),
+        condition: Condition<Model> = Condition.Always,
         groupBy: DataClassPath<Model, Key>
     ): Map<Key, Int>
 
@@ -79,7 +79,7 @@ interface FieldCollection<Model : Any> {
      */
     suspend fun <N : Number?> aggregate(
         aggregate: Aggregate,
-        condition: Condition<Model> = Condition.Always(),
+        condition: Condition<Model> = Condition.Always,
         property: DataClassPath<Model, N>
     ): Double?
 
@@ -88,7 +88,7 @@ interface FieldCollection<Model : Any> {
      */
     suspend fun <N : Number?, Key> groupAggregate(
         aggregate: Aggregate,
-        condition: Condition<Model> = Condition.Always(),
+        condition: Condition<Model> = Condition.Always,
         groupBy: DataClassPath<Model, Key>,
         property: DataClassPath<Model, N>
     ): Map<Key, Double?>

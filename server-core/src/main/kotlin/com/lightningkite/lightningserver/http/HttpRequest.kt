@@ -1,5 +1,8 @@
 package com.lightningkite.lightningserver.http
 
+import com.lightningkite.lightningserver.auth.authAny
+import com.lightningkite.lightningserver.core.ServerContext
+import com.lightningkite.lightningserver.core.ServerEntryPoint
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.settings.generalSettings
 
@@ -22,10 +25,14 @@ data class HttpRequest(
     override val protocol: String = generalSettings().publicUrl.substringBefore("://"),
     /** The originating public IP of the request, as can best be determined **/
     override val sourceIp: String = "0.0.0.0"
-): Request {
+): Request, ServerContext {
+    override val request: Request?
+        get() = this
+    override val entryPoint: ServerEntryPoint
+        get() = endpoint
     override val path: ServerPath
         get() = endpoint.path
-    val method: HttpMethod
+    override val method: HttpMethod
         get() = endpoint.method
 
     fun queryParameter(key: String): String? = queryParameters.find { it.first == key }?.second
@@ -38,5 +45,7 @@ data class HttpRequest(
         cache[key] = calculated
         return calculated
     }
+
+    override suspend fun logString(): String = "${endpoint.method} ${endpoint.path.toString(parts)} accessed by ${this.authAny()} (${sourceIp})"
 }
 

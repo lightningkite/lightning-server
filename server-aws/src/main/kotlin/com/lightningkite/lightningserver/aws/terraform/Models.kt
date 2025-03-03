@@ -9,6 +9,7 @@ data class TerraformProjectInfo(
     val bucket: String,
     val bucketPathOverride: String? = null,
     val region: String = "us-west-2",
+    val availabilityZones: Set<String> = setOf("${region}a", "${region}b", "${region}c"),
     val core: TerraformCoreType = TerraformCoreType.Lambda,
     val vpc: Boolean = true,
     val existingVpc: Boolean = false,

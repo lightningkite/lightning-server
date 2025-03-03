@@ -27,6 +27,7 @@ fun <T> KSerializer<T>.toDynamo(value: T): AttributeValue {
     }
 }
 
+// change test
 fun <T> KSerializer<T>.fromDynamo(value: AttributeValue): T {
     try {
         val element = value.toJson()

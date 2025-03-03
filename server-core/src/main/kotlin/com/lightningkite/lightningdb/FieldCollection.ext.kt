@@ -11,7 +11,7 @@ import com.lightningkite.serialization.SerializableProperty
  * @return Flow that will return ALL the instances of *Model* in the collection.
  */
 suspend fun <Model : Any>
-        FieldCollection<Model>.all() = find(condition = Condition.Always())
+        FieldCollection<Model>.all() = find(condition = Condition.Always)
 
 /**
  * Will find a single instance of *Model* from the collection and return it.
@@ -160,7 +160,7 @@ suspend fun <Model : Any>
 
 @Deprecated("Use the built in group count with keyPaths.")
 suspend inline fun <reified Key, reified Model:Any> FieldCollection<Model>.groupCount(
-    condition: Condition<Model> = Condition.Always(),
+    condition: Condition<Model> = Condition.Always,
     groupBy: SerializableProperty<Model, Key>
 ): Map<Key, Int> {
     return this.groupCount<Key>(condition, path<Model>()[groupBy])

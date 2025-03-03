@@ -19,18 +19,22 @@ data class TypedServerPathParameter<T>(val name: String, val description: String
 data class TypedServerPath0(override val path: ServerPath): TypedServerPath {
     @LightningServerDsl fun path(string: String) = copy(path = path.path(string))
     override val parameters: Array<TypedServerPathParameter<*>> = arrayOf()
+    override fun toString(): String = path.toString()
 }
 data class TypedServerPath1<A>(override val path: ServerPath, val a: TypedServerPathParameter<A>): TypedServerPath {
     @LightningServerDsl fun path(string: String) = copy(path = path.path(string))
     override val parameters: Array<TypedServerPathParameter<*>> = arrayOf(a)
+    override fun toString(): String = path.toString()
 }
 data class TypedServerPath2<A, B>(override val path: ServerPath, val a: TypedServerPathParameter<A>, val b: TypedServerPathParameter<B>): TypedServerPath {
     @LightningServerDsl fun path(string: String) = copy(path = path.path(string))
     override val parameters: Array<TypedServerPathParameter<*>> = arrayOf(a, b)
+    override fun toString(): String = path.toString()
 }
 data class TypedServerPath3<A, B, C>(override val path: ServerPath, val a: TypedServerPathParameter<A>, val b: TypedServerPathParameter<B>, val c: TypedServerPathParameter<C>): TypedServerPath {
     @LightningServerDsl fun path(string: String) = copy(path = path.path(string))
     override val parameters: Array<TypedServerPathParameter<*>> = arrayOf(a, b, c)
+    override fun toString(): String = path.toString()
 }
 
 data class TypedHttpEndpoint<PathType: TypedServerPath>(

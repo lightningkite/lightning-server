@@ -28,7 +28,7 @@ data class SubSessionRequest(
 @Serializable
 @AdminTableColumns(["label", "subjectId", "scopes"])
 data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
-    override val _id: UUID = uuid(),
+    override val _id: UUID = UUID.random(),
     val secretHash: String,
     val derivedFrom: UUID? = null,
     val label: String? = null,

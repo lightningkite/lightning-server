@@ -54,6 +54,9 @@ import kotlin.time.Duration.Companion.minutes
 import com.lightningkite.UUID
 import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningserver.files.S3File
+import com.lightningkite.lightningserver.metrics.CloudwatchMetrics
+import com.lightningkite.lightningserver.websocket.send
+import com.lightningkite.lightningserver.websocket.text
 import com.lightningkite.prepareModelsShared
 import com.lightningkite.uuid
 import kotlinx.html.*
@@ -69,6 +72,7 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     init {
         Metrics
+        CloudwatchMetrics
         DynamoDbCache
         MongoDatabase
         MemcachedCache
@@ -98,23 +102,19 @@ object Server : ServerPathGroup(ServerPath.root) {
         }
     }
 
-    val userInfo = modelInfoWithDefault<User, User, UUID>(
+    val userInfo = database.modelInfo<User, User, UUID>(
         authOptions = authOptions(),
         serialization = ModelSerializationInfo(),
-        getBaseCollection = { database().collection() },
-        defaultItem = { User(email = "") },
-        forUser = { it ->
+        permissions = {
             val user = user()
-            val everyone: Condition<User> = Condition.Always()
+            val everyone: Condition<User> = Condition.Always
             val self: Condition<User> = condition { it._id eq user._id }
-            val admin: Condition<User> = if (user.isSuperUser) Condition.Always() else Condition.Never()
-            it.withPermissions(
-                ModelPermissions(
-                    create = everyone,
-                    read = self or admin,
-                    update = self or admin,
-                    delete = self or admin
-                )
+            val admin: Condition<User> = if (user.isSuperUser) Condition.Always else Condition.Never
+            ModelPermissions(
+                create = everyone,
+                read = self or admin,
+                update = self or admin,
+                delete = self or admin
             )
         }
     )
@@ -134,19 +134,19 @@ object Server : ServerPathGroup(ServerPath.root) {
     }
 
     val socket = path("socket").websocket(
-        connect = { println("Connected $it - you are ${it.user<User?>()}") },
+        willConnect = { UUID.random().toString() },
+        didConnect = { send("Connected $currentState") },
         message = {
-            println("Message $it")
-            it.id.send(it.content)
+            send(it.text)
             if (it.content == "die") {
                 throw Exception("You asked me to die!")
             }
         },
-        disconnect = { println("Disconnect $it") }
+        disconnect = { println("Disconnect $currentState") }
     )
 
     val task = task("Sample Task") { it: Int ->
-        val id = uuid()
+        val id = UUID.random()
         println("Got input $it in the sample task $id")
         var value = cache().get<Int>("key")
         println("From cache is $value for task $id")
@@ -251,7 +251,7 @@ object Server : ServerPathGroup(ServerPath.root) {
             override suspend fun fetch(id: UUID): User = userInfo.collection().get(id) ?: throw NotFoundException()
             override suspend fun findUser(property: String, value: String): User? = when (property) {
                 "email" -> userInfo.collection().findOne(condition { it.email eq value })
-                "_id" -> userInfo.collection().get(uuid(value))
+                "_id" -> userInfo.collection().get(UUID.parse(value))
                 else -> null
             }
 

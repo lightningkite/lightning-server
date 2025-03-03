@@ -1,7 +1,6 @@
 package com.lightningkite.lightningdb.test
 
 import com.lightningkite.lightningdb.*
-import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.CacheTest
@@ -110,14 +109,14 @@ class SecurityTest() {
         runBlocking {
             val unsecured = TestSettings.database().collection<LargeTestModel>("SecurityTest_test")
             val secured = unsecured.withPermissions(ModelPermissions(
-                create = Condition.Always(),
-                read = Condition.Always(),
+                create = Condition.Always,
+                read = Condition.Always,
                 readMask = mask {
                     always(it.intNullable.maskedTo(null))
                     always(it.string.maskedTo(""))
                 },
-                update = Condition.Always(),
-                delete = Condition.Always(),
+                update = Condition.Always,
+                delete = Condition.Always,
             ))
             unsecured.insert(listOf(
                 LargeTestModel(intNullable = 1),
@@ -125,7 +124,7 @@ class SecurityTest() {
                 LargeTestModel(intNullable = 3),
                 LargeTestModel(intNullable = 4),
             ))
-            val results = secured.find(Condition.Always()).toList()
+            val results = secured.find(Condition.Always).toList()
             assertEquals(4, results.size)
             for(r in results) assertEquals(null, r.intNullable)
         }
@@ -134,14 +133,14 @@ class SecurityTest() {
     @Test fun ftsPositive(): Unit = runBlocking {
         val unsecured = TestSettings.database().collection<LargeTestModel>("SecurityTest_test")
         val secured = unsecured.withPermissions(ModelPermissions(
-            create = Condition.Always(),
-            read = Condition.Always(),
+            create = Condition.Always,
+            read = Condition.Always,
             readMask = mask {
                 always(it.intNullable.maskedTo(null))
                 always(it.string.maskedTo(""))
             },
-            update = Condition.Always(),
-            delete = Condition.Always(),
+            update = Condition.Always,
+            delete = Condition.Always,
         ))
         assertEquals(
             Condition.Never,
@@ -152,13 +151,13 @@ class SecurityTest() {
     @Test fun ftsNegative(): Unit = runBlocking {
         val unsecured = TestSettings.database().collection<LargeTestModel>("SecurityTest_test")
         val secured = unsecured.withPermissions(ModelPermissions(
-            create = Condition.Always(),
-            read = Condition.Always(),
+            create = Condition.Always,
+            read = Condition.Always,
             readMask = mask {
                 always(it.intNullable.maskedTo(null))
             },
-            update = Condition.Always(),
-            delete = Condition.Always(),
+            update = Condition.Always,
+            delete = Condition.Always,
         ))
         assertNotEquals(
             Condition.Never,

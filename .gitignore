@@ -16,3 +16,5 @@ bssoftware
 **/.DS_Store
 .kotlin
 kotlin-js-store/
+local.version.txt
+local.auto.tfvars

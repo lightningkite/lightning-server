@@ -36,7 +36,7 @@ interface Documentable {
         val interfaces get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *, *>>()
             .mapNotNull { it.belongsToInterface }
             .distinct()
-        val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *, *, *>>()
+        val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *, *, *, *>>()
         val all get() = endpoints + websockets
         val usedTypes: Collection<KSerializer<*>>
             get() {
@@ -60,6 +60,7 @@ interface Documentable {
     }
 }
 
+val ServerPath.docGroup: String? get() = generateSequence(this) { it.parent }.mapNotNull { it.docName }.firstOrNull()
 val Documentable.docGroup: String? get() = generateSequence(path.path) { it.parent }.mapNotNull { it.docName }.firstOrNull()
 val Documentable.docGroupIdentifier: String? get() = docGroup
     ?.replace(Regex("""[^0-9a-zA-Z]+(?<following>.)?""")) { match ->

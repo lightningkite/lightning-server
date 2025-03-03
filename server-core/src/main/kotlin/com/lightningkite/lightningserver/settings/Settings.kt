@@ -79,7 +79,7 @@ object Settings {
             getter(it)
         }
         private val value by lazy<Goal> {
-            if (!sealed) throw IllegalStateException()
+            if (!sealed) throw IllegalStateException("Settings not yet configured")
             @Suppress("UNCHECKED_CAST")
             if (values.containsKey(name)) {
                 getter(values[name]?.item as Serializable)

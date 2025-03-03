@@ -26,7 +26,7 @@ interface FileObject {
     suspend fun read(): InputStream = get()!!.stream()
     suspend fun put(content: HttpContent)
     suspend fun get(): HttpContent?
-    suspend fun copyTo(other: FileObject): Unit = put(get()!!)
+    suspend fun copyTo(other: FileObject): Unit = other.put(get()!!)
     suspend fun moveTo(other: FileObject): Unit {
         copyTo(other)
         delete()

@@ -2,217 +2,149 @@
 
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
-import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.tasks.startup
-import com.lightningkite.lightningserver.tasks.task
+import com.lightningkite.lightningserver.serialization.TypeRetriever
 import com.lightningkite.lightningserver.typed.*
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.launch
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
 import com.lightningkite.serialization.SerializableProperty
-import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.schedule.schedule
-import com.lightningkite.lightningserver.websocket.WebSocketIdentifier
+import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
+import com.lightningkite.lightningserver.websocket.WebSocketTopic
 import com.lightningkite.now
-import com.lightningkite.serialization.notNull
-import kotlinx.serialization.Contextual
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
+import kotlin.collections.map
 import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
 
-class ModelRestUpdatesWebsocket<USER: HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
-    path: ServerPath,
-    database: () -> Database,
-    info: ModelInfo<USER, T, ID>,
-    key: SerializableProperty<T, *>? = null,
-): ServerPathGroup(path) {
-    init {
-        prepareModelsServerCore()
-    }
-    private val modelName = info.serialization.serializer.descriptor.serialName.substringBefore('<').substringAfterLast('.')
-    private val modelIdentifier = info.serialization.serializer.descriptor.serialName
-    private val helper = ModelRestUpdatesWebsocketHelper[database]
-    private val interfaceName = Documentable.InterfaceInfo(path, "ClientModelRestEndpointsPlusUpdatesWebsocket", listOf(
+
+// Condition<T>, CollectionUpdates<T, ID>
+@Serializable
+data class ModelRestUpdatesWebsocketData<T : HasId<ID>, ID : Comparable<ID>>(
+    val user: RequestAuthSerializable?, //USER
+    val condition: Condition<T> = Condition.Never,
+    val mask: Mask<T>,
+    val topics: Set<String> = setOf(),
+) {
+    @Suppress("UNCHECKED_CAST")
+    fun <USER : HasId<*>?> auth() = user?.real() as? RequestAuth<USER & Any>
+}
+
+class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<ID>>(
+    path: TypedServerPath0,
+    val info: ModelInfo<USER, T, ID>,
+    val key: SerializableProperty<T, *>? = null,
+) : ApiWebsocket<USER, TypedServerPath0, Condition<T>, CollectionUpdates<T, ID>, ModelRestUpdatesWebsocketData<T, ID>>(
+    path,
+    ModelRestUpdatesWebsocketData.serializer(info.serialization.serializer, info.serialization.idSerializer)
+) {
+    constructor(
+        path: ServerPath,
+        info: ModelInfo<USER, T, ID>,
+        key: SerializableProperty<T, *>? = null,
+    ):this(TypedServerPath0(path), info, key)
+    @Deprecated("database parameter no longer required")
+    constructor(
+        path: ServerPath,
+        database: () -> Database,
+        info: ModelInfo<USER, T, ID>,
+        key: SerializableProperty<T, *>? = null,
+    ):this(path, info, key)
+
+    override val authOptions: AuthOptions<USER> get() = info.authOptions
+    override val inputType: KSerializer<Condition<T>> = Condition.serializer(info.serialization.serializer)
+    override val outputType: KSerializer<CollectionUpdates<T, ID>> = CollectionUpdates.serializer(info.serialization.serializer, info.serialization.idSerializer)
+    override val summary: String = "Updates"
+    override val belongsToInterface: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path.path, "ClientModelRestEndpointsPlusUpdatesWebsocket", listOf(
         info.serialization.serializer,
         info.serialization.idSerializer
     ))
+    override val description: String = "Streams updates about items that fulfill your condition."
 
-    val websocket = path.apiWebsocket<USER, Condition<T>, CollectionUpdates<T, ID>>(
-        authOptions = info.authOptions,
-        inputType = Condition.serializer(info.serialization.serializer),
-        outputType = CollectionUpdates.serializer(info.serialization.serializer, info.serialization.idSerializer),
-        belongsToInterface = interfaceName,
-        summary = "Updates",
-        description = "Gets updates to items in the database matching a certain condition.",
-        errorCases = listOf(),
-        connect = {
-            val auth = this.authOrNull
-            val user = auth?.serializable(now().plus(1.days))
-            val collection = info.collection(this)
-            helper.subscriptionDb().insertOne(
-                __WebSocketDatabaseUpdatesSubscription(
-                    _id = event.id,
-                    databaseId = modelIdentifier,
-                    condition = "",
-                    user = user,
-                    mask = Serialization.json.encodeToString(
-                        Mask.serializer(info.serialization.serializer),
-                        collection.mask()
-                    ),
-                    relevant = setOf(),
-                    establishedAt = now()
-                )
-            )
-        },
-        message = { condition ->
-            val existing = helper.subscriptionDb().get(socketId) ?: throw NotFoundException()
-            @Suppress("UNCHECKED_CAST") val auth = existing.user?.real() as? RequestAuth<USER & Any>
-            val p = info.collection(AuthAccessor(auth, null))
-            val fullCondition = p.fullCondition(condition).simplify()
-            val fullConditionSerialized = Serialization.json.encodeToString(Condition.serializer(info.serialization.serializer), fullCondition)
-            helper.subscriptionDb().updateOne(
-                condition = condition { it._id eq socketId },
-                modification = modification {
-                    it.condition assign fullConditionSerialized
-                    if (key != null)
-                        it.relevant assign fullCondition.relevantHashCodesForKey(key)
-                    else
-                        it.relevant assign null
-                },
-            )
-            send(CollectionUpdates(condition = condition))
-        },
-        disconnect = {
-            helper.subscriptionDb().deleteMany(condition { it._id eq socketId })
+    override suspend fun willConnect(
+        auth: AuthAndPathParts<USER, TypedServerPath0>,
+        request: WebSocketConnectRequest
+    ): ModelRestUpdatesWebsocketData<T, ID> {
+        return ModelRestUpdatesWebsocketData(
+            user = auth.authOrNull?.serializable(now().plus(1.days)),
+            mask = info.collection(auth).mask()
+        )
+    }
+
+    val generalTopic = WebSocketTopic("$path/general", CollectionChanges.serializer(info.serialization.serializer))
+    fun hashTopic(hash: Int) = WebSocketTopic("$path/$hash", CollectionChanges.serializer(info.serialization.serializer))
+
+    override suspend fun messageFromClient(
+        connection: ApiWebsocketConnection<USER, TypedServerPath0, Condition<T>, CollectionUpdates<T, ID>, ModelRestUpdatesWebsocketData<T, ID>>,
+        input: Condition<T>
+    ) = with(connection) {
+        val p = info.collection(AuthAccessor(currentState.auth(), null))
+        val c = p.fullCondition(input).simplify()
+        val oldTopics = currentState.topics
+        val newTopics = key?.let { key -> c.relevantHashCodesForKey(key) }?.map {
+            hashTopic(it)
+        } ?: listOf(generalTopic)
+        queueStateUpdate { data ->
+            data.copy(condition = c, topics = newTopics.mapTo(HashSet()) { it.topic })
         }
-    )
+        (oldTopics - newTopics.mapTo(HashSet()) { it.topic }).forEach { unsubscribe(it) }
+        newTopics.filter { it.topic !in oldTopics }.forEach { subscribe(it) }
+        send(CollectionUpdates(condition = input))
+    }
 
-    val sendWsChanges = task(
-        "$modelIdentifier.sendWsUpdates",
-        CollectionChanges.serializer(info.serialization.serializer)
-    ) { changes: CollectionChanges<T> ->
-        val jobs = ArrayList<Job>()
-        val targets = if (key != null) {
-            val relevantValues = changes.changes.asSequence().flatMap { listOfNotNull(it.old, it.new) }
-                .map { key.get(it).hashCode() }
-                .toSet()
-            helper.subscriptionDb().find(condition {
-                (it.databaseId eq modelIdentifier) and ((it.relevant eq null) or (it.relevant.notNull.any { it inside relevantValues }))
-            })
+    override suspend fun messageFromSubscription(
+        connection: ApiWebsocketConnection<USER, TypedServerPath0, Condition<T>, CollectionUpdates<T, ID>, ModelRestUpdatesWebsocketData<T, ID>>,
+        topic: String,
+        retrieve: TypeRetriever
+    ) = with(connection) {
+        val toSend = retrieve(generalTopic.type).changes.map { entry ->
+            ListChange(
+                old = entry.old?.takeIf { currentState.condition(it) }?.let { currentState.mask(it) },
+                new = entry.new?.takeIf { currentState.condition(it) }?.let { currentState.mask(it) },
+            )
+        }.filter { it.old != null || it.new != null }
+        val updates = CollectionUpdates(
+            updates = toSend.mapNotNull { it.new }.toSet(),
+            remove = toSend.mapNotNull { it.old.takeIf { _ -> it.new == null }?._id }.toSet()
+        )
+        val size = Serialization.json.encodeToString(
+            CollectionUpdates.serializer(
+                info.serialization.serializer,
+                info.serialization.idSerializer
+            ), updates
+        ).length
+        if (size >= 24000) {
+            send(CollectionUpdates(overload = true))
         } else {
-            helper.subscriptionDb().find(condition { it.databaseId eq modelIdentifier })
-        }
-        targets.collect {
-            if (it.condition.isEmpty()) return@collect
-            val m =
-                try {
-                    Serialization.json.decodeFromString(Mask.serializer(info.serialization.serializer), it.mask)
-                } catch (e: Exception) {
-                    return@collect
-                }
-            val c = try {
-                Serialization.json.decodeFromString(
-                    Condition.serializer(info.serialization.serializer),
-                    it.condition
-                )
-            } catch (e: Exception) {
-                return@collect
-            }
-            val toSend = changes.changes.map { entry ->
-                ListChange(
-                    old = entry.old?.takeIf { c(it) }?.let { m(it) },
-                    new = entry.new?.takeIf { c(it) }?.let { m(it) },
-                )
-            }.filter { it.old != null || it.new != null }
-
-            if(toSend.isNotEmpty()) {
-                jobs.add(launch {
-                    val updates = CollectionUpdates(
-                        updates = toSend.mapNotNull { it.new }.toSet(),
-                        remove = toSend.mapNotNull { it.old.takeIf { _ -> it.new == null }?._id }.toSet()
-                    )
-                    val size = Serialization.json.encodeToString(
-                        CollectionUpdates.serializer(
-                            info.serialization.serializer,
-                            info.serialization.idSerializer
-                        ), updates
-                    ).length
-                    if (size >= 24000) {
-                        websocket.send(it._id, CollectionUpdates(overload = true))
-                    } else {
-                        websocket.send(it._id, updates)
-                    }
-                })
-            }
-        }
-        jobs.forEach { it.join() }
-    }
-
-    suspend fun sendUpdates(changes: CollectionChanges<T>) {
-        changes.changes.chunked(200).forEach {
-            sendWsChanges(CollectionChanges(changes = it))
+            send(updates)
         }
     }
+
     init {
-        startup {
-            info.registerChangeListener(::sendUpdates)
-        }
-    }
-}
-
-class ModelRestUpdatesWebsocketHelper private constructor(val database: () -> Database) {
-
-    companion object {
-        private val existing = HashMap<() -> Database, ModelRestUpdatesWebsocketHelper>()
-        operator fun get(database: () -> Database) = existing.getOrPut(database) { ModelRestUpdatesWebsocketHelper(database) }
-    }
-
-    fun subscriptionDb() = database().collection<__WebSocketDatabaseUpdatesSubscription>()
-
-    val schedule = schedule("ModelRestUpdatesWebsocketHelper.cleanup", 5.minutes) {
-        val now = now()
-        val db =
-            subscriptionDb().deleteMany(condition<__WebSocketDatabaseUpdatesSubscription> {
-                (it.condition eq "") and
-                        (it.establishedAt lt now.minus(5.minutes))
-            } or condition<__WebSocketDatabaseUpdatesSubscription> {
-                it.establishedAt lt now.minus(1.hours)
-            })
-
-        for (changeSub in db) {
-            try {
-                changeSub._id.close()
-            } catch (_: Exception) {
-                // We don't really care.  We just want to shut down as many of these as we can.
-                /*squish*/
+        info.registerChangeListener { changes ->
+            generalTopic.publish(changes)
+            key?.let { key ->
+                val hashes = changes.changes.asSequence().flatMap {
+                    listOfNotNull(
+                        it.old?.let { key.get(it).hashCode() },
+                        it.new?.let { key.get(it).hashCode() },
+                    )
+                }
+                for (hash in hashes) {
+                    hashTopic(hash).publish(CollectionChanges(changes.changes.mapNotNull {
+                        val old = it.old?.takeIf { key.get(it).hashCode() == hash }
+                        val new = it.new?.takeIf { key.get(it).hashCode() == hash }
+                        if(old == null && new == null) null
+                        else if(old != null && new != null) it  // saves a common allocation
+                        else EntryChange(old, new)
+                    }))
+                }
             }
         }
     }
 }
-
-@Serializable
-@GenerateDataClassPaths
-@Suppress("ClassName")
-@IndexSet(["databaseId", "relevant"])
-data class __WebSocketDatabaseUpdatesSubscription(
-    override val _id: WebSocketIdentifier,
-    val databaseId: String,
-    val user: RequestAuthSerializable?, //USER
-    val condition: String, //Condition<T>
-    val mask: String, //Mask<T>
-    @Contextual val establishedAt: Instant,
-    val relevant: Set<Int>? = null,
-) : HasId<WebSocketIdentifier>
 
 
 fun <T, V> Condition<T>.relevantHashCodesForKey(key: SerializableProperty<T, V>): Set<Int>? = when(this) {

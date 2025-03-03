@@ -25,7 +25,7 @@ import kotlin.test.assertIsNot
 data class BsonSerTest(
     val x: Int = 42,
     val y: Instant = now().roundTo(1.milliseconds),
-    val z: UUID = uuid()
+    val z: UUID = UUID.random()
 )
 
 class SerializationTest {
@@ -48,7 +48,7 @@ class SerializationTest {
         val v = partialOf<BsonSerTest> {
             it.x assign 15
             it.y assign now().roundTo(1.milliseconds)
-            it.z assign uuid()
+            it.z assign UUID.random()
         }
         val s = PartialSerializer(BsonSerTest.serializer())
         val asBuffer = Serialization.protobuf.encodeToByteArray(s, v)
@@ -69,7 +69,7 @@ class SerializationTest {
         val v = partialOf<BsonSerTest> {
             it.x assign 15
             it.y assign now().roundTo(1.milliseconds)
-            it.z assign uuid()
+            it.z assign UUID.random()
         }
         val s = PartialSerializer(BsonSerTest.serializer())
         val asBuffer = Serialization.javaData.encodeToByteArray(s, v)
@@ -117,5 +117,6 @@ class SerializationTest {
         assertIsNot<ContextualSerializer<*>>(ClientModule.contextualSerializerIfHandled<Int>())
         assertIs<ContextualSerializer<*>>(ClientModule.contextualSerializerIfHandled<Instant>())
         assertIs<DeferToContextualUuidSerializer>(EmptySerializersModule().contextualSerializerIfHandled<UUID>())
+        assertIs<InstantIso8601Serializer>(ClientModule.getContextual(ContextualSerializer(Instant::class)))
     }
 }

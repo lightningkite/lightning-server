@@ -3,14 +3,10 @@ package com.lightningkite.lightningdb.test
 import com.lightningkite.lightningdb.*
 import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningserver.files.serverFile
 import com.lightningkite.lightningserver.serialization.Serialization
-import kotlinx.datetime.Clock
 import com.lightningkite.now
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.properties.encodeToStringMap
 import org.junit.Test
-import kotlinx.datetime.Instant
 import kotlin.system.measureTimeMillis
 import kotlin.test.assertEquals
 import kotlin.test.fail
@@ -26,22 +22,24 @@ class ConditionSimplifyKtTest {
         }.also { println(it) }.readPaths().let { println(it) }
     }
 
+
+    @Suppress("Deprecation")
     @Test
     fun test() {
-        condition<LargeTestModel> { Condition.Always<LargeTestModel>() and Condition.Never() }.simplifyOk()
-        condition<LargeTestModel> { Condition.Never<LargeTestModel>() or Condition.Never() }.simplifyOk()
+        condition<LargeTestModel> { Condition.Always and Condition.Never }.simplifyOk()
+        condition<LargeTestModel> { Condition.Never or Condition.Never }.simplifyOk()
         condition<LargeTestModel> { it.boolean eq false }.simplifyOk()
-        condition<LargeTestModel> { it.boolean.eq(false) and Condition.Always() }.simplifyOk()
-        condition<LargeTestModel> { it.boolean.eq(false) and Condition.Never() }.simplifyOk()
-        condition<LargeTestModel> { it.boolean.eq(false) or Condition.Always() }.simplifyOk()
-        condition<LargeTestModel> { it.boolean.eq(false) or Condition.Never() }.simplifyOk()
-        condition<LargeTestModel> { Condition.Always<LargeTestModel>() and it.boolean.eq(false) }.simplifyOk()
+        condition<LargeTestModel> { it.boolean.eq(false) and Condition.Always }.simplifyOk()
+        condition<LargeTestModel> { it.boolean.eq(false) and Condition.Never }.simplifyOk()
+        condition<LargeTestModel> { it.boolean.eq(false) or Condition.Always }.simplifyOk()
+        condition<LargeTestModel> { it.boolean.eq(false) or Condition.Never }.simplifyOk()
+        condition<LargeTestModel> { Condition.Always and it.boolean.eq(false) }.simplifyOk()
         condition<LargeTestModel> { it.boolean.eq(false) and it.byte.eq(0) }.simplifyOk()
         condition<LargeTestModel> { it.boolean.eq(false) and it.boolean.eq(true) }.simplifyOk()
         condition<LargeTestModel> { it.boolean.eq(false) and it.boolean.inside(listOf(true, false)) }.simplifyOk()
         val conditions = listOf<Condition<LargeTestModel>>(
-            Condition.Always(),
-            Condition.Never(),
+            Condition.Always,
+            Condition.Never,
             condition { it.int eq 2 },
             condition { it.int neq 2 },
             condition { it.int gt 2 },
@@ -60,6 +58,9 @@ class ConditionSimplifyKtTest {
             condition { it.int notIn listOf() },
             condition { it.int notIn listOf(2) },
             condition { it.int notIn listOf(0, 2) },
+            condition { it.int notInside listOf() },
+            condition { it.int notInside listOf(2) },
+            condition { it.int notInside listOf(0, 2) },
             condition { it.short eq 2 },
             condition { it.short neq 2 },
             condition { it.short gt 2 },
@@ -78,6 +79,9 @@ class ConditionSimplifyKtTest {
             condition { it.short notIn listOf() },
             condition { it.short notIn listOf(2) },
             condition { it.short notIn listOf(0, 2) },
+            condition { it.short notInside listOf() },
+            condition { it.short notInside listOf(2) },
+            condition { it.short notInside listOf(0, 2) },
         )
         var count = 0
         measureTimeMillis {
