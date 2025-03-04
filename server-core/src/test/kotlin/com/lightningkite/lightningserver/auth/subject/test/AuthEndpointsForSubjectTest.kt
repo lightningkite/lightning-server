@@ -234,6 +234,49 @@ class AuthEndpointsForSubjectTest {
         }
     }
 
+    @Test fun phoneNumberNormalization() {
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("+18008008000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("18008008000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("8008008000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("+1-800-800-8000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("1-800-800-8000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("800-800-8000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("+1 (800) 800-8000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("1 (800) 800-8000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("(800) 800-8000")
+        )
+        assertEquals(
+            "+61212345678",
+            TestSettings.proofSms.normalize("+61 2 1234 5678")
+        )
+    }
+
     @Test
     fun testPasswordSpam(): Unit = runBlocking {
         val info = TestSettings.proofEmail.start.test(null, "notadmin@test.com")
