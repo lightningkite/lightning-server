@@ -39,6 +39,12 @@ class SmsProofEndpoints(
     interfaceInfo = Documentable.InterfaceInfo(path, "SmsProofClientEndpoints", listOf()),
     exampleTarget = "800-1000-100"
 ) {
+    override fun normalize(to: String): String = to.removePrefix("+").substringBefore('x').filter { it.isDigit() }.let {
+        "+" + when(it.length) {
+            10 -> "1$it"
+            else -> it
+        }
+    }
     init {
         path.docName = "SmsProof"
         Authentication.register(this)
