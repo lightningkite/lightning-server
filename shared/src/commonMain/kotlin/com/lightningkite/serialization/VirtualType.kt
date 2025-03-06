@@ -4,6 +4,7 @@ package com.lightningkite.serialization
 
 import com.lightningkite.UUID
 import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningdb.LazyRenamedSerialDescriptor
 import com.lightningkite.now
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
@@ -84,9 +85,32 @@ data class VirtualStruct(
             return VirtualInstance(this, fields)
         }
 
+        private var instantiated: Boolean = false
+        private val placeholderSerializer: KSerializer<Any?> by lazy {
+            // Placeholder is needed for cases where the class has properties of itself. Ex. data class Nested(val inner: Nested?)
+            // When Concrete gets it's internal property serializers it will check if the property is itself, if it is
+            // then this placeholder will be returned, which holds dummy information until the full descriptor is built
+            object : KSerializer<Any?> {
+                private val placeholderDescriptor = buildClassSerialDescriptor("$serialName.placeholder").nullable
+                override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor(serialName) {
+                    if (instantiated) this@Concrete.descriptor else placeholderDescriptor
+                }
+                override fun deserialize(decoder: Decoder): Any {
+                    if (!instantiated) throw SerializationException("Concrete $serialName placeholder deserialize called before instantiated")
+                    return this@Concrete.deserialize(decoder)
+                }
+                override fun serialize(encoder: Encoder, value: Any?) {
+                    if (!instantiated) throw SerializationException("Concrete $serialName placeholder deserialize called before instantiated")
+                    if (value == null) encoder.encodeNull()
+                    else this@Concrete.serialize(encoder, value as VirtualInstance)
+                }
+            }
+        }
+
         val serializers by lazy {
             fields.map {
-                it.type.serializer(registry, typeArguments)
+                if (it.type.serialName == serialName) placeholderSerializer
+                else it.type.serializer(registry, typeArguments)
             }
         }
         val defaultGenerators: List<(() -> Any?)?> by lazy {
@@ -135,7 +159,7 @@ data class VirtualStruct(
 
         @Transient
         override val descriptor: SerialDescriptor by lazy {
-            buildClassSerialDescriptor(serialName) {
+            val descriptor = buildClassSerialDescriptor(serialName) {
                 for (field in fields)
                     element(
                         elementName = field.name,
@@ -144,6 +168,8 @@ data class VirtualStruct(
                         isOptional = field.optional
                     )
             }
+            instantiated = true
+            descriptor
         }
 
         override fun deserialize(decoder: Decoder): VirtualInstance {
