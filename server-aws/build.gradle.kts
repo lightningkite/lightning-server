@@ -14,21 +14,26 @@ plugins {
 }
 
 dependencies {
-    api(project(":server-dynamodb"))
     api(project(":server-core"))
+    fun ModuleDependency.excludeNetty() {
+        exclude("software.amazon.awssdk:netty-nio-client")
+        exclude("software.amazon.awssdk:apache-client")
+    }
+    api(libs.awsS3) { excludeNetty() }
+    api(libs.awsLambda) { excludeNetty() }
+    api(libs.awsSes) { excludeNetty() }
+    api(libs.awsRds) { excludeNetty() }
+    api(libs.awsApiGateway) { excludeNetty() }
+    api(libs.awsCloudWatch) { excludeNetty() }
+    api(libs.awsCrtClient) { excludeNetty() }
+    api(libs.lambdaJavaCore) { excludeNetty() }
+    api(libs.lambdaJavaEvents) { excludeNetty() }
+    api(libs.lambdaJavaLog4j2) { excludeNetty() }
+    api(libs.dynamodb) { excludeNetty() }
     api(libs.orgCrac)
-    api(libs.awsS3)
-    api(libs.awsLambda)
-    api(libs.awsSes)
-    api(libs.awsRds)
-    api(libs.awsApiGateway)
-    api(libs.awsCloudWatch)
-    api(libs.orgCrac)
-    api(libs.lambdaJavaCore)
-    api(libs.lambdaJavaEvents)
-    api(libs.lambdaJavaLog4j2)
     implementation(libs.coroutinesReactive)
     testImplementation(libs.kotlinTest)
+    implementation(libs.coroutinesJdk)
     testImplementation(project(":server-testing"))
     ksp(project(":processor"))
     kspTest(project(":processor"))

@@ -374,7 +374,7 @@ internal fun MultiPartData.adapt(myType: ContentType): HttpContent.Multipart {
                                 key = it.name ?: "",
                                 filename = it.originalFileName ?: "",
                                 headers = h,
-                                content = HttpContent.Stream(
+                                content = HttpContent.LazyStream(
                                     { it.provider().toInputStream() },
                                     h.contentLength,
                                     it.contentType?.adapt() ?: ContentType.Application.OctetStream
@@ -388,7 +388,7 @@ internal fun MultiPartData.adapt(myType: ContentType): HttpContent.Multipart {
                                 key = it.name ?: "",
                                 filename = "",
                                 headers = h,
-                                content = HttpContent.Stream(
+                                content = HttpContent.LazyStream(
                                     { it.provider().asStream() },
                                     h.contentLength,
                                     it.contentType?.adapt() ?: ContentType.Application.OctetStream

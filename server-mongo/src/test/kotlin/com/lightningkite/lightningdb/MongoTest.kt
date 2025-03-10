@@ -12,27 +12,13 @@ import org.junit.BeforeClass
 
 
 abstract class MongoTest {
-    val defaultMongo: MongoDatabase get() = Companion.db
+    init {
 
-    companion object {
-        var mongoClient: MongoClient? = null
-        lateinit var db: MongoDatabase
-
-        @BeforeClass
-        @JvmStatic
-        fun start() {
-            mongoClient = testMongo()
-            db = MongoDatabase("default") { mongoClient!! }
-            prepareModelsShared()
-            prepareModelsServerCore()
-            prepareModelsServerTesting()
-            prepareModelsServerMongoTest()
-        }
-
-        @AfterClass
-        @JvmStatic
-        fun after() {
-            mongoClient?.close()
-        }
+        prepareModelsShared()
+        prepareModelsServerCore()
+        prepareModelsServerMongoTest()
+        prepareModelsServerTesting()
     }
+    val defaultMongo: MongoDatabase = TestDatabase.mongoClient
+    val db get() = defaultMongo
 }

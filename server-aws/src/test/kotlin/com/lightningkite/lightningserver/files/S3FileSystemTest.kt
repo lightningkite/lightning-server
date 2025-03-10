@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.aws.AwsConnections
 import com.lightningkite.lightningserver.bytes.hexToByteArray
 import com.lightningkite.lightningserver.bytes.toHexString
 import com.lightningkite.lightningserver.client
@@ -38,6 +39,15 @@ class S3FileSystemTest : FileSystemTests() {
         }
         S3FileSystem
         FilesSettings(credentials.readText(), signedUrlExpiration = 1.days)()
+    }
+
+    @Test fun printHealth(): Unit = runBlocking {
+        val system = system ?: return@runBlocking
+        println(system.healthCheck())
+        delay(1.seconds)
+        println("used: " + AwsConnections.used)
+        println("total: " + AwsConnections.total)
+        assertTrue(AwsConnections.total != Int.MAX_VALUE)
     }
 
     @Test
