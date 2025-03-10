@@ -18,7 +18,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
         endpoints.filter { it.inputType == Unit.serializer() || it.route.method != HttpMethod.GET }.toList()
     appendLine("import { ${fromLightningServerPackage.joinToString()}, apiCall, Path, DeepPartial } from '@lightningkite/lightning-server-simplified'")
     appendLine()
-    val stringSerialNames: Set<String> = setOf()
+    val stringSerialNames: MutableSet<String> = mutableSetOf()
     usedTypes
         .filter { it.descriptor.simpleSerialName !in skipFromLsPackage }
         .sortedBy { it.descriptor.simpleSerialName }
@@ -63,7 +63,7 @@ fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
                 is PrimitiveKind.STRING -> {
                     val simpleSerialName = it.descriptor.simpleSerialName
                     if (simpleSerialName != "String" && !stringSerialNames.contains(simpleSerialName)) {
-                        stringSerialNames.plus(simpleSerialName)
+                        stringSerialNames.add(simpleSerialName)
                         emitTypeComment(it)
                         appendLine("type $simpleSerialName = string  // ${it.descriptor.serialName}")
                     }
@@ -282,7 +282,7 @@ private fun KClass<*>.userTypeTokenName(): String =
 private fun Appendable.functionHeader(
     documentable: Documentable,
     skipAuth: Boolean = false,
-    overrideUserType: String? = null
+    overrideUserType: String? = null,
 ) {
     append("(")
     var argComma = false
@@ -318,7 +318,7 @@ private fun Appendable.functionCall(
     documentable: Documentable,
     skipAuth: Boolean = false,
     authUsesThis: Boolean = false,
-    overrideUserType: String? = null
+    overrideUserType: String? = null,
 ) {
     append("${documentable.functionName}(")
     var argComma = false
@@ -339,13 +339,13 @@ private data class TArg(
     val type: KSerializer<*>? = null,
     val stringType: String? = null,
     val default: String? = null,
-    val optional: Boolean = false
+    val optional: Boolean = false,
 )
 
 private fun arguments(
     documentable: Documentable,
     skipAuth: Boolean = false,
-    overrideUserType: String? = null
+    overrideUserType: String? = null,
 ): List<TArg> = when (documentable) {
     is ApiEndpoint<*, *, *, *> -> listOfNotNull(
         documentable.path.path.segments.filterIsInstance<ServerPath.Segment.Wildcard>()
@@ -392,10 +392,12 @@ private fun KSerializer<*>.write(): String = nullElement()?.let { it.write() + "
             PrimitiveKind.INT,
             PrimitiveKind.LONG,
             PrimitiveKind.FLOAT,
-            PrimitiveKind.DOUBLE -> out.append("number")
+            PrimitiveKind.DOUBLE,
+                -> out.append("number")
 
             PrimitiveKind.CHAR,
-            PrimitiveKind.STRING -> {
+            PrimitiveKind.STRING,
+                -> {
                 val cleanName = this.descriptor.simpleSerialName
                 if (cleanName != "String") {
                     out.append(cleanName)
@@ -426,16 +428,17 @@ private fun KSerializer<*>.write(): String = nullElement()?.let { it.write() + "
             is PolymorphicKind,
             StructureKind.OBJECT,
             SerialKind.ENUM,
-            StructureKind.CLASS -> {
+            StructureKind.CLASS,
+                -> {
                 if (descriptor.serialName == "com.lightningkite.serialization.Partial") {
                     out.append("DeepPartial")
                 } else {
                     out.append(descriptor.simpleSerialName)
                 }
-                this.tryTypeParameterSerializers2()?.takeUnless { it.isEmpty() }
-                    ?.joinToString(", ", "<", ">") { it.write() }?.let {
-                        out.append(it)
-                    }
+                this.tryTypeParameterSerializers2()
+                    ?.takeUnless { it.isEmpty() }
+                    ?.joinToString(", ", "<", ">") { it.write() }
+                    ?.let { out.append(it) }
             }
         }
     }.toString()
