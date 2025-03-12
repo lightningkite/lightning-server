@@ -137,17 +137,40 @@ data class PublicKeyCredentialUserEntity(
  * See [`PublicKeyCredential`](https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredential)
  */
 @Serializable
-data class PublicKeyCredential(
+data class AttestedPublicKeyCredential(
     val id: String, // base64url-encoded
-    val response: AuthenticatorResponse,
+    val response: AuthenticatorAttestationResponse,
     val type: String = "public-key",
 )
 
 @Serializable
-data class AuthenticatorResponse(
+data class AuthenticatorAttestationResponse(
     val clientDataJSON: String,
     val publicKey: String,
     val publicKeyAlgorithm: PublicKeyAlgorithm,
+) {
+    val clientData: ClientData get() = Json.decodeFromString(ClientDataJSONSerializer, clientDataJSON)
+}
+
+/**
+ * Represents the result of a passkey assertion response. This is the same object that is returned from
+ * `CredentialContainer.get().toJSON()`
+ *
+ * See [`PublicKeyCredential`](https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredential)
+ */
+@Serializable
+data class AssertedPublicKeyCredential(
+    val id: String, // base64url-encoded
+    val response: AuthenticatorAssertionResponse,
+    val type: String = "public-key",
+)
+
+@Serializable
+data class AuthenticatorAssertionResponse(
+    val authenticatorData: String,
+    val clientDataJSON: String,
+    val signature: String,
+    val userHandle: String,
 ) {
     val clientData: ClientData get() = Json.decodeFromString(ClientDataJSONSerializer, clientDataJSON)
 }
