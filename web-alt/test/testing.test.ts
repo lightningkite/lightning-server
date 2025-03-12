@@ -20,6 +20,7 @@ let item: TestType = {
         count: 22
     }
 }
+
 test('Equal true', () => { expect(evaluateCondition({ name: { Equal: "Bob" } }, item)).toBe(true) })
 test('Equal false', () => { expect(evaluateCondition({ name: { Equal: "Bobby" } }, item)).toBe(false) })
 test('GreaterThan true', () => { expect(evaluateCondition({ name: { GreaterThan: "A" } }, item)).toBe(true) })
