@@ -10,7 +10,9 @@ import com.lightningkite.lightningdb.eq
 import com.lightningkite.lightningdb.gte
 import com.lightningkite.lightningdb.insertOne
 import com.lightningkite.lightningdb.mask
+import com.lightningkite.lightningdb.modification
 import com.lightningkite.lightningdb.or
+import com.lightningkite.lightningdb.updateOneById
 import com.lightningkite.lightningdb.updateRestrictions
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.accepts
@@ -30,11 +32,18 @@ import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.auth
 import com.lightningkite.now
 import com.lightningkite.serialization.notNull
+import com.lightningkite.lightningserver.encryption.*
+import com.lightningkite.lightningserver.exceptions.ForbiddenException
+import kotlinx.coroutines.flow.firstOrNull
+import java.security.MessageDigest
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 class PasskeyProofEndpoints(
     path: ServerPath,
     val database: () -> Database,
     val challenge: PasskeyChallengeHandler,
+    val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val interfaceInfo: Documentable.InterfaceInfo,
 ) : ServerPathGroup(path) {
 
@@ -42,15 +51,15 @@ class PasskeyProofEndpoints(
         path.docName = "PasskeyProof"
     }
 
-/*    override val info = ProofMethodInfo(
+    val info = ProofMethodInfo(
         via = "passkey",
         property = null,
         strength = 5
     )
 
     init {
-        Authentication.register(this)
-    }*/
+//        Authentication.register(this)
+    }
 
     private val active get() = condition<PasskeyCredential> { it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())) }
 
@@ -96,7 +105,7 @@ class PasskeyProofEndpoints(
         }
     )
 
-    val registerFinish = path("registerFinish").post.api<HasId<*>, PublicKeyCredential, Unit>(
+    val registerFinish = path("registerFinish").post.api<HasId<*>, AttestedPublicKeyCredential, Unit>(
         belongsToInterface = interfaceInfo,
         authOptions = anyAuthRoot,
         summary = "Finalizes a passkey credential registration",
@@ -104,7 +113,7 @@ class PasskeyProofEndpoints(
         errorCases = listOf(),
         examples = listOf(),
         successCode = HttpStatus.OK,
-        implementation = { created: PublicKeyCredential ->
+        implementation = { created: AttestedPublicKeyCredential ->
             // TODO: We should verify the challenge signature, although since this endpoint has an auth gate anyways, it probably doesn't matter...
             val credential = PasskeyCredential(
                 _id = created.id,
@@ -133,7 +142,8 @@ class PasskeyProofEndpoints(
         }
     )
 
-    val prove = path("prove").post.api<HasId<*>?, FinishProof, Proof>(
+    @OptIn(ExperimentalEncodingApi::class)
+    val prove = path("prove").post.api<HasId<*>?, AssertedPublicKeyCredential, Proof>(
         belongsToInterface = interfaceInfo,
         authOptions = noAuth,
         summary = "Begins a passkey challenge process",
@@ -141,8 +151,40 @@ class PasskeyProofEndpoints(
         errorCases = listOf(),
         examples = listOf(),
         successCode = HttpStatus.OK,
-        implementation = {
-            TODO()
+        implementation = { response: AssertedPublicKeyCredential ->
+            // TODO: check challenge signature
+            val passkey = modelInfo.collection().find(condition {
+                it._id.eq(response.id) and active
+            }).firstOrNull() ?: throw ForbiddenException("Invalid or inactive passkey")
+
+            // See Step 11 of 6.3.3. The `authenticatorGetAssertion` Operation
+            // https://w3c.github.io/webauthn/#sctn-op-get-assertion
+            val authenticatorDataRaw = Base64.UrlSafe.decode(response.response.authenticatorData)
+            val clientDataHash = MessageDigest.getInstance("SHA-256").digest(
+                Base64.UrlSafe.decode(response.response.clientDataJSON)
+            )
+            val signatureContents = authenticatorDataRaw + clientDataHash
+
+            when (passkey.algorithm) {
+                PublicKeyAlgorithm.ES256 -> SignatureVerifier.ES256()
+                PublicKeyAlgorithm.EdDSA -> SignatureVerifier.EdDSA()
+                else -> TODO()
+            }.verify(
+                signature = Base64.UrlSafe.decode(response.response.signature),
+                expected = signatureContents,
+                publicKey = Base64.UrlSafe.decode(passkey.publicKeyDerBase64)
+            )
+
+            modelInfo.collection().updateOneById(passkey._id, modification {
+                it.lastUsedAt assign now()
+            })
+
+            proofHasher().makeProof(
+                info = info,
+                property = "_id",
+                value = passkey.subjectId,
+                at = now()
+            )
         }
     )
 
