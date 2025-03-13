@@ -16,19 +16,19 @@ export type Condition<T> =
   | { IntBitsSet: number }
   | { IntBitsAnyClear: number }
   | { IntBitsAnySet: number }
-  | { Exists: boolean }
+  | { Exists: string }
   | { IfNotNull: Condition<NonNullable<T>> }
-  | StringCondition<T>
   | {
-      FullTextSearch: {
-        value: string;
-        ignoreCase: boolean;
-      };
-    }
-  | ArrayOrSetCondition<T>
-  | (T extends object ? { [P in keyof T]?: Condition<T[P]> } : never);
+    FullTextSearch: {
+      value: string;
+      ignoreCase: boolean;
+    };
+  }
+  | StringCondition<T>
+  | ArrayCondition<T>
+  | { [P in keyof T]?: Condition<T[P]> }
 
-type ArrayOrSetCondition<T> = T extends Array<infer E>
+type ArrayCondition<T> = T extends Array<infer E>
   ?
       | { ListAllElements: Condition<E> }
       | { ListAnyElements: Condition<E> }
