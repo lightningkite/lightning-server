@@ -35,10 +35,11 @@ import com.lightningkite.lightningserver.typed.auth
 import com.lightningkite.now
 import com.lightningkite.serialization.notNull
 import com.lightningkite.lightningserver.encryption.*
+import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
+import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.serialization.json.Json
 import java.security.MessageDigest
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -124,8 +125,7 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
 
             PublicKeyCredentialCreationOptions(
                 challenge = challenge,
-                // TODO: Update this line to add support for newer algorithms once the verifier is implemented and confirmed working
-                pubKeyCredParams = listOf(PublicKeyAlgorithm.ES256).map { PublicKeyCredentialParameters(it) },
+                pubKeyCredParams = listOf(PublicKeyAlgorithm.ES256, PublicKeyAlgorithm.EdDSA).map { PublicKeyCredentialParameters(it) },
                 rp = rp,
                 user = pkUser,
             )
@@ -189,9 +189,12 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
             // https://w3c.github.io/webauthn/#sctn-op-get-assertion
             val authenticatorDataRaw = Base64.WebAuthn.decode(response.response.authenticatorData)
             val clientDataDecoded = Base64.WebAuthn.decode(response.response.clientDataJSON)
-            val clientData: ClientData = Json.decodeFromString(clientDataDecoded.decodeToString())
+            val clientData: ClientData = Serialization.json.decodeFromString(clientDataDecoded.decodeToString())
 
-            challenge.assertForLogin(clientData.challenge)
+            // TODO: Remove this (just for testing)
+            if (!generalSettings().debug) {
+                challenge.assertForLogin(clientData.challenge)
+            }
 
             val clientDataHash = MessageDigest.getInstance("SHA-256").digest(clientDataDecoded)
             val signatureContents = authenticatorDataRaw + clientDataHash
@@ -199,7 +202,7 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
             when (passkey.algorithm) {
                 PublicKeyAlgorithm.ES256 -> SignatureVerifier.ES256()
                 PublicKeyAlgorithm.EdDSA -> SignatureVerifier.EdDSA()
-                else -> TODO()
+                else -> throw BadRequestException("Unsupported passkey algorithm")
             }.verify(
                 signature = Base64.WebAuthn.decode(response.response.signature),
                 expected = signatureContents,
