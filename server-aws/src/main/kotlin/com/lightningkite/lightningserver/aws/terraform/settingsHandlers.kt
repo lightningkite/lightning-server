@@ -839,7 +839,6 @@ object SettingsHandlers {
             listOf(
                 TerraformInput.string("${key}_org_id", null),
                 TerraformInput.boolean("${key}_continuous_backup", false),
-                TerraformInput.string("${key}_existing_project_id", null),
             )
         },
         emit = {
