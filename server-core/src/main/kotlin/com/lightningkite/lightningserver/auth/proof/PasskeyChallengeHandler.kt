@@ -60,8 +60,8 @@ class PasskeyChallengeHandler(
         return subjectName to subjectId
     }
 
-    suspend fun assertForLogin(challenge: String) {
-        cache().get<String>(loginChallengeCacheKey(challenge))
+    suspend fun assertForLogin(challenge: String): String {
+        return cache().get<String>(loginChallengeCacheKey(challenge))
             ?.takeIf { it == challenge }
             ?: throw NotFoundException(detail = "unknown-challenge", message = "Challenge has expired.")
     }
