@@ -61,7 +61,7 @@ import kotlin.time.Duration.Companion.minutes
 
 class FunnelEndpoints(
     database: () -> Database,
-    read: AuthOptions<*> = Authentication.isDeveloper,
+    read: AuthOptions<*> = Authentication.isAdmin,
     val zone: TimeZone = TimeZone.of("America/Denver"),
     path: ServerPath = ServerPath.root.path("meta/funnels")
 ): ServerPathGroup(path) {
