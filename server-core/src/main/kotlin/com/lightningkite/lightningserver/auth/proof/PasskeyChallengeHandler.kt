@@ -5,7 +5,8 @@ import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import java.security.SecureRandom
-import java.util.*
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -40,10 +41,11 @@ class PasskeyChallengeHandler(
         return challenge
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
     private fun generate(): String {
         val bytes = ByteArray(challengeLength)
         SecureRandom().nextBytes(bytes)
-        return Base64.getEncoder().encodeToString(bytes)
+        return Base64.WebAuthn.encode(bytes)
     }
 
     suspend fun assertForRegistration(challenge: String): Pair<String, String> {

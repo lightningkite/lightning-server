@@ -49,6 +49,7 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
     val challenge: PasskeyChallengeHandler,
     registrationAuthOptions: AuthOptions<USER>,
     val nameTemplate: (USER) -> String,
+    val rpId: String? = null,
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val displayNameTemplate: (USER) -> String = nameTemplate,
 ) : ServerPathGroup(path), ProofMethod {
@@ -111,7 +112,10 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
         successCode = HttpStatus.OK,
         implementation = { _: Unit ->
             val challenge = challenge.establishForRegistration(auth.subject.name, auth.idString)
-            val rp = PublicKeyCredentialRpEntity(name = generalSettings.name)
+            val rp = PublicKeyCredentialRpEntity(
+                id = rpId,
+                name = generalSettings().projectName
+            )
             val pkUser = PublicKeyCredentialUserEntity(
                 displayName = displayNameTemplate(user()),
                 id = auth.idString,
@@ -120,8 +124,10 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
 
             PublicKeyCredentialCreationOptions(
                 challenge = challenge,
+                // TODO: Update this line to add support for newer algorithms once the verifier is implemented and confirmed working
+                pubKeyCredParams = listOf(PublicKeyAlgorithm.ES256).map { PublicKeyCredentialParameters(it) },
                 rp = rp,
-                user = pkUser
+                user = pkUser,
             )
         }
     )
@@ -181,8 +187,8 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
 
             // See Step 11 of 6.3.3. The `authenticatorGetAssertion` Operation
             // https://w3c.github.io/webauthn/#sctn-op-get-assertion
-            val authenticatorDataRaw = Base64.UrlSafe.decode(response.response.authenticatorData)
-            val clientDataDecoded = Base64.UrlSafe.decode(response.response.clientDataJSON)
+            val authenticatorDataRaw = Base64.WebAuthn.decode(response.response.authenticatorData)
+            val clientDataDecoded = Base64.WebAuthn.decode(response.response.clientDataJSON)
             val clientData: ClientData = Json.decodeFromString(clientDataDecoded.decodeToString())
 
             challenge.assertForLogin(clientData.challenge)
@@ -195,9 +201,9 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
                 PublicKeyAlgorithm.EdDSA -> SignatureVerifier.EdDSA()
                 else -> TODO()
             }.verify(
-                signature = Base64.UrlSafe.decode(response.response.signature),
+                signature = Base64.WebAuthn.decode(response.response.signature),
                 expected = signatureContents,
-                publicKey = Base64.UrlSafe.decode(passkey.publicKeyDerBase64)
+                publicKey = Base64.WebAuthn.decode(passkey.publicKeyDerBase64)
             )
 
             modelInfo.collection().updateOneById(passkey._id, modification {
