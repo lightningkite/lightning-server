@@ -25,7 +25,7 @@ data class PasskeyCredential(
      * A globally unique id that is generated and returned by the client authenticator
      */
     override val _id: String,
-    val subjectType: String,
+    val subjectName: String,
     /**
      * The String-representation of a subject id that is also passed to the client authenticator
      * as a user id
@@ -91,6 +91,12 @@ data class PublicKeyCredentialCreationOptions(
     val pubKeyCredParams: List<PublicKeyCredentialParameters>? = emptyList(),
     val rp: PublicKeyCredentialRpEntity,
     val user: PublicKeyCredentialUserEntity,
+)
+
+@Serializable
+data class PublicKeyCredentialRequestOptions(
+    val allowCredentials: List<ExistingCredential>? = listOf(),
+    val challenge: String,
 )
 
 @Serializable

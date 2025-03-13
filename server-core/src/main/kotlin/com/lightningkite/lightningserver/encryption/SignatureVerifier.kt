@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.encryption
 
-import org.bouncycastle.crypto.signers.Ed25519Signer
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.KeyFactory
 import java.security.Security
