@@ -1,3 +1,4 @@
+@file:OptIn(ExperimentalSerializationApi::class)
 package com.lightningkite.lightningserver.auth.proof
 
 import com.lightningkite.lightningdb.GenerateDataClassPaths
@@ -5,6 +6,9 @@ import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.IndexSet
 import com.lightningkite.now
 import kotlinx.datetime.Instant
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.EncodeDefault.Mode
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -16,6 +20,9 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+
+@OptIn(ExperimentalEncodingApi::class)
+val Base64.WebAuthn get() = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
 @Serializable
 @GenerateDataClassPaths
@@ -85,17 +92,17 @@ class PublicKeyAlgorithmSerializer : KSerializer<PublicKeyAlgorithm> {
  * See [`PublicKeyCredentialCreationOptions`](https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredentialCreationOptions)
  */
 data class PublicKeyCredentialCreationOptions(
-    val authenticatorSelection: AuthenticatorSelection? = null,
+    @EncodeDefault(Mode.NEVER) val authenticatorSelection: AuthenticatorSelection? = null,
     val challenge: String, // base64url-encoded
-    val excludeCredentials: List<ExistingCredential>? = emptyList(),
-    val pubKeyCredParams: List<PublicKeyCredentialParameters>? = emptyList(),
+    @EncodeDefault(Mode.NEVER) val excludeCredentials: List<ExistingCredential> = emptyList(),
+    val pubKeyCredParams: List<PublicKeyCredentialParameters>,
     val rp: PublicKeyCredentialRpEntity,
     val user: PublicKeyCredentialUserEntity,
 )
 
 @Serializable
 data class PublicKeyCredentialRequestOptions(
-    val allowCredentials: List<ExistingCredential>? = listOf(),
+    @EncodeDefault(Mode.NEVER) val allowCredentials: List<ExistingCredential> = listOf(),
     val challenge: String,
 )
 
@@ -114,18 +121,18 @@ enum class UserVerification {
 @Serializable
 data class ExistingCredential(
     val id: String, // base64url-encoded
-    val type: String = "public-key",
+    @EncodeDefault(Mode.ALWAYS) val type: String = "public-key",
 )
 
 @Serializable
 data class PublicKeyCredentialParameters(
     val alg: PublicKeyAlgorithm,
-    val type: String = "public-key",
+    @EncodeDefault(Mode.ALWAYS) val type: String = "public-key",
 )
 
 @Serializable
 data class PublicKeyCredentialRpEntity(
-    val id: String? = null,
+    @EncodeDefault(Mode.NEVER) val id: String? = null,
     val name: String,
 )
 
@@ -146,7 +153,7 @@ data class PublicKeyCredentialUserEntity(
 data class AttestedPublicKeyCredential(
     val id: String, // base64url-encoded
     val response: AuthenticatorAttestationResponse,
-    val type: String = "public-key",
+    @EncodeDefault(Mode.ALWAYS) val type: String = "public-key",
 )
 
 @Serializable
@@ -168,7 +175,7 @@ data class AuthenticatorAttestationResponse(
 data class AssertedPublicKeyCredential(
     val id: String, // base64url-encoded
     val response: AuthenticatorAssertionResponse,
-    val type: String = "public-key",
+    @EncodeDefault(Mode.ALWAYS) val type: String = "public-key",
 )
 
 @Serializable
@@ -197,11 +204,11 @@ open class Base64JSONSerializer<T>(
 
     override fun serialize(encoder: Encoder, value: T) {
         val jsonRaw = Json.encodeToString(serializationStrategy, value).encodeToByteArray()
-        encoder.encodeString(Base64.UrlSafe.encode(jsonRaw))
+        encoder.encodeString(Base64.WebAuthn.encode(jsonRaw))
     }
 
     override fun deserialize(decoder: Decoder): T {
-        val jsonRaw = Base64.UrlSafe.decode(decoder.decodeString())
+        val jsonRaw = Base64.WebAuthn.decode(decoder.decodeString())
         return Json.decodeFromString(serializationStrategy, jsonRaw.decodeToString())
     }
 }
