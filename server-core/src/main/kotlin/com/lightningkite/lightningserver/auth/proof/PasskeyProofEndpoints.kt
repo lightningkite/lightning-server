@@ -106,7 +106,7 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
     val registerStart = path("registerStart").post.api(
         belongsToInterface = loggedInInterfaceInfo,
         authOptions = registrationAuthOptions,
-        summary = "Begins a passkey credential registration",
+        summary = "Issue passkey register challenge",
         description = "Returns a challenge to be passed on to a client authenticator for the creation of a new passkey.",
         errorCases = listOf(),
         examples = listOf(),
@@ -135,7 +135,7 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
     val registerFinish = path("registerFinish").post.api<HasId<*>, AttestedPublicKeyCredential, Unit>(
         belongsToInterface = loggedInInterfaceInfo,
         authOptions = registrationAuthOptions,
-        summary = "Finalizes a passkey credential registration",
+        summary = "Establish passkey",
         description = "Accepts a public key credential saved in a client authenticator and a previously issued challenge to verify and persist a recently created passkey.",
         errorCases = listOf(),
         examples = listOf(),
@@ -159,7 +159,7 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
     val start = path("start").post.api(
         belongsToInterface = interfaceInfo,
         authOptions = noAuth,
-        summary = "Begins a passkey challenge process",
+        summary = "Begin passkey challenge",
         description = "Returns a challenge to be passed on to a client authenticator for signing.",
         errorCases = listOf(),
         examples = listOf(),
@@ -175,7 +175,7 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
     val prove = path("prove").post.api<HasId<*>?, AssertedPublicKeyCredential, Proof>(
         belongsToInterface = interfaceInfo,
         authOptions = noAuth,
-        summary = "Begins a passkey challenge process",
+        summary = "Prove passkey ownership",
         description = "Returns a challenge to be passed on to a client authenticator for signing.",
         errorCases = listOf(),
         examples = listOf(),
