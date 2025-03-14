@@ -9,7 +9,6 @@ import com.lightningkite.lightningdb.condition
 import com.lightningkite.lightningdb.eq
 import com.lightningkite.lightningdb.gte
 import com.lightningkite.lightningdb.insertOne
-import com.lightningkite.lightningdb.mask
 import com.lightningkite.lightningdb.modification
 import com.lightningkite.lightningdb.or
 import com.lightningkite.lightningdb.updateOneById
@@ -40,6 +39,8 @@ import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.toList
 import java.security.MessageDigest
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -86,9 +87,6 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
             ModelPermissions(
                 create = Condition.Never,
                 read = admin or mine,
-                readMask = mask {
-                    it.publicKeyDerBase64.mask("")
-                },
                 update = admin or (mine and active),
                 updateRestrictions = updateRestrictions {
                     it.subjectName.cannotBeModified()
@@ -113,6 +111,9 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
         successCode = HttpStatus.OK,
         implementation = { _: Unit ->
             val challenge = challenge.establishForRegistration(auth.subject.name, auth.idString)
+            val existingCredentials = modelInfo.collection().find(condition {
+                it.subjectName.eq(auth.subject.name) and it.subjectId.eq(auth.idString) and active
+            }).map { ExistingCredential(it._id) }.toList()
             val rp = PublicKeyCredentialRpEntity(
                 id = rpId,
                 name = generalSettings().projectName
@@ -125,6 +126,7 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
 
             PublicKeyCredentialCreationOptions(
                 challenge = challenge,
+                excludeCredentials = existingCredentials,
                 pubKeyCredParams = listOf(PublicKeyAlgorithm.ES256, PublicKeyAlgorithm.EdDSA).map { PublicKeyCredentialParameters(it) },
                 rp = rp,
                 user = pkUser,
@@ -191,10 +193,7 @@ class PasskeyProofEndpoints<USER : HasId<*>>(
             val clientDataDecoded = Base64.WebAuthn.decode(response.response.clientDataJSON)
             val clientData: ClientData = Serialization.json.decodeFromString(clientDataDecoded.decodeToString())
 
-            // TODO: Remove this (just for testing)
-            if (!generalSettings().debug) {
-                challenge.assertForLogin(clientData.challenge)
-            }
+            challenge.assertForLogin(clientData.challenge)
 
             val clientDataHash = MessageDigest.getInstance("SHA-256").digest(clientDataDecoded)
             val signatureContents = authenticatorDataRaw + clientDataHash
