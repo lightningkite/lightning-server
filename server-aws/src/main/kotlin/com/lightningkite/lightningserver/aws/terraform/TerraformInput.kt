@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.aws.terraform
 
-internal data class TerraformInput(
+data class TerraformInput(
     val name: String,
     val type: String,
     val default: String?,

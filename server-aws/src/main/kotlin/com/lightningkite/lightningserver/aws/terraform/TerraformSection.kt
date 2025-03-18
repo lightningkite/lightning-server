@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.aws.terraform
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
 
-internal data class TerraformSection(
+data class TerraformSection(
     val name: String,
     val providers: List<TerraformProvider> = listOf(
         TerraformProvider.aws,

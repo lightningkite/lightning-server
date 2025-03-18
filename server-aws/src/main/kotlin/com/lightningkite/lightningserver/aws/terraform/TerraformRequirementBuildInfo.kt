@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.aws.terraform
 
 
-internal data class TerraformRequirementBuildInfo(
+data class TerraformRequirementBuildInfo(
     val project: TerraformProjectInfo,
     val name: String,
     val appendable: Appendable,
