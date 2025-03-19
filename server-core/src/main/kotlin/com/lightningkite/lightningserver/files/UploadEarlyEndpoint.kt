@@ -45,6 +45,10 @@ class UploadEarlyEndpoint(
             val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
             val safeFo = files().root.resolve(filePath).resolve("$id.file")
             runBlocking { fileScanner().copyAndScan(originalFo, safeFo) }
+            runBlocking {
+                database().collection<UploadForNextRequest>()
+                    .deleteManyIgnoringOld(condition { it.file eq ServerFile(safeFo.url) })
+            }
             return safeFo
         }
 
@@ -54,6 +58,10 @@ class UploadEarlyEndpoint(
             val originalFo = files().root.resolve(jailFilePath).resolve("$id.file")
             val safeFo = files().root.resolve(filePath).resolve("$id.file")
             runBlocking { fileScanner().copyAndScan(originalFo, safeFo) }
+            runBlocking {
+                database().collection<UploadForNextRequest>()
+                    .deleteManyIgnoringOld(condition { it.file eq ServerFile(safeFo.url) })
+            }
             return safeFo
         }
     }
