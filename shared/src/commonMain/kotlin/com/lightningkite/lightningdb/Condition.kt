@@ -39,6 +39,7 @@ sealed class Condition<in T> {
     @Serializable(ConditionAndSerializer::class)
     @SerialName("And")
     data class And<T>(val conditions: List<Condition<T>>) : Condition<T>() {
+        constructor(vararg conditions: Condition<T>) : this(conditions.toList())
         override fun invoke(on: T): Boolean = conditions.all { it(on) }
         override fun toString(): String = conditions.joinToString(" && ", "(", ")")
     }
@@ -46,6 +47,7 @@ sealed class Condition<in T> {
     @Serializable(ConditionOrSerializer::class)
     @SerialName("Or")
     data class Or<T>(val conditions: List<Condition<T>>) : Condition<T>() {
+        constructor(vararg conditions: Condition<T>) : this(conditions.toList())
         override fun invoke(on: T): Boolean = conditions.any { it(on) }
         override fun toString(): String = conditions.joinToString(" || ", "(", ")")
     }
@@ -272,3 +274,6 @@ sealed class Condition<in T> {
 infix fun <T> Condition<T>.and(other: Condition<T>): Condition.And<T> = Condition.And(listOf(this, other))
 infix fun <T> Condition<T>.or(other: Condition<T>): Condition.Or<T> = Condition.Or(listOf(this, other))
 operator fun <T> Condition<T>.not(): Condition.Not<T> = Condition.Not(this)
+
+fun <T> Condition.Companion.andNotNull(vararg conditions: Condition<T>?) = Condition.And(conditions.toList().filterNotNull())
+fun <T> Condition.Companion.orNotNull(vararg conditions: Condition<T>?) = Condition.Or(conditions.toList().filterNotNull())
