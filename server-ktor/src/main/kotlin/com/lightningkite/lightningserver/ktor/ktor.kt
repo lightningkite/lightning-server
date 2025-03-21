@@ -71,6 +71,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                 allowMethod(HttpMethod.Put)
                 allowMethod(HttpMethod.Patch)
                 allowMethod(HttpMethod.Delete)
+                allowCredentials = true
 
                 allowHeader(io.ktor.http.HttpHeaders.ContentType)
                 allowHeader(io.ktor.http.HttpHeaders.Authorization)
