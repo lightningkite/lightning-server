@@ -11,7 +11,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.time.Duration
-import kotlin.time.measureTime
 
 @OptIn(ExperimentalSerializationApi::class)
 class VirtualTypesTest {
@@ -22,7 +21,9 @@ class VirtualTypesTest {
     }
     fun <T> testVirtualVersion(serializer: KSerializer<T>, instance: T, builderAction: JsonBuilder.()->Unit = {}) {
         val virtualRegistry = SerializationRegistry.master.virtualize { it.contains("testing") }
+        println("Got virtual registry")
         val vtype = virtualRegistry.virtualTypes[serializer.descriptor.serialName] as VirtualStruct
+        println("Got vtype")
         val vtypeSerializer = virtualRegistry[serializer.descriptor.serialName, serializer.tryTypeParameterSerializers3() ?: arrayOf()] as VirtualStruct.Concrete
         println(vtypeSerializer.serializers)
         println(vtype.annotations)
@@ -103,6 +104,10 @@ class VirtualTypesTest {
             GenericBox.serializer(Int.serializer()),
             GenericBox(value = 1, nullable = 2, list = listOf(3, 4))
         )
+    }
+
+    @Test fun testNesting() {
+        testVirtualVersion(NestedModel.serializer(), NestedModel("root", NestedModel("second", NestedModel("third", null))))
     }
 //    @Test fun testEnum() {
 //        val vtype = SampleA.serializer().makeVirtualType() as VirtualEnum

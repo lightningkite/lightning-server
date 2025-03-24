@@ -117,6 +117,7 @@ class LazyRenamedSerialDescriptor(override val serialName: String, val getter: (
     override fun isElementOptional(index: Int): Boolean = getter().isElementOptional(index)
 }
 
+
 class ConditionAndSerializer<T>(val inner: KSerializer<T>) :
     WrappingSerializer<Condition.And<T>, List<Condition<T>>>("And") {
     override fun getDeferred(): KSerializer<List<Condition<T>>> = ListSerializer(Condition.serializer(inner))

@@ -42,7 +42,8 @@ class S3FileSystemTest : FileSystemTests() {
     }
 
     @Test fun printHealth(): Unit = runBlocking {
-        println(system?.healthCheck())
+        val system = system ?: return@runBlocking
+        println(system.healthCheck())
         delay(1.seconds)
         println("used: " + AwsConnections.used)
         println("total: " + AwsConnections.total)

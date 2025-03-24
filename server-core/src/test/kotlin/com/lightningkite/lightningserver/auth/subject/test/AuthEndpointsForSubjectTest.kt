@@ -179,7 +179,7 @@ class AuthEndpointsForSubjectTest {
         TestSettings.proofPassword.establish.test(self, EstablishPassword("test"))
 
         // Set up phone
-        TestSettings.userInfo.collection().updateOneById(self._id, modification { it.phoneNumber assign "8001002000" })
+        TestSettings.userInfo.collection().updateOneById(self._id, modification { it.phoneNumber assign "+18001002000" })
 
         // Can still log in with just an email
         run {
@@ -190,7 +190,7 @@ class AuthEndpointsForSubjectTest {
 
         // Can log in with phone
         run {
-            val key = TestSettings.proofSms.start.test(null, "8001002000")
+            val key = TestSettings.proofSms.start.test(null, "+18001002000")
             val pin = pinRegex.find(TestSMSClient.lastMessageSent?.message ?: "")!!.value
             val proof = TestSettings.proofSms.prove.test(null, FinishProof(key, pin))
             val result = TestSettings.testUserSubject.login.test(null, listOf(proof))
@@ -232,6 +232,49 @@ class AuthEndpointsForSubjectTest {
                 assertContains(e.message ?: "", "not related", ignoreCase = true)
             }
         }
+    }
+
+    @Test fun phoneNumberNormalization() {
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("+18008008000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("18008008000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("8008008000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("+1-800-800-8000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("1-800-800-8000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("800-800-8000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("+1 (800) 800-8000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("1 (800) 800-8000")
+        )
+        assertEquals(
+            "+18008008000",
+            TestSettings.proofSms.normalize("(800) 800-8000")
+        )
+        assertEquals(
+            "+61212345678",
+            TestSettings.proofSms.normalize("+61 2 1234 5678")
+        )
     }
 
     @Test

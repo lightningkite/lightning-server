@@ -4,9 +4,7 @@ package com.lightningkite.lightningdb.testing
 
 import com.lightningkite.*
 import com.lightningkite.lightningdb.*
-import com.lightningkite.serialization.*
 
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.datetime.Instant
@@ -56,6 +54,12 @@ data class GenericBox<T>(
     companion object
 }
 
+@GenerateDataClassPaths
+@Serializable
+data class NestedModel(
+    val name: String,
+    val nested: NestedModel? = null
+)
 
 @GenerateDataClassPaths
 @Serializable

@@ -2,10 +2,12 @@
 
 package com.lightningkite.serialization
 
+import com.lightningkite.lightningdb.LazyRenamedSerialDescriptor
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.encoding.*
@@ -16,45 +18,48 @@ class PartialSerializer<T>(val source: KSerializer<T>): KSerializer<Partial<T>> 
             if (it.serializer.descriptor.isNullable) {
                 val nn = it.serializer.nullElement()!!
                 if (nn.serializableProperties != null) {
-                    PartialSerializer(nn).nullable
+                    if(nn == source) this.nullable
+                    else PartialSerializer(nn).nullable
                 } else it.serializer
             } else {
                 if (it.serializer.serializableProperties != null) {
-                    PartialSerializer(it.serializer)
+                    if(it.serializer == source) this
+                    else PartialSerializer(it.serializer)
                 } else it.serializer
             }
         } ?: if(source.descriptor.serialName == "kotlin.Nothing") listOf() else throw IllegalArgumentException("Failed to make partial serializer: ${source.descriptor.serialName} has no serializableProperties")
     }
-    override val descriptor: SerialDescriptor by lazy {
-            try {
-                val sourceDescriptor = source.descriptor
-                buildClassSerialDescriptor("com.lightningkite.serialization.Partial", sourceDescriptor) {
-                    if(sourceDescriptor.elementsCount != childSerializers.size) {
-                        throw IllegalStateException("Mismatch in child serializer count; ${sourceDescriptor.elementsCount} vs ${childSerializers.size}; ${sourceDescriptor.elementNames.joinToString()} vs ${childSerializers.joinToString { it.descriptor.serialName }}")
-                    }
-                    for (index in 0 until sourceDescriptor.elementsCount) {
-                        val s = childSerializers[index]
-                        if (s is PartialSerializer<*>) {
-                            element(
-                                elementName = sourceDescriptor.getElementName(index),
-                                descriptor = s.descriptor,
-                                annotations = sourceDescriptor.getElementAnnotations(index),
-                                isOptional = true
-                            )
-                        } else {
-                            element(
-                                elementName = sourceDescriptor.getElementName(index),
-                                descriptor = sourceDescriptor.getElementDescriptor(index),
-                                annotations = sourceDescriptor.getElementAnnotations(index),
-                                isOptional = true
-                            )
-                        }
+    private val innerDescriptor: SerialDescriptor by lazy {
+        try {
+            val sourceDescriptor = source.descriptor
+            buildClassSerialDescriptor("com.lightningkite.serialization.Partial", sourceDescriptor) {
+                if(sourceDescriptor.elementsCount != childSerializers.size) {
+                    throw IllegalStateException("Mismatch in child serializer count; ${sourceDescriptor.elementsCount} vs ${childSerializers.size}; ${sourceDescriptor.elementNames.joinToString()} vs ${childSerializers.joinToString { it.descriptor.serialName }}")
+                }
+                for (index in 0 until sourceDescriptor.elementsCount) {
+                    val s = childSerializers[index]
+                    if (s is PartialSerializer<*>) {
+                        element(
+                            elementName = sourceDescriptor.getElementName(index),
+                            descriptor = s.descriptor,
+                            annotations = sourceDescriptor.getElementAnnotations(index),
+                            isOptional = true
+                        )
+                    } else {
+                        element(
+                            elementName = sourceDescriptor.getElementName(index),
+                            descriptor = sourceDescriptor.getElementDescriptor(index),
+                            annotations = sourceDescriptor.getElementAnnotations(index),
+                            isOptional = true
+                        )
                     }
                 }
-            } catch(e: Exception) {
-                throw Exception("Failed to make partial descriptor for ${source.descriptor.serialName}", e)
             }
+        } catch(e: Exception) {
+            throw Exception("Failed to make partial descriptor for ${source.descriptor.serialName}", e)
         }
+    }
+    override val descriptor: SerialDescriptor = LazyRenamedSerialDescriptor("com.lightningkite.serialization.Partial") { innerDescriptor }
 
     override fun deserialize(decoder: Decoder): Partial<T> = decoder.decodeStructure(descriptor) {
         val out = HashMap<SerializableProperty<T, *>, Any?>()

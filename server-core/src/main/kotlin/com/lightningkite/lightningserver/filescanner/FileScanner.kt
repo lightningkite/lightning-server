@@ -4,13 +4,11 @@ import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.files.FileObject
 import com.lightningkite.lightningserver.http.HttpContent
+import com.lightningkite.lightningserver.http.download
 import com.lightningkite.lightningserver.settings.Pluggable
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import java.io.InputStream
-import java.net.URLConnection
-import java.util.*
-import com.lightningkite.UUID
 
 
 interface FileScanner {
@@ -31,12 +29,14 @@ suspend fun FileScanner.copyAndScan(source: FileObject, destination: FileObject)
     }
 }
 suspend fun List<FileScanner>.scan(item: HttpContent) {
+    // TODO Splittable stream
+    val asFile = item.download()
     val all = drop(1).map {
-        val t = Thread { runBlocking { it.scan(item.type, item.stream()) } }
+        val t = Thread { runBlocking { it.scan(item.type, asFile.inputStream()) } }
         t.start()
         t
     }
-    firstOrNull()?.scan(item.type, item.stream())
+    firstOrNull()?.scan(item.type, asFile.inputStream())
     all.forEach { it.join() }
 }
 suspend fun List<FileScanner>.copyAndScan(source: FileObject, destination: FileObject) {
@@ -125,7 +125,7 @@ object CheckMimeFileScanner : FileScanner {
  */
 @Serializable
 data class FileScannerSettings(
-    val urls: List<String> = listOf()
+    val urls: List<String> = listOf(),
 ) : () -> List<FileScanner> {
     companion object : Pluggable<String, FileScanner>() {
         init {
@@ -135,4 +135,3 @@ data class FileScannerSettings(
 
     override fun invoke(): List<FileScanner> = urls.map { parse(it.substringBefore("://"), it) }
 }
-
