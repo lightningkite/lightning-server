@@ -32,17 +32,17 @@ internal val TerraformProjectInfo.vpc_cidr_block get() = if (existingVpc) "data.
 internal val TerraformProjectInfo.public_route_table_ids get() = if (existingVpc) "toset([data.aws_vpc.main.main_route_table_id])" else "module.vpc.public_route_table_ids"
 internal val TerraformProjectInfo.natGatewayIp get() = if (existingVpc) "[for s in data.aws_nat_gateway.main : s.public_ip]" else "module.vpc.nat_public_ips"
 
-internal val TerraformProjectInfo.projectNameSafe: String
+val TerraformProjectInfo.projectNameSafe: String
     get() = projectName.filter {
         it.isLetterOrDigit() || it in setOf(
             '-',
             '_'
         )
     }
-internal val TerraformProjectInfo.namePrefix: String get() = projectNameSafe
-internal val TerraformProjectInfo.namePrefixLower: String get() = projectNameSafe.lowercase()
-internal val TerraformProjectInfo.namePrefixUnderscores: String get() = projectNameSafe.replace("-", "_")
-internal val TerraformProjectInfo.namePrefixSafe: String get() = projectNameSafe.filter { it.isLetterOrDigit() }
-internal val TerraformProjectInfo.namePrefixPath: String
+val TerraformProjectInfo.namePrefix: String get() = projectNameSafe
+val TerraformProjectInfo.namePrefixLower: String get() = projectNameSafe.lowercase()
+val TerraformProjectInfo.namePrefixUnderscores: String get() = projectNameSafe.replace("-", "_")
+val TerraformProjectInfo.namePrefixSafe: String get() = projectNameSafe.filter { it.isLetterOrDigit() }
+val TerraformProjectInfo.namePrefixPath: String
     get() = projectNameSafe.lowercase().replace("-", "/").replace("_", "")
-internal val TerraformProjectInfo.namePrefixPathSegment: String get() = projectNameSafe.lowercase().replace("_", "")
+val TerraformProjectInfo.namePrefixPathSegment: String get() = projectNameSafe.lowercase().replace("_", "")
