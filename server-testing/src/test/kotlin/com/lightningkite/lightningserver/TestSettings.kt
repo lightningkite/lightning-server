@@ -1,10 +1,12 @@
 package com.lightningkite.lightningserver
 
 import com.lightningkite.UUID
+import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.files.ServerFile
 import com.lightningkite.lightningdb.collection
 import com.lightningkite.lightningdb.insertOne
 import com.lightningkite.lightningdb.test.*
+import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.AuthType
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.JwtSigner
@@ -40,8 +42,13 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.sms.SMSSettings
+import com.lightningkite.lightningserver.typed.ApiWebsocket
+import com.lightningkite.lightningserver.typed.TypedServerPath1
 import com.lightningkite.lightningserver.typed.api
+import com.lightningkite.lightningserver.typed.arg
 import com.lightningkite.lightningserver.typed.bulkRequestEndpoint
+import com.lightningkite.lightningserver.typed.post
+import com.lightningkite.lightningserver.typed.typed
 import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.prepareModelsShared
 import kotlinx.coroutines.CoroutineStart
@@ -49,6 +56,7 @@ import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.serializer
 import java.io.InputStream
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -93,6 +101,17 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     }) })
     val consumeFile = path("consume-file").post.api(authOptions = noAuth, summary = "consume file") { input: ServerFile ->
         input.fileObject.signedUrl
+    }
+
+    val testWebSocket = object: ApiWebsocket<HasId<*>?, TypedServerPath1<Int>, Int, Int, Unit>(
+        path("ws-test").arg<Int>("num"),
+        Unit.serializer()
+    ) {
+        override val authOptions: AuthOptions<HasId<*>?> = noAuth
+        override val inputType: KSerializer<Int> = Int.serializer()
+        override val outputType: KSerializer<Int> = Int.serializer()
+        override val summary: String = "Sample Web Socket"
+
     }
 
     val sample1 = path("sample1").post.api(summary = "Test1", authOptions = authOptions<User>()) { input: Int -> input + 42 }
