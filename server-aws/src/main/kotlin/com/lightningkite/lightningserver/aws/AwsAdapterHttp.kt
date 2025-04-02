@@ -45,16 +45,21 @@ class AwsAdapterHttp(val root: AwsAdapter) {
                     body = "No matching path for '${path}' found"
                 )
                 val cors = generalSettings().cors ?: CorsSettings()
-                val matches = cors.allowedDomains.any {
+                val domainMatches = cors.allowedDomains.any {
                     it == "*" || it == origin || origin.endsWith(it.removePrefix("*"))
                 }
-                if (matches) {
+                val headerMatches = headers[HttpHeader.AccessControlRequestHeaders]?.split(',')?.filter { header ->
+                    cors.allowedHeaders.any {
+                        it == "*" || it == header || header.endsWith(it.removePrefix("*"))
+                    }
+                } ?: emptyList()
+                if (domainMatches) {
                     return APIGatewayV2HTTPResponse(
                         statusCode = HttpStatus.NoContent.code,
                         headers = mapOf(
                             HttpHeader.AccessControlAllowOrigin to (headers[HttpHeader.Origin] ?: "*"),
                             HttpHeader.AccessControlAllowMethods to "GET,POST,PUT,PATCH,DELETE,HEAD",
-                            HttpHeader.AccessControlAllowHeaders to (cors.allowedHeaders.joinToString(", ")),
+                            HttpHeader.AccessControlAllowHeaders to (headerMatches.joinToString(",")),
                             HttpHeader.AccessControlAllowCredentials to "true",
                         )
                     )
