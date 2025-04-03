@@ -95,8 +95,18 @@ class AwsAdapterHttp(val root: AwsAdapter) {
 
 internal suspend fun HttpResponse.toAws(
 ): APIGatewayV2HTTPResponse {
-    val outHeaders = HashMap<String, String>()
-    headers.entries.forEach { outHeaders.put(it.first, it.second) }
+    val outHeaders = buildMap<String, MutableList<String>> headerMap@{
+        headers.entries.forEach { (key, value) ->
+            if (key.lowercase() == HttpHeader.SetCookie.lowercase())
+                this@headerMap[key] = mutableListOf(value)
+            else {
+                this@headerMap.getOrPut(key.lowercase(), { mutableListOf() }).add(value)
+            }
+        }
+    }
+        .mapValues { (_, values) -> values.joinToString(", ") { it } }
+        .toMutableMap()
+
     val b = body
     b?.type?.let { outHeaders.put(HttpHeader.ContentType, it.toString()) }
     b?.length?.let { outHeaders.put(HttpHeader.ContentLength, it.toString()) }
@@ -104,7 +114,8 @@ internal suspend fun HttpResponse.toAws(
         b == null -> {
             val response = APIGatewayV2HTTPResponse(
                 statusCode = status.code,
-                headers = outHeaders
+                headers = outHeaders,
+//                cookies = cookies,
             )
             return response
         }
@@ -114,7 +125,8 @@ internal suspend fun HttpResponse.toAws(
                 APIGatewayV2HTTPResponse(
                     statusCode = this@toAws.status.code,
                     headers = outHeaders,
-                    body = b.text()
+                    body = b.text(),
+//                    cookies = cookies,
                 )
             }
             return response
@@ -126,7 +138,8 @@ internal suspend fun HttpResponse.toAws(
                     statusCode = this@toAws.status.code,
                     headers = outHeaders,
                     body = Base64.getEncoder().encodeToString(b.bytes),
-                    isBase64Encoded = true
+                    isBase64Encoded = true,
+//                    cookies = cookies,
                 )
             }
             return response
@@ -138,7 +151,8 @@ internal suspend fun HttpResponse.toAws(
                     statusCode = this@toAws.status.code,
                     headers = outHeaders,
                     body = Base64.getEncoder().encodeToString(b.stream().use { it.readAllBytes() }),
-                    isBase64Encoded = true
+                    isBase64Encoded = true,
+//                    cookies = cookies,
                 )
             }
             return response
