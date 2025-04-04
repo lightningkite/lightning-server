@@ -44,24 +44,37 @@ class AwsAdapterHttp(val root: AwsAdapter) {
                     statusCode = 404,
                     body = "No matching path for '${path}' found"
                 )
-                val cors = generalSettings().cors ?: CorsSettings()
-                val domainMatches = cors.allowedDomains.any {
+                val corsSettings = generalSettings().cors ?: CorsSettings()
+                val domainMatches = corsSettings.allowedDomains.any {
                     it == "*" || it == origin || origin.endsWith(it.removePrefix("*"))
                 }
-                val headerMatches = headers[HttpHeader.AccessControlRequestHeaders]?.split(',')?.filter { header ->
-                    cors.allowedHeaders.any {
-                        it == "*" || it == header || header.endsWith(it.removePrefix("*"))
-                    }
-                } ?: emptyList()
                 if (domainMatches) {
                     return APIGatewayV2HTTPResponse(
                         statusCode = HttpStatus.NoContent.code,
-                        headers = mapOf(
-                            HttpHeader.AccessControlAllowOrigin to (headers[HttpHeader.Origin] ?: "*"),
-                            HttpHeader.AccessControlAllowMethods to "GET,POST,PUT,PATCH,DELETE,HEAD",
-                            HttpHeader.AccessControlAllowHeaders to (headerMatches.joinToString(",")),
-                            HttpHeader.AccessControlAllowCredentials to "true",
-                        )
+                        headers = buildMap {
+                            set(
+                                HttpHeader.AccessControlAllowOrigin,
+                                origin
+                            )
+                            set(
+                                HttpHeader.AccessControlAllowMethods,
+                                corsSettings.allowedMethods.joinToString { it.toString() }
+                            )
+                            set(
+                                HttpHeader.AccessControlAllowHeaders,
+                                corsSettings.allowedHeaders.joinToString()
+                            )
+                            if (corsSettings.exposeHeaders.isNotEmpty())
+                                set(
+                                    HttpHeader.AccessControlExposeHeaders,
+                                    corsSettings.exposeHeaders.joinToString()
+                                )
+                            if (corsSettings.allowCredentials)
+                                set(
+                                    HttpHeader.AccessControlAllowCredentials,
+                                    "true"
+                                )
+                        }
                     )
                 } else {
                     HttpEndpointMatcher.Match(
