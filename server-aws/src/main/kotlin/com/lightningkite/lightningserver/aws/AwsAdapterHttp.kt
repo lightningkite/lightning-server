@@ -44,19 +44,37 @@ class AwsAdapterHttp(val root: AwsAdapter) {
                     statusCode = 404,
                     body = "No matching path for '${path}' found"
                 )
-                val cors = generalSettings().cors ?: CorsSettings()
-                val matches = cors.allowedDomains.any {
+                val corsSettings = generalSettings().cors ?: CorsSettings()
+                val domainMatches = corsSettings.allowedDomains.any {
                     it == "*" || it == origin || origin.endsWith(it.removePrefix("*"))
                 }
-                if (matches) {
+                if (domainMatches) {
                     return APIGatewayV2HTTPResponse(
                         statusCode = HttpStatus.NoContent.code,
-                        headers = mapOf(
-                            HttpHeader.AccessControlAllowOrigin to (headers[HttpHeader.Origin] ?: "*"),
-                            HttpHeader.AccessControlAllowMethods to "GET,POST,PUT,PATCH,DELETE,HEAD",
-                            HttpHeader.AccessControlAllowHeaders to (cors.allowedHeaders.joinToString(", ")),
-                            HttpHeader.AccessControlAllowCredentials to "true",
-                        )
+                        headers = buildMap {
+                            set(
+                                HttpHeader.AccessControlAllowOrigin,
+                                origin
+                            )
+                            set(
+                                HttpHeader.AccessControlAllowMethods,
+                                corsSettings.allowedMethods.joinToString { it.toString() }
+                            )
+                            set(
+                                HttpHeader.AccessControlAllowHeaders,
+                                corsSettings.allowedHeaders.joinToString()
+                            )
+                            if (corsSettings.exposeHeaders.isNotEmpty())
+                                set(
+                                    HttpHeader.AccessControlExposeHeaders,
+                                    corsSettings.exposeHeaders.joinToString()
+                                )
+                            if (corsSettings.allowCredentials)
+                                set(
+                                    HttpHeader.AccessControlAllowCredentials,
+                                    "true"
+                                )
+                        }
                     )
                 } else {
                     HttpEndpointMatcher.Match(
@@ -90,8 +108,18 @@ class AwsAdapterHttp(val root: AwsAdapter) {
 
 internal suspend fun HttpResponse.toAws(
 ): APIGatewayV2HTTPResponse {
-    val outHeaders = HashMap<String, String>()
-    headers.entries.forEach { outHeaders.put(it.first, it.second) }
+    val outHeaders = buildMap<String, MutableList<String>> headerMap@{
+        headers.entries.forEach { (key, value) ->
+            if (key.lowercase() == HttpHeader.SetCookie.lowercase())
+                this@headerMap[key] = mutableListOf(value)
+            else {
+                this@headerMap.getOrPut(key.lowercase(), { mutableListOf() }).add(value)
+            }
+        }
+    }
+        .mapValues { (_, values) -> values.joinToString(", ") { it } }
+        .toMutableMap()
+
     val b = body
     b?.type?.let { outHeaders.put(HttpHeader.ContentType, it.toString()) }
     b?.length?.let { outHeaders.put(HttpHeader.ContentLength, it.toString()) }
@@ -99,7 +127,8 @@ internal suspend fun HttpResponse.toAws(
         b == null -> {
             val response = APIGatewayV2HTTPResponse(
                 statusCode = status.code,
-                headers = outHeaders
+                headers = outHeaders,
+//                cookies = cookies,
             )
             return response
         }
@@ -109,7 +138,8 @@ internal suspend fun HttpResponse.toAws(
                 APIGatewayV2HTTPResponse(
                     statusCode = this@toAws.status.code,
                     headers = outHeaders,
-                    body = b.text()
+                    body = b.text(),
+//                    cookies = cookies,
                 )
             }
             return response
@@ -121,7 +151,8 @@ internal suspend fun HttpResponse.toAws(
                     statusCode = this@toAws.status.code,
                     headers = outHeaders,
                     body = Base64.getEncoder().encodeToString(b.bytes),
-                    isBase64Encoded = true
+                    isBase64Encoded = true,
+//                    cookies = cookies,
                 )
             }
             return response
@@ -133,7 +164,8 @@ internal suspend fun HttpResponse.toAws(
                     statusCode = this@toAws.status.code,
                     headers = outHeaders,
                     body = Base64.getEncoder().encodeToString(b.stream().use { it.readAllBytes() }),
-                    isBase64Encoded = true
+                    isBase64Encoded = true,
+//                    cookies = cookies,
                 )
             }
             return response

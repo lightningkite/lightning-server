@@ -1,6 +1,7 @@
 package com.lightningkite.lightningserver.settings
 
 import com.lightningkite.lightningserver.http.HttpHeader
+import com.lightningkite.lightningserver.http.HttpMethod
 import kotlinx.serialization.Serializable
 
 /**
@@ -16,8 +17,11 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class CorsSettings(
-    val allowedDomains: List<String> = listOf(),
-    val allowedHeaders: List<String> = listOf(),
+    val allowedDomains: List<String> = emptyList(),
+    val allowedHeaders: List<String> = emptyList(),
+    val allowedMethods: List<String> = emptyList(),
+    val exposeHeaders: List<String> = emptyList(),
+    val allowCredentials: Boolean = false,
 )
 
 @Serializable
@@ -31,7 +35,8 @@ data class GeneralServerSettings(
     val realIpHeader: String? = null,
     val cors: CorsSettings? = if (debug) CorsSettings(
         allowedDomains = listOf("*"),
-        allowedHeaders = listOf("*", HttpHeader.Authorization)
+        allowedHeaders = listOf("*", HttpHeader.ContentType, HttpHeader.Authorization),
+        allowedMethods = listOf("*"),
     ) else null,
     val emergencyContact: String? = null,
 ) {
