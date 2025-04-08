@@ -3,22 +3,10 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.condition
 import com.lightningkite.lightningserver.Access
 import com.lightningkite.lightningserver.CompletePermissions
 import com.lightningkite.lightningserver.FinalPermissions
 import com.lightningkite.lightningserver.FinalServicePermissions
-import com.lightningkite.lightningserver.auth.AuthType
-import com.lightningkite.lightningserver.auth.Authentication
-import com.lightningkite.lightningserver.auth.RequestAuthSerializable
-import com.lightningkite.lightningserver.auth.proof.Proof
-import com.lightningkite.lightningserver.auth.token.PrivateTinyTokenFormat
-import com.lightningkite.lightningserver.encryption.Encryptor
-import com.lightningkite.lightningserver.encryption.SecretBasis
-import com.lightningkite.lightningserver.encryption.encryptor
-import com.lightningkite.lightningserver.testmodels.TestUser
-import com.lightningkite.prepareModelsServerCore
-import com.lightningkite.uuid
 import kotlinx.serialization.*
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -34,7 +22,7 @@ class JavaDataTest {
         val latitude: Float,
         val longitude: Float,
         val firmware: Int,
-        val seen: List<Tag>
+        val seen: List<Tag>,
     ) {
         companion object
 
@@ -104,13 +92,25 @@ class JavaDataTest {
             services = FinalServicePermissions()
         )
         println(Serialization.javaData.encodeToHexStringDebug(CompletePermissions.serializer(), sample))
-        assertEquals(sample, Serialization.javaData.decodeFromByteArray(
-            CompletePermissions.serializer(),
-            Serialization.javaData.encodeToByteArray(CompletePermissions.serializer(), sample)
-        ))
+        assertEquals(
+            sample, Serialization.javaData.decodeFromByteArray(
+                CompletePermissions.serializer(),
+                Serialization.javaData.encodeToByteArray(CompletePermissions.serializer(), sample)
+            )
+        )
         val serializer = CompletePermissions.serializer()
-        assertEquals(sample, Serialization.stringArray.decodeFromStringList(serializer, Serialization.stringArray.encodeToStringList(serializer, sample).also { println(it) }))
-        assertEquals(sample, Serialization.stringArray.decodeFromString(serializer, Serialization.stringArray.encodeToString(serializer, sample).also { println(it) }))
+        assertEquals(
+            sample,
+            Serialization.stringArray.decodeFromStringList(
+                serializer,
+                Serialization.stringArray.encodeToStringList(serializer, sample).also { println(it) })
+        )
+        assertEquals(
+            sample,
+            Serialization.stringArray.decodeFromString(
+                serializer,
+                Serialization.stringArray.encodeToString(serializer, sample).also { println(it) })
+        )
     }
 
     @Test
@@ -161,12 +161,41 @@ class JavaDataTest {
         """.trimIndent()
         )
         println(Serialization.javaData.encodeToHexStringDebug(CompletePermissions.serializer(), sample2))
-        assertEquals(sample2, Serialization.javaData.decodeFromByteArray(
-            CompletePermissions.serializer(),
-            Serialization.javaData.encodeToByteArray(CompletePermissions.serializer(), sample2)
-        ))
+        assertEquals(
+            sample2, Serialization.javaData.decodeFromByteArray(
+                CompletePermissions.serializer(),
+                Serialization.javaData.encodeToByteArray(CompletePermissions.serializer(), sample2)
+            )
+        )
         val serializer = CompletePermissions.serializer()
-        assertEquals(sample2, Serialization.stringArray.decodeFromStringList(serializer, Serialization.stringArray.encodeToStringList(serializer, sample2)))
-        assertEquals(sample2, Serialization.stringArray.decodeFromString(serializer, Serialization.stringArray.encodeToString(serializer, sample2)))
+        assertEquals(
+            sample2,
+            Serialization.stringArray.decodeFromStringList(
+                serializer,
+                Serialization.stringArray.encodeToStringList(serializer, sample2)
+            )
+        )
+        assertEquals(
+            sample2,
+            Serialization.stringArray.decodeFromString(
+                serializer,
+                Serialization.stringArray.encodeToString(serializer, sample2)
+            )
+        )
+    }
+
+    @Serializable
+    data class StringContainer(
+        val string1: String = "",
+        val string2: String = "",
+    )
+
+    // The charactor – in string1 is not a -. It's different. This caused Serialization errors that has now been resolved.
+    @Test
+    fun testUnicodeStrings() {
+        val value = StringContainer(string1 = "INF–03–026 C", string2 = "")
+
+        val output = Serialization.javaData.encodeToHexString(StringContainer.serializer(), value)
+        Serialization.javaData.decodeFromHexString<StringContainer>(output)
     }
 }

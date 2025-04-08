@@ -33,8 +33,9 @@ class JavaData(override val serializersModule: SerializersModule) : BinaryFormat
         override fun encodeDouble(value: Double) = output.writeDouble(value)
         override fun encodeChar(value: Char) = output.writeChar(value.code)
         override fun encodeString(value: String) {
-            output.writeShort(value.length)
-            output.write(value.toByteArray(Charsets.UTF_8))
+            val encoded = value.toByteArray(Charsets.UTF_8)
+            output.writeShort(encoded.size)
+            output.write(encoded)
         }
 
         override fun encodeEnum(enumDescriptor: SerialDescriptor, index: Int) {
@@ -109,31 +110,31 @@ class JavaData(override val serializersModule: SerializersModule) : BinaryFormat
         override fun decodeElementIndex(descriptor: SerialDescriptor): Int {
             if(descriptor.kind == StructureKind.CLASS) {
                 if(elementIndex >= descriptor.elementsCount) {
-                    return CompositeDecoder.DECODE_DONE
+                    return (CompositeDecoder.DECODE_DONE)
                 }
                 if(!descriptor.isElementOptional(elementIndex) && elementIndex < descriptor.elementsCount) {
-                    return elementIndex++
+                    return (elementIndex++)
                 }
                 if(descriptor.elementsCount >= 0xFE) {
-                    val index = input.readShort().toInt()
-                    if (index == 0xFF) {
-                        return CompositeDecoder.DECODE_DONE
-                    }
-                    if (index >= descriptor.elementsCount) throw SerializationException()
-                    elementIndex = index + 1
-                    return index
-                } else {
-                    val index = input.readByte().toInt()
+                    val index = input.readShort().toUShort().toInt()
                     if (index == 0xFFFF) {
                         return CompositeDecoder.DECODE_DONE
                     }
                     if (index >= descriptor.elementsCount) throw SerializationException()
                     elementIndex = index + 1
-                    return index
+                    return (index)
+                } else {
+                    val index = input.readByte().toUByte().toInt()
+                    if (index == 0xFF) {
+                        return CompositeDecoder.DECODE_DONE
+                    }
+                    if (index >= descriptor.elementsCount) throw SerializationException()
+                    elementIndex = index + 1
+                    return (index)
                 }
             } else {
                 if (elementIndex == elementsCount) return CompositeDecoder.DECODE_DONE
-                return elementIndex++
+                return (elementIndex++)
             }
         }
 
