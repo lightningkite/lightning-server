@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.aws.terraform
 
-internal data class TerraformProvider(
+data class TerraformProvider(
     val name: String,
     val source: String,
     val version: String,

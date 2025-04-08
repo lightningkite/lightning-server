@@ -48,7 +48,7 @@ data class APIGatewayV2HTTPResponse(
     val statusCode: Int? = null,
     val body: String? = null,
     val isBase64Encoded: Boolean = false,
-//    val multiValueHeaders: Map<String, List<String>> = mapOf(),
+    val cookies: List<String> = emptyList(),
     val headers: Map<String, String> = mapOf()
 )
 

@@ -9,7 +9,8 @@ import java.time.format.DateTimeFormatter
 
 @Serializable
 data class HttpHeaders(val entries: List<Pair<String, String>>) {
-    @Transient val normalizedEntries: Map<String, List<String>> = entries
+    @Transient
+    val normalizedEntries: Map<String, List<String>> = entries
         .groupBy { it.first.lowercase() }
         .mapValues { it.value.map { it.second } }
 
@@ -19,7 +20,8 @@ data class HttpHeaders(val entries: List<Pair<String, String>>) {
 
     operator fun get(key: String): String? = normalizedEntries[key.lowercase()]?.firstOrNull()
     fun getMany(key: String): List<String> = normalizedEntries[key.lowercase()] ?: listOf()
-    fun getValues(key: String): List<HttpHeaderValue> = normalizedEntries[key.lowercase()]?.map { HttpHeaderValue(it) } ?: listOf()
+    fun getValues(key: String): List<HttpHeaderValue> =
+        normalizedEntries[key.lowercase()]?.map { HttpHeaderValue(it) } ?: listOf()
 
     operator fun plus(other: HttpHeaders): HttpHeaders = HttpHeaders(this.entries + other.entries)
 
@@ -54,6 +56,7 @@ data class HttpHeaders(val entries: List<Pair<String, String>>) {
         fun set(key: String, value: String) {
             entries.add(key to value)
         }
+
         fun set(key: String, value: HttpHeaderValue) {
             entries.add(key to value.toString())
         }
@@ -71,35 +74,54 @@ data class HttpHeaders(val entries: List<Pair<String, String>>) {
             path: String? = "/",
             secure: Boolean = false,
             httpOnly: Boolean = false,
-            sameSite: SameSite? = null
+            sameSite: SameSite? = null,
+            extensions: Map<String, String?> = emptyMap(),
         ) {
             entries.add("Set-Cookie" to buildString {
-                append("$key=$value")
+                append("$key=$value;")
                 if (expiresAt != null) {
-                    append("; Expires=")
-                    append(DateTimeFormatter.RFC_1123_DATE_TIME.format(expiresAt.toJavaInstant().atOffset(java.time.ZoneOffset.UTC)))
+                    append(" Expires=")
+                    append(
+                        DateTimeFormatter.RFC_1123_DATE_TIME.format(
+                            expiresAt.toJavaInstant().atOffset(java.time.ZoneOffset.UTC)
+                        )
+                    )
+                    append(";")
                 }
                 if (maxAge != null) {
-                    append("; Max-Age=")
+                    append(" Max-Age=")
                     append(maxAge)
+                    append(";")
                 }
                 if (domain != null) {
-                    append("; Domain=")
+                    append(" Domain=")
                     append(domain)
+                    append(";")
                 }
                 if (path != null) {
-                    append("; Path=")
+                    append(" Path=")
                     append(path)
+                    append(";")
                 }
                 if (secure) {
-                    append("; Secure")
+                    append(" Secure;")
                 }
                 if (httpOnly) {
-                    append("; HttpOnly")
+                    append(" HttpOnly;")
                 }
                 if (sameSite != null) {
-                    append("; SameSite=")
+                    append(" SameSite=")
                     append(sameSite)
+                    append(";")
+                }
+                extensions.forEach {
+                    if (it.value != null) {
+                        append(" ${it.key}=")
+                        append(value)
+                        append(";")
+                    } else {
+                        append(" ${it.key};")
+                    }
                 }
             })
         }
@@ -109,7 +131,9 @@ data class HttpHeaders(val entries: List<Pair<String, String>>) {
 }
 
 @JvmName("HttpHeadersMultiMap")
-fun HttpHeaders(entries: Map<String, List<String>>) = HttpHeaders(entries.entries.flatMap { it.value.map { v -> it.key to v  } })
+fun HttpHeaders(entries: Map<String, List<String>>) =
+    HttpHeaders(entries.entries.flatMap { it.value.map { v -> it.key to v } })
+
 fun HttpHeaders(entries: Map<String, String>) = HttpHeaders(entries.entries.map { it.toPair() })
 fun HttpHeaders(vararg entry: Pair<String, String>) = HttpHeaders(mapOf(*entry))
-inline fun HttpHeaders(setup: HttpHeaders.Builder.()->Unit) = HttpHeaders.Builder().apply(setup).build()
+inline fun HttpHeaders(setup: HttpHeaders.Builder.() -> Unit) = HttpHeaders.Builder().apply(setup).build()

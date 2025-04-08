@@ -4,7 +4,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 import java.util.HashMap
 
-internal data class TerraformHandler(
+data class TerraformHandler(
     val name: String,
     val priority: Int = 0,
     val makeSection: TerraformProjectInfo.(settingKey: String) -> TerraformSection,

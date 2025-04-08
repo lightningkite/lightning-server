@@ -64,28 +64,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
     try {
         runBlocking { Tasks.onSettingsReady() }
         install(io.ktor.server.websocket.WebSockets)
-        generalSettings().cors?.let {
-            install(CORS) {
-                allowMethod(HttpMethod.Post)
-                allowMethod(HttpMethod.Options)
-                allowMethod(HttpMethod.Put)
-                allowMethod(HttpMethod.Patch)
-                allowMethod(HttpMethod.Delete)
-
-                allowHeader(io.ktor.http.HttpHeaders.ContentType)
-                allowHeader(io.ktor.http.HttpHeaders.Authorization)
-
-                exposedHeaders.addAll(CorsSimpleResponseHeaders)
-
-                it.allowedDomains.forEach {
-                    allowHost(it, listOf("http", "https", "ws", "wss"))
-                }
-                it.allowedHeaders.forEach {
-                    if (it == "*") allowHeaders { true }
-                    else allowHeader(it)
-                }
-            }
-        }
+        install(LS_CORS)
         WebSockets.handlers.put(ServerPath.root, QueryParamWebSocketHandler())
         WebSockets.handlers.forEach { (path, rawHandler) ->
             @Suppress("UNCHECKED_CAST")
@@ -102,7 +81,8 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                         var queryParams = call.request.queryParameters.flattenEntries()
                         // TODO: Remove this fugly hack and deal with websocket auth better
                         queryParams = queryParams.flatMap {
-                            if(it.first == "path") listOf(it) + it.second.substringAfter('?').split('&').map { it.substringBefore('=') to it.substringAfter('=') }
+                            if (it.first == "path") listOf(it) + it.second.substringAfter('?').split('&')
+                                .map { it.substringBefore('=') to it.substringAfter('=') }
                             else listOf(it)
                         }
                         val request = WebSocketConnectRequest(
@@ -206,6 +186,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                             is HttpContent.LazyStream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
                                 b.getStream().toByteReadChannel().copyTo(this)
                             }
+
                             is HttpContent.Stream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
                                 b.stream.toByteReadChannel().copyTo(this)
                             }
@@ -260,6 +241,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
                         is HttpContent.LazyStream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
                             b.getStream().toByteReadChannel().copyTo(this)
                         }
+
                         is HttpContent.Stream -> call.respondBytesWriter(ContentType.parse(b.type.toString())) {
                             b.stream.toByteReadChannel().copyTo(this)
                         }

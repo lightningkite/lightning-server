@@ -3,6 +3,8 @@ package com.lightningkite.lightningserver.aws
 import com.lightningkite.lightningserver.compression.extensionForEngineCompression
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.cors.extensionForEngineAddCors
+import com.lightningkite.lightningserver.cors.generateCorsHeaders
+import com.lightningkite.lightningserver.cors.generatePreflightCorsHeaders
 import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.http.HttpEndpoint
@@ -13,12 +15,12 @@ import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.settings.CorsSettings
 import com.lightningkite.lightningserver.settings.generalSettings
 import io.ktor.http.decodeURLPart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Base64
+
 
 class AwsAdapterHttp(val root: AwsAdapter) {
     suspend fun handleHttp(event: APIGatewayV2HTTPEvent, setRoughContext: (String) -> Unit): APIGatewayV2HTTPResponse {
@@ -40,31 +42,10 @@ class AwsAdapterHttp(val root: AwsAdapter) {
 
         val match = Http.matcher.match(path, method) ?: run {
             if (method == HttpMethod.OPTIONS) {
-                val origin = headers[HttpHeader.Origin] ?: return APIGatewayV2HTTPResponse(
-                    statusCode = 404,
-                    body = "No matching path for '${path}' found"
+                return APIGatewayV2HTTPResponse(
+                    statusCode = HttpStatus.NoContent.code,
+                    headers = generalSettings().cors.generatePreflightCorsHeaders(headers).toAwsMap()
                 )
-                val cors = generalSettings().cors ?: CorsSettings()
-                val matches = cors.allowedDomains.any {
-                    it == "*" || it == origin || origin.endsWith(it.removePrefix("*"))
-                }
-                if (matches) {
-                    return APIGatewayV2HTTPResponse(
-                        statusCode = HttpStatus.NoContent.code,
-                        headers = mapOf(
-                            HttpHeader.AccessControlAllowOrigin to (headers[HttpHeader.Origin] ?: "*"),
-                            HttpHeader.AccessControlAllowMethods to "GET,POST,PUT,PATCH,DELETE,HEAD",
-                            HttpHeader.AccessControlAllowHeaders to (cors.allowedHeaders.joinToString(", ")),
-                            HttpHeader.AccessControlAllowCredentials to "true",
-                        )
-                    )
-                } else {
-                    HttpEndpointMatcher.Match(
-                        HttpEndpoint(path, method),
-                        parts = mapOf(),
-                        wildcard = null
-                    )
-                }
             } else HttpEndpointMatcher.Match(
                 HttpEndpoint(path, method),
                 parts = mapOf(),
@@ -88,10 +69,12 @@ class AwsAdapterHttp(val root: AwsAdapter) {
     }
 }
 
+
 internal suspend fun HttpResponse.toAws(
 ): APIGatewayV2HTTPResponse {
-    val outHeaders = HashMap<String, String>()
-    headers.entries.forEach { outHeaders.put(it.first, it.second) }
+    val outHeaders = headers.toAwsMap()
+        .toMutableMap()
+
     val b = body
     b?.type?.let { outHeaders.put(HttpHeader.ContentType, it.toString()) }
     b?.length?.let { outHeaders.put(HttpHeader.ContentLength, it.toString()) }
@@ -99,7 +82,7 @@ internal suspend fun HttpResponse.toAws(
         b == null -> {
             val response = APIGatewayV2HTTPResponse(
                 statusCode = status.code,
-                headers = outHeaders
+                headers = outHeaders,
             )
             return response
         }
@@ -109,7 +92,7 @@ internal suspend fun HttpResponse.toAws(
                 APIGatewayV2HTTPResponse(
                     statusCode = this@toAws.status.code,
                     headers = outHeaders,
-                    body = b.text()
+                    body = b.text(),
                 )
             }
             return response
@@ -121,7 +104,7 @@ internal suspend fun HttpResponse.toAws(
                     statusCode = this@toAws.status.code,
                     headers = outHeaders,
                     body = Base64.getEncoder().encodeToString(b.bytes),
-                    isBase64Encoded = true
+                    isBase64Encoded = true,
                 )
             }
             return response
@@ -133,10 +116,25 @@ internal suspend fun HttpResponse.toAws(
                     statusCode = this@toAws.status.code,
                     headers = outHeaders,
                     body = Base64.getEncoder().encodeToString(b.stream().use { it.readAllBytes() }),
-                    isBase64Encoded = true
+                    isBase64Encoded = true,
                 )
             }
             return response
         }
     }
 }
+
+fun HttpHeaders.toAwsMap(): Map<String, String> = buildMap<String, MutableList<String>> headerMap@{
+    this@toAwsMap.entries.forEach { (key: String, value: String) ->
+        // AWS does not allow repeated Header keys. We must combine repeated headers into the list form under one
+        // instance, EXCEPT for Set-Cookie. Set-Cookie is weird, and if you turn multiple into a list the browser
+        // may not accept them all. AWS response headers ARE case SENSITIVE, so if you defined multiple set-cookies
+        // with different casings, they will all go through. This is a jank work around for this issue.
+        if (key.lowercase() == HttpHeader.SetCookie.lowercase())
+            this@headerMap.getOrPut(key, { mutableListOf() }).add(value)
+        else {
+            this@headerMap.getOrPut(key.lowercase(), { mutableListOf() }).add(value)
+        }
+    }
+}
+    .mapValues { (_, values) -> values.joinToString(", ") { it } }
