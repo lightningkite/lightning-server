@@ -275,5 +275,45 @@ infix fun <T> Condition<T>.and(other: Condition<T>): Condition.And<T> = Conditio
 infix fun <T> Condition<T>.or(other: Condition<T>): Condition.Or<T> = Condition.Or(listOf(this, other))
 operator fun <T> Condition<T>.not(): Condition.Not<T> = Condition.Not(this)
 
-fun <T> Condition.Companion.andNotNull(vararg conditions: Condition<T>?) = Condition.And(conditions.toList().filterNotNull())
-fun <T> Condition.Companion.orNotNull(vararg conditions: Condition<T>?) = Condition.Or(conditions.toList().filterNotNull())
+fun <T> Condition.Companion.andNotNull(vararg conditions: Condition<T>?): Condition<T> {
+    val list = conditions.toList().filterNotNull()
+    return when (list.size) {
+        0 -> Condition.Always // vacuous truth
+        1 -> list.first()
+        else -> Condition.And(list)
+    }
+}
+fun <T> Condition.Companion.orNotNull(vararg conditions: Condition<T>?): Condition<T> {
+    val list = conditions.toList().filterNotNull()
+    return when (list.size) {
+        0 -> Condition.Never
+        1 -> list.first()
+        else -> Condition.Or(list)
+    }
+}
+
+/**
+ * Creates a conditional condition that ensures logical consistency between two conditions.
+ *
+ * If the `if_` condition is true, the `then` condition must also be true for the overall condition to be true.
+ * If the `if_` condition is false, the overall condition will always return true, regardless of the `then` condition.
+ *
+ * This can be thought of as a logical implication: `if_` implies `then`.
+ *
+ * Useful when building [Mask] or [UpdateRestrictions] when changes only _sometimes_ must meet conditions
+ */
+fun <T> Condition.Companion.ifThen(if_: Condition<T>, then: Condition<T>) = (if_ and then) or !if_
+
+/**
+ * Creates a conditional condition that evaluates to one of two conditions based on another condition.
+ *
+ * If the `if_` condition is true, the result will be the `then` condition.
+ * If the `if_` condition is false, the result will be the `else_` condition.
+ *
+ * This can be thought of as a logical ternary operation: `if_ ? then : else_`.
+ *
+ * Useful when you need to express alternative sets of requirements
+ */
+fun <T> Condition.Companion.ifThenElse(if_: Condition<T>, then: Condition<T>, else_: Condition<T>) = (if_ and then) or (!if_ and else_)
+
+
