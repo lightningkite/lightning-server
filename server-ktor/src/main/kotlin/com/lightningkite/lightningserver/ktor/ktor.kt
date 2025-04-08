@@ -64,28 +64,7 @@ fun Application.lightningServer(pubSub: PubSub, cache: Cache) {
     try {
         runBlocking { Tasks.onSettingsReady() }
         install(io.ktor.server.websocket.WebSockets)
-        generalSettings().cors?.let { corsSettings ->
-            install(CORS) {
-                corsSettings.allowedDomains.forEach {
-                    allowHost(it, listOf("http", "https", "ws", "wss"))
-                }
-
-                corsSettings.allowedMethods.forEach {
-                    allowMethod(HttpMethod(it))
-                }
-
-                corsSettings.allowedHeaders.forEach {
-                    allowHeader(it)
-                }
-
-                corsSettings.exposeHeaders.forEach {
-                    exposeHeader(it)
-                }
-                exposedHeaders.addAll(CorsSimpleResponseHeaders)
-
-                allowCredentials = corsSettings.allowCredentials
-            }
-        }
+        install(LS_CORS)
         WebSockets.handlers.put(ServerPath.root, QueryParamWebSocketHandler())
         WebSockets.handlers.forEach { (path, rawHandler) ->
             @Suppress("UNCHECKED_CAST")
