@@ -82,6 +82,7 @@ object SDK2 {
         appendLine("import kotlinx.datetime.*")
         appendLine("import com.lightningkite.serialization.*")
         appendLine("import com.lightningkite.lightningserver.db.*")
+        appendLine("import com.lightningkite.lightningserver.auth.*")
         appendLine()
 
         appendLine("interface Api2 {")
@@ -96,9 +97,9 @@ object SDK2 {
                     append(": ")
                     append(it.joinToString(", ") {
                         it.name +
-                                it.subtypes.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") {
+                                (it.subtypes.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") {
                                     it.kotlinTypeString()
-                                }
+                                } ?: "")
                     })
                 }
                 appendLine("{")
@@ -153,6 +154,7 @@ object SDK2 {
         appendLine("import kotlinx.datetime.*")
         appendLine("import com.lightningkite.serialization.*")
         appendLine("import com.lightningkite.lightningserver.db.*")
+        appendLine("import com.lightningkite.lightningserver.auth.*")
         appendLine("import kotlinx.serialization.builtins.*")
         appendLine("import kotlinx.serialization.*")
         appendLine()
@@ -167,9 +169,9 @@ object SDK2 {
                 append("inner class ${iname}Live ")
                 interfaces.map{
                     it.name +
-                            it.subtypes.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") {
+                            (it.subtypes.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") {
                                 it.kotlinTypeString()
-                            } + " by " + it.name + "Live(fetcher, ${it.path.toCodeString()}, ${it.subtypes.joinToString() { it.kotlinSerializer() }})"
+                            } ?: "") + " by " + it.name + "Live(fetcher, ${it.path.toCodeString()}, ${it.subtypes.joinToString() { it.kotlinSerializer() }})"
                 }.plus("Api2.$iname").let {
                     append(": ")
                     append(it.joinToString(", "))
@@ -236,6 +238,7 @@ object SDK2 {
         appendLine("import kotlinx.datetime.*")
         appendLine("import com.lightningkite.serialization.*")
         appendLine("import com.lightningkite.lightningserver.db.*")
+        appendLine("import com.lightningkite.lightningserver.auth.*")
         appendLine("import kotlinx.serialization.builtins.*")
         appendLine("import kotlinx.serialization.*")
         appendLine()
@@ -246,7 +249,7 @@ object SDK2 {
                     append("val ${group}: ModelCache")
                     append(inter.subtypes.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") {
                         it.kotlinTypeString()
-                    })
+                    } ?: "")
                     append(" = ModelCache(uncached.")
                     append(group)
                     append(", ${inter.subtypes[0].kotlinSerializer()})")
