@@ -13,34 +13,18 @@ import java.io.ByteArrayInputStream
 import java.nio.charset.Charset
 import java.util.*
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.cors.extensionForEngineAddCors
+import com.lightningkite.lightningserver.cors.generateCorsHeaders
+import com.lightningkite.lightningserver.cors.generatePreflightCorsHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.request.httpMethod
+import io.ktor.server.response.header
+import io.ktor.server.response.respond
 import com.lightningkite.lightningserver.http.HttpStatus as HttpStatus1
 
 abstract class AzureAdapter {
     companion object {
         val logger: Logger = LoggerFactory.getLogger(AzureAdapter::class.java)
-    }
-
-    fun processCors(request: HttpRequestMessage<Optional<String>>, responseBuilder: HttpResponseMessage.Builder) {
-        val inHeaders = HttpHeaders(request.headers)
-        val cors = generalSettings().cors ?: run {
-            return
-        }
-        val origin = inHeaders[HttpHeader.Origin] ?: run {
-            return
-        }
-        val matches = cors.allowedDomains.any {
-            it == "*" || it == origin || origin.endsWith(it.removePrefix("*"))
-        }
-        if (!matches) {
-            return
-        }
-        responseBuilder.header(HttpHeader.AccessControlAllowOrigin, origin)
-        responseBuilder.header(
-            HttpHeader.AccessControlAllowMethods,
-            inHeaders[HttpHeader.AccessControlRequestMethod] ?: "GET"
-        )
-        responseBuilder.header(HttpHeader.AccessControlAllowHeaders, cors.allowedHeaders.joinToString(", "))
-        responseBuilder.header(HttpHeader.AccessControlAllowCredentials, "true")
     }
 
     open fun http(
@@ -51,7 +35,12 @@ abstract class AzureAdapter {
         logger.debug("--> ${request.uri} ${request.httpMethod}")
         if (request.httpMethod == com.microsoft.azure.functions.HttpMethod.OPTIONS) {
             return request.createResponseBuilder(HttpStatus.NO_CONTENT)
-                .apply { processCors(request, this) }
+                .apply {
+                    generalSettings().cors
+                        .generatePreflightCorsHeaders(HttpHeaders(request.headers))
+                        .entries
+                        .forEach { (key, value) -> this.header(key, value) }
+                }
                 .build()
         } else {
             val response = try {
@@ -85,7 +74,7 @@ abstract class AzureAdapter {
                         protocol = request.uri.scheme
                     )
                     val result = try {
-                        Http.endpoints[match.endpoint]!!.invoke(request2)
+                        Http.execute(request2).extensionForEngineAddCors(request2)
                     } catch (e: HttpStatusException) {
                         e.toResponse(request2)
                     }
@@ -98,7 +87,6 @@ abstract class AzureAdapter {
                 null
             } ?: return request
                 .createResponseBuilder(HttpStatus.INTERNAL_SERVER_ERROR)
-                .apply { processCors(request, this) }
                 .build()
             return request.createResponseBuilder(HttpStatus.valueOf(response.status.code)).apply {
                 response.headers.entries
@@ -115,7 +103,6 @@ abstract class AzureAdapter {
                     }
                     header(HttpHeader.ContentType, it.type.toString())
                 }
-                processCors(request, this)
             }.build()
         }
     }
