@@ -6,6 +6,7 @@ import com.lightningkite.UUID
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.LazyRenamedSerialDescriptor
 import com.lightningkite.now
+import com.lightningkite.nowLocal
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.CompositeDecoder
@@ -123,6 +124,12 @@ data class VirtualStruct(
                         }
                         "now()" -> {
                             { now() }
+                        }
+                        "nowLocal().date" -> {
+                            { nowLocal().date }
+                        }
+                        "nowLocal().time" -> {
+                            { nowLocal().time }
                         }
                         // TODO: Check for field cloning?
                         else -> null
