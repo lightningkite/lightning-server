@@ -133,7 +133,8 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     val sample4 = path("sample4").post.api(summary = "Test4", authOptions = noAuth) { input: ValidatedModel -> input }
     val sample5 = path("sample5").post.api(summary = "Test5", authOptions = noAuth) { input: UUID -> input }
     val sample6 = path("sample6").post.api(summary = "Test6", authOptions = noAuth) { input: SimpleLargeTestModel -> input }
-    val sample7 = path("sample6").post.api(summary = "Test7", authOptions = noAuth) { input: NestedEnumTestModel -> input }
+    val sample7 = path("sample7").post.api(summary = "Test7", authOptions = noAuth) { input: NestedEnumTestModel -> input }
+    val sample8 = path("sample8").post.api(summary = "Test8", authOptions = noAuth) { input: String? -> input }
     val bulk = path("bulk").bulkRequestEndpoint()
     val meta = path("meta").metaEndpoints("com.lightningkite.lightningserver")
 

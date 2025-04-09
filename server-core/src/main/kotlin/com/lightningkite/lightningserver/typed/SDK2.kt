@@ -6,10 +6,12 @@ import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.websocket.WebSockets
 import com.lightningkite.serialization.listElement
 import com.lightningkite.serialization.mapValueElement
+import com.lightningkite.serialization.nullElement
 import com.lightningkite.serialization.tryTypeParameterSerializers2
 import com.lightningkite.serialization.tryTypeParameterSerializers3
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
@@ -52,6 +54,7 @@ object SDK2 {
         }
     }
     private fun KSerializer<*>.kotlinSerializer(): String {
+        nullElement()?.let { return it.kotlinSerializer() + ".nullable" }
         return when (this.descriptor.kind) {
             StructureKind.MAP -> "MapSerializer(String.serializer(), ${
                 this.mapValueElement()!!.kotlinSerializer()
