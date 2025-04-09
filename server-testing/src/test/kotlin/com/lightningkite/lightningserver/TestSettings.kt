@@ -1,13 +1,20 @@
 package com.lightningkite.lightningserver
 
 import com.lightningkite.UUID
+import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.files.ServerFile
 import com.lightningkite.lightningdb.collection
+import com.lightningkite.lightningdb.condition
+import com.lightningkite.lightningdb.eq
+import com.lightningkite.lightningdb.findOne
+import com.lightningkite.lightningdb.get
 import com.lightningkite.lightningdb.insertOne
 import com.lightningkite.lightningdb.test.*
+import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.AuthType
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.JwtSigner
+import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.auth.authOptions
 import com.lightningkite.lightningserver.auth.authRequired
 import com.lightningkite.lightningserver.auth.noAuth
@@ -17,18 +24,26 @@ import com.lightningkite.lightningserver.auth.old.BaseAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.EmailAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.UserEmailAccess
 import com.lightningkite.lightningserver.auth.old.userEmailAccess
+import com.lightningkite.lightningserver.auth.proof.EmailProofEndpoints
+import com.lightningkite.lightningserver.auth.proof.KnownDeviceProofEndpoints
+import com.lightningkite.lightningserver.auth.proof.OneTimePasswordProofEndpoints
+import com.lightningkite.lightningserver.auth.proof.PasswordProofEndpoints
+import com.lightningkite.lightningserver.auth.proof.PinHandler
+import com.lightningkite.lightningserver.auth.proof.SmsProofEndpoints
 import com.lightningkite.lightningserver.auth.subject.AuthEndpointsForSubject
 import com.lightningkite.lightningserver.cache.CacheSettings
-import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.modelInfo
+import com.lightningkite.lightningserver.email.Email
+import com.lightningkite.lightningserver.email.EmailLabeledValue
 import com.lightningkite.lightningserver.email.EmailSettings
 import com.lightningkite.lightningserver.engine.LocalEngine
 import com.lightningkite.lightningserver.engine.engine
+import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.files.FilesSettings
 import com.lightningkite.lightningserver.files.UploadEarlyEndpoint
 import com.lightningkite.lightningserver.files.fileObject
@@ -40,7 +55,10 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
 import com.lightningkite.lightningserver.sms.SMSSettings
+import com.lightningkite.lightningserver.typed.ApiWebsocket
+import com.lightningkite.lightningserver.typed.TypedServerPath1
 import com.lightningkite.lightningserver.typed.api
+import com.lightningkite.lightningserver.typed.arg
 import com.lightningkite.lightningserver.typed.bulkRequestEndpoint
 import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.prepareModelsShared
@@ -48,9 +66,10 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.serializer
 import java.io.InputStream
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
@@ -74,16 +93,18 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         prepareModelsServerTesting()
     }
 
-    val info = modelInfo<User, User, UUID>(
+    val userInfo = modelInfo<User, User, UUID>(
         getBaseCollection = { database().collection() },
         forUser = { it },
         authOptions = authOptions(),
         serialization = ModelSerializationInfo()
     )
-    val emailAccess: UserEmailAccess<User, UUID> = info.userEmailAccess { User(email = it, phoneNumber = it) }
+    val emailAccess: UserEmailAccess<User, UUID> = userInfo.userEmailAccess { User(email = it, phoneNumber = it) }
     val authPath = ServerPath("auth")
     val baseAuth = BaseAuthEndpoints(authPath, emailAccess, jwtSigner, 1.hours, 5.minutes)
     val emailAuth = EmailAuthEndpoints(baseAuth, emailAccess, cache, email)
+    
+    
 
     val earlyUpload = UploadEarlyEndpoint(path("upload-early"), files, database, fileScanner = { listOf(object: FileScanner {
         override fun requires(claimedType: ContentType): FileScanner.Requires = FileScanner.Requires.Whole
@@ -95,15 +116,112 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         input.fileObject.signedUrl
     }
 
+    val testWebSocket = object: ApiWebsocket<HasId<*>?, TypedServerPath1<Int>, Int, Int, Unit>(
+        path("ws-test").arg<Int>("num"),
+        Unit.serializer()
+    ) {
+        override val authOptions: AuthOptions<HasId<*>?> = noAuth
+        override val inputType: KSerializer<Int> = Int.serializer()
+        override val outputType: KSerializer<Int> = Int.serializer()
+        override val summary: String = "Sample Web Socket"
+
+    }
+
     val sample1 = path("sample1").post.api(summary = "Test1", authOptions = authOptions<User>()) { input: Int -> input + 42 }
     val sample2 = path("sample2").post.api(summary = "Test2", authOptions = noAuth) { input: Int -> input + 42 }
     val sample3 = path("sample3").post.api(summary = "Test3", authOptions = authRequired<User> { false }) { input: Int -> input + 42 }
     val sample4 = path("sample4").post.api(summary = "Test4", authOptions = noAuth) { input: ValidatedModel -> input }
     val sample5 = path("sample5").post.api(summary = "Test5", authOptions = noAuth) { input: UUID -> input }
     val sample6 = path("sample6").post.api(summary = "Test6", authOptions = noAuth) { input: SimpleLargeTestModel -> input }
-    val sample7 = path("sample6").post.api(summary = "Test7", authOptions = noAuth) { input: NestedEnumTestModel -> input }
+    val sample7 = path("sample7").post.api(summary = "Test7", authOptions = noAuth) { input: NestedEnumTestModel -> input }
+    val sample8 = path("sample8").post.api(summary = "Test8", authOptions = noAuth) { input: String? -> input }
     val bulk = path("bulk").bulkRequestEndpoint()
     val meta = path("meta").metaEndpoints("com.lightningkite.lightningserver")
+
+    val proofEmail = EmailProofEndpoints(
+        path("proofEmail"),
+        PinHandler(cache, "pin"),
+        email,
+        { to, pin ->
+            Email(
+                subject = "Log In Code",
+                to = listOf(EmailLabeledValue(to)),
+                plainText = "Your PIN is $pin."
+            )
+        }
+    )
+
+    val proofKnown = KnownDeviceProofEndpoints(
+        path("proofKnown"),
+        database,
+        cache
+    )
+    val proofPassword = PasswordProofEndpoints(
+        path("proofPassword"),
+        database,
+        cache
+    )
+    val proofOtp = OneTimePasswordProofEndpoints(
+        path("proofOtp"),
+        database,
+        cache
+    )
+    val proofSms = SmsProofEndpoints(
+        path("proofSms"),
+        PinHandler(cache, "pin2"),
+        sms,
+    )
+    val subjectHandler = object : Authentication.SubjectHandler<User, UUID> {
+        override val name: String get() = "User"
+        override val authType: AuthType get() = AuthType<User>()
+
+        override suspend fun findUser(property: String, value: String): User? {
+            try {
+                return when (property) {
+                    "email" -> userInfo.collection().findOne(condition { it.email eq value }) ?: run {
+                        userInfo.collection().insertOne(User(email = value, phoneNumber = ""))
+                    }
+                    "phone" -> userInfo.collection().find(condition { it.phoneNumber eq value }).toList().singleOrNull()
+                    else -> super.findUser(property, value)
+                }
+            } catch(e: Exception) {
+                throw Exception("Failed to find $property = $value", e)
+            }
+        }
+
+        override fun get(property: String): Boolean = super.get(property) || property == "phoneNumber"
+        override fun get(subject: User, property: String): String? {
+            return when(property) {
+                "phone" -> subject.phoneNumber
+                else -> super.get(subject, property)
+            }
+        }
+
+        override suspend fun desiredStrengthFor(result: User): Int = 5
+
+        override suspend fun permitMasquerade(
+            other: Authentication.SubjectHandler<*, *>,
+            request: RequestAuth<User>,
+            otherId: Comparable<*>
+        ): Boolean {
+            return other == this && request.get().email.endsWith("@lightningkite.com")
+        }
+
+        override val idSerializer: KSerializer<UUID>
+            get() = userInfo.serialization.idSerializer
+        override val subjectSerializer: KSerializer<User>
+            get() = userInfo.serialization.serializer
+
+        override suspend fun fetch(id: UUID): User = userInfo.collection().get(id) ?: throw NotFoundException()
+        override val knownCacheTypes: List<RequestAuth.CacheKey<User, UUID, *>> = listOf()
+        override fun toString(): String = name
+    }
+    val UserSubject = AuthEndpointsForSubject(
+        path = path("UserSubject"),
+        handler = subjectHandler,
+        database = database,
+    )
+
 
     init {
         Settings.populateDefaults()
@@ -112,7 +230,7 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
 
     @OptIn(DelicateCoroutinesApi::class)
     val sampleUser = GlobalScope.async(start = CoroutineStart.LAZY) {
-        info.collection().insertOne(User(
+        userInfo.collection().insertOne(User(
             email = "test@test.com",
             phoneNumber = "1234567890",
             age = 42
