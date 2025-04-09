@@ -31,6 +31,8 @@ object SDK2 {
         folder.mkdirs()
 
         folder.resolve("Api.kt").writer().use { it.writeInterface(packageName) }
+        folder.resolve("LiveApi.kt").writer().use { it.writeLive(packageName) }
+        folder.resolve("CachedApi.kt").writer().use { it.writeCached(packageName) }
     }
 
     private fun KSerializer<*>.kotlinTypeString(): String {
@@ -155,6 +157,7 @@ object SDK2 {
         appendLine("import com.lightningkite.serialization.*")
         appendLine("import com.lightningkite.lightningserver.db.*")
         appendLine("import com.lightningkite.lightningserver.auth.*")
+        appendLine("import com.lightningkite.lightningserver.networking.Fetcher")
         appendLine("import kotlinx.serialization.builtins.*")
         appendLine("import kotlinx.serialization.*")
         appendLine()
