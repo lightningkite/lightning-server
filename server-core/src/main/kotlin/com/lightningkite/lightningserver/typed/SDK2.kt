@@ -248,7 +248,7 @@ object SDK2 {
         appendLine("import kotlinx.serialization.builtins.*")
         appendLine("import kotlinx.serialization.*")
         appendLine()
-        appendLine("class CachedApi2(val uncached: Api2) {")
+        appendLine("open class CachedApi2(val uncached: Api2) {")
         endpointsByGroup.forEach { (group, endpoints) ->
             for(inter in endpoints.mapNotNull { it.belongsToInterface }.distinct()) {
                 if(inter.name == "ClientModelRestEndpoints") {
