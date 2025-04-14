@@ -10,7 +10,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
-class PasskeyChallengeHandler(
+class WebAuthNChallengeHandler(
     private val cache: () -> Cache,
     val keyPrefix: String,
     val challengeLength: Int = 64,
@@ -18,14 +18,14 @@ class PasskeyChallengeHandler(
 ) {
 
     private fun registerChallengeCacheKey(challenge: String): String =
-        "${keyPrefix}_passkey_register_challenge_${challenge.substring(0, 10)}"
+        "${keyPrefix}_web_authn_register_challenge_${challenge.substring(0, 10)}"
     private fun subjectNameCacheKey(challenge: String): String =
-        "${keyPrefix}_passkey_register_name_${challenge.substring(0, 10)}"
+        "${keyPrefix}_web_authn_register_name_${challenge.substring(0, 10)}"
     private fun subjectIdCacheKey(challenge: String): String =
-        "${keyPrefix}_passkey_register_id_${challenge.substring(0, 10)}"
+        "${keyPrefix}_web_authn_register_id_${challenge.substring(0, 10)}"
 
     private fun loginChallengeCacheKey(challenge: String): String =
-        "${keyPrefix}_passkey_login_challenge_${challenge.substring(0, 10)}"
+        "${keyPrefix}_web_authn_login_challenge_${challenge.substring(0, 10)}"
 
     suspend fun establishForRegistration(subjectName: String, subjectId: String): String {
         val challenge = generate()
@@ -45,7 +45,7 @@ class PasskeyChallengeHandler(
     private fun generate(): String {
         val bytes = ByteArray(challengeLength)
         SecureRandom().nextBytes(bytes)
-        return Base64.WebAuthn.encode(bytes)
+        return Base64.WebAuthN.encode(bytes)
     }
 
     suspend fun assertForRegistration(challenge: String): Pair<String, String> {
