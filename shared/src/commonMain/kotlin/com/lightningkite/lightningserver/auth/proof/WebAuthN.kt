@@ -1,4 +1,5 @@
 @file:OptIn(ExperimentalSerializationApi::class)
+
 package com.lightningkite.lightningserver.auth.proof
 
 import com.lightningkite.lightningdb.GenerateDataClassPaths
@@ -22,12 +23,12 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 @OptIn(ExperimentalEncodingApi::class)
-val Base64.WebAuthn get() = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
+val Base64.WebAuthN get() = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
 @Serializable
 @GenerateDataClassPaths
 @IndexSet(["subjectType", "subjectId"])
-data class PasskeyCredential(
+data class WebAuthNCredential(
     /**
      * A globally unique id that is generated and returned by the client authenticator
      */
@@ -40,7 +41,7 @@ data class PasskeyCredential(
      */
     val subjectId: String,
     /**
-     * A friendly display name that may be set to allow users to distinguish between passkeys in cases where
+     * A friendly display name that may be set to allow users to distinguish between WebAuthN in cases where
      * several may have been set for a single subject (the client authenticator is unaware of this field)
      */
     val friendlyName: String? = null,
@@ -51,7 +52,7 @@ data class PasskeyCredential(
      */
     val publicKeyDerBase64: String,
     /**
-     * The cryptographic algorithm used for the passkey
+     * The cryptographic algorithm used for the WebAuthN
      * (see [`AuthenticatorAttestationResponse.getPublicKeyAlgorithm()`](https://developer.mozilla.org/en-US/docs/Web/API/AuthenticatorAttestationResponse/getPublicKeyAlgorithm)
      */
     val algorithm: PublicKeyAlgorithm,
@@ -67,7 +68,11 @@ enum class PublicKeyAlgorithm(val coseAlgorithmId: Int) {
     RS256(-257),
     ES256(-7),
     EdDSA(-8),
-    PS256(-37)
+    PS256(-37);
+
+    companion object{
+        fun fromCoseId(codeId: Int): PublicKeyAlgorithm? = entries.find { it.coseAlgorithmId == codeId }
+    }
 }
 
 class PublicKeyAlgorithmSerializer : KSerializer<PublicKeyAlgorithm> {
@@ -85,50 +90,97 @@ class PublicKeyAlgorithmSerializer : KSerializer<PublicKeyAlgorithm> {
 }
 
 // We adopt the recommended approach and relevant models for client-server communication
-// related to passkeys as described here: https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API#creating_a_key_pair_and_registering_a_user
+// related to WebAuthN as described here: https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API#creating_a_key_pair_and_registering_a_user
 
 @Serializable
 /**
  * See [`PublicKeyCredentialCreationOptions`](https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredentialCreationOptions)
  */
 data class PublicKeyCredentialCreationOptions(
+    val attestation: Attestation = Attestation.None,
+    val attestationFormats: List<String> = emptyList(),
     @EncodeDefault(Mode.NEVER) val authenticatorSelection: AuthenticatorSelection? = null,
     val challenge: String, // base64url-encoded
     @EncodeDefault(Mode.NEVER) val excludeCredentials: List<ExistingCredential> = emptyList(),
+    val extensions: Map<String, String> = emptyMap(),
+    val hints: List<CreationHints> = emptyList(),
     val pubKeyCredParams: List<PublicKeyCredentialParameters>,
     val rp: PublicKeyCredentialRpEntity,
+    @EncodeDefault(Mode.NEVER) val timeout: Int? = null,
     val user: PublicKeyCredentialUserEntity,
 )
 
+
+@Serializable
+enum class Attestation(val jsonName: String) {
+    None("none"),
+    Direct("direct"),
+    Enterprise("enterprise"),
+    Indirect("indirect"),
+}
+
+@Serializable
+enum class CreationHints(val jsonName: String) {
+    SecurityKey("security-key"),
+    ClientDevice("client-device"),
+    Hybrid("hybrid"),
+}
+
 @Serializable
 data class PublicKeyCredentialRequestOptions(
-    @EncodeDefault(Mode.NEVER) val allowCredentials: List<ExistingCredential> = listOf(),
-    val challenge: String,
+    val allowCredentials: List<ExistingCredential> = listOf(),
+    val challenge: String,  // base64url-encoded
+    val extensions: Map<String, String> = emptyMap(),
+    val hints: List<CreationHints> = emptyList(),
+    @EncodeDefault(Mode.NEVER) val rpId: String? = null,
+    @EncodeDefault(Mode.NEVER) val timeout: Int? = null,
+    val userVerification: GeneralPreference = GeneralPreference.Preferred,
 )
 
 @Serializable
 data class AuthenticatorSelection(
-    val userVerification: UserVerification? = UserVerification.Preferred,
+    @EncodeDefault(Mode.NEVER) val authenticatorAttachment: AuthenticatorAttachment? = null,
+    val residentKey: GeneralPreference = GeneralPreference.Discouraged,
+    val userVerification: GeneralPreference = GeneralPreference.Preferred,
 )
 
 @Serializable
-enum class UserVerification {
-    @SerialName("discouraged") Discouraged,
-    @SerialName("preferred") Preferred,
-    @SerialName("required") Required,
+enum class GeneralPreference(val jsonName: String) {
+    Discouraged("discouraged"),
+    Preferred("preferred"),
+    Required("required"),
 }
+
+@Serializable
+enum class AuthenticatorAttachment(val jsonName: String) {
+    Platform("platform"),
+    CrossPlatform("cross-platform"),
+}
+
+@Serializable
+enum class Transport(val jsonName: String) {
+    BLE("ble"),
+    Hybrid("hybrid"),
+    Internal("internal"),
+    NFC("nfc"),
+    USB("usb"),
+}
+
 
 @Serializable
 data class ExistingCredential(
     val id: String, // base64url-encoded
-    @EncodeDefault(Mode.ALWAYS) val type: String = "public-key",
-)
+    val transports: List<Transport> = emptyList(),
+) {
+    val type: String = "public-key"
+}
 
 @Serializable
 data class PublicKeyCredentialParameters(
     val alg: PublicKeyAlgorithm,
-    @EncodeDefault(Mode.ALWAYS) val type: String = "public-key",
-)
+) {
+    val type: String = "public-key"
+}
 
 @Serializable
 data class PublicKeyCredentialRpEntity(
@@ -144,7 +196,7 @@ data class PublicKeyCredentialUserEntity(
 )
 
 /**
- * Represents a recently created passkey. This is the same object that is returned from
+ * Represents a recently created WebAuthN credential. This is the same object that is returned from
  * `CredentialContainer.create().toJSON()`
  *
  * See [`PublicKeyCredential`](https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredential)
@@ -153,12 +205,14 @@ data class PublicKeyCredentialUserEntity(
 data class AttestedPublicKeyCredential(
     val id: String, // base64url-encoded
     val response: AuthenticatorAttestationResponse,
-    @EncodeDefault(Mode.ALWAYS) val type: String = "public-key",
-)
+) {
+    @EncodeDefault(Mode.ALWAYS)
+    val type: String = "public-key"
+}
 
 @Serializable
 data class AuthenticatorAttestationResponse(
-    val clientDataJSON: String,
+    val clientDataJSON: String, // Base64 String
     val publicKey: String,
     val publicKeyAlgorithm: PublicKeyAlgorithm,
 ) {
@@ -166,7 +220,7 @@ data class AuthenticatorAttestationResponse(
 }
 
 /**
- * Represents the result of a passkey assertion response. This is the same object that is returned from
+ * Represents the result of a WebAuthN assertion response. This is the same object that is returned from
  * `CredentialContainer.get().toJSON()`
  *
  * See [`PublicKeyCredential`](https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredential)
@@ -175,14 +229,17 @@ data class AuthenticatorAttestationResponse(
 data class AssertedPublicKeyCredential(
     val id: String, // base64url-encoded
     val response: AuthenticatorAssertionResponse,
-    @EncodeDefault(Mode.ALWAYS) val type: String = "public-key",
-)
+) {
+    @EncodeDefault(Mode.ALWAYS)
+    val type: String = "public-key"
+
+}
 
 @Serializable
 data class AuthenticatorAssertionResponse(
-    val authenticatorData: String,
-    val clientDataJSON: String,
-    val signature: String,
+    val authenticatorData: String, // Base64 String
+    val clientDataJSON: String, // Base64 String
+    val signature: String, // Base64 String
     val userHandle: String,
 ) {
     val clientData: ClientData get() = Json.decodeFromString(ClientDataJSONSerializer, clientDataJSON)
@@ -198,17 +255,17 @@ data class ClientData(
 @OptIn(ExperimentalEncodingApi::class)
 open class Base64JSONSerializer<T>(
     val serializationStrategy: KSerializer<T>,
-    serialName: String
+    serialName: String,
 ) : KSerializer<T> {
     override val descriptor = PrimitiveSerialDescriptor(serialName, PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: T) {
         val jsonRaw = Json.encodeToString(serializationStrategy, value).encodeToByteArray()
-        encoder.encodeString(Base64.WebAuthn.encode(jsonRaw))
+        encoder.encodeString(Base64.WebAuthN.encode(jsonRaw))
     }
 
     override fun deserialize(decoder: Decoder): T {
-        val jsonRaw = Base64.WebAuthn.decode(decoder.decodeString())
+        val jsonRaw = Base64.WebAuthN.decode(decoder.decodeString())
         return Json.decodeFromString(serializationStrategy, jsonRaw.decodeToString())
     }
 }
