@@ -11,7 +11,6 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.EncodeDefault.Mode
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -29,34 +28,12 @@ val Base64.WebAuthN get() = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSE
 @GenerateDataClassPaths
 @IndexSet(["subjectType", "subjectId"])
 data class WebAuthNCredential(
-    /**
-     * A globally unique id that is generated and returned by the client authenticator
-     */
     override val _id: String,
-    val subjectName: String,
-    /**
-     * The String-representation of a subject id that is also passed to the client authenticator
-     * as a user id
-     * (see [`PublicKeyCredentialCreationOptions.user.id`](https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredentialCreationOptions#id_3))
-     */
     val subjectId: String,
-    /**
-     * A friendly display name that may be set to allow users to distinguish between WebAuthN in cases where
-     * several may have been set for a single subject (the client authenticator is unaware of this field)
-     */
-    val friendlyName: String? = null,
-
-    /**
-     * The DER public key of the key pair used by the client authenticator to sign challenges
-     * (see [`AuthenticatorAttestationResponse.getPublicKey()`](https://developer.mozilla.org/en-US/docs/Web/API/AuthenticatorAttestationResponse/getPublicKey)
-     */
-    val publicKeyDerBase64: String,
-    /**
-     * The cryptographic algorithm used for the WebAuthN
-     * (see [`AuthenticatorAttestationResponse.getPublicKeyAlgorithm()`](https://developer.mozilla.org/en-US/docs/Web/API/AuthenticatorAttestationResponse/getPublicKeyAlgorithm)
-     */
-    val algorithm: PublicKeyAlgorithm,
-
+    val authenticatorAttachment:String,
+    val clientExtensionResults: Map<String, String>,
+    val displayName: String,
+    val response: AuthenticatorAttestationResponse,
     val establishedAt: Instant = now(),
     val lastUsedAt: Instant? = null,
     val expiresAt: Instant? = null,
@@ -93,6 +70,27 @@ class PublicKeyAlgorithmSerializer : KSerializer<PublicKeyAlgorithm> {
 // related to WebAuthN as described here: https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API#creating_a_key_pair_and_registering_a_user
 
 @Serializable
+enum class Attestation(val jsonName: String) {
+    None("none"),
+    Direct("direct"),
+    Enterprise("enterprise"),
+    Indirect("indirect"),
+}
+
+@Serializable
+enum class CreationHints(val jsonName: String) {
+    SecurityKey("security-key"),
+    ClientDevice("client-device"),
+    Hybrid("hybrid"),
+}
+
+@Serializable
+data class WebAuthNRegistrationResponse(
+    val challengeId: String,
+    val options: PublicKeyCredentialCreationOptions
+)
+
+@Serializable
 /**
  * See [`PublicKeyCredentialCreationOptions`](https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredentialCreationOptions)
  */
@@ -111,30 +109,44 @@ data class PublicKeyCredentialCreationOptions(
 )
 
 
-@Serializable
-enum class Attestation(val jsonName: String) {
-    None("none"),
-    Direct("direct"),
-    Enterprise("enterprise"),
-    Indirect("indirect"),
-}
-
-@Serializable
-enum class CreationHints(val jsonName: String) {
-    SecurityKey("security-key"),
-    ClientDevice("client-device"),
-    Hybrid("hybrid"),
-}
+data class RegistrationOptions(
+    val attestation: Attestation = Attestation.None,
+    val attestationFormats: List<String> = emptyList(),
+    val authenticatorSelection: AuthenticatorSelection? = null,
+    val extensions: Map<String, String> = emptyMap(),
+    val hints: List<CreationHints> = emptyList(),
+    val pubKeyCredParams: List<PublicKeyCredentialParameters>,
+    val user: PublicKeyCredentialUserEntity,
+)
 
 @Serializable
 data class PublicKeyCredentialRequestOptions(
-    val allowCredentials: List<ExistingCredential> = listOf(),
+//    val allowCredentials: List<ExistingCredential> = listOf(),
     val challenge: String,  // base64url-encoded
     val extensions: Map<String, String> = emptyMap(),
     val hints: List<CreationHints> = emptyList(),
     @EncodeDefault(Mode.NEVER) val rpId: String? = null,
     @EncodeDefault(Mode.NEVER) val timeout: Int? = null,
     val userVerification: GeneralPreference = GeneralPreference.Preferred,
+)
+
+data class ProveOptions(
+//    val allowCredentials: List<ExistingCredential> = listOf(),
+    val extensions: Map<String, String> = emptyMap(),
+    val hints: List<CreationHints> = emptyList(),
+    val userVerification: GeneralPreference = GeneralPreference.Preferred,
+)
+
+@Serializable
+data class WebAuthNStartResponse(
+    val challengeId: String,
+    val options: PublicKeyCredentialRequestOptions
+)
+
+@Serializable
+data class WebAuthNProveRequest(
+    val challengeId: String,
+    val credentials: AssertedPublicKeyCredential
 )
 
 @Serializable
@@ -203,6 +215,8 @@ data class PublicKeyCredentialUserEntity(
  */
 @Serializable
 data class AttestedPublicKeyCredential(
+    val authenticatorAttachment:String,
+    val clientExtensionResults: Map<String, String>,
     val id: String, // base64url-encoded
     val response: AuthenticatorAttestationResponse,
 ) {
@@ -211,10 +225,19 @@ data class AttestedPublicKeyCredential(
 }
 
 @Serializable
+data class RegisterFinishRequest(
+    val displayName: String,
+    val credential: AttestedPublicKeyCredential
+)
+
+@Serializable
 data class AuthenticatorAttestationResponse(
+    val attestationObject: String, // Base64 String
+    val authenticatorData: String, // Base64 String
     val clientDataJSON: String, // Base64 String
-    val publicKey: String,
-    val publicKeyAlgorithm: PublicKeyAlgorithm,
+    val publicKey: String, // Base64 String
+    val publicKeyAlgorithm: Int,
+    val transports: List<Transport>,
 ) {
     val clientData: ClientData get() = Json.decodeFromString(ClientDataJSONSerializer, clientDataJSON)
 }

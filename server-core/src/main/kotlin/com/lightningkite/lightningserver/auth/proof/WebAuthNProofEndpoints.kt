@@ -1,5 +1,6 @@
 package com.lightningkite.lightningserver.auth.proof
 
+import com.lightningkite.UUID
 import com.lightningkite.lightningdb.Condition
 import com.lightningkite.lightningdb.Database
 import com.lightningkite.lightningdb.HasId
@@ -21,6 +22,9 @@ import com.lightningkite.lightningserver.auth.anyAuthRoot
 import com.lightningkite.lightningserver.auth.idString
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.auth.plus
+import com.lightningkite.lightningserver.cache.Cache
+import com.lightningkite.lightningserver.cache.get
+import com.lightningkite.lightningserver.cache.set
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
@@ -39,30 +43,49 @@ import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.webauthn4j.WebAuthnManager
+import com.webauthn4j.authenticator.AuthenticatorImpl
+import com.webauthn4j.converter.AttestationObjectConverter
+import com.webauthn4j.converter.util.ObjectConverter
+import com.webauthn4j.data.AuthenticationParameters
+import com.webauthn4j.data.AuthenticationRequest
+import com.webauthn4j.data.PublicKeyCredentialType
+import com.webauthn4j.data.RegistrationData
+import com.webauthn4j.data.RegistrationParameters
+import com.webauthn4j.data.attestation.statement.COSEAlgorithmIdentifier
+import com.webauthn4j.data.client.Origin
+import com.webauthn4j.data.client.challenge.Challenge
+import com.webauthn4j.server.ServerProperty
+import com.webauthn4j.verifier.exception.VerificationException
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
-import java.security.MessageDigest
+import kotlinx.serialization.encodeToString
+import java.security.SecureRandom
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 class WebAuthNProofEndpoints<USER : HasId<*>>(
     path: ServerPath,
     val database: () -> Database,
-    val challenge: WebAuthNChallengeHandler,
-    registrationAuthOptions: AuthOptions<USER>,
-    val nameTemplate: (USER) -> String,
-    val rpId: String? = null,
+    val cache: () -> Cache,
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
-    val displayNameTemplate: (USER) -> String = nameTemplate,
+    val challengeLength: Int = 64,
+    val prefix: String,
+    val expiration: Duration = 5.minutes,
+    val rpId: String? = null,
+    val registrationOptionsForUser: (USER) -> RegistrationOptions,
+    val proveOptions: () -> ProveOptions,
+    subjectAuthOptions: AuthOptions<USER>,
 ) : ServerPathGroup(path), ProofMethod {
 
     init {
-        path.docName = "WebAuthNProof"
+        path.docName = "${prefix}WebAuthNProof"
     }
 
     override val info = ProofMethodInfo(
-        via = "webauthn",
+        via = "${prefix}WebAuthN",
         property = null,
         strength = 5
     )
@@ -82,6 +105,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
         }
 
     val modelInfo = database.modelInfo<HasId<*>?, WebAuthNCredential, String>(
+        collectionName = "",
         authOptions = anyAuthRoot + Authentication.isAdmin,
         permissions = {
             val admin = condition<WebAuthNCredential>(Authentication.isAdmin.accepts(authOrNull))
@@ -107,9 +131,42 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
 
     val rest = ModelRestEndpoints(path("credentials"), modelInfo)
 
+
+    private fun challengeCacheKey(keyPrefix:String, uniqueIdentifier: String): String =
+        "${keyPrefix}_challenge_${uniqueIdentifier}"
+
+
+    data class ChallengeAndKey(val challenge: String, val key: String)
+
+    suspend fun establishChallenge(keyPrefix:String): ChallengeAndKey {
+        val challenge = generate()
+        val key = UUID.random().toString()
+        cache().set(challengeCacheKey(keyPrefix, key), challenge, expiration)
+        return ChallengeAndKey(challenge, key)
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun generate(): String {
+        val bytes = ByteArray(challengeLength)
+        SecureRandom().nextBytes(bytes)
+        return Base64.WebAuthN.encode(bytes)
+    }
+
+    suspend fun assert(challenge: String, key:String, keyPrefix:String) {
+        val cacheKey = challengeCacheKey(keyPrefix, key)
+        val fromCache = cache().get<String>(cacheKey)
+        cache().remove(cacheKey)
+
+        if(fromCache != challenge)
+            throw BadRequestException("No Challenge available")
+    }
+
+
+
+    @OptIn(ExperimentalEncodingApi::class)
     val registerStart = path("register-start").post.api(
         belongsToInterface = loggedInInterfaceInfo,
-        authOptions = registrationAuthOptions,
+        authOptions = subjectAuthOptions,
         summary = "Issue WebAuthN register challenge",
         description = "Returns a challenge to be passed on to a client authenticator for the creation of a new Public Key Credential.",
         errorCases = listOf(),
@@ -117,55 +174,89 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
         successCode = HttpStatus.OK,
         implementation = { _: Unit ->
 
-            PublicKeyCredentialCreationOptions(
-                authenticatorSelection = AuthenticatorSelection(
-                    userVerification = GeneralPreference.Discouraged,
-                ),
-                challenge = challenge.establishForRegistration(auth.subject.name, auth.idString),
-                excludeCredentials = modelInfo.collection()
-                    .find(condition {
-                        it.subjectName.eq(auth.subject.name) and
-                                it.subjectId.eq(auth.idString) and
-                                active
-                    })
-                    .map { ExistingCredential(it._id) }
-                    .toList(),
-                pubKeyCredParams = listOf(
-                    PublicKeyAlgorithm.ES256,
-                    PublicKeyAlgorithm.EdDSA,
-                    PublicKeyAlgorithm.RS256
-                ).map { PublicKeyCredentialParameters(it) },
-                rp = PublicKeyCredentialRpEntity(
-                    id = rpId,
-                    name = generalSettings().projectName
-                ),
-                user = PublicKeyCredentialUserEntity(
-                    displayName = displayNameTemplate(user()),
-                    id = auth.idString,
-                    name = nameTemplate(user())
-                ),
+            val challengeAndKey = establishChallenge(prefix)
+
+            val options = registrationOptionsForUser(auth.get())
+
+            WebAuthNRegistrationResponse(
+                challengeId = challengeAndKey.key,
+                options = PublicKeyCredentialCreationOptions(
+                    attestation = options.attestation,
+                    attestationFormats = options.attestationFormats,
+                    authenticatorSelection = options.authenticatorSelection,
+                    challenge = challengeAndKey.challenge,
+                    excludeCredentials = modelInfo.collection()
+                        .find(condition {
+                            it.subjectName.eq(auth.subject.name) and
+                                    it.subjectId.eq(auth.idString) and
+                                    active
+                        })
+                        .map { ExistingCredential(it._id) }
+                        .toList(),
+                    extensions = options.extensions,
+                    hints = options.hints,
+                    pubKeyCredParams = options.pubKeyCredParams,
+                    rp = PublicKeyCredentialRpEntity(
+                        id = rpId,
+                        name = generalSettings().projectName
+                    ),
+                    timeout = expiration.inWholeMilliseconds.toInt(),
+                    user = options.user,
+                )
             )
         }
     )
 
-    val registerFinish = path("register-finish").post.api<HasId<*>, AttestedPublicKeyCredential, Unit>(
+    @OptIn(ExperimentalEncodingApi::class)
+    val registerFinish = path("register-finish").post.api(
         belongsToInterface = loggedInInterfaceInfo,
-        authOptions = registrationAuthOptions,
+        authOptions = subjectAuthOptions,
         summary = "Establish WebAuthN Credential",
         description = "Validates and Accepts a public key credential created from a previously issued creation challenge.",
         errorCases = listOf(),
         examples = listOf(),
         successCode = HttpStatus.OK,
-        implementation = { created: AttestedPublicKeyCredential ->
-            // TODO: We should verify the challenge signature, although since this endpoint has an auth gate anyways, it probably doesn't matter...
+        implementation = { request: RegisterFinishRequest ->
+
+            val clientData = request.credential.response.clientData
+
+            assert(clientData.challenge, auth.idString, prefix)
+
+            val manager = WebAuthnManager.createNonStrictWebAuthnManager()
+            val data: RegistrationData =
+                manager.parseRegistrationResponseJSON(Serialization.json.encodeToString(request.credential))
+
+            try {
+                WebAuthnManager.createNonStrictWebAuthnManager().verify(
+                    data,
+                    RegistrationParameters(
+                        ServerProperty(
+                            Origin(clientData.origin),
+                            rpId ?: "",
+                            Challenge { clientData.challenge.encodeToByteArray() }),
+                        listOf(
+                            com.webauthn4j.data.PublicKeyCredentialParameters(
+                                PublicKeyCredentialType.PUBLIC_KEY,
+                                COSEAlgorithmIdentifier.create(request.credential.response.publicKeyAlgorithm.toLong())
+                            )
+                        ),
+                        true,
+                    ),
+                )
+            } catch (e: VerificationException) {
+                throw BadRequestException("Failed to verify Authenticator")
+            }
+
             val credential = WebAuthNCredential(
-                _id = created.id,
-                subjectName = auth.subject.name,
+                _id = request.credential.id,
                 subjectId = auth.idString,
-                publicKeyDerBase64 = created.response.publicKey,
-                algorithm = created.response.publicKeyAlgorithm,
+                authenticatorAttachment = request.credential.authenticatorAttachment,
+                clientExtensionResults = request.credential.clientExtensionResults,
+                displayName = request.displayName,
+                response = request.credential.response,
             )
             modelInfo.collection().insertOne(credential)
+            Unit
         }
     )
 
@@ -181,48 +272,78 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
         examples = listOf(),
         successCode = HttpStatus.OK,
         implementation = { _: Unit ->
-            PublicKeyCredentialRequestOptions(
-                challenge = challenge.establishForLogin()
+
+            val challengeAndKey = establishChallenge(prefix)
+
+            @Suppress("UNCHECKED_CAST")
+            val options = proveOptions()
+
+            WebAuthNStartResponse(
+                challengeId = challengeAndKey.key,
+                options = PublicKeyCredentialRequestOptions(
+                    challenge = challengeAndKey.challenge,
+                    extensions = options.extensions,
+                    hints = options.hints,
+                    rpId = rpId,
+                    timeout = expiration.inWholeMilliseconds.toInt(),
+                    userVerification = options.userVerification,
+                )
             )
         }
     )
 
     @OptIn(ExperimentalEncodingApi::class)
-    val prove = path("prove").post.api<HasId<*>?, AssertedPublicKeyCredential, Proof>(
+    val prove = path("prove").post.api<HasId<*>?, WebAuthNProveRequest, Proof>(
         belongsToInterface = interfaceInfo,
-        authOptions = noAuth,
+        authOptions = noAuth + subjectAuthOptions,
         summary = "Prove WebAuthN ownership",
         description = "Returns a challenge to be passed on to a client authenticator for signing.",
         errorCases = listOf(),
         examples = listOf(),
         successCode = HttpStatus.OK,
-        implementation = { response: AssertedPublicKeyCredential ->
+        implementation = { (key, credentials) ->
+
+            val clientData = credentials.response.clientData
+            assert(clientData.challenge, key, prefix)
+
             val publicKeyCredential: WebAuthNCredential = modelInfo.collection()
-                .find(condition { it._id.eq(response.id) and active })
+                .find(condition { it._id.eq(credentials.id) and active })
                 .firstOrNull()
-                ?: throw ForbiddenException("Invalid or inactive PublicKey Credential")
+                ?: throw ForbiddenException("Invalid Credential ID")
 
+            val manager = WebAuthnManager.createNonStrictWebAuthnManager()
 
-            // See Step 11 of 6.3.3. The `authenticatorGetAssertion` Operation
-            // https://w3c.github.io/webauthn/#sctn-op-get-assertion
-            val authenticatorDataRaw = Base64.WebAuthN.decode(response.response.authenticatorData)
-            val clientDataDecoded = Base64.WebAuthN.decode(response.response.clientDataJSON)
-            val clientData: ClientData = Serialization.json.decodeFromString(clientDataDecoded.decodeToString())
-
-            challenge.assertForLogin(clientData.challenge)
-
-            val clientDataHash = MessageDigest.getInstance("SHA-256").digest(clientDataDecoded)
-            val signatureContents = authenticatorDataRaw + clientDataHash
-
-            when (publicKeyCredential.algorithm) {
-                PublicKeyAlgorithm.ES256 -> SignatureVerifier.ES256()
-                PublicKeyAlgorithm.EdDSA -> SignatureVerifier.EdDSA()
-                else -> throw BadRequestException("Unsupported WebAuthN algorithm")
-            }.verify(
-                signature = Base64.WebAuthN.decode(response.response.signature),
-                expected = signatureContents,
-                publicKey = Base64.WebAuthN.decode(publicKeyCredential.publicKeyDerBase64)
+            val authRequest = AuthenticationRequest(
+                Base64.WebAuthN.decode(credentials.id),
+                Base64.WebAuthN.decode(credentials.response.authenticatorData),
+                Base64.WebAuthN.decode(credentials.response.clientDataJSON),
+                Base64.WebAuthN.decode(credentials.response.signature),
             )
+
+            val attestation =
+                AttestationObjectConverter(ObjectConverter()).convert(publicKeyCredential.response.attestationObject)!!
+
+            val authParams = AuthenticationParameters(
+                ServerProperty(
+                    Origin(clientData.origin),
+                    rpId ?: "",
+                    Challenge { clientData.challenge.encodeToByteArray() }),
+                AuthenticatorImpl(
+                    attestation.authenticatorData.attestedCredentialData!!,
+                    attestation.attestationStatement,
+                    attestation.authenticatorData.signCount
+                ),
+                true
+            )
+
+            try {
+                manager.validate(
+                    authRequest,
+                    authParams
+                )
+            } catch (e: VerificationException) {
+                throw BadRequestException("Failed to verify Authenticator")
+            }
 
             modelInfo.collection().updateOneById(
                 publicKeyCredential._id,
