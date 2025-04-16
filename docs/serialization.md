@@ -1,5 +1,7 @@
 # Serialization
 
+Last updated April 16, 2025 (`version-4`)
+
 Lightning Server simply leverages [`kotlinx.serialization`](https://github.com/Kotlin/kotlinx.serialization) for all of your serialization needs.  It uses centralized serializer instances in the top-level `Serialization` object.
 
 - JSON - `Serialization.json.encodeToString(MyThing(x = 1))`

@@ -1,5 +1,7 @@
 # Automatically Generated REST Endpoints
 
+**OUT OF DATE**
+
 By combining [typed endpoints](typed-endpoints.md), [authentication](authentication.md), and [databases](database.md), we can conveniently generate REST endpoints for any given model automatically.
 
 ```kotlin

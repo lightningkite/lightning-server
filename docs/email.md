@@ -1,5 +1,7 @@
 # Email
 
+**OUT OF DATE**
+
 Email's built in like many of the other service types a server can depend on.
 
 ## Declaring the need for an email sender

@@ -1,5 +1,7 @@
 # Cache
 
+**OUT OF DATE**
+
 When building servers, it is frequently necessary to keep some information on hand that is shared between every instance.
 
 That's where the cache comes in.  It uses `kotlinx.serialization` to serialize values in and out of the cache, which could be local, Memcached, Redis, or DynamoDB.

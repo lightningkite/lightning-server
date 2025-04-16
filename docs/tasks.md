@@ -1,5 +1,7 @@
 # Scheduled and Asynchronous Tasks
 
+Last updated April 16, 2025 (`version-4`)
+
 You can define server tasks that occur on a regular basis, as well as tasks that need to run asynchronously.
 
 ## Scheduled Tasks

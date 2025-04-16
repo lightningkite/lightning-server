@@ -1,5 +1,7 @@
 # Database
 
+**OUT OF DATE**
+
 Lightning Server contains a database abstraction that enables you to build applications without worrying about exactly which database will be used.  It is abstracted over both NoSQL and SQL databases.
 
 ## Declaring the need for a database

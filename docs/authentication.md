@@ -1,5 +1,7 @@
 # Authentication
 
+**OUT OF DATE**
+
 Authentication is a fundamental concept in Lightning Server, and authentication works the same way across all endpoints.  Multiple methods can be checked.
 
 We've built authentication out for you, but it is also extremely customizable.  We'll start with the easy one.

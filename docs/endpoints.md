@@ -1,5 +1,7 @@
 # Endpoints
 
+**OUT OF DATE**
+
 We've already briefly seen some very basic endpoints in action; let's go into more detail.
 
 First, you won't get very far in this section without some knowledge of HTTP.  One tutorial you could go to for general HTTP information is [this one I found](https://dev.to/abbeyperini/a-beginners-guide-to-http-part-1-definitions-38m7) by Abbey Perini.

@@ -1,5 +1,7 @@
 # Set Up Lightning Server
 
+**OUT OF DATE**  Needs version pinning
+
 ## Create a new Kotlin/Gradle KTS project.
 
 IntelliJ has a quick option for this under "New Project".  Make sure you select Kotlin, Gradle, and Kotlin as your DSL language.

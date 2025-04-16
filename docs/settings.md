@@ -1,5 +1,7 @@
 # Settings
 
+Last updated April 16, 2025 (`version-4`)
+
 Settings in Lightning Server are defined programmatically, are fully customizable, and are strictly typed.  They leverage the KotlinX serialization system, and are usually placed into some form of `settings.json` file.
 
 ## Defining a Setting

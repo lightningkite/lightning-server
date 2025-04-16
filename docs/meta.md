@@ -1,5 +1,7 @@
 # Meta Tools
 
+**OUT OF DATE**
+
 Lightning Server comes with a bunch of easy tools for working with your server.
 
 You can enable them just like this:
