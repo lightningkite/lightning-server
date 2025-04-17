@@ -1,5 +1,7 @@
 # Email
 
+Last updated April 17, 2025 (`version-4`)
+
 Email's built in like many of the other service types a server can depend on.
 
 ## Setting up Email Services
