@@ -21,11 +21,11 @@ object SettingsHandlers {
                     type = """object({ 
         allowedDomains = optional(list(string), null), # Removing in V5
         allowedHeaders = optional(list(string), null), # Removing in V5
-        limitToDomains = optional(list(string), []),
-        limitToHeaders = optional(list(string), []),
-        limitToMethods = optional(list(string), []),
-        exposedHeaders = optional(list(string), []), # optional will be removed in V5
-        allowCredentials = optional(bool, false), # optional will be removed in V5
+        limitToDomains = list(string), # Nullable
+        limitToHeaders = list(string), # Nullable
+        limitToMethods = list(string), # Nullable
+        exposedHeaders = list(string), 
+        allowCredentials = bool,
     })""".trimMargin(),
                     default = "null",
                     nullable = true,
