@@ -52,7 +52,7 @@ data class CorsSettings(
     val limitToDomains: List<String>? = emptyList(),
     val limitToHeaders: List<String>? = emptyList(),
     val limitToMethods: List<String>? = emptyList(),
-    val exposedHeaders: List<String>? = emptyList(), // Nullability will be removed in V5. It is there for backwards compatibility
+    val exposedHeaders: List<String>? = emptyList(),
     val allowCredentials: Boolean? = false, // Nullability will be removed in V5. It is there for backwards compatibility
 )
 

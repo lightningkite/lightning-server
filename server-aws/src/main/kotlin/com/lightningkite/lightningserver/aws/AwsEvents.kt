@@ -48,7 +48,8 @@ data class APIGatewayV2HTTPResponse(
     val statusCode: Int? = null,
     val body: String? = null,
     val isBase64Encoded: Boolean = false,
-    val cookies: List<String> = emptyList(),
+    // Enabling this breaks websockets?!
+//    val cookies: List<String> = emptyList(),
     val headers: Map<String, String> = mapOf()
 )
 

@@ -345,6 +345,7 @@ object SettingsHandlers {
         inputs = { key ->
             listOf(
                 TerraformInput.string("${key}_org_id", null),
+                TerraformInput.string("${key}_zone_name", null, nullable = true),
                 TerraformInput.string("${key}_existing_project_id", null, true, "An Existing Mongo Atlas Project you want this database added to (nullable). If null a new project will be created."),
             )
         },
@@ -374,6 +375,7 @@ object SettingsHandlers {
                   cluster_type = "REPLICASET"
 
                   replication_specs {
+                    zone_name = var.${key}_zone_name
                     region_configs {
                       electable_specs {
                         instance_size = "M0"
@@ -445,6 +447,7 @@ object SettingsHandlers {
         inputs = { key ->
             listOf(
                 TerraformInput.string("${key}_org_id", null),
+                TerraformInput.string("${key}_zone_name", null, nullable = true),
                 TerraformInput.string("${key}_existing_project_id", null, true, "An Existing Mongo Atlas Project you want this database added to (nullable). If null a new project will be created."),
             )
         },
@@ -474,6 +477,7 @@ object SettingsHandlers {
                   cluster_type = "REPLICASET"
                   
                   replication_specs {
+                    zone_name = var.${key}_zone_name
                     region_configs {
                       provider_name         = "FLEX"
                       backing_provider_name = "AWS"
@@ -542,6 +546,7 @@ object SettingsHandlers {
         inputs = { key ->
             listOf(
                 TerraformInput.string("${key}_org_id", null),
+                TerraformInput.string("${key}_zone_name", null, nullable = true),
                 TerraformInput.string("${key}_min_size", "M10"),
                 TerraformInput.string("${key}_max_size", "M40"),
                 TerraformInput.string("${key}_existing_project_id", null, true, "An Existing Mongo Atlas Project you want this database added to (nullable). If null a new project will be created."),
@@ -577,6 +582,7 @@ object SettingsHandlers {
                   
                 #  lifecycle { ignore_changes = [instance_size] }
                   replication_specs {
+                    zone_name = var.${key}_zone_name
                     region_configs {
                       auto_scaling {
                         compute_enabled = true

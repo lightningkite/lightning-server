@@ -135,7 +135,7 @@ object Server : ServerPathGroup(ServerPath.root) {
 
     val socket = path("socket").websocket(
         willConnect = { UUID.random().toString() },
-        didConnect = { send("Connected $currentState") },
+        didConnect = { /*send("Connected $currentState")*/ },
         message = {
             send(it.text)
             if (it.content == "die") {
@@ -196,11 +196,8 @@ object Server : ServerPathGroup(ServerPath.root) {
         HttpResponse.plainText(database().collection<User>()::class.qualifiedName ?: "???")
     }
 
-    val testSchedule = schedule("test-schedule", 1.minutes) {
+    val testSchedule = schedule("test-schedule", 5.minutes) {
         println("Hello schedule!")
-    }
-    val testSchedule2 = schedule("test-schedule2", 1.minutes) {
-        println("Hello schedule 2!")
     }
 
     val hasInternet = path("has-internet").get.handler {

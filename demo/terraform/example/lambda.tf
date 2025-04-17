@@ -135,7 +135,7 @@ resource "aws_lambda_function" "main" {
   s3_key    = aws_s3_object.app_storage.key
 
   runtime = "java17"
-  handler = "com.lightningkite.lightningserver.monitoring.AwsHandler"
+  handler = "com.lightningkite.lightningserverdemo.AwsHandler"
   
   memory_size = "${var.lambda_memory_size}"
   timeout = var.lambda_timeout
@@ -183,13 +183,17 @@ resource "local_sensitive_file" "settings_raw" {
         
     }
     database = {
-      url = "mongodb+srv://demoexampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_serverless_instance.database.connection_strings_standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
+      url = "mongodb+srv://demoexampledatabase-main:${random_password.database.result}@${replace(mongodbatlas_advanced_cluster.database.connection_strings[0].standard_srv, "mongodb+srv://", "")}/default?retryWrites=true&w=majority"
     }
     cache = {
         url = "dynamodb://${var.deployment_location}/demo_example"
     }
     secretBasis = random_password.secretBasis.result
-    slack = var.slack
+    jwt = {
+        expiration = var.jwt_expiration 
+        emailExpiration = var.jwt_emailExpiration 
+        secret = random_password.jwt.result
+    }
     sms = var.sms
     logging = var.logging
     files = {
