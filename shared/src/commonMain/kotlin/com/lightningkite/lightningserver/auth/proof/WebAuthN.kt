@@ -22,23 +22,31 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 @OptIn(ExperimentalEncodingApi::class)
-val Base64.WebAuthN get() = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
+val Base64.WebAuthNEncoder get() = Base64.UrlSafe
+@OptIn(ExperimentalEncodingApi::class)
+val Base64.WebAuthNDecoder get() = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
 @Serializable
 @GenerateDataClassPaths
 @IndexSet(["subjectType", "subjectId"])
 data class WebAuthNCredential(
     override val _id: String,
-    val subjectId: String,
-    val authenticatorAttachment:String,
-    val clientExtensionResults: Map<String, String>,
     val displayName: String,
-    val response: AuthenticatorAttestationResponse,
     val establishedAt: Instant = now(),
     val lastUsedAt: Instant? = null,
-    val expiresAt: Instant? = null,
+    val subjectId: String,
+    val subjectType: String,
+    val authenticatorAttachment:String,
+    val clientExtensionResults: Map<String, String>,
+    val attestationObject: String, // Base64 String
+    val authenticatorData: String, // Base64 String
+    val clientDataJSON: String,  // Base64 Json String
+    val publicKey: String, // Base64 String
+    val publicKeyAlgorithm: Int,
+    val transports: List<Transport>,
     val disabledAt: Instant? = null,
 ) : HasId<String>
+
 
 @Serializable(with = PublicKeyAlgorithmSerializer::class)
 enum class PublicKeyAlgorithm(val coseAlgorithmId: Int) {
@@ -91,28 +99,31 @@ data class WebAuthNRegistrationResponse(
 )
 
 @Serializable
-/**
- * See [`PublicKeyCredentialCreationOptions`](https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredentialCreationOptions)
- */
+data class AuthenticatorSelection(
+    val authenticatorAttachment: AuthenticatorAttachment? = null,
+    val residentKey: GeneralPreference = GeneralPreference.Discouraged,
+    val userVerification: GeneralPreference = GeneralPreference.Preferred,
+)
+
+@Serializable
 data class PublicKeyCredentialCreationOptions(
     val attestation: Attestation = Attestation.None,
     val attestationFormats: List<String> = emptyList(),
-    @EncodeDefault(Mode.NEVER) val authenticatorSelection: AuthenticatorSelection? = null,
+    val authenticatorSelection: AuthenticatorSelection = AuthenticatorSelection(),
     val challenge: String, // base64url-encoded
-    @EncodeDefault(Mode.NEVER) val excludeCredentials: List<ExistingCredential> = emptyList(),
+    val excludeCredentials: List<ExistingCredential> = emptyList(),
     val extensions: Map<String, String> = emptyMap(),
     val hints: List<CreationHints> = emptyList(),
     val pubKeyCredParams: List<PublicKeyCredentialParameters>,
     val rp: PublicKeyCredentialRpEntity,
-    @EncodeDefault(Mode.NEVER) val timeout: Int? = null,
+    val timeout: Int? = null,
     val user: PublicKeyCredentialUserEntity,
 )
 
-
-data class RegistrationOptions(
+data class WebAuthNRegistrationOptions(
     val attestation: Attestation = Attestation.None,
     val attestationFormats: List<String> = emptyList(),
-    val authenticatorSelection: AuthenticatorSelection? = null,
+    val authenticatorSelection: WebAuthNAuthenticatorSelectionOptions = WebAuthNAuthenticatorSelectionOptions(),
     val extensions: Map<String, String> = emptyMap(),
     val hints: List<CreationHints> = emptyList(),
     val pubKeyCredParams: List<PublicKeyCredentialParameters>,
@@ -120,40 +131,38 @@ data class RegistrationOptions(
 )
 
 @Serializable
+data class WebAuthNAuthenticatorSelectionOptions(
+    val authenticatorAttachment: AuthenticatorAttachment? = null,
+    val userVerification: GeneralPreference = GeneralPreference.Preferred,
+)
+
+@Serializable
 data class PublicKeyCredentialRequestOptions(
-//    val allowCredentials: List<ExistingCredential> = listOf(),
-    val challenge: String,  // base64url-encoded
+    val allowCredentials: List<ExistingCredential> = listOf(),
+    val challenge: String,
     val extensions: Map<String, String> = emptyMap(),
     val hints: List<CreationHints> = emptyList(),
-    @EncodeDefault(Mode.NEVER) val rpId: String? = null,
-    @EncodeDefault(Mode.NEVER) val timeout: Int? = null,
-    val userVerification: GeneralPreference = GeneralPreference.Preferred,
-)
-
-data class ProveOptions(
-//    val allowCredentials: List<ExistingCredential> = listOf(),
-    val extensions: Map<String, String> = emptyMap(),
-    val hints: List<CreationHints> = emptyList(),
+    val rpId: String? = null,
+    val timeout: Int? = null,
     val userVerification: GeneralPreference = GeneralPreference.Preferred,
 )
 
 @Serializable
-data class WebAuthNStartResponse(
-    val challengeId: String,
-    val options: PublicKeyCredentialRequestOptions
-)
+data class AssertedPublicKeyCredential(
+    val id: String, // base64url-encoded
+    val response: AuthenticatorAssertionResponse,
+) {
+    @EncodeDefault(Mode.ALWAYS)
+    val type: String = "public-key"
+
+}
 
 @Serializable
-data class WebAuthNProveRequest(
-    val challengeId: String,
-    val credentials: AssertedPublicKeyCredential
-)
-
-@Serializable
-data class AuthenticatorSelection(
-    @EncodeDefault(Mode.NEVER) val authenticatorAttachment: AuthenticatorAttachment? = null,
-    val residentKey: GeneralPreference = GeneralPreference.Discouraged,
-    val userVerification: GeneralPreference = GeneralPreference.Preferred,
+data class AuthenticatorAssertionResponse(
+    val authenticatorData: String, // Base64 String
+    val clientDataJSON: String, // Base64 Json String
+    val signature: String, // Base64 String
+    val userHandle: String?, // Base64 String
 )
 
 @Serializable
@@ -178,12 +187,12 @@ enum class Transport(val jsonName: String) {
     USB("usb"),
 }
 
-
 @Serializable
 data class ExistingCredential(
     val id: String, // base64url-encoded
     val transports: List<Transport> = emptyList(),
 ) {
+    @EncodeDefault(Mode.ALWAYS)
     val type: String = "public-key"
 }
 
@@ -191,33 +200,28 @@ data class ExistingCredential(
 data class PublicKeyCredentialParameters(
     val alg: PublicKeyAlgorithm,
 ) {
+    @EncodeDefault(Mode.ALWAYS)
     val type: String = "public-key"
 }
 
 @Serializable
 data class PublicKeyCredentialRpEntity(
-    @EncodeDefault(Mode.NEVER) val id: String? = null,
+    val id: String? = null,
     val name: String,
 )
 
 @Serializable
 data class PublicKeyCredentialUserEntity(
     val displayName: String,
-    val id: String, // base64url-encoded
+    val id: String,
     val name: String,
 )
 
-/**
- * Represents a recently created WebAuthN credential. This is the same object that is returned from
- * `CredentialContainer.create().toJSON()`
- *
- * See [`PublicKeyCredential`](https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredential)
- */
 @Serializable
 data class AttestedPublicKeyCredential(
     val authenticatorAttachment:String,
     val clientExtensionResults: Map<String, String>,
-    val id: String, // base64url-encoded
+    val id: String,
     val response: AuthenticatorAttestationResponse,
 ) {
     @EncodeDefault(Mode.ALWAYS)
@@ -225,72 +229,50 @@ data class AttestedPublicKeyCredential(
 }
 
 @Serializable
-data class RegisterFinishRequest(
-    val displayName: String,
-    val credential: AttestedPublicKeyCredential
-)
-
-@Serializable
 data class AuthenticatorAttestationResponse(
     val attestationObject: String, // Base64 String
     val authenticatorData: String, // Base64 String
-    val clientDataJSON: String, // Base64 String
+    val clientDataJSON: String, // Base64 Json String
     val publicKey: String, // Base64 String
     val publicKeyAlgorithm: Int,
     val transports: List<Transport>,
-) {
-    val clientData: ClientData get() = Json.decodeFromString(ClientDataJSONSerializer, clientDataJSON)
-}
+)
 
-/**
- * Represents the result of a WebAuthN assertion response. This is the same object that is returned from
- * `CredentialContainer.get().toJSON()`
- *
- * See [`PublicKeyCredential`](https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredential)
- */
-@Serializable
-data class AssertedPublicKeyCredential(
-    val id: String, // base64url-encoded
-    val response: AuthenticatorAssertionResponse,
-) {
-    @EncodeDefault(Mode.ALWAYS)
-    val type: String = "public-key"
-
-}
+data class WebAuthNProveOptions(
+    val extensions: Map<String, String> = emptyMap(),
+    val hints: List<CreationHints> = emptyList(),
+    val userVerification: GeneralPreference = GeneralPreference.Preferred,
+)
 
 @Serializable
-data class AuthenticatorAssertionResponse(
-    val authenticatorData: String, // Base64 String
-    val clientDataJSON: String, // Base64 String
-    val signature: String, // Base64 String
-    val userHandle: String,
-) {
-    val clientData: ClientData get() = Json.decodeFromString(ClientDataJSONSerializer, clientDataJSON)
-}
+data class WebAuthNStart(
+    val subjectId: String?,
+    val subjectType: String?,
+)
+
+@Serializable
+data class WebAuthNStartResponse(
+    val challengeId: String,
+    val options: PublicKeyCredentialRequestOptions
+)
+
+@Serializable
+data class WebAuthNProve(
+    val challengeId: String,
+    val credentials: AssertedPublicKeyCredential
+)
+
+@Serializable
+data class WebAuthNRegisterFinish(
+    val challengeId: String,
+    val displayName: String,
+    val credential: AttestedPublicKeyCredential
+)
 
 @Serializable
 data class ClientData(
     val challenge: String,
     val origin: String,
     val crossOrigin: Boolean,
+    val type: String,
 )
-
-@OptIn(ExperimentalEncodingApi::class)
-open class Base64JSONSerializer<T>(
-    val serializationStrategy: KSerializer<T>,
-    serialName: String,
-) : KSerializer<T> {
-    override val descriptor = PrimitiveSerialDescriptor(serialName, PrimitiveKind.STRING)
-
-    override fun serialize(encoder: Encoder, value: T) {
-        val jsonRaw = Json.encodeToString(serializationStrategy, value).encodeToByteArray()
-        encoder.encodeString(Base64.WebAuthN.encode(jsonRaw))
-    }
-
-    override fun deserialize(decoder: Decoder): T {
-        val jsonRaw = Base64.WebAuthN.decode(decoder.decodeString())
-        return Json.decodeFromString(serializationStrategy, jsonRaw.decodeToString())
-    }
-}
-
-object ClientDataJSONSerializer : Base64JSONSerializer<ClientData>(ClientData.serializer(), "ClientData")
