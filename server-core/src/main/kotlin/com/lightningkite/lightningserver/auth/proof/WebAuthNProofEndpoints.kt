@@ -48,6 +48,7 @@ import com.webauthn4j.converter.AttestationObjectConverter
 import com.webauthn4j.converter.util.ObjectConverter
 import com.webauthn4j.data.AuthenticationParameters
 import com.webauthn4j.data.AuthenticationRequest
+import com.webauthn4j.data.PublicKeyCredentialParameters
 import com.webauthn4j.data.PublicKeyCredentialType
 import com.webauthn4j.data.RegistrationData
 import com.webauthn4j.data.RegistrationParameters
@@ -77,7 +78,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
     val rpId: String? = null,
     val authOptions: AuthOptions<USER>,
     val registrationForUser: (USER) -> WebAuthNRegistrationOptions,
-    val proveOptions: () -> WebAuthNProveOptions,
+    val proveOptions: (USER?) -> WebAuthNProveOptions,
 ) : ServerPathGroup(path), ProofMethod {
 
     init {
@@ -152,6 +153,9 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
     private fun challengeCacheKey(key: String): String =
         "webAuthN_challenge_${key}"
 
+    private fun challengeResidentKeyPreference(key: String): String =
+        "webAuthN_challenge_resident_key_preference${key}"
+
 
     data class ChallengeAndKey(val challenge: String, val key: String)
 
@@ -219,9 +223,10 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
         successCode = HttpStatus.OK,
         implementation = { residentKeyPreference: GeneralPreference ->
 
-            val challengeAndKey = establishChallenge()
-
             val options = registrationForUser(auth.get() as USER)
+
+            val challengeAndKey = establishChallenge()
+            cache().set(challengeResidentKeyPreference(challengeAndKey.key), residentKeyPreference)
 
             WebAuthNRegistrationResponse(
                 challengeId = challengeAndKey.key,
@@ -265,6 +270,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
             )
             val challengeFromCache =
                 assert(challengeId, Base64.WebAuthNDecoder.decode(clientData.challenge).decodeToString())
+            val residentKeyPreference = cache().get<GeneralPreference>(challengeResidentKeyPreference(challengeId))
 
             val manager = WebAuthnManager.createNonStrictWebAuthnManager()
             val data: RegistrationData =
@@ -284,7 +290,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
                     rpId ?: "",
                     Challenge { challengeFromCache.encodeToByteArray() }),
                 listOf(
-                    com.webauthn4j.data.PublicKeyCredentialParameters(
+                    PublicKeyCredentialParameters(
                         PublicKeyCredentialType.PUBLIC_KEY,
                         COSEAlgorithmIdentifier.create(credentials.response.publicKeyAlgorithm.toLong())
                     )
@@ -307,6 +313,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
                 displayName = displayName,
                 subjectId = auth.idString,
                 subjectType = (auth.subject as Authentication.SubjectHandler<HasId<Comparable<Comparable<*>>>, Comparable<Comparable<*>>>).name,
+                residentKey = residentKeyPreference == GeneralPreference.Required,
                 authenticatorAttachment = credentials.authenticatorAttachment,
                 clientExtensionResults = credentials.clientExtensionResults,
                 attestationObject = credentials.response.attestationObject,
@@ -338,18 +345,26 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
 
             val challengeAndKey = establishChallenge()
 
+            val (existingCreds:List<ExistingCredential>, subject:USER?) = subjectId?.let { id ->
+                subjectType?.let { type ->
+                    val creds = userCredentials(subjectId = id, subjectType = type)
+                    @Suppress("UNCHECKED_CAST")
+                    val subject = Authentication.subjects.values.find { it.name == type }
+                        ?.findUser("_id", id) as? USER
+
+                    creds to subject
+                }
+            }
+                ?: (emptyList<ExistingCredential>() to null)
+
+
             @Suppress("UNCHECKED_CAST")
-            val options = proveOptions()
+            val options = proveOptions(subject)
 
             WebAuthNStartResponse(
                 challengeId = challengeAndKey.key,
                 options = PublicKeyCredentialRequestOptions(
-                    allowCredentials = subjectId?.let { id ->
-                        subjectType?.let { type ->
-                            userCredentials(subjectId = subjectId, subjectType = subjectType)
-                        }
-                    }
-                        ?: emptyList(),
+                    allowCredentials = existingCreds,
                     challenge = challengeAndKey.challenge,
                     extensions = options.extensions,
                     hints = options.hints,

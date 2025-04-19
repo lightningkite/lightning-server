@@ -36,6 +36,7 @@ data class WebAuthNCredential(
     val lastUsedAt: Instant? = null,
     val subjectId: String,
     val subjectType: String,
+    val residentKey: Boolean,
     val authenticatorAttachment:String,
     val clientExtensionResults: Map<String, String>,
     val attestationObject: String, // Base64 String
