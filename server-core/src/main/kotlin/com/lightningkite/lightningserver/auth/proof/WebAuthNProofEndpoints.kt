@@ -50,7 +50,6 @@ import com.webauthn4j.data.AuthenticationParameters
 import com.webauthn4j.data.AuthenticationRequest
 import com.webauthn4j.data.PublicKeyCredentialParameters
 import com.webauthn4j.data.PublicKeyCredentialType
-import com.webauthn4j.data.RegistrationData
 import com.webauthn4j.data.RegistrationParameters
 import com.webauthn4j.data.RegistrationRequest
 import com.webauthn4j.data.attestation.statement.COSEAlgorithmIdentifier
@@ -61,6 +60,7 @@ import com.webauthn4j.verifier.exception.VerificationException
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import java.security.SecureRandom
 import kotlin.io.encoding.Base64
@@ -75,10 +75,10 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val challengeLength: Int = 64,
     val expiration: Duration = 5.minutes,
-    val rpId: String? = null,
+    val rpId: String,
     val authOptions: AuthOptions<USER>,
-    val registrationForUser: (USER) -> WebAuthNRegistrationOptions,
-    val proveOptions: (USER?) -> WebAuthNProveOptions,
+    val registrationForUser: (USER) -> WebAuthN.Registration.RegistrationOptions,
+    val proveOptions: (USER?) -> WebAuthN.Authentication.ProveOptions,
 ) : ServerPathGroup(path), ProofMethod {
 
     init {
@@ -114,15 +114,8 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
                 create = Condition.Never,
                 read = admin or mine,
                 readMask = mask {
-                    it.authenticatorAttachment.mask("", Condition.Never)
-                    it.clientExtensionResults.mask(emptyMap(), Condition.Never)
                     it.attestationObject.mask("", Condition.Never)
-                    it.authenticatorData.mask("", Condition.Never)
-                    it.clientDataJSON.mask("", Condition.Never)
-                    it.publicKey.mask("", Condition.Never)
-                    it.publicKeyAlgorithm.mask(0, Condition.Never)
                     it.transports.mask(emptyList(), Condition.Never)
-                    it.disabledAt.mask(null, Condition.Never)
                 },
                 update = admin or (mine and active),
                 updateRestrictions = updateRestrictions {
@@ -130,17 +123,11 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
                     it.establishedAt.cannotBeModified()
                     it.lastUsedAt.cannotBeModified()
                     it.subjectId.cannotBeModified()
+                    it.subjectType.cannotBeModified()
+                    it.residentKey.cannotBeModified()
                     it.authenticatorAttachment.cannotBeModified()
-                    it.clientExtensionResults.cannotBeModified()
-                    it.authenticatorAttachment.cannotBeModified()
-                    it.clientExtensionResults.cannotBeModified()
                     it.attestationObject.cannotBeModified()
-                    it.authenticatorData.cannotBeModified()
-                    it.clientDataJSON.cannotBeModified()
-                    it.publicKey.cannotBeModified()
-                    it.publicKeyAlgorithm.cannotBeModified()
                     it.transports.cannotBeModified()
-                    it.disabledAt.cannotBeModified()
                 },
                 delete = Condition.Never,
             )
@@ -153,35 +140,25 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
     private fun challengeCacheKey(key: String): String =
         "webAuthN_challenge_${key}"
 
-    private fun challengeResidentKeyPreference(key: String): String =
-        "webAuthN_challenge_resident_key_preference${key}"
+    @Serializable
+    data class RegistrationCache(
+        val challenge: String,
+        val residentKeyPreference: WebAuthN.GeneralPreference,
+        val allowedAlgorithms: List<WebAuthN.PublicKeyCredentialParameters>,
+        val userVerification: Boolean,
+    )
 
-
-    data class ChallengeAndKey(val challenge: String, val key: String)
-
-    suspend fun establishChallenge(): ChallengeAndKey {
-        val challenge = generate()
-        val key = UUID.random().toString()
-        cache().set(challengeCacheKey(key), challenge, expiration)
-        return ChallengeAndKey(challenge, key)
-    }
+    @Serializable
+    data class AuthenticationCache(
+        val challenge: String,
+        val userVerification: Boolean,
+    )
 
     @OptIn(ExperimentalEncodingApi::class)
     private fun generate(): String {
         val bytes = ByteArray(challengeLength)
         SecureRandom().nextBytes(bytes)
-        return Base64.WebAuthNEncoder.encode(bytes)
-    }
-
-    suspend fun assert(key: String, challenge: String): String {
-        val cacheKey = challengeCacheKey(key)
-        val fromCache = cache().get<String>(cacheKey)
-        cache().remove(cacheKey)
-
-        if (fromCache != challenge)
-            throw BadRequestException("No Challenge available")
-
-        return fromCache
+        return WebAuthN.base64Encoder.encode(bytes)
     }
 
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
@@ -196,7 +173,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
         }) != null
     }
 
-    suspend fun userCredentials(subjectId: String, subjectType: String): List<ExistingCredential> =
+    suspend fun userCredentials(subjectId: String, subjectType: String): List<WebAuthN.ExistingCredential> =
         modelInfo.collection()
             .find(condition {
                 it.subjectId.eq(subjectId) and
@@ -204,9 +181,9 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
                         active
             })
             .map {
-                ExistingCredential(
+                WebAuthN.ExistingCredential(
                     id = it._id,
-                    transports = it.transports
+                    transports = it.transports.map { WebAuthN.Transport.fromStandardName(it) }
                 )
             }
             .toList()
@@ -221,29 +198,37 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
         errorCases = listOf(),
         examples = listOf(),
         successCode = HttpStatus.OK,
-        implementation = { residentKeyPreference: GeneralPreference ->
+        implementation = { residentKeyPreference: WebAuthN.GeneralPreference ->
 
             val options = registrationForUser(auth.get() as USER)
 
-            val challengeAndKey = establishChallenge()
-            cache().set(challengeResidentKeyPreference(challengeAndKey.key), residentKeyPreference)
+            val challenge = generate()
+            val key = UUID.random().toString()
+            cache().set(
+                challengeCacheKey(key), RegistrationCache(
+                    challenge = challenge,
+                    residentKeyPreference = residentKeyPreference,
+                    allowedAlgorithms = options.pubKeyCredParams,
+                    userVerification = options.authenticatorSelection.userVerification == WebAuthN.GeneralPreference.Required
+                )
+            )
 
-            WebAuthNRegistrationResponse(
-                challengeId = challengeAndKey.key,
-                options = PublicKeyCredentialCreationOptions(
+            WebAuthN.Registration.RegistrationResponse(
+                challengeId = key,
+                options = WebAuthN.Registration.PublicKeyCredentialCreationOptions(
                     attestation = options.attestation,
                     attestationFormats = options.attestationFormats,
-                    authenticatorSelection = AuthenticatorSelection(
+                    authenticatorSelection = WebAuthN.Registration.AuthenticatorSelection(
                         authenticatorAttachment = options.authenticatorSelection.authenticatorAttachment,
                         residentKey = residentKeyPreference,
                         userVerification = options.authenticatorSelection.userVerification,
                     ),
-                    challenge = challengeAndKey.challenge,
+                    challenge = challenge,
                     excludeCredentials = userCredentials(auth.idString, auth.subject.name),
                     extensions = options.extensions,
                     hints = options.hints,
                     pubKeyCredParams = options.pubKeyCredParams,
-                    rp = PublicKeyCredentialRpEntity(
+                    rp = WebAuthN.Registration.PublicKeyCredentialRpEntity(
                         id = rpId,
                         name = generalSettings().projectName
                     ),
@@ -263,39 +248,43 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
         errorCases = listOf(),
         examples = listOf(),
         successCode = HttpStatus.OK,
-        implementation = { (challengeId, displayName, credentials): WebAuthNRegisterFinish ->
+        implementation = { (challengeId, displayName, credentials): WebAuthN.Registration.RegisterRequest ->
 
-            val clientData = Serialization.json.decodeFromString<ClientData>(
+            val clientData = Serialization.json.decodeFromString<WebAuthN.ClientData>(
                 Base64.decode(credentials.response.clientDataJSON).decodeToString()
             )
-            val challengeFromCache =
-                assert(challengeId, Base64.WebAuthNDecoder.decode(clientData.challenge).decodeToString())
-            val residentKeyPreference = cache().get<GeneralPreference>(challengeResidentKeyPreference(challengeId))
 
-            val manager = WebAuthnManager.createNonStrictWebAuthnManager()
-            val data: RegistrationData =
-                manager.parse(
-                    RegistrationRequest(
-                        Base64.WebAuthNDecoder.decode(credentials.response.attestationObject),
-                        Base64.WebAuthNDecoder.decode(credentials.response.clientDataJSON),
-                        null,
-                        credentials.response.transports.map { it.jsonName }.toSet(),
-                    )
-                )
-            manager.parseRegistrationResponseJSON(Serialization.json.encodeToString(credentials))
+            val cacheKey = challengeCacheKey(challengeId)
+            val fromCache = cache().get<RegistrationCache>(cacheKey)
+                ?: throw BadRequestException("No Challenge available")
+            cache().remove(cacheKey)
 
-            val registrationParams = RegistrationParameters(
+            if (fromCache.challenge != WebAuthN.base64Decoder.decode(clientData.challenge).decodeToString())
+                throw BadRequestException("No Challenge available")
+
+
+            val data = RegistrationRequest(
+                WebAuthN.base64Decoder.decode(credentials.response.attestationObject),
+                WebAuthN.base64Decoder.decode(credentials.response.clientDataJSON),
+                Serialization.json.encodeToString(credentials.clientExtensionResults),
+                credentials.response.transports.map { it.standardName }.toSet(),
+            )
+
+            val registrationParams: RegistrationParameters = RegistrationParameters(
+                /* serverProperty = */
                 ServerProperty(
-                    Origin(clientData.origin),
-                    rpId ?: "",
-                    Challenge { challengeFromCache.encodeToByteArray() }),
-                listOf(
-                    PublicKeyCredentialParameters(
-                        PublicKeyCredentialType.PUBLIC_KEY,
-                        COSEAlgorithmIdentifier.create(credentials.response.publicKeyAlgorithm.toLong())
-                    )
+                    /* origin = */ Origin(clientData.origin),
+                    /* rpId = */ rpId,
+                    /* challenge = */ Challenge { fromCache.challenge.encodeToByteArray() }
                 ),
-                true,
+                /* pubKeyCredParams = */
+                fromCache.allowedAlgorithms.map {
+                    PublicKeyCredentialParameters(
+                        PublicKeyCredentialType.create(it.type),
+                        COSEAlgorithmIdentifier.create(it.alg.coseAlgorithmId.toLong())
+                    )
+                },
+                /* userVerificationRequired = */ fromCache.userVerification,
             )
 
             try {
@@ -308,23 +297,25 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
             }
 
             @Suppress("UNCHECKED_CAST")
-            val credential = WebAuthNCredential(
-                _id = credentials.id,
-                displayName = displayName,
-                subjectId = auth.idString,
-                subjectType = (auth.subject as Authentication.SubjectHandler<HasId<Comparable<Comparable<*>>>, Comparable<Comparable<*>>>).name,
-                residentKey = residentKeyPreference == GeneralPreference.Required,
-                authenticatorAttachment = credentials.authenticatorAttachment,
-                clientExtensionResults = credentials.clientExtensionResults,
-                attestationObject = credentials.response.attestationObject,
-                authenticatorData = credentials.response.authenticatorData,
-                clientDataJSON = credentials.response.clientDataJSON,
-                publicKey = credentials.response.publicKey,
-                publicKeyAlgorithm = credentials.response.publicKeyAlgorithm,
-                transports = credentials.response.transports,
-            )
+            modelInfo.collection().insertOne(
+                WebAuthNCredential(
+                    _id = credentials.id,
+                    displayName = displayName,
+                    subjectId = auth.idString,
+                    subjectType = (auth.subject as Authentication.SubjectHandler<HasId<Comparable<Comparable<*>>>, Comparable<Comparable<*>>>).name,
+                    residentKey = when (fromCache.residentKeyPreference) {
+                        WebAuthN.GeneralPreference.Discouraged -> false
+                        WebAuthN.GeneralPreference.Preferred -> {
+                            credentials.clientExtensionResults?.credProps?.rk == true
+                        }
 
-            modelInfo.collection().insertOne(credential)
+                        WebAuthN.GeneralPreference.Required -> true
+                    },
+                    authenticatorAttachment = credentials.authenticatorAttachment,
+                    attestationObject = credentials.response.attestationObject,
+                    transports = credentials.response.transports.map { it.standardName },
+                )
+            )
             Unit
         }
     )
@@ -341,31 +332,42 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
         errorCases = listOf(),
         examples = listOf(),
         successCode = HttpStatus.OK,
-        implementation = { (subjectId, subjectType): WebAuthNStart ->
+        implementation = { (subjectId, subjectType): WebAuthN.Authentication.StartRequest ->
 
-            val challengeAndKey = establishChallenge()
 
-            val (existingCreds:List<ExistingCredential>, subject:USER?) = subjectId?.let { id ->
+            val (existingCreds: List<WebAuthN.ExistingCredential>, subject: USER?) = subjectId?.let { id ->
                 subjectType?.let { type ->
-                    val creds = userCredentials(subjectId = id, subjectType = type)
                     @Suppress("UNCHECKED_CAST")
                     val subject = Authentication.subjects.values.find { it.name == type }
                         ?.findUser("_id", id) as? USER
 
+                    val creds = userCredentials(subjectId = id, subjectType = type)
+
+
                     creds to subject
                 }
             }
-                ?: (emptyList<ExistingCredential>() to null)
+                ?: (emptyList<WebAuthN.ExistingCredential>() to null)
 
 
             @Suppress("UNCHECKED_CAST")
             val options = proveOptions(subject)
 
-            WebAuthNStartResponse(
-                challengeId = challengeAndKey.key,
-                options = PublicKeyCredentialRequestOptions(
+            val challenge = generate()
+            val key = UUID.random().toString()
+            cache().set(
+                key = challengeCacheKey(key),
+                value = AuthenticationCache(
+                    challenge = challenge,
+                    userVerification = options.userVerification == WebAuthN.GeneralPreference.Required
+                )
+            )
+
+            WebAuthN.Authentication.StartResponse(
+                challengeId = key,
+                options = WebAuthN.Authentication.PublicKeyCredentialRequestOptions(
                     allowCredentials = existingCreds,
-                    challenge = challengeAndKey.challenge,
+                    challenge = challenge,
                     extensions = options.extensions,
                     hints = options.hints,
                     rpId = rpId,
@@ -386,48 +388,55 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
         errorCases = listOf(),
         examples = listOf(),
         successCode = HttpStatus.OK,
-        implementation = { (challengeId, credentials): WebAuthNProve ->
+        implementation = { (challengeId, credentials): WebAuthN.Authentication.ProveRequest ->
 
-            val clientData = Serialization.json.decodeFromString<ClientData>(
+            val clientData = Serialization.json.decodeFromString<WebAuthN.ClientData>(
                 Base64.decode(credentials.response.clientDataJSON).decodeToString()
             )
-            val challengeFromCache =
-                assert(challengeId, Base64.WebAuthNDecoder.decode(clientData.challenge).decodeToString())
+
+            val cacheKey = challengeCacheKey(challengeId)
+            val fromCache = cache().get<AuthenticationCache>(cacheKey)
+                ?: throw BadRequestException("No Challenge available")
+            cache().remove(cacheKey)
+
+            if (fromCache.challenge != WebAuthN.base64Decoder.decode(clientData.challenge).decodeToString())
+                throw BadRequestException("No Challenge available")
 
             val publicKeyCredential: WebAuthNCredential = modelInfo.collection()
                 .find(condition { it._id.eq(credentials.id) and active })
                 .firstOrNull()
                 ?: throw ForbiddenException("Invalid Credential ID")
 
-            val manager = WebAuthnManager.createNonStrictWebAuthnManager()
 
             val authRequest = AuthenticationRequest(
-                Base64.WebAuthNDecoder.decode(credentials.id),
-                Base64.WebAuthNDecoder.decode(credentials.response.authenticatorData),
-                Base64.WebAuthNDecoder.decode(credentials.response.clientDataJSON),
-                Base64.WebAuthNDecoder.decode(credentials.response.signature),
+                WebAuthN.base64Decoder.decode(credentials.id),
+                WebAuthN.base64Decoder.decode(credentials.response.authenticatorData),
+                WebAuthN.base64Decoder.decode(credentials.response.clientDataJSON),
+                WebAuthN.base64Decoder.decode(credentials.response.signature),
             )
 
             val attestation =
                 AttestationObjectConverter(ObjectConverter()).convert(publicKeyCredential.attestationObject)!!
 
+
             val authParams = AuthenticationParameters(
                 ServerProperty(
                     /* origin = */ Origin(clientData.origin),
-                    /* rpId = */ rpId ?: "",
-                    /* challenge = */ Challenge { challengeFromCache.encodeToByteArray() }),
+                    /* rpId = */ rpId,
+                    /* challenge = */ Challenge { fromCache.challenge.encodeToByteArray() }
+                ),
                 AuthenticatorImpl(
                     attestation.authenticatorData.attestedCredentialData!!,
                     attestation.attestationStatement,
                     attestation.authenticatorData.signCount
                 ),
-                false
+                fromCache.userVerification,
             )
 
             try {
-                manager.validate(
-                    authRequest,
-                    authParams
+                WebAuthnManager.createNonStrictWebAuthnManager().verify(
+                    /* authenticationRequest = */ authRequest,
+                    /* authenticationParameters = */ authParams
                 )
             } catch (e: VerificationException) {
                 e.printStackTrace()
