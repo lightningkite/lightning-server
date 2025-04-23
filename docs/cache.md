@@ -2,9 +2,21 @@
 
 **OUT OF DATE**
 
+### What is a Cache
+
+A cache is a high speed storage server. Much like a database, but much simpler, and hopefully faster.
+
+### Why is it necessary
 When building servers, it is frequently necessary to keep some information on hand that is shared between every instance.
 
-That's where the cache comes in.  It uses `kotlinx.serialization` to serialize values in and out of the cache, which could be local, Memcached, Redis, or DynamoDB.
+That's where the cache comes in.  It uses `kotlinx.serialization` to serialize values in and out of the cache, which 
+could be local, Memcached, Redis, or DynamoDB.
+
+### Example Need for a Cache
+An example in Lightning Server is with the Pin-Based authentication. We must
+store the pin and the key between the start and prove requests. These values are short lived but cannot be stored in the
+server process, so they go out to the cache. With the values in the cache the prove request can land on any instance of
+the server and the data will be available for validating.
 
 ## Declaring the need for a cache
 
@@ -43,7 +55,10 @@ TODO: Document further
 
 ### Local
 
-Simply use RAM as the cache.  Will only work if there is strictly one instance of the server, so practically speaking it's useful for testing only.
+Simply use RAM as the cache in the server process. There will be no external connections made. Will only work if there 
+is strictly one instance of the server. The moment you have multiple instances you MUST use another option for a Cache 
+or requests may not behave as expected. This is used most often for local development and unit tests. Because this cache
+just uses the ram of the process itself, if you restart your server your cache will be emptied.
 
 ```json5
 // settings.json
@@ -57,7 +72,7 @@ Simply use RAM as the cache.  Will only work if there is strictly one instance o
 ```kotlin
 // Server.kt
 object Server: ServerPathGroup(ServerPath.root) {
-    // Adds MongoDB to the possible database loaders
+    // Adds DynamoDbCache to the possible database loaders
     init { DynamoDbCache }
 }
 ```
@@ -74,7 +89,7 @@ object Server: ServerPathGroup(ServerPath.root) {
 ```kotlin
 // Server.kt
 object Server: ServerPathGroup(ServerPath.root) {
-    // Adds MongoDB to the possible database loaders
+    // Adds RedisCache to the possible database loaders
     init { RedisCache }
 }
 ```
@@ -92,7 +107,6 @@ object Server: ServerPathGroup(ServerPath.root) {
 ```json5
 // settings.json
 {
-  // Standard redis connection string
   "cache": { "url": "redis-test" }
 }
 ```
@@ -102,7 +116,7 @@ object Server: ServerPathGroup(ServerPath.root) {
 ```kotlin
 // Server.kt
 object Server: ServerPathGroup(ServerPath.root) {
-    // Adds MongoDB to the possible database loaders
+    // Adds MemcachedCache to the possible database loaders
     init { MemcachedCache }
 }
 ```
@@ -110,7 +124,6 @@ object Server: ServerPathGroup(ServerPath.root) {
 ```json5
 // settings.json
 {
-  // Standard redis connection string
   "cache": { "url": "memcached://host:port" }
 }
 ```
@@ -120,7 +133,6 @@ object Server: ServerPathGroup(ServerPath.root) {
 ```json5
 // settings.json
 {
-  // Standard redis connection string
   "cache": { "url": "memcached-test" }
 }
 ```
