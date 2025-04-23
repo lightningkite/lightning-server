@@ -9,7 +9,8 @@ A cache is a high speed storage server. Much like a database, but much simpler, 
 ### Why is it necessary
 When building servers, it is frequently necessary to keep some information on hand that is shared between every instance.
 
-That's where the cache comes in.  It uses `kotlinx.serialization` to serialize values in and out of the cache, which could be local, Memcached, Redis, or DynamoDB.
+That's where the cache comes in.  It uses `kotlinx.serialization` to serialize values in and out of the cache, which 
+could be local, Memcached, Redis, or DynamoDB.
 
 ### Example Need for a Cache
 An example in Lightning Server is with the Pin-Based authentication. We must
@@ -56,7 +57,8 @@ TODO: Document further
 
 Simply use RAM as the cache in the server process. There will be no external connections made. Will only work if there 
 is strictly one instance of the server. The moment you have multiple instances you MUST use another option for a Cache 
-or requests may not behave as expected. This is used most often for local development and unit tests.
+or requests may not behave as expected. This is used most often for local development and unit tests. Because this cache
+just uses the ram of the process itself, if you restart your server your cache will be emptied.
 
 ```json5
 // settings.json

@@ -143,13 +143,15 @@ plugins {
 }
 
 application {
-    mainClass.set("com.lightningserver.MainKt") // Your package goes here
+    mainClass.set("com.example.server.MainKt") // Your package goes here
 }
 ```
 
-Once you have added these, there will be new gradle group called distribution. All the options will compile and produce
-the project and dependency jars, and a script to run the server. Most often you will use the compressed options which
-allow quick transferring to the proper machine.
+Once you have added these, there will be new gradle task group called distribution. All the options will compile and 
+produce the project and dependency jars, and a script to run the server. Most often you will use the compressed options 
+which allow quick transferring to the proper machine.
+
+If you run distZip you will find the output in `build/distribution/<file-name-here>.zip`
 
 
 ### Running Your Distribution File
