@@ -41,7 +41,7 @@ object DefaultDecoder : Decoder {
     }
 
     override var serializersModule: SerializersModule = ClientModule
-    val json by lazy { Json { serializersModule = DefaultDecoder.serializersModule } }
+    val json by lazy { Json { serializersModule = DefaultDecoder.serializersModule; encodeDefaults = true } }
     override fun decodeBoolean() = false
     override fun decodeByte() = 0.toByte()
     override fun decodeChar() = ' '
