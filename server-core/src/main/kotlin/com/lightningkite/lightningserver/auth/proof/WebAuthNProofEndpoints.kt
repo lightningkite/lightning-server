@@ -77,8 +77,8 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
     val expiration: Duration = 5.minutes,
     val rpId: String,
     val authOptions: AuthOptions<USER>,
-    val registrationForUser: (USER) -> WebAuthN.Registration.RegistrationOptions,
-    val proveOptions: (USER?) -> WebAuthN.Authentication.ProveOptions,
+    val registrationForUser: (USER, WebAuthN.GeneralPreference) -> WebAuthN.Registration.RegistrationOptions,
+    val proveOptions: (USER?) -> WebAuthN.Authentication.ProveOptions = { WebAuthN.Authentication.ProveOptions() },
 ) : ServerPathGroup(path), ProofMethod {
 
     init {
@@ -152,6 +152,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
     data class AuthenticationCache(
         val challenge: String,
         val userVerification: Boolean,
+        val subjectType: String,
     )
 
     @OptIn(ExperimentalEncodingApi::class)
@@ -188,7 +189,6 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
             }
             .toList()
 
-    @Suppress("UNCHECKED_CAST")
     @OptIn(ExperimentalEncodingApi::class)
     val registerStart = path("register-start").post.api(
         belongsToInterface = registerInterface,
@@ -200,7 +200,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
         successCode = HttpStatus.OK,
         implementation = { residentKeyPreference: WebAuthN.GeneralPreference ->
 
-            val options = registrationForUser(auth.get() as USER)
+            val options = registrationForUser(auth.get(), residentKeyPreference)
 
             val challenge = generate()
             val key = UUID.random().toString()
@@ -334,18 +334,17 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
         successCode = HttpStatus.OK,
         implementation = { (subjectId, subjectType): WebAuthN.Authentication.StartRequest ->
 
+            val handler = Authentication.subjects.values.find { it.name == subjectType }
+            if (handler == null)
+                throw BadRequestException("Invalid Subject Type")
 
             val (existingCreds: List<WebAuthN.ExistingCredential>, subject: USER?) = subjectId?.let { id ->
-                subjectType?.let { type ->
-                    @Suppress("UNCHECKED_CAST")
-                    val subject = Authentication.subjects.values.find { it.name == type }
-                        ?.findUser("_id", id) as? USER
+                @Suppress("UNCHECKED_CAST")
+                val subject = handler.findUser("${subjectType}/_id", id) as? USER
 
-                    val creds = userCredentials(subjectId = id, subjectType = type)
+                val creds = userCredentials(subjectId = id, subjectType = subjectType)
 
-
-                    creds to subject
-                }
+                creds to subject
             }
                 ?: (emptyList<WebAuthN.ExistingCredential>() to null)
 
@@ -359,7 +358,8 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
                 key = challengeCacheKey(key),
                 value = AuthenticationCache(
                     challenge = challenge,
-                    userVerification = options.userVerification == WebAuthN.GeneralPreference.Required
+                    userVerification = options.userVerification == WebAuthN.GeneralPreference.Required,
+                    subjectType = subjectType,
                 )
             )
 
@@ -407,7 +407,6 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
                 .firstOrNull()
                 ?: throw ForbiddenException("Invalid Credential ID")
 
-
             val authRequest = AuthenticationRequest(
                 WebAuthN.base64Decoder.decode(credentials.id),
                 WebAuthN.base64Decoder.decode(credentials.response.authenticatorData),
@@ -433,7 +432,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
                 fromCache.userVerification,
             )
 
-            try {
+            val authData = try {
                 WebAuthnManager.createNonStrictWebAuthnManager().verify(
                     /* authenticationRequest = */ authRequest,
                     /* authenticationParameters = */ authParams
@@ -449,8 +448,8 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
             )
 
             proofHasher().makeProof(
-                info = info,
-                property = "_id",
+                info = if (authData.authenticatorData?.isFlagUV == true) info.copy(strength = 20) else info,
+                property = "${fromCache.subjectType}/_id",
                 value = publicKeyCredential.subjectId,
                 at = now()
             )

@@ -274,7 +274,12 @@ object WebAuthN {
             val authenticatorSelection: AuthenticatorSelectionOptions = AuthenticatorSelectionOptions(),
             val extensions: CreateExtensions = CreateExtensions(),
             val hints: List<Hints> = emptyList(),
-            val pubKeyCredParams: List<PublicKeyCredentialParameters>,
+            val pubKeyCredParams: List<PublicKeyCredentialParameters> = listOf(
+                PublicKeyCredentialParameters(PublicKeyAlgorithm.EdDSA),
+                PublicKeyCredentialParameters(PublicKeyAlgorithm.ES256),
+                PublicKeyCredentialParameters(PublicKeyAlgorithm.RS256),
+                PublicKeyCredentialParameters(PublicKeyAlgorithm.PS256),
+            ),
             val user: PublicKeyCredentialUserEntity,
         )
 
@@ -390,7 +395,7 @@ object WebAuthN {
         @Serializable
         data class StartRequest(
             val subjectId: String?,
-            val subjectType: String?,
+            val subjectType: String,
         )
 
         data class ProveOptions(
