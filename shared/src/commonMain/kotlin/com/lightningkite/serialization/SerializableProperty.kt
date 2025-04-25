@@ -51,7 +51,7 @@ fun <T, S: KSerializer<T>> S.properties(action: (Array<KSerializer<Nothing>>)->A
 //object UUID_mostSignificantBits: SerializableProperty<UUID, Long> {
 //    override val name: String = "mostSignificantBits"
 //    override fun get(receiver: UUID): Long = receiver.mostSignificantBits
-//    override fun setCopy(receiver: UUID, value: Long): UUID = UUID(value, receiver.leastSignificantBits)
+//    override fun setCopy(receiver: UUID, value: Long): UUID = Uuid.fromLongs(value, receiver.leastSignificantBits)
 //    override val serializer: KSerializer<Long> = Long.serializer()
 //}
 //

@@ -1,15 +1,15 @@
 package com.lightningkite.lightningserver
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.HasId
 import com.lightningkite.lightningserver.files.ServerFile
-import com.lightningkite.lightningdb.collection
-import com.lightningkite.lightningdb.condition
-import com.lightningkite.lightningdb.eq
-import com.lightningkite.lightningdb.findOne
-import com.lightningkite.lightningdb.get
-import com.lightningkite.lightningdb.insertOne
-import com.lightningkite.lightningdb.test.*
+import com.lightningkite.lightningserver.db.collection
+import com.lightningkite.lightningserver.db.condition
+import com.lightningkite.lightningserver.db.eq
+import com.lightningkite.lightningserver.db.findOne
+import com.lightningkite.lightningserver.db.get
+import com.lightningkite.lightningserver.db.insertOne
+import com.lightningkite.lightningserver.db.test.*
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.AuthType
 import com.lightningkite.lightningserver.auth.Authentication
@@ -60,7 +60,7 @@ import com.lightningkite.lightningserver.typed.TypedServerPath1
 import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.lightningserver.typed.arg
 import com.lightningkite.lightningserver.typed.bulkRequestEndpoint
-import com.lightningkite.prepareModelsServerCore
+import com.lightningkite.lightningserver.prepareModelsServerCore
 import com.lightningkite.prepareModelsShared
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.DelicateCoroutinesApi

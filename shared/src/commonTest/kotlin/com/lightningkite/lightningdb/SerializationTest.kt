@@ -1,9 +1,9 @@
 @file:OptIn(ExperimentalSerializationApi::class)
 
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
 import com.lightningkite.*
-import com.lightningkite.lightningdb.testing.*
+import com.lightningkite.lightningserver.db.testing.*
 import com.lightningkite.lightningserver.monitoring.FunnelSummary
 import com.lightningkite.serialization.ClientModule
 import com.lightningkite.serialization.*

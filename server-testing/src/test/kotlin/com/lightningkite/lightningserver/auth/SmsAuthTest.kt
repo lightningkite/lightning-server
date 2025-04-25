@@ -1,8 +1,8 @@
-package com.lightningkite.lightningdb.test.com.lightningkite.lightningserver.auth
+package com.lightningkite.lightningserver.db.test.com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningdb.collection
+import com.lightningkite.lightningserver.db.collection
 import com.lightningkite.lightningserver.TestSettings
-import com.lightningkite.lightningdb.test.User
+import com.lightningkite.lightningserver.db.test.User
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.old.*
 import com.lightningkite.lightningserver.auth.old.BaseAuthEndpoints

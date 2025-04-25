@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.meta
 
-import com.lightningkite.lightningdb.Database
+import com.lightningkite.lightningserver.db.Database
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.cache.LocalCache

@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.metrics
 
-import com.lightningkite.lightningdb.condition
-import com.lightningkite.lightningdb.eq
+import com.lightningkite.lightningserver.db.condition
+import com.lightningkite.lightningserver.db.eq
 import com.lightningkite.lightningserver.aws.AwsConnections
 import com.lightningkite.lightningserver.files.S3FileSystem
 import com.lightningkite.lightningserver.serverhealth.HealthStatus

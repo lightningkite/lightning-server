@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.files
 
-import com.lightningkite.lightningdb.Description
+import com.lightningkite.lightningserver.db.Description
 import kotlin.jvm.JvmInline
 
 @JvmInline

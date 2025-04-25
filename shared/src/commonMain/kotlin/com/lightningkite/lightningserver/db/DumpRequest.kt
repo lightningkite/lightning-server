@@ -3,7 +3,7 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.Condition
+import com.lightningkite.lightningserver.db.Condition
 import com.lightningkite.lightningserver.files.ServerFile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization

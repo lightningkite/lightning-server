@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.exceptions
 
-import com.lightningkite.lightningdb.Database
+import com.lightningkite.lightningserver.db.Database
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.settings.Pluggable
 import com.lightningkite.lightningserver.settings.Settings

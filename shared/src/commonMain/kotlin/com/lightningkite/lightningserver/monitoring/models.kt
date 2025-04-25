@@ -2,7 +2,7 @@
 package com.lightningkite.lightningserver.monitoring
 
 import com.lightningkite.EmailAddress
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.now
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization

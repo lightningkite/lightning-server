@@ -1,6 +1,6 @@
 //package com.lightningkite.lightningserver.auth
 //
-//import com.lightningkite.lightningdb.HasId
+//import com.lightningkite.lightningserver.db.HasId
 //
 //
 //data class AuthOp0<R>(val options: AuthOptions, val x: suspend (auth: RequestAuth<*>) -> R)

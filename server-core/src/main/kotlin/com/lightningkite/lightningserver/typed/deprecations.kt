@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.HasId
 
 
 @Deprecated("REEE")

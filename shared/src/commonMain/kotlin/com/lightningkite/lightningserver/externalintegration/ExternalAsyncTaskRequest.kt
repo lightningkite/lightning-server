@@ -2,10 +2,10 @@
 
 package com.lightningkite.lightningserver.externalintegration
 
-import com.lightningkite.lightningdb.AdminTableColumns
-import com.lightningkite.lightningdb.GenerateDataClassPaths
-import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.Index
+import com.lightningkite.lightningserver.db.AdminTableColumns
+import com.lightningkite.lightningserver.db.GenerateDataClassPaths
+import com.lightningkite.lightningserver.db.HasId
+import com.lightningkite.lightningserver.db.Index
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization

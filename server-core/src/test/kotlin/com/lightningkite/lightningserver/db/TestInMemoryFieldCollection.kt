@@ -1,10 +1,10 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.prepareModelsServerCore
-import com.lightningkite.lightningdb.InMemoryFieldCollection
-import com.lightningkite.lightningdb.UniqueViolationException
-import com.lightningkite.lightningdb.collection
-import com.lightningkite.lightningdb.insertOne
+import com.lightningkite.lightningserver.prepareModelsServerCore
+import com.lightningkite.lightningserver.db.InMemoryFieldCollection
+import com.lightningkite.lightningserver.db.UniqueViolationException
+import com.lightningkite.lightningserver.db.collection
+import com.lightningkite.lightningserver.db.insertOne
 import com.lightningkite.lightningserver.prepareModelsServerCoreTest
 import com.lightningkite.lightningserver.testmodels.*
 import com.lightningkite.prepareModelsShared

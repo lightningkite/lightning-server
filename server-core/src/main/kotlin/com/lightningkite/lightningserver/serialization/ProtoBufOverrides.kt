@@ -30,11 +30,11 @@ object UUIDByteArraySerializer : KSerializer<UUID> {
     override val descriptor: SerialDescriptor = SerialDescriptor("com.lightningkite.UUID", defer.descriptor)
 
     override fun deserialize(decoder: Decoder): UUID {
-        return UUID.parse(decoder.decodeSerializableValue(defer))
+        return UUID.fromByteArray(decoder.decodeSerializableValue(defer))
     }
 
     override fun serialize(encoder: Encoder, value: UUID) {
-        encoder.encodeSerializableValue(defer, value.toBytes())
+        encoder.encodeSerializableValue(defer, value.toByteArray())
     }
 }
 

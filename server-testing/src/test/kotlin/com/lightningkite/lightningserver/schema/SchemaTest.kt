@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.schema
 
-import com.lightningkite.lightningdb.test.LargeTestModel
+import com.lightningkite.lightningserver.db.test.LargeTestModel
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.jsonschema.schema
 import com.lightningkite.lightningserver.serialization.Serialization
@@ -15,6 +15,6 @@ class SchemaTest {
     @Test fun nestedEnum() {
         TestSettings
         println(lightningServerKSchema.enums)
-        assertContains(lightningServerKSchema.enums.keys, "com.lightningkite.lightningdb.test.TestEnum")
+        assertContains(lightningServerKSchema.enums.keys, "com.lightningkite.lightningserver.db.test.TestEnum")
     }
 }

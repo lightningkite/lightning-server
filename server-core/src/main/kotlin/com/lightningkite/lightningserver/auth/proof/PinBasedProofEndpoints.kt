@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.auth.proof
 
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.HasId
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.noAuth
 import com.lightningkite.lightningserver.core.ServerPath

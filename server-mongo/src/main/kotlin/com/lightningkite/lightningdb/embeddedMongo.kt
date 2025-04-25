@@ -1,4 +1,4 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings

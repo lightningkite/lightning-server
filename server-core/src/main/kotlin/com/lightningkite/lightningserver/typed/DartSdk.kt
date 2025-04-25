@@ -2,7 +2,7 @@
 
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningdb.MySealedClassSerializer
+import com.lightningkite.lightningserver.db.MySealedClassSerializer
 import com.lightningkite.lightningserver.camelCase
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.HttpMethod

@@ -2,7 +2,7 @@
 
 package com.lightningkite.lightningserver.metrics
 
-import com.lightningkite.lightningdb.Database
+import com.lightningkite.lightningserver.db.Database
 import com.lightningkite.lightningserver.db.DatabaseSettings
 import com.lightningkite.lightningserver.serverhealth.HealthStatus
 import com.lightningkite.lightningserver.settings.Pluggable

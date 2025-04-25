@@ -1,7 +1,7 @@
 @file:UseContextualSerialization(ServerFile::class)
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
 import com.lightningkite.kotlinx.serialization.csv.*
 import com.lightningkite.lightningserver.auth.*

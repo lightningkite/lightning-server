@@ -1,9 +1,9 @@
 package com.lightningkite.lightningserver.files
 
 import com.lightningkite.default
-import com.lightningkite.lightningdb.Condition
-import com.lightningkite.lightningdb.all
-import com.lightningkite.lightningdb.collection
+import com.lightningkite.lightningserver.db.Condition
+import com.lightningkite.lightningserver.db.all
+import com.lightningkite.lightningserver.db.collection
 import com.lightningkite.now
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant

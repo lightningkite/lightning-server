@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.auth.token
 
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.HasId
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.encryption.Encryptor
 import com.lightningkite.lightningserver.encryption.TokenException

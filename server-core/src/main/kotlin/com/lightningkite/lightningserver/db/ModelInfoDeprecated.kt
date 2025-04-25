@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.serialization.Serialization

@@ -1,7 +1,7 @@
 package com.lightningkite.validation
 
 import com.lightningkite.IsRawString
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer

@@ -3,7 +3,7 @@
 package com.lightningkite.lightningserver.serverhealth
 
 
-import com.lightningkite.lightningdb.GenerateDataClassPaths
+import com.lightningkite.lightningserver.db.GenerateDataClassPaths
 import kotlinx.datetime.Clock
 import com.lightningkite.now
 import kotlinx.serialization.Serializable

@@ -1,4 +1,4 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
 import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getClassDeclarationByName
@@ -16,7 +16,7 @@ lateinit var comparable: KSClassDeclaration
 class TableGenerator(
     val codeGenerator: CodeGenerator,
     val logger: KSPLogger,
-) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 27) {
+) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 55) {
     fun KSClassDeclaration.isSerializable(): Boolean = this.annotation("Serializable", "kotlinx.serialization") != null
     fun KSClassDeclaration.isPlainSerializable(): Boolean =
         this.annotation("Serializable", "kotlinx.serialization")?.let {

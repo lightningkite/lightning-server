@@ -2,7 +2,7 @@
 package com.lightningkite.lightningserver.auth.subject
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.References
+import com.lightningkite.lightningserver.db.References
 import com.lightningkite.lightningserver.auth.oauth.OauthClient
 import com.lightningkite.now
 import kotlinx.datetime.Instant

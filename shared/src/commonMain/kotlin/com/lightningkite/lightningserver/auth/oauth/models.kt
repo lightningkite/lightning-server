@@ -2,8 +2,8 @@
 package com.lightningkite.lightningserver.auth.oauth
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.GenerateDataClassPaths
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.GenerateDataClassPaths
+import com.lightningkite.lightningserver.db.HasId
 import com.lightningkite.lightningserver.files.ServerFile
 import com.lightningkite.now
 import com.lightningkite.uuid

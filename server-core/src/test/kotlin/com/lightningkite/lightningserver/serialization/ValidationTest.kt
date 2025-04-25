@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.serialization
 
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import kotlinx.coroutines.runBlocking

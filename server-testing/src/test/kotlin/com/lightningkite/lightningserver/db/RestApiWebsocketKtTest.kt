@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
-import com.lightningkite.lightningdb.test.*
+import com.lightningkite.lightningserver.db.test.*
 import org.junit.Test
 import kotlin.test.assertEquals
 

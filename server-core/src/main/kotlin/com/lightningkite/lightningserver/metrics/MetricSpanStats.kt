@@ -2,7 +2,7 @@
 
 package com.lightningkite.lightningserver.metrics
 
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization

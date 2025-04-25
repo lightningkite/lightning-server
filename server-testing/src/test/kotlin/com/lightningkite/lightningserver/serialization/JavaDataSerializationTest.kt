@@ -1,9 +1,9 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.*
-import com.lightningkite.lightningdb.test.*
-import com.lightningkite.prepareModelsServerCore
+import com.lightningkite.lightningserver.db.*
+import com.lightningkite.lightningserver.db.test.*
+import com.lightningkite.lightningserver.prepareModelsServerCore
 import com.lightningkite.prepareModelsShared
 import com.lightningkite.serialization.contextualSerializerIfHandled
 import com.lightningkite.serialization.notNull

@@ -1,4 +1,4 @@
-package com.lightningkite.lightningdb.testing
+package com.lightningkite.lightningserver.db.testing
 
 import com.lightningkite.*
 import com.lightningkite.serialization.*

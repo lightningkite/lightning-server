@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningdb.Description
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.Description
+import com.lightningkite.lightningserver.db.HasId
 import kotlin.time.Duration
 import kotlin.reflect.typeOf
 import kotlin.time.Duration.Companion.minutes

@@ -1,6 +1,6 @@
 package com.lightningkite
 
-import com.lightningkite.lightningdb.GenerateDataClassPaths
+import com.lightningkite.lightningserver.db.GenerateDataClassPaths
 import com.lightningkite.serialization.innerElement
 import com.lightningkite.serialization.serializableProperties
 import com.lightningkite.serialization.tryChildSerializers

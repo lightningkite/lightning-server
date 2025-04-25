@@ -1,60 +1,78 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
+import com.google.devtools.ksp.containingFile
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFile
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.KSValueParameter
-import org.jetbrains.kotlin.psi.KtFile
+import java.io.File
+
+private var lastFile: File? = null
+private var lastText: String? = null
+private fun File.cachedReadText(): String {
+    if(lastFile == this) return lastText!!
+    lastText = readText()
+    lastFile = this
+    return lastText!!
+}
 
 val KSTypeReference.isMarkedNullable: Boolean get() {
-    return hack(this)
+    return resolve().isMarkedNullable
 }
 
-private val hack: (KSTypeReference)->Boolean by lazy {
-    val kClass = Class.forName("com.google.devtools.ksp.symbol.impl.kotlin.KSTypeReferenceImpl")
-    val getTypeReference = kClass.getMethod("getKtTypeReference")
-    val kClass2 = Class.forName("org.jetbrains.kotlin.psi.KtTypeReference")
-    val getTypeElement = kClass2.getMethod("getTypeElement")
-    val correctType = Class.forName("org.jetbrains.kotlin.psi.KtNullableType")
-    return@lazy {
-        kClass.isInstance(it) && correctType.isInstance(getTypeElement(getTypeReference(it)))
+val KSFile.imports: List<String>
+    get() {
+        return File(this.filePath).cachedReadText().lines().mapNotNull {
+            it.trim().takeIf { it.startsWith("import ") }?.substringAfter("import ")
+        }.toList()
+    }
+
+private operator fun Any?.get(key: String): Any? {
+    return try {
+        this!!::class.java.getDeclaredField(key).also { it.isAccessible = true }.get(this)
+    } catch(e: Exception) {
+        throw Exception("${this!!::class} looking for $key, but only ${this!!::class.java.declaredFields.joinToString { it.name }} exist")
     }
 }
-
-val KSFile.ktFile: KtFile?
-    get() = hack2(this)
-
-private val hack2: (KSFile)->KtFile? by lazy {
-    val kClass = Class.forName("com.google.devtools.ksp.symbol.impl.kotlin.KSFileImpl")
-    val getTypeReference = kClass.getMethod("getFile")
-    return@lazy {
-        if (kClass.isInstance(it)) getTypeReference.invoke(it) as KtFile else null
+private operator fun Any?.invoke(key: String): Any? {
+    return try {
+        this!!::class.java.getDeclaredMethod(key).also { it.isAccessible = true }.invoke(this)
+    } catch(e: Exception) {
+        throw Exception("${this!!::class} looking for $key, but only ${this!!::class.java.declaredMethods.joinToString { it.name }} exist")
     }
 }
 
 val KSValueParameter.defaultText: String?
-    get() = hack3(this)
-
-private val hack3: (KSValueParameter)->String? by lazy {
-    try {
-        val jclass = Class.forName("com.google.devtools.ksp.symbol.impl.kotlin.KSValueParameterImpl")
-        val getKtParameter = jclass.getMethod("getKtParameter")
-        val jclass2 = Class.forName("org.jetbrains.kotlin.psi.KtParameter")
-        val getDefaultValue = jclass2.getMethod("getDefaultValue")
-        val jclass3 = Class.forName("org.jetbrains.kotlin.psi.KtExpression")
-        val getText = jclass3.getMethod("getText")
-        return@lazy out@{
-            try {
-                if (!it.hasDefault) return@out null
-                val x = if (jclass.isInstance(it)) getKtParameter(it) else return@out null
-                val y = if (jclass2.isInstance(x)) getDefaultValue(x) else return@out null
-                val z = if (jclass3.isInstance(y)) getText(y) else return@out null
-                z as? String
-            } catch(e: Exception) {
-                "/* ${e.stackTraceToString()} */"
-            }
+    get() {
+        try {
+            val c = (this.parent as KSFunctionDeclaration).parent as KSClassDeclaration
+            return File(this.containingFile!!.filePath).cachedReadText()
+                .fileDefaultTextForValr(c.simpleName.asString(), name!!.asString())
+        } catch(e: Exception) {
+            return "/*" + e.stackTraceToString() + "*/"
         }
-    } catch(e: Exception) {
-//        throw Exception("Failed to create hack3", e)
-        return@lazy { "/* Failed to create hack3: ${e.stackTraceToString()} */" }
     }
+
+fun String.fileDefaultTextForValr(classname: String, name: String): String? {
+    val classnameRegex = Regex("class +$classname")
+    val start = classnameRegex.find(this)?.range?.last ?: return null
+    val regex = Regex("va[lr] +${name}")
+    val text = this
+    val find = regex.find(text, start) ?: return null
+    val end = text.unwrappedComma(find.range.last)
+    return text.substring(find.range.last, end).substringAfter('=', "").trim().takeUnless { it.isBlank() }
+}
+
+fun String.unwrappedComma(start: Int): Int {
+    var level = 0
+    for(index in start..<length) {
+        when(this[index]) {
+            ',' -> if(level == 0) return index
+            '>' -> if(this[index - 1] != '-') level--
+            '{', '<', '(' -> level++
+            '}', ')' -> if(--level < 0) return index
+        }
+    }
+    return length
 }

@@ -33,13 +33,15 @@ object UUIDPartsSerializer: KSerializer<UUID> {
             }
         }
         s.endStructure(descriptor)
-        return UUID(m, l)
+        return UUID.fromLongs(m, l)
     }
 
     override fun serialize(encoder: Encoder, value: UUID) {
         val s = encoder.beginStructure(descriptor)
-        s.encodeLongElement(descriptor, 0, value.mostSignificantBits.toLong())
-        s.encodeLongElement(descriptor, 1, value.leastSignificantBits.toLong())
+        value.toLongs { m, l ->
+            s.encodeLongElement(descriptor, 0, m)
+            s.encodeLongElement(descriptor, 1, l)
+        }
         s.endStructure(descriptor)
     }
 }

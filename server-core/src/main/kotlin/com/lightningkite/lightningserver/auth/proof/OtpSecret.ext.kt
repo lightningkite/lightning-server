@@ -3,7 +3,7 @@
 
 package com.lightningkite.lightningserver.auth.proof
 
-import com.lightningkite.lightningdb.ExperimentalLightningServer
+import com.lightningkite.lightningserver.db.ExperimentalLightningServer
 import com.lightningkite.lightningserver.encryption.SecureHasher
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.OtpAuthUriBuilder

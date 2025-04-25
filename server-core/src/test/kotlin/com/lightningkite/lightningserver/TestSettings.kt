@@ -1,8 +1,8 @@
 @file:UseContextualSerialization(UUID::class)
 package com.lightningkite.lightningserver
 
-import com.lightningkite.prepareModelsServerCore
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.prepareModelsServerCore
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.oauth.OauthClientEndpoints

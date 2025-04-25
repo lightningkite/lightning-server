@@ -1,10 +1,10 @@
 package com.lightningkite.lightningserver.serialization
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.Condition
-import com.lightningkite.lightningdb.GenerateDataClassPaths
-import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.Mask
+import com.lightningkite.lightningserver.db.Condition
+import com.lightningkite.lightningserver.db.GenerateDataClassPaths
+import com.lightningkite.lightningserver.db.HasId
+import com.lightningkite.lightningserver.db.Mask
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.auth.RequestAuthSerializable
 import com.lightningkite.lightningserver.core.ServerPath

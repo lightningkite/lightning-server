@@ -1,7 +1,7 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.testing.*
+import com.lightningkite.lightningserver.db.testing.*
 import com.lightningkite.prepareModelsShared
 import com.lightningkite.prepareModelsSharedTest
 import com.lightningkite.serialization.ClientModule

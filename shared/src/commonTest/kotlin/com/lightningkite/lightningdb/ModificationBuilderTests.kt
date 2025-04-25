@@ -1,10 +1,10 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.testing.ClassUsedForEmbedding
-import com.lightningkite.lightningdb.testing.LargeTestModel
-import com.lightningkite.lightningdb.testing.embeddedNullable
-import com.lightningkite.lightningdb.testing.value1
-import com.lightningkite.lightningdb.testing.value2
+import com.lightningkite.lightningserver.db.testing.ClassUsedForEmbedding
+import com.lightningkite.lightningserver.db.testing.LargeTestModel
+import com.lightningkite.lightningserver.db.testing.embeddedNullable
+import com.lightningkite.lightningserver.db.testing.value1
+import com.lightningkite.lightningserver.db.testing.value2
 import com.lightningkite.prepareModelsShared
 import com.lightningkite.prepareModelsSharedTest
 import com.lightningkite.serialization.notNull

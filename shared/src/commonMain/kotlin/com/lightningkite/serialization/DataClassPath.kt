@@ -2,8 +2,8 @@
 
 package com.lightningkite.serialization
 
-import com.lightningkite.lightningdb.Condition
-import com.lightningkite.lightningdb.Modification
+import com.lightningkite.lightningserver.db.Condition
+import com.lightningkite.lightningserver.db.Modification
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable

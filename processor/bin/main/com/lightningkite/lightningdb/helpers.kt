@@ -1,4 +1,4 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
 import com.google.devtools.ksp.symbol.*
 import kotlin.math.min
@@ -16,7 +16,7 @@ fun KSTypeReference.tryResolve(): KSType? = try {
 
 val KSDeclaration.importSafeName: String
     get() = when (packageName.asString()) {
-        "kotlin", "kotlin.collection", "com.lightningkite.lightningdb", "org.jetbrains.exposed.sql" -> this.simpleName.asString()
+        "kotlin", "kotlin.collection", "com.lightningkite.lightningserver.db", "org.jetbrains.exposed.sql" -> this.simpleName.asString()
         else -> this.qualifiedName!!.asString()
     }
 
@@ -32,7 +32,7 @@ fun KSType.toKotlin(annotations: Sequence<KSAnnotation> = this.annotations): Str
         it.toString()
     }.let { if (it.isBlank()) "" else "$it " }
 
-    return if (declaration.qualifiedName!!.asString() == "com.lightningkite.lightningdb.UUIDFor") {
+    return if (declaration.qualifiedName!!.asString() == "com.lightningkite.lightningserver.db.UUIDFor") {
         "${annotationString}UUIDFor<*>"
     } else {
         annotationString + (declaration.safeLocalReference() + if (arguments.isNotEmpty() && this.declaration !is KSTypeAlias) {
@@ -43,7 +43,7 @@ fun KSType.toKotlin(annotations: Sequence<KSAnnotation> = this.annotations): Str
 
 fun List<ResolvedAnnotation>.byName(
     name: String,
-    packageName: String = "com.lightningkite.lightningdb"
+    packageName: String = "com.lightningkite.lightningserver.db"
 ): ResolvedAnnotation? = this.find {
     it.type.qualifiedName?.asString() == "$packageName.$name"
 }
@@ -61,7 +61,7 @@ fun KSAnnotation.resolve(): ResolvedAnnotation {
     )
 }
 
-fun KSAnnotated.annotation(name: String, packageName: String = "com.lightningkite.lightningdb"): KSAnnotation? {
+fun KSAnnotated.annotation(name: String, packageName: String = "com.lightningkite.lightningserver.db"): KSAnnotation? {
     return this.annotations.find {
         it.shortName.getShortName() == name &&
                 it.annotationType.resolve().declaration.qualifiedName?.asString() == "$packageName.$name"

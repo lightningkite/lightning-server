@@ -2,8 +2,8 @@
 
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningdb.Description
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.Description
+import com.lightningkite.lightningserver.db.HasId
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.ForbiddenException
 import com.lightningkite.lightningserver.exceptions.UnauthorizedException

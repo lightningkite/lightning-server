@@ -18,10 +18,10 @@ import java.util.regex.Pattern
 import kotlin.reflect.KProperty
 import kotlin.time.Duration
 import com.lightningkite.UUID
-import com.lightningkite.toJavaUuid
-import com.lightningkite.toKotlinUuid
 import org.bson.UuidRepresentation
 import org.bson.types.ObjectId
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
 val BsonOverrides = SerializersModule {
     contextual(Duration::class, DurationMsSerializer)

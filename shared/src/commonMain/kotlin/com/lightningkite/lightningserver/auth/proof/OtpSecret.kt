@@ -2,9 +2,9 @@
 package com.lightningkite.lightningserver.auth.proof
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.ExperimentalLightningServer
-import com.lightningkite.lightningdb.GenerateDataClassPaths
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.ExperimentalLightningServer
+import com.lightningkite.lightningserver.db.GenerateDataClassPaths
+import com.lightningkite.lightningserver.db.HasId
 import com.lightningkite.now
 import com.lightningkite.uuid
 import kotlinx.datetime.Instant

@@ -2,7 +2,7 @@
 
 package com.lightningkite.lightningserver.serialization
 
-import com.lightningkite.lightningdb.Description
+import com.lightningkite.lightningserver.db.Description
 import com.lightningkite.lightningserver.typed.subAndChildSerializers
 import com.lightningkite.lightningserver.typed.subSerializers
 import kotlinx.serialization.*

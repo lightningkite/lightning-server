@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.HasId
 import com.lightningkite.lightningserver.auth.RequestAuth
 import com.lightningkite.lightningserver.auth.test
 import com.lightningkite.lightningserver.http.HttpRequest

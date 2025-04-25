@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningdb.Description
+import com.lightningkite.lightningserver.db.Description
 import com.lightningkite.lightningserver.LSError
 import kotlinx.serialization.Serializable
 

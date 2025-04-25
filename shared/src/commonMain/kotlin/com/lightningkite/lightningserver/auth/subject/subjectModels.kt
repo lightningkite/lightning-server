@@ -1,9 +1,9 @@
 @file:UseContextualSerialization(Instant::class, UUID::class)
 package com.lightningkite.lightningserver.auth.subject
 
-import com.lightningkite.lightningdb.GenerateDataClassPaths
-import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.References
+import com.lightningkite.lightningserver.db.GenerateDataClassPaths
+import com.lightningkite.lightningserver.db.HasId
+import com.lightningkite.lightningserver.db.References
 import com.lightningkite.lightningserver.auth.oauth.OauthClient
 import com.lightningkite.lightningserver.auth.proof.ProofOption
 import com.lightningkite.now
@@ -12,7 +12,7 @@ import kotlinx.serialization.UseContextualSerialization
 import kotlin.time.Duration
 import kotlinx.datetime.Instant
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.AdminTableColumns
+import com.lightningkite.lightningserver.db.AdminTableColumns
 import com.lightningkite.lightningserver.auth.proof.Proof
 import com.lightningkite.uuid
 

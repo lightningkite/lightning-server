@@ -3,8 +3,8 @@
 package com.lightningkite.serialization
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.LazyRenamedSerialDescriptor
+import com.lightningkite.lightningserver.db.HasId
+import com.lightningkite.lightningserver.db.LazyRenamedSerialDescriptor
 import com.lightningkite.now
 import com.lightningkite.nowLocal
 import kotlinx.serialization.*
@@ -344,10 +344,10 @@ private const val LINKED_HASH_MAP_NAME = "kotlin.collections.LinkedHashMap"
 private const val HASH_MAP_NAME = "kotlin.collections.HashMap"
 
 val skipTypes = setOf(
-    "com.lightningkite.lightningdb.Condition",
-    "com.lightningkite.lightningdb.Modification",
-    "com.lightningkite.lightningdb.DataClassPathPartial",
-    "com.lightningkite.lightningdb.SortPart",
+    "com.lightningkite.lightningserver.db.Condition",
+    "com.lightningkite.lightningserver.db.Modification",
+    "com.lightningkite.lightningserver.db.DataClassPathPartial",
+    "com.lightningkite.lightningserver.db.SortPart",
 )
 
 @Serializable

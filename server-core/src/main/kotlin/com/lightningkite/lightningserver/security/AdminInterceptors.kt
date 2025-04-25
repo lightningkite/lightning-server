@@ -1,13 +1,13 @@
 package com.lightningkite.lightningserver.security
 
-import com.lightningkite.lightningdb.Condition
-import com.lightningkite.lightningdb.FieldCollection
-import com.lightningkite.lightningdb.HasEmail
-import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.interceptChangePerInstance
-import com.lightningkite.lightningdb.interceptCreate
-import com.lightningkite.lightningdb.postChange
-import com.lightningkite.lightningdb.postCreate
+import com.lightningkite.lightningserver.db.Condition
+import com.lightningkite.lightningserver.db.FieldCollection
+import com.lightningkite.lightningserver.db.HasEmail
+import com.lightningkite.lightningserver.db.HasId
+import com.lightningkite.lightningserver.db.interceptChangePerInstance
+import com.lightningkite.lightningserver.db.interceptCreate
+import com.lightningkite.lightningserver.db.postChange
+import com.lightningkite.lightningserver.db.postCreate
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelInfo
 import com.lightningkite.lightningserver.email.Email

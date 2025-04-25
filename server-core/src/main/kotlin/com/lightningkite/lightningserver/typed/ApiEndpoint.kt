@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.HasId
 import com.lightningkite.serialization.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.LSError
 import com.lightningkite.lightningserver.auth.*

@@ -7,15 +7,15 @@ class SDK2Test {
     @Test fun test() {
         TestSettings
         with(SDK2) {
-            System.out.writeInterface("com.lightningkite.lightningdb.test")
+            System.out.writeInterface("com.lightningkite.lightningserver.db.test")
             println("// -----------")
             println("// -----------")
             println("// -----------")
-            System.out.writeLive("com.lightningkite.lightningdb.test")
+            System.out.writeLive("com.lightningkite.lightningserver.db.test")
             println("// -----------")
             println("// -----------")
             println("// -----------")
-            System.out.writeCached("com.lightningkite.lightningdb.test")
+            System.out.writeCached("com.lightningkite.lightningserver.db.test")
         }
     }
 }

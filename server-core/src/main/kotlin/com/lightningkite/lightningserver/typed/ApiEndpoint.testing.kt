@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.HasId
 import com.lightningkite.lightningserver.http.HttpEndpoint
 
 suspend inline fun <reified USER: HasId<*>?, reified INPUT, reified OUTPUT> ApiEndpoint<USER, TypedServerPath0, INPUT, OUTPUT>.test(

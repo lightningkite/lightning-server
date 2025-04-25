@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.exceptions
 
-import com.lightningkite.lightningdb.HasEmail
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.HasEmail
+import com.lightningkite.lightningserver.db.HasId
 import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.schedule.ScheduledTask

@@ -6,12 +6,14 @@ import kotlinx.datetime.serializers.TimeZoneSerializer
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.time.Duration.Companion.seconds
+import kotlin.uuid.Uuid
 
 
 interface KSerializerWithDefault<T> : KSerializer<T> {
@@ -23,6 +25,7 @@ object DefaultDecoder : Decoder {
     val defaults = HashMap<String, Any?>()
 
     init {
+        defaults[Uuid.serializer().descriptor.serialName] = UUID.parse("00000000-0000-0000-0000-000000000000")
         defaults[UUIDSerializer.descriptor.serialName] = UUID.parse("00000000-0000-0000-0000-000000000000")
         defaults[DurationSerializer.descriptor.serialName] = 0.seconds
         defaults[InstantIso8601Serializer.descriptor.serialName] = Instant.fromEpochMilliseconds(0)

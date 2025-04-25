@@ -2,7 +2,7 @@
 
 package com.lightningkite.lightningserver.typed
 
-import com.lightningkite.lightningdb.Description
+import com.lightningkite.lightningserver.db.Description
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.LightningServerDsl
 import com.lightningkite.lightningserver.core.ServerPath

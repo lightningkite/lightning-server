@@ -25,6 +25,10 @@ ksp {
 }
 
 kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xcontext-parameters")
+        freeCompilerArgs.add("-opt-in=kotlin.uuid.ExperimentalUuidApi")
+    }
     sourceSets.main {
         kotlin.srcDir("build/generated/ksp/main/kotlin")
     }

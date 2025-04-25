@@ -2,10 +2,10 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.UUID
 import com.lightningkite.serialization.contextualSerializerIfHandled
-import com.lightningkite.lightningdb.test.ClassUsedForEmbedding
-import com.lightningkite.lightningdb.test.LargeTestModel
-import com.lightningkite.lightningdb.test.SimpleLargeTestModel
-import com.lightningkite.lightningdb.test.ValidatedModel
+import com.lightningkite.lightningserver.db.test.ClassUsedForEmbedding
+import com.lightningkite.lightningserver.db.test.LargeTestModel
+import com.lightningkite.lightningserver.db.test.SimpleLargeTestModel
+import com.lightningkite.lightningserver.db.test.ValidatedModel
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException

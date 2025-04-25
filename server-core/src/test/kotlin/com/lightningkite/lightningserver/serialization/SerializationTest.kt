@@ -10,7 +10,7 @@ import org.junit.Test
 import kotlinx.datetime.Instant
 import kotlin.time.Duration.Companion.milliseconds
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.lightningserver.prepareModelsServerCoreTest
 import com.lightningkite.serialization.*
 import kotlinx.serialization.*
@@ -116,7 +116,6 @@ class SerializationTest {
         assertIs<InstantIso8601Serializer>(ClientModule.serializerPreferContextual<Instant>())
         assertIsNot<ContextualSerializer<*>>(ClientModule.contextualSerializerIfHandled<Int>())
         assertIs<ContextualSerializer<*>>(ClientModule.contextualSerializerIfHandled<Instant>())
-        assertIs<DeferToContextualUuidSerializer>(EmptySerializersModule().contextualSerializerIfHandled<UUID>())
         assertIs<InstantIso8601Serializer>(ClientModule.getContextual(ContextualSerializer(Instant::class)))
     }
 }

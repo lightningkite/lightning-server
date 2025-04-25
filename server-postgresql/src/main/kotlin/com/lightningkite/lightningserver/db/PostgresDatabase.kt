@@ -11,7 +11,7 @@ import kotlin.reflect.KType
 
 // This being a lambda to return a Database rather than the database itself is
 // to support the Disconnectable interface.
-class PostgresDatabase(private val makeDb: () -> Database) : com.lightningkite.lightningdb.Database, Disconnectable {
+class PostgresDatabase(private val makeDb: () -> Database) : com.lightningkite.lightningserver.db.Database, Disconnectable {
     private var _db = lazy(makeDb)
 
     val db: Database get() = _db.value

@@ -1,7 +1,7 @@
 @file:UseContextualSerialization(UUID::class, ServerFile::class)
 package com.lightningkite.lightningserverdemo
 
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
 import com.lightningkite.now
 import kotlinx.serialization.Serializable

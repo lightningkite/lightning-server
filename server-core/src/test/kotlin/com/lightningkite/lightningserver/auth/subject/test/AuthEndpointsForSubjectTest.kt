@@ -3,7 +3,7 @@
 package com.lightningkite.lightningserver.auth.subject.test
 
 import com.lightningkite.default
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.auth.oauth.OauthAccessType

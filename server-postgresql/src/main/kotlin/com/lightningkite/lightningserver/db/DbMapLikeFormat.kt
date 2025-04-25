@@ -1,11 +1,9 @@
 package com.lightningkite.lightningserver.db
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.toJavaUuid
-import com.lightningkite.toKotlinUuid
 import kotlinx.datetime.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -31,6 +29,8 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import kotlin.time.toJavaDuration
 import kotlin.time.toKotlinDuration
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
 class DbMapLikeFormat(val serializersModule: SerializersModule = Serialization.module) {
     fun <T> encode(serializer: KSerializer<T>, value: T, it: UpdateBuilder<*>, path: List<String> = listOf("")) {

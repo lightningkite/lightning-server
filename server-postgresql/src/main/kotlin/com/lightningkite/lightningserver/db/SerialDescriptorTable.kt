@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
-import com.lightningkite.lightningdb.Index
+import com.lightningkite.lightningserver.db.Index
 import com.lightningkite.lightningserver.serialization.Serialization
 import io.ktor.websocket.Serializer
 import kotlinx.coroutines.launch

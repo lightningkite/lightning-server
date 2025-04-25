@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.auth.proof
 
 import com.lightningkite.UUID
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cache.Cache

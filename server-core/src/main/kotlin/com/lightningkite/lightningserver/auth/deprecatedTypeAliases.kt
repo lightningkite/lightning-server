@@ -2,7 +2,7 @@
 
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.HasId
 import com.lightningkite.lightningserver.auth.old.BaseAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.EmailAuthEndpoints
 import com.lightningkite.lightningserver.auth.old.SmsAuthEndpoints

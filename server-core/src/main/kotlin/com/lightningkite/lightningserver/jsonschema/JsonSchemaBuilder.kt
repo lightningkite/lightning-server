@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.jsonschema
 
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
@@ -318,7 +318,7 @@ class JsonSchemaBuilder(
                 pattern = "^\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d(:\\d\\d(\\.\\d+)?)?Z$"
             )
         }
-        override("com.lightningkite.lightningdb.Condition") {
+        override("com.lightningkite.lightningserver.db.Condition") {
             val subtype = (it as ConditionSerializer<*>).inner
             JsonSchemaType(
                 title = "Condition for ${subtype.descriptor.serialName.substringAfterLast('.')}",
@@ -332,7 +332,7 @@ class JsonSchemaBuilder(
                 }
             )
         }
-        override("com.lightningkite.lightningdb.Modification") {
+        override("com.lightningkite.lightningserver.db.Modification") {
             val subtype = (it as ModificationSerializer<*>).inner
             JsonSchemaType(
                 title = "Modification for ${subtype}",

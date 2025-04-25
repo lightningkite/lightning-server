@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.HasId
 import com.lightningkite.serialization.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.serialization.serializableProperties

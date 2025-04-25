@@ -1,4 +1,4 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
 import com.lightningkite.serialization.DataClassPathPartial
 import com.mongodb.client.model.changestream.UpdateDescription

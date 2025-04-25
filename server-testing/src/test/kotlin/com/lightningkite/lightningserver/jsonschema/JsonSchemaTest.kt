@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.jsonschema
 
-import com.lightningkite.lightningdb.test.HasServerFiles
-import com.lightningkite.lightningdb.test.LargeTestModel
+import com.lightningkite.lightningserver.db.test.HasServerFiles
+import com.lightningkite.lightningserver.db.test.LargeTestModel
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.serialization.encodeToString
@@ -16,6 +16,6 @@ class JsonSchemaTest {
         val schema = Serialization.jsonWithoutDefaults.schema(HasServerFiles.serializer())
             .also(::println)
             .also { println(Json(Serialization.jsonWithoutDefaults) { prettyPrint = true }.encodeToString(it)) }
-        assertEquals("#/definitions/com.lightningkite.lightningserver.files.ServerFile", schema.definitions["com.lightningkite.lightningdb.test.HasServerFiles"]!!.properties!!["file"]!!.ref)
+        assertEquals("#/definitions/com.lightningkite.lightningserver.files.ServerFile", schema.definitions["com.lightningkite.lightningserver.db.test.HasServerFiles"]!!.properties!!["file"]!!.ref)
     }
 }

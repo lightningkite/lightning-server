@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.auth.proof
 
-import com.lightningkite.lightningdb.ExperimentalLightningServer
+import com.lightningkite.lightningserver.db.ExperimentalLightningServer
 import kotlinx.serialization.Serializable
 
 @Serializable

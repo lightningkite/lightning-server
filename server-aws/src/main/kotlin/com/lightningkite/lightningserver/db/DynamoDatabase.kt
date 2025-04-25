@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.Database
-import com.lightningkite.lightningdb.FieldCollection
+import com.lightningkite.lightningserver.db.Database
+import com.lightningkite.lightningserver.db.FieldCollection
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.runBlocking

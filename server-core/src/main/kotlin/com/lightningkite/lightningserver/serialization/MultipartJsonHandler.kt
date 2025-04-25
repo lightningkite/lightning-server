@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver.serialization
 
-import com.lightningkite.lightningdb.LazyRenamedSerialDescriptor
+import com.lightningkite.lightningserver.db.LazyRenamedSerialDescriptor
 import com.lightningkite.lightningserver.files.ServerFile
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.exceptions.BadRequestException

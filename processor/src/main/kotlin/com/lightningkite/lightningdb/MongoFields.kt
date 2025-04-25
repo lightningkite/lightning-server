@@ -1,4 +1,4 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
 import com.google.devtools.ksp.symbol.*
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.decapitalizeAsciiOnly
@@ -29,7 +29,7 @@ data class MongoFields(
     val classReference: String get() = declaration.safeLocalReference()
     val simpleName: String get() = declaration.simpleName.getShortName()
     val fields by lazy { declaration.fields() }
-    val hasId by lazy { declaration.superTypes.any { it.resolve().declaration.qualifiedName?.asString() == "com.lightningkite.lightningdb.HasId" } }
+    val hasId by lazy { declaration.superTypes.any { it.resolve().declaration.qualifiedName?.asString() == "com.lightningkite.lightningserver.db.HasId" } }
 
     fun write(out: TabAppendable) = with(out) {
         appendLine("""// Automatically generated based off ${declaration.containingFile?.fileName}""")
@@ -41,25 +41,32 @@ data class MongoFields(
         appendLine()
         if (packageName.isNotEmpty()) appendLine("package ${packageName}")
         appendLine()
-        declaration.containingFile?.ktFile?.importList?.imports
-            ?.map { it.importPath.toString() }
-            ?.plus(
-                listOf(
-                    "com.lightningkite.serialization.*",
-                    "com.lightningkite.serialization.DataClassPath",
-                    "com.lightningkite.serialization.DataClassPathSelf",
-                    "com.lightningkite.serialization.SerializableProperty",
-                    "com.lightningkite.lightningdb.*",
-                    "kotlin.reflect.*",
-                    "kotlinx.serialization.*",
-                    "kotlinx.serialization.builtins.*",
-                    "kotlinx.serialization.internal.GeneratedSerializer",
-                    "kotlinx.datetime.*",
-                    "com.lightningkite.*",
+        try {
+            declaration.containingFile?.imports
+                ?.plus(
+                    listOf(
+                        "com.lightningkite.serialization.*",
+                        "com.lightningkite.serialization.DataClassPath",
+                        "com.lightningkite.serialization.DataClassPathSelf",
+                        "com.lightningkite.serialization.SerializableProperty",
+                        "com.lightningkite.lightningserver.db.*",
+                        "kotlin.reflect.*",
+                        "kotlinx.serialization.*",
+                        "kotlinx.serialization.builtins.*",
+                        "kotlinx.serialization.internal.GeneratedSerializer",
+                        "kotlinx.datetime.*",
+                        "com.lightningkite.*",
+                    )
                 )
-            )
-            ?.distinct()
-            ?.forEach { appendLine("import $it") }
+                ?.distinct()
+                ?.filter { it.substringAfterLast('.').let {
+                    !(it.startsWith("prepare") && it.endsWith("Fields")
+                            || it.startsWith("prepareModels"))
+                } }
+                ?.forEach { appendLine("import $it") }
+        } catch(e: Exception) {
+            appendLine("/*" + e.stackTraceToString() + "*/")
+        }
         appendLine()
         val contextualTypes = declaration.containingFile?.annotation(
             "UseContextualSerialization",
@@ -174,7 +181,7 @@ data class MongoFields(
         for (field in fields) {
             out.appendLine("- id: ${packageName}.${field.name}")
             out.appendLine("  type: get")
-            out.appendLine("  receiver: com.lightningkite.lightningdb.DataClassPath<*, ${packageName}.${typeReference}>")
+            out.appendLine("  receiver: com.lightningkite.lightningserver.db.DataClassPath<*, ${packageName}.${typeReference}>")
             out.appendLine("  template: '~this~.prop(\"${field.name}\")'")
         }
     }
@@ -184,7 +191,7 @@ data class MongoFields(
         for (field in fields) {
             out.appendLine("- id: ${packageName}.${field.name}")
             out.appendLine("  type: get")
-            out.appendLine("  receiver: com.lightningkite.lightningdb.DataClassPath<*, ${packageName}.${typeReference}>")
+            out.appendLine("  receiver: com.lightningkite.lightningserver.db.DataClassPath<*, ${packageName}.${typeReference}>")
             out.appendLine("  template: '~this~.get(prop: ${typeReference}.${field.name}Prop)'")
         }
     }
@@ -205,7 +212,7 @@ private val KSType.useCustomType: Boolean
             "kotlin.collections.Map",
             "kotlin.Boolean",
             "kotlin.Pair",
-            "com.lightningkite.lightningdb.UUIDFor",
+            "com.lightningkite.lightningserver.db.UUIDFor",
             "com.lightningkite.UUID",
             "com.lightningkite.UUID",
             "kotlinx.datetime.Instant",
@@ -229,7 +236,7 @@ private val KSType.conditionType: String
             "com.lightningkite.UUID",
             "com.lightningkite.UUID",
             "kotlinx.datetime.Instant",
-            "com.lightningkite.lightningdb.UUIDFor",
+            "com.lightningkite.lightningserver.db.UUIDFor",
             "kotlin.Char" -> "ComparableCondition" + "<${this.makeNotNullable().toKotlin()}>"
 
             "kotlin.collections.List" -> "ArrayCondition" + "<${
@@ -275,7 +282,7 @@ private val KSType.modificationType: String
             "kotlin.Double" -> "NumberModification" + "<${this.makeNotNullable().toKotlin(annotations)}>"
             "java.util.UUID",
             "com.lightningkite.UUID",
-            "com.lightningkite.lightningdb.UUIDFor",
+            "com.lightningkite.lightningserver.db.UUIDFor",
             "kotlinx.datetime.Instant",
             "kotlin.String", "kotlin.Char" -> "ComparableModification" + "<${
                 this.makeNotNullable().toKotlin(annotations)

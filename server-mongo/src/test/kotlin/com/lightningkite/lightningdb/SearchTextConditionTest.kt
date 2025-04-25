@@ -1,9 +1,9 @@
 @file:UseContextualSerialization(UUID::class)
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.test.*
-import com.lightningkite.prepareModelsServerCore
-import com.lightningkite.lightningdb.test.prepareModelsServerTesting
+import com.lightningkite.lightningserver.db.test.*
+import com.lightningkite.lightningserver.prepareModelsServerCore
+import com.lightningkite.lightningserver.db.test.prepareModelsServerTesting
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable

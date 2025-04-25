@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
-import com.lightningkite.lightningdb.test.*
+import com.lightningkite.lightningserver.db.test.*
 import io.zonky.test.db.postgres.junit.EmbeddedPostgresRules
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
@@ -174,14 +174,14 @@ class PostgresAggregationsTest : AggregationsTest() {
     companion object {
         @ClassRule @JvmField val postgres = EmbeddedPostgresRules.singleInstance()
     }
-    override val database: com.lightningkite.lightningdb.Database by lazy { PostgresDatabase{Database.connect(postgres.embeddedPostgres.postgresDatabase)} }
+    override val database: com.lightningkite.lightningserver.db.Database by lazy { PostgresDatabase{Database.connect(postgres.embeddedPostgres.postgresDatabase)} }
 }
 
 class PostgresConditionTests : ConditionTests() {
     companion object {
         @ClassRule @JvmField val postgres = EmbeddedPostgresRules.singleInstance()
     }
-    override val database: com.lightningkite.lightningdb.Database by lazy { PostgresDatabase{Database.connect(postgres.embeddedPostgres.postgresDatabase)} }
+    override val database: com.lightningkite.lightningserver.db.Database by lazy { PostgresDatabase{Database.connect(postgres.embeddedPostgres.postgresDatabase)} }
 
     override fun test_geodistance_1() {
         println("Suppressed until this is supported")
@@ -196,7 +196,7 @@ class PostgresModificationTests : ModificationTests() {
     companion object {
         @ClassRule @JvmField val postgres = EmbeddedPostgresRules.singleInstance()
     }
-    override val database: com.lightningkite.lightningdb.Database by lazy { PostgresDatabase { Database.connect(postgres.embeddedPostgres.postgresDatabase) } }
+    override val database: com.lightningkite.lightningserver.db.Database by lazy { PostgresDatabase { Database.connect(postgres.embeddedPostgres.postgresDatabase) } }
     override fun test_Map_modifyField() {
         // TODO: Make it work
     }
@@ -214,5 +214,5 @@ class PostgresSortTest : SortTest() {
     companion object {
         @ClassRule @JvmField val postgres = EmbeddedPostgresRules.singleInstance()
     }
-    override val database: com.lightningkite.lightningdb.Database by lazy { PostgresDatabase{Database.connect(postgres.embeddedPostgres.postgresDatabase)} }
+    override val database: com.lightningkite.lightningserver.db.Database by lazy { PostgresDatabase{Database.connect(postgres.embeddedPostgres.postgresDatabase)} }
 }

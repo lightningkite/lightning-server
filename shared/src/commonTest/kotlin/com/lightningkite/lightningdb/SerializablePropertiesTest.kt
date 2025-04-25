@@ -1,7 +1,7 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
 import com.lightningkite.*
-import com.lightningkite.lightningdb.testing.User_email
+import com.lightningkite.lightningserver.db.testing.User_email
 import kotlin.test.Test
 import kotlin.test.assertNotEquals
 

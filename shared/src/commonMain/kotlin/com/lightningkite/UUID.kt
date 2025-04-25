@@ -1,4 +1,5 @@
 @file:Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
+@file:OptIn(ExperimentalUuidApi::class)
 
 package com.lightningkite
 
@@ -9,22 +10,15 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.buildSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalSerializationApi::class)
 object DeferToContextualUuidSerializer: KSerializer<UUID> by ContextualSerializer<UUID>(UUID::class, UUIDSerializer, arrayOf())
 
-@Serializable(DeferToContextualUuidSerializer::class)
-expect class UUID: Comparable<UUID> {
-    override fun compareTo(other: UUID): Int
-    fun toBytes(): ByteArray
-    companion object {
-        fun random(): UUID
-        fun parse(uuidString: String): UUID
-        fun parse(bytes: ByteArray): UUID
-    }
-}
+typealias UUID = kotlin.uuid.Uuid
 @Deprecated("Use UUID.v4() instead", ReplaceWith("UUID.v4()", "com.lightningkite.UUID")) fun uuid(): UUID = UUID.random()
 @Deprecated("Use UUID.parse(string) instead", ReplaceWith("UUID.parse(string)", "com.lightningkite.UUID")) fun uuid(string: String): UUID = UUID.parse(string)
-@Deprecated("Use UUID.parse(string) instead", ReplaceWith("UUID.parse(string)", "com.lightningkite.UUID")) fun UUID.Companion.fromString(string: String): UUID = UUID.parse(string)
+@Deprecated("Use UUID.parse(string) instead", ReplaceWith("UUID.parse(string)", "com.lightningkite.UUID")) fun Uuid.Companion.fromString(string: String): UUID = UUID.parse(string)
 
 

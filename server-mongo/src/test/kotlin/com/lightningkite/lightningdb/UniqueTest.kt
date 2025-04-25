@@ -1,9 +1,9 @@
 @file:UseContextualSerialization(UUID::class)
 
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.test.EmbeddedMap
-import com.lightningkite.lightningdb.test.RecursiveEmbed
+import com.lightningkite.lightningserver.db.test.EmbeddedMap
+import com.lightningkite.lightningserver.db.test.RecursiveEmbed
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.mongodb.MongoBulkWriteException
 import com.mongodb.MongoWriteException

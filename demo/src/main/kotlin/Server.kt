@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserverdemo
 
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.old.*
@@ -52,7 +52,7 @@ import kotlin.time.Duration
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.minutes
 import com.lightningkite.UUID
-import com.lightningkite.prepareModelsServerCore
+import com.lightningkite.lightningserver.prepareModelsServerCore
 import com.lightningkite.lightningserver.files.S3File
 import com.lightningkite.lightningserver.metrics.CloudwatchMetrics
 import com.lightningkite.lightningserver.websocket.send

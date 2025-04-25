@@ -2,8 +2,8 @@
 
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.prepareModelsServerCore
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.prepareModelsServerCore
+import com.lightningkite.lightningserver.db.HasId
 import com.lightningkite.lightningserver.SetOnce
 import com.lightningkite.lightningserver.auth.proof.*
 import com.lightningkite.lightningserver.core.ServerPath

@@ -16,6 +16,10 @@ ksp {
 }
 
 kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xcontext-parameters")
+        freeCompilerArgs.add("-opt-in=kotlin.uuid.ExperimentalUuidApi")
+    }
     applyDefaultHierarchyTemplate()
     androidTarget {
         compilations.all {

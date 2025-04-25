@@ -26,6 +26,10 @@ ksp {
 }
 
 kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xcontext-parameters")
+        freeCompilerArgs.add("-opt-in=kotlin.uuid.ExperimentalUuidApi")
+    }
     sourceSets {
         configureEach {
             languageSettings {

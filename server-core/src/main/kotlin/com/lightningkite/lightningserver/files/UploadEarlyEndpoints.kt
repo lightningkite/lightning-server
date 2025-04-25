@@ -1,6 +1,6 @@
 //package com.lightningkite.lightningserver.files
 //
-//import com.lightningkite.lightningdb.*
+//import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
 //import com.lightningkite.lightningserver.auth.noAuth
 //import com.lightningkite.lightningserver.core.ServerPath

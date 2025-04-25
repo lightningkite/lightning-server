@@ -1,4 +1,4 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
 import com.lightningkite.lightningserver.core.Disconnectable
 import com.lightningkite.lightningserver.db.DatabaseSettings

@@ -1,4 +1,4 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
 import com.google.devtools.ksp.symbol.*
 
@@ -10,7 +10,7 @@ data class MongoFields(
     val classReference: String get() = declaration.safeLocalReference()
     val simpleName: String get() = declaration.simpleName.getShortName()
     val fields by lazy { declaration.fields() }
-    val hasId by lazy { declaration.superTypes.any { it.resolve().declaration.qualifiedName?.asString() == "com.lightningkite.lightningdb.HasId" } }
+    val hasId by lazy { declaration.superTypes.any { it.resolve().declaration.qualifiedName?.asString() == "com.lightningkite.lightningserver.db.HasId" } }
 
     fun allSubs(handled: MutableSet<KSClassDeclaration>): Sequence<MongoFields> = sequenceOf(this) + fields
         .flatMap { it.kotlinType.resolve().allClassDeclarations() }
@@ -66,7 +66,7 @@ data class MongoFields(
             ?.map { it.importPath.toString() }
             ?.plus(
                 listOf(
-                    "com.lightningkite.lightningdb.*",
+                    "com.lightningkite.lightningserver.db.*",
                     "kotlin.reflect.*",
                     "kotlinx.serialization.*",
                     "kotlinx.serialization.builtins.*",
@@ -119,7 +119,7 @@ private val KSType.useCustomType: Boolean
             "kotlin.collections.Map",
             "kotlin.Boolean",
             "kotlin.Pair",
-            "com.lightningkite.lightningdb.UUIDFor",
+            "com.lightningkite.lightningserver.db.UUIDFor",
             "com.lightningkite.UUID",
             "kotlinx.datetime.Instant",
             "org.litote.kmongo.Id" -> false
@@ -140,7 +140,7 @@ private val KSType.conditionType: String
             "kotlin.Double",
             "com.lightningkite.UUID",
             "kotlinx.datetime.Instant",
-            "com.lightningkite.lightningdb.UUIDFor",
+            "com.lightningkite.lightningserver.db.UUIDFor",
             "kotlin.Char" -> "ComparableCondition" + "<${this.makeNotNullable().toKotlin(annotations)}>"
             "kotlin.collections.List" -> "ArrayCondition" + "<${
                 this.arguments[0].run {
@@ -181,7 +181,7 @@ private val KSType.modificationType: String
             "kotlin.Float",
             "kotlin.Double" -> "NumberModification" + "<${this.makeNotNullable().toKotlin(annotations)}>"
             "com.lightningkite.UUID",
-            "com.lightningkite.lightningdb.UUIDFor",
+            "com.lightningkite.lightningserver.db.UUIDFor",
             "kotlinx.datetime.Instant",
             "kotlin.String", "kotlin.Char" -> "ComparableModification" + "<${
                 this.makeNotNullable().toKotlin(annotations)

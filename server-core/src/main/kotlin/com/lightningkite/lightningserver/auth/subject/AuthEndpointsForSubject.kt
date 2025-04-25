@@ -1,8 +1,8 @@
 package com.lightningkite.lightningserver.auth.subject
 
 import com.lightningkite.UUID
-import com.lightningkite.prepareModelsServerCore
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.prepareModelsServerCore
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.LSError

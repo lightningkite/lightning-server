@@ -1,9 +1,9 @@
 @file:UseContextualSerialization(UUID::class)
 package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
-import com.lightningkite.lightningdb.Condition
+import com.lightningkite.lightningserver.db.Condition
 import com.lightningkite.lightningserver.serialization.Serialization
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.future.await
@@ -19,7 +19,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.*
 import java.net.URI
 import com.lightningkite.UUID
-import com.lightningkite.prepareModelsServerCore
+import com.lightningkite.lightningserver.prepareModelsServerCore
 import com.lightningkite.prepareModelsShared
 import com.lightningkite.uuid
 

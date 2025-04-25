@@ -7,8 +7,8 @@ class UUIDTest {
     @OptIn(ExperimentalStdlibApi::class)
     @Test fun testBytes() {
         val uuid = UUID.random()
-        println(uuid.toBytes().toHexString())
+        println(uuid.toByteArray().toHexString())
         println(uuid.toString())
-        assertEquals(uuid, UUID.parse(uuid.toBytes()))
+        assertEquals(uuid, UUID.fromByteArray(uuid.toByteArray()))
     }
 }

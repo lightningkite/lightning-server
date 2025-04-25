@@ -1,7 +1,7 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
-import com.lightningkite.lightningdb.test.EmbeddedMap
-import com.lightningkite.lightningdb.test.RecursiveEmbed
+import com.lightningkite.lightningserver.db.test.EmbeddedMap
+import com.lightningkite.lightningserver.db.test.RecursiveEmbed
 import com.mongodb.client.model.changestream.UpdateDescription
 import org.junit.Test
 import kotlin.test.assertEquals

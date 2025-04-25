@@ -1,9 +1,9 @@
 
 @file:UseContextualSerialization(UUID::class, Instant::class)
-package com.lightningkite.lightningdb.testing
+package com.lightningkite.lightningserver.db.testing
 
 import com.lightningkite.*
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization

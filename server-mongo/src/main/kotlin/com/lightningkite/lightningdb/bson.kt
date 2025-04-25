@@ -1,8 +1,8 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
 import com.github.jershell.kbson.*
 import com.lightningkite.GeoCoordinateGeoJsonSerializer
-import com.lightningkite.lightningdb.*
+import com.lightningkite.lightningserver.db.*
 import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.mongodb.client.model.UpdateOptions

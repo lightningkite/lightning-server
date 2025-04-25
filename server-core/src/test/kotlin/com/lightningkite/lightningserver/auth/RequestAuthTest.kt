@@ -1,7 +1,7 @@
 @file:UseContextualSerialization(UUID::class)
 package com.lightningkite.lightningserver.auth
 
-import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningserver.db.HasId
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.testmodels.TestUser
 import com.lightningkite.uuid

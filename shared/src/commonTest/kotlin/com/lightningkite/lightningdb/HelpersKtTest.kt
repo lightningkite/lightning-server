@@ -1,4 +1,4 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

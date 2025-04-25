@@ -1,4 +1,4 @@
-package com.lightningkite.lightningdb
+package com.lightningkite.lightningserver.db
 
 import com.google.devtools.ksp.symbol.*
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.decapitalizeAsciiOnly
@@ -17,7 +17,7 @@ fun KSTypeReference.tryResolve(): KSType? = try {
 
 val KSDeclaration.importSafeName: String
     get() = when (packageName.asString()) {
-        "kotlin", "kotlin.collection", "com.lightningkite.lightningdb", "org.jetbrains.exposed.sql" -> this.simpleName.asString()
+        "kotlin", "kotlin.collection", "com.lightningkite.lightningserver.db", "org.jetbrains.exposed.sql" -> this.simpleName.asString()
         else -> this.qualifiedName!!.asString()
     }
 
@@ -82,7 +82,7 @@ fun KSType.toKotlinLeast(annotations: Sequence<KSAnnotation> = this.annotations,
 
 fun List<ResolvedAnnotation>.byName(
     name: String,
-    packageName: String = "com.lightningkite.lightningdb"
+    packageName: String = "com.lightningkite.lightningserver.db"
 ): ResolvedAnnotation? = this.find {
     it.type.qualifiedName?.asString() == "$packageName.$name"
 }
@@ -100,7 +100,7 @@ fun KSAnnotation.resolve(): ResolvedAnnotation {
     )
 }
 
-fun KSAnnotated.annotation(name: String, packageName: String = "com.lightningkite.lightningdb"): KSAnnotation? {
+fun KSAnnotated.annotation(name: String, packageName: String = "com.lightningkite.lightningserver.db"): KSAnnotation? {
     return this.annotations.find {
         it.shortName.getShortName() == name &&
                 it.annotationType.resolve().declaration.qualifiedName?.asString() == "$packageName.$name"

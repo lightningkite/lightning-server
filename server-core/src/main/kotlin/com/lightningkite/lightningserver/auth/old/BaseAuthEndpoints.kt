@@ -2,8 +2,8 @@
 
 package com.lightningkite.lightningserver.auth.old
 
-import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.get
+import com.lightningkite.lightningserver.db.HasId
+import com.lightningkite.lightningserver.db.get
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.proof.Proof
 import com.lightningkite.lightningserver.core.ServerPath
