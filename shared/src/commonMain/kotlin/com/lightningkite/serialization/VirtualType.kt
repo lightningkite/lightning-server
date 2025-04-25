@@ -135,8 +135,13 @@ data class VirtualStruct(
                         else -> null
                     }
                 } ?: field.defaultJson?.let {
-                    val v = DefaultDecoder.json.decodeFromString(serializer, it)
-                    ;{ v }
+                    try {
+                        val v = DefaultDecoder.json.decodeFromString(serializer, it)
+                        ;{ v }
+                    } catch(e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
                 }
             }
         }
