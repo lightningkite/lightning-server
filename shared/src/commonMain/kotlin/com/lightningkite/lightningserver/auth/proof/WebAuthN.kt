@@ -36,6 +36,7 @@ data class WebAuthNCredential(
     val residentKey: Boolean,
     val authenticatorAttachment: String,
     val attestationObject: String, // Base64 url-encoded
+    val lastSignCount: Long,
     val transports: List<String>,
     @Index val disabledAt: Instant? = null,
 ) : HasId<String>

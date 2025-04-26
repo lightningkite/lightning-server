@@ -50,6 +50,7 @@ import com.webauthn4j.data.AuthenticationParameters
 import com.webauthn4j.data.AuthenticationRequest
 import com.webauthn4j.data.PublicKeyCredentialParameters
 import com.webauthn4j.data.PublicKeyCredentialType
+import com.webauthn4j.data.RegistrationData
 import com.webauthn4j.data.RegistrationParameters
 import com.webauthn4j.data.RegistrationRequest
 import com.webauthn4j.data.attestation.statement.COSEAlgorithmIdentifier
@@ -287,7 +288,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
                 /* userVerificationRequired = */ fromCache.userVerification,
             )
 
-            try {
+            val dataResult: RegistrationData = try {
                 WebAuthnManager.createNonStrictWebAuthnManager().verify(
                     data,
                     registrationParams,
@@ -311,6 +312,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
 
                         WebAuthN.GeneralPreference.Required -> true
                     },
+                    lastSignCount = dataResult.attestationObject?.authenticatorData?.signCount ?: 0,
                     authenticatorAttachment = credentials.authenticatorAttachment,
                     attestationObject = credentials.response.attestationObject,
                     transports = credentials.response.transports.map { it.standardName },
@@ -427,7 +429,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
                 AuthenticatorImpl(
                     attestation.authenticatorData.attestedCredentialData!!,
                     attestation.attestationStatement,
-                    attestation.authenticatorData.signCount
+                    publicKeyCredential.lastSignCount
                 ),
                 fromCache.userVerification,
             )
@@ -444,7 +446,10 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
 
             modelInfo.collection().updateOneById(
                 publicKeyCredential._id,
-                modification { it.lastUsedAt assign now() }
+                modification {
+                    it.lastUsedAt assign now()
+                    it.lastSignCount assign (authData.authenticatorData?.signCount ?: 0L)
+                }
             )
 
             proofHasher().makeProof(
