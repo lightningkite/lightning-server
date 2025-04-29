@@ -4,6 +4,8 @@
 
 By combining [typed endpoints](typed-endpoints.md), [authentication](authentication.md), and [databases](database.md), we can conveniently generate REST endpoints for any given model automatically.
 
+Whatever endpoints you have in your server object are included in the sdk.
+
 ```kotlin
 
 object Server : ServerPathGroup(ServerPath.root) {
@@ -84,4 +86,21 @@ data class User(
     override val _id: UUID = UUID.randomUUID(),
     override val email: String,
 ) : HasId<UUID>, HasEmail
+```
+
+Lightning Server is capable of generating sdks in typescript, kotlin, and dart.
+
+```kotlin
+// typescript
+File("./build/generated/sdk.ts").also { it.parentFile.mkdirs() }.writeText(buildString {
+    Documentable.typescriptSdk(this)
+})
+// kotlin
+FileOutputStream("output.kt").use { stream: FileOutputStream ->
+    Documentable.kotlinSdk(packageName = "com.project.sdk", stream = stream)
+}
+// dart
+File("./build/generated/sdk.dart").also { it.parentFile.mkdirs() }.writeText(buildString {
+    Documentable.dartSdk(filename = "filename.dart", this)
+})
 ```
