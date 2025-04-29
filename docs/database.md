@@ -194,7 +194,30 @@ val collection = Server.database().collection<Post>()
 
 Creating views of databases like this is incredibly useful for centralizing rules about what users can and cannot do.
 
-Later, we'll even show you how to use this to automatically generate REST endpoints with proper permissions.
+## REST endpoints
+
+Lightning Server can automatically generate REST endpoints for a collection. First off, the class must implement the
+`ModelInfoWithDefault` and `ServerPathGroup` interfaces. ModelInfoWithDefault to include the collections to pass to the
+REST endpoints, and ServerPathGroup to include it in the url routing
+
+```kotlin
+class PostEndpoints(path: ServerPath): ServerPathGroup(path), ModelInfoWithDefault<User, Post, UUID> {
+    // implement abstract members
+}
+```
+
+Then use Lightning Server's ModelRestEndpoints class that will automatically create endpoints for you that will also be included in the sdk
+
+```kotlin
+class PostEndpoints: ModelInfoWithDefault<User, Post, UUID> {
+    // your implementation 
+    private val restPath = path("rest")
+    // ModelRestEndpoints uses the context to reference the collections
+    val rest = ModelRestEndpoints(restPath, this)
+}
+```
+
+And there, your model now is REST compatible!
 
 ## Available Backends
 
