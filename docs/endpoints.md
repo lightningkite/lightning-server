@@ -2,48 +2,65 @@
 
 **OUT OF DATE**
 
+# New Stuff
+
 We've already briefly seen some very basic endpoints in action; let's go into more detail.
 
 First, you won't get very far in this section without some knowledge of HTTP.  One tutorial you could go to for general HTTP information is [this one I found](https://dev.to/abbeyperini/a-beginners-guide-to-http-part-1-definitions-38m7) by Abbey Perini.
 
 With that out of the way, let's start looking at how we can define endpoints.
 
-## Routing
+## Url paths
 
-The typical way of defining routes is as follows:
+Start with instantiating an object for your server where all of your nested paths can be found using
 
 ```kotlin
-object Server : ServerPathGroup(ServerPath.root) {
-    //...
-
-    // GET /
-    val a = path.get.handler { /*...*/ }
-    // POST /
-    val b = path.post.handler { /*...*/ }
-    // PATCH /test
-    val c = path("test").patch.handler { /*...*/ }
-    // DELETE /first/second/last
-    val d = path("first/second/last").delete.handler { /*...*/ }
-    // PUT /model/<insert some path segment here>/test
-    val e = path("model/{id}/test").put.handler { /*...*/ }
-    // GET /app/... (any number of path segments after /app/)
-    val f = path("app/{...}").put.handler { /*...*/ }
+object Server: ServerPathGroup(ServerPath.root) {
+    // your endpoints
 }
 ```
 
-To be more rigorous about it, we usually store the endpoint reference in a constant for later access.  This is useful for testing.
+Where `ServerPath.root` essentially just specifies this is the base url for your project "/", and the ServerPathGroup
+is an abstract class that gives you access to more pathing and request method tools
+
+Inside the `Server` object, since you are implementing the `ServerPathGroup` class, you have access to
+`path, get, put, post, patch, and delete`.
+
+`path` is pretty self-explanatory. It contains the data related to the url path. With the path, you can then call
+The path string can contain any number of slash separated segments.  Text and numbers are interpreted literally, while
+names surrounded by `{}` are interpreted as wildcard path segments.  If it ends with `/{...}`, that is interpreted as any
+number of arbitrary segments at the end of the path. 
 
 ```kotlin
-val endpointReference = TODO()
+object Server: ServerPathGroup(ServerPath.root) {
+    // These two are equivalent
+    val longPath = path("path1").path("path2").path("path3")
+    val longPath2 = path("path1/path2/path3")
+}
 ```
 
-Then, we start from our current path (the root as defined in `Server`):
+Once you have your path(s) defined, you can define the methods to apply to them
 
 ```kotlin
-val endpointReference = path("path-string-here")
+val endpoint = path("path-string")
+endpoint.get
+endpoint.post
+endpoint.put
+endpoint.patch
+endpoint.delete
+// You can optionally add more pathing to each http method if you want
+endpoint.get("get") // resulting url: /path-string/get
+endpoint.post("post") // resulting url: /path-string/post
+endpoint.put("put") // resulting url: /path-string/put
+endpoint.patch("patch") // resulting url: /path-string/patch
+endpoint.delete("delete") // resulting url: /path-string/delete
 ```
 
-The path string can contain any number of slash separated segments.  Text and numbers are interpreted literally, while names surrounded by `{}` are interpreted as wildcard path segments.  If it ends with `/{...}`, that is interpreted as any number of arbitrary segments at the end of the path.
+## Defining functionality
+
+With your endpoints defined, you can begin defining functionality for each of your endpoints.
+There are two main ways to do so, used differently depending on what you need. The first will be explained here,
+the other can be found in the `type-endpoints.md`
 
 Paths are matched preferring exact literal matches first, then single wildcard segments, then variable wildcard segments.
 
