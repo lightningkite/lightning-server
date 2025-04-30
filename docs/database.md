@@ -1,7 +1,5 @@
 # Database
 
-**OUT OF DATE**
-
 Lightning Server contains a database abstraction that enables you to build applications without worrying about exactly which database will be used.  It is abstracted over both NoSQL and SQL databases.
 
 ## Declaring the need for a database
@@ -18,7 +16,7 @@ object Server {
 
 ## Declaring a model
 
-Next we need to declare a model.  All models are serializable via `kotlinx.serialization`, and need the additional annotation `@DatabaseModel` which we'll discuss later.  To make `UUID`s serializable, we must also place `@file:UseContextualSerialization(UUID::class)` at the top of the file. 
+Next we need to declare a model.  All models are serializable via `kotlinx.serialization`, and need the additional annotation `@GenerateDataClassPaths` which we'll discuss later.  To make `UUID`s serializable, we must also place `@file:UseContextualSerialization(UUID::class)` at the top of the file. 
 
 It is strongly recommended you define the primary key yourself by making the class implement `HasId<T>`.
 
@@ -28,9 +26,9 @@ It is strongly recommended you define the primary key yourself by making the cla
 //...
 
 @Serializable
-@DatabaseModel
+@GenerateDataClassPaths
 data class Post(
-    @Contextual override val _id: UUID = UUID.randomUUID(),
+    override val _id: UUID = UUID.randomUUID(),
     val title: String,
     val poster: String,
     val body: String,
@@ -44,6 +42,7 @@ data class Post(
 You can now access a table of these objects like this:
 
 ```kotlin
+val collection = Server.database().collection<Post>()
 collection.insertOne(Post(title = "Test", poster = "joseph@lightningkite.com", body = "Example"))
 collection.find(condition { it.title eq "Test" }).toList()
 collection.updateOne(
@@ -218,7 +217,7 @@ Most things work, but `Map` modifications do not.
 ```kotlin
 // Server.kt
 object Server: ServerPathGroup(ServerPath.root) {
-    // Adds MongoDB to the possible database loaders
+    // Adds PostgreSQL to the possible database loaders
     init { PostgresDatabase }
 }
 ```
