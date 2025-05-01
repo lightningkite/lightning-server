@@ -49,6 +49,7 @@ serializationLibs = "1.7.3"
 serializationXmlUtil = "0.86.3"
 shadow = "8.1.1"
 vanniktechMavenPublish = "0.30.0"
+webauthn4jCore = "0.29.0.RELEASE"
 xmlUtilJvm = "0.90.1"
 
 [libraries]
@@ -124,6 +125,7 @@ serialization = { module = "org.jetbrains.kotlin:kotlin-serialization", version 
 serializationCbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version = { ref = "serializationLibs" } }
 serializationProperties = { module = "org.jetbrains.kotlinx:kotlinx-serialization-properties", version = { ref = "serializationLibs" } }
 serializationProtobuf = { module = "org.jetbrains.kotlinx:kotlinx-serialization-protobuf", version = { ref = "serializationLibs" } }
+webauthn4jCore = { module = "com.webauthn4j:webauthn4j-core", version.ref = "webauthn4jCore" }
 xmlUtilJvm = { module = "io.github.pdvrieze.xmlutil:serialization-jvm", version = { ref = "xmlUtilJvm" } }
 
 [plugins]
