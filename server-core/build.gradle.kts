@@ -45,6 +45,7 @@ dependencies {
     api(libs.kotlinReflect)
     implementation(libs.bouncyCastleBcprov)
     implementation(libs.bouncyCastleBcpkix)
+    implementation(libs.webauthn4jCore)
 
     api(libs.angusMail)
     testImplementation(libs.javaJwt)

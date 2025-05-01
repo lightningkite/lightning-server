@@ -35,16 +35,21 @@ class SmsProofEndpoints(
     name = "sms",
     property = "phone",
     proofHasher = proofHasher,
-    pin =pin,
+    pin = pin,
     interfaceInfo = Documentable.InterfaceInfo(path, "SmsProofClientEndpoints", listOf()),
     exampleTarget = "800-1000-100"
 ) {
-    override fun normalize(to: String): String = to.removePrefix("+").substringBefore('x').filter { it.isDigit() }.let {
-        "+" + when(it.length) {
-            10 -> "1$it"
-            else -> it
+    override fun normalize(to: String): String = to
+        .removePrefix("+")
+        .substringBefore('x')
+        .filter { it.isDigit() }
+        .let {
+            "+" + when (it.length) {
+                10 -> "1$it"
+                else -> it
+            }
         }
-    }
+
     init {
         path.docName = "SmsProof"
         Authentication.register(this)
@@ -55,7 +60,7 @@ class SmsProofEndpoints(
             sms().send(to, smsTemplate(pin))
     }
 
-    suspend fun send(destination: String, content: (Proof)->String) {
+    suspend fun send(destination: String, content: (Proof) -> String) {
         sms().send(destination, content(issueProof(destination)))
     }
 }
