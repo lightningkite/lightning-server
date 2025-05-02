@@ -105,6 +105,7 @@ class ModelRestUpdatesWebsocket<USER : HasId<*>?, T : HasId<ID>, ID : Comparable
                 new = entry.new?.takeIf { currentState.condition(it) }?.let { currentState.mask(it) },
             )
         }.filter { it.old != null || it.new != null }
+        if(toSend.isEmpty()) return
         val updates = CollectionUpdates(
             updates = toSend.mapNotNull { it.new }.toSet(),
             remove = toSend.mapNotNull { it.old.takeIf { _ -> it.new == null }?._id }.toSet()
