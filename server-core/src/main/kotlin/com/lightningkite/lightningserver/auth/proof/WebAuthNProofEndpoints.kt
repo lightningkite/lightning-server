@@ -15,7 +15,6 @@ import com.lightningkite.lightningdb.modification
 import com.lightningkite.lightningdb.or
 import com.lightningkite.lightningdb.updateOneById
 import com.lightningkite.lightningdb.updateRestrictions
-import com.lightningkite.lightningserver.auth.AuthOptions
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.Authentication.ProofMethod
 import com.lightningkite.lightningserver.auth.accepts
@@ -77,7 +76,6 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
     val challengeLength: Int = 64,
     val expiration: Duration = 5.minutes,
     val rpId: String,
-    val authOptions: AuthOptions<USER>,
     val registrationForUser: (USER, WebAuthN.GeneralPreference) -> WebAuthN.Registration.RegistrationOptions,
     val proveOptions: (USER?) -> WebAuthN.Authentication.ProveOptions = { WebAuthN.Authentication.ProveOptions() },
 ) : ServerPathGroup(path), ProofMethod {
@@ -193,7 +191,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
     @OptIn(ExperimentalEncodingApi::class)
     val registerStart = path("register-start").post.api(
         belongsToInterface = registerInterface,
-        authOptions = authOptions,
+        authOptions = anyAuthRoot,
         summary = "Issue WebAuthN creation challenge",
         description = "Returns a challenge to be passed on to a client authenticator for the creation of a new Public Key Credential.",
         errorCases = listOf(),
@@ -201,7 +199,8 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
         successCode = HttpStatus.OK,
         implementation = { residentKeyPreference: WebAuthN.GeneralPreference ->
 
-            val options = registrationForUser(auth.get(), residentKeyPreference)
+            @Suppress("UNCHECKED_CAST")
+            val options = registrationForUser(auth.get() as USER, residentKeyPreference)
 
             val challenge = generate()
             val key = UUID.random().toString()
@@ -243,7 +242,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
     @OptIn(ExperimentalEncodingApi::class)
     val registerFinish = path("register-finish").post.api(
         belongsToInterface = registerInterface,
-        authOptions = authOptions,
+        authOptions = anyAuthRoot,
         summary = "Establish WebAuthN Credential",
         description = "Validates and Accepts a public key credential created from a previously issued creation challenge.",
         errorCases = listOf(),

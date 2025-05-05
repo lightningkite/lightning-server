@@ -20,9 +20,9 @@ data class OtpSecret(
     override val _id: UUID = UUID.random(),
     val subjectType: String,
     val subjectId: String,
+    val label: String,
 
     val secretBase32: String,
-    val label: String,
     val issuer: String,
     val period: Duration,
     val digits: Int,

@@ -67,7 +67,11 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     private val sessionSerializer = Session.serializer(handler.subjectSerializer, handler.idSerializer)
     private val dataClassPath = DataClassPathSelf(sessionSerializer)
     val unauthInterface = Documentable.InterfaceInfo(path, "UserAuthClientEndpoints", listOf(handler.idSerializer))
-    val authInterface = Documentable.InterfaceInfo(path, "AuthenticatedUserAuthClientEndpoints", listOf(handler.subjectSerializer, handler.idSerializer))
+    val authInterface = Documentable.InterfaceInfo(
+        path,
+        "AuthenticatedUserAuthClientEndpoints",
+        listOf(handler.subjectSerializer, handler.idSerializer)
+    )
 
     val sessionInfo = modelInfo<HasId<*>?, Session<SUBJECT, ID>, UUID>(
         modelName = "${handler.name}Session",
@@ -132,7 +136,12 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         // TODO: Read JWT from query params, remove and redirect
         val token =
             request.headers[HttpHeader.Authorization]?.removePrefix("bearer ")?.removePrefix("Bearer ")
-                ?: request.queryParameters.find { it.first.equals(HttpHeader.Authorization, true) }?.second?.replace(' ', '+')
+                ?: request.queryParameters.find {
+                    it.first.equals(
+                        HttpHeader.Authorization,
+                        true
+                    )
+                }?.second?.replace(' ', '+')
                 ?: request.queryParameters.find { it.first == "jwt" }?.second?.replace(' ', '+')
                 ?: request.headers.cookies[HttpHeader.Authorization]
                 ?: return null
@@ -140,28 +149,35 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     }
 
     fun presignToken(forSession: Session<SUBJECT, ID>, requirements: RequestRequirements): String {
-        return tokenFormat().create(handler, RequestAuth(
-            subject = handler,
-            sessionId = forSession._id,
-            rawId = forSession.subjectId,
-            issuedAt = now(),
-            scopes = forSession.scopes,
-            fromMasquerade = null,
-            requirements = requirements
-        ))
+        return tokenFormat().create(
+            handler, RequestAuth(
+                subject = handler,
+                sessionId = forSession._id,
+                rawId = forSession.subjectId,
+                issuedAt = now(),
+                scopes = forSession.scopes,
+                fromMasquerade = null,
+                requirements = requirements
+            )
+        )
     }
+
     fun presignToken(forId: ID, requirements: RequestRequirements): String {
-        return tokenFormat().create(handler, RequestAuth(
-            subject = handler,
-            sessionId = null,
-            rawId = forId,
-            issuedAt = now(),
-            requirements = requirements
-        ))
+        return tokenFormat().create(
+            handler, RequestAuth(
+                subject = handler,
+                sessionId = null,
+                rawId = forId,
+                issuedAt = now(),
+                requirements = requirements
+            )
+        )
     }
+
     fun presign(request: RequestRequirements, forSession: Session<SUBJECT, ID>): String {
         return "${request.pathPlusQueryParametersAnd}${HttpHeader.Authorization}=${presignToken(forSession, request)}"
     }
+
     fun presign(request: RequestRequirements, forId: ID): String {
         return "${request.pathPlusQueryParametersAnd}${HttpHeader.Authorization}=${presignToken(forId, request)}"
     }
@@ -264,14 +280,14 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     id = it.id,
                     options = it.options,
                     strengthRequired = it.strengthRequired,
-                    session = if(it.readyToLogIn) newSessionPrivate(
+                    session = if (it.readyToLogIn) newSessionPrivate(
                         subjectId = it.id,
                         scopes = input.scopes,
                         label = input.label,
                         expires = run {
                             val a = it.maxExpiration
                             val b = input.expires
-                            if(a != null && b != null) minOf(a, b) else a ?: b
+                            if (a != null && b != null) minOf(a, b) else a ?: b
                         },
                     ).second.string else null
                 )
@@ -295,18 +311,26 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             val used = proofs.map { it.via }.toSet()
             val users = proofs.mapNotNull { handler.findUser(it.property, it.value) }.distinctBy { it._id }
             val identity = proofs.filter { it.property == "email" || it.property == "phone" }.firstOrNull()
-            val subject = users.singleOrNull() ?: throw HttpStatusException(errorNoSingleUser.copy(
-                message = "No user was found with the ${identity?.property ?: "given ID"} ${identity?.value ?: ""}."
-            ))
+            val subject = users.singleOrNull() ?: throw HttpStatusException(
+                errorNoSingleUser.copy(
+                    message = "No user was found with the ${identity?.property ?: "given ID"} ${identity?.value ?: ""}."
+                )
+            )
             proofs.forEach {
-                if(handler.get(subject, it.property) != it.value) {
+                if (handler.get(subject, it.property) != it.value) {
                     throw HttpStatusException(errorIrrelevantProof.copy(data = it.via))
                 }
             }
-            val strength = proofs.groupBy { it.property }.values.sumOf { it.maxOf { it.strength } }
+
+            //TODO: Strength should account for the property as well. There could be multiple ways to
+            // prove a phone numbers ownership, sms and call. Each would have their own "via" value,
+            // but the property will be phone. We should only account for one of these. This requires
+            // modifying the proof class
+            val strength = proofs.groupBy { it.via }.values.sumOf { it.maxOf { it.strength } }
             val proofMethods = handler.proofMethods
                 .filter { it.established(handler, subject) }
-            val maxStrengthPossible = proofMethods.groupBy { it.info.property }.values.sumOf { it.maxOf { it.info.strength } }
+            val maxStrengthPossible =
+                proofMethods.groupBy { it.info.property }.values.sumOf { it.maxOf { it.info.strength } }
             val actStrenReq = min(handler.desiredStrengthFor(subject), maxStrengthPossible)
             ProofsCheckResult(
                 readyToLogIn = strength >= actStrenReq,
@@ -324,6 +348,29 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     },
                 strengthRequired = actStrenReq
             )
+        }
+    )
+
+    val availableProofs = path("available-proofs").get.api(
+        belongsToInterface = authInterface,
+        authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType))),
+        inputType = Unit.serializer(),
+        outputType = ListSerializer(ProofOption.serializer()),
+        summary = "Available Proofs",
+        description = "Returns a list of proof options for the user to use in re-authenticating.",
+        errorCases = listOf(),
+        implementation = { _: Unit ->
+            val subject = auth.get()
+            handler.proofMethods
+                .filter { it.established(handler, subject) }
+                .map {
+                    ProofOption(
+                        method = it.info,
+                        value = it.info.property?.let { p ->
+                            handler.get(subject, p)
+                        }
+                    )
+                }
         }
     )
 
@@ -540,27 +587,27 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     private suspend fun RefreshToken.session(request: Request?): Session<SUBJECT, ID>? {
         if (!valid) {
-            if(generalSettings().debug) println("Auth failed because !valid")
+            if (generalSettings().debug) println("Auth failed because !valid")
             return null
         }
         if (type != handler.name) {
-            if(generalSettings().debug) println("Auth failed because type != handler.name")
+            if (generalSettings().debug) println("Auth failed because type != handler.name")
             return null
         }
         val session = sessionInfo.collection().get(_id) ?: run {
-            if(generalSettings().debug) println("No such session")
+            if (generalSettings().debug) println("No such session")
             throw UnauthorizedException("No such session")
         }
         if (!plainTextSecret.checkAgainstHash(session.secretHash)) {
-            if(generalSettings().debug) println("Auth failed because !plainTextSecret.checkAgainstHash(session.secretHash) ($plainTextSecret vs ${session.secretHash})")
+            if (generalSettings().debug) println("Auth failed because !plainTextSecret.checkAgainstHash(session.secretHash) ($plainTextSecret vs ${session.secretHash})")
             throw UnauthorizedException("Incorrect hash for session")
         }
         if ((session.expires ?: Instant.DISTANT_FUTURE) < now()) {
-            if(generalSettings().debug) println("Auth failed because session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()")
+            if (generalSettings().debug) println("Auth failed because session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()")
             throw UnauthorizedException("Session has expired.")
         }
         if (session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()) {
-            if(generalSettings().debug) println("Auth failed because session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()")
+            if (generalSettings().debug) println("Auth failed because session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()")
             throw UnauthorizedException("Session has been terminated.")
         }
         sessionInfo.collection().updateOneById(_id, modification(dataClassPath) {
