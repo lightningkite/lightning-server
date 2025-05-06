@@ -351,26 +351,38 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         }
     )
 
-    val availableProofs = path("available-proofs").get.api(
+    val authRequirements = path("auth-requirements").get.api(
         belongsToInterface = authInterface,
         authOptions = AuthOptions<SUBJECT>(setOf(AuthOption(handler.authType))),
         inputType = Unit.serializer(),
-        outputType = ListSerializer(ProofOption.serializer()),
-        summary = "Available Proofs",
-        description = "Returns a list of proof options for the user to use in re-authenticating.",
+        outputType = AuthRequirements.serializer(),
+        summary = "Authentication Requirements",
+        description = "Returns a required strength and a list of proof options for the user to use in re-authenticating.",
         errorCases = listOf(),
         implementation = { _: Unit ->
             val subject = auth.get()
-            handler.proofMethods
+
+            val proofMethods = handler.proofMethods
                 .filter { it.established(handler, subject) }
-                .map {
-                    ProofOption(
-                        method = it.info,
-                        value = it.info.property?.let { p ->
-                            handler.get(subject, p)
-                        }
-                    )
-                }
+
+            val maxStrengthPossible =
+                proofMethods.groupBy { it.info.property }.values.sumOf { it.maxOf { it.info.strength } }
+
+            val actStrenReq = min(handler.desiredStrengthFor(subject), maxStrengthPossible)
+
+            AuthRequirements(
+                handler.proofMethods
+                    .filter { it.established(handler, subject) }
+                    .map {
+                        ProofOption(
+                            method = it.info,
+                            value = it.info.property?.let { p ->
+                                handler.get(subject, p)
+                            }
+                        )
+                    },
+                actStrenReq
+            )
         }
     )
 

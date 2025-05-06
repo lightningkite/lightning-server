@@ -34,6 +34,12 @@ data class ProofOption(
 )
 
 @Serializable
+data class AuthRequirements(
+    val options: List<ProofOption>,
+    val strengthRequired: Int,
+)
+
+@Serializable
 data class Proof(
     val via: String,
     val strength: Int = 1,

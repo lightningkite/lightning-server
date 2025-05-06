@@ -18,6 +18,7 @@ import com.lightningkite.lightningdb.updateRestrictions
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.Authentication.ProofMethod
 import com.lightningkite.lightningserver.auth.accepts
+import com.lightningkite.lightningserver.auth.anyAuth
 import com.lightningkite.lightningserver.auth.anyAuthRoot
 import com.lightningkite.lightningserver.auth.idString
 import com.lightningkite.lightningserver.auth.noAuth
@@ -67,8 +68,9 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
-class WebAuthNProofEndpoints<USER : HasId<*>>(
+class WebAuthNProofEndpoints(
     path: ServerPath,
     val database: () -> Database,
     val cache: () -> Cache,
@@ -76,8 +78,8 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
     val challengeLength: Int = 64,
     val expiration: Duration = 5.minutes,
     val rpId: String,
-    val registrationForUser: (USER, WebAuthN.GeneralPreference) -> WebAuthN.Registration.RegistrationOptions,
-    val proveOptions: (USER?) -> WebAuthN.Authentication.ProveOptions = { WebAuthN.Authentication.ProveOptions() },
+    val registrationForUser: (HasId<*>, WebAuthN.GeneralPreference) -> WebAuthN.Registration.RegistrationOptions,
+    val proveOptions: (String?) -> WebAuthN.Authentication.ProveOptions = { WebAuthN.Authentication.ProveOptions() },
 ) : ServerPathGroup(path), ProofMethod {
 
     init {
@@ -200,7 +202,7 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
         implementation = { residentKeyPreference: WebAuthN.GeneralPreference ->
 
             @Suppress("UNCHECKED_CAST")
-            val options = registrationForUser(auth.get() as USER, residentKeyPreference)
+            val options = registrationForUser(auth.get(), residentKeyPreference)
 
             val challenge = generate()
             val key = UUID.random().toString()
@@ -322,12 +324,13 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
     )
 
 
-    // At this point, the subject need not identify themselves. This is because the Public Key Credential that the client
-    // authenticator uses to sign the challenge will be used in the "prove" step to determine the subject
-    // that is signing in.
+    // The user may or may not identify themselves. If they do not, they expect their authenticator to have discoverable
+    // keys. If they do, then we must return the subjects existing credential IDs. If a user hits this endpoint WITH
+    // authentication, then they are re-authenticating, and we will return the existing credential ids regardless of
+    // identity provided.
     val start = path("start").post.api(
         belongsToInterface = proveInterface,
-        authOptions = noAuth,
+        authOptions = anyAuth + noAuth,
         summary = "Begin WebAuthN challenge",
         description = "Returns a challenge to be passed on to a client authenticator for signing.",
         errorCases = listOf(),
@@ -339,19 +342,26 @@ class WebAuthNProofEndpoints<USER : HasId<*>>(
             if (handler == null)
                 throw BadRequestException("Invalid Subject Type")
 
-            val (existingCreds: List<WebAuthN.ExistingCredential>, subject: USER?) = subjectId?.let { id ->
-                @Suppress("UNCHECKED_CAST")
-                val subject = handler.findUser("${subjectType}/_id", id) as? USER
-
-                val creds = userCredentials(subjectId = id, subjectType = subjectType)
-
-                creds to subject
+            if(authOrNull != null && subjectId != null && authOrNull.idString != subjectId){
+                return@api WebAuthN.Authentication.StartResponse(
+                    challengeId = UUID.random().toString(),
+                    options = WebAuthN.Authentication.PublicKeyCredentialRequestOptions(
+                        allowCredentials = emptyList(),
+                        challenge = generate(),
+                        extensions = WebAuthN.Authentication.RequestExtensions(),
+                        hints = emptyList(),
+                        rpId = rpId,
+                        timeout = expiration.inWholeMilliseconds.toInt(),
+                        userVerification = WebAuthN.GeneralPreference.Required,
+                    )
+                )
             }
-                ?: (emptyList<WebAuthN.ExistingCredential>() to null)
 
+            val existingCreds = (subjectId ?: authOrNull?.idString)
+                ?.let{ userCredentials(subjectId = it, subjectType = subjectType) }
+                ?: emptyList()
 
-            @Suppress("UNCHECKED_CAST")
-            val options = proveOptions(subject)
+            val options = proveOptions(subjectId)
 
             val challenge = generate()
             val key = UUID.random().toString()
