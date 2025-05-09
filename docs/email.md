@@ -25,8 +25,6 @@ Then in add this to your settings.json file
   }
 }
 ```
-If you are using terraform put it into your local.auto.tfvars
-
 For development or debugging you can set it to console output the emails plain text to the console.
 
 For testing you can set the url to "test". The testing EmailClient is similar to ConsoleEmailClient but with more options:
@@ -48,7 +46,7 @@ For live email services we have support out of the box for the following:
 Server.email().send(
     Email(
         subject = "My first email",
-        to = listOf("test@test.test","example@example.com"),
+        to = listOf(EmailLabeledValue("test@test.test"), EmailLabeledValue("example@example.com")),
         html = "<h1>Hello email</h1>",
         plainText = "Hello email",
     )
@@ -66,36 +64,51 @@ data class Email(
     val html: String,
     val plainText: String = html.emailApproximatePlainText(),
     val attachments: List<Attachment> = listOf(),
-    val customHeaders: HttpHeaders = HttpHeaders.EMPTY,)
+    val customHeaders: HttpHeaders = HttpHeaders.EMPTY,
+)
 ```
 
 ## Sending bulk emails
 
 ```kotlin
-Server.email().sendBulk(listOf(Email(
-    subject = "My first email",
-    to = listOf("test@test.test","example@example.com"),
-    html = "<h1>Hello email</h1>",
-    plainText = "Hello email"
-),        
-    subject = "My first email",
-    to = listOf("test@test.test","example@example.com"),
-    html = "<h1>Hello email</h1>",
-    plainText = "Hello email"))
+Server.email().sendBulk(
+    listOf(
+        Email(
+            subject = "My first email",
+            to = listOf("test@test.test", "example@example.com"),
+            html = "<h1>Hello email 1</h1>",
+            plainText = "Hello email 1"
+        ),
+        Email(
+            subject = "My first email",
+            to = listOf("test2@test.test", "example2@example.com"),
+            html = "<h1>Hello email 2</h1>",
+            plainText = "Hello email 2"
+        )
+    )
+)
 ```
 ## Sending bulk emails with personalization
+You can create an email template with tags meant for replacement, then create a list of Personalizations which contains 
+the destination and a map of replacement values. The tags are not typed or custom to Lightning Server, they can be what 
+ever you want them to be. It's best to make them obviously unique. The example below uses double curlies.
 ```kotlin
-val users = listOf(User("Bob","bob@example.com","cc@example.com"),User("John","john@example.com"))
-Server.email().sendBulk(template = Email(
-    subject = "Template Bulk email",
-    to=listOf(),
-    html = "<p> name </p>"),
-personalizations = users.map { user->
-    EmailPersonalization(
-    to = user.email,
-      cc = user.cc,
-      bcc = user.bcc,
-      substitutions = mapOf("name" to user.name),
-      customHeaders = HttpHeaders.EMPTY)
-})
+
+val users = listOf(User("Bob", "bob@example.com", "cc@example.com"), User("John", "john@example.com"))
+Server.email().sendBulk(
+    template = Email(
+        subject = "Template Bulk email",
+        to = listOf(),
+        html = "<p> Welcome {{name}}</p> <p> ..."
+    ),
+    personalizations = users.map { user ->
+        EmailPersonalization(
+            to = user.email,
+            cc = user.cc,
+            bcc = user.bcc,
+            substitutions = mapOf("{{name}}" to user.name),
+            customHeaders = HttpHeaders.EMPTY
+        )
+    }
+)
 ```
