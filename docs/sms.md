@@ -44,7 +44,7 @@ For live sms services we have support out of the box for the following:
 
 ```kotlin
 Server.sms().send(
-    to = 000-000-0000,
+    to = "+10000000000",
     message = "Test"
 )
 ```
