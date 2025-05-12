@@ -618,11 +618,4 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             }
         )
     }
-
-    @Serializable
-    private data class HtmlProofStartReq(val method: String, val property: String, val value: String)
-
-    @Serializable
-    private data class HtmlProofFinish(val password: String)
-
 }

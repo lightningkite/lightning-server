@@ -57,7 +57,7 @@ Built to work for all common serverless platforms.
 - [Cache](docs/cache.md)
 - [Files](docs/files.md)
 - [Email](docs/email.md)
-- [Authentication](docs/authentication.md)
+- [Authentication](docs/authentication/authentication.md)
 - [Typed Endpoints](docs/typed-endpoints.md)
 - [Automatic REST Endpoints](docs/autorest.md)
 - [Tasks](docs/tasks.md)
