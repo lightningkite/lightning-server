@@ -6,11 +6,13 @@ import kotlinx.datetime.serializers.TimeZoneSerializer
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 
@@ -24,7 +26,6 @@ object DefaultDecoder : Decoder {
 
     init {
         defaults[UUIDSerializer.descriptor.serialName] = UUID.parse("00000000-0000-0000-0000-000000000000")
-        defaults[DurationSerializer.descriptor.serialName] = 0.seconds
         defaults[InstantIso8601Serializer.descriptor.serialName] = Instant.fromEpochMilliseconds(0)
         defaults[LocalTimeIso8601Serializer.descriptor.serialName] = LocalTime(0, 0, 0)
         defaults[LocalDateIso8601Serializer.descriptor.serialName] = LocalDate(1970, 1, 1)
@@ -33,6 +34,9 @@ object DefaultDecoder : Decoder {
         defaults[kotlinx.datetime.serializers.LocalTimeIso8601Serializer.descriptor.serialName] = LocalTime(0, 0, 0)
         defaults[kotlinx.datetime.serializers.LocalDateIso8601Serializer.descriptor.serialName] = LocalDate(1970, 1, 1)
         defaults[kotlinx.datetime.serializers.LocalDateTimeIso8601Serializer.descriptor.serialName] = LocalDateTime(LocalDate(1970, 1, 1), LocalTime(0, 0, 0))
+        defaults[DurationSerializer.descriptor.serialName] = 0.seconds
+        defaults[Duration.serializer().descriptor.serialName] = 0.seconds
+        defaults[DurationMsSerializer.descriptor.serialName] = 0.seconds
         defaults[ZonedDateTimeIso8601Serializer.descriptor.serialName] = ZonedDateTime(LocalDateTime(LocalDate(1970, 1, 1), LocalTime(0, 0, 0)), TimeZone.UTC)
         defaults[OffsetDateTimeIso8601Serializer.descriptor.serialName] = OffsetDateTime(LocalDateTime(LocalDate(1970, 1, 1), LocalTime(0, 0, 0)), UtcOffset.ZERO)
         defaults[TimeZoneSerializer.descriptor.serialName] = TimeZone.currentSystemDefault()

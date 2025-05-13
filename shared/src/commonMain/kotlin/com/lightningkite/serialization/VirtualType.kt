@@ -298,7 +298,8 @@ data class VirtualEnumOption(
 class VirtualEnumValue(
     val enum: VirtualEnum,
     val index: Int,
-) {
+): Comparable<VirtualEnumValue> {
+    override fun compareTo(other: VirtualEnumValue): Int = index.compareTo(other.index)
     override fun toString(): String = enum.options[index].name
 }
 

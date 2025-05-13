@@ -17,6 +17,7 @@ import com.lightningkite.lightningserver.titleCase
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.serialization.*
 import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.nullable
@@ -615,9 +616,11 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
         } ?: listOf(),
         implementation = { condition: GroupCountQuery<T> ->
             @Suppress("UNCHECKED_CAST")
+            val keySerializer = condition.groupBy.serializerAny as KSerializer<Any?>
+            @Suppress("UNCHECKED_CAST")
             info.collection(this)
                 .groupCount(condition.condition, condition.groupBy as DataClassPath<T, Any?>)
-                .mapKeys { it.key.toString() }
+                .mapKeys { Serialization.json.encodeToString(keySerializer, it.key) }
         }
     )
 
@@ -650,6 +653,8 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
         errorCases = listOf(),
         implementation = { condition: GroupAggregateQuery<T> ->
             @Suppress("UNCHECKED_CAST")
+            val keySerializer = condition.groupBy.serializerAny as KSerializer<Any?>
+            @Suppress("UNCHECKED_CAST")
             info.collection(this)
                 .groupAggregate(
                     condition.aggregate,
@@ -657,7 +662,7 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
                     condition.groupBy as DataClassPath<T, Any?>,
                     condition.property as DataClassPath<T, Number>
                 )
-                .mapKeys { it.key.toString() }
+                .mapKeys { Serialization.json.encodeToString(keySerializer, it.key) }
         }
     )
 }
