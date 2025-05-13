@@ -2,12 +2,12 @@
 
 A project that drastically speeds up server development.  Comparable to Django for Python.
 
-Built to work for all common serverless platforms.
+Built to work for dedicated and serverless platforms.
 
 ## Major Features
 
 - Abstractions
-  - Multiple backends - AWS, Azure, Ktor
+  - Multiple backends - AWS Lambda, Ktor, and Azure Functions (Out of Date)
     - Generates Terraform for AWS
   - Database Abstraction backed by KotlinX Serialization
     - Supports MongoDB, partial Postgres, local JSON storage
@@ -63,6 +63,7 @@ Built to work for all common serverless platforms.
 - [Tasks](docs/tasks.md)
 - [Websockets](docs/websockets.md) (todo)
 - [Meta](docs/meta.md)
+- [Deployments](docs/deployment/deployment.md)
 
 ## Road Map
 
