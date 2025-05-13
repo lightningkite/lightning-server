@@ -616,11 +616,9 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
         } ?: listOf(),
         implementation = { condition: GroupCountQuery<T> ->
             @Suppress("UNCHECKED_CAST")
-            val keySerializer = condition.groupBy.serializerAny as KSerializer<Any?>
-            @Suppress("UNCHECKED_CAST")
             info.collection(this)
                 .groupCount(condition.condition, condition.groupBy as DataClassPath<T, Any?>)
-                .mapKeys { Serialization.json.encodeToString(keySerializer, it.key) }
+                .mapKeys { it.key.toString() }
         }
     )
 
@@ -649,6 +647,56 @@ open class ModelRestEndpoints<USER : HasId<*>?, T : HasId<ID>, ID : Comparable<I
         inputType = GroupAggregateQuery.serializer(info.serialization.serializer),
         outputType = MapSerializer(String.serializer(), Double.serializer().nullable),
         summary = "Group Aggregate",
+        description = "Aggregates a property of ${collectionName}s matching the given condition divided by group.",
+        errorCases = listOf(),
+        implementation = { condition: GroupAggregateQuery<T> ->
+            @Suppress("UNCHECKED_CAST")
+            info.collection(this)
+                .groupAggregate(
+                    condition.aggregate,
+                    condition.condition,
+                    condition.groupBy as DataClassPath<T, Any?>,
+                    condition.property as DataClassPath<T, Number>
+                )
+                .mapKeys { it.key.toString() }
+        }
+    )
+
+
+
+    val groupCount2 = post("group-count-2").api(
+        belongsToInterface = interfaceName,
+        authOptions = info.authOptions,
+        inputType = GroupCountQuery.serializer(info.serialization.serializer),
+        outputType = MapSerializer(String.serializer(), Int.serializer()),
+        summary = "Group Count 2",
+        description = "Gets the total number of ${collectionName}s matching the given condition divided by group.",
+        errorCases = listOf(),
+        examples = exampleItem()?.let {
+            sampleConditions().mapNotNull { c ->
+                val f = sampleSorts().randomOrNull()?.randomOrNull()?.field ?: return@mapNotNull null
+                ApiExample(
+                    GroupCountQuery(c, f),
+                    mapOf(f.getAny(it).toString() to 3)
+                )
+            }
+        } ?: listOf(),
+        implementation = { condition: GroupCountQuery<T> ->
+            @Suppress("UNCHECKED_CAST")
+            val keySerializer = condition.groupBy.serializerAny as KSerializer<Any?>
+            @Suppress("UNCHECKED_CAST")
+            info.collection(this)
+                .groupCount(condition.condition, condition.groupBy as DataClassPath<T, Any?>)
+                .mapKeys { Serialization.json.encodeToString(keySerializer, it.key) }
+        }
+    )
+
+    val groupAggregate2 = post("group-aggregate-2").api(
+        belongsToInterface = interfaceName,
+        authOptions = info.authOptions,
+        inputType = GroupAggregateQuery.serializer(info.serialization.serializer),
+        outputType = MapSerializer(String.serializer(), Double.serializer().nullable),
+        summary = "Group Aggregate 2",
         description = "Aggregates a property of ${collectionName}s matching the given condition divided by group.",
         errorCases = listOf(),
         implementation = { condition: GroupAggregateQuery<T> ->
