@@ -28,16 +28,19 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 @IndexSet(["subjectType", "subjectId"])
 data class WebAuthNCredential(
     override val _id: String,
-    val displayName: String,
-    val establishedAt: Instant = now(),
-    val lastUsedAt: Instant? = null,
     @Index val subjectId: String,
     @Index val subjectType: String,
+    val displayName: String,
+
     val residentKey: Boolean,
     val authenticatorAttachment: String,
     val attestationObject: String, // Base64 url-encoded
     val lastSignCount: Long,
     val transports: List<String>,
+
+    val establishedAt: Instant = now(),
+    val lastUsedAt: Instant? = null,
+    val expiresAt: Instant? = null,
     @Index val disabledAt: Instant? = null,
 ) : HasId<String>
 
