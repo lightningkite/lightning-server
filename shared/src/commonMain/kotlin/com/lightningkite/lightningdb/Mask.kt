@@ -277,6 +277,10 @@ fun <T> Condition<T>.readsResultOf(modification: Modification<T>, tableTextPaths
             }
         }
 
+        is Condition.Not -> {
+            this.condition.readsResultOf(modification, tableTextPaths)
+        }
+
         else -> true
     }
 }
