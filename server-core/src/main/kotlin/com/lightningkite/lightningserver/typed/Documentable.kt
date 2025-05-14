@@ -20,6 +20,8 @@ import kotlinx.serialization.descriptors.capturedKClass
 import kotlinx.serialization.internal.GeneratedSerializer
 import kotlinx.serialization.modules.SerializersModule
 
+class DocumentableException(message:String? = null, cause: Throwable? = null): Exception(message, cause)
+
 interface Documentable {
     val path: TypedServerPath
     val summary: String
@@ -32,11 +34,21 @@ interface Documentable {
     }
 
     companion object {
-        val endpoints get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *, *>>()
-        val interfaces get() = Http.endpoints.values.asSequence().filterIsInstance<ApiEndpoint<*, *, *, *>>()
-            .mapNotNull { it.belongsToInterface }
-            .distinct()
-        val websockets get() = WebSockets.handlers.values.asSequence().filterIsInstance<ApiWebsocket<*, *, *, *, *>>()
+        val endpoints get() = Http.endpoints.values
+            .asSequence()
+            .filterIsInstance<ApiEndpoint<*, *, *, *>>()
+
+        val interfaces
+            get() = Http.endpoints.values
+                .asSequence()
+                .filterIsInstance<ApiEndpoint<*, *, *, *>>()
+                .mapNotNull { it.belongsToInterface }
+                .distinct()
+
+        val websockets get() = WebSockets.handlers.values
+            .asSequence()
+            .filterIsInstance<ApiWebsocket<*, *, *, *, *>>()
+
         val all get() = endpoints + websockets
         val usedTypes: Collection<KSerializer<*>>
             get() {
@@ -49,24 +61,39 @@ interface Documentable {
                 }
 
                 val types = HashMap<String, KSerializer<*>>()
-                endpoints.flatMap {
-                    sequenceOf(it.inputType, it.outputType)
-                }.plus(websockets.flatMap {
-                    sequenceOf(it.inputType, it.outputType)
-                })
-                    .forEach { onAllTypes(it) { types[it.descriptor.serialName.substringBefore('<')] = it } }
+
+                endpoints.forEach { endpoint ->
+                    try {
+                        onAllTypes(endpoint.inputType) { types[it.descriptor.serialName.substringBefore('<')] = it }
+                        onAllTypes(endpoint.outputType) { types[it.descriptor.serialName.substringBefore('<')] = it }
+                    } catch (e: Exception) {
+                        throw DocumentableException("Failed to generate typing for ${endpoint.path}", e)
+                    }
+                }
+
+                websockets.forEach { endpoint ->
+                    try {
+                        onAllTypes(endpoint.inputType) { types[it.descriptor.serialName.substringBefore('<')] = it }
+                        onAllTypes(endpoint.outputType) { types[it.descriptor.serialName.substringBefore('<')] = it }
+                    } catch (e: Exception) {
+                        throw DocumentableException("Failed to generate typing for ${endpoint.path}", e)
+                    }
+                }
+
                 return types.values
             }
     }
 }
 
 val ServerPath.docGroup: String? get() = generateSequence(this) { it.parent }.mapNotNull { it.docName }.firstOrNull()
-val Documentable.docGroup: String? get() = generateSequence(path.path) { it.parent }.mapNotNull { it.docName }.firstOrNull()
-val Documentable.docGroupIdentifier: String? get() = docGroup
-    ?.replace(Regex("""[^0-9a-zA-Z]+(?<following>.)?""")) { match ->
-        match.groups["following"]?.value?.uppercase() ?: ""
-    }
-    ?.replaceFirstChar { it.lowercase() }
+val Documentable.docGroup: String?
+    get() = generateSequence(path.path) { it.parent }.mapNotNull { it.docName }.firstOrNull()
+val Documentable.docGroupIdentifier: String?
+    get() = docGroup
+        ?.replace(Regex("""[^0-9a-zA-Z]+(?<following>.)?""")) { match ->
+            match.groups["following"]?.value?.uppercase() ?: ""
+        }
+        ?.replaceFirstChar { it.lowercase() }
 val Documentable.functionName: String
     get() = summary
         .replace(Regex("""[^0-9a-zA-Z]+(?<following>.)?""")) { match ->

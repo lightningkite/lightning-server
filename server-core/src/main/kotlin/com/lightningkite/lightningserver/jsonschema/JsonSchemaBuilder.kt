@@ -39,6 +39,8 @@ import kotlin.collections.toList
 import kotlin.collections.toSet
 import kotlin.reflect.KClass
 
+class JsonSchemaException(message: String? = null, cause: Throwable? = null): Exception(message, cause)
+
 @Serializable
 data class LightningServerSchema(
     val uploadEarlyEndpoint: String? = null,
@@ -253,15 +255,19 @@ class JsonSchemaBuilder(
         annotation { it: UiWidget -> copy(uiWidget = it.type) }
         annotation { it: References -> copy(references = key(json.serializersModule.serializer(it.references.java))) }
         annotation { it: MultipleReferences ->
-            copy(
-                items = items!!.copy(
-                    references = key(
-                        json.serializersModule.serializer(
-                            it.references.java
+            try {
+                copy(
+                    items = items!!.copy(
+                        references = key(
+                            json.serializersModule.serializer(
+                                it.references.java
+                            )
                         )
                     )
                 )
-            )
+            } catch (e: Exception){
+                throw JsonSchemaException("Failed to handle MultipleReferences annotation", e)
+            }
         }
         annotation { it: MimeType -> copy(mimeType = it.types.joinToString(", ")) }
         override("com.lightningkite.lightningserver.files.ServerFile") {
@@ -403,7 +409,7 @@ class JsonSchemaBuilder(
                 if (direct) return action()
                 val key = key(serializer)
                 if (defining.add(key)) {
-                    if (serializer.descriptor.serialName == "Not") throw Exception()
+                    if (serializer.descriptor.serialName == "Not") throw JsonSchemaException()
                     definitions[key] = action()
                 }
                 return JsonSchemaType(ref = refString(serializer))
@@ -497,7 +503,7 @@ class JsonSchemaBuilder(
                 SerialKind.CONTEXTUAL -> throw Error("This should not be reachable - ${ser.descriptor.serialName} could be unwrapped no further")
             }
         } catch(e: Exception) {
-            throw Exception("Failed to get schema for ${serializer.descriptor.serialName}", e)
+            throw JsonSchemaException("Failed to get schema for ${serializer.descriptor.serialName}", e)
         }
     }
 
