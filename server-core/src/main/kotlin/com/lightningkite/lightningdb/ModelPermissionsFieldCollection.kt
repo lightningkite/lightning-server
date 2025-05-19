@@ -64,7 +64,7 @@ open class ModelPermissionsFieldCollection<Model : Any>(
         return wraps.insertMany(passingModels).map { permissions.mask(it) }
     }
 
-    override suspend fun count(condition: Condition<Model>): Int = wraps.count(condition and permissions.read)
+    override suspend fun count(condition: Condition<Model>): Int = wraps.count(condition and permissions.read and permissions.readMask(condition, textIndexPaths))
 
     override suspend fun <Key> groupCount(
         condition: Condition<Model>,
