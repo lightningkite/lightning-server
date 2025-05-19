@@ -229,6 +229,19 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         derivedFrom = derivedFrom
     )
 
+    suspend fun newSession(request: LogInRequest, proofCheck: ProofsCheckResult<ID>): Pair<Session<SUBJECT, ID>, RefreshToken>? =
+        if (proofCheck.readyToLogIn) newSessionPrivate(
+            subjectId = proofCheck.id,
+            scopes = request.scopes,
+            label = request.label,
+            expires = run {
+                val a = proofCheck.maxExpiration
+                val b = request.expires
+                if (a != null && b != null) minOf(a, b) else a ?: b
+            },
+        )
+        else null
+
     private suspend fun newSessionPrivate(
         subjectId: ID,
         label: String? = null,
@@ -280,16 +293,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     id = it.id,
                     options = it.options,
                     strengthRequired = it.strengthRequired,
-                    session = if (it.readyToLogIn) newSessionPrivate(
-                        subjectId = it.id,
-                        scopes = input.scopes,
-                        label = input.label,
-                        expires = run {
-                            val a = it.maxExpiration
-                            val b = input.expires
-                            if (a != null && b != null) minOf(a, b) else a ?: b
-                        },
-                    ).second.string else null
+                    session = newSession(input, it)?.second?.string
                 )
             }
         }
