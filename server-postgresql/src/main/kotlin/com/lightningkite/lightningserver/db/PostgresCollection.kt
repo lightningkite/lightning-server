@@ -54,10 +54,13 @@ class PostgresCollection<T : Any>(
                 .orderBy(*orderBy.map {
                     @Suppress("UNCHECKED_CAST")
                     (
-                            if (!it.ignoreCase && it.field.serializerAny.descriptor.kind == PrimitiveKind.STRING)
-                                AsciiValue(table.col[it.field.colName]!! as Column<String>)
-                            else table.col[it.field.colName]!!
-                    ) to if (it.ascending) SortOrder.ASC else SortOrder.DESC }
+                            if (it.field.serializerAny.descriptor.kind == PrimitiveKind.STRING) {
+                                // TODO: Check database default collation to skip extra work
+                                if(it.ignoreCase) (table.col[it.field.colName]!! as Column<String>).lowerCase()
+                                else AsciiValue(table.col[it.field.colName]!! as Column<String>)
+                            } else table.col[it.field.colName]!!
+                            ) to if (it.ascending) SortOrder.ASC else SortOrder.DESC
+                }
                     .toTypedArray())
                 .limit(limit, skip.toLong())
 //                .prep
@@ -120,6 +123,7 @@ class PostgresCollection<T : Any>(
         return t {
             @Suppress("UNCHECKED_CAST")
             val groupCol = table.col[groupBy.colName] as Column<Key>
+
             @Suppress("UNCHECKED_CAST")
             val valueCol = table.col[property.colName] as Column<Number>
             val agg = when (aggregate) {
