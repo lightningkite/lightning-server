@@ -20,6 +20,8 @@ import java.util.Locale
 import kotlin.collections.component1
 import kotlin.collections.component2
 
+class SDKException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
+
 object SDK2 {
 
     val renderableEndpoints = (Http.endpoints.values.filterIsInstance<ApiEndpoint<*, *, *, *>>()
@@ -53,6 +55,7 @@ object SDK2 {
             }
         }
     }
+
     private fun KSerializer<*>.kotlinSerializer(): String {
         nullElement()?.let { return it.kotlinSerializer() + ".nullable" }
         return when (this.descriptor.kind) {
@@ -62,14 +65,17 @@ object SDK2 {
 
             StructureKind.LIST -> "ListSerializer(${this.listElement()!!.kotlinSerializer()})"
             SerialKind.CONTEXTUAL -> "ContextualSerializer(${kotlinTypeString()}::class, null, arrayOf(${
-                this.uncontextualize().tryTypeParameterSerializers3()?.joinToString(", ") { it.kotlinSerializer() } ?: ""
+                this.uncontextualize().tryTypeParameterSerializers3()
+                    ?.joinToString(", ") { it.kotlinSerializer() } ?: ""
             }))"
+
             else -> {
                 descriptor.serialName
                     .substringBefore('/')
                     .substringBefore('<')
                     .plus(".serializer")
-                    .plus(tryTypeParameterSerializers3()?.joinToString(", ", "(", ")") { it.kotlinSerializer() } ?: "()")
+                    .plus(tryTypeParameterSerializers3()?.joinToString(", ", "(", ")") { it.kotlinSerializer() }
+                        ?: "()")
             }
         }
     }
@@ -101,10 +107,14 @@ object SDK2 {
                 interfaces.takeUnless { it.isEmpty() }?.let {
                     append(": ")
                     append(it.joinToString(", ") {
-                        it.name +
-                                (it.subtypes.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") {
-                                    it.kotlinTypeString()
-                                } ?: "")
+                        try {
+                            it.name +
+                                    (it.subtypes.takeUnless { it.isEmpty() }
+                                        ?.joinToString(", ", "<", ">") { it.kotlinTypeString() }
+                                        ?: "")
+                        } catch (e: Exception) {
+                            throw DocumentableException("Failed to generate typing for ${it.path}", e)
+                        }
                     })
                 }
                 appendLine("{")
@@ -113,24 +123,32 @@ object SDK2 {
                 if (it.belongsToInterface != null) return@forEach
                 when (it) {
                     is ApiEndpoint<*, *, *, *> -> {
-                        val args =
-                            it.path.toKotlinArgsStrings() +
-                                    if (it.inputType.descriptor.serialName == "kotlin.Unit") emptyList()
-                                    else listOf("input: ${it.inputType.kotlinTypeString()}")
-                        appendLine(
-                            "suspend fun ${it.functionName}(${args.joinToString()}): ${it.outputType.kotlinTypeString()}"
-                        )
+                        try {
+                            val args =
+                                it.path.toKotlinArgsStrings() +
+                                        if (it.inputType.descriptor.serialName == "kotlin.Unit") emptyList()
+                                        else listOf("input: ${it.inputType.kotlinTypeString()}")
+                            appendLine(
+                                "suspend fun ${it.functionName}(${args.joinToString()}): ${it.outputType.kotlinTypeString()}"
+                            )
+                        } catch (e: Exception) {
+                            throw SDKException("Failed to render endpoint interface ${it.path}", e)
+                        }
                     }
 
                     is ApiWebsocket<*, *, *, *, *> -> {
-                        append(
-                            "fun ${it.functionName}(${it.path.toKotlinArgsStrings().joinToString()}): "
-                        )
-                        append("TypedWebSocket<")
-                        append(it.inputType.kotlinTypeString())
-                        append(", ")
-                        append(it.outputType.kotlinTypeString())
-                        appendLine(">")
+                        try {
+                            append(
+                                "fun ${it.functionName}(${it.path.toKotlinArgsStrings().joinToString()}): "
+                            )
+                            append("TypedWebSocket<")
+                            append(it.inputType.kotlinTypeString())
+                            append(", ")
+                            append(it.outputType.kotlinTypeString())
+                            appendLine(">")
+                        } catch (e: Exception) {
+                            throw SDKException("Failed to render websocket interface ${it.path}", e)
+                        }
                     }
 
                     else -> throw IllegalStateException("Unknown endpoint type: $it")
@@ -173,55 +191,70 @@ object SDK2 {
                 "Api2${group?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }}"
             if (group != null) {
                 append("inner class ${iname}Live ")
-                interfaces.map{
-                    it.name +
-                            (it.subtypes.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") {
-                                it.kotlinTypeString()
-                            } ?: "") + " by " + it.name + "Live(fetcher, ${it.path.toCodeString()}, ${it.subtypes.joinToString() { it.kotlinSerializer() }})"
-                }.plus("Api2.$iname").let {
-                    append(": ")
-                    append(it.joinToString(", "))
-                }
+                interfaces
+                    .map {
+                        try {
+                            it.name +
+                                    (it.subtypes.takeUnless { it.isEmpty() }
+                                        ?.joinToString(", ", "<", ">") { it.kotlinTypeString() }
+                                        ?: "") + " by " + it.name + "Live(fetcher, ${it.path.toCodeString()}, ${it.subtypes.joinToString() { it.kotlinSerializer() }})"
+                        } catch (e: Exception) {
+                            throw DocumentableException("Failed to generate typing for ${it.path}", e)
+                        }
+                    }
+                    .plus("Api2.$iname")
+                    .let {
+                        append(": ")
+                        append(it.joinToString(", "))
+                    }
                 appendLine("{")
             }
             endpoints.forEach {
                 if (it.belongsToInterface != null) return@forEach
                 when (it) {
                     is ApiEndpoint<*, *, *, *> -> {
-                        val args =
-                            it.path.toKotlinArgsStrings() +
-                                    if (it.inputType.descriptor.serialName == "kotlin.Unit") emptyList()
-                                    else listOf("input: ${it.inputType.kotlinTypeString()}")
-                        appendLine(
-                            "override suspend fun ${it.functionName}(${args.joinToString()}): ${it.outputType.kotlinTypeString()}"
-                        )
-                        append("    = fetcher(")
-                        append(it.path.path.toCodeString())
-                        append(", HttpMethod.")
-                        append(it.route.method.toString().uppercase())
-                        append(", ")
-                        append(it.inputType.kotlinSerializer())
-                        append(", ${if(it.inputType.descriptor.serialName == "kotlin.Unit") "Unit" else "input"}, ")
-                        append(it.outputType.kotlinSerializer())
-                        appendLine(")")
+                        try {
+                            val args =
+                                it.path.toKotlinArgsStrings() +
+                                        if (it.inputType.descriptor.serialName == "kotlin.Unit") emptyList()
+                                        else listOf("input: ${it.inputType.kotlinTypeString()}")
+                            appendLine(
+                                "override suspend fun ${it.functionName}(${args.joinToString()}): ${it.outputType.kotlinTypeString()}"
+                            )
+                            append("    = fetcher(")
+                            append(it.path.path.toCodeString())
+                            append(", HttpMethod.")
+                            append(it.route.method.toString().uppercase())
+                            append(", ")
+                            append(it.inputType.kotlinSerializer())
+                            append(", ${if (it.inputType.descriptor.serialName == "kotlin.Unit") "Unit" else "input"}, ")
+                            append(it.outputType.kotlinSerializer())
+                            appendLine(")")
+                        } catch (e: Exception) {
+                            throw SDKException("Failed to render live endpoint ${it.path}", e)
+                        }
                     }
 
                     is ApiWebsocket<*, *, *, *, *> -> {
-                        append(
-                            "override fun ${it.functionName}(${it.path.toKotlinArgsStrings().joinToString()}): "
-                        )
-                        append("TypedWebSocket<")
-                        append(it.inputType.kotlinTypeString())
-                        append(", ")
-                        append(it.outputType.kotlinTypeString())
-                        appendLine(">")
-                        append("    = fetcher.websocket(")
-                        append(it.path.path.toCodeString())
-                        append(", ")
-                        append(it.inputType.kotlinSerializer())
-                        append(", ")
-                        append(it.outputType.kotlinSerializer())
-                        appendLine(")")
+                        try {
+                            append(
+                                "override fun ${it.functionName}(${it.path.toKotlinArgsStrings().joinToString()}): "
+                            )
+                            append("TypedWebSocket<")
+                            append(it.inputType.kotlinTypeString())
+                            append(", ")
+                            append(it.outputType.kotlinTypeString())
+                            appendLine(">")
+                            append("    = fetcher.websocket(")
+                            append(it.path.path.toCodeString())
+                            append(", ")
+                            append(it.inputType.kotlinSerializer())
+                            append(", ")
+                            append(it.outputType.kotlinSerializer())
+                            appendLine(")")
+                        } catch (e: Exception) {
+                            throw SDKException("Failed to render live websocket ${it.path}", e)
+                        }
                     }
 
                     else -> throw IllegalStateException("Unknown endpoint type: $it")
@@ -250,16 +283,23 @@ object SDK2 {
         appendLine()
         appendLine("open class CachedApi2(val uncached: Api2) {")
         endpointsByGroup.forEach { (group, endpoints) ->
-            for(inter in endpoints.mapNotNull { it.belongsToInterface }.distinct()) {
-                if(inter.name == "ClientModelRestEndpoints") {
-                    append("val ${group}: ModelCache")
-                    append(inter.subtypes.takeUnless { it.isEmpty() }?.joinToString(", ", "<", ">") {
-                        it.kotlinTypeString()
-                    } ?: "")
-                    append(" = ModelCache(uncached.")
-                    append(group)
-                    append(", ${inter.subtypes[0].kotlinSerializer()})")
-                    appendLine()
+            for (inter in endpoints.mapNotNull { it.belongsToInterface }.distinct()) {
+                if (inter.name == "ClientModelRestEndpoints") {
+                    try {
+                        append("val ${group}: ModelCache")
+                        append(
+                            inter.subtypes
+                                .takeUnless { it.isEmpty() }
+                                ?.joinToString(", ", "<", ">") { it.kotlinTypeString() }
+                                ?: ""
+                        )
+                        append(" = ModelCache(uncached.")
+                        append(group)
+                        append(", ${inter.subtypes[0].kotlinSerializer()})")
+                        appendLine()
+                    } catch (e: Exception) {
+                        throw SDKException("Failed to render ModelCache for $group", e)
+                    }
                 }
             }
         }

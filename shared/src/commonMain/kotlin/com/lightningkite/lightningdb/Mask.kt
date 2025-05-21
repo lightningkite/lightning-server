@@ -186,6 +186,7 @@ private fun Condition<*>.reads(list: List<SerializableProperty<*, *>>): Boolean 
             else this.condition.reads(list.drop(1))
         } else false
 
+        is Condition.Not -> this.condition.reads(list)
         is Condition.ListAllElements<*> -> this.condition.reads(list)
         is Condition.ListAnyElements<*> -> this.condition.reads(list)
         is Condition.SetAllElements<*> -> this.condition.reads(list)
@@ -276,6 +277,8 @@ fun <T> Condition<T>.readsResultOf(modification: Modification<T>, tableTextPaths
                     .readsResultOf(modification, listOf())
             }
         }
+
+        is Condition.Not -> this.condition.readsResultOf(modification, tableTextPaths)
 
         else -> true
     }
