@@ -4,6 +4,7 @@ import com.lightningkite.serialization.listElement
 import kotlinx.serialization.KSerializer
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.statements.api.PreparedStatementApi
 import org.jetbrains.exposed.sql.statements.jdbc.JdbcConnectionImpl
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 
@@ -86,6 +87,13 @@ class ArrayColumnType(val type: ColumnType) : ColumnType() {
 
 fun <T> ArrayLengthOp(array: Expression<List<T>>) = CustomFunction<Int>("array_length", IntegerColumnType(), array, intLiteral(1))
 fun <T> ArrayIndexOfOp(array: Expression<List<T>>, value: Expression<T>) = CustomFunction<Int>("array_position", IntegerColumnType(), array, value)
+fun AsciiValue(value: Expression<String>) = object: ExpressionWithColumnType<String>() {
+    override val columnType: IColumnType = BinaryColumnType(100)
+    override fun toQueryBuilder(queryBuilder: QueryBuilder) {
+        queryBuilder.append(value)
+        queryBuilder.append("::bytea")
+    }
+}
 
 class SliceOp<T>(
     val source: Expression<List<T>>,

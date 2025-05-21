@@ -121,6 +121,7 @@ private object FakerDecoder : AbstractDecoder() {
     override fun decodeLong() = 0L
     override fun decodeShort() = 0.toShort()
     override fun decodeString() = ""
+    override fun decodeEnum(enumDescriptor: SerialDescriptor): Int = 0
     override fun decodeCollectionSize(descriptor: SerialDescriptor): Int = 0
     override fun decodeElementIndex(descriptor: SerialDescriptor): Int = CompositeDecoder.DECODE_DONE
     override fun decodeNotNullMark(): Boolean = true
@@ -166,6 +167,8 @@ private class CheatingBastardDecoder(var count: Int = 0, override val serializer
     override fun decodeString(): String {
         throw FoundSerializerSignal(String.serializer())
     }
+    override fun decodeEnum(enumDescriptor: SerialDescriptor): Int = throw FoundSerializerSignal(SerializationRegistry.master.get(enumDescriptor.serialName, arrayOf())!!)
+//    override fun decodeEnum(enumDescriptor: SerialDescriptor): Int = throw UnsupportedOperationException("Can't analyze enums.  Sorry.")
 }
 
 fun KSerializer<*>.innerElement(): KSerializer<*> = try {

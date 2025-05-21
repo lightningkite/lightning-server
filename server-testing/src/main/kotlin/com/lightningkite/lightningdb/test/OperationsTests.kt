@@ -24,6 +24,14 @@ abstract class OperationsTests() {
     }
     abstract val database: Database
 
+    @Test fun test_enumkey(): Unit = runBlocking {
+        val collection = database.collection<HasWeirdMap>("test_enumkey")
+        val m = HasWeirdMap(map = mapOf(TestEnum.One to "1", TestEnum.Two to "2"))
+        collection.insertOne(m)
+        val result = collection.get(m._id)
+        assertEquals(m, result)
+    }
+
     @Test fun test_partials(): Unit = runBlocking {
         val collection = database.collection<LargeTestModel>("test_partials")
         var m = LargeTestModel(int = 42)

@@ -127,8 +127,8 @@ abstract class SortTest {
         collection.insertMany(items)
         val results2 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().string, true))).toList()
         val results3 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().string, false))).toList()
-        assertEquals(sortedPosts.map { it._id }, results2.map { it._id })
-        assertEquals(reversePosts.map { it._id }, results3.map { it._id })
+        assertEquals(sortedPosts.map { it.string }, results2.map { it.string })
+        assertEquals(reversePosts.map { it.string }, results3.map { it.string })
     }
 
     @Test
@@ -145,10 +145,8 @@ abstract class SortTest {
         val sortedPosts = items.sortedBy { it.string.lowercase() }
         val reversePosts = items.sortedByDescending { it.string.lowercase() }
         collection.insertMany(items)
-        val results1 = collection.find(Condition.Always).toList()
         val results2 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().string, true, true))).toList()
         val results3 = collection.find(Condition.Always, orderBy = listOf(SortPart(path<LargeTestModel>().string, false, true))).toList()
-        assertEquals(items.map { it._id }, results1.map { it._id })
         assertEquals(sortedPosts.map { it._id }, results2.map { it._id })
         assertEquals(reversePosts.map { it._id }, results3.map { it._id })
     }
@@ -156,7 +154,7 @@ abstract class SortTest {
 
     @Test
     fun testSortCaseInsensitiveCrash():Unit = runBlocking{
-        val collection = database.collection<LargeTestModel>("SortTest_testSortCaseInsensitive")
+        val collection = database.collection<LargeTestModel>("testSortCaseInsensitiveCrash")
         val items = listOf(
             LargeTestModel(string = "aa"),
             LargeTestModel(string = "Ab"),

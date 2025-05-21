@@ -34,6 +34,13 @@ data class ValidatedModel(
 
 @GenerateDataClassPaths
 @Serializable
+data class HasWeirdMap(
+    override val _id: UUID = UUID.random(),
+    val map: Map<TestEnum, String> = mapOf(TestEnum.One to "One", TestEnum.Two to "Two")
+): HasId<UUID>
+
+@GenerateDataClassPaths
+@Serializable
 data class CompoundKeyTestModel(
     override val _id: CompoundTestKey = CompoundTestKey("first", "second"),
     val value: Int = 0,

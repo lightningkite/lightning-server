@@ -147,7 +147,7 @@ object SDK2 {
     private fun ServerPath.toCodeString() = "\"${segments.joinToString("/") { it.toCodeString() }}\""
     private fun ServerPath.Segment.toCodeString() = when (this) {
         is ServerPath.Segment.Constant -> this.value
-        is ServerPath.Segment.Wildcard -> "${'$'}{${this.name}}"
+        is ServerPath.Segment.Wildcard -> "${'$'}{${this.name}.urlifyToCommaString()}"
     }
 
     fun Appendable.writeLive(packageName: String) {

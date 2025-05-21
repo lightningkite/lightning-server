@@ -340,6 +340,9 @@ class SerializationTest {
         println(a.innerElement().innerElement().innerElement())
         println(MapSerializer(String.serializer(), Int.serializer()).innerElement())
         println(MapSerializer(String.serializer(), Int.serializer()).innerElement2())
+        println(MapSerializer(SampleA.serializer(), Int.serializer()).innerElement2())
+
+        println(ListSerializer(SampleA.serializer()).innerElement())
 
         println((Cursed.Inside.serializer(ListSerializer(Int.serializer().nullable)) as GeneratedSerializer<*>).typeParametersSerializers()[0])
 

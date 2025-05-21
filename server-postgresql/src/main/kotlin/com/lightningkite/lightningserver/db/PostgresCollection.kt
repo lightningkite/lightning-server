@@ -54,14 +54,16 @@ class PostgresCollection<T : Any>(
                 .orderBy(*orderBy.map {
                     @Suppress("UNCHECKED_CAST")
                     (
-                            if (it.ignoreCase && it.field.serializerAny.descriptor.kind == PrimitiveKind.STRING)
-                                    (table.col[it.field.colName]!! as Column<String>).lowerCase()
+                            if (!it.ignoreCase && it.field.serializerAny.descriptor.kind == PrimitiveKind.STRING)
+                                AsciiValue(table.col[it.field.colName]!! as Column<String>)
                             else table.col[it.field.colName]!!
                     ) to if (it.ascending) SortOrder.ASC else SortOrder.DESC }
                     .toTypedArray())
                 .limit(limit, skip.toLong())
 //                .prep
-                .map { format.decode(serializer, it) }
+                .map {
+                    format.decode(serializer, it)
+                }
         }
         return items.asFlow()
     }
