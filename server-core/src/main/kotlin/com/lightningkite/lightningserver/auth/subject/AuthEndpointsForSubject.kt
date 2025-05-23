@@ -15,7 +15,6 @@ import com.lightningkite.lightningserver.auth.token.TokenFormat
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.modelInfo
@@ -30,6 +29,7 @@ import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.serialization.decodeFromBase64Url
 import com.lightningkite.lightningserver.serialization.encodeToBase64Url
 import com.lightningkite.lightningserver.serialization.parse
+import com.lightningkite.lightningserver.serverLogger
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.typed.*
 import com.lightningkite.lightningserver.websocket.WebSockets
@@ -218,18 +218,23 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         scopes: Set<String> = setOf("*"),
         label: String? = null,
         expires: Instant? = null,
+        stale: Instant? = null,
         oauthClient: String? = null,
         derivedFrom: UUID? = null,
     ): Pair<Session<SUBJECT, ID>, RefreshToken> = newSessionPrivate(
         subjectId = subjectId,
         label = label,
         expires = expires,
+        stale = stale,
         scopes = scopes,
         oauthClient = oauthClient,
         derivedFrom = derivedFrom
     )
 
-    suspend fun newSession(request: LogInRequest, proofCheck: ProofsCheckResult<ID>): Pair<Session<SUBJECT, ID>, RefreshToken>? =
+    suspend fun newSession(
+        request: LogInRequest,
+        proofCheck: ProofsCheckResult<ID>,
+    ): Pair<Session<SUBJECT, ID>, RefreshToken>? =
         if (proofCheck.readyToLogIn) newSessionPrivate(
             subjectId = proofCheck.id,
             scopes = request.scopes,
@@ -239,6 +244,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 val b = request.expires
                 if (a != null && b != null) minOf(a, b) else a ?: b
             },
+            stale = handler.getSessionStaleLength(handler.fetch(proofCheck.id))?.let { now() + it }
         )
         else null
 
@@ -246,6 +252,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         subjectId: ID,
         label: String? = null,
         expires: Instant? = null,
+        stale: Instant? = null,
         scopes: Set<String>,
         oauthClient: String? = null,
         derivedFrom: UUID? = null,
@@ -258,6 +265,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             subjectId = subjectId,
             label = label,
             expires = expires,
+            stale = stale,
             scopes = scopes,
             oauthClient = oauthClient,
             derivedFrom = derivedFrom,
@@ -407,6 +415,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 derivedFrom = future.originalSessionId,
                 scopes = future.scopes,
                 expires = future.sessionExpiration,
+                stale = handler.getSessionStaleLength(handler.fetch(future.subjectId))?.let { now() + it },
                 oauthClient = future.oauthClient
             )
             secret.string
@@ -432,6 +441,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                 scopes = request.scopes,
                 expires = session.expires?.let { minOf(it, request.expires ?: Instant.DISTANT_FUTURE) }
                     ?: request.expires,
+                stale = session.stale,
                 oauthClient = request.oauthClient,
             ).second.string
         }
@@ -477,9 +487,9 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         implementation = { input: OauthTokenRequest ->
             var generatedRefresh: RefreshToken? = null
             val session = when {
-                input.refresh_token != null -> RefreshToken(input.refresh_token!!).session(
-                    this.rawRequest
-                ) ?: throw BadRequestException("Refresh token not recognized")
+                input.refresh_token != null -> RefreshToken(input.refresh_token!!)
+                    .session(this.rawRequest)
+                    ?: throw BadRequestException("Refresh token not recognized")
 
                 input.code != null -> {
                     val client = OauthClientEndpoints.instance?.modelInfo?.collection()?.get(input.client_id)
@@ -495,6 +505,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                         derivedFrom = future.originalSessionId,
                         scopes = future.scopes,
                         expires = future.sessionExpiration,
+                        stale = handler.getSessionStaleLength(handler.fetch(future.subjectId))?.let { now() + it },
                         oauthClient = future.oauthClient
                     )
                     generatedRefresh = secret
@@ -603,33 +614,39 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     private suspend fun RefreshToken.session(request: Request?): Session<SUBJECT, ID>? {
         if (!valid) {
-            if (generalSettings().debug) println("Auth failed because !valid")
+            if (generalSettings().debug) serverLogger.debug("Auth failed because !valid")
             return null
         }
         if (type != handler.name) {
-            if (generalSettings().debug) println("Auth failed because type != handler.name")
+            if (generalSettings().debug) serverLogger.debug("Auth failed because type != handler.name")
             return null
         }
         val session = sessionInfo.collection().get(_id) ?: run {
-            if (generalSettings().debug) println("No such session")
+            if (generalSettings().debug) serverLogger.debug("No such session")
             throw UnauthorizedException("No such session")
         }
         if (!plainTextSecret.checkAgainstHash(session.secretHash)) {
-            if (generalSettings().debug) println("Auth failed because !plainTextSecret.checkAgainstHash(session.secretHash) ($plainTextSecret vs ${session.secretHash})")
+            if (generalSettings().debug) serverLogger.debug("Auth failed because !plainTextSecret.checkAgainstHash(session.secretHash) ($plainTextSecret vs ${session.secretHash})")
             throw UnauthorizedException("Incorrect hash for session")
         }
         if ((session.expires ?: Instant.DISTANT_FUTURE) < now()) {
-            if (generalSettings().debug) println("Auth failed because session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()")
+            if (generalSettings().debug) serverLogger.debug("Auth failed because (session.expires ?: Instant.DISTANT_FUTURE) < now()")
             throw UnauthorizedException("Session has expired.")
         }
-        if (session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()) {
-            if (generalSettings().debug) println("Auth failed because session.terminated != null || (session.expires ?: Instant.DISTANT_FUTURE) < now()")
+        if ((session.stale ?: Instant.DISTANT_FUTURE) < now()) {
+            if (generalSettings().debug) serverLogger.debug("Auth failed because (session.stale ?: Instant.DISTANT_FUTURE) < now()")
+            throw UnauthorizedException("Session has expired.")
+        }
+        if (session.terminated != null) {
+            if (generalSettings().debug) serverLogger.debug("Auth failed because session.terminated != null")
             throw UnauthorizedException("Session has been terminated.")
         }
         sessionInfo.collection().updateOneById(_id, modification(dataClassPath) {
             it.lastUsed assign now()
             it.userAgents addAll setOf(request?.headers?.get(HttpHeader.UserAgent) ?: "")
             it.ips addAll setOf(request?.sourceIp ?: "test")
+            handler.getSessionStaleLength(handler.fetch(session.subjectId))
+                ?.let { length -> it.stale assign now() + length }
         })
         return session
     }
