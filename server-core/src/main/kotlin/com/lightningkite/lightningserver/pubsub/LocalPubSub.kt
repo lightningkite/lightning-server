@@ -1,11 +1,11 @@
 package com.lightningkite.lightningserver.pubsub
 
-import com.lightningkite.lightningserver.core.serverLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
+import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
 object BadPubSub : PubSub {
@@ -33,16 +33,17 @@ object LocalPubSub : PubSub {
 }
 
 object DebugPubSub : PubSub {
-    init { serverLogger.info("Using debug pub sub") }
+    val logger = LoggerFactory.getLogger(this::class.java)
+    init { logger.info("Using debug pub sub") }
     val known = ConcurrentHashMap<String, PubSubChannel<*>>()
 
     @Suppress("UNCHECKED_CAST")
     override fun <T> get(key: String, serializer: KSerializer<T>): PubSubChannel<T> = known.getOrPut(key) {
-        serverLogger.info("Created channel $key")
+        logger.info("Created channel $key")
         val s = MutableSharedFlow<T>(0)
         object : PubSubChannel<T>, Flow<T> by s, FlowCollector<T> by s {
             override suspend fun emit(value: T) {
-                serverLogger.info("DebugPubSub: emit ${key} to ${s.subscriptionCount.value}")
+                logger.info("DebugPubSub: emit ${key} to ${s.subscriptionCount.value}")
                 s.emit(value)
             }
         }

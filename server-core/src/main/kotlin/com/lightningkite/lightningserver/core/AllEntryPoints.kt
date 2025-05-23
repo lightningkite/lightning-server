@@ -4,6 +4,7 @@ import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.http.Request
 import com.lightningkite.lightningserver.metrics.MetricType
 import com.lightningkite.lightningserver.schedule.Scheduler
+import com.lightningkite.lightningserver.serverLogger
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.websocket.WebSockets
 import kotlinx.coroutines.CoroutineScope
@@ -34,8 +35,6 @@ fun allServerEntryPoints(): List<ServerEntryPoint> {
 interface ServerEntryPoint {
 
 }
-
-val serverLogger = LoggerFactory.getLogger("LightningServer")
 
 interface ServerContext {
     val entryPoint: ServerEntryPoint

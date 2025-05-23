@@ -11,7 +11,7 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.*
-import com.lightningkite.UUID
+import org.slf4j.LoggerFactory
 
 /**
  * An InMemoryFieldCollection with the added feature of loading data from a file at creation
@@ -25,6 +25,10 @@ class InMemoryUnsafePersistentFieldCollection<Model : Any>(
     data = Collections.synchronizedList(ArrayList()),
     serializer = serializer
 ), Closeable{
+
+    companion object{
+        val logger = LoggerFactory.getLogger(this::class.java)
+    }
 
     private val scope = CoroutineScope(Dispatchers.IO)
 

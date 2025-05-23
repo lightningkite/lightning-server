@@ -3,9 +3,8 @@ package com.lightningkite.lightningserver.exceptions
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.get
-import com.lightningkite.lightningserver.logger
+import com.lightningkite.lightningserver.serverLogger
 import com.lightningkite.lightningserver.typed.api
-import com.lightningkite.lightningserver.typed.typed
 import com.lightningkite.now
 import kotlinx.datetime.Instant
 import java.net.NetworkInterface
@@ -22,7 +21,7 @@ object DebugExceptionReporter : ExceptionReporter {
             .firstOrNull()?.hardwareAddress?.sumOf { it.hashCode() }?.toString(16) ?: "?"
 
     override suspend fun report(t: Throwable, context: Any?): Boolean {
-        logger.debug(
+        serverLogger.debug(
             """
 Exception Reported:
     Context: $context

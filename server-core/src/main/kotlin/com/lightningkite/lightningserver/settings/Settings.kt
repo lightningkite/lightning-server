@@ -3,7 +3,7 @@ package com.lightningkite.lightningserver.settings
 import com.lightningkite.serialization.contextualSerializerIfHandled
 import com.lightningkite.lightningserver.encryption.secretBasis
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
-import com.lightningkite.lightningserver.logger
+import com.lightningkite.lightningserver.serverLogger
 import com.lightningkite.lightningserver.logging.loggingSettings
 import com.lightningkite.lightningserver.metrics.Metricable
 import com.lightningkite.lightningserver.metrics.metricsCleanSchedule
@@ -34,7 +34,7 @@ object Settings {
         sealed = true
         if (!lazyLoadResources)
             requirements.values.forEach {
-                logger.debug("Loading setting ${it.name}...")
+                serverLogger.debug("Loading setting ${it.name}...")
                 it()
             }
     }
