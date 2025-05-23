@@ -36,6 +36,7 @@ data class Session<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     val createdAt: Instant = now(),
     val lastUsed: Instant = now(),
     val expires: Instant? = null,
+    val stale: Instant? = null,
     val terminated: Instant? = null,
     val ips: Set<String> = setOf(),
     val userAgents: Set<String> = setOf(),

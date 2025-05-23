@@ -65,6 +65,8 @@ object Authentication {
 
         fun getSessionExpiration(subject: SUBJECT): Instant? = null
 
+        fun getSessionStaleLength(subject: SUBJECT): Duration? = null
+
         val proofMethods: Set<ProofMethod> get() = Authentication.proofMethods.values.filter {
             it.info.property == null || get(it.info.property!!)
         }.toSet()
