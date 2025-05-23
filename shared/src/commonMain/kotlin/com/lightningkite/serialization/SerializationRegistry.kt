@@ -251,8 +251,26 @@ class SerializationRegistry(val module: SerializersModule) {
     private fun registerVirtualWithoutTypeParameters(
         value: KSerializer<*>
     ): VirtualType? {
-        return when (val kind = value.descriptor.kind) {
-            StructureKind.CLASS -> register(VirtualStruct(
+        val kind = value.descriptor.kind
+        return when (kind) {
+            StructureKind.CLASS -> if(value.descriptor.isInline && value.descriptor.getElementDescriptor(0).kind is PrimitiveKind) {
+                val inner = value.descriptor.getElementDescriptor(0)
+                register(VirtualAlias(
+                    serialName = value.descriptor.serialName,
+                    annotations = value.descriptor.annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) } + inner.annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) },
+                    wraps = VirtualTypeReference(when(val kind = inner.kind as PrimitiveKind) {
+                        PrimitiveKind.BOOLEAN -> "kotlin.Boolean"
+                        PrimitiveKind.BYTE -> "kotlin.Byte"
+                        PrimitiveKind.CHAR -> "kotlin.Char"
+                        PrimitiveKind.DOUBLE -> "kotlin.Double"
+                        PrimitiveKind.FLOAT -> "kotlin.Float"
+                        PrimitiveKind.INT -> "kotlin.Int"
+                        PrimitiveKind.LONG -> "kotlin.Long"
+                        PrimitiveKind.SHORT -> "kotlin.Short"
+                        PrimitiveKind.STRING -> "kotlin.String"
+                    }, arguments = listOf(), isNullable = inner.isNullable || value.descriptor.isNullable)
+                ))
+            } else register(VirtualStruct(
                 serialName = value.descriptor.serialName,
                 annotations = value.descriptor.annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) },
                 fields = value.serializableProperties?.mapIndexed { index, it ->
@@ -343,63 +361,83 @@ class SerializationRegistry(val module: SerializersModule) {
     ): VirtualType? {
         val generics = Array(10) { GenericPlaceholderSerializer(key, it) }
         val value = generator(generics.map { it }.toTypedArray())
-        return when (val kind = value.descriptor.kind) {
-            StructureKind.CLASS -> register(VirtualStruct(
-                serialName = value.descriptor.serialName,
-                annotations = value.descriptor.annotations.mapNotNull {
-                    SerializableAnnotation.parseOrNull(
-                        it
-                    )
-                },
-                fields = value.serializableProperties?.mapIndexed { index, it ->
-                    VirtualField(
-                        index = index,
-                        name = it.name,
-                        type = it.serializer.virtualTypeReference(this),
-                        optional = it.defaultCode != null,
-                        annotations = it.annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) },
-                        defaultJson = it.default?.let { default ->
-                            @Suppress("UNCHECKED_CAST")
-                            DefaultDecoder.json.encodeToString(it.serializer as KSerializer<Any?>, default)
-                        },
-                        defaultCode = it.defaultCode,
-                    )
-                } ?: (value as? GeneratedSerializer<*>)?.let {
-                    it.typeParametersSerializers()
-                    println("WARNING: No serializable properties found for ${value.descriptor.serialName}")
-                    val gen = it.childSerializers()
-                    (0..<value.descriptor.elementsCount).map {
-                        val d = value.descriptor.getElementDescriptor(it)
-                        VirtualField(
-                            index = it,
-                            name = value.descriptor.getElementName(it),
-                            type = gen[it].virtualTypeReference(this),
-                            optional = value.descriptor.isElementOptional(it),
-                            annotations = listOf()
+        val kind = value.descriptor.kind
+        return when (kind) {
+            StructureKind.CLASS -> {
+                if(value.descriptor.isInline && value.descriptor.getElementDescriptor(0).kind is PrimitiveKind) {
+                    val inner = value.descriptor.getElementDescriptor(0)
+                    register(VirtualAlias(
+                        serialName = value.descriptor.serialName,
+                        annotations = value.descriptor.annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) } + inner.annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) },
+                        wraps = VirtualTypeReference(when(val kind = inner.kind as PrimitiveKind) {
+                            PrimitiveKind.BOOLEAN -> "kotlin.Boolean"
+                            PrimitiveKind.BYTE -> "kotlin.Byte"
+                            PrimitiveKind.CHAR -> "kotlin.Char"
+                            PrimitiveKind.DOUBLE -> "kotlin.Double"
+                            PrimitiveKind.FLOAT -> "kotlin.Float"
+                            PrimitiveKind.INT -> "kotlin.Int"
+                            PrimitiveKind.LONG -> "kotlin.Long"
+                            PrimitiveKind.SHORT -> "kotlin.Short"
+                            PrimitiveKind.STRING -> "kotlin.String"
+                        }, arguments = listOf(), isNullable = inner.isNullable || value.descriptor.isNullable)
+                    ))
+                } else register(VirtualStruct(
+                    serialName = value.descriptor.serialName,
+                    annotations = value.descriptor.annotations.mapNotNull {
+                        SerializableAnnotation.parseOrNull(
+                            it
                         )
-                    }
-                } ?: run {
-                    println("WARNING: No serializable properties OR gen found for ${value.descriptor.serialName}")
-                    (0..<value.descriptor.elementsCount).map {
-                        val d = value.descriptor.getElementDescriptor(it)
+                    },
+                    fields = value.serializableProperties?.mapIndexed { index, it ->
                         VirtualField(
-                            index = it,
-                            name = value.descriptor.getElementName(it),
-                            type = VirtualTypeReference(
-                                serialName = d.nonNullOriginal.serialName,
-                                arguments = listOf(),
-                                isNullable = d.isNullable
-                            ),
-                            optional = value.descriptor.isElementOptional(it),
-                            annotations = listOf()
+                            index = index,
+                            name = it.name,
+                            type = it.serializer.virtualTypeReference(this),
+                            optional = it.defaultCode != null,
+                            annotations = it.annotations.mapNotNull { SerializableAnnotation.parseOrNull(it) },
+                            defaultJson = it.default?.let { default ->
+                                @Suppress("UNCHECKED_CAST")
+                                DefaultDecoder.json.encodeToString(it.serializer as KSerializer<Any?>, default)
+                            },
+                            defaultCode = it.defaultCode,
                         )
-                    }
-                },
-                parameters = generics.asSequence().filter { it.used }.map {
-                    VirtualTypeParameter(name = it.descriptor.serialName)
-                }.toList()
-            )
-            )
+                    } ?: (value as? GeneratedSerializer<*>)?.let {
+                        it.typeParametersSerializers()
+                        println("WARNING: No serializable properties found for ${value.descriptor.serialName}")
+                        val gen = it.childSerializers()
+                        (0..<value.descriptor.elementsCount).map {
+                            val d = value.descriptor.getElementDescriptor(it)
+                            VirtualField(
+                                index = it,
+                                name = value.descriptor.getElementName(it),
+                                type = gen[it].virtualTypeReference(this),
+                                optional = value.descriptor.isElementOptional(it),
+                                annotations = listOf()
+                            )
+                        }
+                    } ?: run {
+                        println("WARNING: No serializable properties OR gen found for ${value.descriptor.serialName}")
+                        (0..<value.descriptor.elementsCount).map {
+                            val d = value.descriptor.getElementDescriptor(it)
+                            VirtualField(
+                                index = it,
+                                name = value.descriptor.getElementName(it),
+                                type = VirtualTypeReference(
+                                    serialName = d.nonNullOriginal.serialName,
+                                    arguments = listOf(),
+                                    isNullable = d.isNullable
+                                ),
+                                optional = value.descriptor.isElementOptional(it),
+                                annotations = listOf()
+                            )
+                        }
+                    },
+                    parameters = generics.asSequence().filter { it.used }.map {
+                        VirtualTypeParameter(name = it.descriptor.serialName)
+                    }.toList()
+                )
+                )
+            }
 
             SerialKind.ENUM -> register(VirtualEnum(
                 serialName = value.descriptor.serialName,

@@ -7,6 +7,7 @@ import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonBuilder
+import kotlin.jvm.JvmInline
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -21,19 +22,18 @@ class VirtualTypesTest {
     }
     fun <T> testVirtualVersion(serializer: KSerializer<T>, instance: T, builderAction: JsonBuilder.()->Unit = {}) {
         val virtualRegistry = SerializationRegistry.master.virtualize { it.contains("testing") }
-        println("Got virtual registry")
-        val vtype = virtualRegistry.virtualTypes[serializer.descriptor.serialName] as VirtualStruct
+        println("Got virtual registry, looking for ${serializer.descriptor.serialName}, have ${virtualRegistry.virtualTypes.keys}")
+        val vtype = virtualRegistry.virtualTypes[serializer.descriptor.serialName]
         println("Got vtype")
-        val vtypeSerializer = virtualRegistry[serializer.descriptor.serialName, serializer.tryTypeParameterSerializers3() ?: arrayOf()] as VirtualStruct.Concrete
-        println(vtypeSerializer.serializers)
-        println(vtype.annotations)
+        val vtypeSerializer = virtualRegistry[serializer.descriptor.serialName, serializer.tryTypeParameterSerializers3() ?: arrayOf()]!!
+//        println(vtypeSerializer.serializers)
+        println(vtype?.annotations)
         val json = Json {
             serializersModule = ClientModule
             encodeDefaults = true
             allowStructuredMapKeys = true
             builderAction()
         }
-        println("Schema: ${json.encodeToString(vtype)}")
         val original = instance
         // forward
         json.decodeFromString(vtypeSerializer, json.encodeToString(serializer, original).also { println(it) })
@@ -143,5 +143,14 @@ class VirtualTypesTest {
     @Test
     fun testDefaults() {
         println(TestModel.serializer().default())
+    }
+    @Serializable @JvmInline
+    value class TestValueClass(val int: Int)
+
+    @Test fun testValue() {
+        testVirtualVersion(
+            TestValueClass.serializer(),
+            TestValueClass(13)
+        )
     }
 }
