@@ -15,7 +15,6 @@ import com.lightningkite.lightningserver.auth.token.TokenFormat
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
-import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
 import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.db.modelInfo
