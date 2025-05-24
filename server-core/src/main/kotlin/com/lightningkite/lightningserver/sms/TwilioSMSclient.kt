@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.sms
 
 import com.lightningkite.lightningserver.client
-import com.lightningkite.lightningserver.logger
+import com.lightningkite.lightningserver.serverLogger
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -30,7 +30,7 @@ class TwilioSMSClient(
             }) {
             if (status != HttpStatusCode.Created) {
                 val result = bodyAsText()
-                logger.error(result)
+                serverLogger.error(result)
                 throw SMSException(result)
             }
         }

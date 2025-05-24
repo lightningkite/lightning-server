@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver.exceptions
 
 import com.lightningkite.lightningserver.core.serverContext
-import com.lightningkite.lightningserver.logger
+import com.lightningkite.lightningserver.serverLogger
 import com.lightningkite.lightningserver.settings.generalSettings
 
 /**
@@ -9,7 +9,7 @@ import com.lightningkite.lightningserver.settings.generalSettings
  * HttpStatusExceptions of code 500 and any other unhandled exceptions will be reported.
  */
 suspend fun Throwable.report(context: Any? = null) {
-    if (generalSettings().debug) logger.error(this.stackTraceToString())
+    if (generalSettings().debug) serverLogger.error(this.stackTraceToString())
     if (this is HttpStatusException && this.status.code / 100 != 5) return
     exceptionSettings().report(this, context ?: serverContext()?.entryPoint)
 }

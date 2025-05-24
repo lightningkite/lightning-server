@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.http
 import com.lightningkite.lightningserver.HtmlDefaults
 import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.metrics.Metrics
@@ -19,7 +18,7 @@ object Http {
 
     var fixEndingSlash: Boolean = true
 
-    private val logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.http.Http")
+    private val logger = LoggerFactory.getLogger(this::class.java)
 
     val endpoints: MutableMap<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> =
         MutableMapWithChangeHandler<HttpEndpoint, suspend (HttpRequest) -> HttpResponse> {

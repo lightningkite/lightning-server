@@ -36,7 +36,7 @@ data class MetricSettings(
             register("log") {
                 object : Metrics {
                     override val settings: MetricSettings = it
-                    val logger = LoggerFactory.getLogger("Metrics")
+                    val logger = LoggerFactory.getLogger(this::class.java)
                     override suspend fun report(events: List<MetricEvent>) {
                         events.forEach {
                             logger.debug("Logging metric event $it")

@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.cache
 
-import com.lightningkite.lightningserver.logger
 import com.lightningkite.now
 import kotlinx.datetime.Instant
 import kotlinx.serialization.KSerializer

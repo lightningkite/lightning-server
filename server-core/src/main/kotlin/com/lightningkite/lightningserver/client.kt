@@ -8,7 +8,6 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.decodeFromString
 
 
 /**
@@ -44,7 +43,7 @@ suspend fun HttpResponse.statusFailing(): HttpResponse {
  */
 suspend inline fun <reified T> HttpResponse.debugJsonBody(): T {
     val text = bodyAsText()
-    logger.debug("Got response ${status} with data $text")
+    serverLogger.debug("Got response ${status} with data $text")
     return Serialization.json.decodeFromString(text)
 }
 

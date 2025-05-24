@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.aws
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler
 import com.lightningkite.lightningserver.core.Disconnectable
-import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.encryption.OpenSsl
 import com.lightningkite.lightningserver.engine.Engine
 import com.lightningkite.lightningserver.engine.engine
@@ -43,7 +42,7 @@ import kotlin.system.exitProcess
 
 abstract class AwsAdapter(val communicationEncoding: InternalCommunicationEncoding = InternalCommunicationEncoding.JavaData) : RequestStreamHandler, Resource {
 
-    val logger: Logger = LoggerFactory.getLogger(AwsAdapter::class.java)
+    val logger: Logger = LoggerFactory.getLogger(this::class.java)
     var preventLambdaTimeoutReuse: Boolean = false
 
     init {
@@ -195,7 +194,7 @@ abstract class AwsAdapter(val communicationEncoding: InternalCommunicationEncodi
                     }
 
                     else -> {
-                        serverLogger.error("Unrecognized message: ${asJson}")
+                        logger.error("Unrecognized message: ${asJson}")
                         APIGatewayV2HTTPResponse(
                             statusCode = 500,
                             body = "No response available for the handler"

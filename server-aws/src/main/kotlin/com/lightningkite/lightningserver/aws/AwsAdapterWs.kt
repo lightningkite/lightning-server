@@ -4,7 +4,6 @@ import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
-import com.lightningkite.lightningserver.core.serverLogger
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.HttpContent
@@ -137,7 +136,7 @@ class AwsAdapterWs(val root: AwsAdapter) {
                 }.await()
                 val r = result.sdkHttpResponse()
                 if (!r.isSuccessful) {
-                    serverLogger.warn("Socket ${socketId} had a send failure.")
+                    root.logger.warn("Socket ${socketId} had a send failure.")
                     throw Exception(
                         "Failed to send socket message to $socketId ${r.statusCode()} - ${
                             try {
@@ -150,7 +149,7 @@ class AwsAdapterWs(val root: AwsAdapter) {
                 }
                 true
             } catch (e: GoneException) {
-                serverLogger.warn("Socket ${socketId} is gone, but a send was attempted.")
+                root.logger.warn("Socket ${socketId} is gone, but a send was attempted.")
                 webSocketDynamo.clean(socketId)
                 false
             }
@@ -190,7 +189,7 @@ class AwsAdapterWs(val root: AwsAdapter) {
             try {
                 val p = ServerPath(path)
                 val h = if (p == ServerPath.root) rootWs else WebSockets.handlers[p] ?: run {
-                    serverLogger.warn("No handler found for $p")
+                    root.logger.warn("No handler found for $p")
                     return@forSubscribers
                 }
                 h as WebSocketHandler<Any?>
