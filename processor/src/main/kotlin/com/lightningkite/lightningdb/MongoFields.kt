@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
 import com.google.devtools.ksp.symbol.*
+import com.lightningkite.lightningserver.db.imports
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.decapitalizeAsciiOnly
 import kotlin.reflect.KClass
 
@@ -29,7 +30,7 @@ data class MongoFields(
     val classReference: String get() = declaration.safeLocalReference()
     val simpleName: String get() = declaration.simpleName.getShortName()
     val fields by lazy { declaration.fields() }
-    val hasId by lazy { declaration.superTypes.any { it.resolve().declaration.qualifiedName?.asString() == "com.lightningkite.lightningdb.HasId" } }
+    val hasId by lazy { declaration.superTypes.any { it.resolve().declaration.qualifiedName?.asString() == "com.lightningkite.lightningserver.db.HasId" } }
 
     fun write(out: TabAppendable) = with(out) {
         appendLine("""// Automatically generated based off ${declaration.containingFile?.fileName}""")
@@ -41,25 +42,32 @@ data class MongoFields(
         appendLine()
         if (packageName.isNotEmpty()) appendLine("package ${packageName}")
         appendLine()
-        declaration.containingFile?.ktFile?.importList?.imports
-            ?.map { it.importPath.toString() }
-            ?.plus(
-                listOf(
-                    "com.lightningkite.serialization.*",
-                    "com.lightningkite.serialization.DataClassPath",
-                    "com.lightningkite.serialization.DataClassPathSelf",
-                    "com.lightningkite.serialization.SerializableProperty",
-                    "com.lightningkite.lightningdb.*",
-                    "kotlin.reflect.*",
-                    "kotlinx.serialization.*",
-                    "kotlinx.serialization.builtins.*",
-                    "kotlinx.serialization.internal.GeneratedSerializer",
-                    "kotlinx.datetime.*",
-                    "com.lightningkite.*",
+        try {
+            declaration.containingFile?.imports
+                ?.plus(
+                    listOf(
+                        "com.lightningkite.serialization.*",
+                        "com.lightningkite.serialization.DataClassPath",
+                        "com.lightningkite.serialization.DataClassPathSelf",
+                        "com.lightningkite.serialization.SerializableProperty",
+                        "com.lightningkite.lightningdb.*",
+                        "kotlin.reflect.*",
+                        "kotlinx.serialization.*",
+                        "kotlinx.serialization.builtins.*",
+                        "kotlinx.serialization.internal.GeneratedSerializer",
+                        "kotlinx.datetime.*",
+                        "com.lightningkite.*",
+                    )
                 )
-            )
-            ?.distinct()
-            ?.forEach { appendLine("import $it") }
+                ?.distinct()
+                ?.filter { it.substringAfterLast('.').let {
+                    !(it.startsWith("prepare") && it.endsWith("Fields")
+                            || it.startsWith("prepareModels"))
+                } }
+                ?.forEach { appendLine("import $it") }
+        } catch(e: Exception) {
+            appendLine("/*" + e.stackTraceToString() + "*/")
+        }
         appendLine()
         val contextualTypes = declaration.containingFile?.annotation(
             "UseContextualSerialization",
