@@ -55,9 +55,9 @@ val KSValueParameter.defaultText: String?
     }
 
 fun String.fileDefaultTextForValr(classname: String, name: String): String? {
-    val classnameRegex = Regex("class +$classname")
+    val classnameRegex = Regex("class +$classname[^a-zA-Z]")
     val start = classnameRegex.find(this)?.range?.last ?: return null
-    val regex = Regex("va[lr] +${name}")
+    val regex = Regex("va[lr] +${name} *:")
     val text = this
     val find = regex.find(text, start) ?: return null
     val end = text.unwrappedComma(find.range.last)
