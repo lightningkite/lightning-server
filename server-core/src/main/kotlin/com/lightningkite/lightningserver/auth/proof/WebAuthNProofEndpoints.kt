@@ -77,7 +77,7 @@ class WebAuthNProofEndpoints(
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val challengeLength: Int = 64,
     val expiration: Duration = 5.minutes,
-    val rpId: String,
+    val rpId: () -> String,
     val registrationForUser: (HasId<*>, WebAuthN.GeneralPreference) -> WebAuthN.Registration.RegistrationOptions,
     val proveOptions: (String?) -> WebAuthN.Authentication.ProveOptions = { WebAuthN.Authentication.ProveOptions() },
 ) : ServerPathGroup(path), ProofMethod {
@@ -231,7 +231,7 @@ class WebAuthNProofEndpoints(
                     hints = options.hints,
                     pubKeyCredParams = options.pubKeyCredParams,
                     rp = WebAuthN.Registration.PublicKeyCredentialRpEntity(
-                        id = rpId,
+                        id = rpId(),
                         name = generalSettings().projectName
                     ),
                     timeout = expiration.inWholeMilliseconds.toInt(),
@@ -276,7 +276,7 @@ class WebAuthNProofEndpoints(
                 /* serverProperty = */
                 ServerProperty(
                     /* origin = */ Origin(clientData.origin),
-                    /* rpId = */ rpId,
+                    /* rpId = */ rpId(),
                     /* challenge = */ Challenge { fromCache.challenge.encodeToByteArray() }
                 ),
                 /* pubKeyCredParams = */
@@ -350,7 +350,7 @@ class WebAuthNProofEndpoints(
                         challenge = generate(),
                         extensions = WebAuthN.Authentication.RequestExtensions(),
                         hints = emptyList(),
-                        rpId = rpId,
+                        rpId = rpId(),
                         timeout = expiration.inWholeMilliseconds.toInt(),
                         userVerification = WebAuthN.GeneralPreference.Required,
                     )
@@ -381,7 +381,7 @@ class WebAuthNProofEndpoints(
                     challenge = challenge,
                     extensions = options.extensions,
                     hints = options.hints,
-                    rpId = rpId,
+                    rpId = rpId(),
                     timeout = expiration.inWholeMilliseconds.toInt(),
                     userVerification = options.userVerification,
                 )
@@ -432,7 +432,7 @@ class WebAuthNProofEndpoints(
             val authParams = AuthenticationParameters(
                 ServerProperty(
                     /* origin = */ Origin(clientData.origin),
-                    /* rpId = */ rpId,
+                    /* rpId = */ rpId(),
                     /* challenge = */ Challenge { fromCache.challenge.encodeToByteArray() }
                 ),
                 AuthenticatorImpl(
