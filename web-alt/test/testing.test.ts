@@ -6,6 +6,7 @@ interface TestType {
     sub: {
         count: number
     }
+    age: number | null
 }
 
 test('Valid condition types work', () => {
@@ -18,7 +19,8 @@ let item: TestType = {
     name: "Bob",
     sub: {
         count: 22
-    }
+    },
+    age: null
 }
 test('Equal true', () => { expect(evaluateCondition({ name: { Equal: "Bob" } }, item)).toBe(true) })
 test('Equal false', () => { expect(evaluateCondition({ name: { Equal: "Bobby" } }, item)).toBe(false) })
@@ -52,6 +54,7 @@ test('StringContains false', () => { expect(evaluateCondition({ name: { StringCo
 test('StringContains case sensitive', () => { expect(evaluateCondition({ name: { StringContains: { value: "bo", ignoreCase: false } } }, item)).toBe(false) })
 test('Any', () => { expect(evaluateCondition({ numbers: { ListAnyElements: { GreaterThan: 3 } } }, item)).toBe(true) })
 test('All', () => { expect(evaluateCondition({ numbers: { ListAllElements: { GreaterThan: 3 } } }, item)).toBe(false) })
+test('IfNotNull', () => { expect(evaluateCondition({ age: {IfNotNull: {Equal: 4}} }, item)).toBe(true) })
 
 test('Assign', () => { expect(evaluateModification({ name: { Assign: "asdf"} }, item).name).toBe("asdf") })
 
