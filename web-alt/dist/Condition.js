@@ -66,7 +66,9 @@ function evaluateCondition(condition, model) {
         case "Exists":
             return true;
         case "IfNotNull":
-            return model !== null && model !== undefined && evaluateCondition(value, model);
+            if (model === null || model === undefined)
+                return true;
+            return evaluateCondition(value, model);
         default:
             return evaluateCondition(value, model[key]);
     }
