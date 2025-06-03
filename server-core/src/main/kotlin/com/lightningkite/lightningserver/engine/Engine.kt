@@ -74,7 +74,7 @@ object UnitTestEngine : Engine {
         get() = InternalCommunicationEncoding.Json
     val logger = LoggerFactory.getLogger(this::class.java)
     override suspend fun <T> publish(topic: String, serializer: KSerializer<T>, output: T) {
-        println("TOPIC $topic PUBLISHES $output")
+        logger.debug("TOPIC {} PUBLISHES {}", topic, output)
         LocalPubSub.get(topic, serializer).emit(output)
     }
 
