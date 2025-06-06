@@ -89,7 +89,7 @@ fun Documentable.Companion.kotlinSessions(packageName: String): String = CodeEmi
     imports.add("com.lightningkite.lightningserver.auth.*")
     imports.add("com.lightningkite.serialization.*")
     imports.add("kotlinx.datetime.*")
-    safeDocumentables.forEach { it.belongsToInterface?.import?.also(imports::add) }
+    safeDocumentables.forEach { it.belongsToInterface?.imports?.also(imports::addAll) }
 
     run {
         val sessionClassName = "AbstractAnonymousSession"
