@@ -87,13 +87,18 @@ object SDK2 {
     fun Appendable.writeInterface(packageName: String) {
         appendLine("package $packageName")
         appendLine()
-        appendLine("import com.lightningkite.*")
-        appendLine("import com.lightningkite.lightningdb.*")
-        appendLine("import com.lightningkite.kiteui.*")
-        appendLine("import kotlinx.datetime.*")
-        appendLine("import com.lightningkite.serialization.*")
-        appendLine("import com.lightningkite.lightningserver.db.*")
-        appendLine("import com.lightningkite.lightningserver.auth.*")
+        listOf(
+            "com.lightningkite.*",
+            "com.lightningkite.lightningdb.*",
+            "com.lightningkite.kiteui.*",
+            "kotlinx.datetime.*",
+            "com.lightningkite.serialization.*",
+            "com.lightningkite.lightningserver.db.*",
+            "com.lightningkite.lightningserver.auth.*",
+        )
+            .plus(renderableEndpoints.flatMap { it.belongsToInterface?.imports ?: emptySet() })
+            .toSet()
+            .joinTo(this, "\n") { "import $it" }
         appendLine()
 
         appendLine("interface Api2 {")
@@ -171,16 +176,21 @@ object SDK2 {
     fun Appendable.writeLive(packageName: String) {
         appendLine("package $packageName")
         appendLine()
-        appendLine("import com.lightningkite.*")
-        appendLine("import com.lightningkite.lightningdb.*")
-        appendLine("import com.lightningkite.kiteui.*")
-        appendLine("import kotlinx.datetime.*")
-        appendLine("import com.lightningkite.serialization.*")
-        appendLine("import com.lightningkite.lightningserver.db.*")
-        appendLine("import com.lightningkite.lightningserver.auth.*")
-        appendLine("import com.lightningkite.lightningserver.networking.Fetcher")
-        appendLine("import kotlinx.serialization.builtins.*")
-        appendLine("import kotlinx.serialization.*")
+        listOf(
+            "com.lightningkite.*",
+            "com.lightningkite.lightningdb.*",
+            "com.lightningkite.kiteui.*",
+            "kotlinx.datetime.*",
+            "com.lightningkite.serialization.*",
+            "com.lightningkite.lightningserver.db.*",
+            "com.lightningkite.lightningserver.auth.*",
+            "com.lightningkite.lightningserver.networking.Fetcher",
+            "kotlinx.serialization.builtins.*",
+            "kotlinx.serialization.*",
+        )
+            .plus(renderableEndpoints.flatMap { it.belongsToInterface?.imports ?: emptySet() })
+            .toSet()
+            .joinTo(this, "\n") { "import $it" }
         appendLine()
 
         appendLine("class LiveApi2(val fetcher: Fetcher): Api2 {")
