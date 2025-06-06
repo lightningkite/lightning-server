@@ -29,7 +29,7 @@ interface Documentable {
     val authOptions: AuthOptions<*>
     val belongsToInterface: InterfaceInfo?
 
-    class InterfaceInfo(val path: ServerPath, val name: String, val subtypes: List<KSerializer<*>>) {
+    class InterfaceInfo(val path: ServerPath, val name: String, val subtypes: List<KSerializer<*>>, val import: String? = null) {
         override fun toString(): String = "$name at $path"
     }
 
