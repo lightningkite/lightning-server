@@ -13,6 +13,8 @@ import kotlinx.serialization.encoding.CompositeEncoder
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.reflect.KClass
 
+class ValidationInvalidType(message: String) : Exception(message)
+
 interface ShouldValidateSub<A> : KSerializer<A> {
     fun validate(value: A, existingAnnotations: List<Annotation>, defer: (Any?, List<Annotation>) -> Unit) =
         defer(value, existingAnnotations)
@@ -53,9 +55,9 @@ object Validators {
         directProcessor(T::class) { a, b ->
             if (a is T) {
                 @Suppress("UNCHECKED_CAST")
-                if(b is Collection<*>)
+                if (b is Collection<*>)
                     b.asSequence().mapNotNull { action(a, it as V) }.firstOrNull()
-                else if(b is Map<*, *>)
+                else if (b is Map<*, *>)
                     b.values.asSequence().mapNotNull { action(a, it as V) }.firstOrNull()
                 else action(a, b as V)
             } else
@@ -114,7 +116,10 @@ object Validators {
                     "Too long; got ${v.size} entries but have a maximum of ${t.size} entries."
                 ) else null
 
-                else -> throw NotImplementedError("Unknown type ${v::class}")
+                else -> {
+                    ValidationInvalidType("MaxSize applied to invalid type ${v::class}. Ignoring validation.").printStackTrace()
+                    null
+                }
             }
         }
         processor<MaxLength, Any> { t, v ->
@@ -129,7 +134,10 @@ object Validators {
                     "Too long; maximum ${t.size} characters allowed"
                 ) else null
 
-                else -> throw NotImplementedError("Unknown type ${v::class}")
+                else -> {
+                    ValidationInvalidType("MaxLength applied to invalid type ${v::class}. Ignoring validation.").printStackTrace()
+                    null
+                }
             }
         }
         processor<ExpectedPattern, Any> { t, v ->
@@ -144,7 +152,10 @@ object Validators {
                     "Does not match pattern; expected to match ${t.pattern}"
                 ) else null
 
-                else -> throw NotImplementedError("Unknown type ${v::class}")
+                else -> {
+                    ValidationInvalidType("ExpectPattern applied to invalid type ${v::class}. Ignoring validation.").printStackTrace()
+                    null
+                }
             }
         }
         processor<IntegerRange, Any> { t, v ->
@@ -189,7 +200,10 @@ object Validators {
                     "Out of range; expected to be between ${t.min} and ${t.max}"
                 ) else null
 
-                else -> throw NotImplementedError("Unknown type ${v::class}")
+                else -> {
+                    ValidationInvalidType("IntegerRange applied to invalid type ${v::class}. Ignoring validation.").printStackTrace()
+                    null
+                }
             }
         }
         processor<FloatRange, Any> { t, v ->
@@ -204,7 +218,10 @@ object Validators {
                     "Out of range; expected to be between ${t.min} and ${t.max}"
                 ) else null
 
-                else -> throw NotImplementedError("Unknown type ${v::class}")
+                else -> {
+                    ValidationInvalidType("FloatRange applied to invalid type ${v::class}. Ignoring validation.").printStackTrace()
+                    null
+                }
             }
         }
     }
