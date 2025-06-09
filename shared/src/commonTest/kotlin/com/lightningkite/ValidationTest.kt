@@ -14,7 +14,14 @@ import kotlin.test.*
 data class Sample(
     @MaxLength(5) val x: String = "asdf",
     @IntegerRange(0, 100) val y: Int = 4,
-    @MaxLength(5) @MaxSize(5) val z: List<String> = listOf()
+    @MaxLength(5) @MaxSize(5) val z: List<String> = listOf(),
+)
+
+@Serializable
+@GenerateDataClassPaths
+data class BadSample(
+    @MaxSize(1) val a: String = "fdsa",
+    @MaxLength(5) val x: String = "asdf",
 )
 
 class ValidationTest {
@@ -59,5 +66,22 @@ class ValidationTest {
         assertPasses(Sample(z = listOf("asdf", "fdsa")))
         assertFails(Sample(z = listOf("asdf", "fdsaasdf")))
         assertFails(Sample(z = listOf("asdf", "fdsa", "asdf", "fdsa", "asdf", "fdsa")))
+    }
+
+    @Test
+    fun assertBadAnnotationIsIgnored() {
+        assertPasses(BadSample(a = "ASDFA", x = "ooui"))
+        assertPasses(modification<BadSample> { it.a assign "ASDFA" })
+        assertPasses(modification<BadSample> {
+            modifications += it.a.mapModification(
+                Modification.Chain(
+                    listOf(
+                        Modification.Assign("asdfa"),
+                        Modification.Assign("asdfab"),
+                    )
+                )
+            )
+        })
+
     }
 }
