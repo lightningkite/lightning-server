@@ -90,44 +90,44 @@ export function evaluateCondition<T>(
         ignoreCase: boolean;
       };
       if (v.ignoreCase)
-        return (model as string).toLowerCase().indexOf(v.value) !== -1;
-      else return (model as string).indexOf(v.value) !== -1;
+        return (model as unknown as string).toLowerCase().indexOf(v.value) !== -1;
+      else return (model as unknown as string).indexOf(v.value) !== -1;
     case "FullTextSearch":
       const v2 = value as {
         value: string;
         ignoreCase: boolean;
       };
       if (v2.ignoreCase)
-        return (model as string).toLowerCase().indexOf(v2.value) !== -1;
-      else return (model as string).indexOf(v2.value) !== -1;
+        return (model as unknown as string).toLowerCase().indexOf(v2.value) !== -1;
+      else return (model as unknown as string).indexOf(v2.value) !== -1;
     case "IntBitsClear":
-      return ((model as number) & value) === 0;
+      return ((model as unknown as number) & value) === 0;
     case "IntBitsSet":
-      return ((model as number) & value) === value;
+      return ((model as unknown as number) & value) === value;
     case "IntBitsAnyClear":
-      return ((model as number) & value) < value;
+      return ((model as unknown as number) & value) < value;
     case "IntBitsAnySet":
-      return ((model as number) & value) > 0;
+      return ((model as unknown as number) & value) > 0;
     case "ListAllElements":
-      return (model as Array<any>).every((x) =>
+      return (model as unknown as Array<any>).every((x) =>
         evaluateCondition(value as Condition<any>, x)
       );
     case "ListAnyElements":
-      return (model as Array<any>).some((x) =>
+      return (model as unknown as Array<any>).some((x) =>
         evaluateCondition(value as Condition<any>, x)
       );
     case "ListSizesEquals":
-      return (model as Array<any>).length === value;
+      return (model as unknown as Array<any>).length === value;
     case "SetAllElements":
-      return Array.from(model as Set<any>).every((x) =>
+      return Array.from(model as unknown as Set<any>).every((x) =>
         evaluateCondition(value as Condition<any>, x)
       );
     case "SetAnyElements":
-      return Array.from(model as Set<any>).some((x) =>
+      return Array.from(model as unknown as Set<any>).some((x) =>
         evaluateCondition(value as Condition<any>, x)
       );
     case "SetSizesEquals":
-      return (model as Set<any>).size === value;
+      return (model as unknown as Set<any>).size === value;
     case "Exists":
       return true;
     case "IfNotNull":
@@ -137,7 +137,7 @@ export function evaluateCondition<T>(
         evaluateCondition(value as Condition<any>, model)
       );
     default:
-      return evaluateCondition(value as Condition<any>, (model as any)[key]);
+      return evaluateCondition(value as Condition<any>, (model as unknown as any)[key]);
   }
 }
 

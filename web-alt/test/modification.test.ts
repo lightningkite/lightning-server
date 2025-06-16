@@ -116,7 +116,6 @@ describe("List operations", () => {
         numberList
       )
     ).toMatchObject([0, 0, 2, 3, 5]);
-    console.log("HERE NUM LIST", numberList);
     expect(
       evaluateModification(
         {

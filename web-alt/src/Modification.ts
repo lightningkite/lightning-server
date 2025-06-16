@@ -81,65 +81,65 @@ export function evaluateModification<T>(
       return model;
     case "CoerceAtMost":
       if (typeof model === "string" && typeof value == "string") {
-        return model < value ? model : (value as T);
+        return model < value ? model : (value as unknown as T);
       }
       if (typeof model === "number" && typeof value == "number") {
-        return Math.min(model, value) as T;
+        return Math.min(model, value) as unknown as T;
       }
     case "CoerceAtLeast":
       if (typeof model === "string" && typeof value == "string") {
-        return model > value ? model : (value as T);
+        return model > value ? model : (value as unknown as T);
       }
       if (typeof model === "number" && typeof value == "number") {
-        return Math.max(model, value) as T;
+        return Math.max(model, value) as unknown as T;
       }
     case "Increment": {
       const typedValue = value as number;
-      const typedModel = model as number;
-      return (typedModel + typedValue) as T;
+      const typedModel = model as unknown as number;
+      return (typedModel + typedValue) as unknown as T;
     }
     case "Multiply": {
       const typedValue = value as number;
-      const typedModel = model as number;
-      return (typedModel * typedValue) as T;
+      const typedModel = model as unknown as number;
+      return (typedModel * typedValue) as unknown as T;
     }
     case "AppendString": {
       const typedValue = value as string;
-      const typedModel = model as string;
-      return (typedModel + typedValue) as T;
+      const typedModel = model as unknown as string;
+      return (typedModel + typedValue) as unknown as T;
     }
     case "ListAppend":
     case "SetAppend": {
       const typedValue = value as Array<any>;
-      const typedModel = model as Array<any>;
-      return [...typedModel, ...typedValue] as T;
+      const typedModel = model as unknown as Array<any>;
+      return [...typedModel, ...typedValue] as unknown as T;
     }
     case "ListRemove":
     case "SetRemove": {
       const typedValue = value as Condition<any>;
-      const typedModel = model as Array<any>;
+      const typedModel = model as unknown as Array<any>;
       return typedModel.filter(
         (item) => !evaluateCondition(typedValue, item)
-      ) as T;
+      ) as unknown as T;
     }
     case "ListRemoveInstances":
     case "SetRemoveInstances": {
       const typedValue = value as Array<any>;
-      const typedModel = model as Array<any>;
-      return typedModel.filter((item) => !typedValue.includes(item)) as T;
+      const typedModel = model as unknown as Array<any>;
+      return typedModel.filter((item) => !typedValue.includes(item)) as unknown as T;
     }
     case "ListDropFirst":
     case "SetDropFirst": {
       const typedValue = value as boolean;
-      const typedModel = model as Array<any>;
+      const typedModel = model as unknown as Array<any>;
       if (typedValue) {
-        return typedModel.slice(1) as T;
+        return typedModel.slice(1) as unknown as T;
       }
     }
     case "ListDropLast":
     case "SetDropLast": {
-      const typedModel = model as Array<any>;
-      return (typedModel as Array<any>).slice(0, -1) as T;
+      const typedModel = model as unknown as Array<any>;
+      return (typedModel as unknown as Array<any>).slice(0, -1) as unknown as T;
     }
     case "ListPerElement":
     case "SetPerElement": {
@@ -147,7 +147,7 @@ export function evaluateModification<T>(
         condition: Condition<any>;
         modification: Modification<any>;
       };
-      const typedModel = [...(model as Array<any>)];
+      const typedModel = [...(model as unknown as Array<any>)];
 
       typedModel.forEach((item, index) => {
         if (evaluateCondition(typedValue.condition, item)) {
@@ -157,13 +157,13 @@ export function evaluateModification<T>(
           );
         }
       });
-      return typedModel as T;
+      return typedModel as unknown as T;
     }
     default:
       const copy: any = { ...model };
       copy[key] = evaluateModification(
         value as Modification<any>,
-        (model as any)[key]
+        (model as unknown as any)[key]
       );
       return copy;
   }
