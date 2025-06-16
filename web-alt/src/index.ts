@@ -6,3 +6,4 @@ export * from "./modificationHelpers";
 export * from "./mockRestEndpoints";
 export * from "./sessionRest";
 export * from "./annotateEndpoint";
+export * from "./fetching";

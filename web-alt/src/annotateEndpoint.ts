@@ -59,7 +59,7 @@ export function annotateEndpoint<T extends HasId, Annotation>(
     async count(
       input: Condition<WithAnnotations<T, Annotation>>
     ): Promise<number> {
-      return endpoint.count(input);
+      return endpoint.count(input as Condition<T>);
     },
   };
 }
