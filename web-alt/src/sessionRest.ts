@@ -28,7 +28,7 @@ export interface SessionRestEndpoint<T extends HasId> {
   /**
   * Gets parts of items that match the given query.
   **/
-  queryPartial<Q extends QueryPartial<T>>(input: Q): Promise<Array<{[K in keyof T as K extends Q["fields"][number] ? K : never]: T[K]}>>;
+  queryPartial(input: QueryPartial<T>): Promise<Array<DeepPartial<T>>>;
   /**
   * Gets a single item by ID.
   **/

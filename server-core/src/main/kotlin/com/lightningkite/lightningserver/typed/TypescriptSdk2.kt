@@ -202,31 +202,31 @@ private fun String.groupToPartName(): String = replaceFirstChar { it.lowercase()
 
 @OptIn(ExperimentalSerializationApi::class)
 private fun Appendable.functionHeader(documentable: Documentable, omitPartialType: Boolean = false) {
-    if (documentable is ApiEndpoint<*, *, *, *>) {
-        if (documentable.functionName == "queryPartial") {
-            val args = arguments(documentable)
-            val partialType = documentable.outputType.listElement()?.tryTypeParameterSerializers2()?.first()?.write() ?: return
-
-            val otherArgs = args.joinToString(", ") {
-                if ( it.name == "input") {
-                    if (omitPartialType) {
-                        "input: QueryPartial<${partialType}>"
-                    } else {
-                        "input: Q"
-                    }
-                } else {
-                    "${it.name}${if (it.optional) "?" else ""}: ${it.type?.write() ?: it.stringType}"
-                }
-            }
-
-                if (omitPartialType) {
-                    append("(${otherArgs})")
-                } else {
-                    append("<const Q extends QueryPartial<${partialType}>>(${otherArgs}): Promise<Array<{[K in keyof ${partialType} as K extends Q[\"fields\"][number] ? K : never]: ${partialType}[K]}>>")
-                }
-            return@functionHeader
-        }
-    }
+//    if (documentable is ApiEndpoint<*, *, *, *>) {
+//        if (documentable.functionName == "queryPartial") {
+//            val args = arguments(documentable)
+//            val partialType = documentable.outputType.listElement()?.tryTypeParameterSerializers2()?.first()?.write() ?: return
+//
+//            val otherArgs = args.joinToString(", ") {
+//                if ( it.name == "input") {
+//                    if (omitPartialType) {
+//                        "input: QueryPartial<${partialType}>"
+//                    } else {
+//                        "input: Q"
+//                    }
+//                } else {
+//                    "${it.name}${if (it.optional) "?" else ""}: ${it.type?.write() ?: it.stringType}"
+//                }
+//            }
+//
+//                if (omitPartialType) {
+//                    append("(${otherArgs})")
+//                } else {
+//                    append("<const Q extends QueryPartial<${partialType}>>(${otherArgs}): Promise<Array<{[K in keyof ${partialType} as K extends Q[\"fields\"][number] ? K : never]: ${partialType}[K]}>>")
+//                }
+//            return@functionHeader
+//        }
+//    }
     append("(")
     var argComma = false
     arguments(documentable).forEach {
