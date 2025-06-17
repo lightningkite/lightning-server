@@ -24,16 +24,6 @@ export declare type Condition<T> = {
     GreaterThanOrEqual: T;
 } | {
     LessThanOrEqual: T;
-} | (T extends string ? {
-    StringContains: {
-        value: string;
-        ignoreCase: boolean;
-    };
-} : never) | {
-    FullTextSearch: {
-        value: string;
-        ignoreCase: boolean;
-    };
 } | {
     IntBitsClear: number;
 } | {
@@ -42,26 +32,36 @@ export declare type Condition<T> = {
     IntBitsAnyClear: number;
 } | {
     IntBitsAnySet: number;
-} | ArrayCondition<T, any> | SetCondition<T, any> | {
-    Exists: boolean;
 } | {
-    IfNotNull: Condition<T>;
+    Exists: string;
 } | {
+    IfNotNull: Condition<NonNullable<T>>;
+} | {
+    FullTextSearch: {
+        value: string;
+        ignoreCase: boolean;
+    };
+} | StringCondition<T> | ArrayCondition<T> | {
     [P in keyof T]?: Condition<T[P]>;
 };
-declare type ArrayCondition<T, E> = T extends Array<E> ? ({
+declare type ArrayCondition<T> = T extends Array<infer E> ? {
     ListAllElements: Condition<E>;
 } | {
     ListAnyElements: Condition<E>;
-}) | {
+} | {
     ListSizesEquals: number;
-} : never;
-declare type SetCondition<T, E> = T extends Array<E> ? ({
+} | {
     SetAllElements: Condition<E>;
 } | {
     SetAnyElements: Condition<E>;
-}) | {
+} | {
     SetSizesEquals: number;
+} : never;
+declare type StringCondition<T> = T extends string ? {
+    StringContains: {
+        value: string;
+        ignoreCase: boolean;
+    };
 } : never;
 export declare function evaluateCondition<T>(condition: Condition<T>, model: T): boolean;
 declare type PathImpl<T, K extends keyof T> = K extends string ? T[K] extends Record<string, any> ? T[K] extends ArrayLike<any> ? K | `${K}.${PathImpl<T[K], Exclude<keyof T[K], keyof any[]>>}` : K | `${K}.${PathImpl<T[K], keyof T[K]>}` : K : never;

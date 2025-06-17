@@ -10,6 +10,9 @@ type PathImpl<T, K extends keyof T> =
 
 export type Path<T> = PathImpl<T, keyof T> | (keyof T & string);
 
+/**
+ * @deprecated
+ */
 export function apiCall<T>(url: string, body: T, request: RequestInit, fileUploads?: Record<Path<T>, File>, responseInterceptors?: (x: Response)=>Response): Promise<Response> {
     let f: Promise<Response>
     if(fileUploads === undefined || Object.keys(fileUploads).length === 0) {
