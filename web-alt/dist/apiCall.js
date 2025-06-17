@@ -1,6 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.apiCall = void 0;
+/**
+ * @deprecated
+ */
 function apiCall(url, body, request, fileUploads, responseInterceptors) {
     let f;
     if (fileUploads === undefined || Object.keys(fileUploads).length === 0) {

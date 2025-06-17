@@ -1,22 +1,42 @@
 import { Condition } from './Condition'
 import { Modification } from './Modification'
 
+/**
+ * condition: Defaults to Condition.Always<T>()
+ * skip: Defaults to 0
+ * limit: Defaults to 100
+ */
 export interface Query<T> {
-    condition?: Condition<T>// = Condition.Always<T>(),
+    condition?: Condition<T>
     orderBy?: Array<SortPart<T>>
-    skip?: number // = 0,
-    limit?: number // = 100,
+    skip?: number
+    limit?: number
 }
 
+/**
+ * condition: Defaults to Condition.Always<T>()
+ * skip: Defaults to 0
+ * limit: Defaults to 100
+ */
 export interface QueryPartial<T> {
     fields: Array<DataClassPathPartial<T>>
-    condition?: Condition<T> // = Condition.Always<T>(),
+    condition?: Condition<T>
     orderBy?: Array<SortPart<T>>
-    skip?: number // = 0,
-    limit?: number // = 100,
+    skip?: number
+    limit?: number
 }
 
 export type SortPart<T> = (keyof T & string) | `-${keyof T& string}` | `~${keyof T & string}` | `-~${keyof T & string}`
+
+// To replace Sort Part
+export type SortPart1<T> = ObjectPath<T> | `-${ObjectPath<T>}` | `~${ObjectPath<T>}` | `-~${ObjectPath<T>}`
+
+export type ObjectPath<T> = T extends object
+  ? {
+      [K in keyof T]: `${Exclude<K, symbol>}${`.${ObjectPath<T[K]>}` | ""}`;
+    }[keyof T]
+  : never;
+
 export interface MassModification<T> {
     condition: Condition<T>
     modification: Modification<T>

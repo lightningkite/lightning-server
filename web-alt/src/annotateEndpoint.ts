@@ -1,6 +1,6 @@
 import { Condition } from "Condition";
 import { Query } from "otherModels";
-import { HasId, SessionRestEndpoint } from "sessionRest";
+import { HasId, RestEndpoint } from "sessionRest";
 
 export type WithAnnotations<T, A> = T & { _annotations: A };
 
@@ -12,12 +12,12 @@ export type ReadonlyEndpointKeys =
   | "count";
 
 export type AnnotateEndpointReturn<T extends HasId, Annotation> = Pick<
-  SessionRestEndpoint<WithAnnotations<T, Annotation>>,
+  RestEndpoint<WithAnnotations<T, Annotation>>,
   ReadonlyEndpointKeys
 >;
 
 export type ReadonlySessionRestEndpoint<T extends HasId> = Pick<
-  SessionRestEndpoint<T>,
+  RestEndpoint<T>,
   ReadonlyEndpointKeys
 >;
 
@@ -29,7 +29,7 @@ export type ReadonlySessionRestEndpoint<T extends HasId> = Pick<
  * @returns a new endpoint that returns the same data as the original endpoint, but with annotations added
  */
 export function annotateEndpoint<T extends HasId, Annotation>(
-  endpoint: SessionRestEndpoint<T>,
+  endpoint: RestEndpoint<T>,
   addAnnotations: (
     originalItems: T[]
   ) => Promise<WithAnnotations<T, Annotation>[]>
@@ -59,7 +59,7 @@ export function annotateEndpoint<T extends HasId, Annotation>(
     async count(
       input: Condition<WithAnnotations<T, Annotation>>
     ): Promise<number> {
-      return endpoint.count(input);
+      return endpoint.count(input as Condition<T>);
     },
   };
 }

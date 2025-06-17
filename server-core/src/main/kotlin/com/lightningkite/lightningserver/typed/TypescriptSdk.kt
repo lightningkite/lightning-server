@@ -12,6 +12,7 @@ import kotlinx.serialization.descriptors.*
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
+@Deprecated("Will be replaced with typescriptSdk2")
 @OptIn(InternalSerializationApi::class)
 fun Documentable.Companion.typescriptSdk(out: Appendable) = with(out) {
     val safeDocumentables =

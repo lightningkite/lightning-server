@@ -22,4 +22,5 @@ __exportStar(require("./modificationHelpers"), exports);
 __exportStar(require("./mockRestEndpoints"), exports);
 __exportStar(require("./sessionRest"), exports);
 __exportStar(require("./annotateEndpoint"), exports);
+__exportStar(require("./fetching"), exports);
 //# sourceMappingURL=index.js.map

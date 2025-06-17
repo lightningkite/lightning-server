@@ -3,8 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.evaluateModification = void 0;
 const Condition_1 = require("./Condition");
 function evaluateModification(modification, model) {
-    const key = Object.keys(modification)[0];
-    const value = modification[key];
+    const keyAndValue = Object.entries(modification).at(0);
+    if (!keyAndValue) {
+        throw new Error("Single key expected, received none.");
+    }
+    const [key, value] = keyAndValue;
     switch (key) {
         case "Assign":
             return value;
@@ -19,9 +22,19 @@ function evaluateModification(modification, model) {
             }
             return model;
         case "CoerceAtMost":
-            throw new Error("CoerceAtMost is not supported yet");
+            if (typeof model === "string" && typeof value == "string") {
+                return model < value ? model : value;
+            }
+            if (typeof model === "number" && typeof value == "number") {
+                return Math.min(model, value);
+            }
         case "CoerceAtLeast":
-            throw new Error("CoerceAtLeast is not supported yet");
+            if (typeof model === "string" && typeof value == "string") {
+                return model > value ? model : value;
+            }
+            if (typeof model === "number" && typeof value == "number") {
+                return Math.max(model, value);
+            }
         case "Increment": {
             const typedValue = value;
             const typedModel = model;
@@ -37,93 +50,47 @@ function evaluateModification(modification, model) {
             const typedModel = model;
             return (typedModel + typedValue);
         }
-        case "ListAppend": {
+        case "ListAppend":
+        case "SetAppend": {
             const typedValue = value;
             const typedModel = model;
             return [...typedModel, ...typedValue];
         }
-        case "ListRemove": {
+        case "ListRemove":
+        case "SetRemove": {
             const typedValue = value;
             const typedModel = model;
             return typedModel.filter((item) => !(0, Condition_1.evaluateCondition)(typedValue, item));
         }
-        case "ListRemoveInstances": {
+        case "ListRemoveInstances":
+        case "SetRemoveInstances": {
             const typedValue = value;
             const typedModel = model;
             return typedModel.filter((item) => !typedValue.includes(item));
         }
-        case "ListDropFirst": {
+        case "ListDropFirst":
+        case "SetDropFirst": {
             const typedValue = value;
             const typedModel = model;
             if (typedValue) {
                 return typedModel.slice(1);
             }
         }
-        case "ListDropLast": {
-            const typedValue = value;
+        case "ListDropLast":
+        case "SetDropLast": {
             const typedModel = model;
-            if (typedValue) {
-                return typedModel.slice(0, -1);
-            }
+            return typedModel.slice(0, -1);
         }
-        case "ListPerElement": {
-            const typedValue = value;
-            const typedModel = model;
-            typedModel.forEach((item, index) => {
-                if ((0, Condition_1.evaluateCondition)(typedValue.condition, item)) {
-                    typedModel[index] = evaluateModification(typedValue.modification, item);
-                }
-            });
-            return model;
-        }
-        case "SetAppend": {
-            const typedModel = model;
-            const typedValue = value;
-            return [...typedModel, ...typedValue];
-        }
-        case "SetRemove": {
-            const typedModel = model;
-            const typedValue = value;
-            return typedModel.filter((item) => !(0, Condition_1.evaluateCondition)(typedValue, item));
-        }
-        case "SetRemoveInstances": {
-            const typedModel = model;
-            const typedValue = value;
-            return typedModel.filter((item) => !typedValue.includes(item));
-        }
-        case "SetDropFirst":
-            throw new Error("SetDropFirst is not supported yet");
-        case "SetDropLast":
-            throw new Error("SetDropLast is not supported yet");
+        case "ListPerElement":
         case "SetPerElement": {
             const typedValue = value;
-            const typedModel = model;
+            const typedModel = [...model];
             typedModel.forEach((item, index) => {
                 if ((0, Condition_1.evaluateCondition)(typedValue.condition, item)) {
                     typedModel[index] = evaluateModification(typedValue.modification, item);
                 }
             });
-            return model;
-        }
-        case "Combine":
-            throw new Error("Combine is not supported yet");
-        case "ModifyByKey": {
-            const typedValue = value;
-            const typedModel = model;
-            const copy = Object.assign({}, typedModel);
-            Object.keys(typedValue).forEach((key) => {
-                copy[key] = evaluateModification(typedValue[key], copy[key]);
-            });
-            return copy;
-        }
-        case "RemoveKeys": {
-            const typedValue = value;
-            const typedModel = model;
-            const copy = Object.assign({}, typedModel);
-            typedValue.forEach((key) => {
-                delete copy[key];
-            });
-            return copy;
+            return typedModel;
         }
         default:
             const copy = Object.assign({}, model);
