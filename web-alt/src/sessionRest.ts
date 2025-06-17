@@ -11,12 +11,12 @@ import {
   GroupAggregateQuery,
 } from "./otherModels";
 
-type UUID = string;
+export type UUID = string;
 export interface HasId {
   _id: UUID;
 }
 
-export interface SessionRestEndpoint<T extends HasId> {
+export interface RestEndpoint<T extends HasId> {
   /**
   * Gets a default item that would be useful to start creating a full one to insert.  Primarily used for administrative interfaces.
   **/
@@ -94,28 +94,3 @@ export interface SessionRestEndpoint<T extends HasId> {
   **/
   groupAggregate(input: GroupAggregateQuery<T>): Promise<Record<string, number | null | undefined>>;
 }
-
-/**
- * Session rest endpoints with an auth token as the last parameter
- */
-export type ApiRestEndpoint<T extends HasId> = {
-  default: (token: string) => Promise<T>;
-  query(input: Query<T>, token: string): Promise<Array<T>>;
-  queryPartial<Q extends QueryPartial<T>>(input: Q, token: string): Promise<Array<{[K in keyof T as K extends Q["fields"][number] ? K : never]: T[K]}>>;
-  detail(id: UUID, token: string): Promise<T>;
-  insertBulk(input: Array<T>, token: string): Promise<Array<T>>;
-  insert(input: T, token: string): Promise<T>;
-  upsert(id: UUID, input: T, token: string): Promise<T>;
-  bulkReplace(input: Array<T>, token: string): Promise<Array<T>>;
-  replace(id: UUID, input: T, token: string): Promise<T>;
-  bulkModify(input: MassModification<T>, token: string): Promise<number>;
-  modifyWithDiff(id: UUID, input: Modification<T>, token: string): Promise<EntryChange<T>>;
-  modify(id: UUID, input: Modification<T>, token: string): Promise<T>;
-  simplifiedModify(id: UUID, input: DeepPartial<T>, token: string): Promise<T>;
-  bulkDelete(input: Condition<T>, token: string): Promise<number>;
-  delete(id: UUID, token: string): Promise<void>;
-  count(input: Condition<T>, token: string): Promise<number>;
-  groupCount(input: GroupCountQuery<T>, token: string): Promise<Record<string, number>>;
-  aggregate(input: AggregateQuery<T>, token: string): Promise<number | null | undefined>;
-  groupAggregate(input: GroupAggregateQuery<T>, token: string): Promise<Record<string, number | null | undefined>>;
-};

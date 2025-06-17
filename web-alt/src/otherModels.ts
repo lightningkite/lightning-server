@@ -27,6 +27,16 @@ export interface QueryPartial<T> {
 }
 
 export type SortPart<T> = (keyof T & string) | `-${keyof T& string}` | `~${keyof T & string}` | `-~${keyof T & string}`
+
+// To replace Sort Part
+export type SortPart1<T> = ObjectPath<T> | `-${ObjectPath<T>}` | `~${ObjectPath<T>}` | `-~${ObjectPath<T>}`
+
+export type ObjectPath<T> = T extends object
+  ? {
+      [K in keyof T]: `${Exclude<K, symbol>}${`.${ObjectPath<T[K]>}` | ""}`;
+    }[keyof T]
+  : never;
+
 export interface MassModification<T> {
     condition: Condition<T>
     modification: Modification<T>
