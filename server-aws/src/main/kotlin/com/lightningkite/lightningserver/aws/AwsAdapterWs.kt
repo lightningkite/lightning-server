@@ -4,15 +4,18 @@ import com.lightningkite.lightningserver.auth.authAny
 import com.lightningkite.lightningserver.cache.LocalCache
 import com.lightningkite.lightningserver.core.ContentType
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.engine.engine
 import com.lightningkite.lightningserver.exceptions.HttpStatusException
 import com.lightningkite.lightningserver.exceptions.report
 import com.lightningkite.lightningserver.http.HttpContent
 import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.serialization.AnonType
+import com.lightningkite.lightningserver.serialization.InternalCommunicationEncoding
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.settings.generalSettings
 import com.lightningkite.lightningserver.websocket.WebSocketConnection
 import com.lightningkite.lightningserver.websocket.QueryParamWebSocketHandler
+import com.lightningkite.lightningserver.websocket.QueryParamWebSocketHandlerData
 import com.lightningkite.lightningserver.websocket.WebSocketClose
 import com.lightningkite.lightningserver.websocket.WebSocketConnectRequest
 import com.lightningkite.lightningserver.websocket.WebSocketFrame
@@ -26,10 +29,12 @@ import com.lightningkite.lightningserver.websocket.messageFromSubscriptionTracke
 import com.lightningkite.lightningserver.websocket.text
 import com.lightningkite.lightningserver.websocket.willConnectTracked
 import io.ktor.http.decodeURLPart
+import io.ktor.util.encodeBase64
 import kotlinx.coroutines.future.await
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.http.SdkHttpFullResponse
 import software.amazon.awssdk.services.apigatewaymanagementapi.model.GoneException
@@ -364,6 +369,13 @@ class AwsAdapterWs(val root: AwsAdapter) {
                         event.requestContext.connectionId,
                         AnonType(state.state),
                     ) { mid ->
+                        try {
+                            if(generalSettings().debug && state.connectRequest.queryParameterCaseInsensitive("debug")?.toBoolean() == true) {
+                                mid.send(WebSocketFrame("!!! DEBUG AWS INFO !!! - ${if(engine.internalCommunicationEncoding.byteOriented) state.state.encodeBase64() else state.state.toString(Charsets.UTF_8)}"))
+                            }
+                        } catch (e: Exception) {
+                            Exception("Failed to send debug info", e).report()
+                        }
                         rootWs.messageFromClientTracked(
                             ServerPath.root,
                             mid,

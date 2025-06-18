@@ -42,10 +42,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     kotlinOptions.jvmTarget = JavaVersion.VERSION_11.toString()
 }
 
-
-val lk = project.lk {
-    version = gitBasedVersion().also { println("Determined version to be $it") }
-}
 mavenPublishing {
     // publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
     signAllPublications()

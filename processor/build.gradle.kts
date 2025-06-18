@@ -18,9 +18,6 @@ dependencies {
     testImplementation(libs.kotlinTest)
 }
 
-val lk = project.lk {
-    version = gitBasedVersion().also { println("Determined version to be $it") }
-}
 mavenPublishing {
     // publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
     signAllPublications()

@@ -23,6 +23,7 @@ import kotlin.collections.plus
 @Serializable
 data class MultiplexWebSocketHandlerState(
     val map: Map<String, MultiplexWebSocketHandlerConnectionInfo>,
+    val debug: Boolean = false,
 ) {
     operator fun contains(topic: String): Boolean = map.values.any { info -> info.topics.contains(topic) }
 }
@@ -74,6 +75,19 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                     data.copy(map = data.map + (channel to data.map.getValue(channel).let {
                         it.copy(topics = it.topics + topic.topic)
                     }))
+                }.also {
+                    if(it.debug){
+                        this@wrapped.send(
+                            WebSocketFrame(
+                                Serialization.json.encodeToString(
+                                    MultiplexMessage(
+                                        channel = "debug",
+                                        data = Serialization.json.encodeToString(it)
+                                    )
+                                )
+                            )
+                        )
+                    }
                 }
             }
 
@@ -82,6 +96,19 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                     data.copy(map = data.map + (channel to data.map.getValue(channel).let {
                         it.copy(topics = it.topics + topic)
                     }))
+                }.also {
+                    if(it.debug){
+                        this@wrapped.send(
+                            WebSocketFrame(
+                                Serialization.json.encodeToString(
+                                    MultiplexMessage(
+                                        channel = "debug",
+                                        data = Serialization.json.encodeToString(it)
+                                    )
+                                )
+                            )
+                        )
+                    }
                 }
                 if (topic !in newstate) this@wrapped.unsubscribe(topic)
             }
@@ -94,6 +121,20 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                             .copy(storage = AnonType(modification(underlying), handler.storageSerializer)))
                     )
                 }
+                this@wrapped.currentState.also {
+                    if(it.debug){
+                        this@wrapped.send(
+                            WebSocketFrame(
+                                Serialization.json.encodeToString(
+                                    MultiplexMessage(
+                                        channel = "debug",
+                                        data = "Queued:" + Serialization.json.encodeToString(it)
+                                    )
+                                )
+                            )
+                        )
+                    }
+                }
             }
 
             override suspend fun updateStateImmediately(modification: (T) -> T): T {
@@ -105,6 +146,19 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                                 currentState = it
                             }, handler.storageSerializer)))
                     )
+                }.also {
+                    if(it.debug){
+                        this@wrapped.send(
+                            WebSocketFrame(
+                                Serialization.json.encodeToString(
+                                    MultiplexMessage(
+                                        channel = "debug",
+                                        data = Serialization.json.encodeToString(it)
+                                    )
+                                )
+                            )
+                        )
+                    }
                 }
                 return currentState
             }
@@ -132,6 +186,47 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
         val channel = message.channel
         try {
             when {
+                message.channel == "debug" -> {
+                    // Debugging channel
+                    if(message.start) {
+                        connection.updateStateImmediately { it.copy(debug = true) }
+                        connection.send(
+                            WebSocketFrame(
+                                Serialization.json.encodeToString(
+                                    MultiplexMessage(
+                                        channel = "debug",
+                                        start = true
+                                    )
+                                )
+                            )
+                        )
+                    } else if(message.end) {
+                        connection.updateStateImmediately { it.copy(debug = false) }
+                        connection.send(
+                            WebSocketFrame(
+                                Serialization.json.encodeToString(
+                                    MultiplexMessage(
+                                        channel = "debug",
+                                        start = false
+                                    )
+                                )
+                            )
+                        )
+                    } else {
+                        if(connection.currentState.debug){
+                            connection.send(
+                                WebSocketFrame(
+                                    Serialization.json.encodeToString(
+                                        MultiplexMessage(
+                                            channel = "debug",
+                                            data = Serialization.json.encodeToString(connection.currentState)
+                                        )
+                                    )
+                                )
+                            )
+                        }
+                    }
+                }
                 message.start -> {
                     val match = WebSockets.matcher.match(message.path!!) ?: throw NotFoundException()
                     @Suppress("UNCHECKED_CAST")
@@ -151,6 +246,19 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                                 storage = AnonType(storage, otherHandler.storageSerializer),
                             ))
                         )
+                    }.also {
+                        if(it.debug){
+                            connection.send(
+                                WebSocketFrame(
+                                    Serialization.json.encodeToString(
+                                        MultiplexMessage(
+                                            channel = "debug",
+                                            data = Serialization.json.encodeToString(it)
+                                        )
+                                    )
+                                )
+                            )
+                        }
                     }
                     otherHandler.didConnectTracked(match.path, connection.wrapped(channel, match.path, otherHandler))
                     connection.send(
@@ -174,7 +282,20 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                         connection.wrapped(channel, info.handlerPath, otherHandler),
                         WebSocketClose.NORMAL
                     )
-                    connection.updateStateImmediately { it.copy(map = it.map - channel) }
+                    connection.updateStateImmediately { it.copy(map = it.map - channel) }.also {
+                        if(it.debug){
+                            connection.send(
+                                WebSocketFrame(
+                                    Serialization.json.encodeToString(
+                                        MultiplexMessage(
+                                            channel = "debug",
+                                            data = Serialization.json.encodeToString(it)
+                                        )
+                                    )
+                                )
+                            )
+                        }
+                    }
                     connection.send(
                         WebSocketFrame(
                             Serialization.json.encodeToString(
@@ -219,6 +340,20 @@ class MultiplexWebSocketHandler(val cache: () -> Cache) : WebSocketHandler<Multi
                 )
             }
             connection.queueStateUpdate { it.copy(map = it.map - channel) }
+            connection.currentState.also {
+                if(it.debug){
+                    connection.send(
+                        WebSocketFrame(
+                            Serialization.json.encodeToString(
+                                MultiplexMessage(
+                                    channel = "debug",
+                                    data = Serialization.json.encodeToString(it)
+                                )
+                            )
+                        )
+                    )
+                }
+            }
         }
     }
 

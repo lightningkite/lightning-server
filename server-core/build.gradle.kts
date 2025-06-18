@@ -13,23 +13,13 @@ plugins {
     alias(libs.plugins.vanniktechMavenPublish)
 }
 
-val lk = project.lk {
-    version = gitBasedVersion().also { println("Determined version to be $it") }
-}
-
 dependencies {
     api(project(":shared"))
     api(libs.ktorJson)
     api(libs.ktorCioJvm)
     api(libs.ktorClientCio)
     api(libs.ktorContentNegotiation)
-    api(lk.mavenOrLocal(
-        gitUrl = "git@github.com:lightningkite/kotlinx-serialization-csv-durable.git",
-        group = "com.lightningkite",
-        artifact = "kotlinx-serialization-csv-durable",
-        major = 0,
-        minor = 2
-    ))
+    api(libs.comLightningkiteKotlinxSerializationCsvDurable)
     implementation(libs.coroutinesCore)
     implementation(libs.logBackClassic)
     implementation(libs.kotlinStdLib)
