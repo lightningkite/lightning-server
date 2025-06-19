@@ -37,7 +37,7 @@ class FullEventType<USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID 
 
         @Suppress("UNCHECKED_CAST")
         fun <T:HasId<ID>, ID:Comparable<ID>> register(type: FullEventType<USER, UID, T, ID, CONTENT>) {
-            if (type.name in registry.keys) throw EventTypeRegistrationException(type.name, "Event type '${type.name}' is not unique and has been registered before")
+            if (registry.containsKey(type.name)) throw EventTypeRegistrationException(type.name, "Event type '${type.name}' is not unique and has been registered before")
             registry[type.name] = type as FullEventType<USER, UID, HasId<*>, *, CONTENT>
         }
 
@@ -80,9 +80,9 @@ data class FullEvent<USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID
 ): HasId<UUID> {
     val serialized = Event(
         _id = _id,
-        time = time,
+        timestamp = time,
         type = type.type,
-        target = Serialization.json.encodeToString(type.info.serialization.idSerializer, target._id)
+        subject = Serialization.json.encodeToString(type.info.serialization.idSerializer, target._id)
     )
 }
 

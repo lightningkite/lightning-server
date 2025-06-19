@@ -1,16 +1,12 @@
 package com.lightningkite.lightningserver.notifications
 
 
-import com.lightningkite.EmailAddress
-import com.lightningkite.PhoneNumber
 import com.lightningkite.UUID
 import com.lightningkite.lightningdb.Condition
 import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.Index
 import com.lightningkite.lightningdb.IndexSet
-import com.lightningkite.lightningdb.MaxLength
-import com.lightningkite.lightningdb.References
 import com.lightningkite.now
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.DayOfWeek
@@ -43,9 +39,9 @@ data class EventType(
 @GenerateDataClassPaths
 data class Event(
     override val _id: UUID = UUID.random(),
-    val time: Instant,
+    val timestamp: Instant,
     val type: EventType,
-    val target: UntypedID  // JSON of ID of T
+    val subject: UntypedID  // JSON of ID of T
 ): HasId<UUID>
 
 

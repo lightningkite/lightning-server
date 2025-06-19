@@ -76,7 +76,7 @@ abstract class NotificationEndpoints<USER : HasId<UID>, UID : Comparable<UID>, C
      * @return A list of `Email` to be sent.
      * */
     open suspend fun makeEmailNotifications(user: USER, notifications: List<NotificationForUser<UID, CONTENT>>): List<Email> {
-        val email = email(user)?.let { listOf(EmailLabeledValue(it.raw)) } ?: return emptyList()
+        val email = email(user)?.let { listOf(EmailLabeledValue(it)) } ?: return emptyList()
 
         return notifications.map { notif ->
             Email(
@@ -154,11 +154,13 @@ abstract class NotificationEndpoints<USER : HasId<UID>, UID : Comparable<UID>, C
 
     private suspend fun sendPushNotifications(user: USER, notifications: List<NotificationForUser<UID, CONTENT>>) {
         if (push == null) return
+        val allTokens = fcmTokens(user).toMutableSet()
+        if (allTokens.isEmpty()) return
 
         val notificationData = makePushNotifications(user, notifications)
         if (notificationData.isEmpty()) return
+
         val push = push.invoke()
-        val allTokens = fcmTokens(user).toMutableSet()
         val deadTokens = HashSet<String>()
         notificationData.forEach {
             val r = push.send(allTokens.toList(), it)
@@ -208,7 +210,7 @@ abstract class NotificationEndpoints<USER : HasId<UID>, UID : Comparable<UID>, C
 
                 supervisorScope {
                     launch {
-                        val toEmail = userNotifs.filter { it.email != null }
+                        val toEmail = userNotifs.filter { it.email == false }
                         if (toEmail.isEmpty()) return@launch
                         try {
                             sendEmailNotifications(user, toEmail)
@@ -223,7 +225,7 @@ abstract class NotificationEndpoints<USER : HasId<UID>, UID : Comparable<UID>, C
                         }
                     }
                     launch {
-                        val toSms = userNotifs.filter { it.sms != null }
+                        val toSms = userNotifs.filter { it.sms == false }
                         if (toSms.isEmpty()) return@launch
                         try {
                             sendSmsNotifications(user, toSms)
@@ -238,7 +240,7 @@ abstract class NotificationEndpoints<USER : HasId<UID>, UID : Comparable<UID>, C
                         }
                     }
                     launch {
-                        val toPush = userNotifs.filter { it.push != null }
+                        val toPush = userNotifs.filter { it.push == false }
                         if (toPush.isEmpty()) return@launch
                         try {
                             sendPushNotifications(user, toPush)
@@ -358,7 +360,7 @@ abstract class NotificationEndpoints<USER : HasId<UID>, UID : Comparable<UID>, C
     }
 
     val autoRefreshNotifications = schedule("$name.refreshNotifications", 1.minutes) {
-        val acquiredLock = cache().setIfNotExists(scheduleLockKey, "lock", String.serializer(), (actionTimeoutSeconds*16).seconds)
+        val acquiredLock = cache().setIfNotExists(scheduleLockKey, "lock", String.serializer(), (actionTimeoutSeconds*16).seconds)       // TODO: I'm not sure if this timeout will remove the item, if it doesn't that breaks this functionality
         if (acquiredLock) refreshNotifications(BasicPager(0, 200))
     }
 
