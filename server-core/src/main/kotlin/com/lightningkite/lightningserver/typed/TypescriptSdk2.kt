@@ -30,6 +30,7 @@ fun Documentable.Companion.typescriptSdk2(out: Appendable) = with(out) {
     appendLine()
 
     val stringSerialNames: MutableSet<String> = mutableSetOf()
+    println("HERE 1")
 
     usedTypes
         .filter { it.descriptor.simpleSerialName !in skipFromLsPackage }
@@ -130,13 +131,12 @@ fun Documentable.Companion.typescriptSdk2(out: Appendable) = with(out) {
     appendLine("export class LiveApi implements Api {")
     appendLine("    public constructor(public fetcher: Fetcher) {}")
 
+    appendLine()
     for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
-        append("    ")
-        append(entry.functionName)
+        append("    ${entry.functionName} = ")
         this.functionHeader(entry)
-        appendLine(" {")
         val hasInput = entry.inputType != Unit.serializer()
-        append("        return this.fetcher<${entry.inputType.write()}, ${entry.outputType.write()}>(")
+        append(" => this.fetcher<${entry.inputType.write()}, ${entry.outputType.write()}>(")
         append(
             listOf(
                 "`${entry.path.path.escaped}`",
@@ -145,8 +145,8 @@ fun Documentable.Companion.typescriptSdk2(out: Appendable) = with(out) {
             ).joinToString(", ")
         )
         appendLine(")")
-        appendLine("    }")
     }
+    appendLine()
 
 
 
