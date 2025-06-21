@@ -3,6 +3,7 @@ package com.lightningkite.lightningserver.auth.proof
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningserver.auth.Authentication
 import com.lightningkite.lightningserver.auth.noAuth
+import com.lightningkite.lightningserver.cache.Cache
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.encryption.SecureHasher
@@ -10,15 +11,10 @@ import com.lightningkite.lightningserver.encryption.hasher
 import com.lightningkite.lightningserver.encryption.secretBasis
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.post
-import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.ApiExample
 import com.lightningkite.lightningserver.typed.Documentable
 import com.lightningkite.lightningserver.typed.api
 import com.lightningkite.now
-import kotlinx.serialization.encoding.CompositeDecoder
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 abstract class PinBasedProofEndpoints(
     path: ServerPath,
@@ -27,7 +23,8 @@ abstract class PinBasedProofEndpoints(
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val pin: PinHandler,
     val interfaceInfo: Documentable.InterfaceInfo,
-    val exampleTarget: String
+    val exampleTarget: String,
+    val strength: Int = 10,
 ) : ServerPathGroup(path), Authentication.StartedProofMethod {
 
     open fun normalize(to: String): String = to.lowercase().trim()
@@ -35,7 +32,7 @@ abstract class PinBasedProofEndpoints(
     final override val info: ProofMethodInfo = ProofMethodInfo(
         via = name,
         property = property,
-        strength = 10
+        strength = strength
     )
 
     override val start = path("start").post.api(
@@ -57,13 +54,19 @@ abstract class PinBasedProofEndpoints(
             ),
         ),
         successCode = HttpStatus.OK,
-        implementation = { addressUnsafe: String ->
-            val address = normalize(addressUnsafe)
-            val p = pin.establish(address)
-            send(address, p.pin)
-            p.key
+        implementation = { valueUnsafe: String ->
+            val value = normalize(valueUnsafe)
+
+            pin.cache().constrainAttemptRate(
+                cacheKey = "$name-pin-count-${value}"
+            ) {
+                val p = pin.establish(value)
+                send(value, p.pin)
+                p.key
+            }
         }
     )
+
     protected fun issueProof(destination: String): Proof {
         return proofHasher().makeProof(
             info = info,
@@ -72,6 +75,7 @@ abstract class PinBasedProofEndpoints(
             at = now()
         )
     }
+
     override val prove = path("prove").post.api(
         belongsToInterface = interfaceInfo,
         authOptions = noAuth,
@@ -104,6 +108,6 @@ abstract class PinBasedProofEndpoints(
 
     override suspend fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> established(
         handler: Authentication.SubjectHandler<SUBJECT, ID>,
-        item: SUBJECT
+        item: SUBJECT,
     ): Boolean = handler.get(item, info.property!!) != null
 }
