@@ -5,45 +5,50 @@ import com.lightningkite.lightningdb.*
 import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.cache.Cache
-import com.lightningkite.lightningserver.cache.get
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.modelInfo
 import com.lightningkite.lightningserver.db.ModelRestEndpoints
-import com.lightningkite.lightningserver.db.ModelSerializationInfo
 import com.lightningkite.lightningserver.encryption.SecureHasher
 import com.lightningkite.lightningserver.encryption.hasher
 import com.lightningkite.lightningserver.encryption.secretBasis
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.http.HttpStatus
-import com.lightningkite.lightningserver.http.delete
-import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.post
 import com.lightningkite.lightningserver.routes.docName
-import com.lightningkite.lightningserver.serialization.Serialization
-import com.lightningkite.lightningserver.serialization.encodeUnwrappingString
 import com.lightningkite.lightningserver.settings.generalSettings
-import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.typed.*
 import dev.turingcomplete.kotlinonetimepassword.HmacAlgorithm
 import dev.turingcomplete.kotlinonetimepassword.TimeBasedOneTimePasswordConfig
 import com.lightningkite.now
-import com.lightningkite.serialization.DataClassPathSelf
-import com.lightningkite.uuid
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.InternalSerializationApi
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 import java.security.SecureRandom
 import kotlinx.datetime.toJavaInstant
-import kotlinx.serialization.builtins.nullable
 import java.util.concurrent.TimeUnit
-import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
+
+
+@Deprecated("Use TimeBasedOTPProofEndpoints instead", replaceWith = ReplaceWith("TimeBasedOTPProofEndpoints", "com.lightningkite.lightningserver.auth.proof.TimeBasedOTPProofEndpoints") )
+@OptIn(InternalSerializationApi::class)
+fun OneTimePasswordProofEndpoints(
+    path: ServerPath,
+    database: () -> Database,
+    cache: () -> Cache,
+    config: TimeBasedOneTimePasswordConfig = TimeBasedOneTimePasswordConfig(
+        timeStep = 30,
+        timeStepUnit = TimeUnit.SECONDS,
+        codeDigits = 6,
+        hmacAlgorithm = HmacAlgorithm.SHA1
+    ),
+    proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
+) = TimeBasedOTPProofEndpoints(
+    path, database, cache, config, proofHasher
+)
 
 @OptIn(InternalSerializationApi::class)
-class OneTimePasswordProofEndpoints(
+class TimeBasedOTPProofEndpoints(
     path: ServerPath,
     val database: () -> Database,
     val cache: () -> Cache,
@@ -56,20 +61,20 @@ class OneTimePasswordProofEndpoints(
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
 ) : ServerPathGroup(path), Authentication.DirectProofMethod {
     init {
-        path.docName = "OneTimePasswordProof"
+        path.docName = "OneTimePasswordProof" // Version 5: Rename to "TimeBasedOneTimePasswordProof"
     }
 
     override val info: ProofMethodInfo = ProofMethodInfo(
-        via = "otp",
+        via = "totp",
         property = null,
-        strength = 5
+        strength = 10
     )
 
     init {
         Authentication.register(this)
     }
-    val loggedInInterfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "AuthenticatedOneTimePasswordProofClientEndpoints", listOf())
-    val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "OneTimePasswordProofClientEndpoints", listOf())
+    val loggedInInterfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "AuthenticatedOneTimePasswordProofClientEndpoints", listOf()) // Version 5: Rename to "AuthenticatedTimeBasedOneTimePasswordProofClientEndpoints"
+    val interfaceInfo: Documentable.InterfaceInfo = Documentable.InterfaceInfo(path, "OneTimePasswordProofClientEndpoints", listOf()) // Version 5: Rename to "TimeBasedOneTimePasswordProofClientEndpoints"
 
     private val active get() = condition<OtpSecret> { it.disabledAt.eq(null) and (it.expiresAt.eq(null) or it.expiresAt.notNull.gte(now())) }
 
@@ -109,10 +114,10 @@ class OneTimePasswordProofEndpoints(
 
     val establish = path("establish").post.api(
         belongsToInterface = loggedInInterfaceInfo,
-        summary = "Establish One Time Password",
+        summary = "Establish One Time Password", // Version 5: Rename to "Establish Time Based One Time Password"
         inputType = EstablishOtp.serializer(),
         outputType = String.serializer(),
-        description = "Generates a new One Time Password configuration.",
+        description = "Generates a new Time Based One Time Password configuration.",
         authOptions = anyAuthRoot,
         errorCases = listOf(),
         examples = listOf(),
@@ -139,8 +144,8 @@ class OneTimePasswordProofEndpoints(
     override val prove = path("prove").post.api(
         authOptions = noAuth,
         belongsToInterface = interfaceInfo,
-        summary = "Prove OTP",
-        description = "Logs in to the given account with an OTP code.  Limits to 10 attempts per hour.",
+        summary = "Prove OTP", // Version 5: Rename to "Prove TOTP"
+        description = "Logs in to the given account with an TOTP code.  Limits to 10 attempts per hour.",
         errorCases = listOf(),
         examples = listOf(
             ApiExample(
@@ -164,7 +169,7 @@ class OneTimePasswordProofEndpoints(
         implementation = { input: IdentificationAndPassword ->
             val now = now()
             cache().constrainAttemptRate(
-                cacheKey = "otp-count-${input.property}-${input.value}"
+                cacheKey = "totp-count-${input.property}-${input.value}"
             ) {
                 val subject = input.type
                 val handler = Authentication.subjects.values.find { it.name == subject }
@@ -195,10 +200,10 @@ class OneTimePasswordProofEndpoints(
 
     val confirm = path("existing").post.api(
         belongsToInterface = loggedInInterfaceInfo,
-        summary = "Confirm One Time Password",
+        summary = "Confirm One Time Password", // Version 5: Rename to "Confirm Time Based One Time Password"
         inputType = String.serializer(),
         outputType = Unit.serializer(),
-        description = "Confirms your OTP, making it fully active",
+        description = "Confirms your TOTP, making it fully active",
         authOptions = anyAuthRoot,
         errorCases = listOf(),
         examples = listOf(),

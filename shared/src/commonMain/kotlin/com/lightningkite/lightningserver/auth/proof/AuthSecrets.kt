@@ -6,9 +6,7 @@ import com.lightningkite.lightningdb.ExperimentalLightningServer
 import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.now
-import com.lightningkite.uuid
 import kotlinx.datetime.Instant
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlin.time.Duration
@@ -16,7 +14,7 @@ import kotlin.time.Duration
 @OptIn(ExperimentalLightningServer::class)
 @Serializable
 @GenerateDataClassPaths
-data class OtpSecret(
+data class OtpSecret( //Version 5 rename to TOTPSecret
     override val _id: UUID = UUID.random(),
     val subjectType: String,
     val subjectId: String,

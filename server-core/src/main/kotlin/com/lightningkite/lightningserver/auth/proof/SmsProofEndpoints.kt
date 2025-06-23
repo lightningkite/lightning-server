@@ -37,7 +37,8 @@ class SmsProofEndpoints(
     proofHasher = proofHasher,
     pin = pin,
     interfaceInfo = Documentable.InterfaceInfo(path, "SmsProofClientEndpoints", listOf()),
-    exampleTarget = "800-1000-100"
+    exampleTarget = "800-1000-100",
+    strength = 5,
 ) {
     override fun normalize(to: String): String = to
         .removePrefix("+")
