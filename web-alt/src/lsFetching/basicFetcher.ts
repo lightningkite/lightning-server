@@ -1,15 +1,12 @@
-export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+import { Fetcher, HeaderCalculator } from "./fetchingTypes";
 
-export type HeaderCalculator = () =>
-  | Promise<Record<string, string>>
-  | Record<string, string>;
-
-export type Fetcher = <Body, T>(
-  path: string,
-  method: Method,
-  body?: Body
-) => Promise<T>;
-
+/**
+ * Creates a fetcher for making api calls
+ * @param baseUrl Server URL
+ * @param additionalHeaders Optional function for computing headers for each request. Defaults to () => ({})
+ * @param responseInterceptors Intercepts responses before they are resolved.
+ * @returns a 'Fetcher' function for making requests
+ */
 export function createBasicFetcher(
   baseUrl: string,
   additionalHeaders: HeaderCalculator = () => ({}),

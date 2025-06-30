@@ -14,13 +14,8 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-__exportStar(require("./Condition"), exports);
-__exportStar(require("./Modification"), exports);
-__exportStar(require("./otherModels"), exports);
-__exportStar(require("./apiCall"), exports);
-__exportStar(require("./modificationHelpers"), exports);
-__exportStar(require("./mockRestEndpoints"), exports);
-__exportStar(require("./sessionRest"), exports);
-__exportStar(require("./annotateEndpoint"), exports);
-__exportStar(require("./lsFetching"), exports);
+__exportStar(require("./basicFetcher"), exports);
+__exportStar(require("./bulkFetcher"), exports);
+__exportStar(require("./fetchingTypes"), exports);
+__exportStar(require("./helpers"), exports);
 //# sourceMappingURL=index.js.map
