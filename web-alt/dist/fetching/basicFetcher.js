@@ -10,6 +10,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createBasicFetcher = void 0;
+/**
+ * Creates a fetcher for making api calls
+ * @param baseUrl Server URL
+ * @param additionalHeaders Optional function for computing headers for each request. Defaults to () => ({})
+ * @param responseInterceptors Intercepts responses before they are resolved.
+ * @returns a 'Fetcher' function for making requests
+ */
 function createBasicFetcher(baseUrl, additionalHeaders = () => ({}), responseInterceptors) {
     return function (path, method, body) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -29,4 +36,4 @@ function apiCall(url, body, request, responseInterceptors) {
             return response;
     });
 }
-//# sourceMappingURL=fetching.js.map
+//# sourceMappingURL=basicFetcher.js.map
