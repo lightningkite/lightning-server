@@ -3,8 +3,6 @@ package com.lightningkite.lightningserver.typed
 import com.lightningkite.lightningdb.MySealedClassSerializer
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.http.HttpMethod
-import com.lightningkite.lightningserver.typed.Documentable.Companion.endpoints
-import com.lightningkite.lightningserver.typed.Documentable.Companion.usedTypes
 import com.lightningkite.serialization.listElement
 import com.lightningkite.serialization.mapValueElement
 import com.lightningkite.serialization.nullElement
@@ -130,13 +128,12 @@ fun Documentable.Companion.typescriptSdk2(out: Appendable) = with(out) {
     appendLine("export class LiveApi implements Api {")
     appendLine("    public constructor(public fetcher: Fetcher) {}")
 
+    appendLine()
     for (entry in byGroup[null]?.sortedBy { it.functionName } ?: listOf()) {
-        append("    ")
-        append(entry.functionName)
-        this.functionHeader(entry)
-        appendLine(" {")
+        append("    ${entry.functionName}: Api[\"${entry.functionName}\"] = ")
+        this.functionHeader(entry, false)
         val hasInput = entry.inputType != Unit.serializer()
-        append("        return this.fetcher<${entry.inputType.write()}, ${entry.outputType.write()}>(")
+        append(" => this.fetcher(")
         append(
             listOf(
                 "`${entry.path.path.escaped}`",
@@ -145,8 +142,8 @@ fun Documentable.Companion.typescriptSdk2(out: Appendable) = with(out) {
             ).joinToString(", ")
         )
         appendLine(")")
-        appendLine("    }")
     }
+    appendLine()
 
 
 
@@ -159,7 +156,7 @@ fun Documentable.Companion.typescriptSdk2(out: Appendable) = with(out) {
             append("        ")
             append(entry.functionName)
             append(": ")
-            this.functionHeader(entry)
+            this.functionHeader(entry, false)
             val hasInput = entry.inputType != Unit.serializer()
             append(" => this.fetcher(")
             append(
@@ -201,34 +198,41 @@ private val skipFromLsPackage = setOf("Partial") + fromLightningServerPackage
 private fun String.groupToPartName(): String = replaceFirstChar { it.lowercase() }
 
 @OptIn(ExperimentalSerializationApi::class)
-private fun Appendable.functionHeader(documentable: Documentable) {
+private fun Appendable.functionHeader(documentable: Documentable, withTypes: Boolean = true) {
     append("(")
     var argComma = false
     arguments(documentable).forEach {
         if (argComma) append(", ")
         else argComma = true
         append(it.name)
-        if (it.optional) append("?")
-        append(": ")
-        it.type?.write()?.let { append(it) } ?: it.stringType?.let { append(it) }
+        if (withTypes) {
+            if (it.optional) append("?")
+            append(": ")
+            it.type?.write()?.let { append(it) } ?: it.stringType?.let { append(it) }
+        }
     }
-    append("): ")
-    when (documentable) {
-        is ApiEndpoint<*, *, *, *> -> {
-            append("Promise<")
-            documentable.outputType.write().let { append(it) }
-            append(">")
-        }
+    if (withTypes) {
 
-        is ApiWebsocket<*, *, *, *, *> -> {
-            append("Observable<WebSocketIsh<")
-            documentable.inputType.write().let { append(it) }
-            append(", ")
-            documentable.outputType.write().let { append(it) }
-            append(">>")
-        }
+        append("): ")
+        when (documentable) {
+            is ApiEndpoint<*, *, *, *> -> {
+                append("Promise<")
+                documentable.outputType.write().let { append(it) }
+                append(">")
+            }
 
-        else -> TODO()
+            is ApiWebsocket<*, *, *, *, *> -> {
+                append("Observable<WebSocketIsh<")
+                documentable.inputType.write().let { append(it) }
+                append(", ")
+                documentable.outputType.write().let { append(it) }
+                append(">>")
+            }
+
+            else -> TODO()
+        }
+    } else {
+        append(")")
     }
 }
 
