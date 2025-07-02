@@ -39,6 +39,7 @@ lettuce = "6.3.2.RELEASE"
 lkGradleHelpers = "2.0.1"
 logBackClassic = "1.5.3"
 memcached = "2.4.8"
+metadataExtractor = "2.19.0"
 mongoDriver = "5.1.2"
 oneTimePass = "2.4.0"
 orgCrac = "0.1.3"
@@ -52,6 +53,7 @@ shadow = "8.1.1"
 vanniktechMavenPublish = "0.30.0"
 webauthn4jCore = "0.29.0.RELEASE"
 xmlUtilJvm = "0.90.1"
+mcp = "0.5.0"
 
 [libraries]
 androidDesugaring = { module = "com.android.tools:desugar_jdk_libs", version = { ref = "androidDesugaring" } }
@@ -113,6 +115,7 @@ lettuce = { module = "io.lettuce:lettuce-core", version = { ref = "lettuce" } }
 lkGradleHelpers = { module = "com.lightningkite:lk-gradle-helpers", version = { ref = "lkGradleHelpers" } }
 logBackClassic = { module = "ch.qos.logback:logback-classic", version = { ref = "logBackClassic" } }
 memcached = { module = "com.googlecode.xmemcached:xmemcached", version = { ref = "memcached" } }
+metadataExtractor = { module = "com.drewnoakes:metadata-extractor", version.ref = "metadataExtractor" }
 mongoBson = { module = "org.mongodb:bson", version = { ref = "bson" } }
 mongoDriver = { module = "org.mongodb:mongodb-driver-kotlin-coroutine", version = { ref = "mongoDriver" } }
 oneTimePass = { module = "dev.turingcomplete:kotlin-onetimepassword", version = { ref = "oneTimePass" } }
@@ -128,6 +131,7 @@ serializationProperties = { module = "org.jetbrains.kotlinx:kotlinx-serializatio
 serializationProtobuf = { module = "org.jetbrains.kotlinx:kotlinx-serialization-protobuf", version = { ref = "serializationLibs" } }
 webauthn4jCore = { module = "com.webauthn4j:webauthn4j-core", version = { ref = "webauthn4jCore" } }
 xmlUtilJvm = { module = "io.github.pdvrieze.xmlutil:serialization-jvm", version = { ref = "xmlUtilJvm" } }
+mcp = { module = "io.modelcontextprotocol:kotlin-sdk", version = { ref = "mcp" } }
 
 [plugins]
 androidApp = { id = "com.android.application", version = { ref = "agp" } }

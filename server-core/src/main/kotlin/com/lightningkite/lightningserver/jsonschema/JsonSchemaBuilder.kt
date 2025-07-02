@@ -233,6 +233,11 @@ fun Json.schema(type: KSerializer<*>): JsonSchemaDefinition {
     )
 }
 
+fun Json.singleType(type: KSerializer<*>): JsonSchemaType {
+    val b = JsonSchemaBuilder(this)
+    return b.get(type, direct = true)
+}
+
 class JsonSchemaBuilder(
     val json: Json,
     val refString: String = "#/definitions/",
