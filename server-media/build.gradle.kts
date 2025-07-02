@@ -14,34 +14,13 @@ plugins {
 }
 
 dependencies {
-    api(project(":shared"))
-    api(libs.ktorJson)
-    api(libs.ktorCioJvm)
-    api(libs.ktorClientCio)
-    api(libs.ktorContentNegotiation)
-    api(libs.comLightningkiteKotlinxSerializationCsvDurable)
-    implementation(libs.coroutinesCore)
-    implementation(libs.logBackClassic)
-    implementation(libs.metadataExtractor)
-    implementation(libs.kotlinStdLib)
-    implementation(libs.coroutinesCore)
-    api(libs.kotlinHtmlJvm)
-    api(libs.oneTimePass)
-    api(libs.serializationCbor)
-    api(libs.xmlUtilJvm)
-    api(libs.mongoBson)
-    api(libs.kBson)
-    api(libs.kaml)
-    api(libs.serializationProtobuf)
-    api(libs.kotlinReflect)
-    implementation(libs.bouncyCastleBcprov)
-    implementation(libs.bouncyCastleBcpkix)
-    implementation(libs.webauthn4jCore)
-
-    api(libs.angusMail)
-    testImplementation(libs.javaJwt)
+    api(project(":server-core"))
+    api(libs.scrimage)
+    api(libs.scrimageWebP)
+    api(libs.scrimageFormats)
+    implementation(libs.coroutinesReactive)
     testImplementation(libs.kotlinTest)
-
+    testImplementation(project(":server-testing"))
     ksp(project(":processor"))
     kspTest(project(":processor"))
 }
@@ -73,18 +52,17 @@ mavenPublishing {
     signAllPublications()
     coordinates(group.toString(), name, version.toString())
     pom {
-    name.set("Lightning-server-Server")
-    description.set("A set of tools to fill in/replace what Ktor is lacking in.")
-    github("lightningkite", "lightning-server")
+        name.set("Lightning-server-Server")
+        description.set("An implementation of LightningServer Cache using ram.")
+        github("lightningkite", "lightning-server")
 
-    licenses {
-        mit()
+        licenses {
+            mit()
+        }
+
+        developers {
+            joseph()
+            brady()
+        }
     }
-
-    developers {
-        joseph()
-        brady()
-    }
-}
-
 }
