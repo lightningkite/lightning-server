@@ -102,6 +102,8 @@ class ContentType(val type: String, val subtype: String, val parameters: Map<Str
     @Suppress("KDocMissingDocumentation", "unused")
     public object Image {
         public val Any: ContentType = ContentType("image", "*")
+        public val APNG: ContentType = ContentType("image", "apng")
+        public val AVIF: ContentType = ContentType("image", "avif")
         public val GIF: ContentType = ContentType("image", "gif")
         public val JPEG2000: ContentType = ContentType("image", "jp2")
         public val JPEG: ContentType = ContentType("image", "jpeg")
@@ -110,6 +112,7 @@ class ContentType(val type: String, val subtype: String, val parameters: Map<Str
         public val WebP: ContentType = ContentType("image", "webp")
         public val XIcon: ContentType = ContentType("image", "x-icon")
         public val Tiff: ContentType = ContentType("image", "tiff")
+        public val BMP: ContentType = ContentType("image", "bmp")
     }
 
     /**
@@ -202,6 +205,8 @@ class ContentType(val type: String, val subtype: String, val parameters: Map<Str
                 "png" to Image.PNG,
                 "svg" to Image.SVG,
                 "webp" to Image.WebP,
+                "tiff" to Image.Tiff,
+                "bmp" to Image.BMP,
                 "jp2" to Image.JPEG2000,
                 "pdf" to Application.Pdf,
                 "xlsx" to Application.Xlsx,
