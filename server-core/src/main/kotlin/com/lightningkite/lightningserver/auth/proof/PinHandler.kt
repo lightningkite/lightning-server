@@ -15,7 +15,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 open class PinHandler(
-    private val cache: () -> Cache,
+    val cache: () -> Cache,
     val keyPrefix: String,
     val availableCharacters: List<Char> = ('A'..'Z').toList() - setOf('I', 'O'),
     val length: Int = 6,

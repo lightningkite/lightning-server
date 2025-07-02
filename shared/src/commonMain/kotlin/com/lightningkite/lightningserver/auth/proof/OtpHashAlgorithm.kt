@@ -4,7 +4,7 @@ import com.lightningkite.lightningdb.ExperimentalLightningServer
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class OtpHashAlgorithm {
+enum class OtpHashAlgorithm { // Version 5 rename to TOTPHashAlgorithm
     /**
      * SHA1 HMAC with a hash of 20-bytes
      */
