@@ -16,7 +16,7 @@ lateinit var comparable: KSClassDeclaration
 class TableGenerator(
     val codeGenerator: CodeGenerator,
     val logger: KSPLogger,
-) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 56) {
+) : CommonSymbolProcessor2(codeGenerator, "lightningdb", 57) {
     fun KSClassDeclaration.isSerializable(): Boolean = this.annotation("Serializable", "kotlinx.serialization") != null
     fun KSClassDeclaration.isPlainSerializable(): Boolean =
         this.annotation("Serializable", "kotlinx.serialization")?.let {

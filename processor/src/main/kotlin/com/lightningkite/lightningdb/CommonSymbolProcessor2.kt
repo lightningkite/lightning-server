@@ -68,14 +68,16 @@ abstract class CommonSymbolProcessor2(
         })
 
         try {
+            val metaFolder = projectFolder.resolve("build/lightningserver/cache")
             val outFolder = projectFolder.resolve("build/generated/ksp/common/common$flavor/kotlin")
+            metaFolder.mkdirs()
             outFolder.mkdirs()
 
             if (common) {
                 processFiles(
                     version = version,
                     dependencies = interestedIn.asSequence().map { it.filePath.let(::File) },
-                    lockFile = outFolder.resolve("$myId.lock"),
+                    lockFile = metaFolder.resolve("$myId.lock"),
                     destinationFolder = outFolder.resolve(myId).also { it.mkdirs() },
                     action = {
                         fileCreator = label@{ _, packageName, fileName, extensionName ->
