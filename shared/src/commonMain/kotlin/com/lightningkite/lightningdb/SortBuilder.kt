@@ -1,6 +1,7 @@
 package com.lightningkite.lightningdb
 
 import com.lightningkite.serialization.DataClassPath
+import com.lightningkite.serialization.DataClassPathSelf
 import kotlinx.serialization.KSerializer
 
 inline fun <reified T> sort(setup: SortBuilder<T>.(DataClassPath<T, T>) -> Unit): List<SortPart<T>> {
@@ -18,3 +19,7 @@ class SortBuilder<K>() {
     fun DataClassPath<K, String>.ascending(ignoreCase: Boolean) = add(SortPart<K>(this, true, ignoreCase))
     fun DataClassPath<K, String>.descending(ignoreCase: Boolean) = add(SortPart<K>(this, false, ignoreCase))
 }
+
+fun <T> DataClassPathSelf<T>.sort(
+    setup: SortBuilder<T>.(DataClassPath<T, T>)->Unit
+) = SortBuilder<T>().apply { setup(this@sort) }.build()

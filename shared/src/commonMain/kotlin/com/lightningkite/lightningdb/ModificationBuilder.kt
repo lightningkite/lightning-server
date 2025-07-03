@@ -214,3 +214,8 @@ fun <T> Partial<T>.toModification(serializer: KSerializer<T>): Modification<T> {
     perPath(DataClassPathSelf(serializer)) { out += it.modify() }
     return Modification.Chain(out)
 }
+
+fun <T> DataClassPathSelf<T>.modification(
+    modification: ModificationBuilder<T>.(DataClassPath<T, T>)->Unit
+) = ModificationBuilder<T>().apply { modification(this@modification) }.build()
+

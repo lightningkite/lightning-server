@@ -5,7 +5,6 @@ import com.lightningkite.UUID
 import com.lightningkite.lightningdb.Condition
 import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningdb.Index
 import com.lightningkite.lightningdb.IndexSet
 import com.lightningkite.now
 import kotlinx.datetime.DateTimeUnit
@@ -45,7 +44,6 @@ data class Event(
 ): HasId<UUID>
 
 
-
 @Serializable
 @GenerateDataClassPaths
 data class UserEventType<UID : Comparable<UID>>(val user: UID, val type: EventType) : Comparable<UserEventType<UID>> {
@@ -53,30 +51,43 @@ data class UserEventType<UID : Comparable<UID>>(val user: UID, val type: EventTy
         user.compareTo(other.user).takeIf { it != 0 } ?: type.name.compareTo(other.type.name)
 }
 
+
 @Serializable
 @GenerateDataClassPaths
-data class EventSubscription<UID : Comparable<UID>>(
+data class SubscriptionInfo<T>(
+    val filter: Condition<T> = Condition.Always,
+    val email: NotificationFrequency? = NotificationFrequency.immediately(),
+    val sms: NotificationFrequency? = NotificationFrequency.immediately(),
+    val push: NotificationFrequency? = NotificationFrequency.immediately()
+) {
+    constructor(
+        filter: Condition<T> = Condition.Always,
+        frequency: NotificationFrequency = NotificationFrequency.immediately(),
+        email: Boolean = true,
+        sms: Boolean = true,
+        push: Boolean = true
+    ) : this(filter, frequency.takeIf { email }, frequency.takeIf { sms }, frequency.takeIf { push })
+}
+
+@Serializable
+@GenerateDataClassPaths
+data class NotificationEventSubscription<UID : Comparable<UID>>(
     override val _id: UserEventType<UID>,
     val requestedFilter: SerializedCondition,  // JSON of Condition<T> (T is model type of event)
     val readPermissions: SerializedCondition,  // Calculated permissions for T for user
-    @Index val filterHashes: Set<Int>,
-    val frequency: NotificationFrequency,
-    val email: Boolean,
-    val push: Boolean,
-    val sms: Boolean,
-): HasId<UserEventType<UID>> {
-    /**
-     * Used for type-safe construction of [EventSubscription]. Not stored.
-     * */
-    @Serializable
-    data class Info<T>(
-        val filter: Condition<T> = Condition.Always,
-        val frequency: NotificationFrequency = NotificationFrequency.immediately(),
-        val email: Boolean = true,
-        val push: Boolean = true,
-        val sms: Boolean = true,
-    )
-}
+    val email: NotificationFrequency?,
+    val push: NotificationFrequency?,
+    val sms: NotificationFrequency?,
+): HasId<UserEventType<UID>>
+
+@Serializable
+@GenerateDataClassPaths
+data class NotificationSendMethods<UID : Comparable<UID>>(
+    override val _id: UserEventType<UID>,
+    val email: NotificationFrequency?,
+    val push: NotificationFrequency?,
+    val sms: NotificationFrequency?,
+): HasId<UserEventType<UID>>
 
 interface NotificationContent {
     val title: String
@@ -99,25 +110,6 @@ interface NotificationContent {
         ) = Basic(title, body, url)
     }
 }
-
-@Serializable
-@GenerateDataClassPaths
-@IndexSet(["user", "sendAt",])
-data class NotificationForUser<UID, CONTENT : NotificationContent>(
-    override val _id: UUID = UUID.random(),
-    val event: Event,
-    val user: UID,
-    val content: CONTENT,
-    val sendAt: Instant,
-    val createdAt: Instant = now(),
-    val read: Instant? = null,
-    val email: Boolean? = null, // null means do not send via that method, false = not sent yet, true = sent
-    val push: Boolean? = null,
-    val sms: Boolean? = null,
-    val inAppOnlySent: Boolean = false // This is used to notify web sockets that the notification should be sent in-app if no other method is specified
-): HasId<UUID>
-
-
 
 /**
  * Represents the frequency at which notifications should be sent, with options for daily, weekly, batch-based, or immediate scheduling.
@@ -212,3 +204,27 @@ data class TimeInZone(
     val time: LocalTime,
     val zone: TimeZone
 )
+
+
+@Serializable
+@GenerateDataClassPaths
+@IndexSet(["user", "sendAt",])
+data class NotificationForUser<UID, CONTENT : NotificationContent>(
+    override val _id: UUID = UUID.random(),
+    val event: Event,
+    val user: UID,
+    val content: CONTENT,
+    val createdAt: Instant = now(),
+    val read: Instant? = null,
+    val email: SendInfo? = null,
+    val push: SendInfo? = null,
+    val sms: SendInfo? = null,
+): HasId<UUID>
+
+@Serializable
+@GenerateDataClassPaths
+data class SendInfo(
+    val sendAt: Instant,
+    val sent: Boolean = false
+)
+

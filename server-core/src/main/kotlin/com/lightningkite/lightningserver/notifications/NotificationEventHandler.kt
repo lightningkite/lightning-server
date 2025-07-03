@@ -1,55 +1,92 @@
 package com.lightningkite.lightningserver.notifications
 
 import com.lightningkite.lightningdb.HasId
-import com.lightningkite.lightningserver.db.ModelInfo
-import com.lightningkite.lightningserver.tasks.task
+import com.lightningkite.lightningdb.getMany
+import com.lightningkite.lightningdb.insertMany
+import com.lightningkite.lightningserver.events.EventHandler
+import com.lightningkite.lightningserver.events.EventRegistry
+import com.lightningkite.lightningserver.events.TypedEvent
+import com.lightningkite.lightningserver.events.TypedEventType
+import com.lightningkite.lightningserver.exceptions.exceptionSettings
 import com.lightningkite.now
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
+class NotificationEventHandler<USER : HasId<UID>, UID : Comparable<UID>, CONTENT : NotificationContent>(
+    val dispatcher: NotificationDispatcher<USER, UID, CONTENT>,
+    val subscriptions: SubscriptionManager<USER, UID>,
+    override val registry: EventRegistry<USER>,
+): EventHandler<USER> {
+    data class SendMethods<UID : Comparable<UID>>(
+        val user: UID,
+        val email: NotificationFrequency?,
+        val sms: NotificationFrequency?,
+        val push: NotificationFrequency?
+    )
 
-/**
- * Convenience class to define an event type and create events of that type with invocations
- *
- * @param name The name of the event type. Must be unique.
- * @param info ModelInfo for the model this event is based on.
- * @param handler Your implementation of [NotificationEndpoints]
- * @param tags Used to help identify event types in the registry. Useful when you need to mark an attribute of the event type.
- *             For example, a "REQUIRED" tag could indicate that subscriptions to that event are required for every user when implementing notification permissions (Optional)
- * @param defaultSubscription Lambda that takes in a user and maybe returns a subscription to this event. Defaults to no subscription.
- * @param content Lambda to generate the content for a notification based on a given model and user
- *
- * */
-class NotificationEventHandler<USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>, CONTENT : NotificationContent>(
-    val type: EventType,
-    info: ModelInfo<USER, T, ID>,
-    private val handler: NotificationEndpoints<USER, UID, CONTENT>,
-    defaultSubscription: suspend (user: USER)->EventSubscription.Info<T>? = { null },
-    content: suspend (T) -> (USER) -> CONTENT
-) {
-    val fullType = FullEventType(type, info, handler.eventRegistry, defaultSubscription, content)
+    val logger: Logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.notifications.NotificationEventHandler")
 
-    suspend operator fun invoke(subject: T) {
-        handler.notifyEvent(
-            FullEvent(time = now(), type = fullType, target = subject)
-        )
+    interface SubscriptionManager<USER : HasId<UID>, UID : Comparable<UID>> {
+        suspend fun <T:HasId<ID>, ID:Comparable<ID>> subscribed(event: TypedEvent<USER, T, ID>): List<SendMethods<UID>>
     }
 
-    val task = task("Event-${type.name.filter { !it.isWhitespace() }}-TASK", info.serialization.serializer) { invoke(it) }
+    // _____Content Generators_____
+    // These translate events into NotificationContent
 
-    suspend fun launch(subject: T) = task(subject)
+    private data class ContentGenerator<USER:HasId<*>, T:HasId<*>, CONTENT : NotificationContent>(
+        val type: TypedEventType<USER, T, *>,
+        val generator: suspend (T) -> (USER) -> CONTENT
+    )
+
+    private val contentGenerators = HashMap<String, ContentGenerator<USER, *, CONTENT>>()
+
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun <T : HasId<*>> getContent(event: TypedEvent<USER, T, *>) =
+        contentGenerators[event.type.name]
+            ?.let { (it as ContentGenerator<USER, T, CONTENT>).generator(event.subject) }
+            ?: throw EventRegistry.EventTypeRegistrationException(event.type.name, "Event type ${event.type.name} has no content generator")
+
+    fun <T:HasId<*>> setContent(key: TypedEventType<USER, T, *>, generator: suspend (T) -> (USER) -> CONTENT) {
+        contentGenerators[key.type.name]?.let {
+            if (it.type.info != key.info) logger.warn("Event type '${key.name}' is overriding the content generator for event type '${it.type.name}'")
+        }
+        contentGenerators[key.type.name] = ContentGenerator(key, generator)
+    }
+
+    override suspend fun <T : HasId<ID>, ID : Comparable<ID>> handle(event: TypedEvent<USER, T, ID>) {
+        try {
+            val content = getContent(event)
+
+            val now = now()
+
+            val subscribed = subscriptions.subscribed(event)
+
+            if (subscribed.isEmpty()) {
+                logger.debug("No subscriptions found for ${event.type.name}")
+                return
+            } else logger.debug("${subscribed.size} subscriptions found for ${event.type.name}")
+
+            val users = dispatcher.users.collection()
+                .getMany(subscribed.map { it.user }.toSet())
+                .associateBy { it._id }
+
+            val notifications = subscribed.mapNotNull { sub ->
+                val user = users[sub.user] ?: return@mapNotNull null
+
+                NotificationForUser(
+                    event = event.toEvent(),
+                    user = sub.user,
+                    content = content(user),
+                    email = sub.email?.sendAt(now)?.let(::SendInfo),
+                    sms = sub.sms?.sendAt(now)?.let(::SendInfo),
+                    push = sub.push?.sendAt(now)?.let(::SendInfo)
+                )
+            }
+
+            dispatcher.info.collection().insertMany(notifications)
+
+        } catch (e: EventRegistry.EventTypeRegistrationException) {
+            exceptionSettings().report(e)
+        }
+    }
 }
-
-fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>, CONTENT : NotificationContent> NotificationEndpoints<USER, UID, CONTENT>.event(
-    type: EventType,
-    info: ModelInfo<USER, T, ID>,
-    defaultSubscription: suspend (user: USER)->EventSubscription.Info<T>? = { null },
-    content: suspend (T) -> (USER) -> CONTENT
-) = NotificationEventHandler(type, info, this, defaultSubscription, content)
-
-fun <USER : HasId<UID>, UID : Comparable<UID>, T : HasId<ID>, ID : Comparable<ID>, CONTENT : NotificationContent> NotificationEndpoints<USER, UID, CONTENT>.event(
-    name: String,
-    info: ModelInfo<USER, T, ID>,
-    tags: Set<String> = emptySet(),
-    defaultSubscription: suspend (user: USER)->EventSubscription.Info<T>? = { null },
-    content: suspend (T) -> (USER) -> CONTENT
-) = NotificationEventHandler(EventType(name, tags), info, this, defaultSubscription, content)
-

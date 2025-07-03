@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver
 
 import com.lightningkite.prepareModelsServerCore
 import com.lightningkite.lightningdb.*
-import com.lightningkite.serialization.*
 import com.lightningkite.lightningserver.auth.*
 import com.lightningkite.lightningserver.auth.oauth.OauthClientEndpoints
 import com.lightningkite.lightningserver.auth.proof.*
@@ -31,7 +30,6 @@ import com.lightningkite.lightningserver.sms.SMSSettings
 import com.lightningkite.lightningserver.tasks.Tasks
 import com.lightningkite.lightningserver.testmodels.*
 import com.lightningkite.prepareModelsShared
-import com.lightningkite.uuid
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.ContextualSerializer
 import kotlinx.serialization.KSerializer
@@ -39,12 +37,11 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseContextualSerialization
 import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration
-import java.util.*
 import com.lightningkite.UUID
-import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.handler
+import com.lightningkite.lightningserver.events.EventRegistry
 import com.lightningkite.lightningserver.typed.arg
 import com.lightningkite.lightningserver.typed.get
 import kotlinx.coroutines.*
@@ -57,7 +54,6 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     val sms = setting("sms", SMSSettings("test"))
     val cache = setting("cache", CacheSettings())
     val files = setting("files", FilesSettings())
-
 
     val authPath = ServerPath("auth")
 
@@ -226,6 +222,8 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
     val testUser = GlobalScope.async(start = CoroutineStart.LAZY) { userInfo.collection().insertOne(TestUser(email = "test@test.com"))!! }
     val testAdmin = GlobalScope.async(start = CoroutineStart.LAZY) { userInfo.collection().insertOne(TestUser(email = "admin@test.com", isSuperAdmin = true))!! }
     val oauthClients = OauthClientEndpoints(path("oauth-clients"), database)
+
+    val events = EventRegistry<TestUser>(path("events"))
 
     init {
         Settings.populateDefaults(

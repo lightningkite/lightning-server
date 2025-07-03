@@ -1,10 +1,11 @@
-package com.lightningkite.lightningserver.notifications.split
+package com.lightningkite.lightningserver.notifications
 
 import com.lightningkite.lightningdb.Condition
 import com.lightningkite.lightningdb.EntryChange
 import com.lightningkite.lightningdb.FieldCollection
 import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
+import com.lightningkite.lightningdb.condition
 import com.lightningkite.lightningdb.eq
 import com.lightningkite.lightningdb.getMany
 import com.lightningkite.lightningdb.insertMany
@@ -12,52 +13,27 @@ import com.lightningkite.lightningdb.inside
 import com.lightningkite.lightningdb.interceptCreate
 import com.lightningkite.lightningdb.map
 import com.lightningkite.lightningserver.core.ServerPath
+import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.ModelInfo
+import com.lightningkite.lightningserver.db.ModelRestEndpoints
+import com.lightningkite.lightningserver.events.EventRegistry
+import com.lightningkite.lightningserver.events.TypedEvent
+import com.lightningkite.lightningserver.events.TypedEventType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
-import com.lightningkite.lightningserver.notifications.EventType
-import com.lightningkite.lightningserver.notifications.NotificationFrequency
-import com.lightningkite.lightningserver.notifications.NotificationSystemUtils
-import com.lightningkite.lightningserver.notifications.SerializedCondition
-import com.lightningkite.lightningserver.notifications.UserEventType
-import com.lightningkite.lightningserver.notifications.type
+import com.lightningkite.lightningserver.notifications.split._id
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.AuthAccessor
+import com.lightningkite.serialization.DataClassPathSelf
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.set
-
-@Serializable
-@GenerateDataClassPaths
-data class SubscriptionInfo<T>(
-    val filter: Condition<T> = Condition.Always,
-    val email: NotificationFrequency? = NotificationFrequency.immediately(),
-    val sms: NotificationFrequency? = NotificationFrequency.immediately(),
-    val push: NotificationFrequency? = NotificationFrequency.immediately()
-) {
-    constructor(
-        filter: Condition<T> = Condition.Always,
-        frequency: NotificationFrequency = NotificationFrequency.immediately(),
-        email: Boolean = true,
-        sms: Boolean = true,
-        push: Boolean = true
-    ) : this(filter, frequency.takeIf { email }, frequency.takeIf { sms }, frequency.takeIf { push })
-}
-
-@Serializable
-@GenerateDataClassPaths
-data class NotificationEventSubscription<UID : Comparable<UID>>(
-    override val _id: UserEventType<UID>,
-    val requestedFilter: SerializedCondition,  // JSON of Condition<T> (T is model type of event)
-    val readPermissions: SerializedCondition,  // Calculated permissions for T for user
-    val email: NotificationFrequency?,
-    val push: NotificationFrequency?,
-    val sms: NotificationFrequency?,
-): HasId<UserEventType<UID>>
 
 enum class DefaultSubscriptionBehavior {
     /**
@@ -85,15 +61,38 @@ enum class DefaultSubscriptionBehavior {
     UpdateRetainingUserChanges,
 }
 
-class CustomizableFilterSubscriptionManager<USER:HasId<UID>, UID:Comparable<UID>>(
+class PerUserSubscriptions<USER:HasId<UID>, UID:Comparable<UID>>(
     path: ServerPath,
     info: ModelInfo<USER, NotificationEventSubscription<UID>, UserEventType<UID>>,
     users: ModelInfo<USER, USER, UID>,
     val eventRegistry: EventRegistry<USER>
 ) :
-    InfoAndEndpoints<USER, UID, NotificationEventSubscription<UID>, UserEventType<UID>>(path, info),
+    ServerPathGroup(path),
     NotificationEventHandler.SubscriptionManager<USER, UID>
 {
+    val info = object : ModelInfo<USER, NotificationEventSubscription<UID>, UserEventType<UID>> by info {
+        override suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<NotificationEventSubscription<UID>> =
+            info.collection(auth).interceptCreate { subscription ->
+                val type = eventRegistry[subscription._id.type]
+
+                try {
+                    Serialization.json.decodeFromString(type.conditionSerializer, subscription.requestedFilter)
+                } catch (e: Exception) {
+                    throw BadRequestException("Could not decode requested subscription filter for event type: $e", cause = e)
+                }
+
+                subscription.copy(
+                    readPermissions = type.serializedReadPermissions(auth)
+                )
+            }
+    }
+
+    val logger: Logger = LoggerFactory.getLogger("com.lightningkite.lightningserver.notifications.PerUserSubscriptions")
+
+    val rest = ModelRestEndpoints(path("rest"), info)
+
+    private val self = DataClassPathSelf(info.serialization.serializer)
+
     private data class DefaultSubscription<USER:HasId<UID>, UID:Comparable<UID>, T:HasId<*>>(
         val eventType: TypedEventType<USER, T, *>,
         val behavior: DefaultSubscriptionBehavior = DefaultSubscriptionBehavior.UpdateReadPermissions,
@@ -127,7 +126,7 @@ class CustomizableFilterSubscriptionManager<USER:HasId<UID>, UID:Comparable<UID>
         subscription: suspend (USER) -> SubscriptionInfo<T>?
     ) {
         defaultSubscriptions[type.name]?.let {
-            if (it.eventType.info != type.info) NotificationSystemUtils.logger.warn(
+            if (it.eventType.info != type.info) logger.warn(
                 "Default subscription for event type '${it.eventType.name}' is overridden. Old model: ${it.eventType.info.collectionName}  New model: ${type.info.collectionName}"
             )
         }
@@ -135,8 +134,9 @@ class CustomizableFilterSubscriptionManager<USER:HasId<UID>, UID:Comparable<UID>
     }
 
     override suspend fun <T : HasId<ID>, ID : Comparable<ID>> subscribed(event: TypedEvent<USER, T, ID>): List<NotificationEventHandler.SendMethods<UID>> {
-        val subscriptions = collection()
-            .find(condition { it._id.type eq event.type.type })
+        val subscriptions = info
+            .collection()
+            .find(self.condition { it._id.type eq event.type.type })
             .filter {
                 try {
                     val subscribedCondition = Condition.And(
@@ -180,7 +180,7 @@ class CustomizableFilterSubscriptionManager<USER:HasId<UID>, UID:Comparable<UID>
         val deleted = changes.filter { it.old != null && it.new == null }.mapNotNull { it.old }
         val changed = changes.filter { it.old != null && it.new != null }
 
-        NotificationSystemUtils.logger.debug("handling default subscriptions - created : ${created.size} deleted : ${deleted.size} changed : ${changed.size}")
+        logger.debug("handling default subscriptions - created : ${created.size} deleted : ${deleted.size} changed : ${changed.size}")
 
         val toInsert = defaults.flatMap { default ->
             created.mapNotNull { default(it) }
@@ -203,7 +203,7 @@ class CustomizableFilterSubscriptionManager<USER:HasId<UID>, UID:Comparable<UID>
             }
 
             if (newDefaults.isNotEmpty()) {
-                val inDb = collection().getMany(newDefaults.keys).associateBy { it._id };
+                val inDb = info.collection().getMany(newDefaults.keys).associateBy { it._id };
 
                 for ((id, value) in newDefaults.entries) {
                     val (old, new) = value
@@ -254,7 +254,7 @@ class CustomizableFilterSubscriptionManager<USER:HasId<UID>, UID:Comparable<UID>
                 }
             }
 
-            if (newPermissions.isNotEmpty()) collection().getMany(newPermissions.keys).forEach { stored ->
+            if (newPermissions.isNotEmpty()) info.collection().getMany(newPermissions.keys).forEach { stored ->
                 val perms = newPermissions[stored._id]?.takeUnless { it == stored.readPermissions } ?: return@forEach
 
                 put(stored._id, stored.copy(readPermissions = perms))
@@ -270,9 +270,9 @@ class CustomizableFilterSubscriptionManager<USER:HasId<UID>, UID:Comparable<UID>
             }
         }
 
-        collection().run {
+        info.collection().run {
             val removeKeys = (toRemove + withUserChanges.keys + toReplace.keys + justReadPermissions.keys).toSet()
-            if (removeKeys.isNotEmpty()) deleteManyIgnoringOld(condition { it._id inside removeKeys })
+            if (removeKeys.isNotEmpty()) deleteManyIgnoringOld(self.condition { it._id inside removeKeys })
 
             val inserted = toInsert + withUserChanges.values + toReplace.values.filterNotNull() + justReadPermissions.values
             if (inserted.isNotEmpty()) insertMany(inserted)
@@ -285,18 +285,4 @@ class CustomizableFilterSubscriptionManager<USER:HasId<UID>, UID:Comparable<UID>
 
     private suspend fun <T : HasId<*>> TypedEventType<USER, T, *>.serializedReadPermissions(auth: AuthAccessor<USER>) =
         Serialization.json.encodeToString(conditionSerializer, info.permissions(auth).read)
-
-    override suspend fun collection(auth: AuthAccessor<USER>): FieldCollection<NotificationEventSubscription<UID>> = super.collection(auth).interceptCreate { subscription ->
-        val type = eventRegistry[subscription._id.type]
-
-        try {
-            Serialization.json.decodeFromString(type.conditionSerializer, subscription.requestedFilter)
-        } catch (e: Exception) {
-            throw BadRequestException("Could not decode requested subscription filter for event type: $e", cause = e)
-        }
-
-        subscription.copy(
-            readPermissions = type.serializedReadPermissions(auth)
-        )
-    }
 }

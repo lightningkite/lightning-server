@@ -13,6 +13,8 @@ import kotlin.jvm.JvmName
 
 inline fun <reified T> path(): DataClassPath<T, T> = DataClassPathSelf(serializerOrContextual<T>())
 
+fun <T> DataClassPathSelf<T>.condition(condition: (DataClassPath<T, T>) -> Condition<T>) = condition(this)
+
 inline fun <reified T> condition(setup: (DataClassPath<T, T>) -> Condition<T>): Condition<T> =
     path<T>().let(setup)
 fun <T> condition(boolean: Boolean): Condition<T> = if(boolean) Condition.Always else Condition.Never
