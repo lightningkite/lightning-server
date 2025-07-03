@@ -41,13 +41,30 @@ import kotlinx.serialization.builtins.serializer
 import kotlin.time.Duration
 import java.util.*
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.auth.oauth.ExternalProfile
+import com.lightningkite.lightningserver.auth.oauth.OauthClient
+import com.lightningkite.lightningserver.auth.oauth.OauthCodeRequest
+import com.lightningkite.lightningserver.auth.oauth.OauthProviderCredentials
+import com.lightningkite.lightningserver.auth.oauth.OauthProviderInfo
+import com.lightningkite.lightningserver.auth.oauth.OauthResponseMode
+import com.lightningkite.lightningserver.http.HttpHeader
+import com.lightningkite.lightningserver.http.HttpHeaders
 import com.lightningkite.lightningserver.http.HttpRequest
 import com.lightningkite.lightningserver.http.HttpResponse
 import com.lightningkite.lightningserver.http.get
 import com.lightningkite.lightningserver.http.handler
+import com.lightningkite.lightningserver.http.test
+import com.lightningkite.lightningserver.routes.fullUrl
+import com.lightningkite.lightningserver.serialization.parse
+import com.lightningkite.lightningserver.serialization.queryParameters
 import com.lightningkite.lightningserver.typed.arg
 import com.lightningkite.lightningserver.typed.get
+import com.lightningkite.lightningserver.typed.test
+import com.lightningkite.lightningserver.websocket.test
+import io.ktor.client.request.get
+import io.ktor.client.request.headers
 import kotlinx.coroutines.*
+import kotlinx.serialization.encodeToString
 import kotlin.time.Duration.Companion.minutes
 
 @OptIn(DelicateCoroutinesApi::class)
@@ -90,14 +107,15 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         prepareModelsServerCoreTest()
     }
 
-    val userInfo = modelInfoWithDefault<TestUser, TestUser, UUID>(
-        getBaseCollection = {
-            database().collection<TestUser>()
-        },
-        defaultItem = { TestUser(email = "") },
-        forUser = { it },
+    val userInfo = database.modelInfo<TestUser, TestUser, UUID>(
         authOptions = authOptions<TestUser>(),
-        serialization = ModelSerializationInfo()
+        permissions = {
+            ModelPermissions.allowAll()
+        }
+    )
+    val userEndpoints = ModelRestEndpoints(
+        path(UUID.random().toString()),
+        userInfo
     )
 
     val proofEmail = EmailProofEndpoints(
@@ -247,6 +265,57 @@ object TestSettings: ServerPathGroup(ServerPath.root) {
         }
     }
 
+
+    // Self-referencing OAuth for some truly cursed testing
+    val oauthLoginPage = path("oauth-self-test/oauth-authorize").get.handler {
+        val request = it.queryParameters(OauthCodeRequest.serializer())
+        val oauthCode = testUserSubject.generateOauthCode.test(testAdmin.await(), request)
+        HttpResponse.plainText(request.redirect_uri + "?" + Serialization.formData.encodeToString(oauthCode))
+    }
+    val mockLoginPage = path("oauth-self-test/mock-login").get.handler {
+        HttpResponse.plainText("OK")
+    }
+    val oauthClient: Deferred<OauthClient> = GlobalScope.async(start = CoroutineStart.LAZY) {
+        TestSettings.oauthClients.rest.insert.test(
+            TestSettings.testAdmin.await(), OauthClient(
+                _id = UUID.random().toString(),
+                niceName = "Test",
+                scopes = TestSettings.testUserSubject.self.authOptions.options.first()!!.scopes ?: setOf(),
+                redirectUris = setOf(proofOauthSelf.callback.callback.path.fullUrl())
+            )
+        )
+    }
+    val oauthSecret = GlobalScope.async(start = CoroutineStart.LAZY) {
+        TestSettings.oauthClients.createSecret.test(TestSettings.testAdmin.await(), oauthClient.await()._id, Unit)
+    }
+    val proofOauthSelf = OauthProofEndpoints(
+        ServerPath("oauth-self-test/proofs"),
+        cache = cache,
+        provider = OauthProviderInfo(
+            niceName = "Self",
+            loginUrl = oauthLoginPage.path.fullUrl(),
+            tokenUrl = testUserSubject.token.path.path.fullUrl(),
+            mode = OauthResponseMode.query,
+            scopeForProfile = "*",
+            getProfile = { response ->
+                val self = testUserSubject.self.route.endpoint.test(
+                    headers = HttpHeaders(HttpHeader.Authorization to "${response.token_type} ${response.access_token}")
+                ).body!!.parse(TestUser.serializer())
+                ExternalProfile(
+                    email = self.email,
+                )
+            }
+        ),
+        credentials = {
+            runBlocking {
+                OauthProviderCredentials(
+                    id = oauthClient.await()._id,
+                    secret = oauthSecret.await()
+                )
+            }
+        },
+        continueUiAuthUrl = { mockLoginPage.path.fullUrl() }
+    )
 }
 
 

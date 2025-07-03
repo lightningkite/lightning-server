@@ -26,6 +26,7 @@ class OauthProviderInfo(
     val niceName: String,
     val pathName: String = niceName.lowercase().map { if (it.isLetterOrDigit()) it else '-' }.joinToString(""),
     val identifierName: String = niceName.lowercase().map { if (it.isLetterOrDigit()) it else '_' }.joinToString(""),
+    val issuer: String? = null,
     val loginUrl: String,
     val tokenUrl: String,
     val mode: OauthResponseMode = OauthResponseMode.form_post,
@@ -63,6 +64,8 @@ class OauthProviderInfo(
         scope: String = scopeForProfile,
         accessType: OauthAccessType = OauthAccessType.online,
         loginHint: String? = null,
+        codeChallenge: String? = null,
+        codeChallengeMethod: String? = null,
     ): String {
         val params = OauthCodeRequest(
             response_type = "code",
@@ -74,6 +77,8 @@ class OauthProviderInfo(
             access_type = accessType,
             prompt = if (accessType == OauthAccessType.offline) OauthPromptType.consent else null,
             login_hint = loginHint,
+            code_challenge = codeChallenge,
+            code_challenge_method = codeChallengeMethod,
         ).let { Serialization.properties.encodeToFormData(it) }
         return "$loginUrl?$params"
     }
@@ -82,6 +87,7 @@ class OauthProviderInfo(
         credentials: () -> OauthProviderCredentials,
         callback: HttpEndpoint,
         oauth: OauthCode,
+        codeVerifier: String? = null,
     ): OauthResponse {
         oauth.error?.let {
             throw BadRequestException("Got error code '${it}' from $niceName.")
@@ -95,6 +101,7 @@ class OauthProviderInfo(
                             client_secret = credentials().secret,
                             redirect_uri = callback.path.fullUrl(),
                             grant_type = OauthGrantTypes.authorizationCode,
+                            code_verifier = codeVerifier,
                         )
                     )
                 )
@@ -128,6 +135,7 @@ class OauthProviderInfo(
 
         val google = OauthProviderInfo(
             niceName = "Google",
+            issuer = "https://accounts.google.com",
             loginUrl = "https://accounts.google.com/o/oauth2/v2/auth",
             tokenUrl = "https://oauth2.googleapis.com/token",
             scopeForProfile = "https://www.googleapis.com/auth/userinfo.email",

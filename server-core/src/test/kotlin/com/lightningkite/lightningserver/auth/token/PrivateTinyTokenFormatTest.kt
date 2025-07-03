@@ -12,7 +12,7 @@ import java.util.*
 import com.lightningkite.UUID
 
 class PrivateTinyTokenFormatTest: TokenFormatTest() {
-    override fun format(expiration: Duration): TokenFormat = PrivateTinyTokenFormat(SecretBasis().let{{it}}.encryptor("tinytoken"), expiration)
+    override fun format(): TokenFormat = PrivateTinyTokenFormat(SecretBasis().let{{it}}.encryptor("tinytoken"))
 
     init { TestSettings }
 }

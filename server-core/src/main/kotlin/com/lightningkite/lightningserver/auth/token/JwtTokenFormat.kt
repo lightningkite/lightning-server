@@ -18,7 +18,6 @@ import kotlin.time.Duration.Companion.minutes
 
 class JwtTokenFormat(
     val hasher: () -> SecureHasher,
-    val expiration: Duration = 5.minutes,
     val issuerOverride: String? = null,
     val audienceOverride: String? = null,
 ): TokenFormat {
@@ -26,6 +25,7 @@ class JwtTokenFormat(
     val audience: String get() = audienceOverride ?: generalSettings().publicUrl
     override fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         handler: Authentication.SubjectHandler<SUBJECT, ID>,
+        expiration: Duration,
         auth: RequestAuth<SUBJECT>
     ): String {
         return hasher().signJwt(

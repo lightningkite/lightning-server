@@ -15,12 +15,12 @@ import kotlin.time.Duration.Companion.minutes
 
 class PublicTinyTokenFormat(
     val hasher: () -> SecureHasher,
-    val expiration: Duration = 5.minutes,
 ): TokenFormat {
     val resultSize by lazy { hasher().sign(byteArrayOf(1, 2, 3)).size }
 
     override fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         handler: Authentication.SubjectHandler<SUBJECT, ID>,
+        expiration: Duration,
         auth: RequestAuth<SUBJECT>
     ): String = "tt/" + handler.name + "/" + run {
         val out = ByteArrayOutputStream()

@@ -27,9 +27,11 @@ import kotlin.time.Duration
 import kotlinx.datetime.*
 import java.util.*
 import com.lightningkite.UUID
+import com.lightningkite.lightningserver.cache.Cache
 
 class OauthProofEndpoints(
     path: ServerPath,
+    cache: () -> Cache,
     proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val provider: OauthProviderInfo,
     val credentials: () -> OauthProviderCredentials,
@@ -48,17 +50,19 @@ class OauthProofEndpoints(
 
     val callback = path("callback").oauthCallback<UUID>(
         oauthProviderInfo = provider,
-        credentials = credentials
-    ) { response, _ ->
-        val profile = provider.getProfile(response)
-        val email = profile.email ?: throw BadRequestException("No email was found for this profile.")
-        HttpResponse.redirectToGet(continueUiAuthUrl() + "?proof=${Serialization.json.encodeToString(Proof.serializer(), proofHasher().makeProof(
-            info = info,
-            property = "email",
-            value = email,
-            at = now()
-        )).encodeURLQueryComponent()}&backend=${generalSettings().publicUrl.encodeURLQueryComponent()}")
-    }
+        cache = cache,
+        credentials = credentials,
+        onAccess = { response, _ ->
+            val profile = provider.getProfile(response)
+            val email = profile.email ?: throw BadRequestException("No email was found for this profile.")
+            HttpResponse.redirectToGet(continueUiAuthUrl() + "?proof=${Serialization.json.encodeToString(Proof.serializer(), proofHasher().makeProof(
+                info = info,
+                property = "email",
+                value = email,
+                at = now()
+            )).encodeURLQueryComponent()}&backend=${generalSettings().publicUrl.encodeURLQueryComponent()}")
+        }
+    )
     override val indirectLink: ServerPath = path("open").get.handler {
         HttpResponse.redirectToGet(callback.loginUrl(UUID.random()))
     }.path

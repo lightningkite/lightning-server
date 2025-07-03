@@ -15,10 +15,10 @@ import kotlin.time.Duration.Companion.minutes
 
 class PrivateTinyTokenFormat(
     val encryptor: () -> Encryptor = secretBasis.encryptor("tinyToken"),
-    val expiration: Duration = 5.minutes,
 ): TokenFormat {
     override fun <SUBJECT : HasId<ID>, ID : Comparable<ID>> create(
         handler: Authentication.SubjectHandler<SUBJECT, ID>,
+        expiration: Duration,
         auth: RequestAuth<SUBJECT>
     ): String = handler.name + "/" + run {
         encryptor().encrypt(Serialization.javaData.encodeToByteArray(RequestAuthSerializable.serializer(), auth.serializable(

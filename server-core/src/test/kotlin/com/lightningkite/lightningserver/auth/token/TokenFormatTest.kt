@@ -24,7 +24,7 @@ import kotlin.time.Duration.Companion.seconds
 
 abstract class TokenFormatTest {
 
-    abstract fun format(expiration: Duration = 5.minutes): TokenFormat
+    abstract fun format(): TokenFormat
 
     @OptIn(DelicateCoroutinesApi::class)
     val sampleAuth = GlobalScope.async(start = CoroutineStart.LAZY) {
@@ -41,29 +41,29 @@ abstract class TokenFormatTest {
     @Test
     fun testCycle(): Unit = runBlocking {
         val format = format()
-        Assert.assertEquals(sampleAuth.await(), format.read(TestSettings.subjectHandler, format.create(TestSettings.subjectHandler, sampleAuth.await()).also { println(it) }))
+        Assert.assertEquals(sampleAuth.await(), format.read(TestSettings.subjectHandler, format.create(TestSettings.subjectHandler, 5.minutes, sampleAuth.await()).also { println(it) }))
     }
     @Test
     fun testDifferentHashFails(): Unit = runBlocking {
         assertFailsWith<TokenException> {
-            format().read(TestSettings.subjectHandler, format().create(TestSettings.subjectHandler, sampleAuth.await()))
+            format().read(TestSettings.subjectHandler, format().create(TestSettings.subjectHandler, 5.minutes, sampleAuth.await()))
         }
     }
     @Test
     fun testMulticache(): Unit = runBlocking {
         val format = format()
         var auth = sampleAuth.await()
-        Assert.assertEquals(auth, format.read(TestSettings.subjectHandler, format.create(TestSettings.subjectHandler, auth).also { println(it) }))
+        Assert.assertEquals(auth, format.read(TestSettings.subjectHandler, format.create(TestSettings.subjectHandler, 5.minutes, auth).also { println(it) }))
         repeat(100) {
             auth = auth.precache(TestSettings.subjectHandler.knownCacheTypes)
-            Assert.assertEquals(auth, format.read(TestSettings.subjectHandler, format.create(TestSettings.subjectHandler, auth).also { println(it) }))
+            Assert.assertEquals(auth, format.read(TestSettings.subjectHandler, format.create(TestSettings.subjectHandler, 5.minutes, auth).also { println(it) }))
         }
     }
 
     @Test fun expires(): Unit = runBlocking {
         assertFailsWith<TokenException> {
-            val format = format(1.milliseconds)
-            val created = format.create(TestSettings.subjectHandler, sampleAuth.await())
+            val format = format()
+            val created = format.create(TestSettings.subjectHandler, 1.milliseconds, sampleAuth.await())
             Thread.sleep(1)
             format.read(TestSettings.subjectHandler, created)
         }

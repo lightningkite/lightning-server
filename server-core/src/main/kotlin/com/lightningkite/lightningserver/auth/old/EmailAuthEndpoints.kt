@@ -139,13 +139,15 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
             val credRead = (it.first.settings as OauthProviderInfo.SettingInfo<Any>).read
             val callback = path("oauth/${it.first.pathName}/callback").oauthCallback<UUID>(
                 oauthProviderInfo = it.first,
-                credentials = { credRead(rawCreds) }
-            ) { response, _ ->
-                val profile = it.first.getProfile(response)
-                val user = emailAccess.asExternal().byExternalService(profile)
-                val token = base.token(user, 1.minutes)
-                HttpResponse.redirectToGet("${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$token")
-            }
+                cache = cache,
+                credentials = { credRead(rawCreds) },
+                onAccess = { response, _ ->
+                    val profile = it.first.getProfile(response)
+                    val user = emailAccess.asExternal().byExternalService(profile)
+                    val token = base.token(user, 1.minutes)
+                    HttpResponse.redirectToGet("${generalSettings().publicUrl}${base.landingRoute.path}?jwt=$token")
+                }
+            )
             val loginRedirect = path("oauth/${it.first}/login").get.handler {
                 HttpResponse.redirectToGet(callback.loginUrl(UUID.random()))
             }
@@ -234,4 +236,3 @@ open class EmailAuthEndpoints<USER : HasId<ID>, ID: Comparable<ID>>(
         base.redirectToLanding(basis)
     }
 }
-

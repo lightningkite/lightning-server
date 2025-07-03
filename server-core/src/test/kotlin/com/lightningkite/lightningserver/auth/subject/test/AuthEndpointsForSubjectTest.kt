@@ -20,19 +20,18 @@ import com.lightningkite.lightningserver.sms.TestSMSClient
 import com.lightningkite.lightningserver.testmodels.phoneNumber
 import com.lightningkite.lightningserver.typed.AuthAndPathParts
 import com.lightningkite.lightningserver.typed.test
-import com.lightningkite.uuid
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.UseContextualSerialization
 import org.junit.Test
-import java.util.*
 import com.lightningkite.UUID
 import com.lightningkite.lightningserver.auth.toRequestRequirements
 import com.lightningkite.lightningserver.http.Http
 import com.lightningkite.lightningserver.http.HttpMethod
 import com.lightningkite.lightningserver.http.HttpStatus
 import com.lightningkite.lightningserver.http.test
+import com.lightningkite.lightningserver.settings.generalSettings
 import io.ktor.http.decodeURLQueryComponent
 import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
@@ -365,6 +364,8 @@ class AuthEndpointsForSubjectTest {
             redirect_uri = oauthClient.redirectUris.first(),
             client_id = oauthClient._id,
             access_type = OauthAccessType.offline,
+            code_challenge = "",
+            code_challenge_method = "S256",
         ))
 
         val tokenResponse = TestSettings.testUserSubject.token.test(null, OauthTokenRequest(
@@ -395,6 +396,22 @@ class AuthEndpointsForSubjectTest {
             client_secret = oauthSecret,
         ))
         println(self1)
+    }
+
+    @Test fun fullOauthCycleUsingSelf(): Unit = runBlocking {
+        val oauthPageUrl = TestSettings.proofOauthSelf.start.test(null, "joseph@lightningkite.com")
+        println("url: $oauthPageUrl")
+        assert(oauthPageUrl.startsWith(generalSettings().publicUrl))
+
+        val (session, token) = TestSettings.testUserSubject.newSession(TestSettings.testAdmin.await()._id)
+        val loginPageResult = Http.matcher.match(oauthPageUrl.substringAfter("://").substringAfter('/').substringBefore('?').also { println("Accessing $it") }, HttpMethod.GET)!!.endpoint.test(
+            headers = HttpHeaders(HttpHeader.Authorization to "Bearer $token"),
+            queryParameters = oauthPageUrl.substringAfter('?', "").split('&').map { it.substringBefore('=') to it.substringAfter('=').decodeURLQueryComponent() }.also { println("   $it") }
+        ).body!!.text()
+        val redirectToNewFrontendPageWithProof = Http.matcher.match(loginPageResult.substringAfter("://").substringAfter('/').substringBefore('?').also { println("Accessing $it") }, HttpMethod.GET)!!.endpoint.test(
+            queryParameters = loginPageResult.substringAfter('?', "").split('&').map { it.substringBefore('=') to it.substringAfter('=').decodeURLQueryComponent() }.also { println("   $it") }
+        ).headers[HttpHeader.Location]!!
+        println(redirectToNewFrontendPageWithProof)
     }
 
     @Test fun testPresignOk(): Unit = runBlocking {

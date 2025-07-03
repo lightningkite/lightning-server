@@ -19,7 +19,7 @@ import com.lightningkite.UUID
 import kotlin.time.Duration.Companion.seconds
 
 class PublicTinyTokenFormatTest: TokenFormatTest() {
-    override fun format(expiration: Duration): TokenFormat = PublicTinyTokenFormat(SecretBasis().let{{it}}.hasher("tinytoken"), expiration)
+    override fun format(): TokenFormat = PublicTinyTokenFormat(SecretBasis().let{{it}}.hasher("tinytoken"))
 
     init { TestSettings }
 

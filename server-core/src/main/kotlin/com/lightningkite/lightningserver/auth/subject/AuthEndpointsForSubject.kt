@@ -47,6 +47,7 @@ import org.jetbrains.annotations.TestOnly
 import java.security.SecureRandom
 import java.util.*
 import kotlin.math.min
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -57,6 +58,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
     val database: () -> Database,
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
     val tokenFormat: () -> TokenFormat = { PrivateTinyTokenFormat() },
+    val tokenExpiration: () -> Duration = { 5.minutes }
 ) : ServerPathGroup(path), Authentication.Reader {
 
     init {
@@ -150,7 +152,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     fun presignToken(forSession: Session<SUBJECT, ID>, requirements: RequestRequirements): String {
         return tokenFormat().create(
-            handler, RequestAuth(
+            handler, tokenExpiration(), RequestAuth(
                 subject = handler,
                 sessionId = forSession._id,
                 rawId = forSession.subjectId,
@@ -164,7 +166,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
 
     fun presignToken(forId: ID, requirements: RequestRequirements): String {
         return tokenFormat().create(
-            handler, RequestAuth(
+            handler, tokenExpiration(), RequestAuth(
                 subject = handler,
                 sessionId = null,
                 rawId = forId,
@@ -474,7 +476,8 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
                     originalSessionId = auth.sessionId,
                     sessionExpiration = input.sessionExpiration,
                 ).asToken(),
-                state = input.state
+                state = input.state,
+                iss = generalSettings().publicUrl,
             )
         }
     )
@@ -518,18 +521,20 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
             when (input.grant_type) {
                 OauthGrantTypes.refreshToken -> {
                     OauthResponse(
-                        access_token = tokenFormat().create(handler, auth),
+                        access_token = tokenFormat().create(handler, tokenExpiration(), auth),
                         scope = auth.scopes.joinToString(" "),
-                        token_type = tokenFormat().type
+                        token_type = tokenFormat().type,
+                        expires_in = tokenExpiration().inWholeSeconds,
                     )
                 }
 
                 OauthGrantTypes.authorizationCode -> {
                     OauthResponse(
-                        access_token = tokenFormat().create(handler, auth),
+                        access_token = tokenFormat().create(handler, tokenExpiration(), auth),
                         scope = auth.scopes.joinToString(" "),
                         token_type = tokenFormat().type,
-                        refresh_token = generatedRefresh?.string
+                        refresh_token = generatedRefresh?.string,
+                        expires_in = tokenExpiration().inWholeSeconds,
                     )
                 }
 
@@ -546,7 +551,7 @@ class AuthEndpointsForSubject<SUBJECT : HasId<ID>, ID : Comparable<ID>>(
         implementation = { refresh: String ->
             val session = RefreshToken(refresh).session(this.rawRequest ?: throw BadRequestException())
                 ?: throw BadRequestException("Refresh token not recognized")
-            tokenFormat().create(handler, session.toAuth().precache(handler.knownCacheTypes))
+            tokenFormat().create(handler, tokenExpiration(), session.toAuth().precache(handler.knownCacheTypes))
         }
     )
 

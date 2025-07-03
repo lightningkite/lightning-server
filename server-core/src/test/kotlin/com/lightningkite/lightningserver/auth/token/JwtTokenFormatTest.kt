@@ -10,5 +10,5 @@ import java.util.*
 import com.lightningkite.UUID
 
 class JwtTokenFormatTest: TokenFormatTest() {
-    override fun format(expiration: Duration): TokenFormat = JwtTokenFormat(SecretBasis().let{{it}}.hasher("jwt"), expiration)
+    override fun format(): TokenFormat = JwtTokenFormat(SecretBasis().let{{it}}.hasher("jwt"))
 }

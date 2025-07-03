@@ -34,12 +34,26 @@ data class OauthClientSecret(
 )
 
 @Serializable
+data class OauthCode(
+    val code: String? = null,
+    val error: String? = null,
+    val state: String? = null,
+    val iss: String? = null,
+    val error_description: String? = null,
+    val error_uri: String? = null,
+)
+
+@Serializable
 data class OauthResponse(
     val access_token: String,
     val scope: String = "",
     val token_type: String = "Bearer",
     val id_token: String? = null,
     val refresh_token: String? = null,
+    val expires_in: Long? = null,
+    val error: String? = null,
+    val error_description: String? = null,
+    val error_uri: String? = null,
 )
 
 @Serializable
@@ -49,14 +63,8 @@ data class OauthTokenRequest(
     val client_id: String,
     val client_secret: String,
     val redirect_uri: String? = null,
+    val code_verifier: String? = null,
     val grant_type: String = "authorization_code",
-)
-
-@Serializable
-data class OauthCode(
-    val code: String? = null,
-    val error: String? = null,
-    val state: String? = null,
 )
 
 @Serializable
@@ -72,6 +80,8 @@ data class OauthCodeRequest(
     val prompt: OauthPromptType? = null,
     val login_hint: String? = null,
     val sessionExpiration: Instant? = null,
+    val code_challenge: String? = null,
+    val code_challenge_method: String? = null,
 )
 
 @Serializable enum class OauthPromptType {
@@ -90,4 +100,23 @@ enum class OauthAccessType {
 object OauthGrantTypes {
     const val authorizationCode = "authorization_code"
     const val refreshToken = "refresh_token"
+}
+object OauthErrorCodes {
+    // Authorization endpoint errors
+    const val INVALID_REQUEST = "invalid_request"
+    const val UNAUTHORIZED_CLIENT = "unauthorized_client"
+    const val ACCESS_DENIED = "access_denied"
+    const val UNSUPPORTED_RESPONSE_TYPE = "unsupported_response_type"
+    const val INVALID_SCOPE = "invalid_scope"
+    const val SERVER_ERROR = "server_error"
+    const val TEMPORARILY_UNAVAILABLE = "temporarily_unavailable"
+
+    // Token endpoint errors
+    const val INVALID_CLIENT = "invalid_client"
+    const val INVALID_GRANT = "invalid_grant"
+    const val UNSUPPORTED_GRANT_TYPE = "unsupported_grant_type"
+
+    // Resource endpoint errors
+    const val INVALID_TOKEN = "invalid_token"
+    const val INSUFFICIENT_SCOPE = "insufficient_scope"
 }
