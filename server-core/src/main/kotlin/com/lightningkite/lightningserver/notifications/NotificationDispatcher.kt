@@ -33,14 +33,6 @@ import com.lightningkite.lightningserver.email.EmailClient
 import com.lightningkite.lightningserver.email.EmailLabeledValue
 import com.lightningkite.lightningserver.exceptions.NotFoundException
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
-import com.lightningkite.lightningserver.notifications.split.NotificationForUser2_user
-import com.lightningkite.lightningserver.notifications.split._id
-import com.lightningkite.lightningserver.notifications.split.email
-import com.lightningkite.lightningserver.notifications.split.push
-import com.lightningkite.lightningserver.notifications.split.sendAt
-import com.lightningkite.lightningserver.notifications.split.sent
-import com.lightningkite.lightningserver.notifications.split.sms
-import com.lightningkite.lightningserver.notifications.split.user
 import com.lightningkite.lightningserver.schedule.schedule
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.sms.SMSClient
@@ -118,7 +110,7 @@ abstract class NotificationDispatcher<USER : HasId<UID>, UID : Comparable<UID>, 
     val websocket = ModelRestUpdatesWebsocket(
         path = restPath,
         info = info,
-        key = NotificationForUser2_user(users.serialization.idSerializer, contentSerializer)
+        key = NotificationForUser_user(users.serialization.idSerializer, contentSerializer)
     )
 
     open val additionalSendCondition: Condition<NotificationForUser<UID, CONTENT>>? = null
@@ -133,7 +125,7 @@ abstract class NotificationDispatcher<USER : HasId<UID>, UID : Comparable<UID>, 
      * @return A list of `Email` to be sent.
      * */
     open suspend fun makeEmailNotifications(user: USER, notifications: List<NotificationForUser<UID, CONTENT>>): List<Email> {
-        val email = email(user)?.let { listOf(EmailLabeledValue(it)) } ?: return emptyList()
+        val email = email(user)?.let { listOf(EmailLabeledValue(it.toString())) } ?: return emptyList()
 
         return notifications.map { notif ->
             Email(
@@ -275,7 +267,7 @@ abstract class NotificationDispatcher<USER : HasId<UID>, UID : Comparable<UID>, 
                             sendEmailNotifications(user, toEmail)
                             info.collection().updateManyIgnoringResult(
                                 self.condition { n -> n._id inside toEmail.map { it._id } },
-                                modification {
+                                self.modification {
                                     it.email.notNull.sent assign true
                                 }
                             )
@@ -290,7 +282,7 @@ abstract class NotificationDispatcher<USER : HasId<UID>, UID : Comparable<UID>, 
                             sendSmsNotifications(user, toSms)
                             info.collection().updateManyIgnoringResult(
                                 self.condition { n -> n._id inside toSms.map { it._id } },
-                                modification {
+                                self.modification {
                                     it.sms.notNull.sent assign true
                                 }
                             )
@@ -305,7 +297,7 @@ abstract class NotificationDispatcher<USER : HasId<UID>, UID : Comparable<UID>, 
                             sendPushNotifications(user, toPush)
                             info.collection().updateManyIgnoringResult(
                                 self.condition { n -> n._id inside toPush.map { it._id } },
-                                modification {
+                                self.modification {
                                     it.push.notNull.sent assign true
                                 }
                             )
@@ -447,8 +439,10 @@ abstract class NotificationDispatcher<USER : HasId<UID>, UID : Comparable<UID>, 
         }
     }
 
+    suspend fun refreshNotifications() = refreshNotifications(BasicPager(0, 200))
+
     val autoRefreshNotifications = schedule("$name.refreshNotifications", 1.minutes) {
         val acquiredLock = cache().setIfNotExists(scheduleLockKey, "lock", String.serializer(), (actionTimeoutSeconds*16).seconds)       // TODO: I'm not sure if this timeout will remove the item, if it doesn't that breaks this functionality
-        if (acquiredLock) refreshNotifications(BasicPager(0, 200))
+        if (acquiredLock) refreshNotifications()
     }
 }

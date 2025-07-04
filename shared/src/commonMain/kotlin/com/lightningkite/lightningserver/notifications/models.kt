@@ -38,7 +38,7 @@ data class EventType(
 @GenerateDataClassPaths
 data class Event(
     override val _id: UUID = UUID.random(),
-    val timestamp: Instant,
+    val timestamp: Instant = now(),
     val type: EventType,
     val subject: UntypedID  // JSON of ID of T
 ): HasId<UUID>

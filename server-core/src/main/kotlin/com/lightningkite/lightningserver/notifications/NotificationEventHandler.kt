@@ -55,6 +55,8 @@ class NotificationEventHandler<USER : HasId<UID>, UID : Comparable<UID>, CONTENT
 
     override suspend fun <T : HasId<ID>, ID : Comparable<ID>> handle(event: TypedEvent<USER, T, ID>) {
         try {
+            logger.debug("Event occurred: {}", event)
+
             val content = getContent(event)
 
             val now = now()

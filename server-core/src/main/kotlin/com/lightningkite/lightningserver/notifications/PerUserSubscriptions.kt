@@ -3,7 +3,6 @@ package com.lightningkite.lightningserver.notifications
 import com.lightningkite.lightningdb.Condition
 import com.lightningkite.lightningdb.EntryChange
 import com.lightningkite.lightningdb.FieldCollection
-import com.lightningkite.lightningdb.GenerateDataClassPaths
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.condition
 import com.lightningkite.lightningdb.eq
@@ -21,7 +20,6 @@ import com.lightningkite.lightningserver.events.TypedEvent
 import com.lightningkite.lightningserver.events.TypedEventType
 import com.lightningkite.lightningserver.exceptions.BadRequestException
 import com.lightningkite.lightningserver.exceptions.exceptionSettings
-import com.lightningkite.lightningserver.notifications.split._id
 import com.lightningkite.lightningserver.serialization.Serialization
 import com.lightningkite.lightningserver.typed.AuthAccessor
 import com.lightningkite.serialization.DataClassPathSelf

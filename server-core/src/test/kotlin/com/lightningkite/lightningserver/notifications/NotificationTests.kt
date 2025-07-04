@@ -6,22 +6,35 @@ import com.lightningkite.UUID
 import com.lightningkite.lightningdb.HasId
 import com.lightningkite.lightningdb.ModelPermissions
 import com.lightningkite.lightningdb.condition
+import com.lightningkite.lightningdb.eq
+import com.lightningkite.lightningdb.findOne
 import com.lightningkite.lightningdb.gte
+import com.lightningkite.lightningdb.insertOne
 import com.lightningkite.lightningdb.postCreate
 import com.lightningkite.lightningserver.TestSettings
 import com.lightningkite.lightningserver.core.ServerPath
 import com.lightningkite.lightningserver.core.ServerPathGroup
 import com.lightningkite.lightningserver.db.modelInfo
+import com.lightningkite.lightningserver.email.TestEmailClient
 import com.lightningkite.lightningserver.events.EventHandler
 import com.lightningkite.lightningserver.events.EventRegistry
 import com.lightningkite.lightningserver.events.TypedEvent
 import com.lightningkite.lightningserver.events.event
+import com.lightningkite.lightningserver.serialization.Serialization
+import com.lightningkite.lightningserver.sms.TestSMSClient
 import com.lightningkite.lightningserver.testmodels.TestThing
 import com.lightningkite.lightningserver.testmodels.TestUser
 import com.lightningkite.lightningserver.testmodels.value
 import com.lightningkite.toEmailAddress
 import com.lightningkite.toPhoneNumber
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.encodeToString
+import java.time.DayOfWeek
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class NotificationTests {
 
@@ -31,7 +44,6 @@ class NotificationTests {
             permissions = { ModelPermissions.allowAll() }
         )
 
-        // The scheduler
         val dispatcher = object : NotificationDispatcher<TestUser, UUID, NotificationContent.Basic>(
             path,
             info,
@@ -78,26 +90,7 @@ class NotificationTests {
     class OtherEndpoints(path: ServerPath) : ServerPathGroup(path) {
         val info = TestSettings.database.modelInfo<TestUser, TestThing, UUID>(
             permissions = { ModelPermissions.allowAll() },
-            signals = { it.postCreate(::postCreate) }
         )
-
-        suspend fun postCreate(thing: TestThing) { thingCreatedNotif(thing) }
-
-        val thingCreatedNotif = TestServer.notifications.event("Test Thing Created", info) { event ->
-            subscriptions.setDefaultSubscription(event, DefaultSubscriptionBehavior.UpdateRetainingUserChanges) { user ->
-                SubscriptionInfo(
-                    filter = condition { it.value gte 10 }
-                )
-            }
-            notifications.setContent(event) { thing ->
-                {
-                    NotificationContent.Basic(
-                        title = "Thing Created",
-                        body = "Thing was created: $thing"
-                    )
-                }
-            }
-        }
     }
 
     object TestServer : ServerPathGroup(TestSettings.path("server")) {
@@ -110,7 +103,128 @@ class NotificationTests {
     }
 
     @Test
-    fun notificationsAreSentAutomatically() {
+    fun defaultSubscriptionsAreInsertedAutomatically() = runBlocking {
+        val testInfo = SubscriptionInfo<TestThing>(
+            filter = condition { it.value gte 10 },
+            email = NotificationFrequency.weekly(DayOfWeek.MONDAY, 12, 0),
+            sms = NotificationFrequency.immediately(),
+            push = null
+        )
 
+        val notif = TestServer.notifications.event("Test Thing Created", TestServer.things.info) { event ->
+            subscriptions.setDefaultSubscription(event, DefaultSubscriptionBehavior.UpdateRetainingUserChanges) {
+                testInfo
+            }
+
+            notifications.setContent(event) { thing ->
+                {
+                    NotificationContent.Basic(
+                        title = "Thing Created",
+                        body = "Thing was created: $thing"
+                    )
+                }
+            }
+        }
+
+        val user = TestSettings.userInfo.collection().insertOne(
+            TestUser(email = "test@email.com")
+        )!!
+
+        val sub = TestServer.notifications.subscriptions.info
+            .collection()
+            .findOne(condition { it._id.user eq user._id })
+
+        assertEquals(sub?.requestedFilter, Serialization.json.encodeToString(testInfo.filter))
+        assertEquals(sub?.email, testInfo.email)
+        assertEquals(sub?.sms, testInfo.sms)
+        assertEquals(sub?.push, testInfo.push)
+    }
+
+    @Test
+    fun notificationsAreSentAutomatically() = runBlocking {
+        val testInfo = SubscriptionInfo<TestThing>(
+            email = NotificationFrequency.immediately(),
+            sms = null,
+            push = null
+        )
+
+        val notif = TestServer.notifications.event("Test Thing Created", TestServer.things.info) { event ->
+            subscriptions.setDefaultSubscription(event, DefaultSubscriptionBehavior.UpdateRetainingUserChanges) {
+                testInfo
+            }
+
+            notifications.setContent(event) { thing ->
+                {
+                    NotificationContent.Basic(
+                        title = "Thing Created",
+                        body = "Thing was created: $thing"
+                    )
+                }
+            }
+        }
+
+        val user = TestSettings.userInfo.collection().insertOne(
+            TestUser(email = "test@email.com")
+        )
+
+        val thing = TestServer.things.info.collection().insertOne(TestThing(value = 20))!!
+
+        notif(thing)
+
+        TestServer.notifications.dispatcher.refreshNotifications()
+
+        delay(100)
+
+        assertEquals(TestEmailClient.lastEmailSent?.subject, "Thing Created")
+
+        Unit
+    }
+
+    @Test
+    fun filterOnSubscriptionFiltersNotifications() = runBlocking {
+        val testInfo = SubscriptionInfo<TestThing>(
+            filter = condition { it.value gte 10 },
+            email = NotificationFrequency.immediately(),
+            sms = null,
+            push = null
+        )
+
+        val notif = TestServer.notifications.event("Test Thing Created", TestServer.things.info) { event ->
+            subscriptions.setDefaultSubscription(event, DefaultSubscriptionBehavior.UpdateRetainingUserChanges) {
+                testInfo
+            }
+
+            notifications.setContent(event) { thing ->
+                {
+                    NotificationContent.Basic(
+                        title = "Thing Created",
+                        body = "Thing was created: $thing"
+                    )
+                }
+            }
+        }
+
+        val user = TestSettings.userInfo.collection().insertOne(
+            TestUser(email = "test@email.com")
+        )
+
+        var emailsSent = 0
+        TestEmailClient.onEmailSent = {
+            emailsSent++
+        }
+
+        val thing1 = TestServer.things.info.collection().insertOne(TestThing(value = 0))!!
+        notif(thing1)
+
+        TestServer.notifications.dispatcher.refreshNotifications()
+
+        assertEquals(emailsSent, 0)
+
+        val thing2 = TestServer.things.info.collection().insertOne(TestThing(value = 20))!!
+        notif(thing2)
+
+        TestServer.notifications.dispatcher.refreshNotifications()
+
+        assertEquals(emailsSent, 1)
     }
 }
