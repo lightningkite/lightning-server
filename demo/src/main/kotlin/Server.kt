@@ -259,6 +259,15 @@ object Server : ServerPathGroup(ServerPath.root) {
         database = database
     )
 
+    val permanentMemory = ArrayList<ByteArray>()
+    val causeOutOfMemory = get("cause-out-of-memory").handler {
+        while (true) {
+            permanentMemory += ByteArray(1024 * 1024)
+            println("Allocated ${permanentMemory.size} times")
+        }
+        HttpResponse.plainText("This should not be reachable.")
+    }
+
     val sample = get("page").handler {
         HttpResponse.html {
 
