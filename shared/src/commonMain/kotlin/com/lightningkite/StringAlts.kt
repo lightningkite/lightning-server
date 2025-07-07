@@ -141,7 +141,7 @@ fun String.toEmailAddress(): EmailAddress {
 
 
 object PhoneNumberSerializer : KSerializer<PhoneNumber>, KSerializerWithDefault<PhoneNumber> {
-    override val default: PhoneNumber get() = PhoneNumber("")
+    override val default: PhoneNumber get() = PhoneNumber("+18000000000")
     override fun deserialize(decoder: Decoder): PhoneNumber = decoder.decodeString().toPhoneNumber()
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.PhoneNumber", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: PhoneNumber) = encoder.encodeString(value.raw)
