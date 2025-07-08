@@ -6,6 +6,8 @@ import org.junit.Test
 class BadWordListTest {
     @Test
     fun test() {
+        assertTrue(BadWordList.detectParanoid("SEXDJJ"))
+        assertTrue(BadWordList.detectParanoid("sexdjj"))
         assertTrue(BadWordList.detectParanoid("agodb"))
         assertFalse(BadWordList.detectParanoid("abcde"))
     }

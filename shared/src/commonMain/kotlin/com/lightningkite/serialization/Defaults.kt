@@ -89,14 +89,15 @@ object DefaultDecoder : Decoder {
             previousValue: T?
         ): T? = null
 
-        @Suppress("UNCHECKED_CAST")
         override fun <T> decodeSerializableElement(
             descriptor: SerialDescriptor,
             index: Int,
             deserializer: DeserializationStrategy<T>,
             previousValue: T?
         ): T {
+            @Suppress("UNCHECKED_CAST")
             (deserializer as? KSerializerWithDefault<*>)?.default?.let { return it as T }
+            @Suppress("UNCHECKED_CAST")
             (defaults[deserializer.descriptor.serialName])?.let { return it as T }
             return deserializer.deserialize(this@DefaultDecoder)
         }
@@ -106,6 +107,8 @@ object DefaultDecoder : Decoder {
 
     override fun <T : Any> decodeNullableSerializableValue(deserializer: DeserializationStrategy<T?>): T? = null
     override fun <T> decodeSerializableValue(deserializer: DeserializationStrategy<T>): T {
+        @Suppress("UNCHECKED_CAST")
+        (deserializer as? KSerializerWithDefault<*>)?.default?.let { return it as T }
         @Suppress("UNCHECKED_CAST")
         return (defaults[deserializer.descriptor.serialName] as? T) ?: deserializer.deserialize(this)
     }

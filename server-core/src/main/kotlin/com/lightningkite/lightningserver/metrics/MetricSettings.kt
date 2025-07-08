@@ -52,6 +52,12 @@ data class MetricSettings(
                         ?: DatabaseSettings(it.url.substringAfter("://")).invoke()
                 }
             }
+            register("lightningservermonitor") {
+                val after = it.url.substringAfter("://")
+                val domain = after.substringBefore('/')
+                val token = after.substringAfter('/')
+                LightningServerMonitorMetrics(it, "https://$domain", token = token)
+            }
         }
     }
 

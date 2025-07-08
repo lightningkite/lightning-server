@@ -364,7 +364,6 @@ fun forceAppResetOnLowMemory() {
                 println(e.toString())
                 e.printStackTrace()
             }
-            println("Mem check OK")
         }
     }, "MemCheck").start()
 }
