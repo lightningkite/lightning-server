@@ -2,6 +2,8 @@ package com.lightningkite.lightningserver.exceptions
 
 import com.lightningkite.lightningdb.Database
 import com.lightningkite.lightningserver.db.DatabaseSettings
+import com.lightningkite.lightningserver.metrics.LightningServerMonitorMetrics
+import com.lightningkite.lightningserver.metrics.MetricSettings
 import com.lightningkite.lightningserver.settings.Pluggable
 import com.lightningkite.lightningserver.settings.Settings
 import com.lightningkite.lightningserver.settings.setting
@@ -32,6 +34,12 @@ data class ExceptionSettings(
                         GroupedDatabaseExceptionReporter(packageName, database)
                     }
                     ?: throw IllegalStateException("Invalid grouped-db URL. The URL should match the pattern: grouped-db://[dbString:Database Setting Name]|[packageName]")
+            }
+            ExceptionSettings.register("lightningservermonitor") {
+                val after = it.url.substringAfter("://")
+                val domain = after.substringBefore('/')
+                val token = after.substringAfter('/')
+                LightningServerMonitorExceptionReporter("https://$domain", token = token)
             }
         }
     }

@@ -1401,5 +1401,5 @@ open class BadWordList private constructor (val words: Set<String>) {
     /**
      * Returns true if there is a risk that [on] contains one of the words.
      */
-    fun detectParanoid(on: String): Boolean = regex.find(on) != null
+    fun detectParanoid(on: String): Boolean = regex.find(on.lowercase()) != null
 }
