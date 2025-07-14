@@ -17,6 +17,7 @@ import com.lightningkite.now
 import com.lightningkite.toEmailAddress
 import com.lightningkite.toPhoneNumber
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -117,21 +118,31 @@ class NotificationDispatcherTests {
     private fun notification(
         title: String,
         body: String = "Test Notification",
+        email: Instant? = now(),
+        sms: Instant? = email,
+        push: Instant? = email,
+    ): NotificationForUser<UUID, NotificationContent.Basic> =
+        NotificationForUser(
+            event = Event(type = EventType("Test Event Type"), subject = ""),
+            user = userId,
+            content = NotificationContent(title, body),
+            email = email?.let(::SendInfo),
+            sms = sms?.let(::SendInfo),
+            push = push?.let(::SendInfo),
+        )
+
+    private fun notification2(
+        title: String,
+        body: String = "Test Notification",
         email: NotificationFrequency? = NotificationFrequency.immediately(),
         sms: NotificationFrequency? = NotificationFrequency.immediately(),
         push: NotificationFrequency? = NotificationFrequency.immediately(),
     ): NotificationForUser<UUID, NotificationContent.Basic> {
         val now = now()
 
-        return NotificationForUser(
-            event = Event(type = EventType("Test Event Type"), subject = ""),
-            user = userId,
-            content = NotificationContent(title, body),
-            email = email?.sendAt(now)?.let(::SendInfo),
-            sms = sms?.sendAt(now)?.let(::SendInfo),
-            push = push?.sendAt(now)?.let(::SendInfo)
-        )
+        return notification(title, body, email?.sendAt(now), sms?.sendAt(now), push?.sendAt(now))
     }
+
 
     @Test
     fun dispatchesToMethodClients() = runBlocking {

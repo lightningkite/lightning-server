@@ -63,14 +63,15 @@ class PerEventSubscriptions<USER : HasId<UID>, UID : Comparable<UID>>(
             .associateBy { it._id.user }
 
         val now = now()
-        interested.map { user ->
+        interested.mapNotNull { user ->
             userSpecifiedMethods[user]
                 ?.let { NotificationEventHandler.SendMethods(it._id.user, it.email, it.sms, it.push) }
                 ?: grouped
                     .mapNotNull { pair ->
                         pair.second.takeIf { pair.first.contains(user) }
                     }
-                    .let { eventListeners ->
+                    .takeUnless { it.isEmpty() }
+                    ?.let { eventListeners ->
                         NotificationEventHandler.SendMethods(
                             user,
                             eventListeners.mapNotNull { it.defaultEmail }.minByOrNull { it.sendAt(now) },

@@ -161,7 +161,7 @@ data class NotificationFrequency @Deprecated("Use a specific interval constructo
         val (time, timeZone) = onlyAt ?: return null
 
         val dateTime = now.toLocalDateTime(timeZone)
-        val numDays = (dateTime.date.dayOfWeek.ordinal - weekDay.ordinal)%7
+        val numDays = (dateTime.date.dayOfWeek.ordinal - weekDay.ordinal) % 7
         var sendAt = LocalDateTime(dateTime.date.plus(numDays, DateTimeUnit.DAY), time).toInstant(timeZone)
         if (sendAt < now) {
             sendAt = sendAt.plus(1, DateTimeUnit.WEEK, timeZone)
