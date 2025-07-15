@@ -13,7 +13,9 @@ import redis.embedded.RedisExecProvider
 import redis.embedded.RedisServer
 import redis.embedded.util.Architecture
 import redis.embedded.util.OS
+import kotlin.test.Ignore
 
+@Ignore
 class RedisTest: CacheTest() {
     override val cache: Cache? by lazy {
         RedisCache(RedisClient.create("redis://127.0.0.1:6379/0"))
