@@ -26,7 +26,7 @@ data class GeoCoordinate(val latitude: Double, val longitude: Double) {
                 + (cos(deg2rad(this.latitude))
                 * cos(deg2rad(other.latitude))
                 * cos(deg2rad(theta))))
-        dist = acos(dist)
+        dist = acos(dist.coerceIn(-1.0, 1.0)) // it's possible for a result of the last to be 1.00000000000002, when it should actually have just been 1.0. Thanks Double math for being like this. Well that's why we coerce to 1.0
         dist = rad2deg(dist)
         dist *= 60 * 1.1515
         return dist.miles
