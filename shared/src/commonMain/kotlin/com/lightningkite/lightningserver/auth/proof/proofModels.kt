@@ -20,6 +20,14 @@ data class IdentificationAndPassword(
     val password: String
 )
 
+
+@Serializable
+data class Identification(
+    val type: String,
+    val property: String?,
+    val value: String?,
+)
+
 @Serializable
 data class ProofMethodInfo(
     val via: String,

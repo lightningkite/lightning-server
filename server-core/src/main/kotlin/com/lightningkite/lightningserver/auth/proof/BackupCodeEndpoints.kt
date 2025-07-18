@@ -40,7 +40,6 @@ class BackupCodeEndpoints(
     val database: () -> Database,
     val cache: () -> Cache,
     val proofHasher: () -> SecureHasher = secretBasis.hasher("proof"),
-    val availableCharacters: List<Char> = ('A'..'Z').toList() - setOf('I', 'O'),
     val codeLength: Int = 20,
     val generateCount: Int = 10, // The number of codes to generate
 ) : ServerPathGroup(path), Authentication.DirectProofMethod {
@@ -57,6 +56,7 @@ class BackupCodeEndpoints(
     init {
         Authentication.register(this)
     }
+    val availableCharacters = ('A'..'Z').toList() - setOf('I', 'O')
 
     val loggedInInterfaceInfo: Documentable.InterfaceInfo =
         Documentable.InterfaceInfo(path, "AuthenticatedBackupCodeProofClientEndpoints", listOf())
@@ -98,19 +98,18 @@ class BackupCodeEndpoints(
                     code =
                         String(CharArray(codeLength) { availableCharacters[r.nextInt(availableCharacters.size)] })
                 } while (BadWordList.detectParanoid(code))
-                code.chunked(5).joinToString("-")
-
+                code
             }
 
             modelInfo.collection().insert(newCodes.map {
                 BackupCodeSecret(
-                    code = it.secureHash(),
+                    code = it.lowercase(),
                     subjectId = auth.idString,
                     subjectType = auth.subject.name,
                 )
             })
 
-            newCodes
+            newCodes.map { code -> code.chunked(5).joinToString("-") }
         }
     )
 
@@ -194,7 +193,8 @@ class BackupCodeEndpoints(
                 })
                     .toList()
 
-                val match = secrets.find { input.password.checkAgainstHash(it.code) }
+                val normalizedCode = input.password.filter { it.isLetter() }.lowercase()
+                val match = secrets.find { normalizedCode == it.code }
                     ?: throw BadRequestException("Invalid Backup Code")
 
                 modelInfo.collection().deleteOneById(match._id)
