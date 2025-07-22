@@ -336,35 +336,45 @@ class WebAuthNProofEndpoints(
         errorCases = listOf(),
         examples = listOf(),
         successCode = HttpStatus.OK,
-        implementation = { (subjectId, subjectType): WebAuthN.Authentication.StartRequest ->
+        implementation = { (subjectType, subjectProperty, value): Identification ->
 
             val handler = Authentication.subjects.values.find { it.name == subjectType }
             if (handler == null)
                 throw BadRequestException("Invalid Subject Type")
 
-            if(authOrNull != null && subjectId != null && authOrNull.idString != subjectId){
-                return@api WebAuthN.Authentication.StartResponse(
-                    challengeId = UUID.random().toString(),
-                    options = WebAuthN.Authentication.PublicKeyCredentialRequestOptions(
-                        allowCredentials = emptyList(),
-                        challenge = generate(),
-                        extensions = WebAuthN.Authentication.RequestExtensions(),
-                        hints = emptyList(),
-                        rpId = rpId(),
-                        timeout = expiration.inWholeMilliseconds.toInt(),
-                        userVerification = WebAuthN.GeneralPreference.Required,
-                    )
-                )
+            if ((subjectProperty != null).xor(value != null))
+                throw BadRequestException("You must provide or ignore property and value together.")
+
+            val subjectId = subjectProperty?.let { property ->
+                value?.let { value ->
+                    val id = handler.findUserIdString(subjectProperty, value)
+                    if (id == null || authOrNull != null && id != authOrNull.idString)
+                        // Something didn't add up properly. Return a valid looking useless response
+                        return@api WebAuthN.Authentication.StartResponse(
+                            challengeId = UUID.random().toString(),
+                            options = WebAuthN.Authentication.PublicKeyCredentialRequestOptions(
+                                allowCredentials = emptyList(),
+                                challenge = generate(),
+                                extensions = WebAuthN.Authentication.RequestExtensions(),
+                                hints = emptyList(),
+                                rpId = rpId(),
+                                timeout = expiration.inWholeMilliseconds.toInt(),
+                                userVerification = WebAuthN.GeneralPreference.Required,
+                            )
+                        )
+                    id
+                }
             }
 
             val existingCreds = (subjectId ?: authOrNull?.idString)
-                ?.let{ userCredentials(subjectId = it, subjectType = subjectType) }
+                ?.let { userCredentials(subjectId = it, subjectType = subjectType) }
                 ?: emptyList()
 
             val options = proveOptions(subjectId)
 
             val challenge = generate()
             val key = UUID.random().toString()
+
             cache().set(
                 key = challengeCacheKey(key),
                 value = AuthenticationCache(

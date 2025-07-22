@@ -396,12 +396,6 @@ object WebAuthN {
             val userHandle: String?, // Base64 url-encoded
         )
 
-        @Serializable
-        data class StartRequest(
-            val subjectId: String?,
-            val subjectType: String,
-        )
-
         data class ProveOptions(
             val extensions: RequestExtensions = RequestExtensions(),
             val hints: List<Hints> = emptyList(),
