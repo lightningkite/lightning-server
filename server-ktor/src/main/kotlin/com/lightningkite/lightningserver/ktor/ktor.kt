@@ -371,7 +371,12 @@ fun forceAppResetOnLowMemory() {
 /**
  * A helper function to start a Ktor server using GeneralServerSettings and the provided Module.
  */
-fun runServer(pubSub: PubSub, cache: Cache) = embeddedServer(
+@Deprecated("use runServerNetty instead, as CIO has a memory leak.  If you REALLY want to run CIO, use runServerCio.",
+    ReplaceWith("runServerNetty(pubSub, cache)"))
+fun runServer(pubSub: PubSub, cache: Cache) = runServerCio(pubSub, cache)
+
+@Deprecated("use runServerNetty instead, as CIO has a memory leak.", ReplaceWith("runServerNetty(pubSub, cache)"))
+fun runServerCio(pubSub: PubSub, cache: Cache) = embeddedServer(
     factory = CIO,
     port = generalSettings().port,
     host = generalSettings().host,

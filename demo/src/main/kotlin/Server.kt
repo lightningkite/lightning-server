@@ -59,6 +59,7 @@ import com.lightningkite.lightningserver.websocket.send
 import com.lightningkite.lightningserver.websocket.text
 import com.lightningkite.prepareModelsShared
 import com.lightningkite.uuid
+import kotlinx.coroutines.flow.toList
 import kotlinx.html.*
 
 object Server : ServerPathGroup(ServerPath.root) {
@@ -281,6 +282,14 @@ object Server : ServerPathGroup(ServerPath.root) {
             }
 
         }
+    }
+
+    val memLeakCheck = post("memLeakCheck").handler {
+        // Not reading the body.  Is that it?
+//        HttpResponse.plainText("OK")
+//        HttpResponse.json(testModel.info.collection().all().toList())
+        val auth = it.authChecked(authOptions<User>())!!
+        HttpResponse.plainText(auth.id.toString())
     }
 }
 
