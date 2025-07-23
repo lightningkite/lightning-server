@@ -71,7 +71,11 @@ class RedisTest {
                 while(true) {
                     delay(100L)
                     println("Sending")
-                    channel.emit(num++)
+                    try {
+                        channel.emit(num++)
+                    } catch(e: Exception) {
+                        // squish
+                    }
                 }
             }
             channel.collect {

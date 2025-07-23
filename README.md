@@ -4,6 +4,12 @@ A project that drastically speeds up server development.  Comparable to Django f
 
 Built to work for dedicated and serverless platforms.
 
+## Status
+
+Being used in production for multiple projects, though we wish to make some alterations before we'd solidly recommend it to other organizations.
+
+See the roadmap.
+
 ## Major Features
 
 - Abstractions
@@ -67,9 +73,20 @@ Built to work for dedicated and serverless platforms.
 
 ## Road Map
 
-- [ ] Destatic - remove static / global mutable references entirely.  This is unsafe and could lead to malicious actors inserting additional endpoints into your server via libraries.
+- [ ] Destatic - remove static / global mutable references entirely.  
+  - This is unsafe and could lead to malicious actors inserting additional endpoints into your server via compromised libraries.
+- [ ] Separate out the following:
+  - [ ] [Service Abstractions](https://github.com/lightningkite/service-abstractions)
+    - This would allow vanilla Ktor users to leverage our database tools
+  - [ ] Server Definitions (DSL for defining servers that can be deployed to dedicated machines AND serverless services, including websockets)
+  - [ ] Engines (AWS vs Ktor)
+  - [ ] Typed Endpoints and Serialization Tools
+    - Includes auto-admin
+    - Includes OpenAPI doc generation
+    - Includes SDK generation
+- [ ] Better demo project
 - [ ] Improved per-environment Terraform generation
-- [ ] Tutorial
+- [ ] Finish updating all of the documentation
 
 ### When Requested
 

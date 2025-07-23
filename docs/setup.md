@@ -2,101 +2,63 @@
 
 **OUT OF DATE**  Needs version pinning
 
-## Create a new Kotlin/Gradle KTS project.
-
-IntelliJ has a quick option for this under "New Project".  Make sure you select Kotlin, Gradle, and Kotlin as your DSL language.
-
-If your project's `build.gradle.kts` was generated with this line, comment it out.
-
-```kotlin
-//    jvmToolchain(8)
-```
-
 ## Add Gradle Plugins
 
-```properties
-# gradle.properties
-kotlinVersion=1.9.10
-kspVersion=1.9.10-1.0.13
-lightningServerVersion=version-2-SNAPSHOT
-```
+You'll need [KSP](https://kotlinlang.org/docs/ksp-quickstart.html) and Kotlin added.
 
-```kotlin
-// settings.gradle.kts
-pluginManagement {
-    val kotlinVersion: String by settings
-    val kspVersion: String by settings
-    plugins {
-        kotlin("jvm") version kotlinVersion
-        kotlin("plugin.serialization") version kotlinVersion
-        id("com.google.devtools.ksp") version kspVersion
-    }
-}
-```
+## Import from Maven
+
+Right now, the libraries are hosted on our own public S3 bucket.
 
 ```kotlin
 // build.gradle.kts
-plugins {
-    //...
-    id("com.google.devtools.ksp")
-    kotlin("plugin.serialization")
-    //...
-}
-
 repositories {
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/snapshots/")
-    maven(url = "https://s01.oss.sonatype.org/content/repositories/releases/")
-    //...
+    maven("https://lightningkite-maven.s3.us-west-2.amazonaws.com")
 }
-```
-
-## Add the Lightning Server dependencies you need
-
-```kotlin
-// build.gradle.kts
-val lightningServerVersion = "version-2-SNAPSHOT"
 dependencies {
-    //...
-    
+    api("com.lightningkite.lightningserver:shared:<current tag>")
+}
+val lightningServerVersion = "<current tag>"
+dependencies {
     // An annotation processor.  Gives a nice DSL for forming queries.  You'll always want this.
     ksp("com.lightningkite.lightningserver:processor:$lightningServerVersion")
-    
+
     // The core server dependencies.  You'll always want this for the server itself.
     api("com.lightningkite.lightningserver:server-core:$lightningServerVersion")
-    
+
     // Implementations of interfaces for AWS and a terraform generator for deploying to Lambda/API Gateway
     api("com.lightningkite.lightningserver:server-aws:$lightningServerVersion")
-    
+
     // Implementations of interfaces for Microsoft Azure (experimental)
     api("com.lightningkite.lightningserver:server-azure:$lightningServerVersion")
-    
+
     // Run your server via Ktor
     api("com.lightningkite.lightningserver:server-ktor:$lightningServerVersion")
-    
+
     // AWS DynamoDB Cache implementation
     api("com.lightningkite.lightningserver:server-dynamodb:$lightningServerVersion")
-    
+
     // Firebase Cloud Messaging Notification implementation
     api("com.lightningkite.lightningserver:server-firebase:$lightningServerVersion")
-    
+
     // Memcached Cache implementation
     api("com.lightningkite.lightningserver:server-memcached:$lightningServerVersion")
-    
+
     // MongoDB Database implementation
     api("com.lightningkite.lightningserver:server-mongo:$lightningServerVersion")
-    
+
     // PostgreSQL Database implementation (experimental)
     api("com.lightningkite.lightningserver:server-postgresql:$lightningServerVersion")
-    
+
     // Redis Cache implementation
     api("com.lightningkite.lightningserver:server-redis:$lightningServerVersion")
-    
+
     // Sentry exception reporting
     api("com.lightningkite.lightningserver:server-sentry:$lightningServerVersion")
-    
+
     // SFTP File System Implementation (warning: does not work as public file store)
     api("com.lightningkite.lightningserver:server-sftp:$lightningServerVersion")
-    
+
     //...
 }
 ```
