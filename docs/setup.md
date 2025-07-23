@@ -15,9 +15,6 @@ Right now, the libraries are hosted on our own public S3 bucket.
 repositories {
     maven("https://lightningkite-maven.s3.us-west-2.amazonaws.com")
 }
-dependencies {
-    api("com.lightningkite.lightningserver:shared:<current tag>")
-}
 val lightningServerVersion = "<current tag>"
 dependencies {
     // An annotation processor.  Gives a nice DSL for forming queries.  You'll always want this.
