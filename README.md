@@ -67,9 +67,8 @@ Built to work for dedicated and serverless platforms.
 
 ## Road Map
 
+- [ ] Destatic - remove static / global mutable references entirely.  This is unsafe and could lead to malicious actors inserting additional endpoints into your server via libraries.
 - [ ] Improved per-environment Terraform generation
-- [ ] Key-path ordering and grouping
-- [ ] Additional Documentation
 - [ ] Tutorial
 
 ### When Requested
