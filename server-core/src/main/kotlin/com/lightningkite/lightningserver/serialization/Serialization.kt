@@ -2,7 +2,7 @@ package com.lightningkite.lightningserver.serialization
 
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
-import com.github.jershell.kbson.*
+import com.lightningkite.lightningserver.serialization.bson.*
 import com.lightningkite.validation.ValidationIssue
 import com.lightningkite.validation.ValidationIssuePart
 import com.lightningkite.validation.Validators

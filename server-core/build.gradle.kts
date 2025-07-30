@@ -30,7 +30,7 @@ dependencies {
     api(libs.serializationCbor)
     api(libs.xmlUtilJvm)
     api(libs.mongoBson)
-    api(libs.kBson)
+//    api(libs.kBson)
     api(libs.kaml)
     api(libs.serializationProtobuf)
     api(libs.kotlinReflect)
