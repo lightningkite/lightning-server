@@ -1,6 +1,5 @@
 package com.lightningkite.lightningserver.serialization
 
-import com.github.jershell.kbson.*
 import com.lightningkite.serialization.DurationMsSerializer
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
@@ -10,6 +9,7 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.*
 import org.bson.BsonType
 import java.math.BigDecimal
+import com.lightningkite.lightningserver.serialization.bson.*
 import kotlinx.datetime.*
 import kotlinx.datetime.TimeZone
 import java.util.*

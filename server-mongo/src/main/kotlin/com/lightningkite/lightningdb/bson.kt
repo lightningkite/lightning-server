@@ -1,6 +1,6 @@
 package com.lightningkite.lightningdb
 
-import com.github.jershell.kbson.*
+import com.lightningkite.lightningserver.serialization.bson.*
 import com.lightningkite.GeoCoordinateGeoJsonSerializer
 import com.lightningkite.lightningdb.*
 import com.lightningkite.serialization.*
