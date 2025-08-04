@@ -72,6 +72,8 @@ class ModificationBuilder<K>() {
         modifications.add(mapModification(Modification.ListAppend(items)))
     }
 
+
+
     infix operator fun <T> DataClassPath<K, Set<T>>.plusAssign(items: Set<T>) {
         modifications.add(mapModification(Modification.SetAppend(items)))
     }
@@ -84,6 +86,17 @@ class ModificationBuilder<K>() {
     @JvmName("plusSet")
     infix operator fun <T> DataClassPath<K, Set<T>>.plusAssign(item: T) {
         modifications.add(mapModification(Modification.SetAppend(setOf(item))))
+    }
+
+
+    @JvmName("minusList")
+    infix operator fun <T> DataClassPath<K, List<T>>.minusAssign(item: T) {
+        modifications.add(mapModification(Modification.ListRemoveInstances(listOf(item))))
+    }
+
+    @JvmName("minusSet")
+    infix operator fun <T> DataClassPath<K, Set<T>>.minusAssign(item: T) {
+        modifications.add(mapModification(Modification.SetRemoveInstances(setOf(item))))
     }
 
     infix fun <T> DataClassPath<K, List<T>>.addAll(items: List<T>) {
