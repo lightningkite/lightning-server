@@ -58,6 +58,7 @@ suspend fun DynamoDbAsyncClient.describeTableActiveOrNull(describeTableRequest: 
             when (description.table().tableStatus()) {
                 TableStatus.ACTIVE -> return description
                 TableStatus.ARCHIVED,
+                TableStatus.REPLICATION_NOT_AUTHORIZED,
                 TableStatus.INACCESSIBLE_ENCRYPTION_CREDENTIALS -> return null
                 TableStatus.CREATING,
                 TableStatus.UPDATING,
@@ -83,6 +84,7 @@ suspend fun DynamoDbAsyncClient.describeTableActive(describeTableRequest: (Descr
             when (description.table().tableStatus()) {
                 TableStatus.ACTIVE -> return description
                 TableStatus.ARCHIVED,
+                TableStatus.REPLICATION_NOT_AUTHORIZED,
                 TableStatus.INACCESSIBLE_ENCRYPTION_CREDENTIALS -> throw Exception("Not possible...")
                 TableStatus.CREATING,
                 TableStatus.UPDATING,

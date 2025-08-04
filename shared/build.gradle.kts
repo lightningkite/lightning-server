@@ -1,5 +1,6 @@
 import com.lightningkite.deployhelpers.*
 import com.vanniktech.maven.publish.SonatypeHost
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -18,14 +19,18 @@ ksp {
 kotlin {
     applyDefaultHierarchyTemplate()
     androidTarget {
-        compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_1_8)
         }
     }
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
+            compileTaskProvider.configure {
+                compilerOptions{
+                    jvmTarget = JvmTarget.JVM_1_8
+                }
+            }
         }
     }
     js(IR) {
@@ -110,6 +115,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_1_8
     }
     dependencies {
-        coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
+        coreLibraryDesugaring(libs.androidDesugaring)
     }
 }
