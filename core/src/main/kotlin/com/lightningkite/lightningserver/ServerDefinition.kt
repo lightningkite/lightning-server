@@ -2,10 +2,6 @@ package com.lightningkite.lightningserver
 
 import com.lightningkite.MediaType
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.modules.SerializersModule
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 import com.lightningkite.serviceabstractions.data.*
 import com.lightningkite.serviceabstractions.*
 
@@ -262,93 +258,3 @@ public open class ServerDefinitionPart<Path : PathSpec>(
     private val passOnTo: ServerDefinitionBuilder<Path>
 ) : ServerDefinitionBuilder<Path> by passOnTo
 
-public interface HttpHandler<PATH : PathSpec> {
-    public val timeout: Duration get() = 30.seconds
-    public suspend fun handle(serverRunning: ServerRunning, request: HttpRequest<PATH>): HttpResponse
-}
-
-public interface TaskHandler<Input> {
-    public val serializer: KSerializer<Input>
-    public val timeout: Duration get() = 30.seconds
-    public suspend fun execute(serverRunning: ServerRunning, input: Input)
-}
-
-public interface ScheduledTaskHandler {
-    public val schedule: Schedule
-    public val timeout: Duration get() = 30.seconds
-    public suspend fun execute(serverRunning: ServerRunning)
-}
-
-public interface ServerRunning {
-    public val server: ServerDefinition
-    public operator fun <SERIALIZABLE, GOAL> Locationed<PathSpec0, ServerSetting<SERIALIZABLE, GOAL>>.invoke(): GOAL
-    public suspend fun <PATH : PathSpec, T> sendWebSocketSubscriptionMessage(event: WebSocketSubscriptionMessage<PATH, T>)
-}
-
-context(serverRunning: ServerRunning) public operator fun <SERIALIZABLE, GOAL> Locationed<PathSpec0, ServerSetting<SERIALIZABLE, GOAL>>.invoke(): GOAL
-    = with(serverRunning) { invoke() }
-
-context(serverRunning: ServerRunning) public suspend fun <T> WebSocketTopic<PathSpec0, T>.send(value: T): Unit =
-    serverRunning.sendWebSocketSubscriptionMessage(
-        WebSocketSubscriptionMessage(this, listOf(), value)
-    )
-
-context(serverRunning: ServerRunning) public suspend fun <A, T> WebSocketTopic<PathSpec1<A>, T>.send(
-    path1: A,
-    value: T
-): Unit = serverRunning.sendWebSocketSubscriptionMessage(
-    WebSocketSubscriptionMessage(this, listOf(path1), value)
-)
-
-context(serverRunning: ServerRunning) public suspend fun <A, B, T> WebSocketTopic<PathSpec2<A, B>, T>.send(
-    path1: A,
-    path2: B,
-    value: T
-): Unit = serverRunning.sendWebSocketSubscriptionMessage(
-    WebSocketSubscriptionMessage(this, listOf(path1, path2), value)
-)
-
-context(serverRunning: ServerRunning) public suspend fun <A, B, C, T> WebSocketTopic<PathSpec3<A, B, C>, T>.send(
-    path1: A,
-    path2: B,
-    path3: C,
-    value: T
-): Unit = serverRunning.sendWebSocketSubscriptionMessage(
-    WebSocketSubscriptionMessage(this, listOf(path1, path2, path3), value)
-)
-
-public fun <PATH : PathSpec> ServerDefinitionBuilder<*>.httpHandler(
-    timeout: Duration = 30.seconds,
-    handler: ServerRunning.(HttpRequest<PATH>) -> HttpResponse
-): HttpHandler<PATH> = object : HttpHandler<PATH> {
-    override val timeout: Duration = timeout
-    override suspend fun handle(serverRunning: ServerRunning, request: HttpRequest<PATH>): HttpResponse {
-        return handler(serverRunning, request)
-    }
-}
-
-public fun <INPUT> ServerDefinitionBuilder<*>.taskHandler(
-    input: KSerializer<INPUT>,
-    timeout: Duration = 5.minutes,
-    handler: ServerRunning.(INPUT) -> Unit
-): TaskHandler<INPUT> =
-    object : TaskHandler<INPUT> {
-        override val timeout: Duration = timeout
-        override val serializer: KSerializer<INPUT> = input
-        override suspend fun execute(serverRunning: ServerRunning, input: INPUT) {
-            return handler(serverRunning, input)
-        }
-    }
-
-public fun ServerDefinitionBuilder<*>.scheduleHandler(
-    schedule: Schedule,
-    timeout: Duration = 5.minutes,
-    handler: ServerRunning.() -> Unit
-): ScheduledTaskHandler =
-    object : ScheduledTaskHandler {
-        override val schedule: Schedule = schedule
-        override val timeout: Duration = timeout
-        override suspend fun execute(serverRunning: ServerRunning) {
-            handler(serverRunning)
-        }
-    }

@@ -1,0 +1,3 @@
+package com.lightningkite.lightningserver
+
+public annotation class InternalLightningServerApi

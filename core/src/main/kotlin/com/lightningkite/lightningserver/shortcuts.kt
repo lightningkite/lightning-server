@@ -8,12 +8,7 @@ import kotlinx.html.stream.appendHTML
 import kotlinx.io.buffered
 import kotlinx.io.files.FileSystem
 import kotlinx.io.files.Path
-import kotlinx.io.files.source
 import kotlinx.io.writeString
-import kotlinx.serialization.encodeToString
-import java.io.File
-import kotlin.io.path.extension
-import kotlin.text.get
 
 context(serverRunning: ServerRunning)
 public fun HttpResponse.Companion.redirectToGet(to: String, headers: HttpHeaders = HttpHeaders.EMPTY): HttpResponse = HttpResponse(

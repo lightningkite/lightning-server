@@ -1,47 +1,41 @@
 package com.lightningkite.lightningserver
 
-import com.lightningkite.lightningserver.PathServer.Companion.invoke
-import com.lightningkite.lightningserver.TestRunner.TestWebSocket
 import com.lightningkite.serviceabstractions.data.TypedData
-import com.sun.org.apache.xml.internal.serializer.utils.Utils.messages
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.runBlocking
-import kotlin.coroutines.CoroutineContext
 
 public inline fun <SD: ServerDefinition> SD.test(
-    noinline runSuspending: (suspend CoroutineScope.() -> Unit) -> Unit = { runBlocking { it(this) } },
-    settings: context(SettingsBuilder) SD.() -> Unit,
+    settings: context(TestSettings) SD.() -> Unit,
     action: context(TestRunner<SD>) SD.()->Unit
 ) {
-    val runner = TestRunner(this, runSuspending, SettingsBuilder().apply { settings() }.build())
+    val runner = TestRunner(this, TestSettings().apply { settings() })
     action(runner, this)
 }
 
-public class SettingsBuilder() {
-    private val settings = HashMap<Locationed<PathSpec0, ServerSetting<*, *>>, Any?>()
+public class TestSettings() {
+    public val serializable: MutableMap<Locationed<PathSpec0, ServerSetting<*, *>>, Any?> = HashMap()
+    public val goal: MutableMap<Locationed<PathSpec0, ServerSetting<*, *>>, Any?> = HashMap()
     public infix fun <SERIALIZABLE> Locationed<PathSpec0, ServerSetting<SERIALIZABLE, *>>.set(value: SERIALIZABLE) {
-        settings[this] = value as Any?
+        serializable[this] = value as Any?
     }
     public infix fun <RESULT> Locationed<PathSpec0, ServerSetting<*, RESULT>>.setStatic(value: RESULT) {
-        settings[this] = value as Any?
+        goal[this] = value as Any?
     }
-    public fun build(): Map<Locationed<PathSpec0, ServerSetting<*, *>>, Any?> = settings
 }
-context(builder: SettingsBuilder) public infix fun <SERIALIZABLE> Locationed<PathSpec0, ServerSetting<SERIALIZABLE, *>>.set(value: SERIALIZABLE) {
+context(builder: TestSettings) public infix fun <SERIALIZABLE> Locationed<PathSpec0, ServerSetting<SERIALIZABLE, *>>.set(value: SERIALIZABLE) {
     with(builder) { this@set set value }
+}
+context(builder: TestSettings) public infix fun <RESULT> Locationed<PathSpec0, ServerSetting<*, RESULT>>.setStatic(value: RESULT) {
+    with(builder) { this@setStatic setStatic value }
 }
 
 public class TestRunner<SD: ServerDefinition>(
     override val server: SD,
-    public val runSuspending: (suspend CoroutineScope.() -> Unit) -> Unit = { runBlocking { it(this) } },
-    public val settings: Map<Locationed<PathSpec0, ServerSetting<*, *>>, Any?>
+    public val settings: TestSettings,
 ) : ServerRunning {
     public constructor(
         server: SD,
-        runSuspending: (suspend CoroutineScope.() -> Unit) -> Unit = { runBlocking { it(this) } },
-        settings: context(SettingsBuilder) SD.() -> Unit
-    ): this(server, runSuspending, with(server) { SettingsBuilder().apply { settings() }.build() })
+        settings: context(TestSettings) SD.() -> Unit
+    ): this(server, with(server) { TestSettings().apply { settings() } })
 
 
     private val settingsCache = HashMap<Locationed<PathSpec0, ServerSetting<*, *>>, Any?>()
@@ -49,9 +43,11 @@ public class TestRunner<SD: ServerDefinition>(
     @Suppress("UNCHECKED_CAST")
     override fun <SERIALIZABLE, GOAL> Locationed<PathSpec0, ServerSetting<SERIALIZABLE, GOAL>>.invoke(): GOAL {
         return settingsCache.getOrPut(this) {
-            val value = settings.getValue(this) as SERIALIZABLE
-            val result: GOAL = this.item.getter(this@TestRunner, this.location.toString(), value)
-            result
+            (settings.goal[this] as? GOAL) ?: run {
+                val value = settings.serializable.getValue(this) as SERIALIZABLE
+                val result: GOAL = this.item.getter(this@TestRunner, this.location.toString(), value)
+                result
+            }
         } as GOAL
     }
 
@@ -68,7 +64,12 @@ public class TestRunner<SD: ServerDefinition>(
         public val request: WebSocketConnectRequest<PATH>,
         public var currentState: STORAGE
     ) {
+        public var onMessageSent: (frame: WebSocketFrame)->Unit = {}
         public val messages: MutableSharedFlow<WebSocketFrame> = MutableSharedFlow()
+        public suspend fun close() {
+            server.close(WebSocketClose.NORMAL)
+            server.clean()
+        }
 
         public suspend fun send(frame: WebSocketFrame) {
             handler.messageFromClient(server, frame)
@@ -105,29 +106,38 @@ public class TestRunner<SD: ServerDefinition>(
                 }
             }
 
+            private val topics = HashSet<WebSocketSubscriptionRequest<*, *>>()
             override suspend fun subscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-                subscriptions.getOrPut(topic) { ArrayList() }.add(sub)
+                if(topics.add(topic)) {
+                    subscriptions.getOrPut(topic) { ArrayList() }.add(sub)
+                }
             }
 
             override suspend fun unsubscribe(topic: WebSocketSubscriptionRequest<*, *>) {
-                subscriptions.getOrPut(topic) { ArrayList() }.remove(sub)
+                if(topics.remove(topic)) {
+                    subscriptions.getOrPut(topic) { ArrayList() }.remove(sub)
+                }
             }
 
             override suspend fun send(frame: WebSocketFrame) {
-                messages.emit(frame)
+                messages.tryEmit(frame)
+                onMessageSent(frame)
             }
 
             override suspend fun close(reason: WebSocketClose) {
                 handler.disconnect(this, reason)
             }
+
+            internal fun clean() {
+                for(topic in topics) {
+                    subscriptions[topic]?.remove(sub)
+                }
+                topics.clear()
+            }
         }
     }
 
 
-}
-
-context(test: TestRunner<*>) public fun runSuspending(action: suspend CoroutineScope.() -> Unit) {
-    test.runSuspending(action)
 }
 
 context(test: TestRunner<*>) public suspend fun <PATH: PathSpec, T> sendWebSocketSubscriptionMessage(message: WebSocketSubscriptionMessage<PATH, T>) {
@@ -143,6 +153,72 @@ context(test: TestRunner<*>) public suspend fun <STORAGE> Locationed<PathSpec0, 
 ): TestRunner<*>.TestWebSocket<PathSpec0, STORAGE> {
     val request = WebSocketConnectRequest(
         PathServer(this.location),
+        queryParameters = queryParameters,
+        headers = headers,
+        domain = domain,
+        protocol = protocol,
+        sourceIp = sourceIp,
+    )
+    val storage = item.willConnect(
+        test, request
+    )
+    return test.TestWebSocket(item, request, storage)
+}
+context(test: TestRunner<*>) public suspend fun <STORAGE, A> Locationed<PathSpec1<A>, WebSocketHandler<PathSpec1<A>, STORAGE>>.test(
+    path1: A,
+    queryParameters: List<Pair<String, String>> = listOf(),
+    headers: HttpHeaders = HttpHeaders.EMPTY,
+    domain: String = test.server.generalServerSettings().publicUrl.substringAfter("://").substringBefore("/"),
+    protocol: String = test.server.generalServerSettings().publicUrl.substringBefore("://"),
+    sourceIp: String = "local",
+): TestRunner<*>.TestWebSocket<PathSpec1<A>, STORAGE> {
+    val request = WebSocketConnectRequest(
+        PathServer(this.location, path1),
+        queryParameters = queryParameters,
+        headers = headers,
+        domain = domain,
+        protocol = protocol,
+        sourceIp = sourceIp,
+    )
+    val storage = item.willConnect(
+        test, request
+    )
+    return test.TestWebSocket(item, request, storage)
+}
+context(test: TestRunner<*>) public suspend fun <STORAGE, A, B> Locationed<PathSpec2<A, B>, WebSocketHandler<PathSpec2<A, B>, STORAGE>>.test(
+    path1: A,
+    path2: B,
+    queryParameters: List<Pair<String, String>> = listOf(),
+    headers: HttpHeaders = HttpHeaders.EMPTY,
+    domain: String = test.server.generalServerSettings().publicUrl.substringAfter("://").substringBefore("/"),
+    protocol: String = test.server.generalServerSettings().publicUrl.substringBefore("://"),
+    sourceIp: String = "local",
+): TestRunner<*>.TestWebSocket<PathSpec2<A, B>, STORAGE> {
+    val request = WebSocketConnectRequest(
+        PathServer(this.location, path1, path2),
+        queryParameters = queryParameters,
+        headers = headers,
+        domain = domain,
+        protocol = protocol,
+        sourceIp = sourceIp,
+    )
+    val storage = item.willConnect(
+        test, request
+    )
+    return test.TestWebSocket(item, request, storage)
+}
+context(test: TestRunner<*>) public suspend fun <STORAGE, A, B, C> Locationed<PathSpec3<A, B, C>, WebSocketHandler<PathSpec3<A, B, C>, STORAGE>>.test(
+    path1: A,
+    path2: B,
+    path3: C,
+    queryParameters: List<Pair<String, String>> = listOf(),
+    headers: HttpHeaders = HttpHeaders.EMPTY,
+    domain: String = test.server.generalServerSettings().publicUrl.substringAfter("://").substringBefore("/"),
+    protocol: String = test.server.generalServerSettings().publicUrl.substringBefore("://"),
+    sourceIp: String = "local",
+): TestRunner<*>.TestWebSocket<PathSpec3<A, B, C>, STORAGE> {
+    val request = WebSocketConnectRequest(
+        PathServer(this.location, path1, path2, path3),
         queryParameters = queryParameters,
         headers = headers,
         domain = domain,
