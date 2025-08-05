@@ -162,7 +162,9 @@ context(test: TestRunner<*>) public suspend fun <STORAGE> Locationed<PathSpec0, 
     val storage = item.willConnect(
         test, request
     )
-    return test.TestWebSocket(item, request, storage)
+    return test.TestWebSocket(item, request, storage).also {
+        item.didConnect(it.server)
+    }
 }
 context(test: TestRunner<*>) public suspend fun <STORAGE, A> Locationed<PathSpec1<A>, WebSocketHandler<PathSpec1<A>, STORAGE>>.test(
     path1: A,

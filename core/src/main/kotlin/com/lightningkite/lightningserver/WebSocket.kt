@@ -8,6 +8,9 @@ public class WebSocketTopic<PATH: PathSpec, T> internal constructor(
     public val pathSpec: PATH,
     public val type: KSerializer<T>
 ) {
+    override fun equals(other: Any?): Boolean = other is WebSocketTopic<*, *> && other.pathSpec == pathSpec
+    override fun hashCode(): Int = pathSpec.hashCode() + 1
+    override fun toString(): String = pathSpec.toString()
 }
 public fun <T> WebSocketTopic<PathSpec0, T>.request(): WebSocketSubscriptionRequest<PathSpec0, T> = WebSocketSubscriptionRequest(
     topic = this,

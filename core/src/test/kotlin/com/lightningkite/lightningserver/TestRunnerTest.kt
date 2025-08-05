@@ -17,13 +17,14 @@ class TestRunnerTest {
         val testEndpointWithArg = path.resolve("test").arg<String>("arg1").get bind httpHandler {
             HttpResponse.plainText("Hello, ${it.first}!")
         }
-        val testWebsocketTopic: WebSocketTopic<PathSpec0, String> = path.resolve("broadcast").topic(String.serializer())
+        val testWebsocketTopic = path.resolve("broadcast").topic(String.serializer())
         val testWebsocket = path.resolve("mirror") bind webSocketHandler(
             storageSerializer = Unit.serializer(),
             willConnect = { Unit },
             didConnect = { subscribe(testWebsocketTopic) },
             topicHandlers = {
                 testWebsocketTopic bind {
+                    println("Topic hit!")
                     send(WebSocketFrame(it.value))
                 }
             },
@@ -67,6 +68,8 @@ class TestRunnerTest {
                 }
                 socket.send(WebSocketFrame("Ping!"))
                 assertEquals(WebSocketFrame("Ping!"), lastMessage)
+                testWebsocketTopic.send("Pong.")
+                assertEquals(WebSocketFrame("Pong."), lastMessage)
                 socket.close()
             }
         }
