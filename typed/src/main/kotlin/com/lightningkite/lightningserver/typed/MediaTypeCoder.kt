@@ -2,8 +2,8 @@ package com.lightningkite.lightningserver.typed
 
 import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.WebSocketFrame
-import com.lightningkite.serviceabstractions.data.Data
-import com.lightningkite.serviceabstractions.data.TypedData
+import com.lightningkite.services.data.Data
+import com.lightningkite.services.data.TypedData
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import kotlinx.serialization.DeserializationStrategy

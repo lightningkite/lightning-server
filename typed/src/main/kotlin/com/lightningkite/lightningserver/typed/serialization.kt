@@ -4,7 +4,7 @@ import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.ServerDefinition
 import com.lightningkite.lightningserver.ServerRunning
-import com.lightningkite.serviceabstractions.data.TypedData
+import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerializationStrategy
 import kotlin.collections.List

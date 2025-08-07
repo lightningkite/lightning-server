@@ -182,7 +182,7 @@ public sealed class CronDays {
     public data class DaysOfWeek(val days: Set<CronDayOfWeek>) : CronDays()
 }
 
-public operator fun LocalDateTime.plus(pattern: CronPattern): LocalDateTime {
+public fun LocalDateTime.path(pattern: CronPattern): LocalDateTime {
     return LocalDateTime(year, month, dayOfMonth, hour, minute).makeValid(pattern)
 }
 

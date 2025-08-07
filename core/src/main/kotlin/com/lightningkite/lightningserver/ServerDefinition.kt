@@ -2,8 +2,8 @@ package com.lightningkite.lightningserver
 
 import com.lightningkite.MediaType
 import kotlinx.serialization.KSerializer
-import com.lightningkite.serviceabstractions.data.*
-import com.lightningkite.serviceabstractions.*
+import com.lightningkite.services.data.*
+import com.lightningkite.services.*
 
 
 public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerDefinitionBuilder<PathSpec0> {
@@ -17,7 +17,7 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
     public lateinit var httpException: (serverRunning: ServerRunning, Exception, HttpRequest<*>) -> HttpResponse
 
     public val httpInterceptors: List<HttpInterceptor> get() = _interceptors
-    private var _interceptors = listOf<HttpInterceptor>()
+    private var _interceptors = emptyList<HttpInterceptor>()
         set(value) {
             field = value
             // WARNING: This will melt your brain
@@ -47,7 +47,7 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
     private var _fullAction: HttpInterceptor = HttpInterceptor.None
 
     public val websocketInterceptors: List<WebSocketHandlerInterceptor> get() = _wsInterceptors
-    private var _wsInterceptors = listOf<WebSocketHandlerInterceptor>()
+    private var _wsInterceptors = emptyList<WebSocketHandlerInterceptor>()
         set(value) {
             field = value
             // WARNING: This will melt your brain
@@ -83,7 +83,7 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
     /**
      * The root path of the server.
      */
-    override val path: PathSpec0 = PathSpec0(listOf(), PathSpec.Afterwards.None)
+    override val path: PathSpec0 = PathSpec.root
 
     override fun <PATH : PathSpec> HttpEndpoint<PATH>.bind(other: HttpHandler<PATH>): Locationed<HttpEndpoint<PATH>, HttpHandler<PATH>> {
         return Locationed(
@@ -126,7 +126,7 @@ public abstract class ServerDefinition(allowIndexing: Boolean = false) : ServerD
     init {
         // global requirements
         if (allowIndexing) {
-            path.resolve("robots.txt").get bind httpHandler {
+            path.path("robots.txt").get bind httpHandler {
                 HttpResponse(
                     TypedData.text(
                         """
@@ -179,7 +179,7 @@ public fun <Setting, Result> ServerDefinitionBuilder<PathSpec0>.setting(
     optional: Boolean = false,
     description: String? = null,
     getter: ServerRunning.(Setting) -> Result,
-): Locationed<PathSpec0, ServerSetting<Setting, Result>> = path.resolve(name).setting(
+): Locationed<PathSpec0, ServerSetting<Setting, Result>> = path.path(name).setting(
     ServerSetting(
         default = default,
         serializer = serializer,
@@ -195,7 +195,7 @@ public fun <Setting> ServerDefinitionBuilder<PathSpec0>.setting(
     serializer: KSerializer<Setting>,
     optional: Boolean = false,
     description: String? = null,
-): Locationed<PathSpec0, ServerSetting<Setting, Setting>> = path.resolve(name).setting(
+): Locationed<PathSpec0, ServerSetting<Setting, Setting>> = path.path(name).setting(
     ServerSetting(
         default = default,
         serializer = serializer,
@@ -211,7 +211,7 @@ public inline fun <reified Setting, Result> ServerDefinitionBuilder<PathSpec0>.s
     optional: Boolean = false,
     description: String? = null,
     noinline getter: ServerRunning.(name: String, value: Setting) -> Result,
-): Locationed<PathSpec0, ServerSetting<Setting, Result>> = path.resolve(name).setting(
+): Locationed<PathSpec0, ServerSetting<Setting, Result>> = path.path(name).setting(
     ServerSetting(
         default = default,
         serializer = serializerOrContextual(),
@@ -226,7 +226,7 @@ public inline fun <reified S : Setting<Result>, Result> ServerDefinitionBuilder<
     default: S,
     optional: Boolean = false,
     description: String? = null,
-): Locationed<PathSpec0, ServerSetting<S, Result>> = path.resolve(name).setting(
+): Locationed<PathSpec0, ServerSetting<S, Result>> = path.path(name).setting(
     ServerSetting(
         default = default,
         serializer = serializerOrContextual(),
@@ -241,7 +241,7 @@ public inline fun <reified Setting> ServerDefinitionBuilder<PathSpec0>.setting(
     default: Setting,
     optional: Boolean = false,
     description: String? = null,
-): Locationed<PathSpec0, ServerSetting<Setting, Setting>> = path.resolve(name).setting(
+): Locationed<PathSpec0, ServerSetting<Setting, Setting>> = path.path(name).setting(
     ServerSetting(
         default = default,
         serializer = serializerOrContextual(),

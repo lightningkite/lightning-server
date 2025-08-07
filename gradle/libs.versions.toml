@@ -56,7 +56,7 @@ vanniktechMavenPublish = "0.34.0"
 webauthn4jCore = "0.29.4.RELEASE"
 xmlUtilJvm = "0.91.1"
 versionCatalogUpdate = "1.0.0"
-serviceAbstractions = "0.0.1-local"
+serviceAbstractions = "0.0.1-7"
 
 [libraries]
 androidDesugaring = { module = "com.android.tools:desugar_jdk_libs", version.ref = "androidDesugaring" }
@@ -141,10 +141,10 @@ serializationProperties = { module = "org.jetbrains.kotlinx:kotlinx-serializatio
 serializationProtobuf = { module = "org.jetbrains.kotlinx:kotlinx-serialization-protobuf", version.ref = "serializationLibs" }
 webauthn4jCore = { module = "com.webauthn4j:webauthn4j-core", version.ref = "webauthn4jCore" }
 xmlUtilJvm = { module = "io.github.pdvrieze.xmlutil:serialization-jvm", version.ref = "xmlUtilJvm" }
-serviceAbstractionsData = { module = "com.lightningkite.serviceabstractions:data", version.ref = "serviceAbstractions" }
-serviceAbstractionsSBSL = { module = "com.lightningkite.serviceabstractions:should-be-standard-library", version.ref = "serviceAbstractions" }
-serviceAbstractionsBasis = { module = "com.lightningkite.serviceabstractions:basis", version.ref = "serviceAbstractions" }
-serviceAbstractionsDatabase = { module = "com.lightningkite.serviceabstractions:database", version.ref = "serviceAbstractions" }
+serviceAbstractionsData = { module = "com.lightningkite.services:data", version.ref = "serviceAbstractions" }
+serviceAbstractionsSBSL = { module = "com.lightningkite.services:should-be-standard-library", version.ref = "serviceAbstractions" }
+serviceAbstractionsBasis = { module = "com.lightningkite.services:basis", version.ref = "serviceAbstractions" }
+serviceAbstractionsDatabase = { module = "com.lightningkite.services:database", version.ref = "serviceAbstractions" }
 
 [plugins]
 androidApp = { id = "com.android.application", version.ref = "agp" }

@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver
 
-import com.lightningkite.serviceabstractions.data.StringArrayFormat
+import com.lightningkite.services.data.StringArrayFormat
 import kotlinx.serialization.KSerializer
 
 

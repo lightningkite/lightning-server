@@ -11,14 +11,14 @@ class TestRunnerTest {
         override val externalSerialization: Serialization = Serialization()
         override val internalSerialization: Serialization = Serialization()
 
-        val testEndpoint = path.resolve("test").get bind httpHandler {
+        val testEndpoint = path.path("test").get bind httpHandler {
             HttpResponse.plainText("Hello world!")
         }
-        val testEndpointWithArg = path.resolve("test").arg<String>("arg1").get bind httpHandler {
+        val testEndpointWithArg = path.path("test").arg<String>("arg1").get bind httpHandler {
             HttpResponse.plainText("Hello, ${it.first}!")
         }
-        val testWebsocketTopic = path.resolve("broadcast").topic(String.serializer())
-        val testWebsocket = path.resolve("mirror") bind webSocketHandler(
+        val testWebsocketTopic = (path.path("broadcast")).topic(String.serializer())
+        val testWebsocket = path.path("mirror") bind webSocketHandler(
             storageSerializer = Unit.serializer(),
             willConnect = { Unit },
             didConnect = { subscribe(testWebsocketTopic) },
@@ -53,12 +53,12 @@ class TestRunnerTest {
             runBlocking {
                 val response = testEndpoint.test()
                 assertEquals(HttpStatus.OK, response.status)
-                assertEquals("Hello world!", response.body!!.text())
+                assertEquals("Hello world!", response.body!!.text)
             }
             runBlocking {
                 val response = testEndpointWithArg.test("Todd")
                 assertEquals(HttpStatus.OK, response.status)
-                assertEquals("Hello, Todd!", response.body!!.text())
+                assertEquals("Hello, Todd!", response.body!!.text)
             }
             runBlocking {
                 val socket = testWebsocket.test()

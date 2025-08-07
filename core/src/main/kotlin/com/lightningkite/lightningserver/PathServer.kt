@@ -8,15 +8,6 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-context(server: ServerRunning)
-internal val PathServer<*>.match: PathSpecMap.Match<ServerPathHandlers> get(){
-    if(this.matchIfPresent == null) {
-        this.matchIfPresent =
-            server.server.handlers.match(server.server.externalSerialization.stringArrayFormat, asString)
-    }
-    return this.matchIfPresent!!
-}
-
 public class PathSerializer<T: PathSpec>(ignored: KSerializer<T>) : KSerializer<PathServer<T>> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("com.lightningkite.lightningserver.Path", PrimitiveKind.STRING)
 
@@ -87,7 +78,17 @@ public class PathServer<PATH: PathSpec>(
     context(server: ServerRunning)
     override val resolvable: PathSpecResolvable<PATH> get() = match as PathSpecResolvable<PATH>
 
-    internal var matchIfPresent: PathSpecMap.Match<ServerPathHandlers>? = null
+    private var matchIfPresent: PathSpecMap.Match<ServerPathHandlers>? = null
+
+    context(server: ServerRunning)
+    public val match: PathSpecMap.Match<ServerPathHandlers> get() {
+        if(this.matchIfPresent == null) {
+            this.matchIfPresent =
+                server.server.handlers.match(server.server.externalSerialization.stringArrayFormat, asString)
+        }
+        return this.matchIfPresent!!
+    }
+
 
     public constructor(
         asString: String,

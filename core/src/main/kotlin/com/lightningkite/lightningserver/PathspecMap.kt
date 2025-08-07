@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver
 
-import com.lightningkite.serviceabstractions.data.StringArrayFormat
+import com.lightningkite.services.data.StringArrayFormat
 
 public interface PathSpecMap<out V> {
     public operator fun get(path: PathSpec): V?
@@ -124,8 +124,7 @@ public class MutablePathSpecMap<V>(): PathSpecMap<V> {
     public override fun match(format: StringArrayFormat, pathParts: List<String>, endingSlash: Boolean): PathSpecMap.Match<V>? {
         if (pathParts.isEmpty())
             return (root.path ?: root.trailingSlash ?: root.chainedWildcard)?.let {
-                @Suppress("UNCHECKED_CAST")
-                PathSpecMap.Match<V>(PathSpec.root as PathSpec, listOf(), if (it.after == PathSpec.Afterwards.TrailingSegments) listOf() else null, root[it.after])
+                PathSpecMap.Match<V>(PathSpec.root, listOf(), if (it.after == PathSpec.Afterwards.TrailingSegments) listOf() else null, root[it.after])
             }
 
         val wildcards = ArrayList<String>()

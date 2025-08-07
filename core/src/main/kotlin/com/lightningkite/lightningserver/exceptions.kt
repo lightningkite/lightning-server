@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver
 
 import com.lightningkite.MediaType
-import com.lightningkite.serviceabstractions.data.TypedData
+import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.Serializable
 import kotlin.code
 import kotlin.toString

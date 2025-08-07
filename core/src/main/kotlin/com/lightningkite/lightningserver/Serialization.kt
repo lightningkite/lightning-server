@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver
 
-import com.lightningkite.serviceabstractions.data.KotlinBytesFormat
-import com.lightningkite.serviceabstractions.data.StringArrayFormat
+import com.lightningkite.services.data.KotlinBytesFormat
+import com.lightningkite.services.data.StringArrayFormat
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule

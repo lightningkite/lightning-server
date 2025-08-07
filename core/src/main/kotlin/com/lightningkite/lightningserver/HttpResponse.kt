@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver
 
-import com.lightningkite.serviceabstractions.data.TypedData
+import com.lightningkite.services.data.TypedData
 
 public data class HttpResponse(
     public val body: TypedData? = null,

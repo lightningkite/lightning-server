@@ -25,7 +25,7 @@ public class KeyedSerializableCache {
     internal var cacheUpdated: Boolean = false
         private set
     internal var serverRunning: ServerRunning? = null
-    public suspend fun <T> get(serverRunning: ServerRunning, request: Request<*>, key: Key<T>): T {
+    internal suspend fun <T> get(serverRunning: ServerRunning, request: Request<*>, key: Key<T>): T {
         this.serverRunning = serverRunning
         @Suppress("UNCHECKED_CAST")
         if (cache.containsKey(key)) return cache[key] as T

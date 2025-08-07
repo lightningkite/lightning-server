@@ -3,9 +3,9 @@ package com.lightningkite.lightningserver.typed
 import com.lightningkite.MediaType
 import com.lightningkite.lightningserver.BadRequestException
 import com.lightningkite.lightningserver.ServerDefinition
-import com.lightningkite.serviceabstractions.data.ValidationIssue
-import com.lightningkite.serviceabstractions.data.Validators
-import com.lightningkite.serviceabstractions.data.validate
+import com.lightningkite.services.data.ValidationIssue
+import com.lightningkite.services.data.Validators
+import com.lightningkite.services.data.validate
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.json.Json
 

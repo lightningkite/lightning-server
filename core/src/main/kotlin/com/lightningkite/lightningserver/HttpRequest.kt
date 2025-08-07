@@ -1,6 +1,6 @@
 package com.lightningkite.lightningserver
 
-import com.lightningkite.serviceabstractions.data.TypedData
+import com.lightningkite.services.data.TypedData
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 

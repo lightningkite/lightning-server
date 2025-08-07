@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver
 
 import com.lightningkite.MediaType
-import com.lightningkite.serviceabstractions.data.TypedData
+import com.lightningkite.services.data.TypedData
 import kotlinx.html.HTML
 import kotlinx.html.html
 import kotlinx.html.stream.appendHTML

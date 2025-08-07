@@ -1,7 +1,7 @@
 package com.lightningkite.lightningserver
 
-import com.lightningkite.serviceabstractions.MetricSink
-import com.lightningkite.serviceabstractions.SettingContext
+import com.lightningkite.services.MetricSink
+import com.lightningkite.services.SettingContext
 import kotlinx.serialization.modules.SerializersModule
 
 public fun ServerRunning.settingContext(name: String): SettingContext = object: SettingContext {
